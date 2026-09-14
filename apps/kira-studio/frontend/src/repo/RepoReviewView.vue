@@ -49,7 +49,9 @@ onMounted(() => void mountReview());
 
 // Only fires on workspace close (RepoPanel.vue keeps this component alive with v-show for a mere
 // segment switch, §8.4) — the transport itself is cached per repo workspace and outlives this
-// regardless (gitTransportFor, disposed by state/workspace.ts's own close path, C10 S17).
+// regardless (gitTransportFor, disposed by state/workspace.ts's own close path, C10 S17). This
+// view's own transport is a lease (P67b §2.1): its dispose() on unmount releases only this
+// mount's subscriptions, so it can no longer take the graph tab's transport down with it.
 onUnmounted(() => {
   handle?.unmount();
   handle = null;

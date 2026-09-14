@@ -10,6 +10,8 @@ import {
 // in is enough to drive onmessage/onclose the same way a real WailsSocket would.
 class MockSocket implements StreamSocketLike {
   binaryType = 'arraybuffer';
+  // 0 = CONNECTING, 1 = OPEN — matches WebSocket/WailsSocket's own readyState values (P67b §3.2).
+  readyState = 0;
   onopen: (() => void) | null = null;
   // biome-ignore lint/suspicious/noExplicitAny: matches StreamSocketLike's own cross-project escape hatch.
   onmessage: ((ev: any) => void) | null = null;
@@ -34,6 +36,12 @@ class MockSocket implements StreamSocketLike {
   /** Test-only: deliver one message as this socket's peer would. */
   deliver(data: ArrayBuffer): void {
     this.onmessage?.({ data });
+  }
+
+  /** Test-only: transition CONNECTING -> OPEN and fire onopen, as a real socket's open event would. */
+  open(): void {
+    this.readyState = 1;
+    this.onopen?.();
   }
 }
 
@@ -136,10 +144,62 @@ test('closes and reports MalformedBlobFrameError when the header carries two $bl
 test('post JSON-stringifies and sends, never encoding a blob', () => {
   const socket = new MockSocket();
   const channel = createStreamChannel(socket);
+  socket.open();
 
   channel.post({ id: 1, method: 'graph.status' });
 
   expect(socket.sent).toEqual([JSON.stringify({ id: 1, method: 'graph.status' })]);
+});
+
+test('post before onopen queues, then flushes in order once onopen fires', () => {
+  const socket = new MockSocket();
+  const channel = createStreamChannel(socket);
+
+  channel.post({ id: 1, method: 'app.init' });
+  channel.post({ id: 2, method: 'graph.status' });
+  expect(socket.sent).toEqual([]);
+
+  socket.open();
+
+  expect(socket.sent).toEqual([
+    JSON.stringify({ id: 1, method: 'app.init' }),
+    JSON.stringify({ id: 2, method: 'graph.status' }),
+  ]);
+});
+
+test('post after onopen sends immediately', () => {
+  const socket = new MockSocket();
+  const channel = createStreamChannel(socket);
+  socket.open();
+
+  channel.post({ id: 1, method: 'graph.status' });
+
+  expect(socket.sent).toEqual([JSON.stringify({ id: 1, method: 'graph.status' })]);
+});
+
+test('a socket already OPEN when wrapped sends immediately, with no onopen needed', () => {
+  const socket = new MockSocket();
+  socket.readyState = 1; // already open before createStreamChannel ever sees it
+  const channel = createStreamChannel(socket);
+
+  channel.post({ id: 1, method: 'graph.status' });
+
+  expect(socket.sent).toEqual([JSON.stringify({ id: 1, method: 'graph.status' })]);
+});
+
+test('post after onclose sends nothing, does not throw, and drops the queue', () => {
+  const socket = new MockSocket();
+  const channel = createStreamChannel(socket);
+  channel.onMessage(() => undefined);
+
+  channel.post({ id: 1, method: 'queued.before.close' }); // still CONNECTING: queued, not sent
+  socket.onclose?.(undefined);
+
+  expect(() => channel.post({ id: 2, method: 'post.after.close' })).not.toThrow();
+  expect(socket.sent).toEqual([]);
+
+  socket.open();
+  expect(socket.sent).toEqual([]); // the queue was dropped on close, not flushed by a late onopen
 });
 
 test('sets binaryType to arraybuffer so inbound frames are never delivered as a Blob', () => {

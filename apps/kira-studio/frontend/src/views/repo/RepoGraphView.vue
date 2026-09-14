@@ -3,7 +3,9 @@
 // wholesale with the real @kira/git-ui graph mount, read-only (docs/v1.5/plans/
 // C10-git-graph-native.md) — modelled on RepoDiffView.vue's own mount lifecycle: mount() on
 // onMounted, unmount() on onUnmounted (a mere tab switch away, not a workspace close — the
-// transport itself outlives that, cached per repo workspace by gitTransportFor, S17 disposes it).
+// transport itself outlives that, cached per repo workspace by gitTransportFor, S17 disposes it;
+// each mount holds its own lease over that shared transport, P67b §2.1 — so this mount's own
+// unmount/dispose never tears down the graph tab's peers).
 import type { MountHandle } from '@kira/git-ui';
 import type { RepoGraphTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
@@ -58,6 +60,8 @@ onMounted(() => void mountGraph());
 // A mere tab switch away, not a workspace close — git-ui's own AppRoot/App.vue instance is torn
 // down (this is what ViewStateStore exists for, §8), but the transport itself is cached per repo
 // workspace (gitTransportFor) and outlives it; only closing the workspace disposes it (S17).
+// This mount's own transport is a lease (P67b §2.1) — its dispose(), triggered by App.vue's own
+// teardown chain on unmount, releases only this mount's subscriptions, never the shared socket.
 onUnmounted(() => {
   handle?.unmount();
   handle = null;

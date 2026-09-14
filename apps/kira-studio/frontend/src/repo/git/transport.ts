@@ -188,28 +188,93 @@ function createNativeGitTransport(codeRepoId: string): Transport {
   };
 }
 
-const transportsByCodeRepoId = new Map<string, Transport>();
-
-/** One transport per repo workspace (§8), cached across mount/unmount of the pinned graph tab —
- *  a tab switch unmounts `RepoGraphView.vue` (C5), and a cold remount must reuse the SAME
- *  transport rather than opening a second stream and losing whatever repo hold the first one
- *  took. Disposed only when the workspace itself closes (`state/workspace.ts`, S17), never on a
- *  mere tab-hide. */
-export function gitTransportFor(codeRepoId: string): Transport {
-  let transport = transportsByCodeRepoId.get(codeRepoId);
-  if (!transport) {
-    transport = createNativeGitTransport(codeRepoId);
-    transportsByCodeRepoId.set(codeRepoId, transport);
+/** An `AbortController` that aborts as soon as either input signal does. Not `AbortSignal.any` —
+ *  this repo does not rely on it anywhere else, and this is the phase's only use. */
+function linkAbort(a: AbortSignal, b?: AbortSignal): AbortSignal {
+  if (!b) return a;
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  if (a.aborted || b.aborted) {
+    controller.abort();
+  } else {
+    a.addEventListener('abort', onAbort, { once: true });
+    b.addEventListener('abort', onAbort, { once: true });
   }
-  return transport;
+  return controller.signal;
+}
+
+/** One real client per repo workspace, plus every outstanding lease on it (P67b §2.1). */
+interface SharedClient {
+  readonly transport: Transport;
+  readonly leases: Set<Transport>;
+}
+
+/** A fresh view onto `shared.transport` per `gitTransportFor` call. `request` is deliberately
+ *  untracked — an orphaned response from a departed mount resolves into a dead closure, exactly
+ *  as it already does today for call sites (`RepoDiffView.vue`, `RepoFileView.vue`) that never
+ *  dispose anything. `on` and `stream` ARE tracked, so a departed mount's subscriptions and
+ *  long-lived streams (`graph.stream`) actually stop instead of quietly leaking. `dispose()`
+ *  releases only this lease's own registrations and NEVER closes the underlying socket — that is
+ *  `disposeGitTransport`'s job alone. */
+function leaseOf(shared: SharedClient): Transport {
+  const unsubs = new Set<() => void>();
+  const streams = new AbortController();
+  let released = false;
+  const lease: Transport = {
+    request(method, params, signal) {
+      return shared.transport.request(method, params, signal);
+    },
+    on(method, handler) {
+      if (released) return () => {};
+      const off = shared.transport.on(method, handler);
+      unsubs.add(off);
+      return () => {
+        unsubs.delete(off);
+        off();
+      };
+    },
+    stream(method, params, onChunk, signal) {
+      return shared.transport.stream(method, params, onChunk, linkAbort(streams.signal, signal));
+    },
+    dispose(): void {
+      if (released) return;
+      released = true;
+      for (const off of unsubs) off();
+      unsubs.clear();
+      streams.abort();
+      shared.leases.delete(lease);
+    },
+  };
+  shared.leases.add(lease);
+  return lease;
+}
+
+const sharedClientsByCodeRepoId = new Map<string, SharedClient>();
+
+/** One transport LEASE per call (§2.1), over one shared client per repo workspace — cached across
+ *  mount/unmount of the pinned graph tab, so a cold remount reuses the same underlying stream
+ *  rather than opening a second one and losing whatever repo hold the first took. Never returns
+ *  the same object twice: each caller (`RepoGraphView.vue`, `RepoReviewView.vue`,
+ *  `RepoDiffView.vue`, `RepoFileView.vue`) gets its own lease, so one mount tearing its lease down
+ *  on unmount no longer kills every other mount sharing the workspace. The shared client itself is
+ *  disposed only when the workspace closes (`state/workspace.ts`, S17), never on a mere tab-hide. */
+export function gitTransportFor(codeRepoId: string): Transport {
+  let shared = sharedClientsByCodeRepoId.get(codeRepoId);
+  if (!shared) {
+    shared = { transport: createNativeGitTransport(codeRepoId), leases: new Set() };
+    sharedClientsByCodeRepoId.set(codeRepoId, shared);
+  }
+  return leaseOf(shared);
 }
 
 /** S17: called from the repo workspace's own close path. A no-op for a workspace whose graph tab
- *  was never mounted (no transport was ever created). */
+ *  was never mounted (no shared client was ever created). Disposes every outstanding lease first,
+ *  then the shared client — so a workspace close still ends in exactly one `channel.close()`. */
 export function disposeGitTransport(codeRepoId: string): void {
-  const transport = transportsByCodeRepoId.get(codeRepoId);
-  if (!transport) return;
-  transportsByCodeRepoId.delete(codeRepoId);
+  const shared = sharedClientsByCodeRepoId.get(codeRepoId);
+  if (!shared) return;
+  sharedClientsByCodeRepoId.delete(codeRepoId);
   localEmittersByCodeRepoId.delete(codeRepoId);
-  transport.dispose();
+  for (const lease of [...shared.leases]) lease.dispose();
+  shared.transport.dispose();
 }

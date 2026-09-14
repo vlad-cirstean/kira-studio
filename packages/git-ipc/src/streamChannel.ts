@@ -41,6 +41,9 @@ export { MalformedBlobFrameError };
  */
 export interface StreamSocketLike {
   binaryType: string;
+  // Optional: a structural implementer that never exposes readyState (none does today) is treated
+  // as CONNECTING until its own onopen fires — see createStreamChannel's open-ack gate (P67b §3.1).
+  readonly readyState?: number;
   // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
   onopen: ((ev: any) => void) | null;
   // biome-ignore lint/suspicious/noExplicitAny: cross-project structural type — see interface doc above.
@@ -80,6 +83,11 @@ function decodeFrame(data: ArrayBuffer): unknown {
   return JSON.parse(new TextDecoder('utf-8').decode(bytes));
 }
 
+// A Wails/DOM socket's readyState for OPEN — checked defensively (P67b §3.1) so a socket that is
+// already open by the time it reaches this function (nothing does this today) is not stranded
+// waiting for an onopen that already fired.
+const SOCKET_OPEN = 1;
+
 export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
   socket.binaryType = 'arraybuffer';
 
@@ -89,6 +97,21 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
   function fireClose(err?: Error): void {
     for (const handler of [...closeHandlers]) handler(err);
   }
+
+  // P67b §3.1 (bug 2): `Stream()` returns a socket in the CONNECTING state, and Wails' own
+  // `send()` throws on a CONNECTING socket rather than queueing — `post` must stay synchronous
+  // (rpc.ts calls it from inside a Promise executor and from the credit path) so this is a FIFO
+  // queue, not a promise chain, preserving frame order relative to credit/cancel.
+  let phase: 'connecting' | 'open' | 'closed' =
+    socket.readyState === SOCKET_OPEN ? 'open' : 'connecting';
+  const queued: string[] = [];
+
+  socket.onopen = () => {
+    if (phase !== 'connecting') return;
+    phase = 'open';
+    for (const frame of queued) socket.send(frame);
+    queued.length = 0;
+  };
 
   socket.onmessage = (ev: { data: ArrayBuffer }) => {
     let message: unknown;
@@ -105,7 +128,11 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
     // has exactly one subscriber for its whole life — there is no resubscribe-across-an-await gap
     // to lose a frame in.
   };
-  socket.onclose = () => fireClose();
+  socket.onclose = () => {
+    phase = 'closed';
+    queued.length = 0;
+    fireClose();
+  };
   socket.onerror = () => {
     // An `error` event on a Wails/DOM socket is always followed by `close` — teardown lives in
     // onclose alone, the same posture `port.ts`'s own `socket.onerror` already takes.
@@ -115,7 +142,11 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
     bufferEncoding: 'native',
 
     post(message): void {
-      socket.send(JSON.stringify(message));
+      const frame = JSON.stringify(message);
+      if (phase === 'open') socket.send(frame);
+      else if (phase === 'connecting') queued.push(frame);
+      // 'closed': dropped — the peer is gone; onclose has already fired and the client has
+      // already rejected its pending requests.
     },
 
     onMessage(handler): () => void {
