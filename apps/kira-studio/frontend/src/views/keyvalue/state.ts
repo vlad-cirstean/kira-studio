@@ -27,6 +27,19 @@ export interface KeyValueViewRuntime {
   nextToken: string | null;
   prevToken: string | null;
   searchOpen: boolean;
+  /** P63 §2.2: lifted out of KeyValueView.vue's own local refs — the split's own KeyValuePane.vue
+   *  (a row's context menu) and KeyValueView.vue's toolbar/strips (the popover, the "Unsaved
+   *  changes" banner) both read and write these, so they can no longer be component-local state.
+   *  `editOpen`/`editDraft`/`editError`/`editSaving`: the string-value edit popover. */
+  editOpen: boolean;
+  editDraft: string;
+  editError: string | null;
+  editSaving: boolean;
+  /** The S3 object body's staged (not-yet-saved) edit — set by a row click's cell-editor onEdit,
+   *  shown and saved from the strips' own banner. */
+  objectDraft: string | null;
+  objectSaving: boolean;
+  objectSaveError: string | null;
 }
 
 function defaultRuntime(): KeyValueViewRuntime {
@@ -42,6 +55,13 @@ function defaultRuntime(): KeyValueViewRuntime {
     nextToken: null,
     prevToken: null,
     searchOpen: false,
+    editOpen: false,
+    editDraft: '',
+    editError: null,
+    editSaving: false,
+    objectDraft: null,
+    objectSaving: false,
+    objectSaveError: null,
   };
 }
 
