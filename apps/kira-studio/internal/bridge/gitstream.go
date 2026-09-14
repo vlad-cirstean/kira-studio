@@ -44,11 +44,12 @@ func newStreamConnID() gitsession.ConnID {
 // default, which is the failure mode this file exists to prevent (docs/v1.5/plans/
 // C10-git-graph-native.md §4.2).
 //
-// P67e relaxed this stream from "read-only" to "admits every operation that writes through git
-// itself" — the native window is a writing git client (fetch/pull/push/force-push, merge and
-// rebase as pull strategies, undo, restack, stash, worktree add/remove, and the sequencer verbs a
-// conflict needs to carry on). Of the 55 methods internal/gitrpc's Router.ForConn dispatches,
-// exactly three stay refused here, each for a reason this allowlist cannot admit around:
+// P67e relaxed this stream's own posture from refusing every repository write to admitting every
+// operation that writes through git itself — the native window is a writing git client (fetch/
+// pull/push/force-push, merge and rebase as pull strategies, undo, restack, stash, worktree add/
+// remove, and the sequencer verbs a conflict needs to carry on). Of the 55 methods
+// internal/gitrpc's Router.ForConn dispatches, exactly three stay refused here, each for a reason
+// this allowlist cannot admit around:
 //
 //   - worktree.prepare/worktree.cancelPrepare — RunPrepare executes a user-stored shell command
 //     with no human-approval gate anywhere in this codebase (its only check is "does this match
@@ -68,7 +69,7 @@ func newStreamConnID() gitsession.ConnID {
 // review.db, a second SQLite file under KIRA_HOME (gitreview/db.go) — internal/gitreview has no
 // exec.Command, no os.WriteFile and no git invocation of any kind; its only writes are
 // INSERT/UPDATE/DELETE against review_session/review_file/review_range/review_comment. The git
-// work these handlers do perform is read-only porcelain (cat-file, merge-base --is-ancestor,
+// work these handlers do perform is non-mutating porcelain (cat-file, merge-base --is-ancestor,
 // diff) — no update-index, no write-tree, no commit-tree, no ref update, no working-tree write,
 // anywhere in the review path. This is the same shape as repoSettings.set below: a name that says
 // "write" whose writes land in Kira's own storage, never the user's repository.
@@ -118,7 +119,7 @@ var allowedMethods = map[string]struct{}{
 	// cherryPick/stashPop/stashBranch/worktreeAdd/worktreeRemove and the sequencer verbs
 	// (continue/skip/abort) a conflict needs to carry on; remote.run covers fetch/push/forcePush/
 	// deleteRemoteBranch/pull (pull's own strategy — ff-only/merge/rebase — is the only merge or
-	// rebase this stack has anywhere, §7 of docs/v1.6/plans/P67e-git-relax-read-only.md).
+	// rebase this stack has anywhere, per P67e's own plan doc §7, docs/v1.6/plans/).
 	// credential.provide answers git's own askpass prompt for this stream's own remote op
 	// (gitCredential.ts/GitCredentialDialog.vue) — the native window now owns the connection the
 	// prompt is for, so it is the one that must be able to answer it.
@@ -202,11 +203,11 @@ func allowedStream(next streamFn) streamFn {
 // repo.changed and, since P67e, credential.request.
 func ServeGitStream(router *gitrpc.Router, conn StreamSession) {
 	gconn := gitsession.NewConn(newStreamConnID(), nativeClientID, nativeLabel, nil)
-	// P67e/D5: still opted out, but no longer because the surface is read-only — a periodic
+	// P67e/D5: still opted out, but no longer because writes were refused here — a periodic
 	// background `git fetch --prune` is a network write the user never pressed a button for, and
-	// every fetch this phase admits is one they did (docs/v1.6/plans/P67e-git-relax-read-only.md
-	// §9 OQ-2). One deleted line whenever someone actually wants automatic background fetching for
-	// this Conn (unaffected: only this Conn opts out, not RepoEntry.EnsureAutoFetch itself, so an
+	// every fetch this phase admits is one they did (P67e's own plan doc §9 OQ-2, docs/v1.6/plans/).
+	// One deleted line whenever someone actually wants automatic background fetching for this Conn
+	// (unaffected: only this Conn opts out, not RepoEntry.EnsureAutoFetch itself, so an
 	// already-paired VS Code extension window opening the identical repository still arms it).
 	gconn.DisableAutoFetch()
 	defer gconn.Close()
