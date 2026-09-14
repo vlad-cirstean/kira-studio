@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import { fileIconStyle } from './fileIcon';
 import type { RepoSearchRowVm } from './state/search';
 
 // C7 §7.3: one flat row component for both shapes the store's own row fold produces — a file
@@ -64,7 +65,7 @@ function onDblClick(): void {
     >
       <CodiconIcon :name="row.collapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
     </button>
-    <CodiconIcon name="file" :size="13" class="node-icon" />
+    <span class="node-icon" :style="fileIconStyle(row.path)" aria-hidden="true"></span>
     <span class="label" v-tooltip="row.path">{{ fileName }}</span>
     <span class="p-xs dim match-count" data-testid="repo-search-match-count">{{
       row.matchCount
@@ -134,9 +135,18 @@ function onDblClick(): void {
   padding: 0;
 }
 
+/* P67b §6.2: matches RepoTreeRow.vue's own rule — a real per-language icon here too, rather than
+   the tree gaining per-language icons while search keeps one generic glyph. */
 .node-icon {
   flex-shrink: 0;
-  color: var(--kira-fg-muted);
+  width: 16px;
+  height: 16px;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 .label {

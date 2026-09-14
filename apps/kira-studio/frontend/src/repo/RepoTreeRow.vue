@@ -1,57 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import { fileIconStyle } from './fileIcon';
 import type { RepoTreeRowVm } from './state/fileTree';
-
-// §7.2: "Icons come from CodiconIcon with a small extension map ... not a new icon dependency" —
-// five buckets, independent of views/repo/language.ts's own ~20-id Monaco language map (a
-// different purpose: coloring coverage vs. a glance-icon).
-const IMAGE_EXTENSIONS = new Set([
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'svg',
-  'webp',
-  'bmp',
-  'ico',
-  'avif',
-]);
-const CODE_EXTENSIONS = new Set([
-  'ts',
-  'tsx',
-  'js',
-  'jsx',
-  'mjs',
-  'cjs',
-  'go',
-  'rs',
-  'py',
-  'java',
-  'c',
-  'h',
-  'cpp',
-  'hpp',
-  'vue',
-  'svelte',
-  'html',
-  'css',
-  'scss',
-  'less',
-  'sh',
-  'bash',
-  'sql',
-  'yaml',
-  'yml',
-  'toml',
-  'proto',
-  'graphql',
-]);
-
-function extOf(name: string): string {
-  const i = name.lastIndexOf('.');
-  return i < 0 ? '' : name.slice(i + 1).toLowerCase();
-}
 
 const props = withDefaults(
   defineProps<{ row: RepoTreeRowVm; selected: boolean; sticky?: boolean }>(),
@@ -66,15 +17,9 @@ const emit = defineEmits<{
   contextmenu: [row: RepoTreeRowVm, event: MouseEvent];
 }>();
 
-const icon = computed(() => {
-  if (props.row.isDir) return props.row.expanded ? 'folder-opened' : 'folder';
-  const ext = extOf(props.row.name);
-  if (ext === 'json' || ext === 'jsonc') return 'json';
-  if (ext === 'md' || ext === 'markdown') return 'markdown';
-  if (IMAGE_EXTENSIONS.has(ext)) return 'file-media';
-  if (CODE_EXTENSIONS.has(ext)) return 'file-code';
-  return 'file';
-});
+// P67b §6.2: directories keep their folder glyph (OQ-3 — the diff tree has no directory-icon rule
+// to port, so none is invented here). A file's own icon comes from fileIconStyle below instead.
+const dirIcon = computed(() => (props.row.expanded ? 'folder-opened' : 'folder'));
 
 // §7.1's four-value status glyph — 'M'/'A' amber-ish/green-ish, 'D' struck, '?' muted, matching
 // the connection tree's own status-color convention (a data attribute the stylesheet keys off).
@@ -124,7 +69,8 @@ function onContextMenu(e: MouseEvent): void {
     >
       <CodiconIcon :name="row.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
     </button>
-    <CodiconIcon :name="icon" :size="13" class="node-icon" />
+    <CodiconIcon v-if="row.isDir" :name="dirIcon" :size="16" class="node-icon" />
+    <span v-else class="node-icon" :style="fileIconStyle(row.path)" aria-hidden="true"></span>
     <span class="label" v-tooltip="row.name">{{ row.name }}</span>
   </div>
 </template>
@@ -169,9 +115,20 @@ function onContextMenu(e: MouseEvent): void {
   visibility: hidden;
 }
 
+/* P67b §6.2: 16x16, matching VS Code's own explorer icon box (FileTree.vue's own
+   .kv-file-tree-icon, ported verbatim) — was a bare 13px codicon glyph with no box at all. The
+   mask-* rules are inert for the directory glyph (a codicon <i>, not a CSS mask) but harmless. */
 .node-icon {
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
   color: var(--kira-fg-muted);
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 .label {
