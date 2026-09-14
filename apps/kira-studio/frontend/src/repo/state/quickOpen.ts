@@ -105,8 +105,16 @@ export function openQuickOpen(): void {
   ensureRepoTreeLoaded(repoId);
 }
 
+// C14-8: the fuzzysort snapshot is a large per-repo allocation (~110-150MB measured on a big repo)
+// that used to live for the whole workspace's lifetime once the palette had been opened once, even
+// after closing it -- three large open repos could hold ~350MB idle for a feature used in bursts.
+// Evicting on close trades that for one rebuild the next time the palette opens (15-26ms measured,
+// negligible against the memory freed) -- ensureSnapshot already rebuilds transparently on demand,
+// keyed off `paths`' own reference identity, so this needs no other change.
 export function closeQuickOpen(): void {
+  const repoId = quickOpenState.repoId;
   quickOpenState.open = false;
+  if (repoId) snapshotCache.delete(repoId);
 }
 
 /** True while `openQuickOpen`'s own tree load for the open repo hasn't resolved yet. */
