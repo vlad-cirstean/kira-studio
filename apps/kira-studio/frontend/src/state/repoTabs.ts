@@ -135,6 +135,7 @@ export function openRepoReviewDiffTab(
     return (
       diff !== null &&
       diff.state.review !== null &&
+      diff.state.review.branch === review.branch &&
       diff.state.left === left &&
       diff.state.right === right
     );
