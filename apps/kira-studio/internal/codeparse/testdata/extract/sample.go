@@ -45,3 +45,29 @@ func helper2() {
 	_ = localConst
 	_ = localVar
 }
+
+// P67f: a package-level map, read via range and index (§3.2's new "read" reference kind).
+var allowedMethods = map[string]struct{}{"GET": {}}
+
+// P67f: a nested map, proving a nested subscript resolves to the outermost identifier only.
+var nested = map[string]map[string]int{}
+
+type container struct {
+	m     map[string]int
+	items []int
+}
+
+var c container
+
+// P67f: exercises range_clause/index_expression reads plus the two "no row" cases (§5.3): a
+// range over a selector (c.items) and an index whose operand is a selector (c.m[...]).
+func helper3() {
+	for k := range allowedMethods {
+		_ = k
+	}
+	_ = allowedMethods["GET"]
+	for range c.items {
+	}
+	_ = c.m["x"]
+	_ = nested["a"]["b"]
+}

@@ -6,7 +6,7 @@ CREATE TABLE reference (
   file_id    INTEGER NOT NULL REFERENCES file(id) ON DELETE CASCADE,
   repo_id    TEXT    NOT NULL,
   block_id   INTEGER REFERENCES file_block(id) ON DELETE CASCADE,
-  kind       TEXT    NOT NULL,   -- 'call' | 'type' | 'implementation' | 'import' | 'class'
+  kind       TEXT    NOT NULL,   -- 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read'
   name       TEXT    NOT NULL,
   start_byte INTEGER NOT NULL,
   end_byte   INTEGER NOT NULL,

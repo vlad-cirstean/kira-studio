@@ -150,8 +150,14 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			// block (exercises var_spec_list, §1.3), a single var and a single const, and one
 			// const plus one var inside helper2's own body — the latter two produce no rows at
 			// all, proving the source_file anchor (§2.3) excludes function-local declarations.
-			// None of the new declarations reference a named type, so the reference table is
-			// unchanged from before this phase.
+			// P67f adds the new "read" reference kind (docs/v1.6/plans/
+			// P67f-repo-map-sync-and-references.md §3.2/§5.3): allowedMethods is read once via
+			// `range` and once via an index expression (two "read" rows), nested["a"]["b"] is a
+			// nested subscript resolving once to nested (not "a" or "b"), and c.items/c.m["x"]
+			// (a range and an index whose operand is a selector, not a bare identifier) produce
+			// no "read" row at all — the container/allowedMethods/nested/c declarations
+			// themselves also add ordinary "type"/"variable" symbol and reference rows exactly
+			// like the pre-existing declarations above them.
 			id: Go, file: "testdata/extract/sample.go",
 			syms: []symRow{
 				{"type", "Greeter", -1},
@@ -168,6 +174,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"variable", "DefaultName", -1},
 				{"constant", "Version", -1},
 				{"function", "helper2", -1},
+				{"variable", "allowedMethods", -1},
+				{"variable", "nested", -1},
+				{"type", "container", -1},
+				{"variable", "c", -1},
+				{"function", "helper3", -1},
 			},
 			refs: []refRow{
 				{"type", "Greeter"},
@@ -177,6 +188,18 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "string"},
 				{"call", "helper"},
 				{"type", "string"},
+				{"type", "string"},
+				{"type", "string"},
+				{"type", "string"},
+				{"type", "int"},
+				{"type", "container"},
+				{"type", "string"},
+				{"type", "int"},
+				{"type", "int"},
+				{"type", "container"},
+				{"read", "allowedMethods"},
+				{"read", "allowedMethods"},
+				{"read", "nested"},
 			},
 		},
 		{

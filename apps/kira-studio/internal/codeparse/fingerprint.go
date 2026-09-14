@@ -30,7 +30,7 @@ var fingerprintModules = []string{
 // a grammar or query-file change, both already covered below — alters what a parse produces (§2.5).
 // Without it, a change like referenceKinds gaining a new entry would alter extraction while leaving
 // the fingerprint identical, and stale rows would survive a Sync that should have rebuilt them.
-const extractionVersion = 2
+const extractionVersion = 3
 
 // Fingerprint hashes every grammar module version this binary actually linked (via
 // debug.ReadBuildInfo — the version actually built with, not a hand-copied go.mod string that

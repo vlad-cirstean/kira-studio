@@ -44,7 +44,7 @@ type Symbol struct {
 // a JavaScript member call, the reference node's own range (StartByte/EndByte) starts before the
 // name and would otherwise never match a cursor placed on it.
 type Reference struct {
-	Kind       string // 'call' | 'type' | 'implementation' | 'import' | 'class'
+	Kind       string // 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read'
 	Name       string
 	StartByte  int
 	EndByte    int
@@ -68,7 +68,7 @@ var definitionKinds = map[string]bool{
 }
 
 var referenceKinds = map[string]bool{
-	"call": true, "type": true, "implementation": true, "import": true, "class": true,
+	"call": true, "type": true, "implementation": true, "import": true, "class": true, "read": true,
 }
 
 // extractSymbols runs id's vendored tags.scm query (S2) over root and returns the file's own symbols
