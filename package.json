@@ -57,18 +57,18 @@
     "@testcontainers/kafka": "12.1.0",
     "@testcontainers/mariadb": "12.1.0",
     "@testcontainers/postgresql": "12.1.0",
-    "@types/node": "26.4.1",
+    "@types/node": "26.5.1",
     "@types/pg": "8.23.1",
     "@types/vscode": "1.134.0",
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
-    "@vitejs/plugin-vue": "6.0.8",
+    "@vitejs/plugin-vue": "6.0.9",
     "@vscode/codicons": "0.0.46-24",
     "@vscode/vsce": "3.9.2",
     "@wailsio/runtime": "3.0.0-beta.16",
-    "bun-types": "1.4.0",
+    "bun-types": "1.4.2",
     "mariadb": "3.5.4",
     "pg": "8.23.0",
-    "simple-icons": "16.29.0",
+    "simple-icons": "16.31.0",
     "sql-formatter": "15.8.2",
     "tailwindcss": "4.3.3",
     "testcontainers": "12.1.0",
@@ -84,6 +84,6 @@
     "monaco-editor": "0.56.0",
     "shlex": "3.0.0",
     "slickgrid": "5.20.0",
-    "zod": "4.5.4"
+    "zod": "4.6.5"
   }
 }
