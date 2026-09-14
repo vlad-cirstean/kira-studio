@@ -144,7 +144,13 @@ func (idx *Index) parseStale(
 	}
 
 	jobs := make(chan job)
-	outcomes := make(chan parseOutcome)
+	// Buffered at one batch's own width: the writer goroutine below spends most of a flush
+	// blocked inside a single synchronous replaceFilesTx call, not looping on outcomes at all —
+	// an unbuffered channel would stall every parse worker for that whole duration (measured: it
+	// collapses the pipeline back to sequential, 3.3s+ on this repository, no better than before
+	// pipelining). A full batch of slack lets parse keep producing the *next* batch while the
+	// writer is busy committing the current one, which is the actual overlap P64c §2.1 measures.
+	outcomes := make(chan parseOutcome, replaceFileBatch)
 
 	// writerCtx cancels the parse side (worker sends and the enumerator's own job sends) the
 	// moment the writer goroutine hits an error it cannot recover from, without touching ctx
