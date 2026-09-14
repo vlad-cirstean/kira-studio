@@ -295,16 +295,20 @@ export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
 }
 
 /**
- * C10 §4.3 (S6): the native read-only graph's own ref-badge menu (branch, remote-tracking branch,
- * or tag) — always empty. Every item `buildRefMenu` offers is a write (checkout/rename/delete/push
- * tag/delete on remote/stack set-parent-or-remove-or-restack/go to parent-or-child branch, the
- * last two because both resolve a branch and call `runCheckout` despite the navigational name) or
- * is "Review branch changes", which routes to `review.open` and has no native surface until C11
- * (§9) — so unlike the commit row and stash row, there is no read item left to keep. Takes no
- * context: there is nothing here that varies by ref kind or stack membership to gate.
+ * C10 §4.3 (S6), C11 §12 (S12): the native read-only graph's own ref-badge menu (branch,
+ * remote-tracking branch, or tag). Every item `buildRefMenu` offers is a write (checkout/rename/
+ * delete/push tag/delete on remote/stack set-parent-or-remove-or-restack/go to parent-or-child
+ * branch, the last two because both resolve a branch and call `runCheckout` despite the
+ * navigational name) EXCEPT "Review branch changes" — a read, never gated on `canRunOp`
+ * (`buildRefMenu`'s own comment just above), which C10 dropped only because `review.open` had no
+ * native surface yet (§9 there). C11 builds that surface, so this is the one item restored; every
+ * other write stays hidden. Its handler (`App.vue`'s own `opsState.openReview` route to
+ * `review.open`) needs no change — a tag entry never reaches this function (`buildTagMenu`'s own
+ * branch above), matching `buildRefMenu`'s "absent for a tag entirely" note. Takes no context:
+ * there is nothing here that varies by ref kind or stack membership to gate.
  */
 export function buildReadOnlyRefMenu(): MenuSection[] {
-  return [];
+  return [{ items: [plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple')] }];
 }
 
 /**

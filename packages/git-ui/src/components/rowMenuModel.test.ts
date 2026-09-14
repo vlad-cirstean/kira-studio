@@ -220,13 +220,16 @@ describe('C10 read-only menu builders emit no write-capable item', () => {
     }
   });
 
-  test('buildReadOnlyRefMenu: no items at all, for any ref kind', () => {
+  // C11 §12 (S12): "Review branch changes" is restored — a read, never gated on `canRunOp`
+  // (buildRefMenu's own comment) — now that review.open has a native surface. Every other write
+  // buildRefMenu offers stays hidden.
+  test('buildReadOnlyRefMenu: only Review branch changes, for any ref kind', () => {
     for (const kind of ['branch', 'remoteBranch', 'tag'] as const) {
       const sections = buildReadOnlyRefMenu();
       const ids = sections.flatMap((s) => s.items.map((i) => i.id));
-      expect(ids).toEqual([]);
+      expect(ids).toEqual(['reviewBranch']);
       // kind is unused by the function itself (it takes no context) — looping over it here just
-      // documents that the empty result holds regardless of which row a caller invokes it for.
+      // documents that the result holds regardless of which row a caller invokes it for.
       void kind;
     }
   });
