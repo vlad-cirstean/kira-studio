@@ -56,6 +56,12 @@ export interface ReviewDecorationsHandle {
 // (repoId, branch), is the same trade the extension already made rather than threading `base`
 // through the whole tab-open path for a value this module can cheaply ask for itself. Module-level
 // (not per-handle): two review diff tabs for the same branch share one resolution.
+//
+// C12-7: only a SUCCESSFUL resolution stays cached. A failure (e.g. a transient index.lock
+// conflict) used to cache `null` forever, with no expiry — every load() thereafter silently
+// early-returned, permanently disabling the whole review layer for that branch until the app
+// restarted. Evicting the entry on failure lets the next call (this editor's own retry, or
+// another editor's load()) try fresh instead of replaying the same rejection from cache forever.
 const baseMemo = new Map<string, Promise<string | null>>();
 
 function resolveBase(transport: Transport, repoId: string, branch: string): Promise<string | null> {
@@ -65,7 +71,11 @@ function resolveBase(transport: Transport, repoId: string, branch: string): Prom
     cached = transport
       .request('review.resolveBase', { repoId, branch }, undefined)
       .then((r) => r.base)
-      .catch(() => null);
+      .catch((err) => {
+        baseMemo.delete(key);
+        console.error('reviewDecorations: review.resolveBase failed', err);
+        return null;
+      });
     baseMemo.set(key, cached);
   }
   return cached;
@@ -130,6 +140,37 @@ export function attachReviewDecorations(
       zoneId = accessor.addZone({ afterLineNumber: afterLine, heightInPx: 120, domNode });
     });
     zoneApp = mount(domNode);
+  }
+
+  // C12-7: resolveBase's own failure (a transient index.lock conflict, most likely) used to be
+  // invisible — the diff still rendered, just with zero gutter glyphs/highlighting/comments and no
+  // indication anything had gone wrong. A plain DOM view zone (no Vue mount needed, unlike
+  // openZone/closeZone's own compose/thread box above) banners the real failure at the top of the
+  // editor with a manual retry, independent of that zone's own lifecycle.
+  let errorZoneId: string | null = null;
+
+  function closeErrorZone(): void {
+    if (errorZoneId === null) return;
+    const id = errorZoneId;
+    modifiedEditor.changeViewZones((accessor) => accessor.removeZone(id));
+    errorZoneId = null;
+  }
+
+  function showLoadError(): void {
+    closeErrorZone();
+    const domNode = document.createElement('div');
+    domNode.className = 'kira-review-load-error';
+    const message = document.createElement('span');
+    message.textContent = "Couldn't load review data for this file.";
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'kira-review-load-error-retry';
+    retry.textContent = 'Retry';
+    retry.addEventListener('click', () => void load());
+    domNode.append(message, retry);
+    modifiedEditor.changeViewZones((accessor) => {
+      errorZoneId = accessor.addZone({ afterLineNumber: 0, heightInPx: 28, domNode });
+    });
   }
 
   function paintAddGlyph(): void {
@@ -222,7 +263,15 @@ export function attachReviewDecorations(
   async function load(): Promise<void> {
     const seq = ++loadSeq;
     const base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
-    if (disposed || seq !== loadSeq || base === null) return;
+    if (disposed || seq !== loadSeq) return;
+    if (base === null) {
+      // C12-7: visibly surface this instead of a silent empty diff — resolveBase no longer
+      // caches the failure (see baseMemo's own comment), so the banner's own Retry button (or
+      // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
+      showLoadError();
+      return;
+    }
+    closeErrorZone();
     let result = await deps.transport.request('review.fileDiff', {
       repoId: deps.gitRepoId,
       branch: deps.review.branch,
@@ -426,6 +475,7 @@ export function attachReviewDecorations(
       disposed = true;
       unsubscribeRepaint();
       closeZone();
+      closeErrorZone();
       mouseDownDisposable.dispose();
       mouseMoveDisposable.dispose();
       mouseLeaveDisposable.dispose();

@@ -35,3 +35,31 @@
 .kira-review-line-reviewed {
   background-color: color-mix(in srgb, var(--kira-ok) 10%, transparent);
 }
+
+/* C12-7: reviewDecorations.ts's own view-zone banner for a failed review.resolveBase — plain DOM
+   (no Vue mount, unlike the compose/thread zone), visible in place of what used to be a silent
+   empty diff. */
+.kira-review-load-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 12px;
+  background-color: color-mix(in srgb, var(--kira-error) 12%, transparent);
+  color: var(--kira-error);
+  font-size: 12px;
+}
+
+.kira-review-load-error-retry {
+  border: 1px solid var(--kira-error);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--kira-error);
+  font-size: 12px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.kira-review-load-error-retry:hover {
+  background-color: color-mix(in srgb, var(--kira-error) 16%, transparent);
+}
