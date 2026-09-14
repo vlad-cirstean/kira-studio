@@ -52,7 +52,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.13",
     "@faker-js/faker": "10.6.0",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@testcontainers/kafka": "12.1.0",
     "@testcontainers/mariadb": "12.1.0",
