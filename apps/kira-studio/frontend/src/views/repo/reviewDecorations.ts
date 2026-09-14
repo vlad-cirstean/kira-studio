@@ -274,10 +274,11 @@ export function attachReviewDecorations(
       return;
     }
     // F9 (reviewMarking.ts:520-521): never predict the stored state locally — reload from the
-    // server's own fresh review.fileDiff. The transport's own repaint fan-out (§7.6) also fires
-    // this same reload for every OTHER open tab on this (repoId, branch, path); this call's own
-    // await already covers this editor.
-    await load();
+    // server's own fresh review.fileDiff. No explicit reload here: transport.ts's own repaint
+    // fan-out (§7.6) is the ONE reload path for every open tab on this (repoId, branch, path),
+    // this editor included — its `onReviewRepaint` filter matches this editor's own deps just
+    // like every other subscriber's (C12-4: an extra `load()` call here used to double-reload
+    // this same editor, since the fan-out never excluded the tab that made the call).
   }
 
   function currentSelectionRange(): LineRange {
@@ -336,7 +337,8 @@ export function attachReviewDecorations(
       return;
     }
     closeZone();
-    await load();
+    // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
+    // editor already (C12-4).
   }
 
   async function handleDelete(comment: ReviewComment): Promise<void> {
@@ -351,7 +353,8 @@ export function attachReviewDecorations(
       return;
     }
     closeZone();
-    await load();
+    // No explicit reload — see mark()'s own comment: transport.ts's repaint fan-out covers this
+    // editor already (C12-4).
   }
 
   const mouseDownDisposable = modifiedEditor.onMouseDown((e) => {
