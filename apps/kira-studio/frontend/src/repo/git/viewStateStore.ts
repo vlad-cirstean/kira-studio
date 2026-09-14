@@ -8,23 +8,32 @@
  *
  * The schema stays a permissive passthrough (`z.unknown()`) — `git-ui`'s own `parsePersistedViewState`
  * is the sole validator of the version-6 shape, here on read as it is on every other host.
+ *
+ * C12-3: `parsePersistedViewState` is taken as a constructor argument rather than imported here,
+ * so this file carries no runtime (value) import of `@kira/git-ui` — only the type-only import
+ * below, erased at build time. `RepoGraphView.vue` (this store's only caller) already awaits
+ * `loadGitUi()` before constructing this class, so it has the real function in hand to pass in; a
+ * static value import here would otherwise force the whole `@kira/git-ui` chunk back into
+ * `RepoGraphView.vue`'s own eager module graph regardless of `loadGitUi`'s dynamic import
+ * (confirmed by Vite's own `INEFFECTIVE_DYNAMIC_IMPORT` build warning before this change).
  */
 import type { PersistedViewState, ViewStateStore } from '@kira/git-ui';
-import { parsePersistedViewState } from '@kira/git-ui';
 import { asRepoGraphTab } from '@shared/domain/tabs';
 import { patchRepoGraphTabState, tabsState } from '../../state/tabs';
 
 export class TabViewStateStore implements ViewStateStore {
   readonly #tabId: string;
+  readonly #parse: (raw: unknown) => PersistedViewState | null;
 
-  constructor(tabId: string) {
+  constructor(tabId: string, parse: (raw: unknown) => PersistedViewState | null) {
     this.#tabId = tabId;
+    this.#parse = parse;
   }
 
   read(): PersistedViewState | null {
     const tab = asRepoGraphTab(tabsState.tabs.find((t) => t.id === this.#tabId));
     if (!tab) return null;
-    return parsePersistedViewState(tab.state.viewState);
+    return this.#parse(tab.state.viewState);
   }
 
   write(state: PersistedViewState): void {

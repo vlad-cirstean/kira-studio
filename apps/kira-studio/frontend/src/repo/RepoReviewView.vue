@@ -6,8 +6,9 @@
 // a trip to Files and back) and `viewState` is `NullViewStateStore` — `ReviewView.vue` never reads
 // it (§5.3's own corroborating fact), so there is no per-mount state to persist through a
 // TabViewStateStore the way the graph needs one.
-import { type MountHandle, mount, NullViewStateStore } from '@kira/git-ui';
+import type { MountHandle } from '@kira/git-ui';
 import { onMounted, onUnmounted, ref } from 'vue';
+import { loadGitUi } from './git/gitUiModule';
 import { takePendingReviewTarget } from './git/hostHandlers';
 import { gitTransportFor } from './git/transport';
 
@@ -17,7 +18,7 @@ const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
 
-onMounted(() => {
+async function mountReview(): Promise<void> {
   if (!props.repoId) {
     errorMessage.value = 'This panel has no repository.';
     return;
@@ -29,6 +30,9 @@ onMounted(() => {
   // re-applies a stale target.
   const target = takePendingReviewTarget(props.repoId);
 
+  const { mount, NullViewStateStore } = await loadGitUi();
+  if (!container.value) return; // unmounted while the chunk above was in flight.
+
   handle = mount(container.value, {
     transport: gitTransportFor(props.repoId),
     viewState: new NullViewStateStore(),
@@ -39,7 +43,9 @@ onMounted(() => {
     // 'connection.changed' analogue exists to wire this to.
     hostConnectionState: { kind: 'connected' },
   });
-});
+}
+
+onMounted(() => void mountReview());
 
 // Only fires on workspace close (RepoPanel.vue keeps this component alive with v-show for a mere
 // segment switch, §8.4) — the transport itself is cached per repo workspace and outlives this
