@@ -28,7 +28,7 @@
         "@vitejs/plugin-vue": "6.0.9",
         "@vscode/codicons": "0.0.46-24",
         "@vscode/vsce": "3.9.2",
-        "@wailsio/runtime": "3.0.0-beta.16",
+        "@wailsio/runtime": "3.0.0-beta.21",
         "bun-types": "1.4.2",
         "mariadb": "3.5.4",
         "pg": "8.23.0",
@@ -467,7 +467,7 @@
 
     "@vue/shared": ["@vue/shared@3.5.42", "", {}, "sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g=="],
 
-    "@wailsio/runtime": ["@wailsio/runtime@3.0.0-beta.16", "", {}, "sha512-IzaYrUKYDmvWDXf3Pqfl0onT1R5T5YHTx+AnK9vX4MyuE1PF3lXZmQrtvtfYNAsBnL+9e+iCJvIROGhjyf1rew=="],
+    "@wailsio/runtime": ["@wailsio/runtime@3.0.0-beta.21", "", {}, "sha512-5khssqPE98JDCHL82XpVnqOHT5ar9HT1NEJqMyTknNML066lhDc1Zd4sVkR+wx0vO80zlG2svGfzals5a0QsZA=="],
 
     "abort-controller": ["abort-controller@3.0.0", "", { "dependencies": { "event-target-shim": "^5.0.0" } }, "sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg=="],
 

@@ -64,7 +64,7 @@
     "@vitejs/plugin-vue": "6.0.9",
     "@vscode/codicons": "0.0.46-24",
     "@vscode/vsce": "3.9.2",
-    "@wailsio/runtime": "3.0.0-beta.16",
+    "@wailsio/runtime": "3.0.0-beta.21",
     "bun-types": "1.4.2",
     "mariadb": "3.5.4",
     "pg": "8.23.0",
