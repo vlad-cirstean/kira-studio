@@ -11,10 +11,18 @@ export type GitUiModule = typeof import('@kira/git-ui');
 let gitUiModule: Promise<GitUiModule> | undefined;
 
 /** Loads `@kira/git-ui`'s chunk exactly once — every subsequent call reuses the same resolved
- *  module. */
+ *  module. C13-14: a REJECTED import is never cached (only ever assigned back to `gitUiModule`
+ *  once it actually resolves) — the same bug class C12-7/C13-9 already fixed for `baseMemo`
+ *  (reviewDecorations.ts). Without this, one failed chunk load (a transient network blip in a
+ *  web-deployed context, say) would poison every later graph/review mount for the rest of the
+ *  session, since a rejected promise stays rejected forever and every caller would just keep
+ *  awaiting the same dead promise. */
 export function loadGitUi(): Promise<GitUiModule> {
   if (!gitUiModule) {
-    gitUiModule = import('@kira/git-ui');
+    gitUiModule = import('@kira/git-ui').catch((err: unknown) => {
+      gitUiModule = undefined;
+      throw err;
+    });
   }
   return gitUiModule;
 }
