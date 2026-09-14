@@ -1028,9 +1028,11 @@ reverse, and the button re-resolves `claude`'s own location fresh on every click
 a cached probe. No VS Code MCP registration of any kind is attempted.
 
 **Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
-throughout.** Import a git repository into the same `ProjectPanel.vue` a database connection lives
-in (`code_repos`, above) and click it to open it as its own independent workspace: its own tab set,
-never interleaved with another open repo's or with studio/api's shared strip.
+throughout.** Import a git repository and click it to open it as its own independent workspace: its
+own tab set, never interleaved with another open repo's or with studio/api's shared strip. **P67b:**
+the repo list itself lives in `repo/GitPanel.vue` — the Git module's own left panel — not in
+`ProjectPanel.vue` (Studio's), which C5 originally placed it in; see "Git module (v1.3)" below for
+the nav-level reason (a repository is an instance inside the Git module, not a sibling of it).
 
 - **Tab isolation is a new orthogonal *workspace* dimension, not a new `AppMode`.** Two open
   repositories share the exact same two tab kinds (`repo-graph`, `repo-file`), which a mode-per-kind
@@ -2635,6 +2637,24 @@ there because Kira Studio is the trust authority and owner of those settings, no
 read-write git UI crept in. The native mount is provably read-only (below); nothing in this window
 can write to a repository through any route the VS Code extension can.
 
+**P67b: `git` is a peer `AppMode`, not a per-repo title-bar tab.** Before this phase, opening a
+repository added one extra tab to the title bar per open repository, beside the two module tabs
+(`Studio | Api | <repo> | <repo> | …`) — a repository (an instance) sat at the same level as a
+module. The title bar now reads exactly `Studio | Api | Git`, always three tabs: `AppMode` gained a
+third member, `'git'` (`packages/shared/domain/mode.ts`), and every open repository's own workspace
+lives *inside* it. The repo switcher — the row of open/importable repositories, a click opens or
+activates one — moved into `repo/GitPanel.vue`, the Git module's own left panel (mirroring
+`ProjectPanel.vue` for Studio and `api/CollectionsPanel.vue` for Api); `workspaceState.lastRepoKey`
+(session-only, not persisted) is what makes leaving Git for another module and clicking back on it
+return to the same repository, the same "return to where you were" property the old per-repo tabs
+gave for free. `moduleOfWorkspace(key)` (`packages/shared/domain/workspace.ts`) is the one-line
+map every repo `WorkspaceKey` folds onto `'git'` through — `WorkbenchShell.vue`/`MainView.vue` each
+dispatch on it alone now, with no `isRepoWorkspace` special case. `internal/storage/model/window.go`'s
+`validWindowModes` gained `"git"` as its third legal value; `windows.mode` needed no migration, since
+the column has always been unconstrained `TEXT` (only the Go-side allowlist narrows it), and
+`NormalizeMode` already falls back to `"studio"` for anything it doesn't recognise — an older binary
+reading a `'git'`-mode window degrades cleanly.
+
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
 transport seam instead of a UI one: `rpcstream`'s `Conn{Send([]byte) error; Receive() ([]byte,
@@ -3632,3 +3652,11 @@ C14's performance review:
 - **A restored session on app boot starts every restored repo's index sync with no cross-repo
   concurrency limiter** — likely fine in practice (incremental after first run) but unmeasured at
   scale.
+- **No standalone merge or rebase operation exists anywhere in this stack** (P67b §1.5) — not in
+  `gitsession/ops.go`'s `opTable` (the 22 kinds `op.run` serves), not in `OpRequest`
+  (`packages/git-ipc/src/contract.ts`), not in `packages/git-ui`'s menus, not in the VS Code
+  extension. Merge and rebase are reachable only as `remote.run` kind `pull`'s three strategies
+  (`PullStrategy = 'ff-only' | 'merge' | 'rebase'`) and inside `stack.restack`'s own rebase
+  executor — never as a user-invoked operation against two arbitrary branches. Building one needs a
+  new `op.run` kind, a new `opSpec` with its own undo policy, a new preflight, a new dialog, and a
+  `ContractVersion` bump — a real feature, not a one-line gap.
