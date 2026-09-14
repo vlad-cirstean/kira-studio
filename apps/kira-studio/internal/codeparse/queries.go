@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/tsx/c2_implements.scm queries/go/tags.scm queries/rust/tags.scm
+//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/rust/tags.scm
 var queryFS embed.FS
 
 // QuerySource is one query file's provenance (§4.1/NOTICES.md): a future license or version audit
@@ -44,6 +44,11 @@ var Provenance = []QuerySource{
 	{TSX, thisRepo, "queries/tsx/c2_implements.scm", ""},
 	{JavaScript, thisRepo, "queries/javascript/c2_implements.scm", ""},
 	{Python, thisRepo, "queries/python/c2_implements.scm", ""},
+
+	// P64-authored type alias/enum/module-const queries (docs/v1.6/plans/P64-…md §2.2) — the
+	// vendored tags.scm has no pattern for any of the three.
+	{TypeScript, thisRepo, "queries/typescript/p64_declarations.scm", ""},
+	{TSX, thisRepo, "queries/tsx/p64_declarations.scm", ""},
 }
 
 // querySourcePaths maps a symbol-bearing language id to every embedded query file compiled into
@@ -51,14 +56,14 @@ var Provenance = []QuerySource{
 // ahead of typescript's own (§2.1): upstream ships the TypeScript file as an *addition* to the
 // JavaScript one (only signature/abstract/interface patterns, no `; inherits:` header — editors
 // supply that themselves), so typescript's file alone indexes almost nothing. Each language's own
-// c2_implements.scm (§2.3) rides along at the end — same *sitter.Query, same @reference.implementation
-// capture, no schema or extract.go change needed.
+// c2_implements.scm (§2.3) and p64_declarations.scm (type/enum/module-const, P64 §2.2) ride along
+// at the end — same *sitter.Query, no schema or extract.go change needed for either.
 var querySourcePaths = map[ID][]string{
 	Java:       {"queries/java/tags.scm"},
 	Python:     {"queries/python/tags.scm", "queries/python/c2_implements.scm"},
 	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm"},
-	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm"},
-	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm"},
+	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm"},
+	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm"},
 	Go:         {"queries/go/tags.scm"},
 	Rust:       {"queries/rust/tags.scm"},
 }

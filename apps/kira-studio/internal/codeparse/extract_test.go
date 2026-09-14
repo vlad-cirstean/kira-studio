@@ -93,6 +93,14 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			// c2_implements.scm adds the second "implementation" reference, for Robot's own
 			// `implements Greeter`.
 			id: TypeScript, file: "testdata/extract/sample.ts",
+			// P64 adds a type alias, an enum, a call-expression-valued module const, an
+			// arrow-valued module const and a function-body const (docs/v1.6/plans/
+			// P64-repo-map-type-aliases-and-read-symbol.md §2.2/§8): the anti-drift guard this
+			// test exists for now also covers the p64_declarations.scm patterns, not only the
+			// vendored ones. buildRobot is a "function" row (javascript's own unanchored
+			// arrow-const pattern), never a "constant" row — proving p64's own const pattern
+			// correctly excludes an arrow-valued value. helper3's own function-body const
+			// produces no row at all, proving the `program` anchor holds.
 			syms: []symRow{
 				{"interface", "Greeter", -1},
 				{"method", "greet", 0},
@@ -102,6 +110,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"class", "Robot", -1},
 				{"method", "greet", 5},
 				{"function", "helper2", -1},
+				{"type", "RobotKind", -1},
+				{"enum", "RobotState", -1},
+				{"constant", "robotConfig", -1},
+				{"function", "buildRobot", -1},
+				{"function", "helper3", -1},
 			},
 			refs: []refRow{
 				{"implementation", "Greeter"},
@@ -109,6 +122,8 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "Greeter"},
 				{"implementation", "Greeter"},
 				{"call", "helper2"},
+				{"call", "makeConfig"},
+				{"class", "Robot"},
 			},
 		},
 		{
