@@ -47,6 +47,70 @@ func newConformanceServer(t *testing.T) *Server {
 	return srv
 }
 
+// TestFindDefinitionGoTypeSymbolOnly is the dogfooding-log regression (C7): find_definition called
+// with only {"symbol": "<a Go type>"} — no file — must resolve to that type's own declaration, not
+// fall into "no definitions found for \"\"". Root cause: Go's tags.scm double-captures a type
+// declaration's own name as both a definition.type symbol row and a spurious self-referencing
+// reference.type row at the identical span (codegraph's isSelfSite doc comment names the same
+// quirk); locate()'s own search_symbols-derived Point then lands on that shared span, and
+// resolveHit used to pick the reference first, so DefinitionOf found nothing. Regression-guards the
+// resolveHit priority fix in internal/codegraph/position.go — see that package's own
+// TestResolveHitSymbolWinsOverColocatedReference/TestDefinitionOfGoTypeSelfCapture for the same bug
+// at the codegraph layer.
+func TestFindDefinitionGoTypeSymbolOnly(t *testing.T) {
+	home := t.TempDir()
+	root := t.TempDir()
+	store := codeindex.OpenStoreAt(home)
+	t.Cleanup(func() { _ = store.Close() })
+
+	// "type grpcCoalescer struct{...}" at row 0: the symbol's own name spans bytes [5,18); Go's own
+	// tags.scm also emits a reference row at that identical span (the blanket @reference.type
+	// capture on type_identifier, which also matches type_spec's own name field).
+	if err := store.ReplaceFile(context.Background(), codeindex.FileWrite{
+		RepoID: testRepoID, Path: "grpc.go", Language: "go",
+		ParseStatus: codeindex.StatusOK, ParsedAt: time.Now().UnixMilli(),
+		ContentSHA: make([]byte, 32),
+		Symbols:    []codeparse.Symbol{mkSym("type", "grpcCoalescer", 0, 0, 30, 5)},
+		References: []codeparse.Reference{mkRef("type", "grpcCoalescer", 0, 5, 18, 5)},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	resolved := resolvedRepo{repoID: testRepoID, root: root, gitPath: "", runner: gitclient.NewExecRunner()}
+	srv, err := newServer(context.Background(), Config{
+		Token: func(repoID string) (mcpauth.Record, string, bool, error) {
+			plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(repoID)))
+			return rec, plain, true, err
+		},
+	}, home, store, resolved)
+	if err != nil {
+		t.Fatalf("newServer: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Close() })
+
+	res, _, err := srv.findDefinition(context.Background(), nil, findDefinitionArgs{
+		locatorFields: locatorFields{Symbol: "grpcCoalescer"},
+	})
+	if err != nil {
+		t.Fatalf("findDefinition: %v", err)
+	}
+	text := ""
+	if len(res.Content) > 0 {
+		if tc, ok := res.Content[0].(*mcp.TextContent); ok {
+			text = tc.Text
+		}
+	}
+	if res.IsError {
+		t.Fatalf("findDefinition returned IsError: %s", text)
+	}
+	if strings.Contains(text, `no definitions found for ""`) {
+		t.Fatalf("regressed to the empty-string bug: %s", text)
+	}
+	if !strings.Contains(text, `1 definition for "grpcCoalescer"`) || !strings.Contains(text, "type grpcCoalescer") {
+		t.Fatalf("want a resolved definition for grpcCoalescer, got: %s", text)
+	}
+}
+
 // TestConformanceListToolsAndCallEach is §11.3's own smoke test: a real client against a real
 // server over mcp.NewInMemoryTransports(), guarding the thing a compiler cannot — a schema the SDK
 // rejects at registration, or a renamed tool. Not per-tool coverage (render.go/tools.go's own

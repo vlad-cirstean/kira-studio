@@ -80,6 +80,81 @@ func TestResolveHitReferences(t *testing.T) {
 	})
 }
 
+// TestResolveHitSymbolWinsOverColocatedReference guards the dogfooding-log bug (C7): Go's tags.scm
+// double-captures a type declaration's own name node — `type_spec name: (type_identifier)
+// @definition.type` alongside the blanket `(type_identifier) @name @reference.type` — so a real
+// symbol row and a spurious self-referencing reference row end up at the identical name span (see
+// isSelfSite's own doc comment in references.go, which names this exact quirk). A Point or Byte
+// landing on that shared span must resolve to the symbol, not the reference: a symbol row only
+// ever exists at a genuine declaration site, so it's always the more specific hit.
+func TestResolveHitSymbolWinsOverColocatedReference(t *testing.T) {
+	// "type grpcCoalescer struct{...}": the type's own name spans bytes [5,18) on row 0 — both a
+	// definition.type symbol row and a spurious reference.type reference row.
+	symRow := codeindex.SymbolRow{
+		Kind: "type", Name: "grpcCoalescer",
+		StartByte: 0, EndByte: 30, StartRow: 0, StartColumn: 0, EndRow: 0, EndColumn: 30,
+		NameStartByte: 5, NameEndByte: 18, NameStartRow: 0, NameStartColumn: 5,
+	}
+	selfRef := codeindex.ReferenceRow{
+		Kind: "type", Name: "grpcCoalescer",
+		StartByte: 5, EndByte: 18, StartRow: 0, StartColumn: 5,
+		NameStartByte: 5, NameEndByte: 18, NameStartRow: 0, NameStartColumn: 5,
+	}
+	symbols := []codeindex.SymbolRow{symRow}
+	references := []codeindex.ReferenceRow{selfRef}
+
+	t.Run("Point query on the shared name span", func(t *testing.T) {
+		hit := resolveHit(Query{Point: &Point{Row: 0, Column: 8}}, symbols, references)
+		if !hit.Ok || hit.Sym == nil || hit.Ref != nil {
+			t.Fatalf("want a symbol hit (not a reference hit), got %+v", hit)
+		}
+		if hit.Sym.Name != "grpcCoalescer" {
+			t.Fatalf("Sym.Name = %q, want grpcCoalescer", hit.Sym.Name)
+		}
+	})
+
+	t.Run("Byte query on the shared name span", func(t *testing.T) {
+		hit := resolveHit(Query{Byte: 8}, symbols, references)
+		if !hit.Ok || hit.Sym == nil || hit.Ref != nil {
+			t.Fatalf("want a symbol hit (not a reference hit), got %+v", hit)
+		}
+		if hit.Sym.Name != "grpcCoalescer" {
+			t.Fatalf("Sym.Name = %q, want grpcCoalescer", hit.Sym.Name)
+		}
+	})
+}
+
+// TestDefinitionOfGoTypeSelfCapture is the same bug one layer up: DefinitionOf on a Point sitting
+// exactly on a Go type's own declaration name must resolve to that type itself (rule "self"), not
+// zero targets — the shape find_definition hits when called with only {"symbol": "<a Go type>"}
+// (repomap's locate() builds exactly such a Point from search_symbols' own NameSpan).
+func TestDefinitionOfGoTypeSelfCapture(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	// "type grpcCoalescer struct{...}" at row 0: symbol name spans bytes [5,18); tags.scm's own
+	// blanket @reference.type capture also emits a reference row at the identical span.
+	symbols := []codeparse.Symbol{
+		sym("type", "grpcCoalescer", 0, 0, 30, 5, -1),
+	}
+	references := []codeparse.Reference{
+		ref("type", "grpcCoalescer", 0, 5, 18, 5),
+	}
+	file := seedFile(t, store, "grpc.go", "go", nil, symbols, references)
+
+	q := Query{Path: file.Path, Byte: -1, Point: &Point{Row: 0, Column: 8}}
+	targets, err := g.DefinitionOf(ctx, q)
+	if err != nil {
+		t.Fatalf("DefinitionOf: %v", err)
+	}
+	if len(targets) != 1 {
+		t.Fatalf("want exactly one target, got %d: %+v", len(targets), targets)
+	}
+	if targets[0].Name != "grpcCoalescer" || targets[0].Rule != "self" {
+		t.Fatalf("want self-rule hit on grpcCoalescer, got %+v", targets[0])
+	}
+}
+
 // TestLocateThroughStore exercises the same resolveHit path end to end through a real
 // codeindex.Store (§11's own seeding convention): one file carrying a script-setup block's own
 // symbol (Point lookup into a block-scoped definition) and a template region with no rows at all

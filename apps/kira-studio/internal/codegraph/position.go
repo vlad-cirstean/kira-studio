@@ -53,25 +53,34 @@ type queryHit struct {
 	Ok   bool
 }
 
-// resolveHit runs §4.3's numbered steps 2-4 over one file's already-loaded symbols/references.
+// resolveHit runs §4.3's numbered steps 2-4 over one file's already-loaded symbols/references. A
+// symbol match at the exact query position always wins over a reference match there: a symbol row
+// only ever exists at a genuine declaration site, so it's strictly more specific than a
+// same-position reference — and some languages' tags.scm deliberately double-capture a
+// declaration's own name node as both (e.g. Go's blanket `(type_identifier) @name @reference.type`
+// alongside `type_spec`'s own `@definition.type`, so a type's own name is also stored as a
+// self-referencing reference row at the identical span; see isSelfSite in references.go for the
+// same quirk handled on the ReferencesTo path). Checking symbols first here is what lets a Point/
+// Byte query landing on a declaration's own name resolve as a definition (hit.Sym) instead of
+// spuriously chasing "what does this reference refer to" and finding nothing.
 func resolveHit(q Query, symbols []codeindex.SymbolRow, references []codeindex.ReferenceRow) queryHit {
 	switch {
 	case q.Point != nil:
-		if ref := referenceByNamePoint(references, *q.Point); ref != nil {
-			return queryHit{Name: ref.Name, Ref: ref, Ok: true}
-		}
 		if sym := symbolByNamePoint(symbols, *q.Point); sym != nil {
 			return queryHit{Name: sym.Name, Sym: sym, Ok: true}
 		}
+		if ref := referenceByNamePoint(references, *q.Point); ref != nil {
+			return queryHit{Name: ref.Name, Ref: ref, Ok: true}
+		}
 	case q.Byte >= 0:
+		if sym := symbolByNameByte(symbols, q.Byte); sym != nil {
+			return queryHit{Name: sym.Name, Sym: sym, Ok: true}
+		}
 		if ref := referenceByNameByte(references, q.Byte); ref != nil {
 			return queryHit{Name: ref.Name, Ref: ref, Ok: true}
 		}
 		if ref := innermostReferenceNode(references, q.Byte); ref != nil {
 			return queryHit{Name: ref.Name, Ref: ref, Ok: true}
-		}
-		if sym := symbolByNameByte(symbols, q.Byte); sym != nil {
-			return queryHit{Name: sym.Name, Sym: sym, Ok: true}
 		}
 	}
 	if q.Name != "" {

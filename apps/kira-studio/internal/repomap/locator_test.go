@@ -44,6 +44,19 @@ func mkSym(kind, name string, row, startCol, endCol, nameCol int) codeparse.Symb
 	}
 }
 
+// mkRef is mkSym's own counterpart for a codeparse.Reference: the reference node spans
+// [startCol, endCol) on row, its own name spans [nameCol, nameCol+len(name)).
+func mkRef(kind, name string, row, startCol, endCol, nameCol int) codeparse.Reference {
+	return codeparse.Reference{
+		Kind: kind, Name: name,
+		StartByte: startCol, EndByte: endCol,
+		StartPoint:    codeparse.Point{Row: row, Column: startCol},
+		NameStartByte: nameCol, NameEndByte: nameCol + len(name),
+		NameStart:  codeparse.Point{Row: row, Column: nameCol},
+		BlockIndex: -1,
+	}
+}
+
 func TestLocateFileAbsoluteMadeRelative(t *testing.T) {
 	g, store := newTestGraph(t)
 	seed(t, store, "pkg/file.go", []codeparse.Symbol{mkSym("function", "Foo", 4, 0, 20, 5)})
