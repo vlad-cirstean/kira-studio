@@ -2,8 +2,9 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
-import { dialectObjectFor } from '../editor/languages';
+import type { EditorCompletionSource } from '../editor/completion';
 import { type DdlSchema, EMPTY_DDL_SCHEMA, parseDdl } from '../views/console/ddl';
+import { sqlKeywordCompletionSource } from '../views/console/sqlKeywordCompletion';
 import { type SqlDialect, sqlDialectFor } from '../views/shared/sqlIdent';
 
 // P18 (v1.1) D2/D4: the renderer-side store for each connection's pasted DDL document — app-wide
@@ -78,23 +79,35 @@ const parsedCache = new Map<string, { text: string; schema: DdlSchema }>();
  *  when `dialect` is undefined (a non-SQL console never calls this). */
 export function ddlSchemaFor(connectionId: string, dialect: SqlDialect | undefined): DdlSchema {
   const text = schemasState.byConnection[connectionId];
-  const dialectObject = dialect && dialectObjectFor(dialect);
-  if (!text || !dialectObject) return EMPTY_DDL_SCHEMA;
+  if (!text || !dialect) return EMPTY_DDL_SCHEMA;
   const cached = parsedCache.get(connectionId);
   if (cached?.text === text) return cached.schema;
-  const schema = parseDdl(dialectObject, text);
+  const schema = parseDdl(dialect, text);
   parsedCache.set(connectionId, { text, schema });
   return schema;
 }
 
-// SPEC §11: project/ (SchemaDialog.vue, menus.ts) must not import views/ directly — these three
+// SPEC §11: project/ (SchemaDialog.vue, menus.ts) must not import views/ directly — these four
 // wrappers are its one dispatch point into the SQL surface (views/shared/sqlIdent.ts,
-// views/console/ddl.ts), mirroring state/viewCommands.ts's own role for other project/ callers.
+// views/console/ddl.ts, views/console/sqlKeywordCompletion.ts), mirroring state/viewCommands.ts's
+// own role for other project/ callers.
 
 /** undefined for a kind with no SQL surface — SchemaDialog.vue's own guard for whether a
- *  connection even has a DDL document to edit, and CodeMirrorHost.vue's `sql-dialect` prop. */
+ *  connection even has a DDL document to edit, and MonacoHost.vue's `sql-dialect` prop. */
 export function schemaDialectFor(kind: ConnectionKind | undefined): SqlDialect | undefined {
   return sqlDialectFor(kind);
+}
+
+/** P60b §6.2: SchemaDialog.vue passes `:autocomplete="true"` with no `completionSources` and used
+ *  to rely on lang-sql's own implicit language-data keyword source (its own now-stale comment at
+ *  the mount site said so). `MonacoHost.vue`'s `override`-shaped `completionSources` prop has no
+ *  such implicit fallback, so this is that keyword/type source, made explicit — undefined for a
+ *  kind with no SQL surface, matching `schemaDialectFor`. */
+export function sqlKeywordCompletionSourceFor(
+  kind: ConnectionKind | undefined,
+): EditorCompletionSource | undefined {
+  const dialect = sqlDialectFor(kind);
+  return dialect && sqlKeywordCompletionSource(dialect);
 }
 
 /** D3's live parse summary — "N tables, M columns", or an explanatory line when nothing was
@@ -102,9 +115,8 @@ export function schemaDialectFor(kind: ConnectionKind | undefined): SqlDialect |
 export function ddlParseSummary(kind: ConnectionKind | undefined, text: string): string | null {
   if (!text.trim()) return null;
   const dialect = sqlDialectFor(kind);
-  const dialectObject = dialect && dialectObjectFor(dialect);
-  if (!dialectObject) return null;
-  const schema = parseDdl(dialectObject, text);
+  if (!dialect) return null;
+  const schema = parseDdl(dialect, text);
   if (schema.tables.length === 0) return 'No tables recognised in this text — check the paste';
   const columns = schema.tables.reduce((n, t) => n + t.columns.length, 0);
   const tableWord = schema.tables.length === 1 ? 'table' : 'tables';

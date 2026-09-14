@@ -10,7 +10,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import type { RangeHighlight } from '../../editor/variableHighlight';
+import type { RangeHighlight } from '../../editor/ranges';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';

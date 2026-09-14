@@ -27,6 +27,16 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   `monacoLanguageIdFor`) is the right combination for a Vue SFC. No fix needed; noted so a future
   session doesn't spend time on it.
 
+- **P60b**: the native `mcp__kira-repo-map__*` tool surface was unreachable at session start
+  (`ConnectionRefused`) — expected per the setup doc's own note (the harness's tool manifest is
+  fixed at session start, not read from MCP config at runtime). Built + started the server per the
+  headless steps; found two stale hashed token files under `KIRA_HOME`, neither of which prints its
+  raw bearer token back (tokens are stored hashed by design) — deleted both and restarted to mint a
+  fresh one, then used it over plain HTTP/JSON-RPC as documented. `search_symbols` and
+  `find_references` against `sql-tokens.ts`'s new `tokenizeSql` both returned correct, complete
+  results (31 real call sites, no false positives). No fix needed beyond the token remint; noted so
+  a future session with two stale token files doesn't waste time guessing which one is live.
+
 _No non-trivial entries._
 
 <!--

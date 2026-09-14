@@ -1,4 +1,4 @@
-import type { EditorLanguageId } from './languages';
+import type { EditorLanguageId } from '@shared/domain/editor';
 
 // P60a §4.2: the six `EditorLanguageId` values -> Monaco's own registered language ids. `json`,
 // `xml`, `sql` are already registered Monarch languages (`monacoEntry.ts`); `plain` maps to

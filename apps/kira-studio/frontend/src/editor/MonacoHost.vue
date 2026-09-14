@@ -3,13 +3,14 @@
 // methods, so every mount site changes only its import and its tag name. Two prop *types* change
 // (§3.1) because their old types were CodeMirror types; everything else here is deliberately the
 // same shape as `CodeMirrorHost.vue`, restated for Monaco's own API rather than redesigned.
+
+import type { EditorLanguageId } from '@shared/domain/editor';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { settingsState } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
 import type { ConsoleDiagnostic } from './diagnostics';
-import type { ConsoleHoverInfo } from './hover';
-import type { EditorLanguageId } from './languages';
+import type { ConsoleHoverInfo } from './hoverInfo';
 import {
   KIRA_EDITOR_THEME,
   loadMonaco,
@@ -17,7 +18,7 @@ import {
   overflowWidgetsContainer,
 } from './monaco';
 import { monacoLanguageIdFor } from './monacoLanguages';
-import type { RangeHighlight } from './variableHighlight';
+import type { RangeHighlight } from './ranges';
 
 // `import('monaco-editor').X` inline type references, not a static `import type {...}` — matches
 // `views/repo/editors.ts`/`monaco.ts`'s own established style for this ambient module's types.

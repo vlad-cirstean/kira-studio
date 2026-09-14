@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
+import type { EditorLanguageId } from '@shared/domain/editor';
 import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
-import type { EditorLanguageId } from '../../editor/languages';
-import { dialectObjectFor } from '../../editor/languages';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
@@ -130,7 +129,7 @@ watch(
 // P22c D6: the effective schema diagnostics/hover read — the hand-authored document wins
 // wholesale when it has any tables; otherwise the cached columns for this container fill in.
 // Completion (below) reads the raw document and the raw cache separately instead (D4), since
-// schemaCompletionSource wants a namespace and lang-sql's alias resolution needs the tree's own
+// sqlSchemaCompletionSource wants a namespace and its own alias resolution needs the tree's own
 // relation names as a distinct fallback layer — but this is the one place lint/hover read, so
 // they can never disagree with completion about what the console knows.
 const ddlSchema = computed(() =>
@@ -140,8 +139,9 @@ const ddlSchema = computed(() =>
 // D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
 // actually has (caps.sql gates the tab) — `language.value !== 'plain'` covers that without
 // special-casing kafka/sqs/s3. The SQL branch is undefined with no DDL document, no cached
-// columns and no tree relations for this connection — lang-sql's own keyword source stays in
-// charge, byte-for-byte today's behaviour with none of the three (P22c D4).
+// columns and no tree relations for this connection — the keyword completion source
+// (sqlKeywordCompletion.ts) stays in charge, byte-for-byte today's behaviour with none of the
+// three (P22c D4).
 const completionSources = computed(() => {
   if (!connectionKind.value || language.value === 'plain') return undefined;
   if (language.value === 'sql') {
@@ -155,7 +155,6 @@ const completionSources = computed(() => {
       connectionId,
       props.tab.path,
       documentDdlSchema.value,
-      connectionRecord(connectionId)?.database,
       cached,
     );
   }
@@ -167,12 +166,11 @@ const completionSources = computed(() => {
 // always postgres/mariadb/mysql/mongodb/redis in practice.
 const lintSource = computed(() => consoleLintSource(connectionKind.value, ddlSchema.value));
 
-// C6/D8: undefined with no DDL document (D5) or a non-SQL kind — CodeMirrorHost's own hoverSource
+// C6/D8: undefined with no DDL document (D5) or a non-SQL kind — MonacoHost's own hoverSource
 // prop is additive, so every other console stays exactly as it was.
 const hoverSource = computed(() => {
-  const dialectObject = dialect.value && dialectObjectFor(dialect.value);
-  if (!dialectObject) return undefined;
-  return sqlHoverSource(dialectObject, ddlSchema.value);
+  if (!dialect.value) return undefined;
+  return sqlHoverSource(dialect.value, ddlSchema.value);
 });
 
 const cursorPos = ref(0);
@@ -267,8 +265,8 @@ const canShowAutoExplainPlan = computed(() => rt.value?.autoExplain?.kind === 'p
 function onShowAutoExplainPlan(): void {
   showAutoExplainPlan(props.tab.id);
 }
-// Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
-// doesn't read as a type-only use of the CodeMirrorHost import — same convention as
+// Typed as the bare exposed shape (rather than InstanceType<typeof MonacoHost>) so this ref
+// doesn't read as a type-only use of the MonacoHost import — same convention as
 // ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
 const editorHost = ref<{ focus: () => void; setCursor: (pos: number) => void } | null>(null);
 // The saved-queries popover unmounts its own focused entry on close (ConsoleSavedMenu's apply()
@@ -283,7 +281,7 @@ function onSavedMenuClose(): void {
 // P18 addendum D20: the editor's own doc is a shallowRef, not `tab.state.text` directly — binding
 // the template to the tab's reactive text made this view's whole render effect (toolbar, strips,
 // status line, every mounted ConsoleResultGrid) re-run on every keystroke, for no benefit
-// CodeMirrorHost's own equality-guarded `doc` watcher didn't already provide. `lastEmitted` is a
+// MonacoHost's own equality-guarded `doc` watcher didn't already provide. `lastEmitted` is a
 // plain variable, not a ref — comparing against it is what lets an external write (a saved-query
 // load, tab hydration) still reach the editor while a self-triggered echo does not.
 const localDoc = shallowRef(props.tab.state.text);
@@ -292,7 +290,7 @@ let lastEmitted = props.tab.state.text;
 // P12 round 1 finding #7: the three strips below are stale the moment the text they describe is
 // gone — not only on a keystroke (onDocChange), but also on any *external* text replacement
 // (ConsoleSavedMenu's apply(), this view's own onFormat() below), both of which call setText()
-// directly and go through CodeMirrorHost's external-sync path, which deliberately never re-emits
+// directly and go through MonacoHost's external-sync path, which deliberately never re-emits
 // update:doc (the watcher below is what notices those instead). Shared so neither path can drift.
 function resetStalePreviewState(): void {
   formatError.value = null;
@@ -697,7 +695,7 @@ const statusLine = computed(() => {
            a restored tab's query now reconnects itself, so the button was just a second, redundant
            way to do what pressing Run already does. Removed rather than kept as a no-op. -->
       <div class="editor-body">
-        <CodeMirrorHost
+        <MonacoHost
           ref="editorHost"
           :doc="localDoc"
           :language="language"

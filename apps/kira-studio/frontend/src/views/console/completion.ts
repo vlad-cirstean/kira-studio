@@ -1,4 +1,3 @@
-import { type CompletionSource, snippet } from '@codemirror/autocomplete';
 import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import {
@@ -7,6 +6,7 @@ import {
   type PathSegment,
   type RelationColumns,
 } from '@shared/domain/tree';
+import type { EditorCompletionSource } from '../../editor/completion';
 import { rowKey, treeState } from '../../project/state/tree';
 import { mongoFieldNamesFor } from '../shared/mongoFieldSample';
 import {
@@ -19,11 +19,12 @@ import { type DdlSchema, EMPTY_DDL_SCHEMA } from './ddl';
 import { sqlCompletionSources } from './sqlLanguageService';
 
 // P27 D17: reuses the same {insert, caretOffsetFromEnd} vocabulary the filter bar's plain
-// AutocompleteField consumes — only the caret-positioning mechanism differs, since CodeMirror has
-// its own (a `#{}` snippet placeholder) rather than an offset-from-end number.
+// AutocompleteField consumes — only the caret-positioning mechanism differs. P60b: Monaco's own
+// snippet placeholder is `$0` (EditorCompletion.snippet's own doc comment, editor/completion.ts),
+// the successor to CodeMirror's `#{}`.
 function toSnippetTemplate(c: MongoValueConstructor): string {
   const pos = c.insert.length - c.caretOffsetFromEnd;
-  return `${c.insert.slice(0, pos)}#{}${c.insert.slice(pos)}`;
+  return `${c.insert.slice(0, pos)}$0${c.insert.slice(pos)}`;
 }
 
 // P18 addendum D21: the first path segment is the database node's own key
@@ -120,47 +121,49 @@ function enclosingCollectionPath(path: string, before: string): string | null {
 // that collection's own document tabs have loaded (views/shared/mongoFieldSample.ts) — a sample,
 // not a schema (F11: a Mongo collection has none), merged with the BSON-constructor list this
 // position already offered rather than replacing it.
-function mongoCompletionSource(connectionId: string, path: string): CompletionSource {
-  return (context) => {
+function mongoCompletionSource(connectionId: string, path: string): EditorCompletionSource {
+  return ({ doc, offset }) => {
     // Deliberately not gated on "word non-empty or explicit" the way a generic word-completion
     // source would be: the two `before`-anchored positions below (right after `db.` or
     // `db.<collection>.`) are exactly where the current word is empty — that emptiness is the
     // trigger, not a reason to bail.
-    const word = context.matchBefore(/[$\w]*/) ?? { from: context.pos, to: context.pos, text: '' };
-    const before = context.state.sliceDoc(0, word.from);
+    const wordMatch = /[$\w]*$/.exec(doc.slice(0, offset));
+    const wordText = wordMatch ? wordMatch[0] : '';
+    const from = offset - wordText.length;
+    const before = doc.slice(0, from);
 
     if (/\bdb\.$/.test(before)) {
       const names = mongoCollectionNames(connectionId, path);
       if (names.length === 0) return null;
-      return { from: word.from, options: names.map((label) => ({ label, type: 'variable' })) };
+      return { from, options: names.map((label) => ({ label, type: 'variable' as const })) };
     }
     if (/\bdb\.[A-Za-z_$][\w$]*\.$/.test(before)) {
       return {
-        from: word.from,
-        options: MONGO_CONSOLE_METHODS.map((label) => ({ label, type: 'method' })),
+        from,
+        options: MONGO_CONSOLE_METHODS.map((label) => ({ label, type: 'method' as const })),
       };
     }
-    if (word.text.startsWith('$')) {
+    if (wordText.startsWith('$')) {
       return {
-        from: word.from,
-        options: MONGO_QUERY_OPERATORS.map((label) => ({ label, type: 'keyword' })),
+        from,
+        options: MONGO_QUERY_OPERATORS.map((label) => ({ label, type: 'keyword' as const })),
       };
     }
     // P27 D17 + P22c D8: the six BSON constructors — offered wherever a bare word starts, same as
     // any other identifier completion — plus, when this word sits inside a recognisable
     // db.<collection>.<method>(…) call, that collection's own sampled field names ahead of them.
-    // CodeMirror's own default matching narrows the combined list as more is typed.
-    if (/^[A-Za-z]/.test(word.text)) {
+    // Monaco's own default matching narrows the combined list as more is typed.
+    if (/^[A-Za-z]/.test(wordText)) {
       const collectionPath = enclosingCollectionPath(path, before);
       const fields = collectionPath ? mongoFieldNamesFor(connectionId, collectionPath) : [];
       return {
-        from: word.from,
+        from,
         options: [
-          ...fields.map((label) => ({ label, type: 'property' })),
+          ...fields.map((label) => ({ label, type: 'property' as const })),
           ...MONGO_VALUE_CONSTRUCTORS.map((c) => ({
             label: c.name,
-            apply: snippet(toSnippetTemplate(c)),
-            type: 'function',
+            snippet: toSnippetTemplate(c),
+            type: 'function' as const,
           })),
         ],
       };
@@ -212,26 +215,29 @@ const REDIS_COMMANDS: readonly RedisCommandInfo[] = [
 // parse needed. No key-name completion, no argument completion (D22, F5).
 const REDIS_FIRST_TOKEN_RE = /(^|;)\s*$/;
 
-function redisCompletionSource(): CompletionSource {
-  return (context) => {
-    const word = context.matchBefore(/[^\s;]*/);
-    if (!word || (word.from === word.to && !context.explicit)) return null;
-    const before = context.state.sliceDoc(0, word.from);
+function redisCompletionSource(): EditorCompletionSource {
+  return ({ doc, offset, explicit }) => {
+    const wordMatch = /[^\s;]*$/.exec(doc.slice(0, offset));
+    const wordText = wordMatch ? wordMatch[0] : '';
+    const from = offset - wordText.length;
+    if (from === offset && !explicit) return null;
+    const before = doc.slice(0, from);
     if (!REDIS_FIRST_TOKEN_RE.test(before)) return null;
     return {
-      from: word.from,
+      from,
       options: REDIS_COMMANDS.map((cmd) => ({
         label: cmd.name,
         detail: cmd.hint,
-        type: 'keyword',
+        type: 'keyword' as const,
       })),
     };
   };
 }
 
 /** For the five SQL kinds: undefined with no DDL document AND no cached columns for this
- *  connection (D5, lang-sql's own language-data keyword source stays in charge — the console's
- *  `autocomplete` prop is what gates SQL completion generally); P18 (v1.1)'s schema+keyword pair
+ *  connection (D5 — the console's `autocomplete` prop is what gates SQL completion generally, and
+ *  with neither supply completion falls back to `relations`/`sqlKeywordCompletionSource` alone,
+ *  never `undefined` outright unless all three are empty); P18 (v1.1)'s schema+keyword pair
  *  (sqlLanguageService.ts) once either exists. `cached` (P22c D4) is the metadata cache's own
  *  columns for this console's container — a plain value already in memory (state/schemaColumns.ts,
  *  filled by the view's own lifecycle hook), never fetched from here. */
@@ -240,9 +246,8 @@ export function consoleCompletionSources(
   connectionId: string | null,
   path: string,
   schema?: DdlSchema,
-  database?: string | null,
   cached?: readonly RelationColumns[],
-): readonly CompletionSource[] | undefined {
+): readonly EditorCompletionSource[] | undefined {
   if (kind === 'mongodb' && connectionId) return [mongoCompletionSource(connectionId, path)];
   if (kind === 'redis') return [redisCompletionSource()];
   const dialect = sqlDialectFor(kind);
@@ -251,11 +256,5 @@ export function consoleCompletionSources(
   // exists, but a connection with none still gets table-name completion from the tree's own
   // cache (relations), the same technique mongoCompletionSource already uses for collections.
   const relations = connectionId ? consoleRelationNames(connectionId, path) : [];
-  return sqlCompletionSources(
-    dialect,
-    schema ?? EMPTY_DDL_SCHEMA,
-    database,
-    relations,
-    cached ?? [],
-  );
+  return sqlCompletionSources(dialect, schema ?? EMPTY_DDL_SCHEMA, relations, cached ?? []);
 }

@@ -1,10 +1,10 @@
+import type { EditorLanguageId } from '@shared/domain/editor';
 import {
   type BeautifyMode,
   type BeautifyResult,
   beautifyJson,
   beautifyXml,
 } from '../../../beautify';
-import type { EditorLanguageId } from '../../../editor/languages';
 
 /** §8.6's closed vocabulary, decided once (D8). P42 D23/D25: uuid/url dropped (F19 — both were
  *  inert on selection, changing nothing but a label and, for uuid, whether one button was
@@ -65,7 +65,7 @@ export const FORMAT_GROUPS: readonly (readonly CellFormat[])[] = [
   ['base64', 'hex'],
 ];
 
-/** Which CodeMirror grammar renders a format; `plain` means no language extension. */
+/** Which Monaco grammar renders a format; `plain` means no language extension. */
 export const FORMAT_LANGUAGE: Record<CellFormat, EditorLanguageId> = {
   text: 'plain',
   json: 'json',

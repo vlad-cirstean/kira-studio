@@ -36,7 +36,7 @@ import {
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
-import type { RangeHighlight } from '../../editor/variableHighlight';
+import type { RangeHighlight } from '../../editor/ranges';
 import { registerCommand } from '../../shortcuts/commands';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';

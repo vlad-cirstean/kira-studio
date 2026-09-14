@@ -11,8 +11,8 @@ import {
   type TransformName,
 } from '@kira/api-core';
 import type { EditorCompletionSource } from '../../editor/completion';
-import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hover';
-import type { RangeHighlight } from '../../editor/variableHighlight';
+import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hoverInfo';
+import type { RangeHighlight } from '../../editor/ranges';
 import { type Completion, templateToken } from '../../theme/primitives/completion';
 import { cachedVariables, mergedValuesAndSecrets } from './variables';
 

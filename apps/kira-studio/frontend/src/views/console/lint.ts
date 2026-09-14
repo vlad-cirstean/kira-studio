@@ -2,7 +2,6 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import { MONGO_CONSOLE_METHODS } from '@shared/domain/console';
 import { lintSql } from '@shared/domain/sql-lint';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
-import { dialectObjectFor } from '../../editor/languages';
 import { tryParseShellText } from '../shared/document/ejson';
 import {
   backslashEscapesFor,
@@ -24,11 +23,10 @@ function lintSqlConsole(
 ): (text: string) => ConsoleDiagnostic[] {
   const backslashEscapes = backslashEscapesFor(dialect);
   const dollarQuoting = dollarQuotingFor(dialect);
-  const dialectObject = dialect && dialectObjectFor(dialect);
   return (text) => {
     const lexical = lintSql(text, { backslashEscapes, dollarQuoting });
-    if (!dialectObject || !schema || schema.tables.length === 0) return lexical;
-    return [...lexical, ...ddlDiagnostics(dialectObject, text, schema)];
+    if (!dialect || !schema || schema.tables.length === 0) return lexical;
+    return [...lexical, ...ddlDiagnostics(dialect, text, schema)];
   };
 }
 

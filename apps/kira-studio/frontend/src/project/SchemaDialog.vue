@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import CodeMirrorHost from '../editor/CodeMirrorHost.vue';
+import MonacoHost from '../editor/MonacoHost.vue';
 import { connectionRecord } from '../state/connections';
 import {
   closeSchemaDialog,
@@ -9,6 +9,7 @@ import {
   saveDdl,
   schemaDialectFor,
   schemaDialogState,
+  sqlKeywordCompletionSourceFor,
 } from '../state/schemas';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -33,7 +34,7 @@ const saving = ref(false);
 // P12 round 1 finding #12: `draft` (the editor's own live doc) updates every keystroke, but the
 // parse summary below reads this instead — a full Lezer parse of the whole document (measured up
 // to ~58ms on a 200-table schema, against the app's own 50ms interaction budget) has no business
-// running on every keystroke. 400ms mirrors CodeMirrorHost.vue's own `@codemirror/lint` debounce
+// running on every keystroke. 400ms mirrors MonacoHost.vue's own marker (`setModelMarkers`) debounce
 // precedent. An external load (the watcher below) writes both refs immediately, with no delay —
 // only typing goes through the timer.
 const debouncedDraft = ref('');
@@ -44,6 +45,13 @@ const connectionId = computed(() => schemaDialogState.connectionId);
 const connectionKind = computed(() => connectionRecord(connectionId.value)?.kind);
 const connectionName = computed(() => connectionRecord(connectionId.value)?.name ?? '');
 const dialect = computed(() => schemaDialectFor(connectionKind.value));
+// P60b §6.2: MonacoHost has no equivalent of CodeMirror's own implicit language-data keyword
+// source — `:autocomplete="true"` alone offered dialect-correct keyword/type completion before
+// (lang-sql's own override-less default); this is that source, made explicit.
+const completionSources = computed(() => {
+  const source = sqlKeywordCompletionSourceFor(connectionKind.value);
+  return source && [source];
+});
 
 // P12 round 1 finding #3: the reset must happen synchronously, before the `await` below, and the
 // response must be discarded if the dialog has since moved on to a different connection — without
@@ -126,18 +134,18 @@ async function onSave(): Promise<void> {
         override that: a schema that doesn't exist yet, or a connection this app can't introspect.
       </span>
       <div class="editor-wrap">
-        <!-- P4: :autocomplete alone (no completionSources) is enough to get lang-sql's own
-             dialect-correct keyword/type-name completion here — useful for hand-typing VARCHAR,
-             NUMERIC(10,2), REFERENCES, NOT NULL. Relation/column completion from what's being
-             typed in THIS document is a separate, larger piece of work (project/ may not import
-             views/, per biome.json, so it needs its own state/schemas.ts dispatch export) and is
-             left for a later phase. -->
-        <CodeMirrorHost
+        <!-- P4/P60b §6.2: `completionSources` (state/schemas.ts's own sqlKeywordCompletionSourceFor
+             dispatch, project/ may not import views/ per biome.json) gives dialect-correct
+             keyword/type-name completion here — useful for hand-typing VARCHAR, NUMERIC(10,2),
+             REFERENCES, NOT NULL. Relation/column completion from what's being typed in THIS
+             document is a separate, larger piece of work and is left for a later phase. -->
+        <MonacoHost
           :doc="draft"
           language="sql"
           :sql-dialect="dialect"
           :read-only="false"
           :autocomplete="true"
+          :completion-sources="completionSources"
           @update:doc="onDocChange"
         />
       </div>

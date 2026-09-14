@@ -1,6 +1,5 @@
-import type { Completion } from '@codemirror/autocomplete';
-import type { SQLDialect, SQLNamespace } from '@codemirror/lang-sql';
 import type { RelationColumns } from '@shared/domain/tree';
+import type { EditorCompletion } from '../../editor/completion';
 import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import {
   childrenOf,
@@ -8,20 +7,23 @@ import {
   isNameNode,
   keywordText,
   type LNode,
+  parseSql,
   splitComposite,
   TokenCursor,
   text,
   unquotedName,
-} from './lezerNodes';
+} from './sqlNodes';
 
 // D9/D10: the model the SQL language service (completion/diagnostics/hover) reads. Built once per
 // (connectionId, DDL text) — see state/schemas.ts's memoisation — and never touches the network.
 export interface DdlColumn {
   name: string;
-  /** F5.2: taken as a raw source-text slice, never reconstructed from parsed Type/Identifier
-   *  nodes — `Type` classification depends on each dialect's own curated type-name list
-   *  (languages.ts's ClickHouseDialect lists ~40; anything outside it comes back as a plain
-   *  Identifier), so collecting only `Type` nodes would silently drop real declared types. */
+  /** F5.2: taken as a raw source-text slice, never reconstructed from individual tokens —
+   *  `sql-tokens.ts`'s scanner has no dedicated `Type` node kind at all (a declared column type is
+   *  an ordinary run of `Identifier`/`Keyword`/`Parens` tokens), so collecting only "type-shaped"
+   *  nodes would require guessing at exactly the vocabulary this comment used to worry about
+   *  missing. Slicing verbatim between the column name and the first `TYPE_STOP_WORDS` token below
+   *  sidesteps that entirely. */
   type: string;
   primaryKey?: boolean;
   notNull?: boolean;
@@ -348,20 +350,26 @@ function handleStatement(stmt: LNode, source: string, tables: DdlTable[], index:
   // else: SET/GRANT/INSERT/… (D9) — a schema file is pasted, not authored; skipped silently.
 }
 
-/** Parses user-supplied DDL text with `dialect`'s own Lezer grammar into the table/column model
- *  the language service reads. Never throws — an unterminated or unrecognised statement simply
+/** Parses user-supplied DDL text with `dialect`'s own tokenizer into the table/column model the
+ *  language service reads. Never throws — an unterminated or unrecognised statement simply
  *  contributes nothing (D9). */
-export function parseDdl(dialect: SQLDialect, source: string): DdlSchema {
+export function parseDdl(dialect: SqlDialect, source: string): DdlSchema {
   const tables: DdlTable[] = [];
   const index = new TableIndex();
-  const root = dialect.language.parser.parse(source).topNode as unknown as LNode;
+  const root = parseSql(dialect, source);
   for (const stmt of childrenOf(root)) {
     if (stmt.name === 'Statement') handleStatement(stmt, source, tables, index);
   }
   return { tables };
 }
 
-function columnCompletions(table: DdlTable): readonly Completion[] {
+// P60b §5.1: SchemaNamespace replaces lang-sql's own SQLNamespace — the same recursive
+// name -> (columns | nested namespace) object `toSqlNamespace` already built, typed for this app's
+// own EditorCompletion (`editor/completion.ts`) instead of `@codemirror/autocomplete`'s Completion.
+// `sqlSchemaCompletion.ts` is the one consumer.
+export type SchemaNamespace = { [name: string]: SchemaNamespace | readonly EditorCompletion[] };
+
+function columnCompletions(table: DdlTable): readonly EditorCompletion[] {
   return table.columns.map((col) => ({
     label: col.name,
     type: 'property',
@@ -371,16 +379,18 @@ function columnCompletions(table: DdlTable): readonly Completion[] {
   }));
 }
 
-/** D10: the SQLNamespace `schemaCompletionSource` consumes. A qualified table is emitted both
- *  nested (`schema.table`) and flat (`table`) — SQLNamespace is a plain object, so duplicating a
+/** D10: the SchemaNamespace `sqlSchemaCompletion.ts` consumes. A qualified table is emitted both
+ *  nested (`schema.table`) and flat (`table`) — SchemaNamespace is a plain object, so duplicating a
  *  reference costs nothing, and it's what makes a bare table name complete even when the DDL
  *  qualified it. */
-export function toSqlNamespace(schema: DdlSchema): SQLNamespace {
-  const ns: Record<string, SQLNamespace> = {};
+export function toSqlNamespace(schema: DdlSchema): SchemaNamespace {
+  const ns: SchemaNamespace = {};
   for (const table of schema.tables) {
     const columns = columnCompletions(table);
     if (table.schema) {
-      const schemaNs = (ns[table.schema] as Record<string, SQLNamespace> | undefined) ?? {};
+      const existing = ns[table.schema];
+      const schemaNs: SchemaNamespace =
+        existing !== undefined && !Array.isArray(existing) ? (existing as SchemaNamespace) : {};
       schemaNs[table.name] = columns;
       ns[table.schema] = schemaNs;
     }
@@ -389,15 +399,15 @@ export function toSqlNamespace(schema: DdlSchema): SQLNamespace {
   return ns;
 }
 
-/** P22c D4: RelationColumns[] (the metadata cache's own supply, F5) -> lang-sql's namespace
- *  object, the exact shape toSqlNamespace already produces from a parsed DdlSchema — so
- *  schemaCompletionSource cannot tell which supply it got, and alias resolution / `table.`
- *  completion / qualified paths all work identically. Unqualified only: a schema-wide fetch is
- *  scoped to one container already, so there is no second schema/database level to nest under the
- *  way a DDL document's own `table.schema` can produce.
+/** P22c D4: RelationColumns[] (the metadata cache's own supply, F5) -> the same SchemaNamespace
+ *  shape toSqlNamespace produces from a parsed DdlSchema — so sqlSchemaCompletion.ts cannot tell
+ *  which supply it got, and alias resolution / `table.` completion / qualified paths all work
+ *  identically. Unqualified only: a schema-wide fetch is scoped to one container already, so there
+ *  is no second schema/database level to nest under the way a DDL document's own `table.schema`
+ *  can produce.
  *
  *  P4: labels stay bare (matching/highlighting wants the plain name); a column needing quotes
- *  (case-sensitive, a reserved word) gets `apply` set to its quoted form — the same
+ *  (case-sensitive, a reserved word) gets `insert` set to its quoted form — the same
  *  identNeedsQuoting/quoteIdent call views/grid/filterCompletion.ts already makes for the data
  *  view's own filter box, so accepting `"order"` here and accepting it there produce the same
  *  bytes. Without this, a cache-fed completion (unlike the DDL-document branch, which was never in
@@ -405,11 +415,11 @@ export function toSqlNamespace(schema: DdlSchema): SQLNamespace {
 export function namespaceFromCached(
   relations: readonly RelationColumns[],
   dialect: SqlDialect,
-): SQLNamespace {
-  const ns: Record<string, SQLNamespace> = {};
+): SchemaNamespace {
+  const ns: SchemaNamespace = {};
   for (const rc of relations) {
     ns[rc.name] = rc.columns.map((col) => {
-      const completion: Completion = {
+      const completion: EditorCompletion = {
         label: col.name,
         type: 'property',
         detail: col.dataType,
@@ -417,7 +427,7 @@ export function namespaceFromCached(
         boost: col.isPrimaryKey ? 1 : 0,
       };
       return identNeedsQuoting(dialect, col.name)
-        ? { ...completion, apply: quoteIdent(dialect, col.name) }
+        ? { ...completion, insert: quoteIdent(dialect, col.name) }
         : completion;
     });
   }

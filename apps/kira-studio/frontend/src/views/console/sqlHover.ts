@@ -1,8 +1,7 @@
-import type { SQLDialect } from '@codemirror/lang-sql';
-import type { HoverTooltipSource } from '@codemirror/view';
-import { buildHoverSource, type ConsoleHoverInfo } from '../../editor/hover';
+import type { ConsoleHoverInfo } from '../../editor/hoverInfo';
+import type { SqlDialect } from '../shared/sqlIdent';
 import { type DdlColumn, type DdlSchema, type DdlTable, findTable } from './ddl';
-import { childrenOf, isNameNode, type LNode, unquotedName } from './lezerNodes';
+import { childrenOf, isNameNode, type LNode, parseSql, unquotedName } from './sqlNodes';
 import { statementsWithRefs } from './sqlRefs';
 
 const MAX_TABLE_COLUMNS = 40;
@@ -59,20 +58,22 @@ function columnHoverInfo(
 }
 
 function resolveHover(
-  dialect: SQLDialect,
+  dialect: SqlDialect,
   schema: DdlSchema,
   doc: string,
   pos: number,
-  tree?: LNode,
 ): ConsoleHoverInfo | null {
   // P12 round 1 finding #13: parsed once here, then handed to both statementsWithRefs() calls
-  // below (its own `root` param) — before, each one re-parsed this exact same string, a provably
-  // redundant second parse of text already parsed one line above.
-  // P12 round 2 finding #11: `tree`, when given, is CodeMirror's own already-parsed syntax tree
-  // (editor/hover.ts's buildHoverSource, via `syntaxTree(view.state)`) — measured up to ~51ms on a
-  // 191KB document otherwise, over budget with no debounce. A fresh parse only happens when no
-  // tree is supplied (e.g. a caller with no live EditorView, like a unit test).
-  const root = tree ?? (dialect.language.parser.parse(doc).topNode as unknown as LNode);
+  // below (its own `root` param) — each one would otherwise re-parse this exact same string, a
+  // provably redundant second parse of text already parsed one line above.
+  // P60b: `parseSql` calls `tokenizeSql` through `sql-tokens.ts`'s own D2 memo (keyed by
+  // (dialect, source) reference) — several calls over the same untouched document string in one
+  // interaction burst (a hover, then the lint pass, then another hover) share one real tokenize,
+  // restoring the property `editor/hover.ts`'s old `syntaxTree(view.state)` handoff existed for
+  // (measured up to ~51ms on a 191KB document, over budget with no debounce) without needing a
+  // live EditorView to hand a tree through — this lookup is now a plain, pure function of
+  // (doc, offset), no tree parameter to thread.
+  const root = parseSql(dialect, doc);
   const { node, parent } = findLeafAt(root, pos);
   if (!isNameNode(node)) return null;
 
@@ -136,11 +137,14 @@ function resolveHover(
 }
 
 /** undefined with no DDL document for this connection (D5) — no hover source at all rather than
- *  one that never resolves anything. */
+ *  one that never resolves anything. P60b §4: a plain `(doc, offset) => ConsoleHoverInfo | null` —
+ *  `MonacoHost.vue`'s own hover provider (P60a §4.4) plugs a lookup of this exact shape straight
+ *  in, so the CodeMirror-only glue `editor/hover.ts`'s old `buildHoverSource` existed for has no
+ *  equivalent to keep. */
 export function sqlHoverSource(
-  dialect: SQLDialect,
+  dialect: SqlDialect,
   schema: DdlSchema,
-): HoverTooltipSource | undefined {
+): ((doc: string, offset: number) => ConsoleHoverInfo | null) | undefined {
   if (schema.tables.length === 0) return undefined;
-  return buildHoverSource<LNode>((doc, pos, tree) => resolveHover(dialect, schema, doc, pos, tree));
+  return (doc, offset) => resolveHover(dialect, schema, doc, offset);
 }

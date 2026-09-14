@@ -17,7 +17,7 @@ import {
 } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import type { RangeHighlight } from '../../editor/variableHighlight';
+import type { RangeHighlight } from '../../editor/ranges';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';

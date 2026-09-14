@@ -1,13 +1,14 @@
-import type { SQLDialect } from '@codemirror/lang-sql';
+import type { SqlDialect } from '../shared/sqlIdent';
 import {
   childrenOf,
   isKeyword,
   isNameNode,
   type LNode,
+  parseSql,
   splitComposite,
   text,
   unquotedName,
-} from './lezerNodes';
+} from './sqlNodes';
 
 // P18 (v1.1) D7/D8: a from-scratch re-derivation of lang-sql's own getAliases (F2) — a table
 // reference and its optional alias, walked from each statement's FROM/JOIN clause over the exact
@@ -159,11 +160,11 @@ function refsInStatement(toks: readonly LNode[], source: string): TableRef[] {
 // same string — measured ~5-13ms per hover on a moderately large script, half of it provably
 // redundant. Omitted, this parses `source` itself, unchanged from before.
 export function statementsWithRefs(
-  dialect: SQLDialect,
+  dialect: SqlDialect,
   source: string,
   root?: LNode,
 ): StatementRefs[] {
-  const parsedRoot = root ?? (dialect.language.parser.parse(source).topNode as unknown as LNode);
+  const parsedRoot = root ?? parseSql(dialect, source);
   const out: StatementRefs[] = [];
   for (const stmt of childrenOf(parsedRoot)) {
     if (stmt.name !== 'Statement') continue;

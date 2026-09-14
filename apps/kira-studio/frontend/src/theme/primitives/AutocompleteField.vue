@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { EditorLanguageId } from '@shared/domain/editor';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
-import type { EditorLanguageId } from '../../editor/languages';
 import { loadMonaco, type MonacoModule } from '../../editor/monaco';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
-import type { RangeHighlight } from '../../editor/variableHighlight';
+import type { RangeHighlight } from '../../editor/ranges';
 import type { SqlDialect } from '../../views/shared/sqlIdent';
 import CodiconIcon from '../CodiconIcon.vue';
 import { computeFloatPosition, pointReference } from '../floatingPosition';

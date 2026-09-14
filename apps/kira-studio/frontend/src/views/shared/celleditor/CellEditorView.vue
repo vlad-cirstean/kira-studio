@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import { findRanges } from '../../../editor/findRanges';
-import type { EditorLanguageId } from '../../../editor/languages';
 import MonacoHost from '../../../editor/MonacoHost.vue';
 import { formatBytes } from '../../../format';
 import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';

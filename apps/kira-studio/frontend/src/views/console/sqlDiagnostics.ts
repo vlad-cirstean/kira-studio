@@ -1,7 +1,7 @@
-import type { SQLDialect } from '@codemirror/lang-sql';
 import type { ConsoleDiagnostic } from '../../editor/diagnostics';
+import type { SqlDialect } from '../shared/sqlIdent';
 import { type DdlSchema, type DdlTable, findTable } from './ddl';
-import { childrenOf, type LNode } from './lezerNodes';
+import { childrenOf, type LNode } from './sqlNodes';
 import { deepCompositeIdentifiers, statementsWithRefs, type TableRef } from './sqlRefs';
 
 // P18 (v1.1) D7: two diagnostics, both warnings, both bounded by what the DDL can actually prove —
@@ -101,7 +101,7 @@ function unknownColumnDiagnostics(
  *  this module's one call site (lint.ts), which is deliberately debounced 400ms and not (yet) worth
  *  the CodeMirror-internals plumbing hover.ts's own redundant-parse fix needed. */
 export function ddlDiagnostics(
-  dialect: SQLDialect,
+  dialect: SqlDialect,
   text: string,
   schema: DdlSchema,
   root?: LNode,

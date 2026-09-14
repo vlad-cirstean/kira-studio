@@ -134,17 +134,6 @@ function groupStatements(nodes: readonly MNode[]): MNode[] {
   return statements;
 }
 
-function spanNodeName(kind: 'lineComment' | 'blockComment' | 'dollarQuote'): string {
-  switch (kind) {
-    case 'lineComment':
-      return 'LineComment';
-    case 'blockComment':
-      return 'BlockComment';
-    case 'dollarQuote':
-      return 'String';
-  }
-}
-
 function isDigit(c: string | undefined): boolean {
   return c !== undefined && c >= '0' && c <= '9';
 }
@@ -217,12 +206,21 @@ function scanLevel(
 
     const span = scanSqlSpan(source, i, lexOptions);
     if (span) {
+      // Comments are trivia, not structure — dropped here exactly like whitespace, never a
+      // sibling in any parent's children list. This is what lets a header comment sit ahead of a
+      // real statement (a pg_dump preamble's own shape) without derailing `ddl.ts`'s
+      // `TokenCursor`, which always expects its very first token to be the statement's own
+      // leading keyword — the same "comments are noise… dropped" rule `ddl.ts`'s own
+      // `parseColumnDefs` already states for a column list's comments, generalised to every
+      // level rather than one.
+      if (span.kind === 'lineComment' || span.kind === 'blockComment') {
+        i = span.end;
+        continue;
+      }
       const name =
-        span.kind === 'quote'
-          ? span.quoteChar && opts.identifierQuotes.includes(span.quoteChar)
-            ? 'QuotedIdentifier'
-            : 'String'
-          : spanNodeName(span.kind);
+        span.quoteChar && opts.identifierQuotes.includes(span.quoteChar)
+          ? 'QuotedIdentifier'
+          : 'String';
       nodes.push(leaf(name, span.start, span.end));
       i = span.end;
       continue;

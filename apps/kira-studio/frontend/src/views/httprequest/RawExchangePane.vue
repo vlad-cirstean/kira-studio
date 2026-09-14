@@ -5,7 +5,7 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { copyText } from '../../clipboard';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import type { RangeHighlight } from '../../editor/variableHighlight';
+import type { RangeHighlight } from '../../editor/ranges';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
