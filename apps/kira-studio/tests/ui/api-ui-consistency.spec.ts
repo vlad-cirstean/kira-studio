@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { acceptConfirm } from './support/dialogs';
-import { editorText } from './support/editorText';
+import { editorText, stableBoundingBox } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P13 §7: a small, Api-only spec (the SPEC's module-boundary rule — "a single test file covering
@@ -352,8 +352,7 @@ test('hovering a resolved reference shows its value; hovering a secret never doe
 
   const resolvedSpan = page.locator('.url-field .kira-ed-var');
   await expect(resolvedSpan).toHaveCount(1);
-  const resolvedBox = await resolvedSpan.boundingBox();
-  if (!resolvedBox) throw new Error('resolved reference span has no box');
+  const resolvedBox = await stableBoundingBox(resolvedSpan);
   await page.mouse.move(
     resolvedBox.x + resolvedBox.width / 2,
     resolvedBox.y + resolvedBox.height / 2,
@@ -451,8 +450,7 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   // (MonacoHost.vue's own hover provider, `.monaco-hover`), not AutocompleteField's own overlay
   // panel (`autocomplete-hover`): the body editor is a real editable host, wired directly via
   // MonacoHost's hoverSource prop, not the URL field's read-only-overlay-behind-an-input trick.
-  const resolvedBox = await resolvedSpan.boundingBox();
-  if (!resolvedBox) throw new Error('resolved reference span has no box');
+  const resolvedBox = await stableBoundingBox(resolvedSpan);
   await page.mouse.move(
     resolvedBox.x + resolvedBox.width / 2,
     resolvedBox.y + resolvedBox.height / 2,
@@ -506,8 +504,12 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
 
   const resolvedSpan = body.locator('.kira-ed-var');
   await expect(resolvedSpan).toHaveCount(1);
-  const resolvedBox = await resolvedSpan.boundingBox();
-  if (!resolvedBox) throw new Error('resolved reference span has no box');
+  const resolvedBox = await stableBoundingBox(resolvedSpan);
+  // A genuine leave-then-enter, not a teleport from Playwright's own initial (0, 0) mouse position
+  // straight onto the token — Monaco's hover controller only arms its delay timer on a fresh
+  // "entered this token" transition, and starting from a stale internal target left by an earlier
+  // step (`stableBoundingBox`'s own polling included) can leave that transition undetected.
+  await page.mouse.move(0, 0);
   await page.mouse.move(
     resolvedBox.x + resolvedBox.width / 2,
     resolvedBox.y + resolvedBox.height / 2,

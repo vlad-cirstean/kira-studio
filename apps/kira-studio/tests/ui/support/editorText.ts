@@ -44,3 +44,24 @@ export async function diffEditorText(
   ]);
   return { original: original ?? '', modified: modified ?? '' };
 }
+
+/** `locator.boundingBox()`, retried: a `{{variable}}` decoration span (`.kira-ed-var` and
+ *  siblings) inside a live MonacoHost can briefly vanish and come back as a *new* DOM node —
+ *  `scheduleLint`'s own debounced `setModelMarkers` pass re-renders `.view-lines`, independent of
+ *  and shortly after the decorations that painted the span in the first place. A `toHaveCount(1)`
+ *  check right before a plain `boundingBox()` call can pass, then still catch the node mid-churn:
+ *  present, but not (yet) laid out, so `boundingBox()` returns `null`. Polling re-resolves the
+ *  locator each attempt, so it naturally finds the node's replacement once one lands. */
+export async function stableBoundingBox(
+  locator: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  let box: Awaited<ReturnType<Locator['boundingBox']>> = null;
+  await expect
+    .poll(async () => {
+      box = await locator.boundingBox();
+      return box !== null;
+    })
+    .toBe(true);
+  if (!box) throw new Error('stableBoundingBox: locator never settled on a box');
+  return box;
+}
