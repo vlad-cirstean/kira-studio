@@ -251,10 +251,38 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   call sites across `gitstream.go` and the renamed test functions in `gitstream_test.go`. See the
   non-trivial entry below for what did not work.
 
+- **P67f (planning)**: no server was running at session start (`ConnectionRefused`, expected). Built
+  and started per the headless steps. Two notes, transcribed here per this doc's own "trivial" rule
+  (nothing wrong with the tool itself, both are environment/process quirks worth not rediscovering).
+  First, `pgrep -f "kira-repo-map|mcp-repo-map.ts" | xargs kill` kills the calling shell (exit 144),
+  same reason `pkill -f` does (already logged P63/P67): the pattern matches the agent harness's own
+  command line. `ps -eo pid,comm | awk '$2=="kira-repo-map"'` does not. Second, pointing `KIRA_HOME`
+  at "the scratchpad directory" is **not** reliably a cold index — this session's scratchpad already
+  held a `codeindex.db` from an earlier agent under the same session id. Use a fresh subdirectory
+  (`mkdir -p "$SCRATCH/coldhome"`) when a cold index is actually the point.
+
+- **P67f (implementation)**: same `ConnectionRefused`/leftover-orphaned-process pattern as every
+  entry above — a server from an earlier session in this container was already running on 8765 with
+  a stale hashed token; killed it **by PID** (`ps -eo pid,comm | awk '$2=="kira-repo-map"'`, per the
+  note above — not tried against `pgrep -f` this session, since the note already said not to),
+  deleted the stale token file, restarted to mint a fresh bearer token, called it over plain
+  HTTP/JSON-RPC throughout. Rebuilt and restarted the server twice more as this phase's
+  own query files changed (§1.8's fingerprint-driven reindex, once per rebuild) — each full reindex
+  of this monorepo (Go, TypeScript, JavaScript and Vue together) took noticeably longer than P64c's
+  own ~3s figure, on the order of a few minutes; worth recording since a caller timing a "how long
+  should this take" assumption off that earlier number would be surprised. The mandatory
+  dedicated dogfood pass (§3.6/§8 of this phase's own plan) is written up in the two non-trivial
+  entries' own "Fix" notes below rather than repeated here. One additional check beyond those:
+  `find_definition {"symbol":"NewExecRunner"}` (a file this phase never touched) correctly returned
+  an ambiguous 2-candidate list (`internal/ghclient` and `internal/gitclient` both really declare
+  one) rather than a silent top-hit guess, and `outline_file` on `internal/gitclient/runner.go`
+  returned its normal node list — both a clean no-regression check. No new non-trivial finding.
+
 ### Non-trivial
 
 - **P67e (implementation) — `find_references` returns nothing for a package-level variable that is
-  only ever read via `range` or an index expression (`x[k]`), never called. Open.**
+  only ever read via `range` or an index expression (`x[k]`), never called. Fixed (`ddd15b00`,
+  `0bfef238`).**
 
   Found on a server confirmed warm (not the already-logged cold-index issue below: `search_symbols`,
   `find_definition` and `find_references` all answered correctly and immediately for other symbols
@@ -289,8 +317,29 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   query needs a capture for an identifier used as a `range_clause`'s right-hand operand and as an
   `index_expression`'s operand, not only as a `call_expression`'s function.
 
+  **Fix (P67f, `ddd15b00`)**: a new query file, `queries/go/p67f_reads.scm`, adds exactly those two
+  patterns, both captured under a new `read` reference kind (`referenceKinds` in `extract.go`;
+  `extractionVersion` 2→3 to force the rebuild). Verified against a live server on a completed
+  reindex, on the exact four names logged above: `find_references {"symbol":"allowedMethods"}` now
+  returns exactly the 3 real sites (`gitstream.go:146`, `gitstream_test.go:60`,
+  `gitstream_classification_coverage_test.go:42`), and `allowedStreamMethods`/`writeMethods`/
+  `hostAnsweredMethods` all return their real `range`/index sites too — every one kind `read`.
+  `find_references {"symbol":"allowedRequest"}` (the control) is unchanged: still exactly 7, all
+  kind `call`. `find_references {"symbol":"allowedMethods","kinds":["read"]}` returns the same 3
+  sites; `{"kinds":["call"]}` correctly returns none. Symbol/`call`/`type` reference counts for the
+  whole repository were confirmed unchanged before/after (only new `read` rows appeared).
+  **Fix (P67f, `0bfef238`)**: the same gap, one language family over — `queries/javascript/
+  p67f_reads.scm` adds the `for_in_statement`/`subscript_expression` equivalents, registered on
+  JavaScript, TypeScript and TSX (Vue rides along via script-block injection). Measured against the
+  live index before shipping (P67f's own plan §4 stop gate): +1617 `read` rows across the whole
+  JS/TS/Vue family, well under the 10,000-row bound, with every existing kind's count byte-identical
+  before and after. Verified live on a real production name read only via `for...of`:
+  `find_references {"symbol":"DYNAMIC_NAMES"}` (`packages/api-core/src/http/dynamic/catalog.ts`)
+  now returns its one real `for (const name of DYNAMIC_NAMES)` site in
+  `packages/api-core/test/http-dynamic-fake.spec.ts:15`, kind `read`.
+
 - **P67e (planning) — a query answered against a cold or mid-sync index returns a confident "not
-  found" instead of saying the index isn't ready. Open.**
+  found" instead of saying the index isn't ready. Fixed (`1da60f68`, `7025a88b`).**
 
   Against a server started with an empty `KIRA_HOME` (so the index built from scratch), the first
   calls answered as if the repository genuinely had no such symbol:
@@ -311,6 +360,33 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   most. Fix shape, for the dedicated pass: have the tool responses report "index still syncing"
   when the initial sync has not completed, rather than an empty result — not a retry loop inside
   the caller.
+
+  **Correction (P67f)**: this entry's own root-cause guess — "nothing in `internal/repomap` exposes
+  a sync/ready state" — was half right. `repomap` already had a readiness gate (`server.go`'s
+  `ready`/`readyOnce`), it did return a distinct "still building" message, and it did cover the
+  *initial* sync correctly (re-measured: a query issued 0.5s after a cold start blocked 3.255s, then
+  answered correctly — the gate working as designed, not the bug). What was actually missing: the
+  gate is one-shot and outcome-blind — a failed initial sync opens it anyway (on a partial index,
+  with the failure visible nowhere), and every *later* full sync (a watcher-triggered rescan) runs
+  behind an already-open gate with nothing waiting on it. That combination reproduces this entry's
+  own symptom exactly, including "confident empty, then correct later with no restart."
+
+  **Fix (P67f, `1da60f68`, `7025a88b`)**: `codeindex.Index` gains a `syncTracker` (counter +
+  settled channel + last error/generation) that every full `Sync` — initial and every later rescan
+  alike — brackets itself against. `repomap`'s `waitReady` grows a second wait on
+  `Index.SyncSettled()` under the same 25s bound the initial gate already used, so a tool call now
+  waits out an in-flight rescan instead of answering from a mid-rebuild index, and returns "is
+  reindexing … retry shortly" past the bound. A one-line `index degraded: …` prefix (`tools.go`'s
+  `indexNotice`/`s.text`) surfaces a failed full sync on every response while it stands failed — the
+  one window nothing can wait out — and clears itself the moment a later sync succeeds. Verified:
+  `TestSyncTracker_SettledStateAndGeneration` (`-race`) covers the tracker's own ordering; a live
+  server rebuild-and-cold-reindex re-confirmed the initial-sync block-then-answer behavior; a real
+  `idx.Sync` left in flight while the initial gate was already open (`TestWaitReadyWaitsOut
+  InFlightSyncThenTimesOut`) confirms the second wait — the exact code path a watcher rescan uses,
+  since both go through `Index.Sync`. Not verified live against a genuine `fsnotify` event-queue
+  overflow (the real trigger for a live rescan): forcing that deterministically would mean
+  generating tens of thousands of filesystem events against this shared container, a real cost for
+  a code path already covered deterministically at the unit level — declined rather than attempted.
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
   silently resolves to the Go symbol only. Fixed (`54e77579`).**
