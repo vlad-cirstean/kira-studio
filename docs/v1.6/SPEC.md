@@ -5,13 +5,16 @@ This chapter returns to v1.1/v1.2/v1.4's own shape: six independent, unrelated p
 existing modules, so it continues `P` numbering rather than taking a fresh letter — the same reason
 v1.4's own opening paragraph gives for reusing `P` instead of picking a new one.
 
-**Ten rows today**, up from the original six. P63's own planning pass (committed, not yet
+**Eleven rows today**, up from the original six. P63's own planning pass (committed, not yet
 implemented) found its implementation depends on two prerequisites, so this table now inserts them
 ahead of it in landing order (P64, P65) rather than implementing P63 straight off its own plan. The
 two code-review rounds `CLAUDE.md`'s process always closes a chapter with are now explicit rows
-(P68, P69) too, instead of prose alone. As with every earlier chapter, this table accrues
-findings/splits as phases land; a row may gain a "Deliverable" paragraph reporting what was actually
-built if it diverges from what's written here, per this project's own never-retro-edit convention.
+(P68, P69) too, instead of prose alone. A final row (P70) updates this repository's main docs —
+`README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` — for everything both
+v1.5 and v1.6 changed, not just this chapter's own. As with every earlier chapter, this table
+accrues findings/splits as phases land; a row may gain a "Deliverable" paragraph reporting what was
+actually built if it diverges from what's written here, per this project's own never-retro-edit
+convention.
 
 **Sequencing.** P60 (CodeMirror removal) goes first because two later rows plausibly touch editing
 surfaces it will have already moved onto Monaco (P67's cell editor). P61 (dependency/runtime
@@ -31,7 +34,10 @@ repo-map MCP server (P64's improvements included), once deliberately without it 
 MCP-using arm as the real P63 deliverable, and reports the measured token difference between the two
 arms as its own deliverable. P66/P67 (originally P64/P65: the update banner and the FK cell editor)
 are independent of every other row, ordered as given. P68/P69 are last by construction: the
-code-review cycle needs every other row landed first.
+code-review cycle needs every other row landed first. P70 is last of all: main-docs updates need
+the fixes P68/P69 land, not just the feature rows, and are scoped to cover v1.5's own changes too —
+this phase's own planning pass confirms how current the main docs actually are before deciding what
+needs updating, rather than assuming a gap.
 
 | Phase | Deliverable | Why here |
 |---|---|---|
@@ -45,6 +51,7 @@ code-review cycle needs every other row landed first.
 | **P67 Cell editor: enter edit mode for a foreign-key preview's related record** | Extends the existing FK-preview feature (clicking a foreign-key-valued cell already shows the referenced row from its own table — confirmed present, exact component not yet located; likely `views/shared/celleditor/CellEditorView.vue` or adjacent) so the preview can also open that related record in a real edit session, not only a read-only preview. This phase's own planning pass locates the current FK-preview flow precisely (what it calls today to fetch the related row, what schema/FK-relationship metadata it already has access to) and the app's existing row-edit surface (wherever a normal record is edited today), and designs routing the FK preview into that same edit surface pointed at the related table/row, reusing it rather than building a second edit UI. If P60 has already moved the cell editor itself onto Monaco, this phase builds on that end state | Independent of every other feature row; sequenced after P60 so the cell editor is already Monaco-based |
 | **P68 Code review, round 1** | Three parallel Opus subagents, one per dimension — architecture/security, functional correctness, performance/resource efficiency — findings-only, per `CLAUDE.md`'s own process, then one sequential Sonnet subagent fixes every finding judged real | After every feature row (P60-P67) has landed; a review needs a finished tree |
 | **P69 Code review, round 2** | The same three-dimension cycle, run again in full on the tree P68 leaves — not optional, per `CLAUDE.md`'s "repeat the whole loop that many times" rule. A round finding nothing real says so rather than manufacturing a finding | After P68's fixes land |
+| **P70 Update main docs** | Brings this repository's main docs — `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` — current for everything v1.5 and v1.6 changed, not just this chapter's own rows: v1.5's whole code-intelligence subsystem (C1-C14) alongside every row P60-P69 landed here. This phase's own planning pass reads each main doc against the current tree rather than trusting either chapter's `SPEC.md`/`plans/` prose, finds what has drifted (a removed dependency still documented, a new subsystem missing from `ARCHITECTURE.md`'s own component list, a stale tool count, an environment quirk resolved since it was written), and fixes it — same "no shortcuts" bar as every other phase, not a light pass | Last of all: needs every other row (including both code-review rounds) landed, and is the one row scoped to both chapters, not just this one |
 
 ## Layout
 
