@@ -50,7 +50,7 @@
     "generate:wire": "sh scripts/generate-wire.sh"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.11",
+    "@biomejs/biome": "2.5.13",
     "@faker-js/faker": "10.6.0",
     "@playwright/test": "1.62.1",
     "@tailwindcss/vite": "4.3.3",
