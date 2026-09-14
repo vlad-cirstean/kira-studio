@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"path/filepath"
 	"sync"
@@ -480,7 +481,13 @@ func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspa
 
 	go func() {
 		stats, err := codeworkspace.Search(searchCtx, sess, req, coalescer.push)
-		if err != nil {
+		// C14-7: CancelSearch (the panel's own Stop button) cancels searchCtx, which
+		// codeworkspace.Search surfaces as ctx.Err() == context.Canceled -- a clean, user-requested
+		// stop, not a failure. Rendering it as an E_INTERNAL error banner hid the partial-results
+		// summary line and made stopping a search look like it had failed. Session.Close ends
+		// searchCtx the same way (StartSearch's own doc comment), and gets the identical clean
+		// treatment here for the same reason: nothing is left to show it to by then anyway.
+		if err != nil && !errors.Is(err, context.Canceled) {
 			coalescer.finish(&stats, &CodeSearchEventErr{Code: "E_INTERNAL", Message: err.Error()})
 			return
 		}
