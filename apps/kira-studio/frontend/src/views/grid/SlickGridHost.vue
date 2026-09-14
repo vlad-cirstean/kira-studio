@@ -59,6 +59,7 @@ import {
   type CellFocusRequest,
   consumeCellFocus,
   registerGridHost,
+  requestCellFocus,
   unregisterGridHost,
 } from './focusRequest';
 import { cellMenu, type FkNavContext, headerMenu, rowMenu } from './menu';
@@ -1418,8 +1419,13 @@ function startEditCell(row: number, displayCol: number): void {
 
 // P67 §5.3: this tab's own `focusRequest.ts` registry entry — registered in onMounted, called
 // either immediately by `requestCellFocus` (a host already mounted with a matching page) or from
-// the `pageVersion` watch below once a fresh, filtered page lands. `startEditCell` above already
-// does `setActiveCell` + `editActiveCell` and is self-gating (`onBeforeEditCell`'s own veto) — no
+// the `pageVersion` watch below once a fresh, filtered page lands. Deliberately NOT `startEditCell`
+// above: that helper's own `setActiveCell` call suppresses `onActiveCellChanged`, which is fine for
+// its existing callers (the cell menu's "Edit" item, always run on a cell an ordinary prior click
+// already selected) but wrong here — this is the FIRST selection this brand-new tab's cell ever
+// gets, so the event must fire for `SlickHybridSelectionModel.handleActiveCellChange` to populate
+// `rt().selection` at all (the publish watch below reads only that; with it suppressed, the cell
+// editor dock never appears). `onBeforeEditCell`'s own veto still gates `editActiveCell` below — no
 // second editability rule is introduced here (§9's own non-goal).
 function applyCellFocusRequest(req: CellFocusRequest): boolean {
   const p = getPage(props.tabId);
@@ -1434,12 +1440,9 @@ function applyCellFocusRequest(req: CellFocusRequest): boolean {
       break;
     }
   }
-  if (req.edit) {
-    startEditCell(req.row, displayCol);
-  } else {
-    const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
-    grid.setActiveCell(displayPositionOf(idx, req.row), displayCol + 1, false, false, true);
-  }
+  const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
+  grid.setActiveCell(displayPositionOf(idx, req.row), displayCol + 1, false, false, false);
+  if (req.edit) grid.editActiveCell();
   return true;
 }
 
@@ -2097,8 +2100,23 @@ onMounted(() => {
   resizeObserver.observe(el);
 
   // P67 §5.2/§5.3: registers this tab's own focus-request apply — a pending
-  // editReferencedRow()-driven request (menu.ts) may already be waiting for this exact tab.
+  // editReferencedRow()-driven request (menu.ts) may already be waiting for this exact tab. A
+  // brand-new tab's *first* load is the one `editReferencedRow`'s own `setFilter` call triggers —
+  // DataView.vue's own mount-time `load()` is skipped, since `ensureRuntime` (called synchronously
+  // inside `setFilter`, well before this component gets a chance to mount) has already created
+  // `runtime[tabId]` by the time DataView checks for it. So there is no SECOND page load left to
+  // fire the `pageVersion` watch below for a request that was already pending by the time this
+  // component mounts — `requestCellFocus` ran before `registerGridHost` could, found no host, and
+  // left the request pending. Consuming it here, right after this mount's own synchronous
+  // `grid.render()` above, is what actually closes that gap: the page this mount just rendered is
+  // very likely the filtered one the request was waiting for. If it genuinely isn't loaded yet (a
+  // real backend slower than this mount), `applyCellFocusRequest` returns false and the request is
+  // put right back pending — the `pageVersion` watch then has a real future bump to catch it on.
   registerGridHost(props.tabId, applyCellFocusRequest);
+  const pendingFocus = consumeCellFocus(props.tabId);
+  if (pendingFocus && !applyCellFocusRequest(pendingFocus)) {
+    requestCellFocus(props.tabId, pendingFocus);
+  }
 });
 
 onUnmounted(() => {

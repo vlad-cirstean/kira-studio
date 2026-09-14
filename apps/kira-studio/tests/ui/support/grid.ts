@@ -68,6 +68,13 @@ export async function clickCellNav(page: Page, row: number, column: string): Pro
   await cellNavButton(page, row, column).click();
 }
 
+/** P67: the FK-cell preview popover — a single left-click on an FK nav button opens this instead
+ *  of navigating (§3), so this locator is a sibling of `cellNavButton` above, not nested under it
+ *  (the popover isn't scoped to any one cell's DOM once open). */
+export function fkPreview(page: Page): Locator {
+  return page.locator('[data-testid="fk-preview"]');
+}
+
 /** Every pending-insert row — `data-testid="grid-row-insert"` is written once per insert row, the
  *  right pane only. */
 export function insertRow(page: Page): Locator {

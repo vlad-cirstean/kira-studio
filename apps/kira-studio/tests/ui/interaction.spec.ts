@@ -8,6 +8,7 @@ import {
   cellNavButton,
   cellText,
   clickCellNav,
+  fkPreview,
   gridCell,
   gutterCell,
   headerCell,
@@ -366,6 +367,22 @@ function readPayload(
     filter: extra?.filter ?? null,
     sort: extra?.sort ?? null,
     pageSize: 100,
+    cursor: { mode: 'offset' as const, offset: 0 },
+  };
+}
+
+// P67 §4.1: the FK preview popover's own tab-free fetch — same shape as readPayload() above but
+// always pageSize 10 (fkPreview.ts's own fetchReferencedRow, MAX_PAGE_SIZE's smallest), so it is a
+// distinct mock entry from the pageSize-100 read the same filter serves when "Open in new tab" or
+// a real tab open follows it.
+function previewPayload(path: string, filter: string) {
+  return {
+    connectionId: CONNECTION_ID,
+    path,
+    projection: null,
+    filter,
+    sort: null,
+    pageSize: 10,
     cursor: { mode: 'offset' as const, offset: 0 },
   };
 }
@@ -835,6 +852,198 @@ const PORT: PortSnapshot[] = [
         position: {
           offset: 0,
           pageSize: 100,
+          hasMore: false,
+          nextToken: null,
+          prevToken: null,
+          strategy: 'keyset',
+        },
+        truncatedCells: 0,
+      },
+      source: 'server',
+    },
+  },
+  // --- P67 §4.1/§7: the FK preview popover's own pageSize-10 fetch — a distinct mock entry from
+  // the pageSize-100 reads above, one per case §7 exercises ---------------------------------------
+  {
+    op: DATA_OP.read,
+    payload: previewPayload(CUSTOMERS_PATH, `"id" = '1'`),
+    response: {
+      kind: 'read',
+      page: {
+        kind: 'tabular',
+        columns: [
+          {
+            name: 'id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: false,
+            isPrimaryKey: true,
+            generated: false,
+          },
+          {
+            name: 'name',
+            dataType: 'text',
+            typeClass: 'text',
+            nullable: false,
+            isPrimaryKey: false,
+            generated: false,
+          },
+          {
+            name: 'region_id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: true,
+            isPrimaryKey: false,
+            generated: false,
+          },
+        ],
+        rows: [['1', 'Acme Co', '1']],
+        position: {
+          offset: 0,
+          pageSize: 10,
+          hasMore: false,
+          nextToken: null,
+          prevToken: null,
+          strategy: 'keyset',
+        },
+        truncatedCells: 0,
+      },
+      source: 'server',
+    },
+  },
+  {
+    op: DATA_OP.read,
+    payload: previewPayload(PRODUCTS_PATH, `"id" = '1'`),
+    response: {
+      kind: 'read',
+      page: {
+        kind: 'tabular',
+        columns: [
+          {
+            name: 'id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: false,
+            isPrimaryKey: true,
+            generated: false,
+          },
+          {
+            name: 'name',
+            dataType: 'text',
+            typeClass: 'text',
+            nullable: false,
+            isPrimaryKey: false,
+            generated: false,
+          },
+          {
+            name: 'price',
+            dataType: 'numeric(10,2)',
+            typeClass: 'number',
+            nullable: false,
+            isPrimaryKey: false,
+            generated: false,
+          },
+        ],
+        rows: [['1', 'Widget', '9.99']],
+        position: {
+          offset: 0,
+          pageSize: 10,
+          hasMore: false,
+          nextToken: null,
+          prevToken: null,
+          strategy: 'keyset',
+        },
+        truncatedCells: 0,
+      },
+      source: 'server',
+    },
+  },
+  {
+    op: DATA_OP.read,
+    payload: previewPayload(ORDERS_PATH, `"id" = '1'`),
+    response: {
+      kind: 'read',
+      page: {
+        kind: 'tabular',
+        columns: [
+          {
+            name: 'id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: false,
+            isPrimaryKey: true,
+            generated: false,
+          },
+          {
+            name: 'customer_id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: false,
+            isPrimaryKey: false,
+            generated: false,
+          },
+          {
+            name: 'ordered_at',
+            dataType: 'timestamp with time zone',
+            typeClass: 'temporal',
+            nullable: false,
+            isPrimaryKey: false,
+            generated: false,
+          },
+        ],
+        rows: [['1', '1', '2026-08-30 18:04:36.22154+00']],
+        position: {
+          offset: 0,
+          pageSize: 10,
+          hasMore: false,
+          nextToken: null,
+          prevToken: null,
+          strategy: 'keyset',
+        },
+        truncatedCells: 0,
+      },
+      source: 'server',
+    },
+  },
+  // P67 §7 case 4: a "no matching row" preview — orders row 1's customer_id (2) filtered against
+  // customers comes back empty (an orphaned FK value, or the row deleted since the page loaded).
+  {
+    op: DATA_OP.read,
+    payload: previewPayload(CUSTOMERS_PATH, `"id" = '2'`),
+    response: {
+      kind: 'read',
+      page: {
+        kind: 'tabular',
+        columns: [
+          {
+            name: 'id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: false,
+            isPrimaryKey: true,
+            generated: false,
+          },
+          {
+            name: 'name',
+            dataType: 'text',
+            typeClass: 'text',
+            nullable: false,
+            isPrimaryKey: false,
+            generated: false,
+          },
+          {
+            name: 'region_id',
+            dataType: 'integer',
+            typeClass: 'number',
+            nullable: true,
+            isPrimaryKey: false,
+            generated: false,
+          },
+        ],
+        rows: [],
+        position: {
+          offset: 0,
+          pageSize: 10,
           hasMore: false,
           nextToken: null,
           prevToken: null,
@@ -1338,9 +1547,11 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   );
 
   // =============================================================================================
-  // P7 D1/D6/D7: PK/FK cell nav button — an outbound FK cell jumps straight to the referenced
-  // row; a PK cell with exactly one referencing table jumps straight to it too (D6: single
-  // candidate navigates immediately, no popup). Both spawn a *new*, pre-filtered tab.
+  // P67 §3 (D2)/§7: an outbound FK-cell click now opens a read-only preview popover, anchored at
+  // the click, instead of jumping straight there — SPEC's own P67 row description of what clicking
+  // an FK cell does ("shows the referenced row"). "Open in new tab" inside it is P7's own unchanged
+  // jump (navigateForeignKey), one click further in. A PK cell ("Referenced by") is untouched (§9)
+  // — it names *tables*, plural, with no single record to preview.
   // =============================================================================================
   const ordersRow = await findRow(page, ORDERS_PATH);
   await ordersRow.dblclick();
@@ -1348,8 +1559,18 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(headerCell(page, 'customer_id')).toBeVisible();
   expect(await cellText(page, 0, 'customer_id')).toBe('1');
 
+  // P67 §7 case 1: the popover opens and shows the referenced record, with no new tab.
   let tabCount = await page.locator('[data-testid="tab"]').count();
   await clickCellNav(page, 0, 'customer_id');
+  await expect(fkPreview(page)).toBeVisible();
+  await expect(fkPreview(page)).toContainText('customers');
+  await expect(fkPreview(page)).toContainText('Acme Co');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount);
+
+  // P67 §7 case 2: "Open in new tab" is P7's own unchanged jump, one click further in — this
+  // replaces the three stale assertions that used to expect `clickCellNav` alone to open a tab.
+  await fkPreview(page).locator('[data-testid="fk-preview-open"]').click();
+  await expect(fkPreview(page)).toHaveCount(0);
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'name')).toBeVisible();
@@ -1385,6 +1606,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await expect(nullMarker(gridCell(page, 0, 'manager_id'))).toHaveText('NULL');
   await gridCell(page, 0, 'manager_id').click();
   await expect(cellNavButton(page, 0, 'manager_id')).toHaveCount(0);
+  // P67 §7 case 5: NULL source value still no-ops — no button to click, and no popover either.
+  await expect(fkPreview(page)).toHaveCount(0);
 
   tabCount = await page.locator('[data-testid="tab"]').count();
   await clickCellNav(page, 0, 'id');
@@ -1401,6 +1624,10 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await rightClick(gridCell(page, 0, 'manager_id'));
   const fkMenuIds = await menuItemIds(page);
   expect(fkMenuIds.some((id) => id.startsWith('go-to-referenced-'))).toBe(true);
+  // P67 §7 case 6: the mirror "Edit referenced row" item, built from the same editReferencedRow/
+  // foreignKeyValueFilter the popover's own Edit action calls — the P7 D3 invariant, now for two
+  // actions.
+  expect(fkMenuIds.some((id) => id.startsWith('edit-referenced-'))).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
 
@@ -1417,23 +1644,70 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'order_id')).toBe('1');
   expect(await cellText(page, 0, 'product_id')).toBe('1');
 
+  // P67 §7 case 3: "Edit this record" opens a new tab on the referenced table, lands the caret on
+  // its first non-primary-key column ('name' — 'id' is products' own primary key) and enters edit
+  // mode; typing into the dock stages into that NEW tab's own pending set — the *existing* edit
+  // surface, never a second one.
   tabCount = await page.locator('[data-testid="tab"]').count();
   await clickCellNav(page, 0, 'product_id');
+  await expect(fkPreview(page)).toBeVisible();
+  await fkPreview(page).locator('[data-testid="fk-preview-edit"]').click();
+  await expect(fkPreview(page)).toHaveCount(0);
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'price')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
   expect(await cellText(page, 0, 'name')).toBe('Widget');
 
+  const cellEditorPanel = page.locator('[data-testid="cell-editor-panel"]');
+  await expect(cellEditorPanel).toBeVisible();
+  await expect(cellEditorPanel).toHaveAttribute('data-cell-key', /:0:name$/);
+
+  // Real host key handling (this container is Linux), not the page's own `navigator.userAgent`
+  // (WebKit reports 'Macintosh' unconditionally here, per this file's own header note) — selecting
+  // all text inside the Monaco editor is the browser's native binding, not an app-level shortcut
+  // gated by isMac. Mirrors cell-editor.spec.ts's own identical SELECT_ALL constant.
+  const SELECT_ALL = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+  await cellEditorPanel.locator('.view-lines').click();
+  await page.keyboard.press(SELECT_ALL);
+  await page.keyboard.type('"Deluxe Widget"');
+  await page.keyboard.press('Control+Enter');
+  await expect(gridCell(page, 0, 'name')).toHaveClass(/pending-edit/);
+  expect(await cellText(page, 0, 'name')).toBe('"Deluxe Widget"');
+
+  // P67 §7 case 2 (again): order_id's own "Open in new tab" — the last of the three stale
+  // clickCellNav-then-expect-a-tab assertions this phase replaces.
   const orderItemsRowAgain = await findRow(page, ORDER_ITEMS_PATH);
   await orderItemsRowAgain.dblclick();
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'order_id')).toBeVisible();
   tabCount = await page.locator('[data-testid="tab"]').count();
   await clickCellNav(page, 0, 'order_id');
+  await expect(fkPreview(page)).toBeVisible();
+  await fkPreview(page).locator('[data-testid="fk-preview-open"]').click();
+  await expect(fkPreview(page)).toHaveCount(0);
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'ordered_at')).toBeVisible();
   await expect(page.locator('[data-testid="grid-row"]')).toHaveCount(1, { timeout: 10_000 });
   expect(await cellText(page, 0, 'customer_id')).toBe('1');
+
+  // =============================================================================================
+  // P67 §7 case 4: no matching row. orders row 1's customer_id (2) filtered against customers
+  // comes back empty (an orphaned FK value, or the row deleted since the page loaded) — "Edit this
+  // record" is hidden, "Open in new tab" stays offered.
+  // =============================================================================================
+  const ordersRowAgain = await findRow(page, ORDERS_PATH);
+  await ordersRowAgain.dblclick();
+  await expect(grid).toBeVisible();
+  await expect(headerCell(page, 'customer_id')).toBeVisible();
+  expect(await cellText(page, 1, 'customer_id')).toBe('2');
+
+  await clickCellNav(page, 1, 'customer_id');
+  await expect(fkPreview(page)).toBeVisible();
+  await expect(fkPreview(page).locator('[data-testid="fk-preview-empty"]')).toBeVisible();
+  await expect(fkPreview(page).locator('[data-testid="fk-preview-edit"]')).toHaveCount(0);
+  await expect(fkPreview(page).locator('[data-testid="fk-preview-open"]')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await expect(fkPreview(page)).toHaveCount(0);
 });

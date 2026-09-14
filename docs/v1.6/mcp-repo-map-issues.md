@@ -208,6 +208,22 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   argument is rejected with a clear schema-validation error rather than a wrong answer, which is
   the right behavior. No non-trivial finding.
 
+- **P67 (implementation)**: same `ConnectionRefused`/stale-token pattern as every entry above — a
+  server was already alive on 8765 at session start (`ConnectionRefused` for the native tool
+  surface, expected) but "Using this repository's existing token (unchanged since it was last
+  minted)" on connect, unusable (hashed, never printed back this session, per every prior entry's
+  own note). Killed **by PID** (not `pkill`, P63's own note), deleted the stale hashed token file
+  under `/root/.kira-studio/`, restarted with `setsid nohup … & disown` to mint a fresh bearer
+  token, called it over plain HTTP/JSON-RPC per the headless steps. Used it after implementing, to
+  confirm this phase's own new surface: `find_references {"symbol":"foreignKeyValueFilter"}`
+  returned exactly the 5 real call sites (`FkPreviewPopover.vue`'s `load()`, `menu.ts`'s
+  `navigateForeignKey`/`editReferencedRow`/`fkNavItem`/`fkEditItem`), correctly picking up the
+  brand-new `FkPreviewPopover.vue` file with no restart needed since the index was built fresh
+  after this phase's edits landed; `find_references {"symbol":"editReferencedRow"}` returned both
+  real call sites (`FkPreviewPopover.vue`'s `onEditClick`, `menu.ts`'s `fkEditItem`); `search_symbols
+  {"query":"requestCellFocus"}` returned the one real declaration (`focusRequest.ts:35`). No false
+  positives, no misses, nothing missing. No non-trivial finding.
+
 ### Non-trivial
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
