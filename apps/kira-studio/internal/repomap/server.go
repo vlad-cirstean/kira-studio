@@ -60,7 +60,7 @@ type Config struct {
 }
 
 // Server is one repository's own repo-map MCP server: the resolved identity, C1/C2's index and
-// graph over it, the six-tool mcp.Server, and the HTTP listener in front of it (http.go).
+// graph over it, the seven-tool mcp.Server, and the HTTP listener in front of it (http.go).
 type Server struct {
 	repoID string
 	root   string
@@ -98,7 +98,7 @@ type Server struct {
 }
 
 // New resolves cfg's repository, opens the shared codeindex.Store, starts an initial Sync (behind
-// the per-repository flock, §5) and the watcher in the background, builds the six-tool mcp.Server,
+// the per-repository flock, §5) and the watcher in the background, builds the seven-tool mcp.Server,
 // and binds the HTTP listener (§5's default-then-fallback port selection) — but does not yet accept
 // connections; call Serve to do that. Returns as soon as the listener is bound, deliberately: an
 // MCP client's own initialize must answer in milliseconds, and Sync commonly takes far longer than
@@ -186,7 +186,7 @@ const serverVersion = "0.0.0"
 // instructions is §6.0's own one paragraph: the steer that decides whether any of this pays off.
 const instructions = "These tools answer navigation questions from a pre-built index; prefer them to opening a file to find a definition. Positions are 1-based lines; a column, where given, is a 1-based byte column. Each hit is followed by its own line of source, indented, read from the file at that position and truncated at 512 bytes with a trailing `…`; `[stale]` marks a file changed since it was indexed, `[no source: …]` a line that could not be read. Pass `omitSource` to drop them. Results are name-resolved, not type-resolved, and each carries its own confidence and the rule that produced it."
 
-// buildMCPServer constructs the six-tool mcp.Server (§6) — pure registration, no I/O of its own;
+// buildMCPServer constructs the seven-tool mcp.Server (§6) — pure registration, no I/O of its own;
 // every handler closes over s and calls into s.graph/s.store through the readiness gate.
 func (s *Server) buildMCPServer() *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{
@@ -219,6 +219,10 @@ func (s *Server) buildMCPServer() *mcp.Server {
 		Name:        "outline_file",
 		Description: "A file's definition tree (functions, methods, classes, ...) without reading its bytes — the cheapest way to see what a file contains.",
 	}, s.outlineFile)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "read_symbol",
+		Description: "Read a symbol's own declaration source — its exact extent from the index, not a guessed window. Prefer it to opening the file when you need one function, type or component.",
+	}, s.readSymbol)
 
 	return srv
 }

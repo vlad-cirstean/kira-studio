@@ -208,6 +208,61 @@ func renderOutline(path string, nodes []codegraph.Node) string {
 	return b.String()
 }
 
+// positionRange renders a Span's own start/end rows as one grep-like `path:N-M` position (P64
+// §3.4) — read_symbol's own header carries a line range, never the single line every other
+// renderer's position() prints.
+func positionRange(path string, start, end codegraph.Point) string {
+	return fmt.Sprintf("%s:%d-%d", path, start.Row+1, end.Row+1)
+}
+
+// renderSymbolHeader is renderTargetLine's own read_symbol counterpart: identical shape, but the
+// position is a range and a stale file is marked inline rather than by writeSource's own prefix
+// convention (P64 §3.4) — there is no separate continuation line here to prefix.
+func renderSymbolHeader(t codegraph.Target, stale bool) string {
+	header := fmt.Sprintf("%s  %s  %s  %s", positionRange(t.Path, t.Span.Start, t.Span.End), targetLabel(t), t.Confidence, t.Rule)
+	if stale {
+		header += "  [stale]"
+	}
+	return header
+}
+
+// renderSymbolSource is read_symbol's own shape (P64 §3.4): a doc-comment block (if any), one
+// header line carrying the declaration's own line range, then its body verbatim — unindented and
+// untrimmed, a deliberate divergence from writeSource's four-space hit-continuation indent, since
+// this is source, not a hit continuation. Several blocks print in sequence, blank-line separated,
+// only when DefinitionOf itself resolves to more than one candidate — locatorFields' own
+// several-exact-symbol-matches case is already handled by Server.resolve before this is ever
+// reached. Every body's own failure (D5's safe-failure table) prints as one `[no source: …]` line
+// instead of a body, never a tool error.
+func renderSymbolSource(targets []codegraph.Target, bodies []symbolSource) string {
+	var b strings.Builder
+	for i, t := range targets {
+		if i > 0 {
+			b.WriteString("\n\n")
+		}
+		body := bodies[i]
+		if body.Note != "" {
+			b.WriteString(renderSymbolHeader(t, false))
+			b.WriteString("\n[no source: " + body.Note + "]")
+			continue
+		}
+		for _, doc := range body.DocLines {
+			b.WriteString(doc)
+			b.WriteByte('\n')
+		}
+		b.WriteString(renderSymbolHeader(t, body.Stale))
+		for _, line := range body.Lines {
+			b.WriteByte('\n')
+			b.WriteString(line)
+		}
+		if body.Truncated {
+			full := t.Span.End.Row - t.Span.Start.Row + 1
+			b.WriteString(fmt.Sprintf("\n… truncated at %d lines (symbol spans %d)", len(body.Lines), full))
+		}
+	}
+	return b.String()
+}
+
 // renderAmbiguous is §6.1 rule 4's several-exact-hits case: candidates plus one line telling the
 // caller to re-call with file — no silent pick of the top hit.
 func renderAmbiguous(symbol string, candidates []codegraph.Target, src sourceLines) string {

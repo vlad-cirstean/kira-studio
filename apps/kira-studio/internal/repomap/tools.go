@@ -197,6 +197,66 @@ func (s *Server) findImplementations(ctx context.Context, _ *mcp.CallToolRequest
 	return textResult(renderImplementations(name, language, targets, src))
 }
 
+// --- read_symbol ---
+
+type readSymbolArgs struct {
+	locatorFields
+	OmitDoc  bool `json:"omitDoc,omitempty" jsonschema:"Omit the doc comment preceding the declaration. Default false — included when present."`
+	MaxLines int  `json:"maxLines,omitempty" jsonschema:"Max body lines returned per target. Default 400, max 1000."`
+}
+
+const (
+	readSymbolDefaultMaxLines = 400
+	readSymbolMaxMaxLines     = 1000
+	// readSymbolDocLookback is P64 §3.4's own 40-line half of the doc-comment walk's stop
+	// condition — the window readSymbolRows fetches before docCommentLines trims it down.
+	readSymbolDocLookback = 40
+)
+
+func (s *Server) readSymbol(ctx context.Context, _ *mcp.CallToolRequest, in readSymbolArgs) (*mcp.CallToolResult, any, error) {
+	if err := s.waitReady(ctx); err != nil {
+		return s.notReadyResult(err)
+	}
+	q, early, err := s.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no symbol named %q found", in.Symbol) })
+	if err != nil {
+		return nil, nil, err
+	}
+	if early != nil {
+		return early, nil, nil
+	}
+	targets, err := s.graph.DefinitionOf(ctx, q)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(targets) == 0 {
+		name := q.Name
+		if name == "" {
+			name = in.Symbol
+		}
+		return textResult(fmt.Sprintf("no definitions found for %q", name))
+	}
+
+	maxLines := clamp(in.MaxLines, readSymbolDefaultMaxLines, readSymbolMaxMaxLines)
+	docLookback := readSymbolDocLookback
+	if in.OmitDoc {
+		docLookback = 0
+	}
+	bodies := make([]symbolSource, len(targets))
+	for i, t := range targets {
+		startRow, endRow := t.Span.Start.Row, t.Span.End.Row
+		cappedEnd := endRow
+		if fullLines := endRow - startRow + 1; fullLines > maxLines {
+			cappedEnd = startRow + maxLines - 1
+		}
+		body := s.readSymbolRows(ctx, t.Path, startRow, cappedEnd, docLookback)
+		if cappedEnd < endRow && body.Note == "" {
+			body.Truncated = true
+		}
+		bodies[i] = body
+	}
+	return textResult(renderSymbolSource(targets, bodies))
+}
+
 // --- search_symbols ---
 
 type searchSymbolsArgs struct {

@@ -151,23 +151,15 @@ func readRows(f *os.File, rows []int) map[int]sourceLine {
 	return out
 }
 
-// sanitiseLine applies C8 plan §4.4's sanitising order to one raw line (EOL not yet stripped by
-// the caller — readLine's own contract keeps a trailing '\n' out, but a CRLF file's '\r' is still
-// present and stripped here).
-func sanitiseLine(raw []byte, truncated bool) sourceLine {
-	raw = bytes.TrimSuffix(raw, []byte("\r"))
-
-	if bytes.IndexByte(raw, 0x00) >= 0 {
-		return sourceLine{Note: "binary content"}
-	}
-
+// capLineBytes truncates raw to sourceLineMaxBytes, backing off to the last full rune so a
+// multi-byte character straddling the cut is never halved into invalid UTF-8 — shared by
+// sanitiseLine and sanitiseBodyLine, the one place this truncation rule is written.
+func capLineBytes(raw []byte, truncated bool) ([]byte, bool) {
 	if len(raw) > sourceLineMaxBytes {
 		raw = raw[:sourceLineMaxBytes]
 		truncated = true
 	}
 	if truncated {
-		// Back off to the last full rune so a multi-byte character straddling the cut is never
-		// halved into invalid UTF-8.
 		for len(raw) > 0 && !utf8.RuneStart(raw[len(raw)-1]) {
 			raw = raw[:len(raw)-1]
 		}
@@ -180,6 +172,20 @@ func sanitiseLine(raw []byte, truncated bool) sourceLine {
 			}
 		}
 	}
+	return raw, truncated
+}
+
+// sanitiseLine applies C8 plan §4.4's sanitising order to one raw line (EOL not yet stripped by
+// the caller — readLine's own contract keeps a trailing '\n' out, but a CRLF file's '\r' is still
+// present and stripped here).
+func sanitiseLine(raw []byte, truncated bool) sourceLine {
+	raw = bytes.TrimSuffix(raw, []byte("\r"))
+
+	if bytes.IndexByte(raw, 0x00) >= 0 {
+		return sourceLine{Note: "binary content"}
+	}
+
+	raw, truncated = capLineBytes(raw, truncated)
 
 	text := strings.TrimSpace(string(raw))
 	if text == "" {
@@ -203,6 +209,35 @@ func sanitiseLine(raw []byte, truncated bool) sourceLine {
 		return sourceLine{}
 	}
 	return sourceLine{Text: text, Truncated: truncated}
+}
+
+// sanitiseBodyLine is read_symbol's own line sanitiser (P64 §3.4) — sanitiseLine's counterpart
+// with the one rule §3.4 deliberately reverses: leading/trailing whitespace and tabs are kept
+// as-is, since read_symbol prints real source (indentation is information there), not a hit's
+// compact one-line continuation. Still refuses a NUL byte and still truncates at
+// sourceLineMaxBytes on a UTF-8 rune boundary — the same safety bound, not a display choice.
+func sanitiseBodyLine(raw []byte, truncated bool) sourceLine {
+	raw = bytes.TrimSuffix(raw, []byte("\r"))
+
+	if bytes.IndexByte(raw, 0x00) >= 0 {
+		return sourceLine{Note: "binary content"}
+	}
+
+	raw, truncated = capLineBytes(raw, truncated)
+
+	var b strings.Builder
+	b.Grow(len(raw))
+	for _, r := range string(raw) {
+		switch {
+		case r == '\t':
+			b.WriteRune(r)
+		case r < 0x20 || r == 0x7f:
+			b.WriteRune('�')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return sourceLine{Text: b.String(), Truncated: truncated}
 }
 
 // sourceFor reads the literal source line at each of hits' positions (C8 plan §4.2): group by
@@ -319,4 +354,133 @@ func (s *Server) sourceForSites(ctx context.Context, omit bool, sites []codegrap
 		hits[i] = hitPos{Path: site.Path, Row: site.NameSpan.Start.Row}
 	}
 	return s.sourceFor(ctx, hits)
+}
+
+// symbolSourceMaxBytes is read_symbol's own body byte ceiling (P64 §3.4) — independent of
+// maxLines; whichever binds first cuts the body.
+const symbolSourceMaxBytes = 64 * 1024
+
+// docCommentLookbackCap bounds how many lines readSymbolRows will ever consider for the
+// doc-comment walk (P64 §3.4) — the "40 lines" half of that walk's own stop condition.
+const docCommentLookbackCap = 40
+
+// docCommentPrefixes is P64 §3.4's own comment-prefix heuristic: a line immediately preceding a
+// declaration, trimmed, starting with any of these is presumed part of its doc comment. §13's own
+// accepted false positive: a trailing comment belonging to the *previous* declaration is picked up
+// when no blank line separates the two — honest over-inclusion, never a wrong body.
+var docCommentPrefixes = []string{"//", "/*", "*", "*/", "#"}
+
+// docCommentLines walks candidate (the raw lines immediately preceding a declaration, in file
+// order — candidate[len-1] is the line directly above the declaration) backward and returns the
+// trailing run that looks like a doc comment, oldest-first. Three stop conditions, all encoded
+// here or by the caller's own bound on candidate's length: candidate exhausted (docLookbackCap/
+// file-start, already applied by whoever built candidate), a blank line, or a line matching none
+// of docCommentPrefixes.
+func docCommentLines(candidate []string) []string {
+	end := len(candidate)
+	start := end
+	for start > 0 {
+		trimmed := strings.TrimSpace(candidate[start-1])
+		if trimmed == "" {
+			break
+		}
+		matched := false
+		for _, p := range docCommentPrefixes {
+			if strings.HasPrefix(trimmed, p) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			break
+		}
+		start--
+	}
+	return candidate[start:end]
+}
+
+// symbolSource is readSymbolRows' own result — everything renderSymbolSource needs to print one
+// target's declaration honestly (P64 §3.4).
+type symbolSource struct {
+	DocLines  []string // the doc-comment block immediately preceding the declaration, oldest-first; nil when none, omitted, or the read failed
+	Lines     []string // the declaration's own body, one raw/untrimmed entry per line
+	Stale     bool     // the file on disk no longer matches the indexed row (D4's own rule)
+	Note      string   // non-empty: neither DocLines nor Lines is meaningful (D5's safe-failure table, reused verbatim)
+	Truncated bool     // Lines stops short of [startRow, endRow] — the 64 KiB body cap bound, inline
+}
+
+// readSymbolRows reads path's own [startRow, endRow] line range (inclusive, 0-based) for
+// read_symbol's body, plus up to docLookback preceding lines for the doc-comment walk — built on
+// sourceForOneFile's own resolve/open/stat/stale sequence (P64 §3.4/§3.5): every failure degrades
+// to Note, never an error, exactly D5's table. docLookback is 0 to skip the doc walk entirely
+// (omitDoc); the body is additionally capped at symbolSourceMaxBytes, independent of how many
+// lines the caller already asked for by choosing endRow.
+func (s *Server) readSymbolRows(ctx context.Context, path string, startRow, endRow, docLookback int) symbolSource {
+	noteResult := func(reason string) symbolSource { return symbolSource{Note: reason} }
+
+	abs, err := pathsafe.ValidateRelPath(s.root, path)
+	if err != nil {
+		return noteResult("path outside repository")
+	}
+
+	// See sourceForOneFile's own doc comment: a missing/errored index row leaves staleness simply
+	// unknown, read anyway.
+	row, hadRow, _ := s.store.GetFile(ctx, s.repoID, path)
+
+	f, err := os.Open(abs) //nolint:gosec // abs already validated (pathsafe.ValidateRelPath).
+	if err != nil {
+		if os.IsNotExist(err) {
+			return noteResult("file not found")
+		}
+		return noteResult("unreadable")
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return noteResult("unreadable")
+	}
+	if !info.Mode().IsRegular() {
+		return noteResult("not a regular file")
+	}
+	stale := hadRow && !row.MatchesDisk(info)
+
+	docStart := startRow - docLookback
+	if docStart < 0 {
+		docStart = 0
+	}
+
+	r := bufio.NewReaderSize(f, sourceReadBufBytes)
+	var docCandidate, body []string
+	byteBudget := symbolSourceMaxBytes
+	truncated := false
+readLoop:
+	for row := 0; row <= endRow; row++ {
+		buf, lineTruncated, eof := readLine(r)
+		if eof && len(buf) == 0 {
+			// EOF before the wanted range's own last row — a stale index row (already stamped
+			// above) rather than a byte-budget cut; whatever was already collected stands.
+			break
+		}
+		if row < startRow {
+			if row >= docStart {
+				docCandidate = append(docCandidate, sanitiseBodyLine(buf, lineTruncated).Text)
+			}
+			continue
+		}
+		// startRow <= row <= endRow
+		ln := sanitiseBodyLine(buf, lineTruncated)
+		if len(ln.Text)+1 > byteBudget { // +1: the newline this body will be joined with
+			truncated = true
+			break readLoop
+		}
+		byteBudget -= len(ln.Text) + 1
+		body = append(body, ln.Text)
+	}
+
+	var doc []string
+	if docLookback > 0 {
+		doc = docCommentLines(docCandidate)
+	}
+	return symbolSource{DocLines: doc, Lines: body, Stale: stale, Truncated: truncated}
 }
