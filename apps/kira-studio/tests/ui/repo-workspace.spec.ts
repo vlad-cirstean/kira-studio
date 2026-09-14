@@ -1,3 +1,4 @@
+import { defaultSettings } from '@shared/domain/settings';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
@@ -448,4 +449,64 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
   const picker = page.locator('[data-testid="review-no-branch"]');
   await expect(picker).toBeVisible();
   await expect(picker.getByText('main', { exact: true })).toBeVisible();
+});
+
+// P62 §9: deliberately shallow, matching C11's own call for the review sidebar above — tests/ui/
+// has no git-stream mock that can answer blame.line, so asserting a real blame answer would need a
+// fixture that is its own piece of work, not this row's (§9's own reasoning). What this tier CAN
+// assert: the gitRepoIdFor === undefined guard (§4.1) is honest (no crash, no annotation) rather
+// than assumed, and toggling the setting leaves the editor mounted and healthy either way.
+test('a repo workspace: the blame annotation stays off with no git record, and its setting toggles safely', async ({
+  relaunch,
+}) => {
+  // A repository this window has no git record for — repoId '' (never populated), the same "no
+  // git identification" shape a plain-folder import would produce. gitRepoIdFor(codeRepoId) reads
+  // this back as falsy, exactly the guard RepoFileView.vue/blameAnnotation.ts checks.
+  const NO_GIT_REPO = { ...REPO, id: 'repo-no-git', repoId: '' };
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [NO_GIT_REPO] },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: NO_GIT_REPO.id },
+        response: FILE_LISTING,
+      },
+      {
+        channel: IPC.codeWorkspaceReadFile,
+        args: { id: NO_GIT_REPO.id, path: 'a.ts' },
+        response: {
+          kind: 'found',
+          text: 'export const a = 1;\n',
+          bytes: 21,
+          limitBytes: 8 * 1024 * 1024,
+          language: 'typescript',
+        },
+      },
+      { channel: IPC.settingsSet, response: defaultSettings },
+    ],
+  });
+
+  const noGitRepoRow = page.locator(`[data-testid="repo-row"][data-repo-id="${NO_GIT_REPO.id}"]`);
+  await noGitRepoRow.dblclick();
+  await expect(treeRow(page, 'a.ts')).toBeVisible();
+  await treeRow(page, 'a.ts').click();
+
+  const editor = page.locator('[data-testid="repo-file-editor"]');
+  await expect(editor).toBeVisible();
+  // §4.1's guard is honest, not merely absent because nothing ever requested a blame line: no
+  // annotation renders at all.
+  await expect(page.locator('.kira-blame-inline')).toHaveCount(0);
+
+  // Toggling the setting off and back on, then saving, doesn't disturb the still-mounted editor —
+  // the live watch (RepoFileView.vue) and the dispose/reattach cycle both run cleanly with no git
+  // record behind them.
+  await page.click('[data-testid="open-settings"]');
+  await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
+  await page.click('[data-testid="settings-inline-blame"]');
+  await page.click('[data-testid="settings-inline-blame"]');
+  await page.click('[data-testid="settings-save"]');
+  await expect(page.locator('[data-testid="settings-dialog"]')).toHaveCount(0);
+
+  await expect(editor).toBeVisible();
+  await expect(page.locator('.kira-blame-inline')).toHaveCount(0);
 });
