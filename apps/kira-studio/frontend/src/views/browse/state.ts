@@ -39,6 +39,17 @@ export interface BrowseViewRuntime {
    *  mirroring how a real KeyValue tab's own page size survives paging through different pages. */
   previewPageIndex: number;
   previewPageSize: PageSize;
+  /** P63 §4.3: redis key path -> its TYPE, filled in windowed (BrowseView.vue's own
+   *  `@visible-range` handler calls ensureKeyTypes below with the paths currently on screen) —
+   *  never the whole level, which can hold up to 200 000 keys (redis/catalog.go's own scanCount x
+   *  maxScanRounds). `markRaw`'d for the same reason `nodes` is (P21 round 3 performance finding
+   *  8): a Map bounded by what has been scrolled past is far smaller than a whole level, but nothing
+   *  here mutates in a way a template needs cell-by-cell reactivity for either, so `keyTypesVersion`
+   *  below (bumped whenever new entries land) is what a template actually observes. Cleared on
+   *  every level change (setLevel), same reason `selected`/`filter` are: a path from the previous
+   *  level must never colour a row in this one. */
+  keyTypes: Map<string, string>;
+  keyTypesVersion: number;
 }
 
 function defaultRuntime(): BrowseViewRuntime {
@@ -53,6 +64,8 @@ function defaultRuntime(): BrowseViewRuntime {
     loadSeq: 0,
     previewPageIndex: 0,
     previewPageSize: 100,
+    keyTypes: markRaw(new Map()),
+    keyTypesVersion: 0,
   };
 }
 
@@ -63,6 +76,7 @@ export { runtime };
 
 registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
+  delete pendingKeyTypePaths[tabId];
 });
 
 /** P43 F6/D7: written by browse/menu.ts's own catch around a row's Delete item. */
@@ -138,6 +152,9 @@ async function setLevel(tabId: string, level: string): Promise<void> {
   rt.filter = '';
   rt.selected = null;
   rt.previewPageIndex = 0;
+  rt.keyTypes.clear();
+  rt.keyTypesVersion++;
+  pendingKeyTypePaths[tabId]?.clear();
   patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
   await load(tabId);
 }
@@ -174,6 +191,73 @@ export function selectRow(tabId: string, path: string | null): void {
   // opening a fresh KeyValue tab would (defaultKeyValueTabState's own `pageIndex: 0`).
   if (rt.selected !== path) rt.previewPageIndex = 0;
   rt.selected = path;
+}
+
+// P63 §4.3: paths a treeKeyTypes call is already in flight for, per tab — module-level (not
+// runtime state) since it is purely a dedupe guard, never rendered. Cleared alongside `runtime`
+// itself (registerTabRuntimeCleanup above) and on every level change (setLevel above).
+const pendingKeyTypePaths: Record<string, Set<string>> = {};
+
+// Well under any viewport (§4.3's own guard) — a defensive cap on ensureKeyTypes itself, not
+// trusted to the caller, so a future caller that hands in more than one screen's worth of paths
+// still can't turn this into a whole-level fetch.
+const KEY_TYPES_BATCH_LIMIT = 200;
+
+// P63 §4.3: fetches redis TYPE for `paths` not already known or already in flight, batched and
+// windowed by the caller (BrowseView.vue's own `@visible-range` handler) rather than eagerly for
+// a whole level. Dedupes against `rt.keyTypes` (already answered) and this tab's own in-flight set
+// (a request already running) — interacting rules over an in-flight set plus a loadSeq guard, the
+// "cache invalidation with interacting rules" case CLAUDE.md's own testing bar names, covered by
+// state.spec.ts's own dedupe/supersede test.
+export function ensureKeyTypes(tabId: string, paths: readonly string[]): void {
+  const rt = runtime[tabId];
+  if (!rt) return;
+  if (!pendingKeyTypePaths[tabId]) pendingKeyTypePaths[tabId] = new Set();
+  const pending = pendingKeyTypePaths[tabId];
+  const need: string[] = [];
+  for (const p of paths) {
+    if (rt.keyTypes.has(p) || pending.has(p)) continue;
+    need.push(p);
+  }
+  if (need.length === 0) return;
+  const batch = need.slice(0, KEY_TYPES_BATCH_LIMIT);
+  for (const p of batch) pending.add(p);
+  // Tagged with the level's own loadSeq (D39's existing supersession counter, reused rather than
+  // duplicated) — a level change bumps it via load(), so a batch that resolves after the user has
+  // already navigated away writes nothing rather than colouring the wrong level's rows.
+  void loadKeyTypes(tabId, batch, rt.loadSeq, pending);
+}
+
+async function loadKeyTypes(
+  tabId: string,
+  batch: string[],
+  seq: number,
+  pending: Set<string>,
+): Promise<void> {
+  const tab = findBrowseTab(tabId);
+  if (!tab?.connectionId) {
+    for (const p of batch) pending.delete(p);
+    return;
+  }
+  try {
+    const types = await control.treeKeyTypes(tab.connectionId, batch);
+    for (const p of batch) pending.delete(p);
+    const rt = runtime[tabId];
+    if (!rt || rt.loadSeq !== seq) return; // superseded by a newer level load
+    let wrote = false;
+    for (let i = 0; i < batch.length; i++) {
+      const t = types[i];
+      const p = batch[i];
+      if (t === undefined || p === undefined) continue;
+      rt.keyTypes.set(p, t);
+      wrote = true;
+    }
+    if (wrote) rt.keyTypesVersion++;
+  } catch {
+    // §4.3's own rule: a failed batch is silent — rows keep the generic glyph, since a decorative
+    // badge must never raise the error strip a failed *listing* owns.
+    for (const p of batch) pending.delete(p);
+  }
 }
 
 // P41 D14: an S3 upload/delete lands in a level the project tree no longer renders (F22) — this

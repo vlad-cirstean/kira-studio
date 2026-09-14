@@ -208,6 +208,12 @@ const studioControl = {
         nodes: r.nodes ?? [],
       }),
     ),
+  // P63 §4.3: a batch of paths, answered with each one's engine-level type, in order — Redis
+  // only (Caps().keyTypes gates every call site; every other adapter would just throw).
+  treeKeyTypes: (connectionId: string, paths: string[]): Promise<string[]> =>
+    unwrap<Awaited<ReturnType<typeof TreeService.KeyTypes>>>(
+      TreeService.KeyTypes({ connectionId, paths }),
+    ).then((r) => trust<string[]>(r ?? [])),
   treeDescribe: (
     connectionId: string,
     path: string,

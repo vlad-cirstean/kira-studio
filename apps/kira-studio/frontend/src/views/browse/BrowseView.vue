@@ -7,7 +7,7 @@ import { openContextMenu } from '../../state/contextMenu';
 import { openUploadDialog } from '../../state/objectStore';
 import { openKeyValueTab, patchBrowseTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { nodeIcon } from '../../theme/icons';
+import { nodeIcon, redisTypeIcon, redisTypeLabel } from '../../theme/icons';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -24,7 +24,17 @@ import {
 import KeyValuePane from '../shared/keyvalue/KeyValuePane.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { menuForNode } from './menu';
-import { ascend, descend, goToLevel, load, reload, runtime, selectRow, setFilter } from './state';
+import {
+  ascend,
+  descend,
+  ensureKeyTypes,
+  goToLevel,
+  load,
+  reload,
+  runtime,
+  selectRow,
+  setFilter,
+} from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other view.
 const props = defineProps<{ tab: BrowseTabRecord }>();
@@ -155,6 +165,33 @@ onUnmounted(() => unregisterKeyValueHost(previewKey));
 // path), so no separate "load into the right pane" call belongs here.
 function onRowClick(node: TreeNode): void {
   selectRow(props.tab.id, node.path);
+}
+
+// P63 §4.3: gates the whole per-type fetch — an S3 browse tab (caps.keyTypes false) never issues
+// treeKeyTypes at all, not just gets an empty answer from it.
+const supportsKeyTypes = computed(
+  () => !!connectionsState.states[props.tab.connectionId ?? '']?.caps?.keyTypes,
+);
+
+// Reads through `keyTypesVersion` so this re-renders when ensureKeyTypes below fills in a path —
+// `rt.keyTypes` itself is markRaw'd (browse/state.ts's own doc comment), so the Map's own mutation
+// is invisible to Vue without this.
+function keyType(path: string): string | undefined {
+  void rt.value?.keyTypesVersion;
+  return rt.value?.keyTypes.get(path);
+}
+
+// VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
+// per §4.3, never the whole (up to 200 000-key) level.
+function onVisibleRange(range: { start: number; end: number }): void {
+  if (!supportsKeyTypes.value) return;
+  const nodes = filteredNodes.value;
+  const paths: string[] = [];
+  for (let i = range.start; i < range.end && i < nodes.length; i++) {
+    const node = nodes[i];
+    if (node && node.kind === 'key') paths.push(node.path);
+  }
+  if (paths.length > 0) ensureKeyTypes(props.tab.id, paths);
 }
 
 // D12: a container descends; a leaf opens the existing keyvalue tab — the same tab kind the tree
@@ -307,7 +344,13 @@ onMounted(() => {
             >
               No matching items
             </div>
-            <VirtualList v-else :items="filteredNodes" :row-height="rowHeight" class="body">
+            <VirtualList
+              v-else
+              :items="filteredNodes"
+              :row-height="rowHeight"
+              class="body"
+              @visible-range="onVisibleRange"
+            >
               <template #default="{ item }">
                 <div
                   class="browse-row"
@@ -320,8 +363,21 @@ onMounted(() => {
                   @dblclick="onRowOpen(item)"
                   @contextmenu.prevent="onRowContextMenu($event, item)"
                 >
-                  <span class="icon-box muted"><CodiconIcon :name="nodeIcon(item.kind)" :size="13" /></span>
+                  <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE
+                       has arrived (redisTypeIcon falls back to the generic key glyph otherwise —
+                       never a wrong type). S3 objects and every container kind are unaffected. -->
+                  <span class="icon-box muted"
+                    ><CodiconIcon
+                      :name="item.kind === 'key' ? redisTypeIcon(keyType(item.path)) : nodeIcon(item.kind)"
+                      :size="13"
+                  /></span>
                   <span class="row-name">{{ item.name }}</span>
+                  <span
+                    v-if="item.kind === 'key' && redisTypeLabel(keyType(item.path))"
+                    class="p-badge row-type-badge"
+                    data-testid="browse-key-type"
+                    >{{ redisTypeLabel(keyType(item.path)) }}</span
+                  >
                   <span v-if="item.detail" class="row-detail muted">{{ item.detail }}</span>
                 </div>
               </template>
@@ -469,5 +525,9 @@ onMounted(() => {
 .row-detail {
   flex-shrink: 0;
   font-size: var(--kira-t-xs);
+}
+
+.row-type-badge {
+  flex-shrink: 0;
 }
 </style>

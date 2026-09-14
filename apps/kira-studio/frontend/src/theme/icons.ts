@@ -163,6 +163,36 @@ export function columnTypeIcon(dataType: string): string {
   return CATEGORY_ICON[columnTypeCategory(dataType)];
 }
 
+// P63 §4.2: a per-type glyph for a Browse row's icon-box, matching columnTypeIcon's own shape —
+// the six real redis types (RedisInsight's own vocabulary, minus ReJSON: this app has no
+// JSON-module support). No colour: §4.2's own reasoning is that these are container/structure
+// classes, the exact family P9/P46-7's own CATEGORY_COLOR already paints plain (json/array/binary/
+// string/other), and there is no categorical palette in the app to spend on a seventh bucket that
+// has no grammar-token counterpart the way number/boolean/datetime do.
+const REDIS_TYPE_ICON: Record<string, string> = {
+  string: 'symbol-string', // same glyph CATEGORY_ICON.string uses
+  hash: 'symbol-object', // a field→value map; CATEGORY_ICON.json's glyph
+  list: 'list-ordered', // ordered, index-addressed — the 'sequence' kind's own glyph (KIND_ICON.sequence)
+  set: 'symbol-enum', // unordered members
+  zset: 'sort-precedence', // members ordered by score
+  stream: 'pulse', // an append-only event log — not 'broadcast' (already "a Kafka topic", KIND_ICON.topic)
+};
+
+/** Falls back to the generic key glyph (KIND_ICON.key) — a row whose type has not arrived yet
+ *  (§4.3's windowed fetch) must look exactly like today's row, never like a wrong type; likewise
+ *  for `none` (a key gone by the time TYPE ran, redis/catalog.go's own keyTypes doc comment). */
+export function redisTypeIcon(type: string | null | undefined): string {
+  return (type && REDIS_TYPE_ICON[type]) || KIND_ICON.key;
+}
+
+/** The text a Browse row's own type badge shows — `undefined` for the same two cases
+ *  redisTypeIcon falls back on (not arrived yet, or `none`), so a badge only ever names one of
+ *  the six real vocabulary entries, never the string "none". The same lowercase spelling
+ *  KeyValuePane.vue's own `keyvalue-type` badge renders (§4.2's "one term per concept" rule). */
+export function redisTypeLabel(type: string | null | undefined): string | undefined {
+  return type && REDIS_TYPE_ICON[type] ? type : undefined;
+}
+
 // Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse CodeMirror's own VS
 // Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the exact hex values VS
 // Code's own Dark Modern theme ships) instead of the connection-colour picker's palette — the user
