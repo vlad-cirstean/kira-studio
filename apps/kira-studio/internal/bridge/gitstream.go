@@ -166,6 +166,11 @@ func readOnlyStream(next streamFn) streamFn {
 // repo.changed.
 func ServeGitStream(router *gitrpc.Router, conn StreamSession) {
 	gconn := gitsession.NewConn(newStreamConnID(), nativeClientID, nativeLabel, nil)
+	// C13-10: the native mount's own repo.open must never arm a RepoEntry's background auto-fetch
+	// timer (autofetch.go) — docs/ARCHITECTURE.md documents this surface as provably read-only, and
+	// a real git fetch --prune is a write gitsock's own paired, external clients still get to make
+	// (unaffected: only this Conn opts out, not RepoEntry.EnsureAutoFetch itself).
+	gconn.DisableAutoFetch()
 	defer gconn.Close()
 
 	handlers := router.ForConn(gconn)

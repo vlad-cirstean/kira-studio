@@ -132,10 +132,17 @@ type RepoEntry struct {
 	done chan struct{}
 }
 
+// skipInitialAutoFetch is C13-10's own construction-time opt-out: true only for
+// Registry.AcquireQuiet, whose one caller (Conn.Open, for a Conn with noAutoFetch set — the native
+// git-graph mount) must never be what arms a brand-new entry's auto-fetch timer. It affects ONLY
+// this first-construction moment: a later, ordinary Open of the SAME (already-existing) entry still
+// arms it normally through EnsureAutoFetch's own off→on path (F4/D5) — this parameter never
+// suppresses that, since it is read exactly once, here, and never stored on the entry itself.
 func newRepoEntry(
 	summary gitclient.RepoSummary, repo *gitclient.Repo, w Watcher,
 	settings func() ([]string, int, string), repoSettingsGet func(string) (model.GitRepoSettings, error),
 	review *gitreview.Store, ghClient *ghclient.Client, isOpen func(string) bool,
+	skipInitialAutoFetch bool,
 ) *RepoEntry {
 	e := &RepoEntry{
 		Summary:         summary,
@@ -158,7 +165,7 @@ func newRepoEntry(
 		done:            make(chan struct{}),
 	}
 	go e.pump()
-	if _, minutes, _ := settings(); minutes > 0 {
+	if _, minutes, _ := settings(); minutes > 0 && !skipInitialAutoFetch {
 		e.startAutoFetch(minutes)
 	}
 	return e

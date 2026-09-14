@@ -2930,6 +2930,25 @@ Layer three is the UI simply not offering a write affordance at all (`capabiliti
 hides every mutating toolbar button, dialog and row-menu item) — a convenience and an honesty
 measure, never the boundary itself; layer one holds regardless of what any Vue component believes.
 
+**`repo.open` itself must never transitively arm a write, either — traced once, C13 round 2's own
+finding.** `repo.open` sits on the allowlist as a pure identify-and-subscribe read, but
+`gitsession.Conn.Open` → `Registry.Acquire`/`RepoEntry.EnsureAutoFetch` (`autofetch.go`) arms a
+background timer that eventually runs a real `git fetch --prune` whenever a user has set
+`git.fetchAutoIntervalMinutes` above its default of 0 — opt-in, credential-free and silent, but a
+real write (remote-tracking refs/objects/`FETCH_HEAD`, never the worktree, index or local refs) that
+`repo.open` alone, with no explicit fetch call from anyone, would otherwise be enough to trigger.
+Closed at the source rather than documented as a standing exception: `gitsession.Conn` carries a
+`noAutoFetch` flag (`DisableAutoFetch`), set by `ServeGitStream` before serving any request, that
+routes its own `Open` through `Registry.AcquireQuiet` (never arms a *brand-new* entry's timer at
+construction) and skips `EnsureAutoFetch` on the already-existing-entry path too — so the native
+mount's own `repo.open` can never be what arms one, in either direction. This is scoped to *this*
+Conn only: `RepoEntry` (and its timer) is shared per-repository across every connection regardless,
+so an ordinary, already-paired VS Code extension window opening the identical repository still arms
+it exactly as before — a real write that surface has always been allowed to make, unaffected by any
+of this. `gitsession/conn_test.go`'s `TestConn_DisableAutoFetch_OptsThisConnOutOfArming` pins both
+directions (this Conn never arms it; an ordinary Conn reusing the same, still-unarmed entry still
+does).
+
 **Three repository identities, and the one mapping that matters.** `CodeRepo.ID` (`code_repos.id`)
 is what every native tab/workspace call speaks; `gitclient.RepoSummary.RepoID` is what `git-ui` and
 every `gitrpc` method speak; the two are never equal and never interchangeable

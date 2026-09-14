@@ -50,6 +50,18 @@ type Conn struct {
 	ClientLabel string
 	Emit        func(method string, payload any)
 
+	// noAutoFetch is C13-10's own opt-out: the native git-graph mount's own Conn (bridge/
+	// gitstream.go's ServeGitStream) sets this before serving any request, so its own repo.open
+	// never arms a RepoEntry's background auto-fetch timer (autofetch.go) — restoring
+	// docs/ARCHITECTURE.md's "provably read-only" claim for that surface specifically. Set once,
+	// before this Conn is handed to anything that could call Open concurrently (a plain field, not
+	// mutex-guarded, on that basis) — see DisableAutoFetch's own doc comment. Every other Conn
+	// (gitsock's own external, paired clients) leaves this false and keeps today's behaviour
+	// unchanged: RepoEntry is shared per-repository across every connection regardless, so any
+	// OTHER already-open connection on the same repository can still have armed its timer — this
+	// only stops the native mount's OWN repo.open from being what arms it.
+	noAutoFetch bool
+
 	mu     sync.Mutex
 	held   map[string]*hold     // RepoID -> hold
 	walks  map[string]*walkPair // RepoID -> walkPair (D3), allocated lazily by whichever walk is created first
@@ -85,6 +97,13 @@ func NewConn(id ConnID, clientID, clientLabel string, emit func(method string, p
 
 // Done reports this connection's own disconnect signal (G7 D20) — closed exactly once, by Close.
 func (c *Conn) Done() <-chan struct{} { return c.done }
+
+// DisableAutoFetch opts this Conn's own Open calls out of arming a RepoEntry's background
+// auto-fetch timer (C13-10). Call it once, right after NewConn, before this Conn is handed to
+// anything that could start dispatching requests on it (ServeGitStream does so before
+// rpcstream.Session.Serve ever runs) — the resulting happens-before edge (the "go" statement that
+// starts each request-handling goroutine) is what makes this safe with no lock of its own.
+func (c *Conn) DisableAutoFetch() { c.noAutoFetch = true }
 
 // credentialRequestPayload mirrors @kira/git-ipc's own 'credential.request' event payload field
 // for field (G7 D2).
@@ -166,7 +185,16 @@ func (c *Conn) ProvideCredential(requestID string, secret *string) bool {
 // runs inside Acquire, so this is acquire-then-release rather than check-then-acquire — identifying
 // under this connection's own lock would serialise every Open this connection makes.
 func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (gitclient.RepoSummary, error) {
-	entry, release, err := reg.Acquire(ctx, gitPath, path)
+	// C13-10: a noAutoFetch Conn (the native git-graph mount) must never be what arms a BRAND-NEW
+	// entry's auto-fetch timer either — AcquireQuiet is Acquire with exactly that one difference.
+	var entry *RepoEntry
+	var release func()
+	var err error
+	if c.noAutoFetch {
+		entry, release, err = reg.AcquireQuiet(ctx, gitPath, path)
+	} else {
+		entry, release, err = reg.Acquire(ctx, gitPath, path)
+	}
 	if err != nil {
 		return gitclient.RepoSummary{}, err
 	}
@@ -220,7 +248,14 @@ func (c *Conn) Open(ctx context.Context, reg *Registry, gitPath, path string) (g
 	// AT construction time, so a repository already open when the setting flips on would otherwise
 	// never get a timer. ensureAutoFetch is a no-op whenever one is already running or the entry is
 	// disabled, so N windows opening this repository arm exactly one.
-	entry.EnsureAutoFetch()
+	//
+	// C13-10: skipped for a Conn that opted out (the native git-graph mount) — its own repo.open
+	// must never be what arms a timer. This is per-Conn only: RepoEntry itself is still shared
+	// across every connection on this repository, so another, ordinary connection opening the same
+	// repository can still arm it regardless of what this Conn does.
+	if !c.noAutoFetch {
+		entry.EnsureAutoFetch()
+	}
 	return entry.Summary, nil
 }
 

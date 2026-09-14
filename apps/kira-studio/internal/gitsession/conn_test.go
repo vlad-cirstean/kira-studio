@@ -319,3 +319,67 @@ func TestConn_MarkWalksStaleRacesSafelyWithWalkRebuild(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+// TestConn_DisableAutoFetch_OptsThisConnOutOfArming is C13-10: the native git-graph mount's own
+// Conn (bridge/gitstream.go's ServeGitStream) calls DisableAutoFetch before serving any request,
+// so its own repo.open must never be what arms a RepoEntry's background auto-fetch timer —
+// docs/ARCHITECTURE.md documents that surface as provably read-only, and a real `git fetch
+// --prune` is a write. An ordinary Conn (no DisableAutoFetch call) opening the identical scenario
+// DOES arm it, proving this test's own assertion actually distinguishes the two rather than being
+// vacuously true regardless of the fix.
+func TestConn_DisableAutoFetch_OptsThisConnOutOfArming(t *testing.T) {
+	t.Parallel()
+	reg := newTestRegistry()
+	reg.LingerFor = time.Hour
+	reg.Settings = func() ([]string, int, string) { return nil, 5, "" } // a positive interval
+
+	native := NewConn("native", "kira-native", "This window", nil)
+	native.DisableAutoFetch()
+	summary, err := native.Open(context.Background(), reg, "/usr/bin/git", "/repo-native")
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	reg.mu.Lock()
+	entry := reg.entries[summary.RepoID].entry
+	reg.mu.Unlock()
+	entry.autoFetch.mu.Lock()
+	timer := entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if timer != nil {
+		t.Fatal("a DisableAutoFetch'd Conn's own Open armed the auto-fetch timer anyway")
+	}
+
+	ordinary := NewConn("paired", "gitsock-client", "Some editor", nil)
+	summary2, err := ordinary.Open(context.Background(), reg, "/usr/bin/git", "/repo-ordinary")
+	if err != nil {
+		t.Fatalf("Open (ordinary): %v", err)
+	}
+	reg.mu.Lock()
+	entry2 := reg.entries[summary2.RepoID].entry
+	reg.mu.Unlock()
+	entry2.autoFetch.mu.Lock()
+	timer2 := entry2.autoFetch.timer
+	entry2.autoFetch.mu.Unlock()
+	if timer2 == nil {
+		t.Fatal("an ordinary Conn's own Open must still arm the auto-fetch timer -- this test would pass even broken otherwise")
+	}
+
+	// An ordinary Conn later opening the SAME repository the native Conn opened quietly (reusing
+	// that already-constructed, still-unarmed entry) must still arm it -- EnsureAutoFetch's own
+	// existing off→on path (F4/D5), untouched by AcquireQuiet, which only ever affects the one
+	// moment a brand-new entry is constructed.
+	ordinary2 := NewConn("paired-2", "gitsock-client", "Some editor", nil)
+	summary3, err := ordinary2.Open(context.Background(), reg, "/usr/bin/git", "/repo-native")
+	if err != nil {
+		t.Fatalf("Open (ordinary, reusing the native Conn's own entry): %v", err)
+	}
+	if summary3.RepoID != summary.RepoID {
+		t.Fatalf("expected the same entry to be reused (repo-native), got a different RepoID")
+	}
+	entry.autoFetch.mu.Lock()
+	timerAfterOrdinaryReopen := entry.autoFetch.timer
+	entry.autoFetch.mu.Unlock()
+	if timerAfterOrdinaryReopen == nil {
+		t.Fatal("an ordinary Conn reopening the native Conn's own (still-unarmed) entry must arm it")
+	}
+}

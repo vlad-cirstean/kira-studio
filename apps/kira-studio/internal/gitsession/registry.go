@@ -116,6 +116,22 @@ func NewRegistry(runner gitclient.Runner) *Registry {
 // new one — watcher included — under the lock. The returned release is idempotent; call it exactly
 // once per successful Acquire.
 func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEntry, func(), error) {
+	return reg.acquire(ctx, gitPath, path, false)
+}
+
+// AcquireQuiet is Acquire, except a brand-new entry's auto-fetch timer is never armed at
+// construction (C13-10) — Conn.Open's own call for a Conn with noAutoFetch set (the native
+// git-graph mount), so its repo.open can never be what arms one. Identical to Acquire in every
+// other respect, REUSED-entry case included: joining an entry someone else already constructed (and
+// may already have armed) is untouched by this — this only ever affects the one moment a brand-new
+// entry is constructed by this call.
+func (reg *Registry) AcquireQuiet(ctx context.Context, gitPath, path string) (*RepoEntry, func(), error) {
+	return reg.acquire(ctx, gitPath, path, true)
+}
+
+func (reg *Registry) acquire(
+	ctx context.Context, gitPath, path string, skipInitialAutoFetch bool,
+) (*RepoEntry, func(), error) {
 	summary, err := gitclient.Identify(ctx, reg.runner, gitPath, path)
 	if err != nil {
 		return nil, nil, err
@@ -140,6 +156,7 @@ func (reg *Registry) Acquire(ctx context.Context, gitPath, path string) (*RepoEn
 	repo := gitclient.NewRepo(summary, reg.runner, gitPath)
 	entry := newRepoEntry(
 		summary, repo, w, reg.Settings, reg.RepoSettingsGet, reg.Review, reg.Gh, reg.IsOpen,
+		skipInitialAutoFetch,
 	)
 	reg.entries[summary.RepoID] = &slot{entry: entry, refs: 1}
 	return entry, reg.releaseFunc(summary.RepoID), nil
