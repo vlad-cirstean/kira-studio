@@ -29,7 +29,7 @@ describe('findRanges correctness (unchanged by the memoisation)', () => {
     const doc = uniqueDoc('correctness-1');
     const ranges = findRanges(doc, 'needle');
     expect(ranges).toHaveLength(3);
-    expect(ranges.every((r) => r.class === 'cm-kira-find-match')).toBe(true);
+    expect(ranges.every((r) => r.class === 'kira-ed-find-match')).toBe(true);
     expect(ranges[0]?.from).toBeLessThan(ranges[1]?.from ?? 0);
     expect(ranges[1]?.from).toBeLessThan(ranges[2]?.from ?? 0);
     for (const r of ranges) {
@@ -41,9 +41,9 @@ describe('findRanges correctness (unchanged by the memoisation)', () => {
     const doc = uniqueDoc('correctness-2');
     const ranges = findRanges(doc, 'needle', 1);
     expect(ranges.map((r) => r.class)).toEqual([
-      'cm-kira-find-match',
-      'cm-kira-find-match-current',
-      'cm-kira-find-match',
+      'kira-ed-find-match',
+      'kira-ed-find-match-current',
+      'kira-ed-find-match',
     ]);
   });
 
@@ -58,7 +58,7 @@ describe('findRanges correctness (unchanged by the memoisation)', () => {
   test('an out-of-range currentIndex marks nothing current (still valid ranges)', () => {
     const doc = uniqueDoc('correctness-5');
     const ranges = findRanges(doc, 'needle', 99);
-    expect(ranges.every((r) => r.class === 'cm-kira-find-match')).toBe(true);
+    expect(ranges.every((r) => r.class === 'kira-ed-find-match')).toBe(true);
   });
 });
 

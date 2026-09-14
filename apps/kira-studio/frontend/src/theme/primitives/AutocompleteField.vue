@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import type { EditorLanguageId } from '../../editor/languages';
+import { loadMonaco, type MonacoModule } from '../../editor/monaco';
+import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
+import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import type { SqlDialect } from '../../views/shared/sqlIdent';
 import CodiconIcon from '../CodiconIcon.vue';
@@ -45,18 +47,20 @@ const props = withDefaults(
     prefixActive?: boolean;
     placeholder?: string;
     invalid?: boolean;
-    /** Item 2: a read-only CodeMirrorHost, stacked behind this field's own (still fully in
-     *  charge) `<input>`, painting the same text through the query console's own SQL/Mongo
-     *  grammar and colours (kiraHighlightStyle) — `undefined`/`'plain'` keeps today's unstyled
-     *  look. Never the interactive surface itself: switching this field over to CodeMirror
-     *  outright would trade its own hand-rolled completion popup for CodeMirror's, and — the
-     *  actual blocker — break every existing `locator.fill()` call across the SQL/Mongo engine
-     *  specs, which only works on a real `<input>`/`<textarea>`/`[contenteditable]` element, not a
-     *  wrapper div around one. */
+    /** Item 2 / P60a §5: a read-only, paint-only overlay stacked behind this field's own (still
+     *  fully in charge) `<input>`, painting the same text through Monaco's own tokenizer and the
+     *  app's `kira-editor` theme colours — `undefined`/`'plain'` keeps today's unstyled look.
+     *  Never a real editor instance (§5's own D3: a full Monaco per filter field is the wrong
+     *  shape for one line of paint) and never the interactive surface itself — the actual blocker
+     *  for either is the same: it would break every existing `locator.fill()` call across the
+     *  SQL/Mongo engine specs, which only works on a real `<input>`/`<textarea>`/`[contenteditable]`
+     *  element, not a wrapper div around one. */
     language?: EditorLanguageId;
-    /** Only consulted when `language === 'sql'`, forwarded to CodeMirrorHost unchanged. */
+    /** Unconsulted since P60a: Monaco's built-in `sql` Monarch has no per-dialect keyword set
+     *  (MonacoHost.vue's own `sqlDialect` prop carries the identical limitation). Kept for
+     *  call-site compatibility rather than removed mid-migration. */
     sqlDialect?: SqlDialect;
-    /** P15b D3(a): forwarded to the overlay CodeMirrorHost verbatim — a field with no *grammar*
+    /** P15b D3(a): painted onto the overlay verbatim — a field with no *grammar*
      *  (no `language`) still gets the read-only overlay when it has *ranges* to paint (the URL and
      *  header/param value fields' `{{variable}}` colouring, item 10). */
     rangeHighlights?: (doc: string) => readonly RangeHighlight[];
@@ -75,8 +79,52 @@ const props = withDefaults(
 
 const highlighted = computed(() => !!props.language && props.language !== 'plain');
 // D3(a): the overlay's own render condition — a grammar (`highlighted`) or ranges to paint, either
-// is reason enough for the read-only CodeMirrorHost to exist behind the real input.
+// is reason enough for the paint-only overlay to exist behind the real input.
 const showOverlay = computed(() => highlighted.value || !!props.rangeHighlights);
+
+// P60a §5: Monaco is loaded lazily and shared (`loadMonaco()` is memoised app-wide) — a filter
+// field on a fresh session pulls the chunk the first time any editor surface does, not before.
+// Until it resolves the overlay repaints as plain, unstyled text (paintOverlayHtml's own
+// `mod`-less early exit below), the same graceful degradation MonacoHost.vue's own pending state
+// uses for the identical reason.
+const monacoMod = shallowRef<MonacoModule | null>(null);
+onMounted(() => {
+  void loadMonaco().then((mod) => {
+    monacoMod.value = mod;
+  });
+});
+
+function escapePlain(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+const overlayHtml = ref('');
+let paintGeneration = 0;
+async function repaintOverlay(): Promise<void> {
+  if (!showOverlay.value) {
+    overlayHtml.value = '';
+    return;
+  }
+  const text = props.modelValue;
+  const mod = monacoMod.value;
+  if (!mod) {
+    overlayHtml.value = escapePlain(text);
+    return;
+  }
+  const languageId = monacoLanguageIdFor(props.language ?? 'plain');
+  const ranges = props.rangeHighlights ? props.rangeHighlights(text) : [];
+  // A generation counter, not a debounce — two paints can be in flight (a fast retype outrunning
+  // colorize()'s own async grammar load) and only the one started last is allowed to win.
+  const generation = ++paintGeneration;
+  const html = await paintOverlayHtml(mod, text, languageId, ranges);
+  if (generation !== paintGeneration) return;
+  overlayHtml.value = html;
+}
+watch(
+  () => [props.modelValue, props.language, props.rangeHighlights, monacoMod.value] as const,
+  () => void repaintOverlay(),
+  { immediate: true },
+);
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -257,13 +305,13 @@ function onKeydown(e: KeyboardEvent): void {
 // The overlay is `pointer-events: none` (purely paint, see the template) and never scrolls on its
 // own — it has no scrollbar and the user can never focus it to drag one. A native text `<input>`
 // fires its own 'scroll' event as its internal text pans to keep the caret in view once the value
-// overflows the box; mirroring that onto the overlay's `.cm-scroller` (still `overflow: hidden`,
-// which honours a programmatic scrollLeft same as any other overflow value) keeps the coloured
-// text panned to the exact same offset as the invisible real text sitting on top of it.
+// overflows the box; mirroring that onto the overlay root itself (`overflow: hidden`, which honours
+// a programmatic scrollLeft same as any other overflow value) keeps the coloured text panned to
+// the exact same offset as the invisible real text sitting on top of it.
 const overlayRootRef = ref<HTMLElement | null>(null);
 function onInputScroll(e: Event): void {
-  const scroller = overlayRootRef.value?.querySelector<HTMLElement>('.cm-scroller');
-  if (scroller) scroller.scrollLeft = (e.target as HTMLInputElement).scrollLeft;
+  if (overlayRootRef.value)
+    overlayRootRef.value.scrollLeft = (e.target as HTMLInputElement).scrollLeft;
 }
 
 // P15b D3(c): a field-local floating tooltip for the token under the pointer, built on
@@ -275,16 +323,10 @@ function onInputScroll(e: Event): void {
 // immediately.
 //
 // OQ-1: 400 mirrors workbench/state/tooltip.ts's own TOOLTIP_DELAY_MS (itself already shared with
-// CodeMirrorHost.vue's lint hover delay) — a third copy of the same constant rather than a hoist of
+// MonacoHost.vue's own hover delay) — a third copy of the same constant rather than a hoist of
 // that file into `theme/`, which `theme/` cannot import from anyway (F7).
 const HOVER_DELAY_MS = 400;
 
-// Typed as the bare exposed shape (rather than InstanceType<typeof CodeMirrorHost>) so this ref
-// doesn't read as a type-only use of the CodeMirrorHost import — same convention as
-// ConsoleView.vue's own editorHost/ConsoleSavedMenu.vue's promptInput.
-const codeMirrorHostRef = ref<{ posAtCoords: (x: number, y: number) => number | null } | null>(
-  null,
-);
 const hoverPanelRef = ref<HTMLElement | null>(null);
 const hoverLines = ref<string[] | null>(null);
 const hoverStyle = ref<{ left: string; top: string } | null>(null);
@@ -316,13 +358,14 @@ async function openHoverAt(x: number, y: number, lines: string[]): Promise<void>
 
 function onInputMouseMove(e: MouseEvent): void {
   if (!props.hoverAt) return;
-  const host = codeMirrorHostRef.value;
+  const overlay = overlayRootRef.value;
   const el = inputRef.value;
-  if (!host || !el) return;
-  // CodeMirror's own coordinate hit-testing on the overlay that is already painting the same text
-  // at the same viewport coordinates as this real input — exact, and it does not re-assume the
-  // monospace grid the overlay's *painted* alignment depends on (font-agnostic, D3(c)).
-  const offset = host.posAtCoords(e.clientX, e.clientY);
+  if (!overlay || !el) return;
+  // §5: DOM-native coordinate hit-testing (caretPositionFromPoint/caretRangeFromPoint) on the
+  // overlay that is already painting the same text at the same viewport coordinates as this real
+  // input — exact, and it does not re-assume the monospace grid the overlay's *painted* alignment
+  // depends on (font-agnostic, D3(c)).
+  const offset = overlayOffsetAtPoint(overlay, e.clientX, e.clientY);
   const lines = offset === null ? null : props.hoverAt(props.modelValue, offset);
   const key = lines ? JSON.stringify(lines) : null;
   if (key === lastHoverKey) return; // same token (or still no token) as the last move
@@ -377,24 +420,18 @@ onBeforeUnmount(() => {
     <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
     <span class="input-wrap">
       <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
-           behind the real input rather than the input itself. `key` remounts it on a language
-           change (there are only ever two call sites today, each fixed to one language for its
-           whole lifetime, so this never actually fires — cheap insurance all the same). The
-           surrounding div (not the component itself) is what `overlayRootRef` needs to be an
-           actual DOM node `.querySelector` can walk — a `ref` on <CodeMirrorHost> would resolve to
-           its exposed `{ focus }` object instead (defineExpose), not its root element. -->
-      <div v-if="showOverlay" ref="overlayRootRef" class="highlight-overlay" aria-hidden="true">
-        <CodeMirrorHost
-          ref="codeMirrorHostRef"
-          :key="language"
-          :doc="modelValue"
-          :language="language ?? 'plain'"
-          :sql-dialect="sqlDialect"
-          :read-only="true"
-          single-line
-          :range-highlights="rangeHighlights"
-        />
-      </div>
+           behind the real input rather than the input itself (P60a §5: span-painted text, not a
+           mounted editor). `overlayHtml` is built entirely by `paintOverlayHtml` — every character
+           of the field's own text, HTML-escaped, wrapped only in this module's own static class
+           names — never raw markup from anywhere else, so `v-html` here paints exactly what
+           `escapeHtml`/`mergeHighlightRanges` produced and nothing else. -->
+      <div
+        v-if="showOverlay"
+        ref="overlayRootRef"
+        class="highlight-overlay"
+        aria-hidden="true"
+        v-html="overlayHtml"
+      ></div>
       <input
         ref="inputRef"
         v-bind="$attrs"
@@ -480,28 +517,36 @@ onBeforeUnmount(() => {
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  /* `.cm-editor` sizes to its one line of content (CodeMirrorHost's own singleLine CSS), not to
-     this inset:0 box — centering it here is what lines its text up with the native input's own
-     vertically-centered line box (`.input-wrap`'s own align-items: center) regardless of the
-     current font-size setting. */
+  white-space: pre;
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-sm);
+  line-height: normal;
+  background: transparent;
+  /* The painted text sizes to its own one line of content, not to this inset:0 box — centering it
+     here is what lines it up with the native input's own vertically-centered line box
+     (`.input-wrap`'s own align-items: center) regardless of the current font-size setting.
+     `onInputScroll` pans this element's own `scrollLeft`, so the overflowing (flex, non-shrinking)
+     text content is what actually needs the horizontal scroll, not a nested child. */
   display: flex;
   align-items: center;
 }
 
-.highlight-overlay :deep(.cm-editor) {
-  width: 100%;
-  background: transparent !important;
+/* P60a: mirrors MonacoHost.vue's own identical rules — `classFor` (api/state/variableCompletion.ts)
+   paints the same three classes into this overlay's `v-html` content, which never reaches
+   MonacoHost's own scoped styles (they're two separate components' DOM). `:deep()` is required
+   either way: `v-html` content carries no `data-v-*` scoping attribute of its own. */
+.highlight-overlay :deep(.kira-ed-var) {
+  color: var(--kira-var-resolved);
 }
 
-.highlight-overlay :deep(.cm-scroller) {
-  font-family: var(--kira-font-data) !important;
-  font-size: var(--kira-t-sm) !important;
-  line-height: normal !important;
-  background: transparent !important;
+.highlight-overlay :deep(.kira-ed-var-secret) {
+  color: var(--kira-var-resolved);
+  text-decoration: underline dotted var(--kira-syntax-meta);
 }
 
-.highlight-overlay :deep(.cm-content) {
-  caret-color: transparent;
+.highlight-overlay :deep(.kira-ed-var-unknown) {
+  color: var(--kira-warn);
+  text-decoration: underline wavy var(--kira-warn);
 }
 
 /* The real input stays the only interactive/focusable/selectable element — its own text is
