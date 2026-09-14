@@ -34,6 +34,27 @@ import {
 import { setRepoSearchView } from '../state/search';
 import { loadReviewSession, saveReviewSession } from './reviewSession';
 
+// C11 §8.2/§8.4 (S13): review.open's own cold-mount hand-off. The local event bus (S4) only
+// reaches a `transport.on('review.target', ...)` subscriber that already exists — a first-ever
+// activation of the Review segment mounts ReviewView.vue AFTER review.open has already fired (the
+// segment switch below triggers a Vue re-render, which runs on the next tick, by which time this
+// synchronous handler has already returned), so the event it emits would otherwise be dropped on
+// the floor. RepoReviewView.vue's own mount (S13) consumes this once, as `MountOptions.target`,
+// exactly the role `panelView.ts`'s own bootstrap-island `#pendingUiAction` plays for the graph.
+const pendingReviewTargetByCodeRepoId = new Map<string, { repoId: string; branch: string }>();
+
+/** Consumed once — a later mount of the same segment (switch to Files and back, no new
+ *  review.open in between) starts on whatever branch ReviewView.vue was already showing, which is
+ *  its own state (`state/review.ts`) to keep, not a second stale target this would otherwise keep
+ *  handing back. */
+export function takePendingReviewTarget(
+  codeRepoId: string,
+): { repoId: string; branch: string } | null {
+  const target = pendingReviewTargetByCodeRepoId.get(codeRepoId) ?? null;
+  pendingReviewTargetByCodeRepoId.delete(codeRepoId);
+  return target;
+}
+
 /** git's own well-known empty-tree object id — `<sha>:<path>` against it always resolves to
  *  `file.read`'s existing `{kind: 'missing'}` classification (the path never existed in an empty
  *  tree), which is exactly the rendering a root commit's added file needs on its left side. Used
@@ -296,6 +317,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       if (codeRepoId === undefined) {
         throw new Error(`hostHandlers: review.open: unknown git repoId ${gitRepoId}`);
       }
+      pendingReviewTargetByCodeRepoId.set(codeRepoId, { repoId: gitRepoId, branch });
       setRepoSearchView(codeRepoId, 'review');
       if (!layoutState.panel.project.visible) toggleProjectPanel();
       deps.emitLocal('review.target', { repoId: gitRepoId, branch });
