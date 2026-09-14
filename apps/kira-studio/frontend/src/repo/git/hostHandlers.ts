@@ -180,20 +180,24 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
           // this host cannot actually serve.
           goToFile: false,
           clipboard: true,
-          // Native reports its own conflicts through its own Source Control surface, not git-ui's
-          // "Resolve in VS Code" banner action — the existing capabilities.resolveConflict gate
-          // (App.vue) already covers this; layer 2 (editor.resolveConflict throwing, below) covers
-          // it regardless.
+          // This app has no merge editor — the user's own stated carve-out
+          // (docs/v1.6/plans/P67e-git-relax-read-only.md): conflicts surface through the
+          // conflict banner instead, resolved in the user's own external editor. Layer 2
+          // (editor.resolveConflict throwing, below) covers it regardless.
           resolveConflict: false,
-          // "Open in New Window" (vscode.openFolder) has no native meaning — worktree.openWindow
-          // throws below regardless (§4.2 layer 2).
+          // "Open in New Window" (vscode.openFolder) has no native meaning: there is no second
+          // window to open a worktree into. worktree.openWindow throws below regardless
+          // (layer 2).
           openWorktreeWindow: false,
-          // No workspace-trust concept here, and the affordance this gates is hidden anyway
-          // (write: false) — a real value would be advertising a capability layer 1 always refuses.
+          // Running the worktree prepare script is arbitrary shell execution with no
+          // human-approval gate anywhere in this codebase — a security boundary, not a
+          // file-editing one, so it stays refused even though write is now true.
           runPrepareScript: false,
-          // C10's whole reason for existing (§4.2/§4.3): this is the one flag the UI actually
-          // branches on to hide every write affordance uniformly.
-          write: false,
+          // P67e: the native mount now admits every git operation that writes through git
+          // itself (fetch/pull/push/force-push, merge/rebase as pull strategies, undo, restack,
+          // stash, worktree add/remove) — this is the one flag the UI actually branches on to
+          // show every such write affordance uniformly.
+          write: true,
         },
       };
     },
@@ -366,15 +370,12 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     // honest and costs nothing (§5's own table).
     'editor.goToFile': readOnlyRefusal('editor.goToFile', 'has no native caller'),
 
-    // §4.2 layer 2 — never reach Go at all under VS Code either; a local throw names the real
-    // reason instead of layer 1's more generic E_READ_ONLY.
-    'credential.provide': readOnlyRefusal(
-      'credential.provide',
-      'is unreachable here — there is no socket connection, and therefore no credential prompt, for the native graph to answer',
-    ),
+    // P67e: this stream's own remote op now needs to answer git's own askpass prompts for
+    // real (state/gitCredential.ts + workbench/GitCredentialDialog.vue) — the refusal here is
+    // gone, and layer 1 (gitstream.go's allowedMethods) now forwards this to Go.
     'editor.resolveConflict': readOnlyRefusal(
       'editor.resolveConflict',
-      'is a write — the native graph is read-only (§4.2)',
+      'needs a merge editor this window does not have; resolve the files in your own editor, then Continue',
     ),
     'settings.setGitPath': readOnlyRefusal(
       'settings.setGitPath',
@@ -382,7 +383,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     ),
     'worktree.openWindow': readOnlyRefusal(
       'worktree.openWindow',
-      'is a write — the native graph is read-only (§4.2)',
+      'has no native meaning: there is no second window to open a worktree into',
     ),
   };
 }
