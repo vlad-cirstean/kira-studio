@@ -73,7 +73,16 @@ var readOnlyMethods = map[string]struct{}{
 	"undo.peek": {}, "search.run": {},
 	"commit.resolvePr": {}, "branch.resolvePr": {},
 	"worktree.list": {}, "stack.list": {},
-	"repoSettings.get": {}, "repoSettings.set": {}, // §4.4: writes only Kira's own SQLite.
+	// repoSettings.set: §4.4 says it only ever writes Kira's own SQLite, never the repository — true,
+	// but four of its patch fields are write-only surface this stream must still refuse at the FIELD
+	// level (readOnlyRepoSettingsSet below): WorktreePrepareScript/WorktreeBasePath (an approved patch
+	// here can later be executed as a real shell command by worktree.prepare — RunPrepare's only gate
+	// is "does this match what's currently stored", not "did a human approve this content"; there is
+	// no separate prepareScriptApprovedSha gate anywhere in this codebase despite contract.go's own
+	// comment naming one) and PullStrategy/CheckoutAutoStash (already hidden client-side per C10 §4.4,
+	// never blocked at this layer until now). GraphPageSize/GraphScope/StashShowInGraph/
+	// StashIncludeUntracked/ReviewBaseCandidates/LogLevel/GithubEnabled stay allowed.
+	"repoSettings.get": {}, "repoSettings.set": {},
 	"review.resolveBase": {}, "review.files": {}, "review.fileDiff": {}, "review.mark": {},
 	"review.comment.add": {}, "review.comment.list": {}, "review.comment.remove": {},
 	"review.comment.clear": {}, "review.comment.export": {}, // review.db only — see above.
@@ -103,6 +112,41 @@ func readOnlyRequest(next requestFn) requestFn {
 	}
 }
 
+// restrictedRepoSettingsFields are the RepoSettingsPatchWire leaves repoSettings.set must refuse on
+// this stream even though the method itself is allowlisted (see readOnlyMethods' own comment).
+// repoSettingsSetTouchesRestrictedField decodes just enough of params to check them, following this
+// package's existing json.RawMessage-decode-and-inspect precedent (gitrpc's own handlers all decode
+// params into a typed struct before acting on it; this does the same, just to inspect instead of
+// dispatch).
+func repoSettingsSetTouchesRestrictedField(params json.RawMessage) bool {
+	var p gitrpc.RepoSettingsSetParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		// Malformed params: let it through to the real handler, which rejects it properly. This
+		// wrapper only ever narrows what the allowlist admits — it is never a substitute for the
+		// inner handler's own request validation.
+		return false
+	}
+	patch := p.Patch
+	return patch.WorktreePrepareScript != nil || patch.WorktreeBasePath != nil ||
+		patch.PullStrategy != nil || patch.CheckoutAutoStash != nil
+}
+
+// readOnlyRepoSettingsSet is readOnlyRequest's companion, adding the one FIELD-level restriction
+// this stream needs on top of every other method's method-level allow/refuse: repoSettings.set is
+// allowed, but only for a patch that leaves every restricted field (above) absent. Composed around
+// readOnlyRequest in ServeGitStream so a restricted field is refused before the method-level check
+// even runs. Scoped to gitstream.go alone — gitsock's own paired-client path calls
+// handlers.Request directly and is completely unaffected by this wrapper.
+func readOnlyRepoSettingsSet(next requestFn) requestFn {
+	return func(ctx context.Context, method string, params json.RawMessage) (any, error) {
+		if method == "repoSettings.set" && repoSettingsSetTouchesRestrictedField(params) {
+			return nil, ipcerr.New("E_READ_ONLY",
+				"gitstream: repoSettings.set: this field is not available from the native graph surface")
+		}
+		return next(ctx, method, params)
+	}
+}
+
 // readOnlyStream is readOnlyRequest's counterpart for OpenStream calls.
 func readOnlyStream(next streamFn) streamFn {
 	return func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error {
@@ -127,7 +171,7 @@ func ServeGitStream(router *gitrpc.Router, conn StreamSession) {
 	handlers := router.ForConn(gconn)
 	sess := rpcstream.NewSession(conn, rpcstream.Handlers{
 		ContractVersion: gitrpc.ContractVersion,
-		Request:         readOnlyRequest(handlers.Request),
+		Request:         readOnlyRepoSettingsSet(readOnlyRequest(handlers.Request)),
 		Stream:          readOnlyStream(handlers.Stream),
 		MaxFrameBytes:   maxGitStreamFrameBytes,
 	})

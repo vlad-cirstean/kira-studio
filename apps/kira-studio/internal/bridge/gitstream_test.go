@@ -180,3 +180,73 @@ func TestReadOnlyStream_UnknownStreamMethodIsRefused(t *testing.T) {
 		t.Fatalf("inner handler was called (%v) for a non-allowlisted stream method", spy.called)
 	}
 }
+
+// --- readOnlyRepoSettingsSet: the field-level restriction on top of repoSettings.set's own
+// method-level allowlisting (finding C12-1). ---
+
+// TestReadOnlyRepoSettingsSet_AllowedFieldsReachInnerHandler pins the non-regression half: a patch
+// touching only fields that were always meant to work over this stream (graph paging/scope here,
+// standing in for the rest — StashShowInGraph/StashIncludeUntracked/ReviewBaseCandidates/LogLevel/
+// GithubEnabled follow the identical shape) must still reach the real handler unchanged.
+func TestReadOnlyRepoSettingsSet_AllowedFieldsReachInnerHandler(t *testing.T) {
+	spy := &spyRequest{}
+	wrapped := readOnlyRepoSettingsSet(readOnlyRequest(spy.fn))
+
+	params := json.RawMessage(`{"repoId":"r1","patch":{"kiraVersion.graph.pageSize":50,"kiraVersion.graph.scope":"local"}}`)
+	result, err := wrapped(context.Background(), "repoSettings.set", params)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "inner-result" {
+		t.Fatalf("got result %v, want the inner handler's own result", result)
+	}
+	if len(spy.called) != 1 || spy.called[0] != "repoSettings.set" {
+		t.Fatalf("inner handler called with %v, want exactly one call", spy.called)
+	}
+}
+
+// TestReadOnlyRepoSettingsSet_RestrictedFieldsAreRefused is this finding's load-bearing test: a
+// patch carrying any of the four write-only-surface fields — even alongside otherwise-allowed
+// fields — must be refused with E_READ_ONLY and must never reach the inner handler.
+func TestReadOnlyRepoSettingsSet_RestrictedFieldsAreRefused(t *testing.T) {
+	cases := []struct {
+		name   string
+		params string
+	}{
+		{
+			name:   "WorktreePrepareScript alongside an allowed field",
+			params: `{"repoId":"r1","patch":{"kiraVersion.graph.pageSize":50,"kiraVersion.worktree.prepareScript":"rm -rf /"}}`,
+		},
+		{
+			name:   "WorktreeBasePath",
+			params: `{"repoId":"r1","patch":{"kiraVersion.worktree.basePath":"/tmp/worktrees"}}`,
+		},
+		{
+			name:   "PullStrategy",
+			params: `{"repoId":"r1","patch":{"kiraVersion.pull.strategy":"rebase"}}`,
+		},
+		{
+			name:   "CheckoutAutoStash",
+			params: `{"repoId":"r1","patch":{"kiraVersion.checkout.autoStash":false}}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			spy := &spyRequest{}
+			wrapped := readOnlyRepoSettingsSet(readOnlyRequest(spy.fn))
+
+			_, err := wrapped(context.Background(), "repoSettings.set", json.RawMessage(tc.params))
+
+			if err == nil {
+				t.Fatalf("got no error, want E_READ_ONLY")
+			}
+			if !isReadOnlyErr(err) {
+				t.Fatalf("got error %v, want an ipcerr.Error with code E_READ_ONLY", err)
+			}
+			if len(spy.called) != 0 {
+				t.Fatalf("inner handler was called (%v) — a restricted field must never reach it", spy.called)
+			}
+		})
+	}
+}
