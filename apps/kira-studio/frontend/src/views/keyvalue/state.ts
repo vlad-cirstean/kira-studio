@@ -2,9 +2,9 @@ import type { KeyValueTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findKeyValueTab, patchKeyValueTabState } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { keyValueHost } from './host';
 import { getPage, setPage } from './page';
 
 // Mirrors views/documents/state.ts's DataViewRuntime shape, narrowed further: no expand/collapse
@@ -51,8 +51,12 @@ const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen 
 export { runtime, setSearchOpen, toggleSearchOpen };
 
 // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
+// P63 §2.2: `viewKey` here is whatever real tab id `cleanupTabRuntime` is called with — the browse
+// split's own `${tabId}::preview` entry is cleaned up separately, by state/tabs.ts blind-calling
+// this same registry against that synthetic key too (see its own dropPreviewPageStoresForTab
+// comment) — nothing here needs to know about `::preview` itself.
+registerTabRuntimeCleanup((viewKey) => {
+  delete runtime[viewKey];
 });
 
 /** P43 F6/D7: written by KeyValueView.vue's own catch around onDeleteKey — the popover-local
@@ -65,14 +69,20 @@ export { setActionError };
 // given, is the pageIndex this tab was showing before its caller optimistically advanced it. A
 // failed or cancelled load never calls setPage, so without this the pager would show the new page
 // number while the grid still renders the old page's rows.
+//
+// P63 §2.2: `viewKey` widens the old `tabId` — resolved through `keyValueHost`, which is either a
+// real KeyValue tab (the fallback every existing tab gets for free) or a synthetic host (the
+// browse split's own preview pane) registered explicitly. `data.read`'s own `tabId` wire field
+// stays whatever `viewKey` is verbatim — confirmed against internal/adapterhost's own RunOp/
+// wire.go: it is an opaque string tagging the op-log row, never validated against a live tab.
 export async function load(
-  tabId: string,
+  viewKey: string,
   cursor?: PageCursor,
   revertPageIndexOnFailure?: number,
 ): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab?.connectionId) return;
-  const rt = ensureRuntime(tabId);
+  const host = keyValueHost(viewKey);
+  if (!host?.connectionId) return;
+  const rt = ensureRuntime(viewKey);
   let effectiveCursor: PageCursor;
   if (cursor) {
     effectiveCursor = cursor;
@@ -86,12 +96,12 @@ export async function load(
     // claiming a page further in. A list key's own LRANGE offset strategy is unaffected — this
     // only fires for a page that was already cursor-paged. Mirrors KeyValueView.vue's own
     // prevDisabled, which reads the same `position.strategy` to answer the same question.
-    const currentPage = getPage(tabId);
+    const currentPage = getPage(viewKey);
     if (currentPage && currentPage.position.strategy !== 'offset') {
       effectiveCursor = { mode: 'offset', offset: 0 };
-      patchKeyValueTabState(tabId, { pageIndex: 0 });
+      host.patch({ pageIndex: 0 });
     } else {
-      effectiveCursor = { mode: 'offset', offset: tab.state.pageIndex * tab.state.pageSize };
+      effectiveCursor = { mode: 'offset', offset: host.pageIndex * host.pageSize };
     }
   }
   const opId = beginOp(rt);
@@ -99,25 +109,25 @@ export async function load(
   try {
     const response = await data.read({
       opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
+      tabId: viewKey,
+      connectionId: host.connectionId,
+      path: host.path,
       projection: null,
       filter: null,
       sort: null,
-      pageSize: tab.state.pageSize,
+      pageSize: host.pageSize,
       cursor: effectiveCursor,
     });
     // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
     // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
-    // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
-    if (!runtime[tabId]) return;
+    // catch this and setPage below would leak a page keyed by a viewKey nothing can reach again.
+    if (!runtime[viewKey]) return;
     if (rt.opId !== opId) return;
     if (response.page.kind !== 'keyvalue') {
       throw new Error(`unexpected page kind for a key/value tab: ${response.page.kind}`);
     }
 
-    setPage(tabId, response.page);
+    setPage(viewKey, response.page);
     rt.status = 'idle';
     rt.opId = null;
     rt.rowCount = response.page.rowCount;
@@ -126,32 +136,32 @@ export async function load(
     rt.prevToken = response.page.position.prevToken;
   } catch (err) {
     const superseded = rt.opId !== opId;
-    applyLoadFailure(rt, opId, err, tabId);
+    applyLoadFailure(rt, opId, err, viewKey);
     if (!superseded && revertPageIndexOnFailure !== undefined) {
-      patchKeyValueTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+      host.patch({ pageIndex: revertPageIndexOnFailure });
     }
   }
 }
 
-export async function reload(tabId: string): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab?.connectionId) return;
-  await data.invalidate(tab.connectionId, tab.path);
-  await load(tabId);
+export async function reload(viewKey: string): Promise<void> {
+  const host = keyValueHost(viewKey);
+  if (!host?.connectionId) return;
+  await data.invalidate(host.connectionId, host.path);
+  await load(viewKey);
 }
 
-export async function runCount(tabId: string): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab?.connectionId) return;
-  const rt = ensureRuntime(tabId);
+export async function runCount(viewKey: string): Promise<void> {
+  const host = keyValueHost(viewKey);
+  if (!host?.connectionId) return;
+  const rt = ensureRuntime(viewKey);
   const opId = crypto.randomUUID();
   rt.countOpId = opId;
   try {
     const response = await data.count({
       opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
+      tabId: viewKey,
+      connectionId: host.connectionId,
+      path: host.path,
       filter: null,
       // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
       refresh: rt.count?.stale === true,
@@ -165,52 +175,52 @@ export async function runCount(tabId: string): Promise<void> {
   }
 }
 
-export function stop(tabId: string): void {
-  stopOp(runtime[tabId]);
+export function stop(viewKey: string): void {
+  stopOp(runtime[viewKey]);
 }
 
 // D7's cursor choice, mirrors grid/state.ts's goNext/goPrev: prefer the token when one is
 // available (hash/set/zset/stream's cursor strategy), falling back to `pageIndex`-tracked offset
 // paging (a list key's LRANGE offset strategy has no token to advance by).
-export async function goNext(tabId: string): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab) return;
-  const rt = ensureRuntime(tabId);
-  const prevIndex = tab.state.pageIndex;
+export async function goNext(viewKey: string): Promise<void> {
+  const host = keyValueHost(viewKey);
+  if (!host) return;
+  const rt = ensureRuntime(viewKey);
+  const prevIndex = host.pageIndex;
   const nextIndex = prevIndex + 1;
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
-    : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
-  patchKeyValueTabState(tabId, { pageIndex: nextIndex });
-  await load(tabId, cursor, prevIndex);
+    : { mode: 'offset', offset: nextIndex * host.pageSize };
+  host.patch({ pageIndex: nextIndex });
+  await load(viewKey, cursor, prevIndex);
 }
 
-export async function goPrev(tabId: string): Promise<void> {
-  const tab = findKeyValueTab(tabId);
-  if (!tab) return;
-  const rt = ensureRuntime(tabId);
-  const prevIndex = tab.state.pageIndex;
+export async function goPrev(viewKey: string): Promise<void> {
+  const host = keyValueHost(viewKey);
+  if (!host) return;
+  const rt = ensureRuntime(viewKey);
+  const prevIndex = host.pageIndex;
   const targetIndex = Math.max(0, prevIndex - 1);
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
-    : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
-  patchKeyValueTabState(tabId, { pageIndex: targetIndex });
-  await load(tabId, cursor, prevIndex);
+    : { mode: 'offset', offset: targetIndex * host.pageSize };
+  host.patch({ pageIndex: targetIndex });
+  await load(viewKey, cursor, prevIndex);
 }
 
 // Mirrors grid/state.ts's setPageSize: resets to the first page and clears whatever cursor
 // tokens were held for the old page size (a SCAN cursor from a 100-sized page is not valid
 // against a 1000-sized one).
 export async function setPageSize(
-  tabId: string,
+  viewKey: string,
   pageSize: KeyValueTabState['pageSize'],
 ): Promise<void> {
-  const prevIndex = findKeyValueTab(tabId)?.state.pageIndex;
-  const rt = ensureRuntime(tabId);
+  const prevIndex = keyValueHost(viewKey)?.pageIndex;
+  const rt = ensureRuntime(viewKey);
   rt.nextToken = null;
   rt.prevToken = null;
-  patchKeyValueTabState(tabId, { pageSize, pageIndex: 0 });
-  await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
+  keyValueHost(viewKey)?.patch({ pageSize, pageIndex: 0 });
+  await load(viewKey, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 // D5/D6: project/ no longer imports this module directly — it reaches reload through
