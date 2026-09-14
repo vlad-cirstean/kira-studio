@@ -21,8 +21,48 @@ interface RepoEditorEntry {
 
 const entries = new Map<string, RepoEditorEntry>();
 
+// C14-5: openRepoCommitDiffTab/openRepoReviewDiffTab deliberately keep separate tabs open for what
+// can be an identical (path, left, right) revision pair (e.g. a commit-diff tab and a review-diff
+// tab over the same range, or two branches sharing a tip/base per C13-1) — monaco.ts's
+// repoRevisionDiffUris keys the underlying models by revision alone, so two such tabs share the
+// exact same cached model objects. That sharing is harmless while both stay open (the content is
+// immutable, read-only, identical either way) but disposeModel used to run unconditionally on
+// close: closing one tab tore down models the other tab was still actively displaying. Tracked
+// here as "which open tabs currently reference this uri" — a uri is only ever handed to
+// disposeModel once its last referencing tab closes.
+const tabIdsByUri = new Map<string, Set<string>>();
+
+function addRefs(tabId: string, uris: readonly string[]): void {
+  for (const uri of uris) {
+    let tabIds = tabIdsByUri.get(uri);
+    if (!tabIds) {
+      tabIds = new Set();
+      tabIdsByUri.set(uri, tabIds);
+    }
+    tabIds.add(tabId);
+  }
+}
+
+/** Drops tabId's own reference to each of `uris`, returning only the ones now unreferenced by any
+ *  open tab — the sole set actually safe to hand to disposeModel. */
+function releaseRefs(tabId: string, uris: readonly string[]): string[] {
+  const releasable: string[] = [];
+  for (const uri of uris) {
+    const tabIds = tabIdsByUri.get(uri);
+    if (!tabIds) continue;
+    tabIds.delete(tabId);
+    if (tabIds.size === 0) {
+      tabIdsByUri.delete(uri);
+      releasable.push(uri);
+    }
+  }
+  return releasable;
+}
+
 /** Called on mount (and on every remount after a tab-switch-away) — replaces any previous entry. */
 export function registerEditor(tabId: string, uri: string, editor: StandaloneEditor): void {
+  releaseUnusedPriorRefs(tabId, [uri]);
+  addRefs(tabId, [uri]);
   entries.set(tabId, { uris: [uri], editor });
 }
 
@@ -33,7 +73,20 @@ export function registerDiffEditor(
   uris: string[],
   editor: StandaloneDiffEditor,
 ): void {
+  releaseUnusedPriorRefs(tabId, uris);
+  addRefs(tabId, uris);
   entries.set(tabId, { uris, editor });
+}
+
+// A remount always recomputes the identical uris for the same tab (they're a pure function of the
+// tab's own stable revision pair/path), so this is normally a no-op — defensive only, in case a
+// future caller ever re-registers the same tabId against a different uri without an intervening
+// close: without it, the stale uri's ref would never be released and could never be disposed.
+function releaseUnusedPriorRefs(tabId: string, nextUris: readonly string[]): void {
+  const prior = entries.get(tabId);
+  if (!prior) return;
+  const stale = prior.uris.filter((uri) => !nextUris.includes(uri));
+  for (const uri of releaseRefs(tabId, stale)) disposeModel(uri);
 }
 
 /** Called on Vue unmount (a tab switch away, not a close) — disposes the widget, keeps the uris so
@@ -47,12 +100,13 @@ export function unmountEditor(tabId: string): void {
 }
 
 /** state/tabKinds.ts's own `dropResources(tabId)` hook — the tab is actually closing. Disposes
- *  whatever widget is still live plus the cached model(s), and forgets this tab entirely. */
+ *  whatever widget is still live plus the cached model(s) — C14-5: only the ones no other open tab
+ *  still references (releaseRefs) — and forgets this tab entirely. */
 export function dropRepoFileTab(tabId: string): void {
   const entry = entries.get(tabId);
   if (!entry) return;
   entry.editor?.dispose();
-  for (const uri of entry.uris) disposeModel(uri);
+  for (const uri of releaseRefs(tabId, entry.uris)) disposeModel(uri);
   entries.delete(tabId);
 }
 
