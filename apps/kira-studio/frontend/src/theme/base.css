@@ -11,6 +11,7 @@
 @import "./vscode-bridge.css";
 @import "./primitives.css";
 @import "./review-decorations.css";
+@import "./blame-annotation.css";
 
 /* Maps the token set into Tailwind v4's CSS-first config, so utilities like
    `bg-chrome` / `text-muted` exist alongside the raw custom properties. */

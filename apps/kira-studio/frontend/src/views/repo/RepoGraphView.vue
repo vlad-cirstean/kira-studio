@@ -9,6 +9,7 @@ import type { RepoGraphTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
+import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -32,11 +33,16 @@ async function mountGraph(): Promise<void> {
   const { mount, parsePersistedViewState } = await loadGitUi();
   if (!container.value) return; // unmounted while the chunk above was in flight.
 
+  // P62 §4.5: a blame-annotation click-through that fired while this tab was cold — consumed
+  // exactly once, the same `pendingUiAction` seam G10 D19's palette commands already use.
+  const pendingReveal = takePendingBlameReveal(repoId);
+
   handle = mount(container.value, {
     transport: gitTransportFor(repoId),
     viewState: new TabViewStateStore(props.tab.id, parsePersistedViewState),
     host: 'kira',
     view: 'graph', // never 'review' — the C11 boundary (§9): this excludes the whole review layer.
+    pendingUiAction: pendingReveal ? { action: 'revealCommit', target: pendingReveal } : null,
     // §14 OQ4: no wire event maps onto this natively. Go's gitrpc emits no 'connection.changed'
     // analogue at all — that event is composed entirely by the VS Code extension host
     // (proxyHandlers.ts's own ConnectionManager.onStateChange push), not something a raw

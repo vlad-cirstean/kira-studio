@@ -1,0 +1,9 @@
+/* P62 §4.4 — the repo file viewer's git-blame annotation, injected text at the end of the
+   cursor's line (blameAnnotation.ts). A separate file rather than folding into
+   review-decorations.css: blame is not review, the same discipline that file's own precedent
+   already established (`base.css`'s own import comment). */
+
+.kira-blame-inline {
+  color: var(--kira-fg-subtle);
+  font-style: italic;
+}

@@ -55,6 +55,28 @@ export function takePendingReviewTarget(
   return target;
 }
 
+// P62 §4.5: the blame annotation's own click-through ("Open Blame Commit in Graph") hits the
+// identical race — a repo-file tab can be active before the pinned graph tab has ever mounted, so
+// a `ui.action` emitted straight onto the transport (`transport.ts`'s `emitUiAction`) would have
+// nothing listening. Mirrors `pendingReviewTargetByCodeRepoId` above exactly: stashed here,
+// consumed once by `RepoGraphView.vue`'s own mount as `MountOptions.pendingUiAction`.
+const pendingBlameRevealByCodeRepoId = new Map<string, { repoId: string; sha: string }>();
+
+export function stashPendingBlameReveal(
+  codeRepoId: string,
+  target: { repoId: string; sha: string },
+): void {
+  pendingBlameRevealByCodeRepoId.set(codeRepoId, target);
+}
+
+/** Consumed once — a later remount of the graph tab (switch away and back, no new reveal in
+ *  between) starts wherever the graph already was, not replaying a stale target. */
+export function takePendingBlameReveal(codeRepoId: string): { repoId: string; sha: string } | null {
+  const target = pendingBlameRevealByCodeRepoId.get(codeRepoId) ?? null;
+  pendingBlameRevealByCodeRepoId.delete(codeRepoId);
+  return target;
+}
+
 /** git's own well-known empty-tree object id — `<sha>:<path>` against it always resolves to
  *  `file.read`'s existing `{kind: 'missing'}` classification (the path never existed in an empty
  *  tree), which is exactly the rendering a root commit's added file needs on its left side. Used

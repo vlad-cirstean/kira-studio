@@ -18,7 +18,10 @@ import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { tabsForWorkspace } from '../../state/mode';
 import { patchRepoGraphTabState, tabsState } from '../../state/tabs';
 
-function pinnedGraphTabId(codeRepoId: string): string | null {
+// P62 §4.5: exported so views/repo/blameAnnotation.ts's own click-through can find the pinned
+// graph tab without a second copy of this lookup — the same tab hostHandlers.ts's own pending-
+// reveal map (below) targets.
+export function pinnedGraphTabId(codeRepoId: string): string | null {
   const key = repoWorkspaceKey(codeRepoId);
   return tabsForWorkspace(key).find((t) => t.kind === 'repo-graph')?.id ?? null;
 }

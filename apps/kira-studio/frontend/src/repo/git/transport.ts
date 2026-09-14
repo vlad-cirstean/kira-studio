@@ -112,9 +112,25 @@ const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
 /** One named stream per repo workspace, each its own `gitsession.Conn`/repo hold on the Go side
  *  (`handlers.go`'s own per-connection design, §8) — independent even for two workspaces open on
  *  the same repository. */
+// P62 §4.5: the blame annotation's click-through needs to push `ui.action` the same way
+// review.open's own handler does (§8.1's local event bus) — but from
+// views/repo/blameAnnotation.ts, which is not a hostHandlers.ts request handler and so has no
+// `emitLocal` closure of its own. Keyed by codeRepoId (not the git repoId) so this module — the
+// one that actually owns each repo workspace's local emitter — can be asked directly.
+const localEmittersByCodeRepoId = new Map<string, ReturnType<typeof createLocalEmitter>>();
+
+/** A no-op for a codeRepoId whose graph tab (and therefore transport) was never mounted — nothing
+ *  is listening yet, the same "cold" outcome every other local-bus emission already tolerates
+ *  (`review.open`'s own `emitLocal` call has the identical property while the review sidebar is
+ *  unmounted). */
+export function emitUiAction(codeRepoId: string, payload: EventPayload<'ui.action'>): void {
+  localEmittersByCodeRepoId.get(codeRepoId)?.emit('ui.action', payload);
+}
+
 function createNativeGitTransport(codeRepoId: string): Transport {
   const remote = createRpcClient(createStreamChannel(Stream('git')));
   const local = createLocalEmitter();
+  localEmittersByCodeRepoId.set(codeRepoId, local);
   const host = createHostHandlers({
     remoteRequest: remote.request,
     codeRepoId,
@@ -194,5 +210,6 @@ export function disposeGitTransport(codeRepoId: string): void {
   const transport = transportsByCodeRepoId.get(codeRepoId);
   if (!transport) return;
   transportsByCodeRepoId.delete(codeRepoId);
+  localEmittersByCodeRepoId.delete(codeRepoId);
   transport.dispose();
 }
