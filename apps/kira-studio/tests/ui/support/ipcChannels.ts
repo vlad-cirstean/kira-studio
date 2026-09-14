@@ -51,6 +51,7 @@ export const IPC = {
   connectionsDisconnect: 'kira:connections:disconnect',
   connectionsStates: 'kira:connections:states',
   treeChildren: 'kira:tree:children',
+  treeKeyTypes: 'kira:tree:keyTypes',
   treeDescribe: 'kira:tree:describe',
   treeDefinition: 'kira:tree:definition',
   treeSchemaColumns: 'kira:tree:schemaColumns',
