@@ -4,8 +4,8 @@ import type { DefinitionTabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { copyText } from '../../clipboard';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { findRanges } from '../../editor/findRanges';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openConsoleTab, patchDefinitionTabState } from '../../state/tabs';
@@ -309,7 +309,7 @@ const breadcrumb = computed(() => {
       />
       <template v-else>
       <div v-if="pane === 'source'" class="editor-body">
-        <CodeMirrorHost
+        <MonacoHost
           ref="docHostRef"
           :doc="document"
           :language="definition?.language === 'json' ? 'json' : 'sql'"

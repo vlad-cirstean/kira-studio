@@ -8,8 +8,8 @@ import {
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
@@ -358,7 +358,7 @@ onUnmounted(() => {
               <span class="p-xs dim">#{{ m.seq }}</span>
             </button>
             <div v-if="expanded.has(m.seq)" class="message-detail">
-              <CodeMirrorHost
+              <MonacoHost
                 :ref="(el) => setMessageHost(m.seq, el)"
                 :doc="m.json"
                 language="json"
@@ -450,7 +450,7 @@ onUnmounted(() => {
 
 /* Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay numerically
    equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON document taller than this
-   scrolls inside CodeMirrorHost's own scroller instead of growing the row. */
+   scrolls inside MonacoHost's own scroller instead of growing the row. */
 .message-detail {
   height: 200px;
   box-sizing: border-box;

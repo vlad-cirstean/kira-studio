@@ -4,8 +4,8 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { beautifyJson, beautifyXml } from '../../beautify';
-import CodeMirrorHost from '../../editor/CodeMirrorHost.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
+import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/variableHighlight';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
@@ -242,7 +242,7 @@ const findTargets = computed<readonly FindBarTarget[]>(() => {
 // Paints exactly the matches the bar itself counts and steps through, onto whichever editor(s)
 // are actually on screen. Reads `findBarRef`'s exposed `query`/`currentGlobal` (and `findTargets`)
 // synchronously in this computed's own evaluation — not inside the closures it returns — so this
-// recomputes, and so each editor's `rangeHighlights` prop reference changes (CodeMirrorHost's own
+// recomputes, and so each editor's `rangeHighlights` prop reference changes (MonacoHost's own
 // watch on that prop is what triggers a repaint), exactly when the query or the current match does.
 const perTargetHighlighters = computed<((doc: string) => readonly RangeHighlight[])[]>(() => {
   const bar = findBarRef.value;
@@ -422,7 +422,7 @@ onUnmounted(() => {
         >
           {{ response.bodyBytes }} bytes of binary data
         </span>
-        <CodeMirrorHost
+        <MonacoHost
           v-else
           ref="bodyHostRef"
           :doc="bodyText"
