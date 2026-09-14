@@ -208,6 +208,12 @@ const studioControl = {
         nodes: r.nodes ?? [],
       }),
     ),
+  // P63 §4.3 step 5: a batch of redis key types, windowed to whatever VirtualList's own
+  // visible-range currently spans — never a whole level, which can hold up to 200 000 keys.
+  treeKeyTypes: (connectionId: string, paths: string[]): Promise<string[]> =>
+    unwrap<Awaited<ReturnType<typeof TreeService.KeyTypes>>>(
+      TreeService.KeyTypes({ connectionId, paths }),
+    ).then((r) => trust<string[]>(r ?? [])),
   treeDescribe: (
     connectionId: string,
     path: string,

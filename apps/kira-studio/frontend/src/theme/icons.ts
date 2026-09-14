@@ -163,6 +163,28 @@ export function columnTypeIcon(dataType: string): string {
   return CATEGORY_ICON[columnTypeCategory(dataType)];
 }
 
+// P63 §4.2: RedisInsight's own type vocabulary (its own `ReJSON` dropped — this app has no
+// JSON-module support and does not add one). No colour: icons.ts already answered "may a type
+// badge carry a colour?" for SQL column types above — colour is reserved for the everyday scalar
+// classes (number/boolean/datetime), while json/array/binary/uuid/string/other all render plain —
+// and redis's six types are container/structure classes, the exact family that precedent paints
+// plain. `stream` takes 'pulse' rather than 'broadcast' on purpose: 'broadcast' already means "a
+// Kafka topic" (KIND_ICON.topic above) and this app keeps one glyph per concept.
+const REDIS_TYPE_ICON: Record<string, string> = {
+  string: 'symbol-string', // the same glyph CATEGORY_ICON.string uses
+  hash: 'symbol-object', // a field->value map; CATEGORY_ICON.json's glyph
+  list: 'list-ordered', // ordered, index-addressed — KIND_ICON.sequence's own glyph
+  set: 'symbol-enum', // unordered members
+  zset: 'sort-precedence', // members ordered by score
+  stream: 'pulse', // an append-only event log
+};
+
+/** Falls back to the generic key glyph — a row whose type has not arrived yet (fetched windowed,
+ *  P63 §4.3) must look exactly like today's row, never like a wrong type. */
+export function redisTypeIcon(type: string | null | undefined): string {
+  return (type && REDIS_TYPE_ICON[type]) || KIND_ICON.key;
+}
+
 // Item 3 (regression pass, task batch P46-5): numeric/boolean/datetime reuse CodeMirror's own VS
 // Code Dark Modern syntax colours (theme/tokens.css's --kira-syntax-*, the exact hex values VS
 // Code's own Dark Modern theme ships) instead of the connection-colour picker's palette — the user

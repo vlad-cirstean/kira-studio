@@ -34,6 +34,13 @@ export interface BrowseViewRuntime {
    *  own reasoning for `filter`/`selected` below). */
   previewPageIndex: number;
   previewPageSize: PageSize;
+  /** P63 §4.3: redis key types, fetched windowed (driven by VirtualList's own visible-range
+   *  event, not eagerly for the whole level) and keyed by node path — a plain `Map` kept small by
+   *  construction (bounded by what has been scrolled past, never a whole level, which can hold up
+   *  to 200 000 keys — §1.3's own `markRaw` discipline for `nodes` records why that bound
+   *  matters). Cleared by setLevel: a path from the previous level must never colour a row in this
+   *  one. */
+  keyTypes: Map<string, string>;
   /** P43 iter3 D39: monotonic per tab. `load()` captures it before its own await and drops its
    *  result on all three exit paths if a newer load has started since — the same supersession
    *  guard grid/documents/keyvalue/stream all keep as `opId`, expressed as a counter because
@@ -52,6 +59,7 @@ function defaultRuntime(): BrowseViewRuntime {
     selected: null,
     previewPageIndex: 0,
     previewPageSize: 100,
+    keyTypes: new Map(),
     loadSeq: 0,
   };
 }
@@ -138,6 +146,8 @@ async function setLevel(tabId: string, level: string): Promise<void> {
   rt.filter = '';
   rt.selected = null;
   rt.previewPageIndex = 0;
+  rt.keyTypes = new Map();
+  inFlightKeyTypes.delete(tabId);
   patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
   await load(tabId);
 }
@@ -178,6 +188,55 @@ export function selectRow(tabId: string, path: string | null): void {
 // idiom HttpRequestView.vue's own onResizeRequestPane follows.
 export function setListWidth(tabId: string, width: number): void {
   patchBrowseTabState(tabId, { listWidth: width });
+}
+
+// P63 §4.3: paths currently in flight, per tab — dedupe against a request already running for a
+// path a second `ensureKeyTypes` call (the next scroll tick) asks about again before the first
+// one's response has landed. Cleared entry-by-entry as each batch settles, and wholesale by
+// setLevel above (an in-flight request for the previous level's own paths is left to resolve into
+// a Map that has already been replaced — the `rt.loadSeq !== seq` guard below is what actually
+// drops its result, this Set is only what stops it being requested twice meanwhile).
+const inFlightKeyTypes = new Map<string, Set<string>>();
+
+// A level's own worst case (redis/catalog.go's scanCount x maxScanRounds) is 200 000 keys; a
+// batch this size is still well under any viewport VirtualList could ever report in one
+// visible-range event, so this is a safety ceiling, not a tuning knob.
+const KEY_TYPES_BATCH_SIZE = 200;
+
+/** Fetches the redis type of every path in `paths` not already known (`rt.keyTypes`) or already
+ *  in flight — driven by BrowseView.vue's own `@visible-range` handler, so this fires on every
+ *  scroll tick and must cheaply no-op once a window's types are all resolved. Silent on failure:
+ *  a decorative badge must never raise the error strip a failed *listing* owns (rows keep the
+ *  generic glyph instead). */
+export async function ensureKeyTypes(tabId: string, paths: string[]): Promise<void> {
+  const tab = findBrowseTab(tabId);
+  if (!tab?.connectionId) return;
+  const rt = runtime[tabId];
+  if (!rt) return;
+  let inFlight = inFlightKeyTypes.get(tabId);
+  if (!inFlight) {
+    inFlight = new Set();
+    inFlightKeyTypes.set(tabId, inFlight);
+  }
+  const pending = paths.filter((p) => !rt.keyTypes.has(p) && !inFlight.has(p));
+  if (pending.length === 0) return;
+  const batch = pending.slice(0, KEY_TYPES_BATCH_SIZE);
+  for (const p of batch) inFlight.add(p);
+  // Mirrors load()'s own supersession guard (`browse/state.ts:74/81` per the plan's own line
+  // reference) — a batch answered after a newer level load has started must never colour a row
+  // under the new level's breadcrumb.
+  const seq = rt.loadSeq;
+  try {
+    const types = await control.treeKeyTypes(tab.connectionId, batch);
+    if (rt.loadSeq !== seq || runtime[tabId] !== rt) return;
+    for (let i = 0; i < batch.length; i++) {
+      rt.keyTypes.set(batch[i], types[i] ?? 'none');
+    }
+  } catch {
+    // Silent (own doc comment above) — rows in this batch simply keep the generic glyph.
+  } finally {
+    for (const p of batch) inFlight.delete(p);
+  }
 }
 
 // P41 D14: an S3 upload/delete lands in a level the project tree no longer renders (F22) — this

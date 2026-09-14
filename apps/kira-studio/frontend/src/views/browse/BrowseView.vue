@@ -7,7 +7,7 @@ import { openContextMenu } from '../../state/contextMenu';
 import { openUploadDialog } from '../../state/objectStore';
 import { openKeyValueTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { nodeIcon } from '../../theme/icons';
+import { nodeIcon, redisTypeIcon } from '../../theme/icons';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -28,6 +28,7 @@ import { menuForNode } from './menu';
 import {
   ascend,
   descend,
+  ensureKeyTypes,
   goToLevel,
   load,
   reload,
@@ -148,6 +149,42 @@ const canUpload = computed(() => {
 function onUploadClick(): void {
   if (!props.tab.connectionId) return;
   openUploadDialog(props.tab.connectionId, currentLevelPath.value);
+}
+
+// P63 §4.3 step 7: only redis reports Caps().KeyTypes — an S3 browse tab (or any future
+// key-browsing engine without a per-key type concept) never issues the call at all.
+const keyTypesEnabled = computed(
+  () => !!connectionsState.states[props.tab.connectionId ?? '']?.caps?.keyTypes,
+);
+
+// Driven by VirtualList's own visible-range event (§4.3): fetches types only for the `key`-kind
+// rows currently on screen, never a whole level (up to 200 000 keys). filteredNodes, not rt.nodes
+// — the visible RANGE is an index into whatever list VirtualList is actually rendering, and the
+// filter toggle can make those two arrays diverge.
+function onVisibleRange(range: { start: number; end: number }): void {
+  if (!keyTypesEnabled.value) return;
+  const nodes = filteredNodes.value;
+  const paths: string[] = [];
+  for (let i = range.start; i < range.end && i < nodes.length; i++) {
+    const node = nodes[i];
+    if (node.kind === 'key') paths.push(node.path);
+  }
+  if (paths.length > 0) void ensureKeyTypes(props.tab.id, paths);
+}
+
+// P63 §4.2: the icon carries the type distinction (no colour — see icons.ts's own comment on
+// why); the type also lands in the row's free .row-detail slot as a lowercase text badge, the
+// *same* spelling KeyValueView.vue's own type badge renders — one term per concept, so the list
+// and the detail header can never disagree. Falls back to the generic glyph/no badge for a row
+// whose type hasn't arrived yet (fetched windowed, §4.3) or whose engine has no type concept (S3
+// objects are untouched: `nodeIcon('object')` → 'file', no badge).
+function rowIcon(item: TreeNode): string {
+  if (item.kind !== 'key') return nodeIcon(item.kind);
+  return redisTypeIcon(rt.value?.keyTypes.get(item.path));
+}
+function rowTypeBadge(item: TreeNode): string | null {
+  if (item.kind !== 'key') return null;
+  return rt.value?.keyTypes.get(item.path) ?? null;
 }
 
 const rowHeight = 28;
@@ -315,7 +352,13 @@ onUnmounted(() => {
           >
             No matching items
           </div>
-          <VirtualList v-else :items="filteredNodes" :row-height="rowHeight" class="body">
+          <VirtualList
+            v-else
+            :items="filteredNodes"
+            :row-height="rowHeight"
+            class="body"
+            @visible-range="onVisibleRange"
+          >
             <template #default="{ item }">
               <div
                 class="browse-row"
@@ -328,9 +371,14 @@ onUnmounted(() => {
                 @dblclick="onRowOpen(item)"
                 @contextmenu.prevent="onRowContextMenu($event, item)"
               >
-                <span class="icon-box muted"><CodiconIcon :name="nodeIcon(item.kind)" :size="13" /></span>
+                <span class="icon-box muted"><CodiconIcon :name="rowIcon(item)" :size="13" /></span>
                 <span class="row-name">{{ item.name }}</span>
                 <span v-if="item.detail" class="row-detail muted">{{ item.detail }}</span>
+                <span
+                  v-else-if="rowTypeBadge(item)"
+                  class="p-badge"
+                  data-testid="browse-key-type"
+                >{{ rowTypeBadge(item) }}</span>
               </div>
             </template>
           </VirtualList>
@@ -470,5 +518,9 @@ onUnmounted(() => {
 .row-detail {
   flex-shrink: 0;
   font-size: var(--kira-t-xs);
+}
+
+.browse-row .p-badge {
+  flex-shrink: 0;
 }
 </style>

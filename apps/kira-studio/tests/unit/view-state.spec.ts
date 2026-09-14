@@ -29,6 +29,7 @@ const {
   descend: descendBrowse,
   setFilter: setBrowseFilter,
   selectRow: selectBrowseRow,
+  ensureKeyTypes,
   runtime: browseRuntime,
 } = await import('../../frontend/src/views/browse/state');
 const {
@@ -195,6 +196,61 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
     expect(isReactive(nodes)).toBe(false);
     expect(isReactive(nodes?.[0])).toBe(false);
     expect(nodes?.map((n) => n.name)).toEqual(['a', 'b']);
+  });
+});
+
+// P63 §4.3/§7: the one place this phase's plan names as earning coverage beyond the redis
+// adapter suite — interacting rules over an in-flight set plus the loadSeq supersession guard,
+// CLAUDE.md's own "cache invalidation with interacting rules" bar. One test, not a suite.
+describe("views/browse/state.ts — ensureKeyTypes's dedupe/supersede logic (P63)", () => {
+  test('dedupes against an in-flight request and an already-known result, and drops a result superseded by a newer level load', async () => {
+    const { id } = openBrowseTab('conn7', 'db0', { newTab: true });
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
+    (control as any).treeChildren = async () => ({ nodes: [], truncated: false });
+    await loadBrowse(id); // establishes the runtime record ensureKeyTypes requires
+
+    const calls: Array<{
+      paths: string[];
+      d: ReturnType<typeof deferred<string[]>>;
+    }> = [];
+    // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
+    (control as any).treeKeyTypes = (_connectionId: string, paths: string[]) => {
+      const d = deferred<string[]>();
+      calls.push({ paths, d });
+      return d.promise;
+    };
+
+    // Call 1: two keys, neither known nor in flight yet.
+    const first = ensureKeyTypes(id, ['key:a', 'key:b']);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.paths).toEqual(['key:a', 'key:b']);
+
+    // Call 2, while call 1 is still in flight: 'key:b' is deduped against the in-flight set,
+    // only the genuinely new 'key:c' goes out.
+    const second = ensureKeyTypes(id, ['key:b', 'key:c']);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.paths).toEqual(['key:c']);
+
+    // Call 2 resolves first and lands normally — no newer load has started yet.
+    calls[1]?.d.resolve(['string']);
+    await second;
+    expect(browseRuntime[id]?.keyTypes.get('key:c')).toBe('string');
+
+    // A newer level load starts (bumps loadSeq) before call 1's own response arrives.
+    const rt = browseRuntime[id];
+    if (rt) rt.loadSeq++;
+    calls[0]?.d.resolve(['hash', 'list']);
+    await first;
+
+    // Superseded — call 1's answers for key:a/key:b must never land under the new level.
+    expect(browseRuntime[id]?.keyTypes.has('key:a')).toBe(false);
+    expect(browseRuntime[id]?.keyTypes.has('key:b')).toBe(false);
+    // key:c's own already-landed result is untouched by an unrelated call's supersession.
+    expect(browseRuntime[id]?.keyTypes.get('key:c')).toBe('string');
+
+    // Re-asking for the now-known 'key:c' triggers no further call.
+    await ensureKeyTypes(id, ['key:c']);
+    expect(calls).toHaveLength(2);
   });
 });
 
