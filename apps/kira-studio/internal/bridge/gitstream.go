@@ -39,17 +39,29 @@ func newStreamConnID() gitsession.ConnID {
 	return gitsession.ConnID(hex.EncodeToString(buf))
 }
 
-// readOnlyMethods is an ALLOWLIST, deliberately: a contract method added later is refused by this
+// allowedMethods is an ALLOWLIST, deliberately: a contract method added later is refused by this
 // stream until someone adds it here on purpose. A denylist would admit every future write by
 // default, which is the failure mode this file exists to prevent (docs/v1.5/plans/
 // C10-git-graph-native.md §4.2).
 //
-// Every preflight.* method — and remote.pullPreflight/remote.pushPreflight, the same shape under a
-// different name — is deliberately ABSENT. A pre-flight is a read, but its only purpose is to stage
-// a write; admitting it would let a UI bug render a confirm dialog whose confirm button then fails
-// at this layer — a worse experience than the action simply not existing. Pinned explicitly (not
-// merely relying on default-deny) by gitstream_test.go's own preflightMethods list, alongside this
-// stream's other two "must stay refused" tables (writeMethods, hostAnsweredMethods) — C13-11.
+// P67e relaxed this stream from "read-only" to "admits every operation that writes through git
+// itself" — the native window is a writing git client (fetch/pull/push/force-push, merge and
+// rebase as pull strategies, undo, restack, stash, worktree add/remove, and the sequencer verbs a
+// conflict needs to carry on). Of the 55 methods internal/gitrpc's Router.ForConn dispatches,
+// exactly three stay refused here, each for a reason this allowlist cannot admit around:
+//
+//   - worktree.prepare/worktree.cancelPrepare — RunPrepare executes a user-stored shell command
+//     with no human-approval gate anywhere in this codebase (its only check is "does this match
+//     what's currently stored"); a security boundary, not a file-editing one. Hidden client-side by
+//     capabilities.runPrepareScript: false (hostHandlers.ts).
+//   - settings.setGitPath — writes the global git path, which this app's own Settings dialog
+//     already owns; no git-ui affordance calls it at all (it is the VS Code extension's own
+//     one-time migration routine).
+//
+// Two more methods stay refused at layer two (repo/git/hostHandlers.ts) as defence in depth even
+// though Router.ForConn has no case for either, so they never reach this file's own check:
+// editor.resolveConflict (this app has no merge editor — the user's own stated carve-out) and
+// worktree.openWindow (vscode.openFolder has no native meaning).
 //
 // The nine review.* methods below (C11 §3) look like writes but never touch the repository: every
 // one is a thin decode-validate-delegate onto gitsession.RepoEntry whose only persistence is
@@ -61,13 +73,19 @@ func newStreamConnID() gitsession.ConnID {
 // anywhere in the review path. This is the same shape as repoSettings.set below: a name that says
 // "write" whose writes land in Kira's own storage, never the user's repository.
 //
+// commit.resolvePr/branch.resolvePr are plain reads (a GitHub lookup, never returning an RPC
+// error for a GitHub-side failure) with one side effect worth naming here since nothing else
+// documents it: each purges review.db's own review session for a branch/commit whose PR GitHub
+// now reports closed or merged — review.db only, exactly the same storage review.mark and the
+// review.comment.* methods already write, never the repository itself.
+//
 // review.session.save/.load are NOT here — handlers.go has no case for either (contract.go's own
 // history note: they resume the extension's own context.workspaceState and never reach this
 // server), so they stay refused as defence in depth even though nothing routes them anyway.
 // review.open/editor.openRangeDiff are likewise absent — answered host-side, never forwarded here.
 // undo.peek is admitted because UndoButton.vue reads it to render a label even when undo itself is
 // hidden.
-var readOnlyMethods = map[string]struct{}{
+var allowedMethods = map[string]struct{}{
 	"app.init": {}, "repo.open": {}, "repo.close": {},
 	"graph.status": {}, "graph.loadMore": {}, "graph.refresh": {},
 	"commit.detail": {}, "commit.fileDiff": {}, "file.read": {}, "file.goToTarget": {},
@@ -77,37 +95,54 @@ var readOnlyMethods = map[string]struct{}{
 	"commit.resolvePr": {}, "branch.resolvePr": {},
 	"worktree.list": {}, "stack.list": {},
 	// repoSettings.set: §4.4 says it only ever writes Kira's own SQLite, never the repository — true,
-	// but four of its patch fields are write-only surface this stream must still refuse at the FIELD
-	// level (readOnlyRepoSettingsSet below): WorktreePrepareScript/WorktreeBasePath (an approved patch
-	// here can later be executed as a real shell command by worktree.prepare — RunPrepare's only gate
-	// is "does this match what's currently stored", not "did a human approve this content"; there is
-	// no separate prepareScriptApprovedSha gate anywhere in this codebase despite contract.go's own
-	// comment naming one) and PullStrategy/CheckoutAutoStash (already hidden client-side per C10 §4.4,
-	// never blocked at this layer until now). GraphPageSize/GraphScope/StashShowInGraph/
-	// StashIncludeUntracked/ReviewBaseCandidates/LogLevel/GithubEnabled stay allowed.
+	// but two of its patch fields are write-only surface this stream must still refuse at the FIELD
+	// level (guardRepoSettingsSet below): WorktreePrepareScript/WorktreeBasePath — an approved patch
+	// here can later be executed as a real shell command by worktree.prepare; RunPrepare's only gate
+	// is "does this match what's currently stored", not "did a human approve this content", and there
+	// is no separate prepareScriptApprovedSha gate anywhere in this codebase despite contract.go's own
+	// comment naming one. PullStrategy/CheckoutAutoStash are now ordinary settings for operations this
+	// stream admits (P67e) and are no longer restricted. GraphPageSize/GraphScope/StashShowInGraph/
+	// StashIncludeUntracked/ReviewBaseCandidates/LogLevel/GithubEnabled stay allowed, as before.
 	"repoSettings.get": {}, "repoSettings.set": {},
 	"review.resolveBase": {}, "review.files": {}, "review.fileDiff": {}, "review.mark": {},
 	"review.comment.add": {}, "review.comment.list": {}, "review.comment.remove": {},
 	"review.comment.clear": {}, "review.comment.export": {}, // review.db only — see above.
+	// P67e: every preflight — a read whose only purpose is to stage a write for a subsequent
+	// op.run/remote.run — is now admitted alongside the write it stages, so a confirm dialog's
+	// confirm button no longer fails at this layer for an operation the toolbar already offers.
+	"preflight.checkout": {}, "preflight.revert": {}, "preflight.reset": {},
+	"preflight.cherryPick": {}, "preflight.stashPop": {}, "preflight.stashBranch": {},
+	"preflight.worktreeAdd": {}, "preflight.worktreeRemove": {}, "preflight.restack": {},
+	"remote.pullPreflight": {}, "remote.pushPreflight": {},
+	// P67e: the repository-mutating operations themselves. op.run covers checkout/revert/reset/
+	// cherryPick/stashPop/stashBranch/worktreeAdd/worktreeRemove and the sequencer verbs
+	// (continue/skip/abort) a conflict needs to carry on; remote.run covers fetch/push/forcePush/
+	// deleteRemoteBranch/pull (pull's own strategy — ff-only/merge/rebase — is the only merge or
+	// rebase this stack has anywhere, §7 of docs/v1.6/plans/P67e-git-relax-read-only.md).
+	// credential.provide answers git's own askpass prompt for this stream's own remote op
+	// (gitCredential.ts/GitCredentialDialog.vue) — the native window now owns the connection the
+	// prompt is for, so it is the one that must be able to answer it.
+	"op.run": {}, "remote.run": {}, "remote.cancel": {}, "undo.run": {},
+	"stack.restack": {}, "stack.cancelRestack": {}, "credential.provide": {},
 }
 
-// readOnlyStreamMethods is layer 1's own allowlist for the one streaming method — graph.stream is
+// allowedStreamMethods is layer 1's own allowlist for the one streaming method — graph.stream is
 // the only OpenStream call the graph makes; everything else streamed (SPEC's remote progress, for
 // instance) is a write-triggered stream with no native caller.
-var readOnlyStreamMethods = map[string]struct{}{
+var allowedStreamMethods = map[string]struct{}{
 	"graph.stream": {},
 }
 
 type requestFn = func(ctx context.Context, method string, params json.RawMessage) (any, error)
 type streamFn = func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error
 
-// readOnlyRequest wraps next so every request this stream ever serves is checked against
-// readOnlyMethods before next is even called — the load-bearing boundary (§4.2 layer 1). This
-// cannot be bypassed by any frontend change: a method missing here is refused regardless of what
-// hostHandlers.ts or any git-ui component believes is safe.
-func readOnlyRequest(next requestFn) requestFn {
+// allowedRequest wraps next so every request this stream ever serves is checked against
+// allowedMethods before next is even called — the load-bearing boundary. This cannot be bypassed
+// by any frontend change: a method missing here is refused regardless of what hostHandlers.ts or
+// any git-ui component believes is safe.
+func allowedRequest(next requestFn) requestFn {
 	return func(ctx context.Context, method string, params json.RawMessage) (any, error) {
-		if _, ok := readOnlyMethods[method]; !ok {
+		if _, ok := allowedMethods[method]; !ok {
 			return nil, ipcerr.New("E_READ_ONLY",
 				"gitstream: "+method+" is not available from the native graph surface")
 		}
@@ -115,12 +150,11 @@ func readOnlyRequest(next requestFn) requestFn {
 	}
 }
 
-// restrictedRepoSettingsFields are the RepoSettingsPatchWire leaves repoSettings.set must refuse on
-// this stream even though the method itself is allowlisted (see readOnlyMethods' own comment).
-// repoSettingsSetTouchesRestrictedField decodes just enough of params to check them, following this
-// package's existing json.RawMessage-decode-and-inspect precedent (gitrpc's own handlers all decode
-// params into a typed struct before acting on it; this does the same, just to inspect instead of
-// dispatch).
+// repoSettingsSetTouchesRestrictedField are the RepoSettingsPatchWire leaves repoSettings.set must
+// refuse on this stream even though the method itself is allowlisted (see allowedMethods' own
+// comment). Follows this package's existing json.RawMessage-decode-and-inspect precedent
+// (gitrpc's own handlers all decode params into a typed struct before acting on it; this does the
+// same, just to inspect instead of dispatch).
 func repoSettingsSetTouchesRestrictedField(params json.RawMessage) bool {
 	var p gitrpc.RepoSettingsSetParams
 	if err := json.Unmarshal(params, &p); err != nil {
@@ -130,17 +164,16 @@ func repoSettingsSetTouchesRestrictedField(params json.RawMessage) bool {
 		return false
 	}
 	patch := p.Patch
-	return patch.WorktreePrepareScript != nil || patch.WorktreeBasePath != nil ||
-		patch.PullStrategy != nil || patch.CheckoutAutoStash != nil
+	return patch.WorktreePrepareScript != nil || patch.WorktreeBasePath != nil
 }
 
-// readOnlyRepoSettingsSet is readOnlyRequest's companion, adding the one FIELD-level restriction
-// this stream needs on top of every other method's method-level allow/refuse: repoSettings.set is
+// guardRepoSettingsSet is allowedRequest's companion, adding the one FIELD-level restriction this
+// stream needs on top of every other method's method-level allow/refuse: repoSettings.set is
 // allowed, but only for a patch that leaves every restricted field (above) absent. Composed around
-// readOnlyRequest in ServeGitStream so a restricted field is refused before the method-level check
+// allowedRequest in ServeGitStream so a restricted field is refused before the method-level check
 // even runs. Scoped to gitstream.go alone — gitsock's own paired-client path calls
 // handlers.Request directly and is completely unaffected by this wrapper.
-func readOnlyRepoSettingsSet(next requestFn) requestFn {
+func guardRepoSettingsSet(next requestFn) requestFn {
 	return func(ctx context.Context, method string, params json.RawMessage) (any, error) {
 		if method == "repoSettings.set" && repoSettingsSetTouchesRestrictedField(params) {
 			return nil, ipcerr.New("E_READ_ONLY",
@@ -150,10 +183,10 @@ func readOnlyRepoSettingsSet(next requestFn) requestFn {
 	}
 }
 
-// readOnlyStream is readOnlyRequest's counterpart for OpenStream calls.
-func readOnlyStream(next streamFn) streamFn {
+// allowedStream is allowedRequest's counterpart for OpenStream calls.
+func allowedStream(next streamFn) streamFn {
 	return func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error {
-		if _, ok := readOnlyStreamMethods[method]; !ok {
+		if _, ok := allowedStreamMethods[method]; !ok {
 			return ipcerr.New("E_READ_ONLY",
 				"gitstream: "+method+" is not available from the native graph surface")
 		}
@@ -166,21 +199,23 @@ func readOnlyStream(next streamFn) streamFn {
 // webview, not an external client the trust store exists to gate (docs/v1.5/plans/
 // C10-git-graph-native.md §3.2). gconn still does its real job — per-connection repo holds, so
 // repo.close only ever releases this connection's own hold (gitrpc/handlers.go), and Emit for
-// repo.changed.
+// repo.changed and, since P67e, credential.request.
 func ServeGitStream(router *gitrpc.Router, conn StreamSession) {
 	gconn := gitsession.NewConn(newStreamConnID(), nativeClientID, nativeLabel, nil)
-	// C13-10: the native mount's own repo.open must never arm a RepoEntry's background auto-fetch
-	// timer (autofetch.go) — docs/ARCHITECTURE.md documents this surface as provably read-only, and
-	// a real git fetch --prune is a write gitsock's own paired, external clients still get to make
-	// (unaffected: only this Conn opts out, not RepoEntry.EnsureAutoFetch itself).
+	// P67e/D5: still opted out, but no longer because the surface is read-only — a periodic
+	// background `git fetch --prune` is a network write the user never pressed a button for, and
+	// every fetch this phase admits is one they did (docs/v1.6/plans/P67e-git-relax-read-only.md
+	// §9 OQ-2). One deleted line whenever someone actually wants automatic background fetching for
+	// this Conn (unaffected: only this Conn opts out, not RepoEntry.EnsureAutoFetch itself, so an
+	// already-paired VS Code extension window opening the identical repository still arms it).
 	gconn.DisableAutoFetch()
 	defer gconn.Close()
 
 	handlers := router.ForConn(gconn)
 	sess := rpcstream.NewSession(conn, rpcstream.Handlers{
 		ContractVersion: gitrpc.ContractVersion,
-		Request:         readOnlyRepoSettingsSet(readOnlyRequest(handlers.Request)),
-		Stream:          readOnlyStream(handlers.Stream),
+		Request:         guardRepoSettingsSet(allowedRequest(handlers.Request)),
+		Stream:          allowedStream(handlers.Stream),
 		MaxFrameBytes:   maxGitStreamFrameBytes,
 	})
 	gconn.Emit = sess.Emit

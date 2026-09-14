@@ -12,17 +12,19 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 )
 
-// TestGitrpcDispatch_EveryMethodIsClassified is C13-11: readOnlyMethods/readOnlyStreamMethods
-// (gitstream.go) plus writeMethods/hostAnsweredMethods/preflightMethods (gitstream_test.go, hoisted
-// to package scope for exactly this reason) are FIVE independently-maintained lists, and nothing
-// before this test ever checked they actually cover every method internal/gitrpc/handlers.go's
-// Router.ForConn dispatches. A new gitrpc method added with no corresponding entry in any of the
-// five would silently inherit this stream's default-refuse behaviour (safe) but with no signal at
-// all that a classification decision was even needed — exactly the gap that let the original C12-1
-// bug happen for repoSettings.set's own restricted fields. Running this once, unfixed, is in fact
-// what found preflightMethods' own gap in the first place: every preflight.*/remote.*Preflight
-// method was refused correctly (default-deny) but had never been pinned as a deliberate decision
-// anywhere a test could catch its absence.
+// TestGitrpcDispatch_EveryMethodIsClassified is C13-11: allowedMethods/allowedStreamMethods
+// (gitstream.go) plus writeMethods/hostAnsweredMethods (gitstream_test.go, hoisted to package
+// scope for exactly this reason) are FOUR independently-maintained lists, and nothing before this
+// test ever checked they actually cover every method internal/gitrpc/handlers.go's Router.ForConn
+// dispatches. A new gitrpc method added with no corresponding entry in any of the four would
+// silently inherit this stream's default-refuse behaviour (safe) but with no signal at all that a
+// classification decision was even needed — exactly the gap that let the original C12-1 bug happen
+// for repoSettings.set's own restricted fields. Running this once, unfixed, is in fact what found
+// the original preflightMethods gap in the first place: every preflight.*/remote.*Preflight method
+// was refused correctly (default-deny) but had never been pinned as a deliberate decision anywhere
+// a test could catch its absence — P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D2/D3)
+// resolved that by admitting every preflight onto allowedMethods, alongside the write it stages, so
+// there is no longer a separate "must stay refused" preflight table for this test to fold in.
 //
 // ForConn's dispatch table is a plain `switch method { case "...": ... }` inside a func literal,
 // not a data structure reflection can enumerate — so this derives the REAL case set the only way
@@ -37,10 +39,10 @@ func TestGitrpcDispatch_EveryMethodIsClassified(t *testing.T) {
 	}
 
 	classified := map[string]bool{}
-	for m := range readOnlyMethods {
+	for m := range allowedMethods {
 		classified[m] = true
 	}
-	for m := range readOnlyStreamMethods {
+	for m := range allowedStreamMethods {
 		classified[m] = true
 	}
 	for _, m := range writeMethods {
@@ -49,14 +51,11 @@ func TestGitrpcDispatch_EveryMethodIsClassified(t *testing.T) {
 	for _, m := range hostAnsweredMethods {
 		classified[m] = true
 	}
-	for _, m := range preflightMethods {
-		classified[m] = true
-	}
 
 	for _, method := range dispatched {
 		if !classified[method] {
 			t.Errorf(
-				"gitrpc method %q is dispatched by Router.ForConn but classified in none of readOnlyMethods, readOnlyStreamMethods, writeMethods or hostAnsweredMethods (gitstream.go/gitstream_test.go) -- a new method needs an explicit decision, not silent default-refuse",
+				"gitrpc method %q is dispatched by Router.ForConn but classified in none of allowedMethods, allowedStreamMethods, writeMethods or hostAnsweredMethods (gitstream.go/gitstream_test.go) -- a new method needs an explicit decision, not silent default-refuse",
 				method,
 			)
 		}
@@ -84,15 +83,17 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 	// exactly what a first draft of this test (using a plain bool map, no `seen`/`ok` check) still
 	// let through uncaught in testing.
 	//
-	// Mirrors gitstream.go's own restrictedRepoSettingsFields doc comment: the four `true` entries
-	// are write-only surface a compromised graph mount could otherwise stage (a prepare script/base
-	// path later executed verbatim by worktree.prepare, or a pull/checkout behaviour change) with no
-	// separate human-approval gate. Every `false` entry is a per-repo graph/UI preference.
+	// Mirrors gitstream.go's own repoSettingsSetTouchesRestrictedField doc comment: the two `true`
+	// entries are write-only surface a compromised graph mount could otherwise stage (a prepare
+	// script/base path later executed verbatim by worktree.prepare) with no separate human-approval
+	// gate. PullStrategy/CheckoutAutoStash flipped to `false` in P67e (docs/v1.6/plans/
+	// P67e-git-relax-read-only.md D4) — they configure operations this stream now admits, not
+	// write-only surface. Every `false` entry is a per-repo graph/UI preference.
 	knownFields := map[string]bool{
 		"WorktreePrepareScript": true,
 		"WorktreeBasePath":      true,
-		"PullStrategy":          true,
-		"CheckoutAutoStash":     true,
+		"PullStrategy":          false,
+		"CheckoutAutoStash":     false,
 		"GraphPageSize":         false,
 		"GraphScope":            false,
 		"StashShowInGraph":      false,
