@@ -56,8 +56,10 @@ describe('C13-1: openRepoReviewDiffTab reuse predicate', () => {
     const tabsInWorkspace = tabsState.tabs.filter((t) => (t.workspaceId ?? null) === workspaceId);
     expect(tabsInWorkspace.length).toBe(2);
 
-    const mainDiff = asRepoDiffTab(tabsState.tabs.find((t) => t.id === main.id)!);
-    const originDiff = asRepoDiffTab(tabsState.tabs.find((t) => t.id === originMain.id)!);
+    const mainTab = tabsState.tabs.find((t) => t.id === main.id);
+    const originTab = tabsState.tabs.find((t) => t.id === originMain.id);
+    const mainDiff = mainTab ? asRepoDiffTab(mainTab) : null;
+    const originDiff = originTab ? asRepoDiffTab(originTab) : null;
     expect(mainDiff?.state.review?.branch).toBe('main');
     expect(originDiff?.state.review?.branch).toBe('origin/main');
   });
