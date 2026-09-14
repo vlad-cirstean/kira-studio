@@ -1,20 +1,15 @@
 <script setup lang="ts">
-import { syntaxHighlighting } from '@codemirror/language';
-import type { MergeView as MergeViewType } from '@codemirror/merge';
-import { EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
-import { languageExtension } from '../../editor/languages';
-import { kiraEditorTheme, kiraHighlightStyle } from '../../editor/theme';
+import { KIRA_EDITOR_THEME, loadMonaco } from '../../editor/monaco';
+import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { formatBytes, formatRelative } from '../../format';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import DialogFrame from '../../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import { loadMerge } from './mergeEntry';
 
 // P8 D12: two entries, three levels of difference, one dialog. `ids` are the two selections from
 // the History list's own checkboxes — this dialog itself decides which is A (older) and which is
@@ -28,7 +23,20 @@ const loadingSnapshots = ref(true);
 const loadError = ref<string | null>(null);
 const mergeLoading = ref(false);
 const mergeHostRef = ref<HTMLElement | null>(null);
-let mergeView: MergeViewType | null = null;
+type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
+type TextModel = import('monaco-editor').editor.ITextModel;
+let diffEditor: DiffEditor | null = null;
+let originalModel: TextModel | null = null;
+let modifiedModel: TextModel | null = null;
+
+function disposeMergeView(): void {
+  diffEditor?.dispose();
+  diffEditor = null;
+  originalModel?.dispose();
+  originalModel = null;
+  modifiedModel?.dispose();
+  modifiedModel = null;
+}
 
 async function loadSnapshots(): Promise<void> {
   try {
@@ -110,11 +118,11 @@ const bodyTextB = computed(() => {
 });
 
 // D12 level 2: the headers table. Reduced to added/removed/changed/unchanged by header *name*
-// (case-insensitive) rather than by @codemirror/merge's own text-diff — headers are a keyed
+// (case-insensitive) rather than by the diff editor's own text-diff — headers are a keyed
 // structure, not ordered prose, so a name-keyed comparison is the semantically correct model (it
 // stays right even when two servers emit the same headers in a different order) and needs no
-// diff algorithm of its own. @codemirror/merge's diff/LCS machinery is exactly what the body
-// level below is for.
+// diff algorithm of its own. Monaco's diff editor (P60a) is exactly what the body level below is
+// for.
 interface HeaderRow {
   name: string;
   a: string | null;
@@ -155,32 +163,37 @@ const unchangedHeaderRows = computed(() =>
   headerRows.value.filter((r) => r.status === 'unchanged'),
 );
 
-// D12 level 3: the real payoff of @codemirror/merge — a scroll-locked, line-aligned,
-// intra-line-highlighted side-by-side view. Both sides read-only (F14's own recipe).
+// D12 level 3 / P60a §6: the real payoff of Monaco's diff editor — a scroll-locked,
+// line-aligned, intra-line-highlighted side-by-side view. Both sides read-only (§6's own recipe,
+// the same second-layer guard RepoDiffView.vue's review diff already uses: readOnly alone blocks
+// edits, renderMarginRevertIcon/renderGutterMenu additionally hide the revert/apply affordances a
+// read-write diff widget would otherwise offer).
 async function buildMergeView(): Promise<void> {
   if (!bothStored.value || !snapA.value || !snapB.value) return;
   mergeLoading.value = true;
-  const { MergeView } = await loadMerge();
+  const mod = await loadMonaco();
   mergeLoading.value = false;
-  mergeView?.destroy();
-  mergeView = null;
+  disposeMergeView();
   await nextTick();
   if (!mergeHostRef.value) return;
-  const lang = commonFormat.value ? [languageExtension(commonFormat.value)] : [];
-  const readOnly = [
-    EditorState.readOnly.of(true),
-    EditorView.editable.of(false),
-    syntaxHighlighting(kiraHighlightStyle),
-    kiraEditorTheme,
-  ];
-  mergeView = new MergeView({
-    parent: mergeHostRef.value,
-    highlightChanges: true,
-    gutter: true,
-    collapseUnchanged: {},
-    a: { doc: bodyTextA.value, extensions: [...lang, ...readOnly] },
-    b: { doc: bodyTextB.value, extensions: [...lang, ...readOnly] },
+  const languageId = monacoLanguageIdFor(commonFormat.value ?? 'plain');
+  originalModel = mod.editor.createModel(bodyTextA.value, languageId);
+  modifiedModel = mod.editor.createModel(bodyTextB.value, languageId);
+  diffEditor = mod.editor.createDiffEditor(mergeHostRef.value, {
+    theme: KIRA_EDITOR_THEME,
+    readOnly: true,
+    domReadOnly: true,
+    originalEditable: false,
+    renderMarginRevertIcon: false,
+    renderGutterMenu: false,
+    automaticLayout: true,
+    renderSideBySide: true,
+    renderIndicators: true,
+    hideUnchangedRegions: { enabled: true },
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
   });
+  diffEditor.setModel({ original: originalModel, modified: modifiedModel });
 }
 
 watch(
@@ -191,8 +204,7 @@ watch(
 );
 
 onUnmounted(() => {
-  mergeView?.destroy();
-  mergeView = null;
+  disposeMergeView();
 });
 </script>
 
@@ -395,7 +407,7 @@ onUnmounted(() => {
   overflow: auto;
 }
 
-.diff-merge-host :deep(.cm-mergeView) {
+.diff-merge-host :deep(.monaco-diff-editor) {
   height: 100%;
 }
 </style>

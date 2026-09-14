@@ -32,7 +32,7 @@ const rt = computed(() => runtime[props.tab.id]);
 const historyRt = computed(() => historyRuntime[props.tab.id]);
 
 // P8 C6/D12: the dialog mounts only while a compare is in flight — the same "reached only from an
-// explicit click" gate that keeps @codemirror/merge's chunk unfetched until then (D13).
+// explicit click" gate that keeps Monaco's chunk unfetched (beyond whatever else on the page already needed it) until then (D13).
 const compareIds = ref<[string, string] | null>(null);
 function onCompare(ids: [string, string]): void {
   compareIds.value = ids;

@@ -27,7 +27,7 @@ import {
 // inside a <button> (F20 — invalid HTML the parser silently hoisted the delete control out of),
 // is-viewing highlighting, and formatRelative instead of an absolute toLocaleTimeString.
 //
-// No Compare: HTTP's rides @codemirror/merge over two response *bodies*; a gRPC call is a
+// No Compare: HTTP's rides Monaco's diff editor over two response *bodies*; a gRPC call is a
 // message *sequence* with metadata, a genuinely different design left for a future row (§5).
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
