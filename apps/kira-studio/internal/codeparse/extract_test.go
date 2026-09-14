@@ -69,6 +69,13 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			// Robot extends Greeter (§2.3's c2_implements.scm) and constructs one (§2.2's "class"
 			// referenceKinds entry, already vendored in javascript's own tags.scm but dropped
 			// before this phase).
+			// P64b adds module-level constant coverage (docs/v1.6/plans/
+			// P64b-repo-map-go-and-javascript-constants.md §2.5/§4.2): an export const bound to an
+			// object and a bare const bound to a call expression (both new patterns), an
+			// arrow-valued export const asserting a single "function" row and no duplicate
+			// "constant" row, a const inside a function body asserting no row (the `program`
+			// anchor), and a module-level `let` asserting no row (deliberately excluded, matching
+			// P64 §2.2's own decision for TypeScript).
 			id: JavaScript, file: "testdata/extract/sample.js",
 			syms: []symRow{
 				{"class", "Greeter", -1},
@@ -76,11 +83,17 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"function", "helper", -1},
 				{"class", "Robot", -1},
 				{"method", "build", 3},
+				{"constant", "robotDefaults", -1},
+				{"constant", "robotFactory", -1},
+				{"function", "buildRobot", -1},
+				{"function", "helper2", -1},
 			},
 			refs: []refRow{
 				{"call", "helper"},
 				{"implementation", "Greeter"},
 				{"class", "Greeter"},
+				{"call", "makeRobot"},
+				{"class", "Robot"},
 			},
 		},
 		{

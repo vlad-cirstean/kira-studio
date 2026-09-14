@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/rust/tags.scm
+//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/rust/tags.scm
 var queryFS embed.FS
 
 // QuerySource is one query file's provenance (§4.1/NOTICES.md): a future license or version audit
@@ -54,6 +54,12 @@ var Provenance = []QuerySource{
 	// tags.scm captures the name but never wraps it in a @definition, and its var pattern cannot
 	// match a parenthesized `var ( … )` block at all.
 	{Go, thisRepo, "queries/go/p64b_declarations.scm", ""},
+
+	// P64b-authored module-level const query (docs/v1.6/plans/P64b-…md §2.5) — javascript's own
+	// vendored @definition.constant pattern matches only a CommonJS-era `export default (X = …)`
+	// shape, nothing this repository's ESM actually writes. JavaScript only (§2.6): TypeScript/TSX
+	// already carry the equivalent coverage via their own p64_declarations.scm files.
+	{JavaScript, thisRepo, "queries/javascript/p64b_declarations.scm", ""},
 }
 
 // querySourcePaths maps a symbol-bearing language id to every embedded query file compiled into
@@ -66,7 +72,7 @@ var Provenance = []QuerySource{
 var querySourcePaths = map[ID][]string{
 	Java:       {"queries/java/tags.scm"},
 	Python:     {"queries/python/tags.scm", "queries/python/c2_implements.scm"},
-	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm"},
+	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm", "queries/javascript/p64b_declarations.scm"},
 	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm"},
 	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm"},
 	Go:         {"queries/go/tags.scm", "queries/go/p64b_declarations.scm"},
