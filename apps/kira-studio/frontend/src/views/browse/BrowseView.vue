@@ -213,28 +213,9 @@ onMounted(() => {
       @refresh="onReload"
     >
       <template #toolbar>
-        <IconButton
-          icon="arrow-up"
-          data-testid="browse-up"
-          :disabled="atRoot"
-          v-tooltip="'Up one level'"
-          @click="onUp"
-        />
-        <span class="breadcrumb">
-          <template v-for="(crumb, i) in crumbs" :key="crumb.path">
-            <span v-if="i > 0" class="crumb-sep">/</span>
-            <button
-              type="button"
-              class="crumb"
-              data-testid="browse-crumb"
-              :class="{ 'is-current': i === crumbs.length - 1 }"
-              @click="onCrumbClick(crumb.path)"
-            >
-              {{ crumb.name }}
-            </button>
-          </template>
-        </span>
-        <div class="sep" />
+        <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
+             pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps
+             only what is view-scoped: filter, upload, and (ViewChrome's own built-in) refresh. -->
         <IconButton
           icon="search"
           :active="filterOpen"
@@ -249,7 +230,6 @@ onMounted(() => {
           v-tooltip="'Upload file…'"
           @click="onUploadClick"
         />
-        <span class="p-push p-sm muted" data-testid="browse-count">{{ countText }}</span>
       </template>
 
       <template #strips>
@@ -287,6 +267,34 @@ onMounted(() => {
       />
       <div v-else class="browse-body">
         <div class="list-pane" :style="{ width: `${listWidth}px` }">
+          <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
+               ViewChrome's own toolbar into the pane whose list they act on. Reuses `.p-toolbar`
+               styling (the same 26px in-view band every other toolbar already is) rather than
+               inventing a header. -->
+          <div class="p-toolbar list-head" data-testid="browse-list-head">
+            <IconButton
+              icon="chevron-left"
+              data-testid="browse-up"
+              :disabled="atRoot"
+              v-tooltip="'Back'"
+              @click="onUp"
+            />
+            <span class="breadcrumb">
+              <template v-for="(crumb, i) in crumbs" :key="crumb.path">
+                <span v-if="i > 0" class="crumb-sep">/</span>
+                <button
+                  type="button"
+                  class="crumb"
+                  data-testid="browse-crumb"
+                  :class="{ 'is-current': i === crumbs.length - 1 }"
+                  @click="onCrumbClick(crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
+            </span>
+            <span class="p-push p-sm muted" data-testid="browse-count">{{ countText }}</span>
+          </div>
           <div class="p-panel body-panel">
             <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty muted">Loading…</div>
             <div v-else-if="rt.nodes.length === 0" class="empty muted" data-testid="browse-empty">
