@@ -8,11 +8,14 @@ import (
 // caps is caps.ts's s3Caps, literally (P58d D18). Reuses the keyvalue shape — a single object's
 // metadata+body is exactly a flat field/value listing, same as a redis hash.
 var caps = adapters.Caps{
-	Tabular:         false,
-	Documents:       false,
-	KeyValue:        true,
-	Stream:          false,
-	KeyBrowser:      true, // a bucket's prefix/object space is unbounded — browsed in a Browse tab
+	Tabular:    false,
+	Documents:  false,
+	KeyValue:   true,
+	Stream:     false,
+	KeyBrowser: true, // a bucket's prefix/object space is unbounded — browsed in a Browse tab
+	// An S3 object has no analogous per-key "value type" the way a redis key's TYPE does —
+	// KeyBrowser:true here is not KeyTypes:true (P63).
+	KeyTypes:        false,
 	DefaultPageKind: page.PageKindKeyValue,
 	SQL:             false,
 	// Stays false for now, as a named follow-up rather than a permanent no — an *object* already

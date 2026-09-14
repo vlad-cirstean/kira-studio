@@ -20,11 +20,13 @@ const (
 // have none, which capsSchema.parse (positive-int) rejects on the TypeScript side while the two
 // coexist.
 type Caps struct {
-	Tabular         bool          `json:"tabular"`
-	Documents       bool          `json:"documents"`
-	KeyValue        bool          `json:"keyValue"`
-	Stream          bool          `json:"stream"`
-	KeyBrowser      bool          `json:"keyBrowser"`
+	Tabular    bool `json:"tabular"`
+	Documents  bool `json:"documents"`
+	KeyValue   bool `json:"keyValue"`
+	Stream     bool `json:"stream"`
+	KeyBrowser bool `json:"keyBrowser"`
+	// KeyTypes: the adapter implements Adapter.KeyTypes() — P63, true for redis only.
+	KeyTypes        bool          `json:"keyTypes"`
 	DefaultPageKind page.PageKind `json:"defaultPageKind"`
 	SQL             bool          `json:"sql"`
 	Definition      bool          `json:"definition"`

@@ -30,6 +30,7 @@ const CAPS = {
   keyValue: false,
   stream: false,
   keyBrowser: false,
+  keyTypes: false,
   defaultPageKind: 'document' as const,
   sql: true,
   definition: true,

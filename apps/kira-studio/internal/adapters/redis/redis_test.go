@@ -493,6 +493,39 @@ func TestRedis_Count(t *testing.T) {
 	}
 }
 
+// P63: KeyTypes — order preserved against the input paths, a deleted key reporting "none", db
+// index honoured. One batch spanning both db0 (four distinct types) and db1 (testsupport's own
+// secondary-db marker key, present only there) — a wrong db index would answer "none" for it
+// exactly as a genuinely missing key would, so this also doubles as the db-index-honoured case.
+func TestRedis_KeyTypes_OrderPreservedMissingKeyAndDbIndexHonoured(t *testing.T) {
+	fixture := testsupport.StartRedis(t)
+	a := connectedAdapter(t, fixture)
+
+	paths := []model.NodePath{
+		nodePath(fixture, seg("database", "db0"), seg("key", "counter")),
+		nodePath(fixture, seg("database", "db0"), seg("key", testsupport.RedisHashKey)),
+		nodePath(fixture, seg("database", "db0"), seg("key", "this-key-was-never-set")),
+		nodePath(fixture, seg("database", "db1"), seg("key", testsupport.RedisSecondaryDbKey)),
+		nodePath(fixture, seg("database", "db0"), seg("key", testsupport.RedisListKey)),
+		nodePath(fixture, seg("database", "db0"), seg("key", testsupport.RedisSetKey)),
+		nodePath(fixture, seg("database", "db0"), seg("key", testsupport.RedisZSetKey)),
+	}
+	want := []string{"string", "hash", "none", "string", "list", "set", "zset"}
+
+	got, err := a.KeyTypes(context.Background(), paths, adapters.NewOpCtx("op-keytypes-1"))
+	if err != nil {
+		t.Fatalf("KeyTypes: %v", err)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d types, want %d: %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("types[%d] = %q, want %q (paths=%v got=%v)", i, got[i], want[i], paths, got)
+		}
+	}
+}
+
 // mutate: insert (SET NX) / update (SET) / delete (DEL), against db index 1 (C23 — every mutating
 // test runs against the secondary db, never db0, whose exact root listing scenario 3 asserts).
 func TestRedis_Mutate_InsertUpdateDelete(t *testing.T) {

@@ -371,6 +371,11 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported(a.Kind(), "file transfer")
 }
 
+// KeyTypes — caps.KeyTypes is false; never reached. A SQL table has no per-key value type.
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported(a.Kind(), "key types")
+}
+
 // Cancel is index.ts's cancel — a short-lived side connection, mirroring Postgres's
 // pg_cancel_backend path (D26). Killing your own query needs no PROCESS/SUPER privilege — only
 // killing someone else's does.

@@ -222,6 +222,11 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("sqs", "file transfer")
 }
 
+// KeyTypes — caps.KeyTypes is false; never reached. An SQS message has no per-key value type.
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("sqs", "key types")
+}
+
 // Cancel is index.ts's cancel — a permanent no-op. Unlike every native adapter built before this
 // sub-phase, SQS has no server-side kill mechanism at all: the op's own context.Context, passed
 // directly to every SDK call in read.go/mutate.go (P58d D3, never adapters.RunWithAbortRace), is

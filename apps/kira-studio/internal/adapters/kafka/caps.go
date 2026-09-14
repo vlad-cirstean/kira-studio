@@ -15,6 +15,7 @@ var caps = adapters.Caps{
 	KeyValue:        false,
 	Stream:          true,
 	KeyBrowser:      false,
+	KeyTypes:        false,
 	DefaultPageKind: page.PageKindStream,
 	SQL:             false,
 	// P23 D5: a topic's partitions/config and a consumer group's members/offsets moved here once

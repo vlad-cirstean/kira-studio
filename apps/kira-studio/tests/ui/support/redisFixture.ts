@@ -23,6 +23,7 @@ const CAPS = {
   keyValue: true,
   stream: false,
   keyBrowser: true,
+  keyTypes: true,
   defaultPageKind: 'keyvalue' as const,
   sql: true,
   definition: false,

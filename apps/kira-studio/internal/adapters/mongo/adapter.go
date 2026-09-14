@@ -301,6 +301,11 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("mongodb", "file transfer")
 }
 
+// KeyTypes — caps.KeyTypes is false; never reached. A document has no per-key value type.
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("mongodb", "key types")
+}
+
 type currentOpEntry struct {
 	// Not necessarily a plain number (can be a compound shard-qualified value) — round-tripped to
 	// killOp verbatim rather than assumed to be any particular type.

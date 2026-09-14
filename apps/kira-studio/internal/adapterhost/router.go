@@ -250,6 +250,35 @@ func (r *Router) SchemaColumns(ctx context.Context, connectionID string, path mo
 	return relations, nil
 }
 
+// KeyTypes is P63's own per-path value-type lookup, gated by Caps().KeyTypes. Uncached (unlike
+// Children/Describe/Definition/SchemaColumns above): it answers a windowed slice of a level's
+// keys, not a level itself, and the tree/service.go cache is keyed one row per (connectionID,
+// path) — a batch of many paths has no single cache key to hang off.
+func (r *Router) KeyTypes(ctx context.Context, connectionID string, paths []model.NodePath) ([]string, error) {
+	adapter, err := requireLiveAdapter(connectionID)
+	if err != nil {
+		return nil, err
+	}
+	id := connectionID
+	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "keyTypes"},
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			types, err := adapter.KeyTypes(ctx, paths, op)
+			if err != nil {
+				return nil, err
+			}
+			op.SetRows(len(types))
+			return types, nil
+		})
+	if err != nil {
+		return nil, err
+	}
+	types := value.([]string)
+	if types == nil {
+		types = []string{}
+	}
+	return types, nil
+}
+
 // ---- bridge.Canceller ----
 
 // Cancel asks the in-process scheduler — the only place an op can be running now that P58f's

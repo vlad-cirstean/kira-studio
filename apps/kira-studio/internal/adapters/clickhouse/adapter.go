@@ -318,6 +318,11 @@ func (a *Adapter) DownloadObject(context.Context, model.ObjectDownloadRequest, *
 	return model.ObjectTransferResult{}, adapters.Unsupported("clickhouse", "file transfer")
 }
 
+// KeyTypes — caps.KeyTypes is false; never reached. A SQL table has no per-key value type.
+func (a *Adapter) KeyTypes(context.Context, []model.NodePath, *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("clickhouse", "key types")
+}
+
 // Cancel is index.ts's cancel — D7/D8: the KILL QUERY request never carries readonly, a second,
 // free HTTP request on the client's own connection pool (F7/F9), never scoped by this connection's
 // own read-only flag.

@@ -14,6 +14,7 @@ var caps = adapters.Caps{
 	KeyValue:        true,
 	Stream:          false,
 	KeyBrowser:      true, // P41: a db index's key namespace is unbounded — browsed in a Browse tab
+	KeyTypes:        true, // P63: KeyTypes (catalog.go) badges a Browse-panel key row with its type
 	DefaultPageKind: page.PageKindKeyValue,
 	SQL:             true,
 	// P23 D10: stays false permanently — a key's type/TTL/memory usage are already on every

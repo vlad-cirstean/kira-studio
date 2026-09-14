@@ -195,6 +195,7 @@ export const POSTGRES_CAPS = {
   keyValue: false,
   stream: false,
   keyBrowser: false,
+  keyTypes: false,
   defaultPageKind: 'tabular' as const,
   sql: true,
   definition: true,

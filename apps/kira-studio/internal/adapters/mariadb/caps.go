@@ -13,6 +13,7 @@ var caps = adapters.Caps{
 	KeyValue:        false,
 	Stream:          false,
 	KeyBrowser:      false,
+	KeyTypes:        false,
 	DefaultPageKind: page.PageKindTabular,
 	SQL:             true,
 	Definition:      true,

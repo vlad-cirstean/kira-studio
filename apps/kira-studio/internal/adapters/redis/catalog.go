@@ -202,3 +202,30 @@ func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, nam
 	}
 	return adapters.TreeChildren{Nodes: nodes}, nil
 }
+
+// keyTypes runs a single goredis pipeline of TYPE against every key on one db connection — P63's
+// own per-key type lookup behind Adapter.KeyTypes, gated by Caps().KeyTypes. Order matches keys.
+// TYPE never errors for a missing key (it answers "none"), so a key deleted between the Browse
+// panel's own SCAN and this call reports "none" here — redisTypeIcon's own fallback handles that
+// client-side (§4.2) — rather than failing the whole batch over one race.
+func keyTypes(ctx context.Context, conn *goredis.Client, keys []string) ([]string, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
+	if err := adapters.CheckCancelled(ctx); err != nil {
+		return nil, err
+	}
+	pipe := conn.Pipeline()
+	cmds := make([]*goredis.StatusCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Type(ctx, key)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, mapError(err)
+	}
+	types := make([]string, len(keys))
+	for i, cmd := range cmds {
+		types[i] = cmd.Val()
+	}
+	return types, nil
+}

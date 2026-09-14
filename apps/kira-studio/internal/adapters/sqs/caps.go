@@ -13,6 +13,7 @@ var caps = adapters.Caps{
 	KeyValue:        false,
 	Stream:          true,
 	KeyBrowser:      false,
+	KeyTypes:        false,
 	DefaultPageKind: page.PageKindStream,
 	SQL:             false,
 	// P23 D9: a queue's attributes — visibility timeout, retention, redrive policy, FIFO/dedup,

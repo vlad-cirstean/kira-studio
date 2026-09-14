@@ -35,6 +35,8 @@ type Backend interface {
 	Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error)
 	// SchemaColumns is P22c D1/D2's schema-wide sibling of Describe.
 	SchemaColumns(ctx context.Context, connectionID string, path model.NodePath) ([]model.RelationColumns, error)
+	// KeyTypes is P63's own per-path value-type lookup, gated by Caps().KeyTypes.
+	KeyTypes(ctx context.Context, connectionID string, paths []model.NodePath) ([]string, error)
 }
 
 type ChildrenResult struct {
@@ -251,6 +253,25 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 		_ = s.meta.Put(connectionID, path, "columns", encoded)
 	}
 	return SchemaColumnsResult{Relations: relations, Source: "server"}, nil
+}
+
+// KeyTypes ports no old tree-service.ts method (new in P63) — a live passthrough, uncached (see
+// Backend's own KeyTypes doc comment for why). connected is still required first: an
+// already-disconnected connection has no live adapter for the backend to call through to, and the
+// stated error should say so rather than surface whatever the dead adapter throws.
+func (s *Service) KeyTypes(connectionID string, rawPaths []string) ([]string, error) {
+	if err := s.requireConnected(connectionID); err != nil {
+		return nil, err
+	}
+	paths := make([]model.NodePath, len(rawPaths))
+	for i, raw := range rawPaths {
+		nodePath, err := model.DecodePath(connectionID, raw)
+		if err != nil {
+			return nil, ipcerr.Internal(err.Error())
+		}
+		paths[i] = nodePath
+	}
+	return s.backend.KeyTypes(context.Background(), connectionID, paths)
 }
 
 // Invalidate drops L1 for one node (path non-nil) or the whole connection (path nil). No push of

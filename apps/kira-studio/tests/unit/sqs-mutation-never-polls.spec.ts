@@ -30,6 +30,7 @@ const sqsCaps: Caps = {
   keyValue: false,
   stream: true,
   keyBrowser: false,
+  keyTypes: false,
   defaultPageKind: 'stream',
   sql: false,
   definition: true,

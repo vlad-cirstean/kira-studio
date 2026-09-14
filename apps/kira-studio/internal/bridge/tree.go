@@ -23,6 +23,20 @@ func (s *TreeService) Children(args TreeChildrenArgs) (tree.ChildrenResult, erro
 	return s.Deps.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
 }
 
+// TreeKeyTypesArgs is P63's own batch request — bridge/index.ts's treeKeyTypes(connectionId,
+// paths), beside treeChildren.
+type TreeKeyTypesArgs struct {
+	ConnectionID string   `json:"connectionId"`
+	Paths        []string `json:"paths"`
+}
+
+func (s *TreeService) KeyTypes(args TreeKeyTypesArgs) ([]string, error) {
+	if args.ConnectionID == "" {
+		return nil, ipcerr.BadRequest("connectionId is required")
+	}
+	return s.Deps.Tree.KeyTypes(args.ConnectionID, args.Paths)
+}
+
 // TreeDescribeArgs is shared by Describe and Definition — both take the same four arguments.
 type TreeDescribeArgs struct {
 	ConnectionID string  `json:"connectionId"`

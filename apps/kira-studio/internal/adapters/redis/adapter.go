@@ -244,6 +244,53 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("redis", "file transfer")
 }
 
+// KeyTypes is P63's own per-path value-type lookup (catalog.go's keyTypes), gated by
+// Caps().KeyTypes. paths may in principle span more than one db index — the Browse panel's own
+// caller never asks across a level boundary, but the interface makes no such promise — so this
+// groups by db index (resolveKeyTarget, the same lookup Read/Count already use) and runs one
+// pipeline per group, still answering in the caller's own order.
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	set, err := a.requireSet()
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, len(paths))
+	byDB := map[int][]int{} // dbIndex -> indices into paths/keys/types, in encounter order
+	var dbOrder []int
+	for i, p := range paths {
+		dbIndex, key, err := a.resolveKeyTarget(p)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = key
+		if _, seen := byDB[dbIndex]; !seen {
+			dbOrder = append(dbOrder, dbIndex)
+		}
+		byDB[dbIndex] = append(byDB[dbIndex], i)
+	}
+
+	types := make([]string, len(paths))
+	for _, dbIndex := range dbOrder {
+		indices := byDB[dbIndex]
+		conn, err := set.get(ctx, dbIndex)
+		if err != nil {
+			return nil, err
+		}
+		groupKeys := make([]string, len(indices))
+		for j, i := range indices {
+			groupKeys[j] = keys[i]
+		}
+		groupTypes, err := keyTypes(ctx, conn, groupKeys)
+		if err != nil {
+			return nil, err
+		}
+		for j, i := range indices {
+			types[i] = groupTypes[j]
+		}
+	}
+	return types, nil
+}
+
 // Cancel is index.ts's cancel (D7/D8): CheckCancelled between bounded SCAN-family rounds is fully
 // sufficient on its own — every op this adapter issues is either a bounded SCAN-family loop or a
 // single fast command — so this stays a permanent no-op rather than attempting a CLIENT KILL that

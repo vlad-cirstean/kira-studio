@@ -379,3 +379,8 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 func (a *Adapter) DownloadObject(context.Context, model.ObjectDownloadRequest, *adapters.OpCtx) (model.ObjectTransferResult, error) {
 	return model.ObjectTransferResult{}, adapters.Unsupported("sqlite", "file transfer")
 }
+
+// KeyTypes — caps.KeyTypes is false; never reached. A SQL table has no per-key value type.
+func (a *Adapter) KeyTypes(context.Context, []model.NodePath, *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("sqlite", "key types")
+}
