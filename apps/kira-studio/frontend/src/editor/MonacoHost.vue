@@ -190,14 +190,27 @@ function kindFor(m: MonacoModule, type?: EditorCompletionKind): CompletionItemKi
 // leak one pane's completions into every other pane of the same language.
 function buildCompletionProvider(m: MonacoModule): CompletionItemProvider {
   return {
-    provideCompletionItems(candidateModel, position) {
+    // §4.8 dogfooding finding (P60b): with no `triggerCharacters`, Monaco's own quickSuggestions
+    // only re-invokes a provider as an ordinary word continues — never right after `.`, `$` or
+    // `{`, the exact three characters this app's own sources key a position off of (`table.`/
+    // `alias.column`, `db.`/`$operator`, `{{variable`). Registering them here is what makes typing
+    // straight through one of those characters pop the list, the same as a real trigger character
+    // would in any other Monaco-based editor.
+    triggerCharacters: ['.', '$', '{'],
+    provideCompletionItems(candidateModel, position, context) {
       if (candidateModel !== model || !props.completionSources?.length) {
         return { suggestions: [] };
       }
       const doc = candidateModel.getValue();
       const offset = candidateModel.getOffsetAt(position);
+      // §4.8 dogfooding finding (P60b): a real Ctrl+Space request is
+      // `CompletionTriggerKind.Invoke` — every source that gates an empty-word position on
+      // `explicit` (the sql-language-service ones, mirroring `@codemirror/autocomplete`'s own
+      // `completeFromList` rule) needs this to actually tell a bare cursor apart from a real
+      // request, or an empty-context Ctrl+Space silently shows "No suggestions" instead.
+      const explicit = context.triggerKind === m.languages.CompletionTriggerKind.Invoke;
       for (const source of props.completionSources) {
-        const result = source({ doc, offset, explicit: false });
+        const result = source({ doc, offset, explicit });
         if (!result) continue;
         const start = candidateModel.getPositionAt(result.from);
         const range: MonacoRange = {

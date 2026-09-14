@@ -24,10 +24,10 @@ import { connectionRow, expandRow, openRowMenu } from './support/tree';
 // execute() responses (scripts/capture-postgres-tree.ts, including the real "relation ... does
 // not exist" error text). Scenario 6 (session restore) is dropped — no backing store in this
 // tier, same category as workbench.spec.ts's five. Scenario 7 (undo/redo) keeps only its
-// keyboard-driven half: @codemirror/commands' own history()/historyKeymap is pure client-side and
-// fully portable, but the native Electron Edit▸Undo/Redo menu path (role: 'undo'/'redo' dispatched
-// through ElectronApplication.evaluate) has no equivalent here — there is no ElectronApplication,
-// and ConsoleView.vue's own CodeMirror instance already handles the identical keyboard accelerator
+// keyboard-driven half: Monaco's own undo/redo model is pure client-side and fully portable, but
+// the native Electron Edit▸Undo/Redo menu path (role: 'undo'/'redo' dispatched through
+// ElectronApplication.evaluate) has no equivalent here — there is no ElectronApplication, and
+// ConsoleView.vue's own MonacoHost instance already handles the identical keyboard accelerator
 // either way, so nothing about the *feature* goes untested, only one of two ways of triggering it.
 // The op-count bookkeeping the original had no equivalent of here (window.kira never existed in
 // this test) is not reintroduced — see definition.spec.ts's own note on the same subject.
@@ -91,7 +91,7 @@ async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
 }
 
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.type(text);
 }
 
@@ -313,36 +313,49 @@ test('Query console — open, run statement/all, errors, saved queries', async (
   });
   await expect(savedEntry).toBeVisible();
   await savedEntry.click();
-  await expect(consoleView4.locator('.cm-content')).toContainText('SELECT 42 AS answer;');
+  await expect.poll(() => editorText(consoleView4)).toContain('SELECT 42 AS answer;');
 
   // --- scenario 6: undo/redo (P18 addendum D15), keyboard only — see file header note --------
   await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
   const consoleView5 = page.locator('[data-testid="console-view"]');
-  const editor5 = consoleView5.locator('.cm-content');
+
+  // Monaco groups a run of typed characters into its own undo steps by its own internal timing
+  // heuristic, unlike CodeMirror's explicit `newGroupDelay: 500` — a single ⌘Z after
+  // `page.keyboard.type()` is not guaranteed to undo the whole typed string in one press the way
+  // it was before. `pressUndoUntil` presses the key repeatedly (bounded) until the document
+  // reaches the expected text, which is what this scenario actually cares about (undo/redo work
+  // via the keyboard at all — the WebKit-focus bug P60a's own MonacoHost.vue fix targets) rather
+  // than the exact number of internal undo groups Monaco chose to make.
+  async function pressUndoUntil(key: string, expected: string): Promise<void> {
+    for (let i = 0; i < 10; i++) {
+      if ((await editorText(consoleView5)) === expected) return;
+      await page.keyboard.press(key);
+    }
+    await expect.poll(() => editorText(consoleView5)).toBe(expected);
+  }
 
   await typeInto(consoleView5, page, 'SELECT 1;');
-  await expect(editor5).toContainText('SELECT 1;');
-  await page.keyboard.press(UNDO_KEY);
-  await expect(editor5).toHaveText('');
-  await page.keyboard.press(REDO_KEY);
-  await expect(editor5).toContainText('SELECT 1;');
+  await expect.poll(() => editorText(consoleView5)).toContain('SELECT 1;');
+  await pressUndoUntil(UNDO_KEY, '');
+  await pressUndoUntil(REDO_KEY, 'SELECT 1;');
 
   await typeInto(consoleView5, page, ' -- more');
-  await expect(editor5).toContainText('SELECT 1; -- more');
-  await page.keyboard.press(UNDO_KEY);
-  await expect(editor5).toHaveText('SELECT 1;');
-  await page.keyboard.press(REDO_KEY);
-  await expect(editor5).toContainText('SELECT 1; -- more');
+  await expect.poll(() => editorText(consoleView5)).toBe('SELECT 1; -- more');
+  await pressUndoUntil(UNDO_KEY, 'SELECT 1;');
+  await pressUndoUntil(REDO_KEY, 'SELECT 1; -- more');
 
   // Undoing a saved-query load restores the previous text and leaves the cursor where typing was
-  // left off, not pinned at 0 — typing after undo appends at the end.
+  // left off, not pinned at 0 — typing after undo appends at the end. This one is a single ⌘Z,
+  // not `pressUndoUntil`: the saved-query load is an external-sync write, isolated into exactly
+  // one undo group by construction (MonacoHost.vue's own `pushStackElement()` pair around it,
+  // P60a §4.7's port of the v1.4 Format-then-undo fix).
   await page.click('[data-testid="console-saved-toggle"]');
   await page.locator('[data-testid="console-saved-entry"]', { hasText: 'My saved query' }).click();
-  await expect(editor5).toContainText('SELECT 42 AS answer;');
+  await expect.poll(() => editorText(consoleView5)).toContain('SELECT 42 AS answer;');
   await page.keyboard.press(UNDO_KEY);
-  await expect(editor5).toContainText('SELECT 1; -- more');
+  await expect.poll(() => editorText(consoleView5)).toBe('SELECT 1; -- more');
   await page.keyboard.type('!');
-  await expect(editor5).toContainText('SELECT 1; -- more!');
+  await expect.poll(() => editorText(consoleView5)).toBe('SELECT 1; -- more!');
 });
 
 // P40: the result-set strip (new-vs-reuse toggle, per-result ×, chip switching) and the shared
@@ -771,8 +784,8 @@ test('Query console — two duplicate-named columns render and select their own 
   await expect(secondDupCell).toHaveText('222');
 
   // --- selection: clicking each publishes its own distinct value to the cell-editor dock -----
-  // CellEditorView's own host, migrated to MonacoHost (P60a) — the console's own query editor
-  // right above it stays CodeMirror (P60b) and is untouched by this helper.
+  // CellEditorView's own host, migrated to MonacoHost (P60a) — same host the console's own query
+  // editor right above it now uses too (P60b), both read through the identical helper.
   const cellEditorText = () => editorText(page.locator('[data-testid="cell-editor-panel"]'));
 
   await firstDupCell.click();

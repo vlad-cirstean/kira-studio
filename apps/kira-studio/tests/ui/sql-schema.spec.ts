@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -91,22 +92,23 @@ async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
 }
 
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.type(text);
 }
 
 async function clearAndType(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Backspace');
   await page.keyboard.type(text);
 }
 
-// CodeMirror splits a line's text across several highlighting spans, so a word is not reliably
-// its own element for Playwright's getByText — this finds the exact text-node offset via a real
-// DOM Range instead, robust to however the syntax highlighter chunked the line.
+// Monaco splits a line's text across several highlighting spans (like CodeMirror before it), so a
+// word is not reliably its own element for Playwright's getByText — this finds the exact
+// text-node offset via a real DOM Range instead, robust to however the syntax highlighter
+// chunked the line.
 async function hoverWord(page: Page, view: Locator, word: string): Promise<void> {
-  const point = await view.locator('.cm-content').evaluate((el, w) => {
+  const point = await view.locator('.view-lines').evaluate((el, w) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const idx = (node.textContent ?? '').indexOf(w);
@@ -120,7 +122,11 @@ async function hoverWord(page: Page, view: Locator, word: string): Promise<void>
     }
     return null;
   }, word);
-  if (!point) throw new Error(`hoverWord: "${word}" not found in .cm-content`);
+  if (!point) throw new Error(`hoverWord: "${word}" not found in .view-lines`);
+  // A genuine leave-then-enter, not a teleport from wherever the mouse already sits — Monaco's
+  // hover controller only arms its delay timer on a fresh "entered this token" transition
+  // (api-ui-consistency.spec.ts's own identical note for the request body's {{variable}} hover).
+  await page.mouse.move(0, 0);
   await page.mouse.move(point.x, point.y);
 }
 
@@ -169,7 +175,7 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
 
   // Type a two-table DDL script, assert the live parse summary, then discard it.
   await openSchemaDialog();
-  await dialog.locator('.cm-content').click();
+  await dialog.locator('.view-lines').click();
   await page.keyboard.type(TWO_TABLE_DDL);
   await expect(summary).toContainText('2 tables, 5 columns');
   await page.locator('.dialog-footer button', { hasText: 'Cancel' }).click();
@@ -178,11 +184,11 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
   // Reopening after Cancel shows the document exactly as it was before (empty) — Cancel
   // discarded the typed draft, and nothing was saved.
   await openSchemaDialog();
-  await expect(dialog.locator('.cm-content')).toHaveText('');
+  expect(await editorText(dialog)).toBe('');
   await expect(summary).not.toContainText('tables');
 
   // Type it again and Save this time.
-  await dialog.locator('.cm-content').click();
+  await dialog.locator('.view-lines').click();
   await page.keyboard.type(TWO_TABLE_DDL);
   const opsBeforeSave = control.log().length;
   await page.locator('.dialog-footer button', { hasText: 'Save schema' }).click();
@@ -191,14 +197,13 @@ test('Schema (DDL)… dialog stages until Save (D3)', async ({ relaunch }) => {
 
   // Reopening now shows the saved document.
   await openSchemaDialog();
-  await expect(dialog.locator('.cm-content')).toContainText('CREATE TABLE users');
+  await expect.poll(() => editorText(dialog)).toContain('CREATE TABLE users');
   await expect(summary).toContainText('2 tables, 5 columns');
 });
 
-// P4: the DDL editor's :autocomplete was hardcoded false — flipped on with no completionSources,
-// so lang-sql's own dialect-correct keyword/type-name source applies here the same way it does
-// for a console with no schema at all (D5's "override replaces language-data sources wholesale"
-// applies in reverse: no override at all means lang-sql stays in charge).
+// P4: the DDL editor's :autocomplete was hardcoded false — flipped on, with an explicit
+// completionSources now (P60b §6.2's sqlKeywordCompletionSourceFor, since MonacoHost has no
+// implicit language-data fallback the way CodeMirror's un-overridden keyword source once was).
 test('the Schema (DDL) editor now offers keyword completion (P4)', async ({ relaunch }) => {
   const CONNECTION_ID = 'conn-sql-schema-ddl-autocomplete';
   const CONNECTION_SUMMARY = postgresConnectionSummary(CONNECTION_ID, 'Schema DB', 'red');
@@ -219,12 +224,12 @@ test('the Schema (DDL) editor now offers keyword completion (P4)', async ({ rela
   const dialog = page.locator('[data-testid="schema-dialog"]');
   await expect(dialog).toBeVisible();
 
-  await dialog.locator('.cm-content').click();
+  await dialog.locator('.view-lines').click();
   await page.keyboard.type('sel');
-  // G20 D7: every CodeMirrorHost's tooltip escapes its own container to `document.body`
-  // (theme.ts/CodeMirrorHost.vue's own tooltips({ parent: document.body })) — it renders outside
-  // the dialog's DOM subtree entirely, so the locator must be page-scoped, not dialog-scoped.
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  // G20 D7: every MonacoHost's suggest widget escapes its own container to `document.body`
+  // (`editor/monaco.ts`'s shared `overflowWidgetsContainer()`) — it renders outside the dialog's
+  // DOM subtree entirely, so the locator must be page-scoped, not dialog-scoped.
+  const tooltip = page.locator('.suggest-widget.visible');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('SELECT');
 });
@@ -257,7 +262,7 @@ test('a rejected Save shows the error and leaves the dialog open', async ({ rela
   await page.click('[data-testid="menu-item-schema"]');
   await expect(dialog).toBeVisible();
 
-  await dialog.locator('.cm-content').click();
+  await dialog.locator('.view-lines').click();
   await page.keyboard.type(TWO_TABLE_DDL);
   await page.locator('.dialog-footer button', { hasText: 'Save schema' }).click();
 
@@ -307,7 +312,7 @@ test('SQL console completes tables, columns and aliases once a DDL document exis
   // trailing space proactively pops the list.
   await typeInto(view, page, 'select * from ');
   await page.keyboard.press('Control+Space');
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  const tooltip = page.locator('.suggest-widget.visible');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
   await expect(tooltip).toContainText('users');
   await expect(tooltip).toContainText('orders');
@@ -364,7 +369,7 @@ test('with no DDL document, table names and columns complete from the cache (D4/
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  const tooltip = page.locator('.suggest-widget.visible');
   // lang-sql's own schemaCompletionSource returns null for an "empty" (no partial word typed
   // yet) non-explicit context — the cached-columns branch (P22c D4) now goes through the same
   // schemaCompletionSource the document branch always did, so this asks for it explicitly, same
@@ -439,7 +444,7 @@ test('a console opened at the connection root still completes table names from w
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  const tooltip = page.locator('.suggest-widget.visible');
   await typeInto(view, page, 'select * from ');
   await page.keyboard.press('Control+Space');
   await expect(tooltip).toBeVisible({ timeout: 5_000 });
@@ -457,9 +462,16 @@ test('a console opened at the connection root still completes table names from w
 });
 
 // P4: the honest-degradation boundary — a root console opened on a connection that was NEVER
-// expanded in the tree has nothing cached to offer (no round trip fired to find out), so it falls
-// all the way through to lang-sql's own keyword source, same as before this phase.
-test('a console opened at the connection root with nothing expanded gets keywords only (P4)', async ({
+// expanded in the tree has nothing cached to offer (no round trip fired to find out): no DDL
+// document, no cached columns, no tree-loaded relations. `sqlCompletionSources` already returned
+// `undefined` for exactly this case before P60b too (D5's own "no gap to patch" note) — under
+// CodeMirror that still showed keywords, since `undefined` meant "no override", and lang-sql's own
+// language-data keyword source stayed registered underneath regardless. Monaco has no such
+// implicit fallback (`monacoEntry.ts`'s own `sql` Monarch registers no completion items at all),
+// so `undefined` now means what the plan's own acceptance checklist says it should: no popup, no
+// error — not a regression to patch, since nothing here can tell a query keyword apart from a
+// column/table name it has never seen without something to complete against.
+test('a console opened at the connection root with nothing expanded offers no completion at all (P4)', async ({
   relaunch,
   consoleErrors,
 }) => {
@@ -484,12 +496,10 @@ test('a console opened at the connection root with nothing expanded gets keyword
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  const tooltip = page.locator('.suggest-widget.visible');
   await clearAndType(view, page, 'sel');
-  await expect(tooltip).toBeVisible({ timeout: 5_000 });
-  await expect(tooltip).toContainText('SELECT');
-  await expect(tooltip).not.toContainText('order_items');
-  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300); // no debounce to wait out — this is asserting an absence
+  await expect(tooltip).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });
@@ -522,12 +532,12 @@ test('hovering a column the cache knows about, that the user never opened, shows
 
   await typeInto(view, page, 'select quantity from order_items');
   await hoverWord(page, view, 'quantity');
-  const hover = page.locator('.cm-kira-hover');
+  const hover = page.locator('.monaco-hover:not(.hidden)');
   await expect(hover).toBeVisible({ timeout: 5_000 });
   await expect(hover).toContainText('integer');
 
   // The linter agrees — a column the cache knows about is never flagged as unknown.
-  await expect(view.locator('.cm-lintRange-warning')).toHaveCount(0, { timeout: 3_000 });
+  await expect(view.locator('.squiggly-warning')).toHaveCount(0, { timeout: 3_000 });
 });
 
 // P22c D4: the hand-authored document still wins wholesale the moment it declares any table, even
@@ -567,7 +577,7 @@ test('a DDL document still wins over the cache (D4)', async ({ relaunch, console
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
 
-  const tooltip = page.locator('.cm-tooltip-autocomplete');
+  const tooltip = page.locator('.suggest-widget.visible');
   // widgets (the document's own table, not in the cache's own order_items relation) completes —
   // proof the document, not the cache, is driving completion. An empty non-explicit context needs
   // an explicit request the same as the sibling DDL-document test above.
@@ -617,10 +627,10 @@ test('a diagnostic fires only for what the DDL cannot prove (D7)', async ({
   await expect(view).toBeVisible();
 
   await typeInto(view, page, 'select * from oredrs');
-  await expect(view.locator('.cm-lintRange-warning')).toHaveCount(1, { timeout: 5_000 });
+  await expect(view.locator('.squiggly-warning')).toHaveCount(1, { timeout: 5_000 });
 
   await clearAndType(view, page, 'select * from users u join orders o on o.user_id = u.id');
-  await expect(view.locator('.cm-lintRange-warning')).toHaveCount(0, { timeout: 5_000 });
+  await expect(view.locator('.squiggly-warning')).toHaveCount(0, { timeout: 5_000 });
 
   expect(consoleErrors).toEqual([]);
 });
@@ -655,7 +665,7 @@ test('hovering a known column shows its verbatim declared type (D8)', async ({ r
 
   await typeInto(view, page, 'select total from orders');
   await hoverWord(page, view, 'total');
-  const hover = page.locator('.cm-kira-hover');
+  const hover = page.locator('.monaco-hover:not(.hidden)');
   await expect(hover).toBeVisible({ timeout: 5_000 });
   await expect(hover).toContainText('numeric(10,2)');
 });
@@ -707,7 +717,7 @@ test('the "Fill from connection" button and the no-schema hint are gone (D7)', a
   await expect(page.locator('[data-testid="schema-fill-cancel"]')).toHaveCount(0);
 
   // The dialog still saves.
-  await dialog.locator('.cm-content').click();
+  await dialog.locator('.view-lines').click();
   await page.keyboard.type('CREATE TABLE t (id integer PRIMARY KEY);');
   await page.locator('.dialog-footer button', { hasText: 'Save schema' }).click();
   await expect(dialog).toHaveCount(0);

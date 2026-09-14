@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
   connectAndExpandControl as mongoConnectAndExpandControl,
@@ -158,15 +159,16 @@ async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
 }
 
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.type(text);
 }
 
-/** `.innerText()`, not `.textContent()` — CodeMirror renders one line per DOM block and only
- *  `.innerText()` reproduces the real line breaks (and the leading-space indentation) between
- *  them, the same helper cell-editor.spec.ts's own Beautify scenarios use. */
+/** `editorText()`, not `.innerText()` — Monaco virtualises `.view-lines` (only the currently
+ *  rendered subset of a large document is ever a real DOM child), so reading the model's own
+ *  value through `MonacoHost.vue`'s debug-hook attribute (P60a §9.1/OQ-3) is the only way to get
+ *  the *whole* document back, not just whatever happens to be on screen. */
 async function consoleText(view: Locator): Promise<string> {
-  return view.locator('.cm-content').innerText();
+  return editorText(view);
 }
 
 test('Query console — Format reformats a Postgres statement in place', async ({ relaunch }) => {
@@ -196,8 +198,10 @@ test('Query console — Format reformats a Postgres statement in place', async (
   await page.click('[data-testid="console-format"]');
   // §6.2: the emitted chunk's own cost (F4's ~180ms cold import + first format) lands here, on
   // the first press of the whole test run — a coarse in-process measurement, logged rather than
-  // asserted on (docs/PERF.md's own rule for this timing tier).
-  await expect(view.locator('.cm-line').first()).toHaveText('SELECT');
+  // asserted on (docs/PERF.md's own rule for this timing tier). Matches the reformatted shape
+  // specifically (a lone "SELECT" first line) — the *unformatted* source also starts with the
+  // substring "SELECT", so a bare prefix match would pass before Format's own async work lands.
+  await expect.poll(() => consoleText(view)).toMatch(/^SELECT\n/);
   console.log(`P13 §6.2 first Format press (cold import + format), ms: ${Date.now() - before}`);
 
   const text = await consoleText(view);
@@ -241,9 +245,12 @@ test('Query console — Format on unparseable SQL leaves the text untouched', as
   // expectation list) must never reach the UI — only its first line is fit to show.
   const stripText = (await strip.innerText()).trim();
   expect(stripText.split('\n')).toHaveLength(1);
-  await expect(view.locator('.cm-content')).toHaveText(broken);
+  expect(await consoleText(view)).toBe(broken);
 
   // D9: the strip clears on the very next edit, so it never outlives the text that caused it.
+  // Clicking the Format button (a real DOM button, unlike CodeMirror's own focus behaviour) moves
+  // focus off the editor — re-click before typing so the keystroke actually lands in the document.
+  await view.locator('.view-lines').click();
   await page.keyboard.type('x');
   await expect(strip).toHaveCount(0);
 });
@@ -450,7 +457,7 @@ test('Query console — Format leaves the caret in the statement it was in, so R
   await expect(view).toBeVisible();
 
   await typeInto(view, page, 'select 1 as a;\nselect 2 as b;\nselect 3 as c;');
-  await expect(view.locator('.cm-line')).toHaveCount(3);
+  await expect(view.locator('.view-line')).toHaveCount(3);
 
   // Put the caret in the SECOND statement — typing left it at the very end (line 3); one Up
   // arrow from there lands in line 2, deterministically (a mouse click's target coordinate can
@@ -469,7 +476,7 @@ test('Query console — Format leaves the caret in the statement it was in, so R
   await page.click('[data-testid="console-format"]');
   // Formatting rewrote every offset in the document — this is only proof the press itself
   // completed, not that the caret landed anywhere in particular.
-  await expect(view.locator('.cm-content')).toContainText('as c');
+  await expect.poll(() => consoleText(view)).toContain('as c');
 
   await page.click('[data-testid="console-run-statement"]');
   const executed = (await stream.ops()).filter((o) => o.op === DATA_OP.execute).at(-1);
@@ -480,12 +487,13 @@ test('Query console — Format leaves the caret in the statement it was in, so R
   expect(statements?.[0]).not.toContain('as c');
 });
 
-// v1.4 follow-up: CodeMirrorHost's external-sync dispatch (used by Format's own setText(), and by
-// loading a saved query) had no isolateHistory annotation, so @codemirror/commands' history()
-// could merge it into whatever undo group was still open under its own newGroupDelay (500ms) — the
-// ordinary case of typing a query then immediately clicking Format, right next to it. One Cmd+Z
-// then wiped the WHOLE query back to empty instead of undoing just the reformat. No artificial
-// delay anywhere in this test — that immediacy is exactly what triggered it.
+// v1.4 follow-up, ported to Monaco by P60a §4.7: CodeMirrorHost's old external-sync dispatch (used
+// by Format's own setText(), and by loading a saved query) had no undo-boundary annotation, so it
+// could merge into whatever undo group was still open — the ordinary case of typing a query then
+// immediately clicking Format, right next to it. One Cmd+Z then wiped the WHOLE query back to
+// empty instead of undoing just the reformat. MonacoHost.vue's own external-sync watcher now
+// brackets every such write with a `pushStackElement()` pair for exactly this reason. No
+// artificial delay anywhere in this test — that immediacy is exactly what triggered the bug.
 test('Query console — Format immediately after typing, then undo, restores the typed text (not empty)', async ({
   relaunch,
 }) => {
@@ -512,9 +520,11 @@ test('Query console — Format immediately after typing, then undo, restores the
   const original = 'SELECT a,b FROM t WHERE a=1 AND b IN (SELECT x FROM y)';
   await typeInto(view, page, original);
   await page.click('[data-testid="console-format"]');
-  await expect(view.locator('.cm-line').first()).toHaveText('SELECT');
+  // Matches the reformatted shape (a lone "SELECT" first line), not merely the "SELECT" prefix
+  // the unformatted source already has — the same reason the first test in this file does.
+  await expect.poll(() => consoleText(view)).toMatch(/^SELECT\n/);
 
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.press('ControlOrMeta+z');
-  await expect(view.locator('.cm-content')).toHaveText(original);
+  await expect.poll(() => consoleText(view)).toBe(original);
 });

@@ -201,7 +201,7 @@ async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
 }
 
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.cm-content').click();
+  await view.locator('.view-lines').click();
   await page.keyboard.type(text);
 }
 
@@ -344,8 +344,8 @@ test('Query console — Raw is one toggle away', async ({ relaunch }) => {
   await expect(raw).toBeVisible();
   // `plan.raw` is the server's own text verbatim, never re-formatted (D16) — F11's JSON is
   // minified, so this checks the raw text exactly as it would come back over the wire.
-  // ExplainResultView's own host is MonacoHost (P60a); the console's query editor above it stays
-  // CodeMirror (P60b) and is untouched by `typeInto`.
+  // ExplainResultView's own host is MonacoHost (P60a) — same host the console's query editor
+  // above it now uses too (P60b), both read through the identical `editorText()` helper.
   expect(await editorText(raw)).toContain('"Node Type":"Seq Scan"');
 });
 
@@ -424,7 +424,7 @@ test('Query console — auto-explain warns and still runs the query', async ({ r
 });
 
 // P12 round 1 finding #7: loading a saved query writes the new text via setText(), which goes
-// through CodeMirrorHost's external-sync path — the one path that deliberately never re-emits
+// through MonacoHost's external-sync path — the one path that deliberately never re-emits
 // update:doc, the only event onDocChange (the sole place that used to reset this strip) ever saw.
 test('Query console — loading a saved query clears a stale auto-explain warning', async ({
   relaunch,
@@ -481,7 +481,7 @@ test('Query console — loading a saved query clears a stale auto-explain warnin
   await page.click('[data-testid="console-saved-toggle"]');
   await page.locator('[data-testid="console-saved-entry"]', { hasText: 'Other query' }).click();
 
-  await expect(view.locator('.cm-content')).toContainText('SELECT 1;');
+  await expect.poll(() => editorText(view)).toContain('SELECT 1;');
   await expect(strip).toHaveCount(0);
 });
 
