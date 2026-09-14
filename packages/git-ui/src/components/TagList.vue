@@ -27,7 +27,13 @@ const props = defineProps<{
 
 const emit = defineEmits<(e: 'checked-out') => void>();
 
+// C12-6: the row's own main click handler — same gap BranchPicker.vue's own branch/remote rows
+// had (see that file's own comment on `checkoutBranch`): unlike the ref-scoped context menu
+// (gated below via `buildReadOnlyRefMenu`), nothing stopped this from running under
+// `writeCapability: false`, issuing a `preflight.checkout` the native read-only stream refuses
+// with an unhandled promise rejection.
 async function checkout(row: RefRow): Promise<void> {
+  if (!props.writeCapability) return;
   emit('checked-out');
   await props.ops.runCheckout(row.shortName, 'switch');
 }
@@ -73,6 +79,14 @@ async function onRefMenuSelect(id: string): Promise<void> {
   const { row } = entry;
   if (id === 'checkoutRef') {
     await checkout(row);
+    return;
+  }
+  // C12-6: buildReadOnlyRefMenu's own "Review branch changes" item (rowMenuModel.ts) — reachable
+  // from here via the `!props.writeCapability` branch above despite that function's own doc
+  // comment claiming "a tag entry never reaches this function" (fixed alongside this). Mirrors
+  // BranchPicker.vue's identical case for its own branch/remote rows.
+  if (id === 'reviewBranch') {
+    await props.ops.openReview(row.shortName);
     return;
   }
   if (id === 'deleteRef') {

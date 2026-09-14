@@ -302,10 +302,12 @@ export function buildReadOnlyRowMenu(clipboardEnabled: boolean): MenuSection[] {
  * navigational name) EXCEPT "Review branch changes" — a read, never gated on `canRunOp`
  * (`buildRefMenu`'s own comment just above), which C10 dropped only because `review.open` had no
  * native surface yet (§9 there). C11 builds that surface, so this is the one item restored; every
- * other write stays hidden. Its handler (`App.vue`'s own `opsState.openReview` route to
- * `review.open`) needs no change — a tag entry never reaches this function (`buildTagMenu`'s own
- * branch above), matching `buildRefMenu`'s "absent for a tag entirely" note. Takes no context:
- * there is nothing here that varies by ref kind or stack membership to gate.
+ * other write stays hidden. Reached from two call sites' own `!writeCapability` branch:
+ * `BranchPicker.vue`'s branch/remote-branch rows (its own `'reviewBranch'` case routes to
+ * `OpsState.openReview`) AND `TagList.vue`'s tag rows (C12-6: its own doc comment here used to
+ * claim "a tag entry never reaches this function", which was wrong — `TagList.vue` falls back to
+ * this exact function for its own ref menu and needed the identical `'reviewBranch'` case added).
+ * Takes no context: there is nothing here that varies by ref kind or stack membership to gate.
  */
 export function buildReadOnlyRefMenu(): MenuSection[] {
   return [{ items: [plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple')] }];

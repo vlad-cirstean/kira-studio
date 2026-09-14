@@ -163,12 +163,21 @@ function closeForCheckout(): void {
   close();
 }
 
+// C12-6: these are the row's own MAIN click handler, unlike every other write-capable affordance
+// in this file (the ref-scoped context menu, gated by `refMenuSections` falling back to
+// `buildReadOnlyRefMenu` above) — nothing upstream of this function stops it from running under
+// `writeCapability: false`. Before this guard, clicking a branch row on the native read-only graph
+// issued `preflight.checkout`, which `gitstream.go`'s allowlist correctly refuses with
+// `E_READ_ONLY` — but `OpsState.runCheckout`'s own `try/finally` has no `catch`, so the rejection
+// surfaced as an unhandled promise rejection and the row looked like a dead, broken click.
 async function checkoutBranch(row: RefRow): Promise<void> {
+  if (!props.writeCapability) return;
   closeForCheckout();
   await props.ops.runCheckout(row.shortName, 'switch');
 }
 
 async function checkoutRemote(row: RefRow): Promise<void> {
+  if (!props.writeCapability) return;
   closeForCheckout();
   await props.ops.runCheckout(remoteCheckoutTarget(row, props.refs.branches.value), 'switch');
 }
