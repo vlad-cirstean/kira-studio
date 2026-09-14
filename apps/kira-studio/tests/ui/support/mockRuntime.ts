@@ -63,6 +63,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   connectionsDisconnect: 'ConnectionsService.Disconnect',
   connectionsStates: 'ConnectionsService.States',
   treeChildren: 'TreeService.Children',
+  treeKeyTypes: 'TreeService.KeyTypes',
   treeDescribe: 'TreeService.Describe',
   treeDefinition: 'TreeService.Definition',
   treeSchemaColumns: 'TreeService.SchemaColumns',
@@ -253,6 +254,13 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // treeSchemaColumns snapshot of its own gets "nothing cached for this container yet", the same
   // reasoning treeDescribe's own wildcard above already carries, not a fixture miss.
   [IPC.treeSchemaColumns]: JSON.stringify({ relations: [], source: 'server' }),
+  // P63: BrowseView.vue's own ensureKeyTypes fires on every VirtualList visible-range tick for a
+  // redis browse tab — `paths` is whatever happens to be on screen at whatever moment a headless
+  // run's own scroll/render timing lands on, so unlike treeChildren there is no fixed args shape
+  // any fixture could capture even in principle. ensureKeyTypes itself already treats a failed
+  // batch as silent (a decorative badge must never raise the error strip a failed *listing*
+  // owns) — this just answers "nothing yet" instead of a network-level miss for the same call.
+  [IPC.treeKeyTypes]: '[]',
   // P4 F11: Http's left panel fetches its whole tree on mount, and the call is NOT wrapped in a
   // try/catch — a fixture miss would leave the panel permanently empty rather than degrade. Every
   // spec that switches to Http mode without seeding a collections fixture (mode-switch.spec.ts
