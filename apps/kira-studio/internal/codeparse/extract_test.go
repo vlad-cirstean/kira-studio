@@ -127,12 +127,30 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			},
 		},
 		{
+			// P64b adds package-level const/var coverage (docs/v1.6/plans/
+			// P64b-repo-map-go-and-javascript-constants.md §2.2/§4.1): an iota block (KindA/B/C,
+			// the 2nd/3rd names valueless), a grouped string-const block, a grouped `var ( … )`
+			// block (exercises var_spec_list, §1.3), a single var and a single const, and one
+			// const plus one var inside helper2's own body — the latter two produce no rows at
+			// all, proving the source_file anchor (§2.3) excludes function-local declarations.
+			// None of the new declarations reference a named type, so the reference table is
+			// unchanged from before this phase.
 			id: Go, file: "testdata/extract/sample.go",
 			syms: []symRow{
 				{"type", "Greeter", -1},
 				{"type", "Person", -1},
 				{"method", "Greet", -1},
 				{"function", "helper", -1},
+				{"constant", "KindA", -1},
+				{"constant", "KindB", -1},
+				{"constant", "KindC", -1},
+				{"constant", "StateIdle", -1},
+				{"constant", "StateRunning", -1},
+				{"variable", "ErrNotFound", -1},
+				{"variable", "maxRetries", -1},
+				{"variable", "DefaultName", -1},
+				{"constant", "Version", -1},
+				{"function", "helper2", -1},
 			},
 			refs: []refRow{
 				{"type", "Greeter"},
