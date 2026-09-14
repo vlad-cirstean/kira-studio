@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { control } from '../bridge/control';
 import { formatBytes } from '../format';
 import { appMetricsState } from '../state/appMetrics';
+import { appUpdateState } from '../state/appUpdate';
 import { cacheStatsState } from '../state/cacheStats';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { engineState } from './state/engine';
@@ -53,6 +55,16 @@ const cacheSizeLabel = computed(() => {
   const stats = cacheStatsState.stats;
   return stats ? formatBytes(stats.l2Bytes) : null;
 });
+
+const updateTooltip = computed(
+  () =>
+    `Version ${appUpdateState.latestVersion} is available. You have ${appUpdateState.currentVersion}. ` +
+    `Opens GitHub in your browser.`,
+);
+
+function onOpenReleasePage(): void {
+  void control.updateOpenReleasePage().catch(() => {});
+}
 </script>
 
 <template>
@@ -67,6 +79,16 @@ const cacheSizeLabel = computed(() => {
     </div>
 
     <div class="side">
+      <button
+        v-if="appUpdateState.available"
+        class="p-status update"
+        data-testid="update-available"
+        v-tooltip="updateTooltip"
+        @click="onOpenReleasePage"
+      >
+        <CodiconIcon name="cloud-download" :size="13" />
+        Update {{ appUpdateState.latestVersion }}
+      </button>
       <span
         v-if="appMetricsState.sample"
         class="p-status"
@@ -117,5 +139,18 @@ const cacheSizeLabel = computed(() => {
 }
 .metric-sep {
   color: var(--kira-fg-subtle);
+}
+
+/* .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
+   and Enter/Space come free. Reset the button's own UA chrome; .p-status already supplies
+   height/padding/border-radius/cursor. --kira-info (already used by .p-td.fk) reads as actionable
+   against the bar's own --kira-fg-muted. */
+.update {
+  background: none;
+  font: inherit;
+  color: var(--kira-info);
+}
+.update:hover {
+  color: var(--kira-fg);
 }
 </style>

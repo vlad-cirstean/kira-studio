@@ -16,6 +16,7 @@ import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
 import * as TreeService from '@bindings/treeservice.js';
+import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
 import type {
@@ -72,6 +73,8 @@ import { on, trust, unwrap, windowKey } from './rpc';
 // `import { control } from '.../bridge/control'` call site (~200 of them) is unchanged.
 const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
+  updateStatus: (): Promise<WailsModels.UpdateStatus> => unwrap(UpdateService.Status()),
+  updateOpenReleasePage: (): Promise<void> => unwrap(UpdateService.OpenReleasePage()),
   settingsGetAll: (): Promise<Settings> =>
     unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),
   settingsSet: (patch: SettingsPatch): Promise<Settings> =>

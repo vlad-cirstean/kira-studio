@@ -6,6 +6,7 @@ import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
 import { initAppMetrics } from './state/appMetrics';
+import { initAppUpdate } from './state/appUpdate';
 import { initCacheStats } from './state/cacheStats';
 import { codeReposState, hydrateCodeRepos } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
@@ -316,6 +317,9 @@ async function bootstrap(): Promise<void> {
     }
   }
   createApp(App).directive('tooltip', vTooltip).mount('#app');
+  // Off the boot critical path (Promise.all above) — an update check gains nothing from blocking
+  // first paint, and Go's own 6h cache floor (§3.3) decides what actually fetches.
+  initAppUpdate();
 }
 
 void bootstrap();
