@@ -23,7 +23,13 @@ interface RepoSearchState {
   options: RepoSearchOptions;
   searchId: string | null; // null when idle
   running: boolean;
-  files: FileMatches[]; // path-sorted (D11)
+  // C14-1: path-sorted (D11), markRaw'd -- see insertByPath's own comment. Never read this
+  // directly outside insertByPath/repoSearchRows; go through `filesVersion` for reactivity.
+  files: FileMatches[];
+  // Bumped once per incoming batch that mutates `files` in place. `files` itself is markRaw'd (so
+  // splicing it never walks a reactive proxy -- see insertByPath), which means Vue can no longer
+  // see those mutations; this counter is the reactive signal repoSearchRows depends on instead.
+  filesVersion: number;
   collapsed: Set<string>;
   stats: SearchStats | null;
   error: string | null;
@@ -36,7 +42,8 @@ function emptySearchState(): RepoSearchState {
     options: defaultOptions(),
     searchId: null,
     running: false,
-    files: [],
+    files: markRaw([]),
+    filesVersion: 0,
     collapsed: new Set(),
     stats: null,
     error: null,
@@ -117,12 +124,17 @@ function handleCodeSearchEvent(event: CodeSearchEvent): void {
   // C13-5: each incoming group (and its own nested matches array) is markRaw'd before it ever
   // touches `state.files` -- once inserted, a group is only ever replaced wholesale (insertByPath's
   // own splice, on a same-path recur), never field-mutated, so there is nothing for Vue's deep
-  // reactivity to usefully track inside it. Without this, `state.files` (living inside this repo's
-  // `reactive()` state object) deep-proxies every FileMatches/SearchMatch arriving off the wire.
-  // Measured 45x: 73ms plain vs 3,275ms reactive over 243,192 cumulative rows across one capped
-  // 10,000-match search's ~38 flush batches. The containing array itself stays a normal reactive
-  // property, so splice/length changes still notify repoSearchRows' own callers correctly.
+  // reactivity to usefully track inside it.
+  //
+  // C14-1: `state.files` itself is now ALSO markRaw'd (see emptySearchState/startRepoSearch), so
+  // insertByPath's splice runs against a plain array, never a reactive proxy -- C13-5 alone still
+  // left every element-shift from a mid-array splice walking Vue's get/set traps, O(F) per insert
+  // and O(F^2) over a streaming search. Measured on a capped 10,000-match search: 41,550ms
+  // cumulative main-thread cost (one flush as high as 2,100ms) through the reactive array, vs 2ms
+  // for the identical splice sequence on a plain one. Since a raw array's in-place mutation notifies
+  // no one, `filesVersion` below is what tells repoSearchRows' own computed new rows are ready.
   for (const group of event.files) insertByPath(state.files, markRaw(group));
+  if (event.files.length > 0) state.filesVersion++;
 
   if (event.done) {
     state.running = false;
@@ -157,7 +169,8 @@ export async function startRepoSearch(repoId: string): Promise<void> {
   ensureSubscribed();
 
   if (state.searchId) repoBySearchId.delete(state.searchId); // supersede (D8) our own previous run.
-  state.files = [];
+  state.files = markRaw([]);
+  state.filesVersion++;
   state.collapsed = new Set();
   state.stats = null;
   state.error = null;
@@ -213,6 +226,10 @@ export interface RepoSearchRowVm {
 export function repoSearchRows(repoId: string): RepoSearchRowVm[] {
   const state = byRepo.get(repoId);
   if (!state) return [];
+  // `state.files` is markRaw'd (C14-1): reading it does not by itself see in-place splice/insert
+  // mutations, only reference replacement. `filesVersion` is the reactive dependency this computed
+  // actually needs to re-run as new groups stream in -- read it before touching `files`.
+  void state.filesVersion;
   const rows: RepoSearchRowVm[] = [];
   for (const group of state.files) {
     const collapsed = state.collapsed.has(group.path);
