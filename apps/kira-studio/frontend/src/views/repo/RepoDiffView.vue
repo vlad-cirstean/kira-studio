@@ -29,6 +29,7 @@ import {
   repoRevisionDiffUris,
 } from './monaco';
 import { ensureNavigationRegistered } from './navigation';
+import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
 
 // C10 §6.1: file.read's own four-way result, reshaped into DiffSide — the same classification
 // codeWorkspaceReadDiff's own two sides already use, so the binary/tooLarge/bothMissing branches
@@ -54,6 +55,7 @@ const state = ref<ViewState>('loading');
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let unregisterFind: (() => void) | null = null;
+let reviewDecorations: ReviewDecorationsHandle | null = null;
 
 // §11: read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
 // paste; renderMarginRevertIcon/renderGutterMenu are the second layer, hiding the revert/apply
@@ -72,7 +74,8 @@ async function mount(): Promise<void> {
   // C10 §6.1/§6.2: repoDiffTabStateSchema's own revision pair — both null is C6's original
   // HEAD-vs-worktree comparison, byte-identical below; a commit diff (openRepoCommitDiffTab, S15)
   // always supplies both (a root commit's left is git's well-known empty-tree sha, never null).
-  const { left, right } = props.tab.state;
+  const { left, right, review } = props.tab.state;
+  let gitRepoId: string | undefined;
   let diff: { head: DiffSide; worktree: DiffSide };
   if (left === null) {
     try {
@@ -83,7 +86,7 @@ async function mount(): Promise<void> {
       return;
     }
   } else {
-    const gitRepoId = gitRepoIdFor(repoId);
+    gitRepoId = gitRepoIdFor(repoId);
     if (!gitRepoId || right === null) {
       state.value = 'error';
       errorMessage.value = 'This repository is not open.';
@@ -160,7 +163,14 @@ async function mount(): Promise<void> {
     automaticLayout: true,
     renderSideBySide: true,
     ignoreTrimWhitespace: false,
-    hideUnchangedRegions: { enabled: true },
+    // C11 §7.3 gotcha 2: 0.56.0 has no public API to expand one specific collapsed unchanged
+    // region, so a comment anchored inside one would be invisible — only the review variant
+    // disables this; C6/C10's plain diff keeps it enabled, byte-identical.
+    hideUnchangedRegions: { enabled: review === null },
+    // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
+    // for the review variant rather than depend on either being right in a future Monaco bump.
+    // The plain diff passes nothing, unchanged from before this phase.
+    ...(review !== null ? { glyphMargin: true } : {}),
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
     gotoLocation: { multipleDefinitions: 'goto' },
@@ -179,6 +189,18 @@ async function mount(): Promise<void> {
     void modifiedEditor.getAction('actions.find')?.run();
   });
 
+  // C11 §7.4/S11: the comment-thread/mark-reviewed layer, only for a review diff tab. `left` is
+  // never null here — openRepoReviewDiffTab (S8) always supplies both revisions alongside `review`.
+  if (review !== null && gitRepoId !== undefined && left !== null) {
+    reviewDecorations = attachReviewDecorations(mod, editor, {
+      transport: gitTransportFor(repoId),
+      gitRepoId,
+      path: props.tab.path,
+      leftRev: left,
+      review,
+    });
+  }
+
   state.value = 'found';
 }
 
@@ -189,6 +211,8 @@ onMounted(() => void mount());
 onUnmounted(() => {
   unregisterFind?.();
   unregisterFind = null;
+  reviewDecorations?.dispose();
+  reviewDecorations = null;
   unmountEditor(props.tab.id);
 });
 </script>
