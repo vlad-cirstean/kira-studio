@@ -1513,6 +1513,7 @@ onBeforeUnmount(() => {
         </div>
         <ConflictBanner
           :ops="opsState"
+          :write-capability="actions?.capabilities.write ?? false"
           :resolve-conflict-enabled="actions?.capabilities.resolveConflict ?? false"
           :resolve-conflict="resolveConflictInEditor"
         />

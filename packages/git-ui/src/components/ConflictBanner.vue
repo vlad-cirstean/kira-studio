@@ -26,6 +26,7 @@ import type { OpsState } from '../state/ops.ts';
 
 const props = defineProps<{
   ops: OpsState;
+  writeCapability: boolean;
   resolveConflictEnabled: boolean;
   resolveConflict: (path: string) => Promise<void>;
 }>();
@@ -102,7 +103,7 @@ const PATH_DISPLAY_CAP = 20;
         Resolve in VS Code
       </KuiButton>
       <KuiButton
-        v-if="inProgress.canContinue"
+        v-if="writeCapability && inProgress.canContinue"
         :disabled="inProgress.unmergedCount > 0 || busyAction !== undefined"
         :aria-describedby="inProgress.unmergedCount > 0 ? CONTINUE_REASON_ID : undefined"
         @click="onContinue"
@@ -110,14 +111,14 @@ const PATH_DISPLAY_CAP = 20;
         Continue
       </KuiButton>
       <KuiButton
-        v-if="inProgress.canSkip"
+        v-if="writeCapability && inProgress.canSkip"
         :disabled="busyAction !== undefined"
         @click="onSkip"
       >
         Skip
       </KuiButton>
       <KuiButton
-        v-if="inProgress.canAbort"
+        v-if="writeCapability && inProgress.canAbort"
         variant="danger"
         :disabled="busyAction !== undefined"
         @click="onAbort"
