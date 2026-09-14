@@ -32,12 +32,12 @@ import {
 import { searchState as documentSearchState } from './views/documents/search';
 import { pageStoreEntries as gridPageStoreEntries, totalRetainedBytes } from './views/grid/page';
 import { searchState as gridSearchState } from './views/grid/search';
+import { retentionSnapshot as documentRowsRetention } from './views/shared/document/rows';
 import {
   pageStoreEntries as keyValuePageStoreEntries,
   totalRetainedBytes as keyValueRetainedBytes,
-} from './views/keyvalue/page';
-import { searchState as keyValueSearchState } from './views/keyvalue/search';
-import { retentionSnapshot as documentRowsRetention } from './views/shared/document/rows';
+} from './views/shared/keyvalue/page';
+import { searchState as keyValueSearchState } from './views/shared/keyvalue/search';
 import {
   type ScrollTraceResult,
   start as startScrollTrace,

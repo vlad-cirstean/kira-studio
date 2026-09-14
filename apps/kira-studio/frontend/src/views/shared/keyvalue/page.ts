@@ -1,5 +1,5 @@
 import { cellText, isTruncated, type KeyValuePage } from '@shared/protocol/page';
-import { createPageStore, type RetentionEntry, retentionEntries } from '../shared/page/store';
+import { createPageStore, type RetentionEntry, retentionEntries } from '../page/store';
 
 const store = createPageStore<KeyValuePage>();
 

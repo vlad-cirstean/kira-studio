@@ -1,5 +1,5 @@
 import type { KeyValueTabState, PageSize } from '@shared/domain/tabs';
-import { findKeyValueTab, patchKeyValueTabState } from '../../state/tabs';
+import { findKeyValueTab, patchKeyValueTabState } from '../../../state/tabs';
 
 // P63 §2.2: the seam that widens keyvalue/state.ts's `tabId` (a real KeyValueTabRecord id) into
 // `viewKey` (any string identifying a place that renders a key/value page) — the browse split's

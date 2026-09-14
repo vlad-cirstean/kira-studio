@@ -56,13 +56,27 @@ function dropPageStoresForTab(id: string): void {
   }
 }
 
+// P63 §2.2: a browse tab's split-pane value preview loads through the keyvalue view's own page
+// store, keyed `${tabId}::preview` — not a real tab id, so dropPageStoresForTab(id)'s own kind
+// loop above never reaches it. Blind-calling the same loop against that key too is a harmless
+// no-op miss for every tab whose id this isn't (only a browse tab has one), the identical
+// discipline dropPageStoresForTab already applies per-kind.
+function dropPreviewPageStoresForTab(id: string): void {
+  dropPageStoresForTab(`${id}::preview`);
+}
+
 // The tab-closed signal: page stores plus the runtime record every view keeps its count,
 // selection, find-toolbar state and actionError in (state/tabRuntime.ts). A disconnect (below)
 // deliberately calls only dropPageStoresForTab — the tab comes back on reconnect and should keep
 // looking like the same tab, not one that lost its find toolbar and selection along with its rows.
+// `cleanupTabRuntime` reaches the preview's own runtime record (keyvalue/state.ts's `runtime`) and
+// its search/filter/visible-window stores the same way — every registered cleanup callback is
+// blind-called with `${id}::preview` too, for the same no-op-miss reason.
 function dropAllPagesForTab(id: string): void {
   dropPageStoresForTab(id);
+  dropPreviewPageStoresForTab(id);
   cleanupTabRuntime(id);
+  cleanupTabRuntime(`${id}::preview`);
 }
 
 // Cross-view state (§11): tabs are read by the tab strip, the toolbar, the main view and the
@@ -214,6 +228,7 @@ control.onConnectionState((state) => {
     if (t.connectionId !== state.connectionId) continue;
     unmarkHydrated(t.id);
     dropPageStoresForTab(t.id);
+    dropPreviewPageStoresForTab(t.id); // a browse tab's own preview shows the same connection.
   }
 });
 

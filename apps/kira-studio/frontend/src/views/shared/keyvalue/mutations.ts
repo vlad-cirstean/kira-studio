@@ -1,8 +1,8 @@
 import { decodePath, encodePath, pathParent } from '@shared/domain/tree';
-import { data } from '../../bridge/data';
-import { openKeyValueTab } from '../../state/tabs';
-import { browseInvalidate } from '../../state/viewCommands';
-import { createImmediateMutator } from '../shared/immediateMutation';
+import { data } from '../../../bridge/data';
+import { openKeyValueTab } from '../../../state/tabs';
+import { browseInvalidate } from '../../../state/viewCommands';
+import { createImmediateMutator } from '../immediateMutation';
 import { keyValueHost } from './host';
 import { reload } from './state';
 

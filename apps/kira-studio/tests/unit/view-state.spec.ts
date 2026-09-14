@@ -35,8 +35,8 @@ const {
   load: loadKeyValue,
   goNext: keyValueGoNext,
   runtime: keyValueRuntime,
-} = await import('../../frontend/src/views/keyvalue/state');
-const { setPage } = await import('../../frontend/src/views/keyvalue/page');
+} = await import('../../frontend/src/views/shared/keyvalue/state');
+const { setPage } = await import('../../frontend/src/views/shared/keyvalue/page');
 const {
   goNext: gridGoNext,
   goPrev: gridGoPrev,

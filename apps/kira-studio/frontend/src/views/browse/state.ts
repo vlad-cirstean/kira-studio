@@ -1,3 +1,4 @@
+import type { PageSize } from '@shared/domain/tabs';
 import { pathParent, type TreeNode } from '@shared/domain/tree';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
@@ -25,6 +26,14 @@ export interface BrowseViewRuntime {
   filter: string;
   /** The row that holds the list's roving tab stop, by path. */
   selected: string | null;
+  /** P63 §2.2/§5: the split's value pane pager position — a selection, not session, concept
+   *  (§5's own reasoning: it belongs to a key that itself doesn't survive tab restore), so it
+   *  lives here rather than in browseTabStateSchema. Reset to page 0 whenever `selected` changes
+   *  (BrowseView.vue's own row click) or the level changes — a stale offset from a previous key's
+   *  own page count must never seed the next key's first fetch (mirrors P21 round 3 finding 14's
+   *  own reasoning for `filter`/`selected` below). */
+  previewPageIndex: number;
+  previewPageSize: PageSize;
   /** P43 iter3 D39: monotonic per tab. `load()` captures it before its own await and drops its
    *  result on all three exit paths if a newer load has started since — the same supersession
    *  guard grid/documents/keyvalue/stream all keep as `opId`, expressed as a counter because
@@ -41,6 +50,8 @@ function defaultRuntime(): BrowseViewRuntime {
     truncated: false,
     filter: '',
     selected: null,
+    previewPageIndex: 0,
+    previewPageSize: 100,
     loadSeq: 0,
   };
 }
@@ -126,6 +137,7 @@ async function setLevel(tabId: string, level: string): Promise<void> {
   const rt = ensureRuntime(tabId);
   rt.filter = '';
   rt.selected = null;
+  rt.previewPageIndex = 0;
   patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
   await load(tabId);
 }
@@ -157,7 +169,15 @@ export function setFilter(tabId: string, filter: string): void {
 
 export function selectRow(tabId: string, path: string | null): void {
   const rt = runtime[tabId];
-  if (rt) rt.selected = path;
+  if (!rt) return;
+  if (rt.selected !== path) rt.previewPageIndex = 0;
+  rt.selected = path;
+}
+
+// P63 §2.1: PanelSplitter is a pure drag track — the caller owns the size and persists it, same
+// idiom HttpRequestView.vue's own onResizeRequestPane follows.
+export function setListWidth(tabId: string, width: number): void {
+  patchBrowseTabState(tabId, { listWidth: width });
 }
 
 // P41 D14: an S3 upload/delete lands in a level the project tree no longer renders (F22) — this

@@ -4,9 +4,9 @@ import {
   runChunkedScan,
   type SearchHandle,
   type SearchQuery,
-} from '../shared/page/scan';
-import { createPageSearch } from '../shared/page/search';
-import { visibleRowsOf } from '../shared/page/visibleRows';
+} from '../page/scan';
+import { createPageSearch } from '../page/search';
+import { visibleRowsOf } from '../page/visibleRows';
 import { getPage, pageVersion } from './page';
 
 // Mirrors views/grid/search.ts exactly, narrowed to KeyValuePage's two fixed semantic columns

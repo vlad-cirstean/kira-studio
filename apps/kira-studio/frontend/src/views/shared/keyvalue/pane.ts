@@ -4,12 +4,12 @@ import {
   type KeyValuePage,
   OBJECT_BODY_EDIT_BYTES,
 } from '@shared/protocol/page';
-import { formatBytes } from '../../format';
-import { publishSelectedCell, type SelectedCell } from '../../state/cellSelection';
-import { confirmDialog } from '../../state/confirmDialog';
-import { connectionRecord, connectionsState } from '../../state/connections';
-import { deleteObject, downloadObject } from '../../state/objectStore';
-import { browseInvalidate } from '../../state/viewCommands';
+import { formatBytes } from '../../../format';
+import { publishSelectedCell, type SelectedCell } from '../../../state/cellSelection';
+import { confirmDialog } from '../../../state/confirmDialog';
+import { connectionRecord, connectionsState } from '../../../state/connections';
+import { deleteObject, downloadObject } from '../../../state/objectStore';
+import { browseInvalidate } from '../../../state/viewCommands';
 import { keyValueHost } from './host';
 import { deleteKey, saveValueEdit } from './mutations';
 import { getPage, keyValueRow } from './page';

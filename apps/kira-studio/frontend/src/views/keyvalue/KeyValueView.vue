@@ -16,11 +16,9 @@ import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
-import { pageSizeOptions } from '../shared/page/sizes';
-import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
-import KeyValuePane from './KeyValuePane.vue';
-import { addKey } from './mutations';
-import { getPage, pageVersion } from './page';
+import KeyValuePane from '../shared/keyvalue/KeyValuePane.vue';
+import { addKey } from '../shared/keyvalue/mutations';
+import { getPage, pageVersion } from '../shared/keyvalue/page';
 import {
   closeEdit,
   memoryText,
@@ -33,7 +31,7 @@ import {
   saveObjectEdit,
   ttlText,
   writeDisabledReason,
-} from './pane';
+} from '../shared/keyvalue/pane';
 import {
   goNext,
   goPrev,
@@ -44,7 +42,9 @@ import {
   setPageSize,
   stop,
   toggleSearchOpen,
-} from './state';
+} from '../shared/keyvalue/state';
+import { pageSizeOptions } from '../shared/page/sizes';
+import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DocumentView.vue.
 const props = defineProps<{ tab: KeyValueTabRecord }>();

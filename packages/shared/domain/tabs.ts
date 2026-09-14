@@ -200,6 +200,10 @@ export type KeyValueTabState = z.infer<typeof keyValueTabStateSchema>;
 // every other tab-state schema's own added field follows.
 export const browseTabStateSchema = /*#__PURE__*/ z.object({
   levelPath: z.string().default(''),
+  /** P63: the vertical split's list-pane width in px. 0 means "the default"
+   *  (BrowseView.vue's own DEFAULT_LIST_WIDTH), so a tab saved before this field existed restores
+   *  unchanged — same discipline as keyValueTabStateSchema's own `pageSize` comment. */
+  listWidth: z.number().default(0),
 });
 export type BrowseTabState = z.infer<typeof browseTabStateSchema>;
 
@@ -485,7 +489,7 @@ export function defaultStreamTabState(pageSize: PageSize = 100): StreamTabState 
 }
 
 export function defaultBrowseTabState(): BrowseTabState {
-  return { levelPath: '' };
+  return { levelPath: '', listWidth: 0 };
 }
 
 export function defaultRepoGraphTabState(): RepoGraphTabState {
