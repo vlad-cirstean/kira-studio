@@ -249,8 +249,17 @@ export type EnvironmentsTabState = z.infer<typeof environmentsTabStateSchema>;
 // permissive passthrough rather than re-deriving that shape here — git-ui's own
 // `parsePersistedViewState` (already shipped, `index.ts`) is the sole validator, so this schema
 // does not become a second, drift-prone implementation of the same version-6 contract.
+// C11 §8.3: reviewSession is a second opaque blob of the same shape as viewState above — the
+// pinned graph tab is the only per-repo-workspace state that survives a tab switch/app restart, so
+// it also hosts the review sidebar's own "back to branch selection" resume point
+// (`ReviewSessionSnapshot`, G19 D11b), stored and read back through `review.session.save/.load`'s
+// native host answer (`repo/git/reviewSession.ts`). Opaque to the host for the same reason
+// `viewState` is: `ReviewView.vue`/`state/review.ts` define and validate their own shape; this file
+// only persists it. `null` is "no resume point" — the same value `review.session.save` writes when
+// asked to clear one.
 export const repoGraphTabStateSchema = /*#__PURE__*/ z.object({
   viewState: z.unknown().nullable().default(null),
+  reviewSession: z.unknown().nullable().default(null),
 });
 export type RepoGraphTabState = z.infer<typeof repoGraphTabStateSchema>;
 
@@ -270,11 +279,23 @@ export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
 // `left`/`right` as the two revisions and `leftLabel`/`rightLabel` as their short-sha display text.
 // `.default(null)` on every field keeps a tab saved before this phase restorable — the same
 // discipline `repoFileTabStateSchema`'s own `revealLine` already follows.
+// C11 §7.5: review turns on the gutter/comment-thread layer (`views/repo/reviewDecorations.ts`)
+// over the same left/right pair rather than forking a third tab kind — `left`/`right` already
+// carry `leftRev`/`branchTip` for a review diff exactly as they do for a plain commit diff, so
+// `file.read` needs no new request shape. `null` (the default) is C6/C10 behaviour, byte-identical.
 export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({
   left: z.string().nullable().default(null),
   right: z.string().nullable().default(null),
   leftLabel: z.string().nullable().default(null),
   rightLabel: z.string().nullable().default(null),
+  review: /*#__PURE__*/ z
+    .object({
+      branch: z.string(),
+      branchTip: z.string(),
+      leftLabel: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
 
@@ -468,7 +489,7 @@ export function defaultBrowseTabState(): BrowseTabState {
 }
 
 export function defaultRepoGraphTabState(): RepoGraphTabState {
-  return { viewState: null };
+  return { viewState: null, reviewSession: null };
 }
 
 export function defaultRepoFileTabState(revealLine: number | null = null): RepoFileTabState {
@@ -477,20 +498,25 @@ export function defaultRepoFileTabState(revealLine: number | null = null): RepoF
 
 /**
  * With no arguments, C6's own HEAD-vs-worktree comparison (every field null) — every existing
- * caller of `defaultRepoDiffTabState()` is unaffected. C10's `openRepoCommitDiffTab` (S15) is the
- * one caller that supplies the revision pair.
+ * caller of `defaultRepoDiffTabState()` is unaffected. C10's `openRepoCommitDiffTab` is one caller
+ * that supplies the revision pair; C11's `openRepoReviewDiffTab` (S8) is the one caller that also
+ * supplies `review`.
  */
-export function defaultRepoDiffTabState(revision?: {
-  left: string;
-  right: string;
-  leftLabel: string;
-  rightLabel: string;
-}): RepoDiffTabState {
+export function defaultRepoDiffTabState(
+  revision?: {
+    left: string;
+    right: string;
+    leftLabel: string;
+    rightLabel: string;
+  },
+  review?: { branch: string; branchTip: string; leftLabel: string },
+): RepoDiffTabState {
   return {
     left: revision?.left ?? null,
     right: revision?.right ?? null,
     leftLabel: revision?.leftLabel ?? null,
     rightLabel: revision?.rightLabel ?? null,
+    review: review ?? null,
   };
 }
 
