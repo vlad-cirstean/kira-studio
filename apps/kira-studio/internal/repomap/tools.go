@@ -29,6 +29,27 @@ func (s *Server) notReadyResult(err error) (*mcp.CallToolResult, any, error) {
 	return errResult(fmt.Sprintf("repo-map index for %s: %s", s.root, err.Error()))
 }
 
+// indexNotice is P67f §2.4: W1's own surfacing (a failed initial or later full Sync leaves the
+// gate open on a partial index, with nowhere else a caller could see it). Empty — the normal case —
+// costs a caller nothing.
+func (s *Server) indexNotice() string {
+	st := s.idx.SyncState()
+	if st.LastErr == nil {
+		return ""
+	}
+	return fmt.Sprintf("index degraded: the last full sync of %s failed (%s); results may be incomplete.", s.root, st.LastErr)
+}
+
+// text is textResult with §2.4's degraded notice prepended when one stands — on every response
+// while degraded, not only empty ones, since a partial index also returns incomplete non-empty
+// answers that would otherwise read as complete.
+func (s *Server) text(body string) (*mcp.CallToolResult, any, error) {
+	if n := s.indexNotice(); n != "" {
+		body = n + "\n" + body
+	}
+	return textResult(body)
+}
+
 // locatorFields is embedded in every navigation tool's own input struct — §6.1's shared file/
 // line/column/symbol trio, one struct tag source (jsonschema derives from these) rather than four
 // separately-typed copies.
@@ -65,10 +86,10 @@ func (s *Server) resolve(ctx context.Context, f locatorFields, emptyMsg func() s
 		return codegraph.Query{}, result, nil
 	case res.ambiguous != nil:
 		src := s.sourceForTargets(ctx, f.OmitSource, res.ambiguous)
-		result, _, _ := textResult(renderAmbiguous(f.Symbol, res.ambiguous, src))
+		result, _, _ := s.text(renderAmbiguous(f.Symbol, res.ambiguous, src))
 		return codegraph.Query{}, result, nil
 	case res.empty:
-		result, _, _ := textResult(emptyMsg())
+		result, _, _ := s.text(emptyMsg())
 		return codegraph.Query{}, result, nil
 	default:
 		return res.query, nil, nil
@@ -105,7 +126,7 @@ func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in 
 		resolvedFrom = position(q.Path, codegraph.Point{Row: q.Point.Row, Column: q.Point.Column})
 	}
 	src := s.sourceForTargets(ctx, in.OmitSource, targets)
-	return textResult(renderDefinitions(name, resolvedFrom, targets, src))
+	return s.text(renderDefinitions(name, resolvedFrom, targets, src))
 }
 
 // --- find_references ---
@@ -161,7 +182,7 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 		name = refs.Sites[0].Name
 	}
 	src := s.sourceForSites(ctx, in.OmitSource, refs.Sites)
-	return textResult(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
+	return s.text(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
 }
 
 // --- find_implementations ---
@@ -194,7 +215,7 @@ func (s *Server) findImplementations(ctx context.Context, _ *mcp.CallToolRequest
 		language = file.Language
 	}
 	src := s.sourceForTargets(ctx, in.OmitSource, targets)
-	return textResult(renderImplementations(name, language, targets, src))
+	return s.text(renderImplementations(name, language, targets, src))
 }
 
 // --- read_symbol ---
@@ -233,7 +254,7 @@ func (s *Server) readSymbol(ctx context.Context, _ *mcp.CallToolRequest, in read
 		if name == "" {
 			name = in.Symbol
 		}
-		return textResult(fmt.Sprintf("no definitions found for %q", name))
+		return s.text(fmt.Sprintf("no definitions found for %q", name))
 	}
 
 	maxLines := clamp(in.MaxLines, readSymbolDefaultMaxLines, readSymbolMaxMaxLines)
@@ -254,7 +275,7 @@ func (s *Server) readSymbol(ctx context.Context, _ *mcp.CallToolRequest, in read
 		}
 		bodies[i] = body
 	}
-	return textResult(renderSymbolSource(targets, bodies))
+	return s.text(renderSymbolSource(targets, bodies))
 }
 
 // --- search_symbols ---
@@ -290,7 +311,7 @@ func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in s
 		return nil, nil, err
 	}
 	src := s.sourceForTargets(ctx, in.OmitSource, targets)
-	return textResult(renderSymbolSearch(in.Query, targets, src))
+	return s.text(renderSymbolSearch(in.Query, targets, src))
 }
 
 // --- search_files ---
@@ -318,7 +339,7 @@ func (s *Server) searchFiles(ctx context.Context, _ *mcp.CallToolRequest, in sea
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(renderFileSearch(in.Query, hits))
+	return s.text(renderFileSearch(in.Query, hits))
 }
 
 // --- outline_file ---
@@ -342,7 +363,7 @@ func (s *Server) outlineFile(ctx context.Context, _ *mcp.CallToolRequest, in out
 	if err != nil {
 		return nil, nil, err
 	}
-	return textResult(renderOutline(rel, nodes))
+	return s.text(renderOutline(rel, nodes))
 }
 
 func clamp(v, def, max int) int {

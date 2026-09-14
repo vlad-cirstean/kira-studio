@@ -260,16 +260,29 @@ func (s *Server) runInitialSync(ctx context.Context, home string) {
 	s.readyOnce.Do(func() { close(s.ready) })
 }
 
-// waitReady blocks until the initial Sync has completed or readyTimeout elapses, whichever first —
-// §4.2's own bound, checked by every tool handler before it touches the graph.
+// waitReady blocks until the initial Sync has completed and no later full Sync is in flight, or
+// readyTimeout elapses, whichever first — §4.2's own bound, checked by every tool handler before it
+// touches the graph. One shared deadline covers both waits, so a caller's total wait stays bounded
+// by readyTimeout exactly as before P67f.
 func (s *Server) waitReady(ctx context.Context) error {
+	deadline := time.After(readyTimeout)
 	select {
 	case <-s.ready:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-deadline:
+		return fmt.Errorf("repo-map index for %s is still building (initial sync running past %s) — retry shortly", s.root, readyTimeout)
+	}
+	// P67f §1.2 W2: the gate above is one-shot, so a later full Sync (a watcher rescan) runs behind
+	// an already-open gate. Wait it out under the same deadline rather than answer from a
+	// mid-rebuild index.
+	select {
+	case <-s.idx.SyncSettled():
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(readyTimeout):
-		return fmt.Errorf("repo-map index for %s is still building (initial sync running past %s) — retry shortly", s.root, readyTimeout)
+	case <-deadline:
+		return fmt.Errorf("repo-map index for %s is reindexing (running past %s) — retry shortly", s.root, readyTimeout)
 	}
 }
 
