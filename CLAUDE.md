@@ -149,8 +149,8 @@ duplicated here; this file only points at them.
 
 Code navigation over this repository's own tree-sitter graph (C3, `internal/repomap`), served as MCP
 tools: `find_definition`, `find_references`, `find_implementations`, `search_symbols`,
-`search_files`, `outline_file`. Ask it instead of opening whole files to find a symbol — the tokens
-that saves are the point.
+`search_files`, `outline_file`, `read_symbol`. Ask it instead of opening whole files to find a
+symbol or read one declaration — the tokens that saves are the point.
 
 **Use it when working in this repository.** Standing expectation, not a demo: start it and navigate
 with it.
@@ -164,7 +164,7 @@ Headless setup, for a session with no GUI:
 3. `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
    "Authorization: Bearer <token>"` — the command it prints on startup. **In an agent-harness
    session (this one, and every subagent spawned in it) this registers but never actually surfaces
-   the six tools** — the tool manifest here is fixed when the session starts, not read from MCP
+   the seven tools** — the tool manifest here is fixed when the session starts, not read from MCP
    config at runtime, confirmed by checking a genuinely fresh sibling session: it saw zero MCP
    servers configured, not just this one missing. Run the command anyway (`claude mcp list` then
    reports "✓ Connected", useful as a smoke check the server itself is healthy) but don't expect
@@ -180,11 +180,11 @@ Headless setup, for a session with no GUI:
    response, not a stream) — the payload is standard JSON-RPC, `result.content[0].text` is the
    answer. `tools/list` (no `params` needed beyond `{}`) returns every tool's real name and
    JSON Schema — read a tool's actual `inputSchema` before calling it rather than guessing a
-   parameter name (`search_symbols` takes `query`, not `symbol`, for instance). The same six tools
-   as the native surface: `find_definition`, `find_references`, `find_implementations`,
-   `search_symbols`, `search_files`, `outline_file`. The token savings this server exists for come
-   from the response being a targeted answer instead of a whole file, which curl doesn't change —
-   only the transport is manual, not the value.
+   parameter name (`search_symbols` takes `query`, not `symbol`, for instance). The same seven
+   tools as the native surface: `find_definition`, `find_references`, `find_implementations`,
+   `search_symbols`, `search_files`, `outline_file`, `read_symbol`. The token savings this server
+   exists for come from the response being a targeted answer instead of a whole file, which curl
+   doesn't change — only the transport is manual, not the value.
 
 Each repository's token is stored hashed under `KIRA_HOME`, so a later run reuses it and prints a
 note instead of a command; an already-registered client keeps working. To mint a fresh one, delete

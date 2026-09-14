@@ -945,14 +945,19 @@ no new resolution logic, just a wire format.** `github.com/modelcontextprotocol/
 the protocol org's own reference implementation, v1.7.0) over MCP's Streamable HTTP transport, never
 stdio: the server is one long-running process serving as many concurrent clients/tool calls as
 connect, not a process spawned fresh per client (stdio ties one process to one client by
-construction, which is the wrong shape for "an agent keeps calling this while it works"). Six tools,
-one per `codegraph` operation this chapter's own SPEC row names plus `outline_file` — `find_definition`,
-`find_references`, `find_implementations`, `search_symbols`, `search_files`, `outline_file` — each a
-thin argument-to-`Query` translation (`locator.go`'s five resolution rules: an explicit `file`+`line`,
-a `file`+`symbol` hint, or `symbol` alone resolved through `SearchSymbols`, ambiguity returned as
-candidates rather than a silent top-hit guess) and a grep-like text rendering (`render.go`) that
-prints every `Target`'s own `Rule`/`Confidence` rather than hiding C2's honesty markers behind a
-clean-looking result.
+construction, which is the wrong shape for "an agent keeps calling this while it works"). Seven
+tools, one per `codegraph` operation this chapter's own SPEC row names plus `outline_file` and
+(P64) `read_symbol` — `find_definition`, `find_references`, `find_implementations`,
+`search_symbols`, `search_files`, `outline_file`, `read_symbol` — each a thin argument-to-`Query`
+translation (`locator.go`'s five resolution rules: an explicit `file`+`line`, a `file`+`symbol`
+hint, or `symbol` alone resolved through `SearchSymbols`, ambiguity returned as candidates rather
+than a silent top-hit guess) and a grep-like text rendering (`render.go`) that prints every
+`Target`'s own `Rule`/`Confidence` rather than hiding C2's honesty markers behind a clean-looking
+result. `read_symbol` is the one tool that returns a declaration's own bytes rather than a
+position: the same locator resolves a target, then `source.go`'s `readSymbolRows` returns its
+exact indexed extent (start/end row, already stored, previously surfaced nowhere) plus a
+backward-walked doc comment — bounded by `maxLines`/64 KiB, `[stale]`-marked the same way a C8 hit
+line is.
 
 **C8 adds one source line under each hit — the one place this server reads a file's own bytes,
 never a whole file.** `find_definition`, `find_references`, `find_implementations` and
@@ -968,8 +973,10 @@ rule `Index.isStale` uses) and printed as a `[stale] ` prefix, and every failure
 file, a symlink escaping the repository, a NUL byte) degrades to a `[no source: <reason>]` note
 rather than an error — a navigation answer never turns into a tool failure because a file changed
 underneath it. `omitSource` restores the exact pre-C8 compact shape for a caller that wants it.
-`outline_file` and `search_files` are unchanged, so `outline_file`'s own "without reading its bytes"
-still holds and, post-C8, is the sentence naming the cheap tool.
+`outline_file` is unchanged, so its own "without reading its bytes" still holds and is the sentence
+naming the cheap tool — `search_files` is no longer, since P64 adds a per-row line count to its own
+output, and P64's own `read_symbol` reads bytes by design, the one deliberate exception to "never a
+whole file."
 
 **Two independent instances of the same server code, never a shared listener.** *Embedded*: started
 and stopped by this app's own process, in step with the `codeIntel.mcpServerEnabled` setting — on

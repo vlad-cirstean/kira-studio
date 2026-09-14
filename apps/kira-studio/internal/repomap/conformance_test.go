@@ -141,7 +141,7 @@ func TestConformanceListToolsAndCallEach(t *testing.T) {
 	}
 	want := map[string]bool{
 		"find_definition": false, "find_references": false, "find_implementations": false,
-		"search_symbols": false, "search_files": false, "outline_file": false,
+		"search_symbols": false, "search_files": false, "outline_file": false, "read_symbol": false,
 	}
 	for _, tool := range tools.Tools {
 		if _, ok := want[tool.Name]; !ok {
@@ -169,6 +169,7 @@ func TestConformanceListToolsAndCallEach(t *testing.T) {
 		{"search_symbols", map[string]any{"query": "Main"}},
 		{"search_files", map[string]any{"query": "main"}},
 		{"outline_file", map[string]any{"file": "main.go"}},
+		{"read_symbol", map[string]any{"symbol": "Main"}},
 	}
 	for _, c := range calls {
 		t.Run(c.name, func(t *testing.T) {

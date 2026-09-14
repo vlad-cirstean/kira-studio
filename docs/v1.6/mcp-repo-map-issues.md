@@ -83,10 +83,25 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   and `findKeyValueTab`/`patchKeyValueTabState` returned 7 and 5 production sites, which is what
   sized the plan's refactor seam. No false positives, no misses against a spot-check.
 
+- **P64 (implementation)**: same `ConnectionRefused`/leftover-orphaned-process pattern as every
+  entry above — killed live servers **by PID**, deleted the stale hashed token file, restarted to
+  mint a fresh bearer token, used it over plain HTTP/JSON-RPC throughout. Real navigation work used
+  the server continuously while implementing (finding `resolveName`'s own line range via
+  `read_symbol` instead of guessing a `Read` window, checking `sortCandidates`'/`search.go`'s own
+  call sites, etc.), plus the mandatory dedicated dogfood pass: `read_symbol` against a Go method
+  (`codegraph.resolveName`, doc comment + exact 292-376 range), a Go struct and a TypeScript type
+  alias sharing one name (`TreeNode`, both directions — `.go`-referring and `.ts`-referring — ranked
+  by the correct language via §2.4's fix), and a Vue SFC function (`BranchPicker.vue`'s `open`,
+  doc comment correctly walked back through a multi-line G10 comment block); `search_symbols` with
+  `pathPrefix:"packages/"` cut 100 unfiltered "open" hits to 38, all genuinely under `packages/`;
+  `maxLines` truncation ("… truncated at 5 lines (symbol spans 85)") and `[stale]` (verified against
+  a scratch file created, indexed, edited without a resync, and deleted) both behaved exactly as
+  designed. One non-trivial finding, logged below and left open per process.
+
 ### Non-trivial
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
-  silently resolves to the Go symbol only. OPEN.**
+  silently resolves to the Go symbol only. Fixed (`54e77579`).**
 
   `search_symbols` and `find_definition` both miss every `export type X = …` alias:
 
@@ -110,6 +125,61 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   Per the process above, not fixed in this phase. P64 waits on a dedicated fix pass. A fix likely
   needs both halves: index `type_alias_declaration` in the TS/TSX tree-sitter queries, and make a
   cross-language name collision report every hit rather than the first.
+
+  **Fix (P64, `54e77579`)**: two new repo-authored query files
+  (`queries/typescript/p64_declarations.scm`, `queries/tsx/p64_declarations.scm`) add the missing
+  `type_alias_declaration`/`enum_declaration`/module-level-`const` patterns; `codegraph.resolve.go`
+  gained a same-language-family tiebreak (`4760482a`) so a cross-language collision now ranks the
+  referring file's own language first instead of losing on directory accident; `find_definition`/
+  `find_references`/`find_implementations` gained a `languages` filter (`dbfc5813`) to resolve one
+  in a single call. **Correction to the original finding above**: the gap was wider than first
+  logged — `enum` declarations and module-level `const`s were invisible too (P64's own planning
+  pass measured 0 rows of each across the whole TypeScript family), and since `locate` reaches
+  reference rows only through a symbol-table lookup, the missing definitions also silently broke
+  `find_references` for every one of these names, not only `find_definition`. Verified against a
+  live server on a completed reindex: `BrowseTabState`/`BrowseTabRecord`/`treeNodeSchema` all now
+  resolve, and `outline_file` on `packages/shared/domain/tree.ts` returns 23 nodes rather than 7.
+
+- **P64 (implementation) — a bare-symbol ambiguous listing still lists the cross-language
+  collision in path-alphabetical order, not language-family order. OPEN.**
+
+  `find_definition {"symbol":"TreeNode"}` (no `file`, no `languages`) correctly returns both
+  candidates now (§2.2's fix), but lists `apps/kira-studio/internal/storage/model/tree.go` (the Go
+  struct) **first** and `packages/shared/domain/tree.ts` (the TypeScript alias) second — the
+  opposite of what P64's own plan (§2.7's verification table) expects ("tree.ts:96 present and
+  listed first").
+
+  Root cause: this is a *different* code path from the one §2.4's language-family tiebreak
+  touches. A bare `{"symbol": X}` call with several exact matches never reaches
+  `codegraph.resolveName`/`sortCandidates` at all — `repomap/locator.go`'s own `locate()` resolves
+  it directly via `codegraph.SearchSymbols`, whose Go-side ranking (`codegraph/search.go`'s
+  `less()`) has no language concept, only exact/prefix/offset/name-length then plain path-string
+  comparison. `apps/kira-studio/...` sorts before `packages/...` alphabetically regardless of which
+  file shares the caller's own language. §2.4's fix (`4760482a`) lives entirely in
+  `resolve.go`'s `sortCandidates`, used only by `DefinitionOf`'s reference/position-based
+  resolution (confirmed working correctly: `read_symbol` with a `.go` referring file ranks the Go
+  candidate first, a `.ts` referring file the TypeScript one) — it was never wired into
+  `SearchSymbols`'s own ranking or into `locate()`'s ambiguous-listing path.
+
+  `languages` (§2.5, `dbfc5813`) is the working escape hatch for this exact case today —
+  `find_definition {"symbol":"TreeNode","languages":["typescript"]}` resolves cleanly in one call —
+  so the gap is cosmetic (list order), not a missing answer: both candidates are still returned,
+  every time, just not language-ordered by default.
+
+  Not fixed in this phase, per process (the finding surfaces from P64's own new/changed surface, so
+  it waits on a dedicated fix pass before the next phase starts). One nuance for that pass to
+  settle first, not just a mechanical port: a **bare** `{"symbol": X}` call (no `file`) carries no
+  referring file at all, so — unlike `DefinitionOf`'s reference/position-based path, which always
+  has a concrete site and therefore a concrete language to prefer — there is no principled "this
+  caller's own language" to rank by here. Confirmed correct by construction, not a bug: a bare
+  lookup is genuinely anchor-free. So either (a) the plan's own §2.7 expectation ("listed first")
+  was written assuming a language anchor that a bare-symbol call structurally doesn't have, and the
+  fix is to correct that expectation rather than the code — `languages` already gives the caller a
+  one-call, no-ambiguity escape hatch, which may be the intended answer — or (b) some other
+  tiebreak entirely (alphabetical-by-language-name? Go-before-everything as a stable default?) is
+  wanted for this specific no-anchor case, which is a real design decision, not a one-line
+  `sameLanguageFamily` port. Either way, the next pass should decide deliberately rather than
+  silently reusing §2.4's fix where it structurally doesn't fit.
 
 <!--
 Entry template:
