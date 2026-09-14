@@ -66,6 +66,10 @@ export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
 // file into one tab. This wrapper does its own lookup over the revision pair as well, then
 // delegates with reuse:false so openTab's own key stays exactly what C5 defined — a second commit
 // diff of the same file is a second tab, never a silent replacement of the first.
+//
+// C11 §7.5: the lookup also requires `review === null` — without it, a single-commit branch whose
+// merge base equals the commit's own parent would have the identical (left, right) pair as its
+// review diff and this function would silently reuse that tab, rendering no review layer at all.
 export function openRepoCommitDiffTab(
   repoId: string,
   path: string,
@@ -78,7 +82,12 @@ export function openRepoCommitDiffTab(
   const existing = tabsState.tabs.find((t) => {
     if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
     const diff = asRepoDiffTab(t);
-    return diff !== null && diff.state.left === left && diff.state.right === right;
+    return (
+      diff !== null &&
+      diff.state.review === null &&
+      diff.state.left === left &&
+      diff.state.right === right
+    );
   });
   if (existing) {
     activateTab(existing.id);
@@ -101,6 +110,51 @@ export function openRepoCommitDiffTab(
         leftLabel: labels.left,
         rightLabel: labels.right,
       }),
+    { reuse: false, workspaceId, preview: !pinned },
+  );
+}
+
+// C11 §7.5/§7.4 (S8): the review-diff counterpart to openRepoCommitDiffTab above — same shape, one
+// correction to the dedupe predicate (`review !== null`, this function's own mirror of that
+// function's added `review === null`) so the two tab kinds can never collide into one. `review`
+// turns on `reviewDecorations.ts`'s comment/mark layer (§7.4) over the same left/right pair; `left`
+// is the merge base or `reviewedAtSha` (§7.2's two diff modes), `right` is always `review.branchTip`.
+export function openRepoReviewDiffTab(
+  repoId: string,
+  path: string,
+  left: string,
+  right: string,
+  labels: { left: string; right: string },
+  review: { branch: string; branchTip: string; leftLabel: string },
+  pinned: boolean,
+): OpenTabResult {
+  const workspaceId = repoWorkspaceKey(repoId);
+  const existing = tabsState.tabs.find((t) => {
+    if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
+    const diff = asRepoDiffTab(t);
+    return (
+      diff !== null &&
+      diff.state.review !== null &&
+      diff.state.left === left &&
+      diff.state.right === right
+    );
+  });
+  if (existing) {
+    activateTab(existing.id);
+    if (pinned && tabsState.previewIdByWorkspace[workspaceId] === existing.id) {
+      tabsState.previewIdByWorkspace[workspaceId] = null;
+    }
+    return { id: existing.id, reused: true };
+  }
+  return openTab(
+    'repo-diff',
+    null,
+    path,
+    () =>
+      defaultRepoDiffTabState(
+        { left, right, leftLabel: labels.left, rightLabel: labels.right },
+        review,
+      ),
     { reuse: false, workspaceId, preview: !pinned },
   );
 }
