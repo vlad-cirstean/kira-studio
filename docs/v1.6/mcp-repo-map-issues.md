@@ -141,7 +141,8 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   resolve, and `outline_file` on `packages/shared/domain/tree.ts` returns 23 nodes rather than 7.
 
 - **P64 (implementation) — a bare-symbol ambiguous listing still lists the cross-language
-  collision in path-alphabetical order, not language-family order. OPEN.**
+  collision in path-alphabetical order, not language-family order. Resolved — not a defect
+  (P64b, docs-only).**
 
   `find_definition {"symbol":"TreeNode"}` (no `file`, no `languages`) correctly returns both
   candidates now (§2.2's fix), but lists `apps/kira-studio/internal/storage/model/tree.go` (the Go
@@ -166,20 +167,22 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   so the gap is cosmetic (list order), not a missing answer: both candidates are still returned,
   every time, just not language-ordered by default.
 
-  Not fixed in this phase, per process (the finding surfaces from P64's own new/changed surface, so
-  it waits on a dedicated fix pass before the next phase starts). One nuance for that pass to
-  settle first, not just a mechanical port: a **bare** `{"symbol": X}` call (no `file`) carries no
-  referring file at all, so — unlike `DefinitionOf`'s reference/position-based path, which always
-  has a concrete site and therefore a concrete language to prefer — there is no principled "this
-  caller's own language" to rank by here. Confirmed correct by construction, not a bug: a bare
-  lookup is genuinely anchor-free. So either (a) the plan's own §2.7 expectation ("listed first")
-  was written assuming a language anchor that a bare-symbol call structurally doesn't have, and the
-  fix is to correct that expectation rather than the code — `languages` already gives the caller a
-  one-call, no-ambiguity escape hatch, which may be the intended answer — or (b) some other
-  tiebreak entirely (alphabetical-by-language-name? Go-before-everything as a stable default?) is
-  wanted for this specific no-anchor case, which is a real design decision, not a one-line
-  `sameLanguageFamily` port. Either way, the next pass should decide deliberately rather than
-  silently reusing §2.4's fix where it structurally doesn't fit.
+  A bare `{"symbol": X}` call (no `file`) carries no referring file at all, so — unlike
+  `DefinitionOf`'s reference/position-based path, which always has a concrete site and therefore a
+  concrete language to prefer — there is no principled "this caller's own language" to rank by
+  here. Confirmed correct by construction, not a bug: a bare lookup is genuinely anchor-free.
+
+  **Resolution (P64b, docs-only, no code change)**: option (a) from the original finding. P64's own
+  §2.7 verification-table expectation ("tree.ts:96 ... listed first") assumed a language anchor
+  that a bare-symbol call structurally doesn't have — the expectation was wrong, not the code.
+  `languages` (§2.5, `dbfc5813`) already gives a one-call, unambiguous resolution for this exact
+  case (`find_definition {"symbol":"TreeNode","languages":["typescript"]}`), and both candidates
+  are still returned on the bare call every time — never a lost answer, only listing order. The
+  path-alphabetical fallback for a bare, no-`languages` lookup is acceptable behavior, not a
+  defect. `sameLanguageFamily` (`resolve.go`'s `sortCandidates`, used only by `DefinitionOf`'s
+  reference/position-based path, where a concrete referring file makes the anchor principled) is
+  deliberately **not** ported into `codegraph/search.go`'s `less()` — that would invent a language
+  preference where no anchor exists (P64b plan §0.1).
 
 <!--
 Entry template:
