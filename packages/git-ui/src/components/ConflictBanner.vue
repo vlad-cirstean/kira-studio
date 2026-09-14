@@ -127,11 +127,24 @@ const PATH_DISPLAY_CAP = 20;
       </KuiButton>
     </div>
 
-    <p v-if="inProgress.unmergedCount > 0" :id="CONTINUE_REASON_ID" class="kv-conflict-banner-reason">
+    <p
+      v-if="inProgress.unmergedCount > 0 && resolveConflictEnabled"
+      :id="CONTINUE_REASON_ID"
+      class="kv-conflict-banner-reason"
+    >
       Resolve the remaining {{ inProgress.unmergedCount }}
       {{ inProgress.unmergedCount === 1 ? "file" : "files" }} first, then Continue{{
         inProgress.canSkip ? ", or Skip this commit and move on." : "."
       }}
+    </p>
+    <p
+      v-else-if="inProgress.unmergedCount > 0"
+      :id="CONTINUE_REASON_ID"
+      class="kv-conflict-banner-reason"
+    >
+      Resolve the remaining {{ inProgress.unmergedCount }}
+      {{ inProgress.unmergedCount === 1 ? "file" : "files" }} in your own editor and stage them,
+      then Continue{{ inProgress.canSkip ? ", or Skip this commit and move on." : "." }}
     </p>
     <p v-else-if="inProgress.canSkip" class="kv-conflict-banner-reason">
       No conflicts remain. Continue to commit this change, or Skip if it is already present.
