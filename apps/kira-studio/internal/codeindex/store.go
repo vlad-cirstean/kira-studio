@@ -3,10 +3,14 @@ package codeindex
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeparse"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // ParseStatus is §5.2's closed set for file.parse_status.
@@ -137,7 +141,58 @@ func (s *Store) writeBatch(ctx context.Context, ws []FileWrite) error {
 	if err != nil {
 		return err
 	}
-	return replaceFilesTx(ctx, db, ws)
+	return replaceFilesTxWithBusyRetry(ctx, db, ws)
+}
+
+// busyRetryMaxAttempts/busyRetryBackoff are §2.3's own bounded retry: resilience insurance for a
+// batch transaction that lost the race for SQLite's single write lock past the DSN's own
+// busy_timeout (5s, db.go's buildDSN) — measured (P64c §1.5) to need a transaction stretched to
+// roughly 25x its normal ~200ms commit time, i.e. a pathological load, not the common path. Kept
+// deliberately small: this is insurance against the worst available outcome (the whole Sync pass
+// discarded), not a substitute for busy_timeout itself.
+const (
+	busyRetryMaxAttempts = 5
+	busyRetryBackoff     = 200 * time.Millisecond
+)
+
+// replaceFilesTxWithBusyRetry wraps replaceFilesTx in a bounded retry on SQLite's BUSY/LOCKED
+// result code alone — every other error returns immediately, unretried, exactly as before this
+// wrapper existed. A whole batch is the correct retry unit because replaceFilesTx is already
+// all-or-nothing (it rolls back its transaction on any failure, store.go's own replaceFilesTx doc
+// comment), so a retried batch cannot double-write.
+func replaceFilesTxWithBusyRetry(ctx context.Context, db *sql.DB, ws []FileWrite) error {
+	var lastErr error
+	for attempt := 0; attempt < busyRetryMaxAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(busyRetryBackoff):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+		err := replaceFilesTx(ctx, db, ws)
+		if err == nil {
+			return nil
+		}
+		if !isSQLiteBusy(err) {
+			return err
+		}
+		lastErr = err
+	}
+	return lastErr
+}
+
+// isSQLiteBusy reports whether err is modernc.org/sqlite's own SQLITE_BUSY or SQLITE_LOCKED
+// result code, detected through the driver's numeric code (Error.Code(), masked to the primary
+// result code per SQLite's own guidance) rather than by matching the string "database is locked" —
+// a string match would silently stop working on a driver upgrade that rewords its message.
+func isSQLiteBusy(err error) bool {
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return false
+	}
+	code := sqliteErr.Code() & 0xff
+	return code == sqlite3.SQLITE_BUSY || code == sqlite3.SQLITE_LOCKED
 }
 
 // replaceFilesTx writes one batch inside a single transaction.
