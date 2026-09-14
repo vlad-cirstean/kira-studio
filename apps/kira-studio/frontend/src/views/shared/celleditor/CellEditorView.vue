@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import CodeMirrorHost from '../../../editor/CodeMirrorHost.vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import { findRanges } from '../../../editor/findRanges';
 import type { EditorLanguageId } from '../../../editor/languages';
+import MonacoHost from '../../../editor/MonacoHost.vue';
 import { formatBytes } from '../../../format';
 import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
 import { connectionRecord } from '../../../state/connections';
@@ -340,10 +340,10 @@ const formatProblem = computed(() =>
 // format choice itself is wrong", which isn't the claim being made — the *value* doesn't parse as
 // whatever format is in effect. Squiggly-underlining the actual offending text is what every code
 // editor does for exactly this ("your JSON is broken, your timestamp is wrong"), and this app
-// already has the whole mechanism built for the console (CodeMirrorHost's `lintSource` prop,
-// @codemirror/lint under the hood) — reused as-is rather than inventing a second lint UI. A
-// validator with no offset (xml/csv/base64/hex/timestamp) underlines the whole value; one with an
-// offset (json/sql) underlines the single character it points at.
+// already has the whole mechanism built for the console (MonacoHost's `lintSource` prop,
+// editor.setModelMarkers under the hood, P60a) — reused as-is rather than inventing a second lint
+// UI. A validator with no offset (xml/csv/base64/hex/timestamp) underlines the whole value; one
+// with an offset (json/sql) underlines the single character it points at.
 function cellLintSource(): ConsoleDiagnostic[] {
   const problem = formatProblem.value;
   if (!problem) return [];
@@ -562,7 +562,7 @@ const statusLine = computed(() => {
     </ViewHeader>
 
     <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
-         (onEditorKeydown) stages without needing to move focus away; neither is on CodeMirrorHost
+         (onEditorKeydown) stages without needing to move focus away; neither is on MonacoHost
          itself, since its own keymap only binds plain Enter (for newlines) and lets everything
          else bubble. Both are on the wrapping div, so they cover the translate pane too — TimestampPane
          lives inside here (not in its own strip, as the native picker used to) precisely so it
@@ -574,7 +574,7 @@ const statusLine = computed(() => {
       @focusout="onEditorBlur"
     >
       <div class="encoded-pane" data-testid="cell-editor-encoded">
-        <CodeMirrorHost
+        <MonacoHost
           ref="encodedHostRef"
           :doc="doc"
           :language="language"
@@ -594,7 +594,7 @@ const statusLine = computed(() => {
           <span>Decoded text</span>
         </div>
         <div v-if="decodedDoc !== null" class="translate-pane" data-testid="cell-editor-decoded">
-          <CodeMirrorHost
+          <MonacoHost
             :doc="decodedDoc"
             language="plain"
             :read-only="!isEditable"
