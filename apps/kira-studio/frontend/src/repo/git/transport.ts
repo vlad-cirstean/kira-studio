@@ -43,6 +43,7 @@ import { createRpcClient, createStreamChannel } from '@kira/git-ipc';
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Stream } from '/wails/runtime.js';
+import { dropCredentialRequests, enqueueCredentialRequest } from '../../state/gitCredential';
 import { createHostHandlers } from './hostHandlers';
 
 /** The two `EventKey`s this host answers itself rather than forwarding to `remote.on` — never
@@ -135,6 +136,25 @@ function createNativeGitTransport(codeRepoId: string): Transport {
     remoteRequest: remote.request,
     codeRepoId,
     emitLocal: local.emit,
+  });
+
+  // P67e D9: on the SHARED client, not a per-mount lease — this prompt belongs to the repo
+  // workspace as a whole (a pull started in the Git module must stay answerable after switching
+  // tabs), not to whichever mount happened to trigger the remote op. remote.dispose() below
+  // (disposeGitTransport) releases this subscription along with everything else on the client.
+  remote.on('credential.request', (req) => {
+    enqueueCredentialRequest({
+      codeRepoId,
+      prompt: req.prompt,
+      masked: req.masked,
+      answer: (secret) => {
+        void remote
+          .request('credential.provide', { requestId: req.requestId, secret })
+          .catch(() => {
+            /* the broker's own 120s bound already ended the wait — nothing to log or recover. */
+          });
+      },
+    });
   });
 
   return {
@@ -275,6 +295,7 @@ export function disposeGitTransport(codeRepoId: string): void {
   if (!shared) return;
   sharedClientsByCodeRepoId.delete(codeRepoId);
   localEmittersByCodeRepoId.delete(codeRepoId);
+  dropCredentialRequests(codeRepoId);
   for (const lease of [...shared.leases]) lease.dispose();
   shared.transport.dispose();
 }

@@ -2215,7 +2215,13 @@ export type Contract = {
      *  in-flight remote op — never Kira Studio's own window (SPEC §5 item 4, §6, confirmed
      *  2026-09-07). `requestId` is a server-minted, unguessable id; the extension answers exactly
      *  once with `credential.provide`. Nothing here is ever logged or stored on either side —
-     *  `prompt` can itself contain a username the user just typed (probe P1's second prompt). */
+     *  `prompt` can itself contain a username the user just typed (probe P1's second prompt).
+     *
+     *  P67e: "never Kira Studio's own window" scopes an *external paired client's* op, owned by
+     *  that client's own `gitsession.Conn` — the native stream's own remote op is owned by the
+     *  native `Conn` (`internal/bridge/gitstream.go`), so its prompt is answered by this same
+     *  window (`state/gitCredential.ts` + `workbench/GitCredentialDialog.vue`). Routing it there
+     *  applies this rule rather than breaking it. */
     'credential.request': {
       readonly requestId: string;
       readonly repoId: string;
