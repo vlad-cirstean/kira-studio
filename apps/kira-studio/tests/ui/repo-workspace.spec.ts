@@ -1,6 +1,7 @@
 import { defaultSettings } from '@shared/domain/settings';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installGitStreamMock } from './support/gitStreamMock';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -80,19 +81,37 @@ function tab(page: import('@playwright/test').Page, kind?: string) {
     : page.locator('[data-testid="tab-strip-row"] [data-testid="tab"]');
 }
 
+function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api' | 'git') {
+  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
+}
+
+// P67b §4.4: the repo list lives in the Git module's own panel now, not Studio's — every test
+// below that used to find `repoRow` directly on boot (Studio active by default) switches to Git
+// first, the same one click a real user makes.
+async function openGitModule(page: import('@playwright/test').Page): Promise<void> {
+  await modeTab(page, 'git').click();
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+}
+
 test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and studio isolation', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: CONTROL });
 
-  // Import a fixture repository (seeded above) — visible in the panel's Repositories section.
+  // P67b §0/§4.4: the repo list is not in Studio's panel at all — it lives in the Git module's
+  // own panel now, absorbed out of the old "Connections" section.
+  await expect(page.locator('[data-testid="repo-row"]')).toHaveCount(0);
+  await openGitModule(page);
+
+  // Import a fixture repository (seeded above) — visible in the Git panel's repo list.
   await expect(repoRow(page)).toBeVisible();
 
-  // Opening it (double-click, the tree's own select/open split) switches to its own workspace.
+  // Opening it (double-click, the tree's own select/open split) activates its own workspace and
+  // the row itself, and adds no top-level tab (§0's correction — exactly three mode tabs, always).
   await repoRow(page).dblclick();
-  await expect(
-    page.locator('[data-testid="workspace-repo-tab"][data-repo-id="repo-1"]'),
-  ).toHaveClass(/is-active/);
+  await expect(repoRow(page)).toHaveClass(/active/);
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
 
   // The pinned graph tab exists, alone, and has no close button.
   await expect(tab(page)).toHaveCount(1);
@@ -144,6 +163,7 @@ test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) =
     ],
   });
 
+  await openGitModule(page);
   await repoRow(page).dblclick();
   await expect(treeRow(page, 'c.ts')).toBeVisible();
 
@@ -183,6 +203,7 @@ test('a repo workspace: search streams results out of order and opens a match', 
     ],
   });
 
+  await openGitModule(page);
   await repoRow(page).dblclick();
   await page.locator('[data-testid="repo-view-search"]').click();
 
@@ -285,6 +306,7 @@ test('a repo workspace: quick open fuzzy-finds and opens a file', async ({ relau
   await emitWailsEvent(page, IPC.quickOpen, null);
   await expect(quickOpen()).toHaveCount(0);
 
+  await openGitModule(page);
   await repoRow(page).dblclick();
 
   // Renders with every fixture file, unfiltered, on open (D8 loads the tree itself).
@@ -327,109 +349,6 @@ test('a repo workspace: quick open fuzzy-finds and opens a file', async ({ relau
 // the native git stream and renders something real (its own branch picker) rather than an empty
 // container — the one thing neither typecheck nor a Go test can reach for this phase, the same
 // role the diff-tab/search/quick-open specs above already play for C6/C7/C9.
-//
-// repo/git/transport.ts speaks the native git JSON-RPC protocol (@kira/git-ipc's rpc.ts) over a
-// Wails Stream — an entirely different wire (and mocking mechanism, `window._wails.streamFactory`)
-// than mockRuntime.ts's `control.*` Call endpoint or mockStream.ts's own FlatBuffers bulk-data
-// protocol, and one this repo has no existing mock for (C10 never added a UI test for its own
-// graph mount for the identical reason). installGitStreamMock below is a minimal, purpose-built
-// stand-in — real enough to answer the three requests this shallow path actually needs
-// (app.init, repo.list, refs.list) and silent (never crashing, just never resolving) for every
-// other method, which is exactly what a real bootstrap() tolerates: review.session.load and
-// review.resolveBase are awaited but never block the branch picker from rendering.
-async function installGitStreamMock(page: import('@playwright/test').Page): Promise<void> {
-  await page.evaluate((gitRepoId: string) => {
-    const w =
-      (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ??
-      {};
-    (window as unknown as { _wails: typeof w })._wails = w;
-    const existingFactory = w.streamFactory;
-
-    interface MockSocket {
-      binaryType: string;
-      onopen: ((ev: unknown) => void) | null;
-      onmessage: ((ev: { data: ArrayBuffer }) => void) | null;
-      onclose: ((ev: unknown) => void) | null;
-      onerror: ((ev: unknown) => void) | null;
-      readyState: number;
-      send(data: string): void;
-      close(): void;
-    }
-
-    function deliver(socket: MockSocket, envelope: unknown): void {
-      const bytes = new TextEncoder().encode(JSON.stringify(envelope));
-      setTimeout(() => socket.onmessage?.({ data: bytes.buffer }), 0);
-    }
-
-    function createGitMockSocket(): MockSocket {
-      const socket: MockSocket = {
-        binaryType: 'arraybuffer',
-        onopen: null,
-        onmessage: null,
-        onclose: null,
-        onerror: null,
-        readyState: 0,
-        send(data: string) {
-          let envelope: { version: number; body?: { t?: string; id?: number; method?: string } };
-          try {
-            envelope = JSON.parse(data);
-          } catch {
-            return;
-          }
-          const frame = envelope.body;
-          if (frame?.t !== 'req' || frame.id === undefined) return;
-          // @kira/git-ipc's rpc.ts frame union: {t:'res', id, ok:true, result}.
-          const resultByMethod: Record<string, unknown> = {
-            'app.init': {
-              contractVersion: envelope.version,
-              serverVersion: 'ui-test',
-              git: { kind: 'ok', path: '/usr/bin/git', version: '2.40.0' },
-            },
-            'repo.list': { candidates: [], activeRepoId: gitRepoId },
-            'refs.list': {
-              branches: [
-                {
-                  refname: 'refs/heads/main',
-                  kind: 'branch',
-                  shortName: 'main',
-                  objectId: '0'.repeat(40),
-                  peeledObjectId: undefined,
-                  upstream: undefined,
-                  track: undefined,
-                  committerDate: 0,
-                  isHead: true,
-                  checkedOutIn: undefined,
-                  annotation: undefined,
-                },
-              ],
-              remoteBranches: [],
-              tags: [],
-              head: { kind: 'branch', name: 'main' },
-            },
-          };
-          const method = frame.method;
-          if (method === undefined || !(method in resultByMethod)) return; // hang forever
-          deliver(socket, {
-            version: envelope.version,
-            body: { t: 'res', id: frame.id, ok: true, result: resultByMethod[method] },
-          });
-        },
-        close() {
-          socket.readyState = 3;
-        },
-      };
-      setTimeout(() => {
-        socket.readyState = 1;
-        socket.onopen?.({});
-      }, 0);
-      return socket;
-    }
-
-    w.streamFactory = (name: string) =>
-      name === 'git' ? createGitMockSocket() : existingFactory?.(name);
-  }, REPO.repoId);
-}
-
 test('a repo workspace: switching the panel to Review mounts the review sidebar', async ({
   relaunch,
 }) => {
@@ -438,8 +357,9 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
   // tab immediately, which is what first calls Stream('git') — repo/git/transport.ts's
   // gitTransportFor is lazy, unlike bridge/port.ts's own module-scope Stream('engine'), so
   // page.evaluate (not page.addInitScript) is both sufficient and correct here.
-  await installGitStreamMock(page);
+  await installGitStreamMock(page, REPO.repoId);
 
+  await openGitModule(page);
   await repoRow(page).dblclick();
   await page.locator('[data-testid="repo-view-review"]').click();
 
@@ -486,6 +406,7 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
     ],
   });
 
+  await openGitModule(page);
   const noGitRepoRow = page.locator(`[data-testid="repo-row"][data-repo-id="${NO_GIT_REPO.id}"]`);
   await noGitRepoRow.dblclick();
   await expect(treeRow(page, 'a.ts')).toBeVisible();
@@ -509,4 +430,132 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
 
   await expect(editor).toBeVisible();
   await expect(page.locator('.kira-blame-inline')).toHaveCount(0);
+});
+
+// P67b §4.2/§9: "activating a repo tab from anywhere brings the Git module forward" — the
+// concrete boot-time manifestation is main.ts's post-hydrate loop: a window that persisted
+// 'studio' as its own module but restored a repo's pinned graph tab with no active tab of its own
+// (ensureWorkspaceShell's own gate) calls activateTab -> setActiveTabId -> activateWorkspace,
+// which now persists 'git' (setModule) rather than leaving modeState.active untouched the way the
+// pre-phase code did (state/tabs.ts's own updated doc comment). This is the same state-layer path
+// Quick Open's own "jump to a repo file" goes through — Quick Open itself can only be invoked from
+// inside an already-active repo workspace (D6), so this is the boot-time route that actually
+// starts from Studio.
+test('a repo tab restored from a previous session brings the Git module forward, even though the window persisted Studio', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.windowsEnsure, response: { mode: 'studio' } },
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+      { channel: IPC.codeWorkspaceListFiles, args: { id: REPO.id }, response: FILE_LISTING },
+      {
+        channel: IPC.tabsList,
+        response: [
+          {
+            id: 'restored-repo-graph',
+            kind: 'repo-graph',
+            connectionId: null,
+            path: '',
+            order: 0,
+            active: false,
+            workspaceId: `repo:${REPO.id}`,
+            state: { viewState: null, reviewSession: null },
+          },
+        ],
+      },
+    ],
+  });
+
+  // The window's own persisted mode was 'studio' — but a live repo tab survived restore with no
+  // active tab of its own, so boot brings Git forward instead of honouring the stale persisted
+  // mode literally.
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'studio')).not.toHaveClass(/is-active/);
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+});
+
+// P67b §4.2/§9: workspaceState.lastRepoKey — leaving Git for another module and coming back lands
+// on the same repository, the same "return to where you were" behaviour the old per-repo title-bar
+// tabs gave for free.
+test('leaving Git for Api and returning lands back on the same repository', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openGitModule(page);
+  await repoRow(page).dblclick();
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+
+  await modeTab(page, 'api').click();
+  await expect(modeTab(page, 'api')).toHaveClass(/is-active/);
+
+  await modeTab(page, 'git').click();
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  await expect(repoRow(page)).toHaveClass(/active/);
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+});
+
+// P67b §4.2/§9: closing the active repo workspace from the panel's own × falls back to the Git
+// module's own empty state (GitStart.vue), not to Studio — a repo workspace closing is a
+// Git-module event.
+test("closing the active repo workspace from the panel's × falls back to the Git module's empty state, not Studio", async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openGitModule(page);
+  await repoRow(page).dblclick();
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+
+  await page.locator('[data-testid="workspace-repo-close"]').click();
+
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  await expect(modeTab(page, 'studio')).not.toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="git-start"]')).toBeVisible();
+  await expect(page.locator('[data-testid="project-panel"]')).not.toContainText('Connections');
+});
+
+// P67b §6/§9: a .ts row and a .go row carry different per-language icon styles (ported from the
+// diff tree's own setiIconFor rule, repo/fileIcon.ts), and a directory row still carries a real
+// codicon (folder/folder-opened) — §6.2/OQ-3: no directory-icon rule was ported, since the diff
+// tree has none.
+test('a repo workspace: file-tree rows carry per-language icons, directories keep their codicon', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: REPO.id },
+        response: {
+          paths: ['main.go', 'app.ts', 'src/util.ts'],
+          status: {},
+          truncated: false,
+        },
+      },
+    ],
+  });
+
+  await openGitModule(page);
+  await repoRow(page).dblclick();
+
+  const goIcon = treeRow(page, 'main.go').locator('.node-icon');
+  const tsIcon = treeRow(page, 'app.ts').locator('.node-icon');
+  await expect(goIcon).toBeVisible();
+  await expect(tsIcon).toBeVisible();
+
+  const [goStyle, tsStyle] = await Promise.all([
+    goIcon.getAttribute('style'),
+    tsIcon.getAttribute('style'),
+  ]);
+  expect(goStyle).toContain('mask-image');
+  expect(tsStyle).toContain('mask-image');
+  expect(goStyle).not.toBe(tsStyle);
+
+  // The directory row synthesized from 'src/util.ts' keeps a real codicon glyph — not a mask icon.
+  const dirRow = treeRow(page, 'src');
+  await expect(dirRow.locator('.codicon-folder, .codicon-folder-opened')).toHaveCount(1);
+  await expect(dirRow.locator('.node-icon[style*="mask-image"]')).toHaveCount(0);
 });

@@ -71,20 +71,28 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, 'database:kira_test/schema:app');
 }
 
-function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api') {
+function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api' | 'git') {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
-test('mode switch — two mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
+test('mode switch — three mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  // 1. two mode tabs, Studio active by default.
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(2);
+  // 1. three mode tabs (P67b §4.1: Git joins as a peer of Studio/Api), Studio active by default.
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
+  await expect(modeTab(page, 'git')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="project-panel"]')).toContainText('Connections');
+  // The Git tab activates like any other — with no repository ever opened it lands on the Git
+  // module's own empty state (repo/GitStart.vue), not a boot error.
+  await modeTab(page, 'git').click();
+  await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="git-start"]')).toBeVisible();
+  await modeTab(page, 'studio').click();
+  await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
 
   // Build a real Studio tab with non-default state (page size 1000) to prove it survives.
   await createAndConnect(page);
@@ -262,7 +270,7 @@ async function inkBounds(
 
 async function modeTabInk(
   page: Page,
-  mode: 'studio' | 'api',
+  mode: 'studio' | 'api' | 'git',
 ): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
   const tab = modeTab(page, mode);
   const iconBoxLocator = tab.locator('.icon-box');
@@ -291,13 +299,16 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
 
   const studio = await modeTabInk(page, 'studio');
   const api = await modeTabInk(page, 'api');
+  // P67b §4.3/§9: Git is a third real .mode-tab now (icon 'source-control', the same glyph the
+  // former per-repo tabs used) — the same ink guard applies to it, not just Studio/Api.
+  const git = await modeTabInk(page, 'git');
 
   // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not
   // merely inferred from the font's stated design grid. Before D6 (a 13px glyph in a 16px box)
   // this sandbox's own headless-Chromium render measures a 4px inset on "database" alone, purely
   // from the box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at
   // native size that mismatch is gone and only the glyph's own (smaller) bearing remains.
-  for (const { iconRightInset } of [studio, api]) {
+  for (const { iconRightInset } of [studio, api, git]) {
     expect(iconRightInset).toBeLessThanOrEqual(3.5);
   }
 
@@ -306,7 +317,7 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   // A generous tolerance: F9(b)'s own residual is sub-pixel on the two words this app actually
   // renders ("Studio" has no descender, "Api" does — a real, permanent, per-word difference in
   // ink extent that a shared line-height can't and shouldn't erase).
-  for (const { iconCentreY, labelCentreY } of [studio, api]) {
+  for (const { iconCentreY, labelCentreY } of [studio, api, git]) {
     expect(Math.abs(iconCentreY - labelCentreY)).toBeLessThanOrEqual(1.5);
   }
 

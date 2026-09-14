@@ -271,8 +271,10 @@ export async function hydrateTabs(): Promise<void> {
 // brings its mode forward", generalised to every workspace), which is a no-op when the caller is
 // already there. Goes through activateWorkspace (state/workspace.ts), not a direct modeState write
 // — so a studio/api tab activated this way is eventually persisted exactly like a mode-tab click
-// is, and a repo tab activated this way brings its own workspace forward without touching
-// modeState.active at all (§4.2).
+// is. P67b §4.2: a repo tab activated this way now ALSO brings the Git module forward
+// (activateWorkspace persists 'git' via setModule) — the behaviour change that makes clicking a
+// repo file tab from anywhere (Quick Open, a restored session's own pinned graph tab) switch the
+// title bar to Git, not just the workspace underneath it.
 function setActiveTabId(id: string, key: WorkspaceKey): void {
   for (const t of tabsState.tabs) {
     if (workspaceKeyOf(t) === key) t.active = t.id === id;
