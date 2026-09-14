@@ -98,6 +98,34 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   a scratch file created, indexed, edited without a resync, and deleted) both behaved exactly as
   designed. One non-trivial finding, logged below and left open per process.
 
+- **P64b (planning)**: the server was `ConnectionRefused` at session start, same as every prior
+  entry. Started it per the headless steps. The existing hashed token under `/root/.kira-studio/`
+  cannot be read back, and deleting it would have broken the concurrently-running P64 agent's own
+  registration, so this session pointed `KIRA_HOME` at a scratchpad directory instead to mint a
+  fresh token against an isolated index — a cleaner workaround than remint-and-break, worth
+  recording. One nit: the server does not create `KIRA_HOME` if the directory is absent; it exits
+  with `mcpauth: write …: no such file or directory`. `mkdir -p` first. Trivial, no fix filed.
+
+- **P64b (planning)**: the tool answers themselves were correct in every call made. The three
+  wrong-looking answers (`CodeConnect`, `PaginationKeyset`, `ErrStreamFull` all "not found") are
+  this phase's own subject, already logged as the P64b SPEC row, so they are not a new entry.
+
+- **P64b (implementation)**: same `ConnectionRefused`/leftover-orphaned-process pattern as every
+  entry above — killed live servers **by PID**, deleted the stale hashed token file, restarted to
+  mint a fresh bearer token, used it over plain HTTP/JSON-RPC throughout (twice — once per rebuild,
+  since query text changes retrigger the fingerprint check and a full reindex, §1.9). Real
+  navigation work used the server continuously while verifying: §2.10's full table plus the
+  mandatory dedicated dogfood pass — `find_definition`/`read_symbol` on a Go const inside a grouped
+  block (`CodeAuth`, correctly scoped to its own line, not the enclosing `const ( … )`) and on a Go
+  `var` sentinel (`ErrPathEscapesRoot` — turned out to be a genuine 3-way cross-package name
+  collision, `codeworkspace`/`gitsession`/`pathsafe` each declaring their own; correctly returned as
+  a full ambiguous candidate list with a source line under each, not a silent top-hit guess);
+  `outline_file` on `errors.go` (25 nodes) and `build.mjs` (19 nodes); `search_symbols` with
+  `kinds:["constant"]` (the eight Go `ErrorCode` constants, `pathPrefix`-scoped) and
+  `kinds:["variable"]` (28 matches for `Err`, correctly including both production sentinels and the
+  new golden-fixture ones). No non-trivial finding in P64b's own new surface — every call returned
+  the expected, correctly-scoped result.
+
 ### Non-trivial
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
