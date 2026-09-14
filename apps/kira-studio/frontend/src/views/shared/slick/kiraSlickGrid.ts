@@ -190,12 +190,12 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  regardless. Unlike `ancestorScrollHandler`, nothing guarantees a pre-`super()`-return write
    *  actually happens here, so the constructor below (post-`super()`) nullish-assigns a real default
    *  to each field — `??=`, never `=`, so it still can't clobber a genuine early write. */
-  private declare chaseHandle: number;
-  private declare chaseWanted: boolean;
+  declare private chaseHandle: number;
+  declare private chaseWanted: boolean;
   /** P22 iter2-onset D2 — `scrollEventSeq()` as of the previous chase callback, or -1 for "this is
    *  the first callback of a chain, there is nothing to compare against yet". Finding 5: `declare`d
    *  alongside `chaseHandle`/`chaseWanted` above, same reasoning. */
-  private declare chaseSeenSeq: number;
+  declare private chaseSeenSeq: number;
 
   /** A7/P21 round 1 — `getRenderedRange`'s own average-column-width divisor, below, used to be an
    *  O(cols) `reduce` on *every* render call; cached here and only recomputed when the columns
@@ -205,9 +205,9 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  `getRenderedRange` can run *during* `super()` (via `init()` -> `resizeCanvas()` -> `render()`,
    *  this file's own documented call path), so a plain initializer would clobber a write made
    *  before it runs. */
-  private declare avgColumnWidthCache: number;
-  private declare avgColumnWidthColumns: unknown;
-  private declare avgColumnWidthDirty: boolean;
+  declare private avgColumnWidthCache: number;
+  declare private avgColumnWidthColumns: unknown;
+  declare private avgColumnWidthDirty: boolean;
 
   // Finding 5 — forwards to `SlickGrid`'s own constructor unchanged (this class has no constructor
   // params of its own), then nullish-defaults the three `declare`d fields above: `??=` rather than
@@ -335,7 +335,7 @@ export class KiraSlickGrid extends SlickGrid<RowHandle, Column<any>> {
    *  Confirmed empirically: without `declare`, `this.ancestorScrollHandler` is `null` immediately
    *  after `super()` returns even though `bindAncestorScrollEvents()` just set it; with `declare`,
    *  it holds the real handler. */
-  private declare ancestorScrollHandler: ((e: Event) => void) | null;
+  declare private ancestorScrollHandler: ((e: Event) => void) | null;
 
   override bindAncestorScrollEvents(): void {
     const handler = (e: Event): void => {
