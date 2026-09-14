@@ -119,6 +119,15 @@ else
   fail "version files missing" "$VSCODE_PKG or $CONFIG_YML not found — this check needs updating along with it"
 fi
 
+# --- S10: the update check reads release metadata only — it never downloads an artifact --------
+# P66's own "no silent auto-update" premise made checkable: the update-availability banner reads
+# GitHub's releases/latest JSON and opens the release's own web page — nothing under apps/ or
+# packages/ may reference downloading a release asset, which is what a later phase would need to
+# turn this into a real (silent) auto-updater.
+if grep -rnE 'browser_download_url|releases/download' apps/ packages/ >/dev/null 2>&1; then
+  fail "release asset download present" "apps/ or packages/ references a release asset download; P66 ships an availability banner only"
+fi
+
 # --- S5: the packaging script cannot publish ---------------------------------------------------
 # A POSIX `sed` read, not `node -p require(...)`: this repository does not declare `node` as a
 # dependency anywhere (P58f deleted the vendored runtime), so a machine that satisfies every
