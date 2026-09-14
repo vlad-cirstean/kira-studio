@@ -55,6 +55,28 @@ export function cssVar(name: string, fallback: string): string {
   return expandHexShorthand(value || fallback);
 }
 
+// P60a §4.4/dogfooding: `fixedOverflowWidgets: true` alone does NOT reparent a hover/suggest
+// widget to `document.body` — verified against the pinned 0.56.0's own `view.js` (`appendChild`
+// under `this.domNode`, i.e. the editor's own root, whenever no `overflowWidgetsDomNode` is given).
+// `position: fixed` still escapes an ancestor's `overflow: hidden` *visually*, but a widget stays a
+// literal DOM descendant of `MonacoHost`'s own root — which the api-ui-consistency spec's own
+// `el.closest('.request-pane') === null` (etc.) checks require to be false. One body-level
+// container, shared by every `MonacoHost` instance (matching how VS Code itself wires this), is
+// what actually reparents — created lazily, once, memoised the same way `loadMonaco()` is.
+let overflowContainer: HTMLElement | undefined;
+
+/** The one shared `overflowWidgetsDomNode` every `MonacoHost.vue` instance passes — every hover/
+ *  suggest widget from every editor on the page ends up here, under `document.body`, regardless of
+ *  which pane created it. */
+export function overflowWidgetsContainer(): HTMLElement {
+  if (!overflowContainer) {
+    overflowContainer = document.createElement('div');
+    overflowContainer.className = 'kira-editor-overflow-widgets';
+    document.body.appendChild(overflowContainer);
+  }
+  return overflowContainer;
+}
+
 /** Loads monaco-editor's chunk exactly once, wires the worker and defines the theme on first
  *  load — every subsequent call reuses the same resolved module. */
 export function loadMonaco(): Promise<MonacoModule> {

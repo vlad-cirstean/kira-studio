@@ -194,6 +194,14 @@ async function buildMergeView(): Promise<void> {
     scrollBeyondLastLine: false,
   });
   diffEditor.setModel({ original: originalModel, modified: modifiedModel });
+  // tests/ui's own text-reading seam (P60a §9.1/OQ-3) — both models are static once created (this
+  // dialog never edits them), so a one-time attribute set here (rather than a change listener,
+  // MonacoHost.vue's own approach) is enough. The diff editor's two sides are plain Monaco
+  // sub-editors, not a MonacoHost mount, so they carry no `data-kira-editor-text` of their own.
+  if (__KIRA_DEBUG_HOOKS__ && mergeHostRef.value) {
+    mergeHostRef.value.setAttribute('data-kira-diff-original-text', originalModel.getValue());
+    mergeHostRef.value.setAttribute('data-kira-diff-modified-text', modifiedModel.getValue());
+  }
 }
 
 watch(

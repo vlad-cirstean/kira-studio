@@ -10,7 +10,12 @@ import type { EditorCompletionKind, EditorCompletionSource } from './completion'
 import type { ConsoleDiagnostic } from './diagnostics';
 import type { ConsoleHoverInfo } from './hover';
 import type { EditorLanguageId } from './languages';
-import { KIRA_EDITOR_THEME, loadMonaco, type MonacoModule } from './monaco';
+import {
+  KIRA_EDITOR_THEME,
+  loadMonaco,
+  type MonacoModule,
+  overflowWidgetsContainer,
+} from './monaco';
 import { monacoLanguageIdFor } from './monacoLanguages';
 import type { RangeHighlight } from './variableHighlight';
 
@@ -303,6 +308,11 @@ function applyBaseOptions(): ConstructionOptions {
     folding: false,
     glyphMargin: false,
     fixedOverflowWidgets: true,
+    // §4.4/dogfooding: `fixedOverflowWidgets` alone keeps a widget a DOM descendant of this host
+    // (only escaping ancestor `overflow: hidden` visually, via `position: fixed`) — this is what
+    // actually reparents it to `document.body`, matching capability 20's own requirement and
+    // `CodeMirrorHost.vue`'s old `tooltips({ parent: document.body })`.
+    overflowWidgetsDomNode: overflowWidgetsContainer(),
     wordWrap: resolveWordWrap(),
     autoSurround: 'never', // §4.6: this host's own onKeyDown handler owns wrap-on-type instead.
     autoClosingBrackets: props.autoCloseBrackets ? 'languageDefined' : 'never',
@@ -579,25 +589,29 @@ watch(
   background: var(--kira-search-match-current);
 }
 
-/* §4.4: the hover widget's value/caption split — `theme.ts:200,213`'s own two registers. */
-.monaco-host :deep(.monaco-hover) {
+/* §4.4/dogfooding: the hover widget's value/caption split — `theme.ts:200,213`'s own two
+   registers, ported here. `:global()`, not `:deep()` — `overflowWidgetsDomNode`
+   (`editor/monaco.ts`) reparents every hover/suggest widget from every MonacoHost instance to one
+   shared `document.body`-level container, so they are never a DOM descendant of `.monaco-host` to
+   scope a selector against. */
+:global(.monaco-hover) {
   z-index: var(--kira-z-tooltip);
 }
 
-.monaco-host :deep(.monaco-hover .hover-contents pre) {
+:global(.monaco-hover .hover-contents pre) {
   background-color: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius-sm);
   padding: 4px 6px;
 }
 
-.monaco-host :deep(.monaco-hover .hover-contents p) {
+:global(.monaco-hover .hover-contents p) {
   font-family: var(--kira-font-ui);
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-muted);
 }
 
-.monaco-host :deep(.suggest-widget) {
+:global(.suggest-widget) {
   z-index: var(--kira-z-tooltip);
 }
 </style>
