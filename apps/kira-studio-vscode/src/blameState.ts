@@ -2,8 +2,13 @@
  * P5 — the pure algebra beneath `blameWidget.ts`'s own `vscode`-facing controller, the same split
  * `reviewMarking.ts`/`reviewRanges.ts` already establish for a different feature: no `vscode`
  * import, importable and testable with plain `bun test`.
+ *
+ * P62 D2: `blameAge` (this file's former local copy of `formatRelativeDate`) is retired — the
+ * function now lives in `@kira/git-core`, which this host bundle already imports
+ * (`blameWidget.ts`'s own `nfcPath`), so the reason for the copy (git-ui's barrel pulling Vue into
+ * an extension-host bundle) never applied here.
  */
-import { blameAge } from './blameAge.ts';
+import { formatRelativeDate } from '@kira/git-core';
 
 /** The sentinel `porcelain.UncommittedBlameSHA`/`blame.line`'s own wire result use for a line
  *  whose content isn't in any commit yet (an unstaged, on-disk edit) — mirrored here as the
@@ -61,5 +66,5 @@ export function blameStatusText(
   state: Extract<BlameDisplayState, { kind: 'resolved' }>,
   nowMs?: number,
 ): string {
-  return `${state.author}, ${blameAge(state.authorTimeSeconds, nowMs)}`;
+  return `${state.author}, ${formatRelativeDate(state.authorTimeSeconds, nowMs)}`;
 }
