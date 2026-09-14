@@ -114,19 +114,26 @@ type SymbolSearch struct {
 	Substring bool
 	Kinds     []string
 	Languages []string
-	Limit     int // default 50, max 200
+	// PathPrefix additionally narrows to files whose path starts with this (P64 §4.1) — Languages
+	// cannot separate a monorepo's several same-language trees; empty means no filter.
+	PathPrefix string
+	Limit      int // default 50, max 200
 }
 
 // FileSearch configures SearchFiles — a substring match over a repository's own file paths.
 type FileSearch struct {
-	Text  string
-	Limit int // default 50, max 200
+	Text string
+	// PathPrefix additionally narrows to paths starting with this (P64 §4.1) — empty means no
+	// filter.
+	PathPrefix string
+	Limit      int // default 50, max 200
 }
 
 // FileHit is one SearchFiles result.
 type FileHit struct {
-	Path     string
-	Language string
+	Path      string
+	Language  string
+	LineCount int // P64 §4.2 — printed by renderFileSearch, previously read and discarded
 }
 
 // Node is one Outline entry — a file's definition tree without the file's bytes, the

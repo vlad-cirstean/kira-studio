@@ -45,10 +45,15 @@ func (g *Graph) SearchSymbols(ctx context.Context, s SymbolSearch) ([]Target, er
 		pattern += "%"
 	}
 
+	pathPattern := ""
+	if s.PathPrefix != "" {
+		pathPattern = escapeLike(s.PathPrefix) + "%"
+	}
+
 	// Overfetch ahead of Go-side ranking: SQL's own ORDER BY (name, path, start_byte) is not the
 	// rank this function promises, so the candidate set feeding that rank needs to be wider than
 	// the final limit.
-	hits, err := g.store.SearchSymbols(ctx, g.repoID, pattern, s.Kinds, s.Languages, limit*5)
+	hits, err := g.store.SearchSymbols(ctx, g.repoID, pattern, s.Kinds, s.Languages, pathPattern, limit*5)
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +109,12 @@ func less(a, b codeindex.SymbolHit, needle string) bool {
 func (g *Graph) SearchFiles(ctx context.Context, s FileSearch) ([]FileHit, error) {
 	limit := clampLimit(s.Limit)
 	pattern := "%" + escapeLike(s.Text) + "%"
+	pathPattern := ""
+	if s.PathPrefix != "" {
+		pathPattern = escapeLike(s.PathPrefix) + "%"
+	}
 
-	rows, err := g.store.SearchFiles(ctx, g.repoID, pattern, limit*5)
+	rows, err := g.store.SearchFiles(ctx, g.repoID, pattern, pathPattern, limit*5)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +137,7 @@ func (g *Graph) SearchFiles(ctx context.Context, s FileSearch) ([]FileHit, error
 
 	out := make([]FileHit, len(rows))
 	for i, r := range rows {
-		out[i] = FileHit{Path: r.Path, Language: r.Language}
+		out[i] = FileHit{Path: r.Path, Language: r.Language, LineCount: r.LineCount}
 	}
 	return out, nil
 }

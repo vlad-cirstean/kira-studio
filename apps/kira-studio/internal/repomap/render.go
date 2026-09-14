@@ -166,7 +166,7 @@ func renderFileSearch(query string, hits []codegraph.FileHit) string {
 	b.WriteString(fmt.Sprintf(" matching %q", query))
 	for _, h := range hits {
 		b.WriteByte('\n')
-		b.WriteString(fmt.Sprintf("%s  %s", h.Path, h.Language))
+		b.WriteString(fmt.Sprintf("%s  %s  %d", h.Path, h.Language, h.LineCount))
 	}
 	return b.String()
 }

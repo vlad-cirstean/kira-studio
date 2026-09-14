@@ -264,6 +264,7 @@ type searchSymbolsArgs struct {
 	Substring  bool     `json:"substring,omitempty" jsonschema:"Match query anywhere in the name, not just as a prefix."`
 	Kinds      []string `json:"kinds,omitempty" jsonschema:"Restrict to these symbol kinds, e.g. function, method, class."`
 	Languages  []string `json:"languages,omitempty" jsonschema:"Restrict to these languages."`
+	PathPrefix string   `json:"pathPrefix,omitempty" jsonschema:"Restrict to files whose path starts with this — narrows a monorepo's several same-language trees that languages alone can't separate."`
 	Limit      int      `json:"limit,omitempty" jsonschema:"Max results. Default 30, max 200."`
 	OmitSource bool     `json:"omitSource,omitempty" jsonschema:"Omit the source line printed under each hit. Default false — each hit is followed by its own line of code, indented."`
 }
@@ -282,7 +283,8 @@ func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in s
 	}
 	limit := clamp(in.Limit, searchSymbolsDefaultLimit, searchSymbolsMaxLimit)
 	targets, err := s.graph.SearchSymbols(ctx, codegraph.SymbolSearch{
-		Text: in.Query, Substring: in.Substring, Kinds: in.Kinds, Languages: in.Languages, Limit: limit,
+		Text: in.Query, Substring: in.Substring, Kinds: in.Kinds, Languages: in.Languages,
+		PathPrefix: in.PathPrefix, Limit: limit,
 	})
 	if err != nil {
 		return nil, nil, err
@@ -294,8 +296,9 @@ func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in s
 // --- search_files ---
 
 type searchFilesArgs struct {
-	Query string `json:"query" jsonschema:"Substring to search for in indexed file paths — not a fuzzy finder."`
-	Limit int    `json:"limit,omitempty" jsonschema:"Max results. Default 30, max 200."`
+	Query      string `json:"query" jsonschema:"Substring to search for in indexed file paths — not a fuzzy finder."`
+	PathPrefix string `json:"pathPrefix,omitempty" jsonschema:"Restrict to files whose path starts with this."`
+	Limit      int    `json:"limit,omitempty" jsonschema:"Max results. Default 30, max 200."`
 }
 
 const (
@@ -311,7 +314,7 @@ func (s *Server) searchFiles(ctx context.Context, _ *mcp.CallToolRequest, in sea
 		return errResult("query is required")
 	}
 	limit := clamp(in.Limit, searchFilesDefaultLimit, searchFilesMaxLimit)
-	hits, err := s.graph.SearchFiles(ctx, codegraph.FileSearch{Text: in.Query, Limit: limit})
+	hits, err := s.graph.SearchFiles(ctx, codegraph.FileSearch{Text: in.Query, PathPrefix: in.PathPrefix, Limit: limit})
 	if err != nil {
 		return nil, nil, err
 	}

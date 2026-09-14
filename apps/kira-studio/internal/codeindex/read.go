@@ -254,10 +254,11 @@ type SymbolHit struct {
 // SearchSymbols runs pattern — a caller-built SQL LIKE pattern (e.g. "name%" for a prefix search,
 // "%name%" for a substring one), with any literal `%`/`_`/`\` in the user's own text already
 // escaped by the caller and matched via `ESCAPE '\'` — against symbol_name's own (repo_id, name)
-// index, optionally narrowed to kinds/languages, ordered by name then path for determinism, capped
-// at limit. Ranking beyond that (exact match first, then prefix, then position, §4.3) is
-// codegraph's own job over this result set, not SQL's.
-func (s *Store) SearchSymbols(ctx context.Context, repoID, pattern string, kinds, languages []string, limit int) ([]SymbolHit, error) {
+// index, optionally narrowed to kinds/languages/pathPattern (P64 §4.1: same caller-built LIKE
+// pattern convention as pattern itself; empty means no filter), ordered by name then path for
+// determinism, capped at limit. Ranking beyond that (exact match first, then prefix, then
+// position, §4.3) is codegraph's own job over this result set, not SQL's.
+func (s *Store) SearchSymbols(ctx context.Context, repoID, pattern string, kinds, languages []string, pathPattern string, limit int) ([]SymbolHit, error) {
 	db, err := s.conn()
 	if err != nil {
 		return nil, err
@@ -280,6 +281,10 @@ func (s *Store) SearchSymbols(ctx context.Context, repoID, pattern string, kinds
 		for _, l := range languages {
 			args = append(args, l)
 		}
+	}
+	if pathPattern != "" {
+		query += ` AND f.path LIKE ? ESCAPE '\'`
+		args = append(args, pathPattern)
 	}
 	query += ` ORDER BY sy.name, f.path, sy.start_byte LIMIT ?`
 	args = append(args, limit)
@@ -317,17 +322,26 @@ func (s *Store) SearchSymbols(ctx context.Context, repoID, pattern string, kinds
 }
 
 // SearchFiles runs pattern (same LIKE-pattern convention as SearchSymbols) against file.path,
-// ordered by path, capped at limit.
-func (s *Store) SearchFiles(ctx context.Context, repoID, pattern string, limit int) ([]FileRow, error) {
+// optionally additionally narrowed to pathPattern (P64 §4.1: empty means no filter — a second
+// independent LIKE clause, not a rewrite of pattern itself, since search_files' own query is
+// already a substring match over the same column), ordered by path, capped at limit.
+func (s *Store) SearchFiles(ctx context.Context, repoID, pattern, pathPattern string, limit int) ([]FileRow, error) {
 	db, err := s.conn()
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.QueryContext(ctx, `
+	query := `
 		SELECT id, repo_id, path, language, size_bytes, mtime_unix_ns, content_sha,
 		       parse_status, has_error, line_count, parsed_at
-		FROM file WHERE repo_id = ? AND path LIKE ? ESCAPE '\'
-		ORDER BY path LIMIT ?`, repoID, pattern, limit)
+		FROM file WHERE repo_id = ? AND path LIKE ? ESCAPE '\'`
+	args := []any{repoID, pattern}
+	if pathPattern != "" {
+		query += ` AND path LIKE ? ESCAPE '\'`
+		args = append(args, pathPattern)
+	}
+	query += ` ORDER BY path LIMIT ?`
+	args = append(args, limit)
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("codeindex: search files: %w", err)
 	}
