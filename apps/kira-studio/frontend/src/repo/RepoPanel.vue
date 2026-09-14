@@ -131,6 +131,7 @@ onUnmounted(() => {
         <RepoReviewView
           v-if="reviewActivatedRepoIds.has(repoId)"
           v-show="view === 'review'"
+          :key="repoId"
           class="repo-tree"
           :repo-id="repoId"
         />
