@@ -66,6 +66,46 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   is not. Kill the server by PID instead. Second, the server picked port 41521 rather than 8765
   while an earlier instance still held 8765; the printed URL is authoritative, so read it from the
   startup output rather than assuming the documented port. Neither is a defect.
+
+- **P63 (implementation, arm A)**: built and started the server for this worktree specifically
+  (`bun run mcp:repo-map:build` then `bun run mcp:repo-map --repo
+  /home/user/kira-studio-p63-arm-a`, backgrounded) — a fresh worktree, no stale token file to clean
+  up first. The index took a genuinely noticeable while to finish its initial sync (`search_symbols`
+  returned "still building (initial sync running past 25s) — retry shortly" on the first two calls,
+  ~30s apart, before succeeding on the third) — not a defect, just slower than P62/P60b's own runs,
+  worth knowing rather than assuming ConnectionRefused-only startup cost. Two real findings, one
+  trivial:
+  - Called `outline_file` with a `path` argument once, out of habit from other tools' own
+    convention — rejected ("unexpected additional properties"; the real parameter is `file`).
+    Trivial, my own mistake, not a tool defect; fixed inline by reading `tools/list`'s own schema
+    as CLAUDE.md already says to.
+  - Confirmed, not newly found: P60a's own note holds exactly — `search_symbols`/`outline_file`/
+    `find_definition`/`read_symbol` return nothing for any `.vue` SFC (tried `EmptyState.vue`,
+    `ViewChrome.vue`; both real components, both zero results), while `search_files` finds the
+    file itself fine. This phase's own work was ~70% `.vue` template/script edits (BrowseView.vue,
+    KeyValuePane.vue extracted from KeyValueView.vue) — for that whole slice the server had nothing
+    to offer beyond confirming a file's existence, and Read/Grep carried it instead.
+
+  Genuine, valuable hits on the Go/shared-TS side, where the actual navigation work happened:
+  `search_symbols` for `BrowseViewRuntime`/`KeyValueViewRuntime` to jump straight to their
+  declarations before editing; `find_references {"symbol":"KeyTypes"}` at the very end, as a sanity
+  check rather than a discovery step — asked it to enumerate every `KeyTypes` method across the
+  codebase after wiring `adapters.Adapter.KeyTypes` through nine stub adapters, redis's real
+  implementation, `Router`, `bridge.TreeService` and `tree.Service`, and it returned exactly the 13
+  expected symbols (the interface method once per adapter kind, plus the four bridge/service
+  layers) with no false positives and nothing missing — a real, if small, win: cheaper and more
+  certain than re-grepping nine files by hand to confirm nothing was skipped.
+
+  Honest accounting for this session as a whole: the large majority of lookups (BrowseView.vue's
+  and KeyValuePane.vue's own structure, ViewChrome/PanelSplitter/VirtualList/EmptyState prop
+  shapes, every state.ts/page.ts/host.ts's exact contents before editing, the Go adapter/bridge
+  files' exact line ranges to anchor edits against) went through direct Read/Grep, not the server —
+  driven by the `.vue`-SFC gap above (this phase's own dominant file type) plus the fact that, once
+  I already had a file open via Read to make an edit, asking the server a second question about
+  content already in context saved nothing. Where it was used (Go/TS symbol lookups, the final
+  cross-file consistency check), it was faster and more certain than the Read/Grep alternative — the
+  P60a gap is the one thing that kept it from being the default for more of this particular phase's
+  work, not a shortcoming in what it does cover.
 - **P64 (planning)**: same `ConnectionRefused` at session start as every entry above, same fix —
   killed the two live servers **by PID** (`pkill` kills the calling shell, per the P63 note),
   deleted both stale hashed token files under `/root/.kira-studio/`, restarted to mint a fresh
