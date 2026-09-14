@@ -56,7 +56,48 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   No fix needed beyond the restart; noted so a future session finds a live-but-orphaned process on
   8765 unsurprising.
 
-_No non-trivial entries._
+- **P63 (planning)**: same `ConnectionRefused` at session start as every entry above, same fix —
+  started the server per the headless steps, deleted the stale hashed token file under
+  `/root/.kira-studio/`, restarted to mint a fresh bearer token, called it over plain
+  HTTP/JSON-RPC. Two notes for a future session. First, `pkill -f mcp-repo-map` /
+  `pkill -f kira-repo-map` **kills the calling shell too** — the pattern matches the agent
+  harness's own command line, so the rest of the compound command (the `rm` of the token file)
+  never runs and the restart then reports the token unchanged, which looks like a server bug and
+  is not. Kill the server by PID instead. Second, the server picked port 41521 rather than 8765
+  while an earlier instance still held 8765; the printed URL is authoritative, so read it from the
+  startup output rather than assuming the documented port. Neither is a defect.
+- **P63 (planning)**: `find_references` did the real work this phase needed and did it well —
+  `openKeyValueTab` returned 13 hits (8 production, 5 test) each with its enclosing function name,
+  and `findKeyValueTab`/`patchKeyValueTabState` returned 7 and 5 production sites, which is what
+  sized the plan's refactor seam. No false positives, no misses against a spot-check.
+
+### Non-trivial
+
+- **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
+  silently resolves to the Go symbol only. OPEN.**
+
+  `search_symbols` and `find_definition` both miss every `export type X = …` alias:
+
+  - `find_definition {"symbol":"BrowseTabState"}` → `no symbol named "BrowseTabState" found`,
+    though it is declared at `packages/shared/domain/tabs.ts:204`.
+  - `search_symbols {"query":"BrowseTab"}` → `no symbols matching "BrowseTab"`, though
+    `BrowseTabState` and `BrowseTabRecord` both exist. Matching is by prefix and works otherwise:
+    `{"query":"browse"}` correctly returns `browseMenuItem`, `browseInvalidate` and
+    `BrowseViewRuntime`, so the alias is genuinely not indexed rather than merely unmatched.
+  - Worse, silently: `find_definition {"symbol":"TreeNode"}` returns **one** definition, the Go
+    struct at `internal/storage/model/tree.go:33`, and never mentions the TypeScript
+    `export type TreeNode = z.infer<typeof treeNodeSchema>` at
+    `packages/shared/domain/tree.ts:96`. A single confident hit reads as "this is the definition",
+    so a frontend question gets answered with a backend type.
+
+  Impact here is real rather than theoretical: this repo derives most of its shared domain types
+  from zod (`z.infer`), so `TreeNode`, `NodeKind`, every `*TabState` and every `*TabRecord` — the
+  exact types a frontend phase navigates by — are invisible. Interfaces (`BrowseViewRuntime`) and
+  functions index correctly, so the gap is specifically TS type-alias declarations.
+
+  Per the process above, not fixed in this phase. P64 waits on a dedicated fix pass. A fix likely
+  needs both halves: index `type_alias_declaration` in the TS/TSX tree-sitter queries, and make a
+  cross-language name collision report every hit rather than the first.
 
 <!--
 Entry template:
