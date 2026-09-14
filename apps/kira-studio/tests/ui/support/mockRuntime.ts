@@ -142,6 +142,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   repoMapRegenerate: 'RepoMapService.Regenerate',
   repoMapInstallClaudeCode: 'RepoMapService.InstallClaudeCode',
 
+  updateStatus: 'UpdateService.Status',
+  updateOpenReleasePage: 'UpdateService.OpenReleasePage',
+
   codeWorkspaceListRepos: 'CodeWorkspaceService.ListRepos',
   codeWorkspaceImportRepo: 'CodeWorkspaceService.ImportRepo',
   codeWorkspaceRenameRepo: 'CodeWorkspaceService.RenameRepo',
@@ -309,6 +312,16 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     probed: [],
     error: '',
   }),
+  // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
+  // no-committed-fixture-will-ever-snapshot-this reasoning as gitVsixStatus/repoMapStatus above.
+  // "no update" is the honest default for a dev-server run under Playwright, which never reports a
+  // tagged release version.
+  [IPC.updateStatus]: JSON.stringify({
+    updateAvailable: false,
+    currentVersion: '0.0.0-dev',
+    latestVersion: '',
+  }),
+  [IPC.updateOpenReleasePage]: 'null',
   // C5: main.ts's bootstrap() joins hydrateCodeRepos() to the same unconditional-every-boot
   // Promise.all as hydrateGitClients()/hydrateRepoMap() above, same reasoning — a spec that never
   // imports a repository gets "nothing imported yet", not a fixture miss.

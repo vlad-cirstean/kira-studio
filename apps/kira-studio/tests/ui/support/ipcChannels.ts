@@ -137,6 +137,9 @@ export const IPC = {
   repoMapRegenerate: 'kira:repomap:regenerate',
   repoMapInstallClaudeCode: 'kira:repomap:installClaudeCode',
 
+  updateStatus: 'kira:update:status',
+  updateOpenReleasePage: 'kira:update:openReleasePage',
+
   codeWorkspaceListRepos: 'kira:codeWorkspace:listRepos',
   codeWorkspaceImportRepo: 'kira:codeWorkspace:importRepo',
   codeWorkspaceRenameRepo: 'kira:codeWorkspace:renameRepo',
