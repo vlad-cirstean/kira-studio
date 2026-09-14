@@ -194,6 +194,20 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   resolved the one real method (`sync.go:138:19`). No non-trivial finding — both calls answered
   correctly on the first try.
 
+- **P67 (planning)**: same `ConnectionRefused`/stale-token pattern as every entry above. One new
+  wrinkle worth recording: `pkill -f kira-repo-map` killed this agent's own shell (exit 144) before
+  its following `rm` ran, leaving a stale token file and a server that then reported "Using this
+  repository's existing token" while the token printed a moment earlier answered `401` — two
+  minutes lost. P63's own note ("kill by PID, not `pkill`") is the fix and now has a second
+  independent confirmation. Also: start the server with `setsid nohup … & disown`, since a plain
+  background job dies with the agent's shell. Tool answers themselves were correct on every call:
+  `find_references {"symbol":"foreignKeyNavItems"}` returned exactly the two real call sites
+  (`views/grid/menu.ts:200`, `views/grid/slick/rowValues.ts:267`), both verified by direct read;
+  `search_symbols {"query":"requestReveal"}` returned both real declarations. Note for a future
+  session, not a defect: `find_definition`/`find_references` take `symbol`, not `name` — a `name`
+  argument is rejected with a clear schema-validation error rather than a wrong answer, which is
+  the right behavior. No non-trivial finding.
+
 ### Non-trivial
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go
