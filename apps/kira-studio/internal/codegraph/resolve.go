@@ -171,6 +171,25 @@ func commonPrefixLen(a, b string) int {
 	return i
 }
 
+// languageFamily groups languages that can genuinely define one another's names (P64 §2.4). A name
+// shared across two families is a collision, not a resolution — rank the referring file's own
+// family first rather than letting commonPrefixLen decide by directory accident.
+var languageFamily = map[string]string{
+	"javascript": "js", "typescript": "js", "tsx": "js", "vue": "js", "svelte": "js", "html": "js",
+	"go": "go", "java": "java", "python": "python", "rust": "rust",
+}
+
+// sameLanguageFamily reports whether candidateLanguage is in the same family as refLanguage. A
+// no-op (always true) when refLanguage is absent from languageFamily (css/json and the like), so
+// nothing outside the symbol-bearing language set changes behaviour.
+func sameLanguageFamily(refLanguage, candidateLanguage string) bool {
+	refFamily, ok := languageFamily[refLanguage]
+	if !ok {
+		return true
+	}
+	return languageFamily[candidateLanguage] == refFamily
+}
+
 func minTier(cands []candidate) int {
 	best := 2
 	for _, c := range cands {
@@ -211,6 +230,13 @@ func sortCandidates(cands []candidate, refKind, language, refPath string) {
 		}
 		if ka, kb := kindCompatible(refKind, a.sym.Kind), kindCompatible(refKind, b.sym.Kind); ka != kb {
 			return ka
+		}
+		// P64 §2.4: a same-family candidate ranks ahead of a cross-language name collision — a
+		// demotion, never a filter (both candidates still come back), placed below kindCompatible
+		// (what a reference syntactically *is* outranks which half of a polyglot repo it lives in)
+		// and above basenameMatches/commonPrefixLen (path heuristics, not a hard language fact).
+		if fa, fb := sameLanguageFamily(language, a.file.Language), sameLanguageFamily(language, b.file.Language); fa != fb {
+			return fa
 		}
 		if ba, bb := basenameMatches(language, refKind, a), basenameMatches(language, refKind, b); ba != bb {
 			return ba

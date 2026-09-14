@@ -285,6 +285,39 @@ func TestResolverJSBasenameRule(t *testing.T) {
 	})
 }
 
+// TestResolverSameLanguageFamilyRule is P64 §2.4/§8.2: a TreeNode-shaped fixture — a Go struct and
+// a TypeScript type alias share one name, and the Go file's own path shares a longer prefix with
+// the referring TypeScript file than the TypeScript candidate's own path does. Without the
+// language-family tiebreak, commonPrefixLen (rule 6) would rank the Go struct first purely on
+// directory accident; the fix ranks the same-family (TypeScript) candidate first instead, while
+// still returning both — a demotion, never a filter.
+func TestResolverSameLanguageFamilyRule(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	fileRef := seedFile(t, store, "src/frontend/caller.ts", "typescript", nil, nil, nil)
+	seedFile(t, store, "src/frontend/model/tree.go", "go", nil, []codeparse.Symbol{
+		sym("type", "TreeNode", 0, 0, 20, 5, -1),
+	}, nil)
+	seedFile(t, store, "domain/tree.ts", "typescript", nil, []codeparse.Symbol{
+		sym("type", "TreeNode", 0, 0, 20, 5, -1),
+	}, nil)
+
+	cands, _, err := g.resolveName(ctx, "TreeNode", nil, bareSite(fileRef, "type"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cands) != 2 {
+		t.Fatalf("want both candidates returned (a demotion, not a filter), got %+v", cands)
+	}
+	if cands[0].file.Path != "domain/tree.ts" {
+		t.Fatalf("want the same-family TypeScript candidate ranked first despite the Go file's longer path prefix, got %+v", cands)
+	}
+	if cands[1].file.Path != "src/frontend/model/tree.go" {
+		t.Fatalf("want the Go candidate still present, second, got %+v", cands)
+	}
+}
+
 func TestResolverKindDemotion(t *testing.T) {
 	g, store := newTestGraph(t)
 	ctx := context.Background()
