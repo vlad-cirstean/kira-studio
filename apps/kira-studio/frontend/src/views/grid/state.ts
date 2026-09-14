@@ -14,6 +14,7 @@ import {
 } from '../../state/viewCommands';
 import type { Selection } from '../shared/slick/selection';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
+import { clearCellFocus } from './focusRequest';
 import { setPage } from './page';
 import { clearPending, registerFullPrimaryKeyAccessor } from './pendingChanges';
 
@@ -67,9 +68,11 @@ const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen 
 export { runtime, setSearchOpen, toggleSearchOpen };
 
 // D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
-// directly (reality 18), so it registers here instead.
+// directly (reality 18), so it registers here instead. P67 §5.2: also drops that tab's own
+// pending focus request (focusRequest.ts), if any — a request never outlives the tab it targeted.
 registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
+  clearCellFocus(tabId);
 });
 
 // P21 round 2 functional finding 2: pendingChanges.ts already imports clearPending from this
@@ -169,6 +172,10 @@ export async function load(
     if (!superseded && revertPageIndexOnFailure !== undefined) {
       patchDataTabState(tabId, { pageIndex: revertPageIndexOnFailure });
     }
+    // P67 §5.2: a load that produced no page can never satisfy a pending focus request — leaving
+    // it pending would let a *later*, unrelated load consume it and jump somewhere nobody asked
+    // for.
+    clearCellFocus(tabId);
   }
 }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ObjectMeta } from '@shared/domain/tree';
+import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type {
@@ -24,7 +24,7 @@ import {
   type SelectedCell,
 } from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { openContextMenu, runMenuShortcut } from '../../state/contextMenu';
+import { type MenuItem, openContextMenu, runMenuShortcut } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
@@ -54,7 +54,14 @@ import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import { cellMenu, headerMenu, rowMenu } from './menu';
+import FkPreviewPopover from './FkPreviewPopover.vue';
+import {
+  type CellFocusRequest,
+  consumeCellFocus,
+  registerGridHost,
+  unregisterGridHost,
+} from './focusRequest';
+import { cellMenu, type FkNavContext, headerMenu, rowMenu } from './menu';
 import {
   addInsertRow,
   discardCellEdit,
@@ -79,6 +86,7 @@ import {
   type DisplayCellView,
   type NavColumns,
   navColumnsFor,
+  navValuesFor,
   pasteTargetRows,
   rowsForSelection,
   cellNavEntry as rvCellNavEntry,
@@ -513,6 +521,21 @@ function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDa
 
 const rootRef = ref<HTMLElement | null>(null);
 
+// P67 §3/§4.3: the open preview popover for this tab, if any — v-if'd in the template (:2329's
+// root div). A plain ref (not part of `runtime[tabId]`, §4.1's own "never touches runtime" rule):
+// this is purely a transient UI overlay, never persisted, never read by anything outside this file.
+interface FkPreviewOpen {
+  x: number;
+  y: number;
+  entry: ForeignKeyMeta;
+  ctx: FkNavContext;
+  openInNewTab: () => void;
+}
+const fkPreview = ref<FkPreviewOpen | null>(null);
+function closeFkPreview(): void {
+  fkPreview.value = null;
+}
+
 // Never a ref/shallowRef/reactive (CodeMirrorHost.vue's own rule, restated here — D3).
 let grid: KiraSlickGrid | null = null;
 let eventHandler: SlickEventHandler | null = null;
@@ -638,6 +661,10 @@ function velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
 function onViewportScroll(): void {
   const el = viewportEl;
   if (!el) return;
+  // P67 §4.3: the preview popover is anchored to a viewport point over a virtualized row — a
+  // scroll makes that point mean nothing (a different row, maybe no row) — reuses this existing
+  // listener rather than binding a second one to the same element.
+  if (fkPreview.value) closeFkPreview();
   const now = performance.now();
   scrollTrace.noteScrollEvent(el.scrollTop, now);
   window.__kiraGridScrollWorkStart?.(now);
@@ -969,19 +996,71 @@ function placeNavButtonsForRenderedCells(): void {
 // anything of its own; `stopImmediatePropagation` (checked by `handleClick` right after
 // triggering `onClick`, `slick.grid.ts:4611-4614`) is what stops the click from *also* moving the
 // active cell there.
+// P67 §3 (D2): an FK-kind click ('fk' — an outbound edge) now opens the preview popover instead of
+// navigating straight there; a PK-kind click ('pk' — "Referenced by") is untouched (§9: it names
+// *tables*, plural, with no single record to preview). `entry.items` is already the enabled-edges-
+// only list `cellNavEntry` built (disabled edges filtered out); `fkEdgesFor` re-derives the same
+// `meta.foreignKeys` filter `foreignKeyNavItems` uses so each item can be matched back to its raw
+// `ForeignKeyMeta` by id (`go-to-referenced-<fk.name>`, P7 D9's own stable convention) — the popover
+// needs the raw edge (referencedPath/columns), not just the resolved MenuItem.
+function fkEdgesFor(meta: ObjectMeta | null, columnName: string): ForeignKeyMeta[] {
+  return meta?.foreignKeys.filter((fk) => fk.columns.includes(columnName)) ?? [];
+}
+function fkEdgeForItem(edges: ForeignKeyMeta[], item: MenuItem): ForeignKeyMeta | null {
+  if (item.type !== 'item') return null;
+  return edges.find((fk) => `go-to-referenced-${fk.name}` === item.id) ?? null;
+}
+
 function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
   if (!e.target?.closest('.cell-nav-btn')) return;
   e.stopImmediatePropagation();
   const entry = navEntryAt(args.row, args.cell);
   if (!entry) return;
-  // D6: exactly one candidate navigates immediately; more than one opens the same ContextMenu
-  // popup the right-click cell menu uses, anchored at the click — onCellNavClick's body, verbatim.
+  const native = e.getNativeEvent<MouseEvent>();
+
+  if (entry.kind === 'fk') {
+    const order = currentOrder();
+    const columnName = order[args.cell - 1] ?? '';
+    const handle = dataSource?.getItem(args.row);
+    const meta = rt()?.meta ?? null;
+    const connectionId = tab()?.connectionId ?? null;
+    if (handle === undefined || !connectionId) return;
+    const ctx: FkNavContext = {
+      connectionId,
+      dialect: currentDialect(),
+      rowValues: navValuesFor(props.tabId, getPage(props.tabId), order, navColumns, handle.row),
+    };
+    const edges = fkEdgesFor(meta, columnName);
+    const openPreview = (fk: ForeignKeyMeta, openInNewTab: () => void): void => {
+      fkPreview.value = { x: native.clientX, y: native.clientY, entry: fk, ctx, openInNewTab };
+    };
+    // D6/§3: exactly one candidate opens the preview directly; more than one opens the same
+    // ContextMenu popup the right-click cell menu uses, but each item now opens the preview for
+    // its own edge rather than navigating (§3's own "no capability lost" — the popover's own
+    // "Open in new tab" is that item's original navigateForeignKey run, one click further in).
+    if (entry.items.length === 1) {
+      const item = entry.items[0];
+      const fk = item ? fkEdgeForItem(edges, item) : null;
+      if (item?.type === 'item' && fk) openPreview(fk, () => void item.run());
+      return;
+    }
+    const previewItems: MenuItem[] = entry.items.map((item) => {
+      const fk = fkEdgeForItem(edges, item);
+      if (item.type !== 'item' || !fk) return item;
+      return { ...item, run: () => openPreview(fk, () => void item.run()) };
+    });
+    openContextMenu(native, previewItems);
+    return;
+  }
+
+  // kind === 'pk' ("Referenced by") — unchanged (§9): exactly one candidate navigates immediately;
+  // more than one opens the same ContextMenu popup the right-click cell menu uses.
   if (entry.items.length === 1) {
     const only = entry.items[0];
     if (only?.type === 'item') void only.run();
     return;
   }
-  openContextMenu(e.getNativeEvent<MouseEvent>(), entry.items);
+  openContextMenu(native, entry.items);
 }
 
 function currentWidths(): Record<string, number> {
@@ -1335,6 +1414,33 @@ function startEditCell(row: number, displayCol: number): void {
   const pos = displayPositionOf(idx, row);
   grid.setActiveCell(pos, displayCol + 1, false, false, true);
   grid.editActiveCell();
+}
+
+// P67 §5.3: this tab's own `focusRequest.ts` registry entry — registered in onMounted, called
+// either immediately by `requestCellFocus` (a host already mounted with a matching page) or from
+// the `pageVersion` watch below once a fresh, filtered page lands. `startEditCell` above already
+// does `setActiveCell` + `editActiveCell` and is self-gating (`onBeforeEditCell`'s own veto) — no
+// second editability rule is introduced here (§9's own non-goal).
+function applyCellFocusRequest(req: CellFocusRequest): boolean {
+  const p = getPage(props.tabId);
+  if (!grid || !p || req.row >= p.rowCount) return false;
+  const order = currentOrder();
+  let displayCol = 0;
+  for (let i = 0; i < order.length; i++) {
+    const pageCol = pageColumnIndexFor(p, order, i);
+    const col = pageCol >= 0 ? p.columns[pageCol] : undefined;
+    if (col && !col.isPrimaryKey) {
+      displayCol = i;
+      break;
+    }
+  }
+  if (req.edit) {
+    startEditCell(req.row, displayCol);
+  } else {
+    const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
+    grid.setActiveCell(displayPositionOf(idx, req.row), displayCol + 1, false, false, true);
+  }
+  return true;
 }
 
 // §5 D8 — exactly `startEdit`'s own guards (DataGrid.vue:810-818 mirror: not writable, row
@@ -1989,11 +2095,18 @@ onMounted(() => {
     grid?.resizeCanvas();
   });
   resizeObserver.observe(el);
+
+  // P67 §5.2/§5.3: registers this tab's own focus-request apply — a pending
+  // editReferencedRow()-driven request (menu.ts) may already be waiting for this exact tab.
+  registerGridHost(props.tabId, applyCellFocusRequest);
 });
 
 onUnmounted(() => {
   // Order matters (§6 D3): stop everything that could still fire into a half-torn-down grid before
   // tearing it down.
+  // P67 §4.3: an open preview popover has nothing left to anchor to once this host is gone.
+  closeFkPreview();
+  unregisterGridHost(props.tabId);
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
@@ -2049,6 +2162,11 @@ watch(
     grid.render();
     syncSortIndicators();
     refreshSearchLayer();
+    // P67 §5.2: this is exactly when a freshly loaded page is rendered and its columns are built
+    // — the point a pending focus request (a host that wasn't registered yet, or one that was but
+    // had no matching page at request time) can finally be satisfied.
+    const pendingFocus = consumeCellFocus(props.tabId);
+    if (pendingFocus) applyCellFocusRequest(pendingFocus);
   },
 );
 
@@ -2359,5 +2477,15 @@ defineExpose({
         Show all rows
       </AppButton>
     </EmptyState>
+    <FkPreviewPopover
+      v-if="fkPreview"
+      :x="fkPreview.x"
+      :y="fkPreview.y"
+      :entry="fkPreview.entry"
+      :ctx="fkPreview.ctx"
+      :source-tab-id="props.tabId"
+      :open-in-new-tab="fkPreview.openInNewTab"
+      @close="closeFkPreview"
+    />
   </div>
 </template>

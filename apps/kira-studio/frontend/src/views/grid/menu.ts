@@ -11,6 +11,7 @@ import {
   rowsToTsv,
 } from '../shared/clipboardFormats';
 import { quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
+import { requestCellFocus } from './focusRequest';
 import {
   discardRowChange,
   duplicateAsInsert,
@@ -52,8 +53,11 @@ export function nextProjectionAfterHidingColumn(
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
 // discipline SlickGridHost.vue's own qualifiedName() and project/menus.ts's qualifiedNameFor use.
+// P67 §5.1: exported — the preview popover needs the referenced table's display name for its
+// header, and duplicating the decodePath + QUALIFIED_KINDS filter is exactly the drift P7 D9
+// avoided.
 const QUALIFIED_KINDS = new Set(['schema', 'table', 'view', 'matview']);
-function qualifiedNameForPath(connectionId: string, path: string): string {
+export function qualifiedNameForPath(connectionId: string, path: string): string {
   return decodePath(connectionId, path)
     .segments.filter((s) => QUALIFIED_KINDS.has(s.kind))
     .map((s) => s.name)
@@ -72,7 +76,10 @@ export interface FkNavContext {
 // columns, their referencedPath/referencedColumns" convention regardless of which populated them.
 // Returns null (P7 D2) — never an IS NULL clause — when a needed source value is missing or NULL:
 // there is no row to jump to, unlike D5's filter-by-value which treats NULL as a real predicate.
-function foreignKeyValueFilter(
+// P67 §4.1: exported — the preview popover needs this same filter to scope its own tab-free
+// `data.read`, and reuses this builder rather than re-deriving it (one shared builder, §5.1's own
+// "never threaded from the caller" rule applies here too).
+export function foreignKeyValueFilter(
   dialect: SqlDialect | undefined,
   columns: string[],
   referencedColumns: string[],
@@ -101,6 +108,31 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
   if (filter === null) return;
   const { id: tabId } = openDataTab(ctx.connectionId, entry.referencedPath, { newTab: true });
   void setFilter(tabId, filter);
+}
+
+/** P67: the same jump navigateForeignKey performs, then a request to land the caret in the
+ *  related record — the grid tab IS the edit surface (no second editor exists), so "edit the
+ *  related record" is "open it there and select a cell in it".
+ *
+ *  `newTab: true`, same as navigateForeignKey: reusing an existing tab on the same target is
+ *  unsafe — `load()` calls `clearPending(tabId)` unconditionally (state.ts), so re-filtering a
+ *  tab that already holds staged edits would discard them silently. A new tab cannot do that.
+ *
+ *  `await setFilter`, then request focus: `setFilter` resolves only after `load()` has called
+ *  `setPage`, so by the time the request is made, the page in the store is the *filtered* one —
+ *  requesting before the await would risk the target tab's own first, unfiltered mount-load
+ *  consuming it and selecting the wrong record. */
+export async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Promise<void> {
+  const filter = foreignKeyValueFilter(
+    ctx.dialect,
+    entry.columns,
+    entry.referencedColumns,
+    ctx.rowValues,
+  );
+  if (filter === null) return;
+  const { id: tabId } = openDataTab(ctx.connectionId, entry.referencedPath, { newTab: true });
+  await setFilter(tabId, filter);
+  requestCellFocus(tabId, { row: 0, prefer: 'first-non-key', edit: true });
 }
 
 // P7 D9: ids derive from the constraint's own name (unique per table, stable across reloads) —
@@ -134,6 +166,36 @@ export function foreignKeyNavItems(
   return meta.foreignKeys
     .filter((fk) => fk.columns.includes(columnName))
     .map((fk) => fkNavItem('go-to-referenced', fk, ctx));
+}
+
+// P67 §5.1: mirrors fkNavItem above one for one (same disabled predicate, same id convention) so
+// the cell menu's mirror action and the preview popover's own "Edit this record" can never
+// disagree about what's editable.
+function fkEditItem(entry: ForeignKeyMeta, ctx: FkNavContext): MenuItem {
+  const label = qualifiedNameForPath(ctx.connectionId, entry.referencedPath);
+  return {
+    type: 'item',
+    id: `edit-referenced-${entry.name}`,
+    label: `Edit referenced row (${label})`,
+    icon: 'edit',
+    disabled:
+      foreignKeyValueFilter(ctx.dialect, entry.columns, entry.referencedColumns, ctx.rowValues) ===
+      null,
+    run: () => void editReferencedRow(entry, ctx),
+  };
+}
+
+// P67 §5.1: mirrors foreignKeyNavItems one for one (same edges) — spliced into cellMenu's own
+// fkItems array right after the nav items (P7 D3's own invariant, now for two actions).
+export function foreignKeyEditItems(
+  columnName: string,
+  meta: ObjectMeta | null,
+  ctx: FkNavContext,
+): MenuItem[] {
+  if (!meta) return [];
+  return meta.foreignKeys
+    .filter((fk) => fk.columns.includes(columnName))
+    .map((fk) => fkEditItem(fk, ctx));
 }
 
 // Flat "<qualified referencing table>.<col(s)>" items, one per meta.referencedBy entry — shown
@@ -198,6 +260,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
   // rowMenu()'s always-present copy-rows submenu below, no extra "anything to show" branch.
   const fkItems = [
     ...foreignKeyNavItems(ctx.columnName, ctx.meta, fkCtx),
+    ...foreignKeyEditItems(ctx.columnName, ctx.meta, fkCtx),
     ...referencedByMenuItems(ctx.columnName, ctx.meta, fkCtx),
   ];
 
