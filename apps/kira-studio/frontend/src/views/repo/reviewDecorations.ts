@@ -284,30 +284,47 @@ export function attachReviewDecorations(
     }
   }
 
+  // C13-12: split from one combined load() into loadDiff()/loadComments() — onReviewRepaint's own
+  // fan-out (below) now dispatches by the repaint event's own `kind` instead of always reloading
+  // both. A `mark` mutation can't change the comment list; a `comments` mutation can't change the
+  // file diff — with N open review tabs on one branch, reloading both on every mutation cost N
+  // redundant full diffs (a real server-side git diff, review.fileDiff) plus N full branch-wide
+  // comment re-fetches (re-anchoring every comment on the branch server-side) for every single
+  // comment click or mark toggle. Both still share one `loadSeq` generation counter: whichever
+  // finishes with a stale `seq` (superseded by a newer loadDiff OR loadComments call, either one
+  // bumps the same counter) bails without touching state — the property that matters, "a slow
+  // in-flight request can never clobber state with an outdated result," holds regardless of which
+  // of the two calls did the superseding.
+
   // reviewMarking.ts:245-288's own resolution chain, ported: sinceReview first, retried as `range`
   // only when the file's own reviewedAtSha has moved past what this tab was opened against — the
   // same "never silently switch modes under an open tab" rule.
-  async function load(): Promise<void> {
+  // Returns whether the diff actually loaded — C13-12's own load() uses this so a failed diff load
+  // (any of the three early-return cases below) skips the now-separate loadComments() call too,
+  // preserving the original combined function's own short-circuit: no point fetching a branch's
+  // full comment list for an editor that has nothing to anchor it against and is showing an error
+  // banner instead.
+  async function loadDiff(): Promise<boolean> {
     const seq = ++loadSeq;
     let base: string | null;
     try {
       base = await resolveBase(deps.transport, deps.gitRepoId, deps.review.branch);
     } catch (err) {
-      if (disposed || seq !== loadSeq) return;
+      if (disposed || seq !== loadSeq) return false;
       // C13-9: a genuine rejection (a transient index.lock conflict, most likely) — resolveBase
       // no longer caches this (see baseMemo's own comment), so the banner's own Retry button (or
       // another load() call, e.g. the repaint fan-out) can genuinely succeed on a later attempt.
       console.error('reviewDecorations: review.resolveBase failed', err);
       showLoadError();
-      return;
+      return false;
     }
-    if (disposed || seq !== loadSeq) return;
+    if (disposed || seq !== loadSeq) return false;
     if (base === null) {
       // C13-9: a SUCCESSFUL resolution to "no base configured" — permanent, not transient, so
       // Retry (which would just re-resolve the same legitimate null) is actively misleading here.
       // Distinct message, no Retry button.
       showNoBaseConfigured();
-      return;
+      return false;
     }
     closeErrorZone();
 
@@ -320,7 +337,7 @@ export function attachReviewDecorations(
         path: deps.path,
         mode: 'sinceReview',
       });
-      if (disposed || seq !== loadSeq) return;
+      if (disposed || seq !== loadSeq) return false;
       if (result.reviewedAtSha !== null && result.reviewedAtSha !== deps.leftRev) {
         result = await deps.transport.request('review.fileDiff', {
           repoId: deps.gitRepoId,
@@ -329,22 +346,27 @@ export function attachReviewDecorations(
           path: deps.path,
           mode: 'range',
         });
-        if (disposed || seq !== loadSeq) return;
+        if (disposed || seq !== loadSeq) return false;
       }
     } catch (err) {
-      if (disposed || seq !== loadSeq) return;
+      if (disposed || seq !== loadSeq) return false;
       // C13-9: previously uncaught — a rejection here left a silently blank review layer and an
       // unhandled promise rejection in the console, entirely bypassing C12-7's retry-banner
       // mechanism (unlike the review.comment.list call below, which already had a `.catch`).
       console.error('reviewDecorations: review.fileDiff failed', err);
       showLoadError();
-      return;
+      return false;
     }
     hunks = result.body.kind === 'text' ? result.body.hunks : [];
     bodyKind = result.body.kind;
     reviewedRanges = result.reviewedRanges;
     lineCount = result.lineCount;
+    paint();
+    return true;
+  }
 
+  async function loadComments(): Promise<void> {
+    const seq = ++loadSeq;
     const commentsResult = await deps.transport
       .request('review.comment.list', {
         repoId: deps.gitRepoId,
@@ -355,6 +377,15 @@ export function attachReviewDecorations(
     if (disposed || seq !== loadSeq) return;
     comments = commentsResult.comments;
     paint();
+  }
+
+  /** The mount-time (and Retry-button) load only — reloads reachable from onReviewRepaint's own
+   *  fan-out below call loadDiff/loadComments directly, whichever the mutation could actually have
+   *  changed. Skips loadComments() when the diff itself never loaded (any of loadDiff's own three
+   *  early-return cases) — no point fetching a branch's full comment list for an editor that is
+   *  showing an error banner instead, the original combined function's own short-circuit. */
+  async function load(): Promise<void> {
+    if (await loadDiff()) await loadComments();
   }
 
   async function mark(range: LineRange, reviewed: boolean): Promise<void> {
@@ -511,11 +542,17 @@ export function attachReviewDecorations(
 
   // §7.6's repaint table, the listening side of transport.ts's fan-out — a mutation from either
   // half of the UI (this editor or the panel's own Comments pane) reloads this editor exactly
-  // once it actually succeeded.
+  // once it actually succeeded. C13-12: dispatches by the event's own `kind` rather than always
+  // reloading both halves — a `mark` mutation can only have changed the file diff (reviewed
+  // ranges/hunks), a `comments` mutation only the comment list.
   const unsubscribeRepaint = onReviewRepaint((event) => {
     if (event.repoId !== deps.gitRepoId || event.branch !== deps.review.branch) return;
-    if (event.kind === 'mark' && event.path !== deps.path) return;
-    void load();
+    if (event.kind === 'mark') {
+      if (event.path !== deps.path) return;
+      void loadDiff();
+    } else {
+      void loadComments();
+    }
   });
 
   void load();
