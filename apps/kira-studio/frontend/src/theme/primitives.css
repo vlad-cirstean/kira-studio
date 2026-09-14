@@ -383,6 +383,13 @@
    (a bare, unstyled native control) rather than this file's previous appearance:none + manual-SVG
    approach — acceptable since, again, the Chromium version here is pinned, not guessed at. */
 .p-select {
+  /* P61: WebKit's `appearance: base-select` box carries its own intrinsic min-height floor
+     (font-metric-driven, ~24px at this font-size/line-height) that wins over an authored
+     `height` even under box-sizing: border-box — since Playwright 1.63's bundled WebKit, this
+     floor sits above --kira-control-h and breaks the .p-input height match below. min-height: 0
+     removes the floor so the authored height governs again, on every appearance: base-select
+     engine, not just the newer one. */
+  min-height: 0;
   height: var(--kira-control-h);
   display: inline-flex;
   align-items: center;
