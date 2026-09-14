@@ -258,6 +258,13 @@ running it here.
   the separate build script exists precisely so a client's own connection attempt isn't the first
   thing to pay it. `bun run mcp:repo-map` (no `:build`) always rebuilds too (Go's own build cache
   makes a no-op rebuild sub-second) and then execs the binary — the one command to actually run it.
+- **A cold cgo rebuild of `kira-repo-map` measures ~34s in this container** (build cache cleared,
+  P64c §1.2) — this is the grammar compile, not index time, and it is what "restart the server to
+  pick up a change" actually pays first. It is easy to misread as "the reindex is hanging": a full
+  cold `Sync` of this repository itself is a few seconds (below/`docs/ARCHITECTURE.md`'s
+  `codeindex.db` paragraph); a rebuild-then-index that feels like it took a minute is overwhelmingly
+  this one-time compile, not the parse-and-write pipeline. A warm build-cache rebuild (most restarts
+  in one session) is sub-second, per the bullet above.
 - **`bun run mcp:repo-map` blocks in the foreground, serving HTTP, and prints its own registration
   command to stdout once bound** — it is not a one-shot script. Run it in the background (this
   environment's own "start, poll, test, kill inside one invocation" rule, above) if a following

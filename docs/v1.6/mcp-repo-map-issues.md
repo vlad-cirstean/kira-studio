@@ -126,6 +126,19 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   new golden-fixture ones). No non-trivial finding in P64b's own new surface — every call returned
   the expected, correctly-scoped result.
 
+- **P64c (implementation)**: same leftover-orphaned-process pattern as every entry above — a
+  `kira-repo-map`/`bun run scripts/mcp-repo-map.ts` pair from an earlier session was already
+  running at session start (`ConnectionRefused` for the native tool surface, expected), consuming
+  real CPU via its own watcher reacting to this session's own edits; killed by PID, not `pkill`
+  (P63's own note). Rebuilt (`bun run mcp:repo-map:build`, 1.7s — build cache was warm from this
+  phase's own repeated `go build`s, not the ~34s cold figure this phase records in
+  `docs/DEV_ENVIRONMENT.md`), deleted the stale hashed token file, restarted to mint a fresh bearer
+  token, called it over plain HTTP/JSON-RPC per the headless steps. Mandatory dogfood smoke check
+  against the live pipelined index: `find_definition {"symbol":"ReplaceFiles"}` correctly resolved
+  the one real method (`store.go:122:17`); `search_symbols {"query":"parseStale"}` correctly
+  resolved the one real method (`sync.go:138:19`). No non-trivial finding — both calls answered
+  correctly on the first try.
+
 ### Non-trivial
 
 - **P63 (planning) — TypeScript `type` aliases are absent from the index; a name shared with Go

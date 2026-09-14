@@ -874,7 +874,18 @@ instances that can each open this file at once** — an embedded one inside this
 and a headless one (`bun run mcp:repo-map`), below — and a per-repository lock file,
 `${KIRA_HOME}/codeindex-sync-<first 12 hex of sha256(repo_id)>.lock`, keeps two instances from
 parsing one repository's initial sync twice; WAL, `_busy_timeout` and the connection pool are what
-make the file itself safe under that, unchanged from C1's own design. **Schema version is 2 as of
+make the file itself safe under that, unchanged from C1's own design, and each batch transaction
+also retries a bounded number of times (5 attempts, 200ms backoff) on SQLite's BUSY/LOCKED result
+code before giving up (P64c §2.3) — resilience insurance for a transaction that loses the write-lock
+race past `_busy_timeout`, not something the normal path ever hits. **P64c overlaps `Sync`'s parse
+and write phases**: a single writer goroutine batches `FileWrite`s into `replaceFileBatch`-sized
+(256) transactions as the parse worker pool produces them, streamed over a batch-wide buffered
+channel, instead of materializing every write into one slice before any of them land — parse and
+write cost about the same (~1.7s each on this repository), so overlapping them recovers close to
+the smaller of the two rather than paying both in sequence. Measured on this repository (1848 files,
+4 CPUs, this checkout): a cold full `Sync` is **~2.3-2.5s**, down from ~3.5s sequential, and peak
+retained heap during the pass drops from the whole repository's parse output (order of 150 MiB) to
+about one batch. **Schema version is 2 as of
 C2**: `reference` also
 carries the identifier's own range (`name_start_byte`/`name_end_byte`/`name_start_row`/
 `name_start_column`), separate from the reference node's own range — for a Java `method_invocation`
@@ -3484,6 +3495,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   features would couple two independent lifecycles for a savings that has never mattered in
   practice. The per-repository sync *flock* (`internal/codeindex.AcquireSyncLock`) only covers each
   side's own *initial* sync, by design — it is not a general single-parser guarantee.
+- **The repo-map MCP server's watcher is armed before its own initial `Sync` completes**
+  (`repomap/server.go:168`-`170`, P64c §1.5/§6.7): `runInitialSync` runs in a goroutine and
+  `idx.Watch()` is called immediately after, so a watcher-driven `GetFile`/`ReplaceFile` write can
+  interleave with the initial full `Sync`'s own batch transactions. Real, but not a throughput
+  problem — concurrent writers against `codeindex.db` were measured to serialize cleanly with zero
+  errors (P64c §1.5), and arming the watcher later would trade this for a worse correctness gap (an
+  edit landing during the initial `Sync` would be missed entirely, since nothing re-scans once the
+  gate opens) — closing it properly needs queueing watcher events during the initial `Sync` and
+  draining them after, watcher-lifecycle design rather than a parse-and-write throughput fix.
 - **A C6 navigation position can drift by a line if the worktree file changed after the tab
   opened** (§4's own honest limit, `internal/codeworkspace/textpos.go`). The byte/UTF-16 conversion
   is always computed against the file's bytes *on disk right now*, not the bytes Monaco's model
