@@ -66,6 +66,18 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   is not. Kill the server by PID instead. Second, the server picked port 41521 rather than 8765
   while an earlier instance still held 8765; the printed URL is authoritative, so read it from the
   startup output rather than assuming the documented port. Neither is a defect.
+- **P64 (planning)**: same `ConnectionRefused` at session start as every entry above, same fix —
+  killed the two live servers **by PID** (`pkill` kills the calling shell, per the P63 note),
+  deleted both stale hashed token files under `/root/.kira-studio/`, restarted to mint a fresh
+  bearer token. Reproduced the open non-trivial entry below exactly as logged. Found it is wider
+  than logged, and recorded in `plans/P64-repo-map-type-aliases-and-read-symbol.md` §1.4 rather
+  than amending that entry: `enum` declarations and module-level `const`s are missing too (0 rows
+  of each for the whole TypeScript family), and the gap blocks `find_references` as well as
+  `find_definition` — `locate` reaches reference rows only through a symbol-table lookup, so a
+  missing definition makes existing `@reference.type` rows unreachable. `outline_file` on
+  `packages/shared/domain/tree.ts` returns 7 of 23 declarations. No new entry opened: same root
+  cause, same fix pass.
+
 - **P63 (planning)**: `find_references` did the real work this phase needed and did it well —
   `openKeyValueTab` returned 13 hits (8 production, 5 test) each with its enclosing function name,
   and `findKeyValueTab`/`patchKeyValueTabState` returned 7 and 5 production sites, which is what
