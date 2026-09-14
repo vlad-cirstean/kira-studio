@@ -2628,14 +2628,19 @@ is unaffected — LAW 14 governs it, not this feature.
 The third top-level module, beside `studio` and `api`, and the one whose *backend* runs headless: the
 git logic lives in this Go binary, and the primary frontend is a separately-installed VS Code
 extension connecting as an external client. **As of C10, Kira Studio's own Wails window also mounts
-a second, read-only frontend onto the identical backend** — the pinned first tab of every repo
-workspace shows the same commit graph the VS Code extension does, over a second, in-process
-transport (see "Git graph in the native workspace (C10)" below). The window's other git-facing
-surfaces are unchanged: the Settings dialog's *Connected editors* pane (pairing, revocation,
-extension install) and its *Git* section (the two server-owned remote-op settings below) — both
-there because Kira Studio is the trust authority and owner of those settings, not because a
-read-write git UI crept in. The native mount is provably read-only (below); nothing in this window
-can write to a repository through any route the VS Code extension can.
+a second frontend onto the identical backend** — the pinned first tab of every repo workspace
+shows the same commit graph the VS Code extension does, over a second, in-process transport (see
+"Git graph in the native workspace (C10)" below). The window's other git-facing surfaces are
+unchanged: the Settings dialog's *Connected editors* pane (pairing, revocation, extension install)
+and its *Git* section (the two server-owned remote-op settings below) — both there because Kira
+Studio is the trust authority and owner of those settings. **As of P67e, the native mount is a
+writing git client**: it admits every operation that writes through git itself (fetch, pull, push,
+force-push, merge/rebase as pull strategies, undo, restack, stash, worktree add/remove, and the
+sequencer verbs a conflict needs to carry on) — the same surface any ordinary git GUI client
+offers, per the app owner's own request that read-only was "about modifying files", not about git
+operations themselves. What replaces "provably read-only" as the safety property is a two-way
+correspondence, not a blanket refusal: nothing the UI can reach fails at the allowlist layer, and
+nothing the allowlist admits has no reachable affordance (see below).
 
 **P67b: `git` is a peer `AppMode`, not a per-repo title-bar tab.** Before this phase, opening a
 repository added one extra tab to the title bar per open repository, beside the two module tabs
@@ -2783,15 +2788,27 @@ GitServer (internal/gitsock)
 - **The undo slot is one per repository**, not per connection, and names the originating client in
   its own label, so a second window reads "Undo reset of `main` (window: repo-review)" rather than
   an anonymous or misattributed action.
-- **Credential prompts go to the editor; pairing prompts stay in Kira Studio.** The split is
-  deliberate and the two questions are genuinely different: "what is the password for this one
-  push" is about an action the user just took in that window, while "should this window ever talk
-  to me at all" is a trust decision belonging to the trust authority. `internal/gitaskpass` brokers
-  the first over its own private socket behind a `GIT_ASKPASS` shim, relaying to the connection
-  that owns the in-flight remote op. If that connection dies mid-prompt the broker fails the
-  credential request non-zero rather than hanging, and the wait is bounded regardless — a git
-  process blocked forever on a prompt nobody will answer is the failure this design exists to make
-  impossible.
+- **Credential prompts go to whichever connection owns the in-flight remote op; pairing prompts
+  always stay in Kira Studio.** The split is deliberate and the two questions are genuinely
+  different: "what is the password for this one push" is about an action the user just took in
+  *that* window, while "should this window ever talk to me at all" is a trust decision belonging to
+  the trust authority. `internal/gitaskpass` brokers the first over its own private socket behind a
+  `GIT_ASKPASS` shim, relaying to whichever `gitsession.Conn` owns the op — an external, paired VS
+  Code extension window for its own op, or (as of P67e) Kira Studio's own native window for the
+  native stream's own op, since that stream now has real writes to prompt for. If that connection
+  dies mid-prompt the broker fails the credential request non-zero rather than hanging, and the
+  120-second wait (`gitaskpass.DefaultTimeout`) is bounded regardless — a git process blocked
+  forever on a prompt nobody will answer is the failure this design exists to make impossible.
+  **The native window's own answer path** (`frontend/src/state/gitCredential.ts` +
+  `workbench/GitCredentialDialog.vue`) is a FIFO queue feeding one always-mounted dialog, the same
+  precedent `GitPairingDialog.vue` sets — a prompt started in one repo tab must stay answerable
+  after switching away, and one repository's own remote-op slot means at most one prompt per
+  workspace, but two open workspaces can each prompt at once. No client-side timeout: the broker's
+  own 120-second bound already covers it, and answering a request the broker has already given up
+  on is a documented no-op. Nothing on this path is ever logged, persisted, or stored anywhere
+  beyond the one in-flight prompt — the typed secret lives only in the dialog's own field, cleared
+  on submit, cancel, Escape or the frame's own close, and the prompt text gets the same treatment
+  (it can itself contain a username the user just typed).
 
 **Settings ownership follows the same shared/private line, and it is a correctness question rather
 than a preference.** `protectedBranches`, `fetch.autoInterval` and `git.path` are **server-owned**
@@ -3003,22 +3020,34 @@ same blob-frame body shape (`blobFrame.ts`, shared by both), but no length prefi
 no drain loop — a Wails stream is message-framed already, so the machinery that exists solely to
 turn a byte stream back into frames is simply absent.
 
-**The read-only boundary is three layers, and only one of them is load-bearing.**
-`readOnlyMethods` in `gitstream.go` is a default-deny **allowlist**, not a denylist: a method the
+**The write boundary is still three layers, and only one of them is load-bearing — P67e widened
+what layer one admits, not the shape of the boundary itself.** `allowedMethods` in `gitstream.go`
+(`readOnlyMethods` before P67e) is a default-deny **allowlist**, not a denylist: a method the
 allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
-called, so a future contract addition is refused by construction rather than admitted by omission —
-`gitstream_test.go` pins both directions (every allowlisted method reaches the handler; every method
-that genuinely writes the repository from `git-ui`'s real surface — `op.run`'s 24 kinds, the five
-`remote.run` kinds, `undo.run`, `worktree.prepare`, `stack.restack`, `settings.setGitPath` — is
-refused **and never reaches the handler**, asserted with a spy; a separate table covers methods
-refused for the different reason that Go has no handler for them at all). C11 (below) admits the
-nine `review.*` methods to this same allowlist — they read like writes but never touch the
-repository. Layer two is a handful of explicit
-throwing entries in `repo/git/hostHandlers.ts` (`credential.provide`, `editor.resolveConflict`,
-`settings.setGitPath`, `worktree.openWindow`) for methods that never reach Go under VS Code either.
-Layer three is the UI simply not offering a write affordance at all (`capabilities.write: false`
-hides every mutating toolbar button, dialog and row-menu item) — a convenience and an honesty
-measure, never the boundary itself; layer one holds regardless of what any Vue component believes.
+called, so a future contract addition is refused by construction rather than admitted by omission.
+Of the 55 methods `internal/gitrpc`'s `Router.ForConn` dispatches, the allowlist now admits 52 —
+every operation that writes through git itself (`op.run`'s kinds, the five `remote.run` kinds,
+every `preflight.*`/`remote.*Preflight`, `undo.run`, `stack.restack`/`cancelRestack`,
+`credential.provide`) alongside every pre-existing read and the nine `review.*` methods (below).
+Exactly three stay refused: `worktree.prepare`/`worktree.cancelPrepare` (arbitrary shell execution
+with no human-approval gate anywhere in this codebase — a security boundary, not a file-editing
+one) and `settings.setGitPath` (owned by this app's own Settings dialog, never called by `git-ui`
+at all). `gitstream_test.go` pins both directions (every allowlisted method reaches the handler;
+every refused method **never reaches the handler**, asserted with a spy — one table for a genuine
+refusal, a separate one for a method Go has no handler for at all). Layer two is a handful of
+explicit throwing entries in `repo/git/hostHandlers.ts` (`editor.resolveConflict`,
+`settings.setGitPath`, `worktree.openWindow`) for methods layer one also refuses or never reaches Go
+under VS Code either — `editor.resolveConflict` because this app has no merge editor (the user's
+own stated carve-out: conflicts surface through the conflict banner, resolved in the user's own
+external editor, then Continue/Skip/Abort), `worktree.openWindow` because `vscode.openFolder` has no
+native meaning. Layer three is `capabilities.*` — `write: true` now shows every write affordance
+`git-ui`'s toolbar/dialogs/row menus gate on that one flag, while `resolveConflict`/
+`runPrepareScript`/`openWorktreeWindow` stay `false`, each naming a real layer-one or layer-two
+refusal — a convenience and an honesty measure, never the boundary itself; layer one holds
+regardless of what any Vue component believes. The property this three-layer shape now guarantees,
+in both directions: **every `capabilities.*` flag that is `false` corresponds to something layer one
+or layer two refuses, and every method layer one admits has a reachable UI affordance** (or, for
+`settings.setGitPath`'s own refusal, no affordance anywhere — `git-ui` has no caller for it at all).
 
 **`repo.open` itself must never transitively arm a write, either — traced once, C13 round 2's own
 finding.** `repo.open` sits on the allowlist as a pure identify-and-subscribe read, but
@@ -3037,7 +3066,11 @@ so an ordinary, already-paired VS Code extension window opening the identical re
 it exactly as before — a real write that surface has always been allowed to make, unaffected by any
 of this. `gitsession/conn_test.go`'s `TestConn_DisableAutoFetch_OptsThisConnOutOfArming` pins both
 directions (this Conn never arms it; an ordinary Conn reusing the same, still-unarmed entry still
-does).
+does). **P67e kept this opt-out even though the native mount is no longer read-only** — the reason
+was never "this surface can't write", it is that every fetch this phase's own allowlist widening
+admits is one the user pressed a button for, and a periodic background `git fetch --prune` the user
+never asked for is a different thing entirely. One deleted line (`DisableAutoFetch()`'s own call)
+whenever someone actually wants automatic background fetching for the native mount too.
 
 **Three repository identities, and the one mapping that matters.** `CodeRepo.ID` (`code_repos.id`)
 is what every native tab/workspace call speaks; `gitclient.RepoSummary.RepoID` is what `git-ui` and
@@ -3113,8 +3146,8 @@ name that says "write" whose writes land in Kira's own storage, never the user's
 case for either; they resume the extension's own `context.workspaceState`, replaced here by
 `repo/git/reviewSession.ts`'s use of the pinned graph tab's own state, below) — so they stay
 refused by the allowlist as defence in depth, and `gitstream_test.go`'s own table split reflects
-the two different reasons: `TestReadOnlyRequest_WriteMethodsAreRefused` for a genuine write,
-`TestReadOnlyRequest_HostAnsweredMethodsAreRefused` for a method Go simply has no handler for.
+the two different reasons: `TestAllowedRequest_WriteMethodsAreRefused` for a genuine write,
+`TestAllowedRequest_HostAnsweredMethodsAreRefused` for a method Go simply has no handler for.
 
 **Anchoring needs no client-side line mapping.** A review diff's right-hand document is always
 `<branchTip>:<path>`, and `LineRange`/`ReviewComment.range` are already defined in exactly those
@@ -3609,6 +3642,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   be arbitrarily old and still gets silently reapplied on the next cold mount — no parity fix
   attempted here, since the pinned tab's state is small (a branch/mode pointer, not the review data
   itself) and already goes away when the tab or workspace closes.
+- **No standalone merge or rebase operation exists anywhere in this stack** (P67e §7). `op.run`'s
+  `OpRequest` kinds have no such kind, `packages/git-ipc`'s contract has none, and `packages/git-ui`
+  has no `MergeDialog`/`RebaseDialog`. Merge and rebase are reachable only as `remote.run`'s own pull
+  strategies (`ff-only`/`merge`/`rebase`) and inside `stack.restack`'s own branch-by-branch rebase.
+  Building a standalone version needs a new `OpRequest` kind, a new `opSpec` with an undo policy, a
+  new preflight, a new dialog and a `ContractVersion` bump — out of scope until a phase actually
+  asks for it.
 
 C14's architecture/security review:
 - **`internal/codeindex/watch.go`'s `Watcher.Close()` doesn't cancel an in-flight full `Sync`** —
@@ -3622,10 +3662,6 @@ C14's architecture/security review:
   window.
 - **Watcher writes arriving during the initial sync's one large transaction can be dropped** after a
   5-second busy-timeout on a very large repo (unmeasured, theoretical).
-- **`internal/bridge/gitstream.go`'s `readOnlyMethods` allowlist comment doesn't note that
-  `branch.resolvePr`/`commit.resolvePr` have a `review.db` purge side effect** (deleting a branch's
-  review session when GitHub reports its PR closed/merged) — a one-line comment clarity gap, not a
-  behavior bug.
 
 C14's correctness review:
 - **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
