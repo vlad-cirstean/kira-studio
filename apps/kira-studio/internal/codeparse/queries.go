@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/go/p67f_reads.scm queries/rust/tags.scm
+//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/javascript/p67f_reads.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/go/p67f_reads.scm queries/rust/tags.scm
 var queryFS embed.FS
 
 // QuerySource is one query file's provenance (§4.1/NOTICES.md): a future license or version audit
@@ -60,6 +60,13 @@ var Provenance = []QuerySource{
 	// so a name read via `range x` or `x[k]` produced no reference row at all.
 	{Go, thisRepo, "queries/go/p67f_reads.scm", ""},
 
+	// P67f-authored value-read query (docs/v1.6/plans/P67f-…md §3.3) — the same gap one language
+	// family over. One file, registered directly on JavaScript, TypeScript and TSX alike (below):
+	// its two patterns (for_in_statement/subscript_expression) are plain syntax every one of the
+	// three grammars shares, unlike tags.scm's own languages which need composing through
+	// javascript's own file first.
+	{JavaScript, thisRepo, "queries/javascript/p67f_reads.scm", ""},
+
 	// P64b-authored module-level const query (docs/v1.6/plans/P64b-…md §2.5) — javascript's own
 	// vendored @definition.constant pattern matches only a CommonJS-era `export default (X = …)`
 	// shape, nothing this repository's ESM actually writes. JavaScript only (§2.6): TypeScript/TSX
@@ -77,9 +84,9 @@ var Provenance = []QuerySource{
 var querySourcePaths = map[ID][]string{
 	Java:       {"queries/java/tags.scm"},
 	Python:     {"queries/python/tags.scm", "queries/python/c2_implements.scm"},
-	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm", "queries/javascript/p64b_declarations.scm"},
-	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm"},
-	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm"},
+	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm", "queries/javascript/p64b_declarations.scm", "queries/javascript/p67f_reads.scm"},
+	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm", "queries/javascript/p67f_reads.scm"},
+	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm", "queries/javascript/p67f_reads.scm"},
 	Go:         {"queries/go/tags.scm", "queries/go/p64b_declarations.scm", "queries/go/p67f_reads.scm"},
 	Rust:       {"queries/rust/tags.scm"},
 }

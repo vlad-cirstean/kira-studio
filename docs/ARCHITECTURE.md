@@ -972,16 +972,31 @@ result. `read_symbol` is the one tool that returns a declaration's own bytes rat
 position: the same locator resolves a target, then `source.go`'s `readSymbolRows` returns its
 exact indexed extent (start/end row, already stored, previously surfaced nowhere) plus a
 backward-walked doc comment — bounded by `maxLines`/64 KiB, `[stale]`-marked the same way a C8 hit
-line is.
+line is. **P67f (§2)**: every handler waits out a full reindex, not only the initial one — a tool
+call blocks on `codeindex.Index.SyncSettled()` under the same 25s bound `waitReady` already used for
+the initial sync, and returns "is reindexing … retry shortly" rather than an empty result if a
+watcher-triggered rescan is still running past it. A response also carries a one-line `index
+degraded: the last full sync of … failed (…); results may be incomplete.` prefix while the last full
+sync stands failed — the one window (a failed sync, never retried) nothing can wait out — clearing
+itself the moment a later sync succeeds; empty and costs nothing in the normal case.
 
-**P64b's Go package-level `const`/`var` are indexed as definitions with no matching reference
-rows.** Go's grammar has no `const_identifier` node kind distinguishing a constant's use from any
-other identifier use, so `find_references` on a Go constant returns empty by construction — that is
-the honest answer, not "unused." A blanket `identifier`/`field_identifier` reference pattern was
-measured and declined: 257,971 new reference rows for one language against a then-current
-whole-repo total of 134,068, a 2.9x blowup for a name-based resolver that would rank every local
-`err` as a candidate. `find_definition`, `search_symbols`, `outline_file` and `read_symbol` all work
-normally for these; only `find_references` stays structurally empty.
+**P64b's Go package-level `const`/`var` are indexed as definitions with reference rows only for a
+`range`/index-expression read.** Go's grammar has no `const_identifier` node kind distinguishing a
+constant's use from any other identifier use, so `find_references` on a Go constant returns empty by
+construction for most read shapes (a call argument, a selector base, an assignment RHS) — that is
+the honest answer, not "unused." **P67f (§3)** narrows this rather than closes it: a name read as a
+`range` clause's own operand or an `index_expression`'s operand now earns a `read` reference row
+(`queries/go/p67f_reads.scm`, and `queries/javascript/p67f_reads.scm` for JavaScript/TypeScript/TSX/
+Vue alike) — specifically where a *named collection* is consulted, the shape a session asking "where
+is this allowlist actually read?" needs and the one the P67e dogfooding log's own repro hit. A
+blanket `identifier`/`field_identifier` reference pattern covering every read position was measured
+and declined for the rest of that surface, both times: P64b's own whole-identifier measurement
+(257,971 new reference rows for Go alone against a then-current whole-repo total of 134,068, a 2.9x
+blowup) and P67f's narrower one (selector-base reads alone, 64,652 rows for one position against the
+range/index fix's own ~3.7k) — a name-based resolver ranking every local `err` as a candidate either
+way. `find_definition`, `search_symbols`, `outline_file` and `read_symbol` all work normally for
+these; `find_references` returns rows for a `range`/index read, still structurally empty for every
+other read shape.
 
 **C8 adds one source line under each hit — the one place this server reads a file's own bytes,
 never a whole file.** `find_definition`, `find_references`, `find_implementations` and

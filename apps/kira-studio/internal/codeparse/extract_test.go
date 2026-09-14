@@ -87,6 +87,14 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"constant", "robotFactory", -1},
 				{"function", "buildRobot", -1},
 				{"function", "helper2", -1},
+				// P67f adds the new "read" reference kind (docs/v1.6/plans/
+				// P67f-repo-map-sync-and-references.md §3.3/§5.3): a for...of over
+				// p67fSampleItems and an index read of it (two "read" rows), and a for...of over
+				// p67fMakeItems() — a call expression, not a bare identifier — produces no "read"
+				// row (only the pre-existing "call" reference the call itself already earns).
+				{"constant", "p67fSampleItems", -1},
+				{"function", "p67fMakeItems", -1},
+				{"function", "p67fHelperReads", -1},
 			},
 			refs: []refRow{
 				{"call", "helper"},
@@ -94,6 +102,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"class", "Greeter"},
 				{"call", "makeRobot"},
 				{"class", "Robot"},
+				{"read", "p67fSampleItems"},
+				{"call", "log"},
+				{"read", "p67fSampleItems"},
+				{"call", "p67fMakeItems"},
+				{"call", "log"},
 			},
 		},
 		{
@@ -132,6 +145,14 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				// widened to include (regex) (ternary_expression) (await_expression)
 				// (subscript_expression).
 				{"constant", "OPERATOR_RE", -1},
+				// P67f adds the new "read" reference kind (docs/v1.6/plans/
+				// P67f-repo-map-sync-and-references.md §3.3/§5.3), same shape as JavaScript's own
+				// case above: a for...of over p67fSampleItems and an index read of it (two "read"
+				// rows), and a for...of over p67fMakeItems() (a call expression) produces no
+				// "read" row.
+				{"constant", "p67fSampleItems", -1},
+				{"function", "p67fMakeItems", -1},
+				{"function", "p67fHelperReads", -1},
 			},
 			refs: []refRow{
 				{"implementation", "Greeter"},
@@ -141,6 +162,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"call", "helper2"},
 				{"call", "makeConfig"},
 				{"class", "Robot"},
+				{"read", "p67fSampleItems"},
+				{"call", "log"},
+				{"read", "p67fSampleItems"},
+				{"call", "p67fMakeItems"},
+				{"call", "log"},
 			},
 		},
 		{
@@ -151,13 +177,18 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			// const plus one var inside helper2's own body — the latter two produce no rows at
 			// all, proving the source_file anchor (§2.3) excludes function-local declarations.
 			// P67f adds the new "read" reference kind (docs/v1.6/plans/
-			// P67f-repo-map-sync-and-references.md §3.2/§5.3): allowedMethods is read once via
-			// `range` and once via an index expression (two "read" rows), nested["a"]["b"] is a
-			// nested subscript resolving once to nested (not "a" or "b"), and c.items/c.m["x"]
-			// (a range and an index whose operand is a selector, not a bare identifier) produce
-			// no "read" row at all — the container/allowedMethods/nested/c declarations
-			// themselves also add ordinary "type"/"variable" symbol and reference rows exactly
-			// like the pre-existing declarations above them.
+			// P67f-repo-map-sync-and-references.md §3.2/§5.3): p67fSampleReadMap is read once via
+			// `range` and once via an index expression (two "read" rows),
+			// p67fSampleNestedMap["a"]["b"] is a nested subscript resolving once to
+			// p67fSampleNestedMap (not "a" or "b"), and p67fSampleContainerVal.items/
+			// p67fSampleContainerVal.m["x"] (a range and an index whose operand is a selector, not
+			// a bare identifier) produce no "read" row at all — the p67fSampleContainer/
+			// p67fSampleReadMap/p67fSampleNestedMap/p67fSampleContainerVal declarations themselves
+			// also add ordinary "type"/"variable" symbol and reference rows exactly like the
+			// pre-existing declarations above them. Fixture names are prefixed p67f rather than
+			// reused from the real allowedMethods-shaped production code this phase fixes — this
+			// fixture is indexed alongside the rest of the repository by the live MCP server, and
+			// a colliding name would make find_references ambiguous against it.
 			id: Go, file: "testdata/extract/sample.go",
 			syms: []symRow{
 				{"type", "Greeter", -1},
@@ -174,11 +205,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"variable", "DefaultName", -1},
 				{"constant", "Version", -1},
 				{"function", "helper2", -1},
-				{"variable", "allowedMethods", -1},
-				{"variable", "nested", -1},
-				{"type", "container", -1},
-				{"variable", "c", -1},
-				{"function", "helper3", -1},
+				{"variable", "p67fSampleReadMap", -1},
+				{"variable", "p67fSampleNestedMap", -1},
+				{"type", "p67fSampleContainer", -1},
+				{"variable", "p67fSampleContainerVal", -1},
+				{"function", "p67fHelperReads", -1},
 			},
 			refs: []refRow{
 				{"type", "Greeter"},
@@ -192,14 +223,14 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "string"},
 				{"type", "string"},
 				{"type", "int"},
-				{"type", "container"},
+				{"type", "p67fSampleContainer"},
 				{"type", "string"},
 				{"type", "int"},
 				{"type", "int"},
-				{"type", "container"},
-				{"read", "allowedMethods"},
-				{"read", "allowedMethods"},
-				{"read", "nested"},
+				{"type", "p67fSampleContainer"},
+				{"read", "p67fSampleReadMap"},
+				{"read", "p67fSampleReadMap"},
+				{"read", "p67fSampleNestedMap"},
 			},
 		},
 		{

@@ -46,28 +46,31 @@ func helper2() {
 	_ = localVar
 }
 
-// P67f: a package-level map, read via range and index (§3.2's new "read" reference kind).
-var allowedMethods = map[string]struct{}{"GET": {}}
+// P67f: a package-level map, read via range and index (§3.2's new "read" reference kind). Named
+// distinctly from any real production identifier — this fixture is indexed alongside the rest of
+// the repository, and a colliding name would make find_references ambiguous against it.
+var p67fSampleReadMap = map[string]struct{}{"GET": {}}
 
 // P67f: a nested map, proving a nested subscript resolves to the outermost identifier only.
-var nested = map[string]map[string]int{}
+var p67fSampleNestedMap = map[string]map[string]int{}
 
-type container struct {
+type p67fSampleContainer struct {
 	m     map[string]int
 	items []int
 }
 
-var c container
+var p67fSampleContainerVal p67fSampleContainer
 
 // P67f: exercises range_clause/index_expression reads plus the two "no row" cases (§5.3): a
-// range over a selector (c.items) and an index whose operand is a selector (c.m[...]).
-func helper3() {
-	for k := range allowedMethods {
+// range over a selector (p67fSampleContainerVal.items) and an index whose operand is a selector
+// (p67fSampleContainerVal.m[...]).
+func p67fHelperReads() {
+	for k := range p67fSampleReadMap {
 		_ = k
 	}
-	_ = allowedMethods["GET"]
-	for range c.items {
+	_ = p67fSampleReadMap["GET"]
+	for range p67fSampleContainerVal.items {
 	}
-	_ = c.m["x"]
-	_ = nested["a"]["b"]
+	_ = p67fSampleContainerVal.m["x"]
+	_ = p67fSampleNestedMap["a"]["b"]
 }

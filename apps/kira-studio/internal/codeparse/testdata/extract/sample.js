@@ -31,3 +31,25 @@ function helper2() {
 
 // P64b: a `let` at module scope — deliberately excluded (§2.5, matching P64 §2.2's own decision).
 let robotCounter = 0;
+
+// P67f: a module-level array, read via for...of and an index expression (§3.3's new "read"
+// reference kind, one language family over from Go's queries/go/p67f_reads.scm). Named distinctly
+// from any real production identifier — this fixture is indexed alongside the rest of the
+// repository by the live MCP server, and a colliding name would make find_references ambiguous.
+const p67fSampleItems = [1, 2, 3];
+
+// P67f: a for...of over a call expression — the "no row" case (§5.3): the operand is not a bare
+// identifier.
+function p67fMakeItems() {
+  return [];
+}
+
+function p67fHelperReads() {
+  for (const v of p67fSampleItems) {
+    console.log(v);
+  }
+  const first = p67fSampleItems[0];
+  for (const v of p67fMakeItems()) {
+    console.log(v);
+  }
+}

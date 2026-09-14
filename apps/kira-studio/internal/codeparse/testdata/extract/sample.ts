@@ -44,3 +44,25 @@ function helper3(): void {
 
 // P64b: a regex-valued module const — invisible before §2.7's widened value list.
 const OPERATOR_RE = /[+\-*/]/;
+
+// P67f: a module-level array, read via for...of and an index expression (§3.3's new "read"
+// reference kind, one language family over from Go's queries/go/p67f_reads.scm). Named distinctly
+// from any real production identifier — this fixture is indexed alongside the rest of the
+// repository by the live MCP server, and a colliding name would make find_references ambiguous.
+const p67fSampleItems: number[] = [1, 2, 3];
+
+// P67f: a for...of over a call expression — the "no row" case (§5.3): the operand is not a bare
+// identifier.
+function p67fMakeItems(): number[] {
+  return [];
+}
+
+function p67fHelperReads(): void {
+  for (const v of p67fSampleItems) {
+    console.log(v);
+  }
+  const first = p67fSampleItems[0];
+  for (const v of p67fMakeItems()) {
+    console.log(v);
+  }
+}
