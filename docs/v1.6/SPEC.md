@@ -32,3 +32,10 @@ landing at once. P62-P65 are independent of each other and of P60/P61, ordered a
   starts, written by an Opus subagent per `CLAUDE.md`'s own process, never edited afterward.
 - **`mcp-repo-map-issues.md`** — this chapter's own repo-map MCP dogfooding log, continuing the
   practice v1.5 established (`CLAUDE.md`'s "Repo-map MCP server" section, updated to point here).
+
+## Closing
+
+After all six phases land: **two rounds of code review**, per `CLAUDE.md`'s own process — each round
+three parallel Opus subagents (architecture/security, functional correctness, performance/resource
+efficiency), findings-only, then one sequential Sonnet subagent fixes every finding. Run the full
+cycle twice, not once with the second treated as optional.
