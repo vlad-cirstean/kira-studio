@@ -45,6 +45,17 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   false positives; `search_symbols` for `attachReviewDecorations` returned the one correct
   definition. No fix needed.
 
+- **P62 (implementation)**: same `ConnectionRefused` at session start as every prior entry above —
+  the server from the planning session's own run was still alive on port 8765 but its token file
+  had already been deleted (planning session's own cleanup), so the live process's in-memory token
+  no longer matched anything on disk. Killed and restarted it per the headless steps to mint a
+  token this session actually has, then verified over plain HTTP/JSON-RPC: `search_symbols` for
+  `gitRepoIdFor` returned the one correct definition (`hostHandlers.ts:68`), and `find_references`
+  for `formatRelativeDate` returned all three real call sites (`CommitGrid.vue`, `columns.ts`,
+  `ReviewCommitRow.vue`) — checked against a plain grep beforehand, no false positives, no misses.
+  No fix needed beyond the restart; noted so a future session finds a live-but-orphaned process on
+  8765 unsurprising.
+
 _No non-trivial entries._
 
 <!--

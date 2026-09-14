@@ -3070,6 +3070,68 @@ AI service, API call or AI-authored data anywhere in this repo. The feature is e
 built: a user writes plain-text comments on lines, they render as gutter icons and threads, and
 `review.comment.export` formats them for pasting into an AI conversation by hand.
 
+### Git blame, inline (P62)
+
+**Reuses v1.4 P5's backend outright — no Go change, no contract bump.** `blame.line` (one line per
+`git blame` spawn, working tree only, no `atSha`) already answers the extension's status-bar
+widget; `views/repo/blameAnnotation.ts` calls the identical method over the identical wire.
+`ContractVersion` stays 35 on both sides and `internal/bridge/gitstream.go`'s allowlist is
+unchanged — the only Go touched by this phase at all is `internal/storage/{model,repos}/
+settings.go`, for the unrelated reason below.
+
+**Where it surfaces, and why not the status bar.** The annotation renders as injected text at the
+end of the cursor's line in `views/repo/RepoFileView.vue` — the one native surface whose displayed
+bytes and `blame.line`'s answer are the same document by construction (the diff tabs compare
+historical revisions `blame.line` structurally can't answer for). The status bar was the extension's
+own surface for this, but `workbench/StatusBar.vue`'s own LAW 14 reserves its left readout for
+"where is the caret", never a fact about the line under it — porting the widget literally would
+mean breaking that law or wiring a per-view caret readout first, a separate, unrelated deliverable.
+Whole-file gutter blame (a GitLens-style column beside every line) is deliberately not built either:
+`blame.line` is one spawn per line, so a real implementation needs a new multi-hunk porcelain
+parser, a new `blame.file` method, and a `ContractVersion` bump — real backend work SPEC's own P62
+row states this phase does not do.
+
+**The repo hold, and the request shape.** `blame.line` requires the calling connection to already
+hold the repository (`gitsession.Conn.Entry`'s own `alreadyHeld` check) — `blameAnnotation.ts`
+ensures this itself with a memoised `repo.open`, the same idempotent-per-`(connection, repoId)`
+call the pinned graph tab's own mount already relies on, so a file tab opened before the graph ever
+mounts still works. The request itself follows the extension's own shape: cursor-line trigger,
+150 ms debounce, dedupe on the line, a per-mount cache (sound here in a way a server-side cache
+isn't — the model is immutable for the life of the mount), and `repo.changed` invalidation. There is
+no dirty-buffer state to track (P5's `'dirty'` display state): this view is `readOnly`/`domReadOnly`
+and nothing in this app ever writes the model, so the buffer is always the saved file. Failure is
+always silence — an untracked path, a line past EOF, an aborted request all render nothing, matching
+the extension's own posture that this is, from the reader's vantage, an ordinary file.
+
+**Click-through mirrors C11's own cold-mount race.** A context-menu action ("Open Blame Commit in
+Graph") reveals the blamed commit in the pinned graph tab — but a file tab can be active before that
+tab has ever mounted, the identical race `review.open`'s own handler already solves for the review
+sidebar. `hostHandlers.ts` gains a second pending-target map (`pendingBlameRevealByCodeRepoId`,
+alongside the existing `pendingReviewTargetByCodeRepoId`), consumed once by `RepoGraphView.vue`'s
+own mount as `MountOptions.pendingUiAction` — the same "bootstrap-island" seam G10 D19's palette
+commands already use. `transport.ts` gains one new export, `emitUiAction`, because the local event
+bus's `emit` function was previously reachable only from inside a `hostHandlers.ts` request handler
+(`review.open`'s own `emitLocal` closure) — `blameAnnotation.ts` is a Monaco-layer module, not a
+request handler, so it needed a way to reach the same per-repo-workspace local emitter from outside.
+
+**The date formatters moved to `@kira/git-core`.** `formatRelativeDate`/`formatAbsoluteDate` lived
+in `packages/git-ui/src/components/dateFormat.ts`, with a second copy in the extension's own
+`blameAge.ts` (git-ui's barrel pulls Vue into an extension-host bundle, so P5 couldn't import the
+original). Neither reason applies to the native app — `@kira/git-core` has no DOM dependency and is
+already eager here (`reviewDecorations.ts`'s own static import) — so both functions now live in
+`packages/git-core/src/util/dateFormat.ts`; git-ui re-exports them (keeping only the DOM-bound
+`measureAbsoluteDateWidth`), and the extension's own `blameAge.ts` copy is deleted in favor of the
+same import. One function, one home, three callers.
+
+**A settings toggle, defaulted on.** `appearance.inlineBlame` gates the whole layer —
+`views/repo/RepoFileView.vue` watches it live, so toggling takes effect on an open tab immediately.
+Settings, unlike the git backend above, genuinely are Go-persisted: `SettingsRepo` stores one row
+per leaf, typed through `internal/storage/model/settings.go`'s `AppearanceSettings`/
+`AppearancePatch` structs — a leaf with no Go counterpart would have its value silently discarded on
+every `Set`, reappearing at its zod default on the very next read. `inlineBlame` was added there
+alongside `wordWrap`/`rowColoring`, the only Go change this phase makes and the only reason it makes
+one.
+
 ## Renderer security surface
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what
