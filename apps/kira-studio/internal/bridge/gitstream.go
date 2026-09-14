@@ -44,9 +44,12 @@ func newStreamConnID() gitsession.ConnID {
 // default, which is the failure mode this file exists to prevent (docs/v1.5/plans/
 // C10-git-graph-native.md §4.2).
 //
-// Every preflight.* method is deliberately ABSENT. A pre-flight is a read, but its only purpose is
-// to stage a write; admitting it would let a UI bug render a confirm dialog whose confirm button
-// then fails at this layer — a worse experience than the action simply not existing.
+// Every preflight.* method — and remote.pullPreflight/remote.pushPreflight, the same shape under a
+// different name — is deliberately ABSENT. A pre-flight is a read, but its only purpose is to stage
+// a write; admitting it would let a UI bug render a confirm dialog whose confirm button then fails
+// at this layer — a worse experience than the action simply not existing. Pinned explicitly (not
+// merely relying on default-deny) by gitstream_test.go's own preflightMethods list, alongside this
+// stream's other two "must stay refused" tables (writeMethods, hostAnsweredMethods) — C13-11.
 //
 // The nine review.* methods below (C11 §3) look like writes but never touch the repository: every
 // one is a thin decode-validate-delegate onto gitsession.RepoEntry whose only persistence is

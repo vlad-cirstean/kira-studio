@@ -21,6 +21,61 @@ func (s *spyRequest) fn(_ context.Context, method string, _ json.RawMessage) (an
 	return "inner-result", nil
 }
 
+// writeMethods and hostAnsweredMethods are the explicit, commented "must stay refused" lists
+// TestReadOnlyRequest_WriteMethodsAreRefused/TestReadOnlyRequest_HostAnsweredMethodsAreRefused
+// exercise below — hoisted to package scope (rather than declared inline in each test) so
+// TestGitrpcDispatch_EveryMethodIsClassified (gitrpc_dispatch_coverage_test.go, C13-11) can check
+// its own derived method set against the exact same two lists, with nothing to fall out of sync.
+var writeMethods = []string{
+	"op.run", "remote.run", "remote.cancel", "undo.run",
+	"worktree.prepare", "worktree.cancelPrepare",
+	"stack.restack", "stack.cancelRestack",
+	"credential.provide", "editor.resolveConflict", "settings.setGitPath",
+}
+
+var hostAnsweredMethods = []string{
+	"review.session.save", "review.session.load", "review.open", "editor.openRangeDiff",
+}
+
+// preflightMethods is gitstream.go's own third "must stay refused" category, made explicit here by
+// C13-11 (it previously relied on default-deny alone, with no test pinning it and no signal that
+// the exclusion was a decision rather than an oversight): every preflight.*/remote.*Preflight
+// method stages a write for a subsequent op.run/remote.run and is a read in isolation, but
+// admitting it would let a UI bug render a confirm dialog whose confirm button then fails at this
+// layer. TestGitrpcDispatch_EveryMethodIsClassified cross-checks this against gitrpc's own real
+// dispatch table — if a future preflight-shaped method isn't added here (or to one of the other
+// three lists), that test fails instead of the exclusion passing silently by accident.
+var preflightMethods = []string{
+	"preflight.checkout", "preflight.revert", "preflight.reset", "preflight.cherryPick",
+	"preflight.stashPop", "preflight.stashBranch",
+	"preflight.worktreeAdd", "preflight.worktreeRemove", "preflight.restack",
+	"remote.pullPreflight", "remote.pushPreflight",
+}
+
+// TestReadOnlyRequest_PreflightMethodsAreRefused pins gitstream.go's own third "must stay refused"
+// category (preflightMethods above) the same way TestReadOnlyRequest_WriteMethodsAreRefused and
+// TestReadOnlyRequest_HostAnsweredMethodsAreRefused already pin theirs.
+func TestReadOnlyRequest_PreflightMethodsAreRefused(t *testing.T) {
+	for _, method := range preflightMethods {
+		t.Run(method, func(t *testing.T) {
+			spy := &spyRequest{}
+			wrapped := readOnlyRequest(spy.fn)
+
+			_, err := wrapped(context.Background(), method, json.RawMessage(`{}`))
+
+			if err == nil {
+				t.Fatalf("method %q: got no error, want E_READ_ONLY", method)
+			}
+			if !isReadOnlyErr(err) {
+				t.Fatalf("method %q: got error %v, want an ipcerr.Error with code E_READ_ONLY", method, err)
+			}
+			if len(spy.called) != 0 {
+				t.Fatalf("method %q: inner handler was called (%v) — a preflight must never reach it", method, spy.called)
+			}
+		})
+	}
+}
+
 func isReadOnlyErr(err error) bool {
 	var e *ipcerr.Error
 	if !errors.As(err, &e) {
@@ -68,12 +123,6 @@ func TestReadOnlyRequest_AllowlistedMethodsReachInnerHandler(t *testing.T) {
 // moved to TestReadOnlyRequest_HostAnsweredMethodsAreRefused since it is refused because Go has no
 // handler for it, not because it is a write.
 func TestReadOnlyRequest_WriteMethodsAreRefused(t *testing.T) {
-	writeMethods := []string{
-		"op.run", "remote.run", "remote.cancel", "undo.run",
-		"worktree.prepare", "worktree.cancelPrepare",
-		"stack.restack", "stack.cancelRestack",
-		"credential.provide", "editor.resolveConflict", "settings.setGitPath",
-	}
 	for _, method := range writeMethods {
 		t.Run(method, func(t *testing.T) {
 			spy := &spyRequest{}
@@ -102,9 +151,6 @@ func TestReadOnlyRequest_WriteMethodsAreRefused(t *testing.T) {
 // the write boundary itself, but the property under test — never reaching the inner handler — is
 // the same one that matters.
 func TestReadOnlyRequest_HostAnsweredMethodsAreRefused(t *testing.T) {
-	hostAnsweredMethods := []string{
-		"review.session.save", "review.session.load", "review.open", "editor.openRangeDiff",
-	}
 	for _, method := range hostAnsweredMethods {
 		t.Run(method, func(t *testing.T) {
 			spy := &spyRequest{}
