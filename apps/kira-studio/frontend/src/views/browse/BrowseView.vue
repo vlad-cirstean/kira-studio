@@ -223,28 +223,8 @@ onUnmounted(() => {
       @refresh="onReload"
     >
       <template #toolbar>
-        <IconButton
-          icon="arrow-up"
-          data-testid="browse-up"
-          :disabled="atRoot"
-          v-tooltip="'Up one level'"
-          @click="onUp"
-        />
-        <span class="breadcrumb">
-          <template v-for="(crumb, i) in crumbs" :key="crumb.path">
-            <span v-if="i > 0" class="crumb-sep">/</span>
-            <button
-              type="button"
-              class="crumb"
-              data-testid="browse-crumb"
-              :class="{ 'is-current': i === crumbs.length - 1 }"
-              @click="onCrumbClick(crumb.path)"
-            >
-              {{ crumb.name }}
-            </button>
-          </template>
-        </span>
-        <div class="sep" />
+        <!-- §3.2: back-navigation and the breadcrumb move into .list-head, with the list they
+             navigate — this toolbar keeps only what's view-scoped rather than navigator-scoped. -->
         <IconButton
           icon="search"
           :active="filterOpen"
@@ -259,7 +239,6 @@ onUnmounted(() => {
           v-tooltip="'Upload file…'"
           @click="onUploadClick"
         />
-        <span class="p-push p-sm muted" data-testid="browse-count">{{ countText }}</span>
       </template>
 
       <template #strips>
@@ -298,6 +277,33 @@ onUnmounted(() => {
            PanelSplitter/VirtualList changes; this is the only new geometry. -->
       <div v-else class="browse-body">
         <div class="list-pane p-panel" :style="{ width: `${listWidth}px` }">
+          <!-- §3.2: reuses .p-toolbar band styling (PanelSplitter.vue names it as one of the
+               surfaces whose border weight the design system already fixes) rather than inventing
+               a header — same 26px in-view band every other toolbar uses. -->
+          <div class="list-head p-toolbar">
+            <IconButton
+              icon="chevron-left"
+              data-testid="browse-up"
+              :disabled="atRoot"
+              v-tooltip="'Back'"
+              @click="onUp"
+            />
+            <span class="breadcrumb">
+              <template v-for="(crumb, i) in crumbs" :key="crumb.path">
+                <span v-if="i > 0" class="crumb-sep">/</span>
+                <button
+                  type="button"
+                  class="crumb"
+                  data-testid="browse-crumb"
+                  :class="{ 'is-current': i === crumbs.length - 1 }"
+                  @click="onCrumbClick(crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
+            </span>
+            <span class="p-push p-sm muted" data-testid="browse-count">{{ countText }}</span>
+          </div>
           <div v-if="!rt || (loading && rt.nodes.length === 0)" class="empty muted">Loading…</div>
           <div v-else-if="rt.nodes.length === 0" class="empty muted" data-testid="browse-empty">
             No items
@@ -422,11 +428,14 @@ onUnmounted(() => {
 }
 
 .body {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 .empty {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
