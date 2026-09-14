@@ -20,7 +20,14 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
 
 ## Log
 
-_No entries yet._
+- **P60a**: `search_symbols` finds nothing for a `.vue` SFC's own component name (e.g.
+  `MonacoHost`) — expected, not a defect: `<script setup>` declares no symbol actually named after
+  the file, so there's nothing to index. `search_files` (finds the file) plus `find_references` on
+  a function/type it exports (both work correctly, verified against `loadMonaco`/
+  `monacoLanguageIdFor`) is the right combination for a Vue SFC. No fix needed; noted so a future
+  session doesn't spend time on it.
+
+_No non-trivial entries._
 
 <!--
 Entry template:

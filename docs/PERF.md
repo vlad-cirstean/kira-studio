@@ -25,7 +25,7 @@ caveat below for exactly which of those numbers that affects and which it doesn'
 | Grid scroll frame, vertical axis, wide table (P29) ≤ 8 ms | same work-delta measurement, **p50** over 20 steps, on `app.scroll_grid` | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1** |
 | Row window stays coalesced to <= 1 re-render/frame during sustained fast scroll (P22 D1) | `notifiesPerFrame` <= 1 at 40/100/200/456 px/frame; `uncoveredPx` === 0 at 40-100 px/frame | `tests/ui/budgets.spec.ts` | **asserted — passing; see §2.1a** |
 | — (secondary) | rAF interval p95 < 24 ms (80 ms on the `tests/ui/` tier, see §2.1), DOM cells < 1500 | `tests/ui/perf.spec.ts` | asserted |
-| Cell selection → editor populated ≤ 50 ms | click cell → `.cm-content` contains the cell's text, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
+| Cell selection → editor populated ≤ 50 ms | click cell → `.view-lines` contains the cell's text (`.cm-content`, CodeMirror, before P60a moved the cell editor to Monaco) — the DOM element the click-to-DOM measurement waits on, not a full-document read, so it stays a plain DOM text-wait rather than the `data-kira-editor-text` debug hook `tests/ui/support/editorText.ts` uses elsewhere, p95 over 20 cells | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tab switch (cached) ≤ 50 ms | click tab → the other table's header cell present, p95 over 20 alternations | `tests/ui/budgets.spec.ts` | **asserted** |
 | Tree node expand (cached) ≤ 50 ms | click twisty → child rows present, p95 over 20 collapse/expand cycles of an already-cached schema node | `tests/ui/budgets.spec.ts` | **asserted** |
 | Console keystroke → completion popup visible ≤ 50 ms (p50) | last keypress → `.cm-tooltip-autocomplete` present, p50 over 20 keystrokes | `tests/ui/budgets.spec.ts` | **asserted** |
@@ -1361,7 +1361,12 @@ other result is closed — freeing exactly that page's own share.
 
 **C8's two gated measurements, and the verdicts.**
 
-1. **D8 (CodeMirror async chunk): declined — no split landed.** CodeMirror + Lezer is 407,469 bytes
+1. **D8 (CodeMirror async chunk): declined — no split landed.** *(P60a/v1.6 note: this measurement's
+   own premise — `AutocompleteField.vue` mounting a live `CodeMirrorHost` unconditionally on the
+   WHERE/ORDER BY boxes — is gone; P60a replaced that overlay with Monaco span-painting
+   (`editor/paintSpans.ts`), loaded lazily like every other editor surface, not eagerly on first
+   data-tab open. Kept as the historical record of the P5-era decision it documents, not a
+   currently-true fact about the bundle.)* CodeMirror + Lezer is 407,469 bytes
    (38.9%) of the single JS chunk (F3), but `AutocompleteField.vue` — the permanent filter-row
    AutocompleteField every data-tab kind (grid/documents/keyvalue/stream) mounts unconditionally —
    confirmed to mount a live `CodeMirrorHost` the instant the *first* data tab opens: booting to
