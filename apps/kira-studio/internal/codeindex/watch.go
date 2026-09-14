@@ -217,9 +217,15 @@ func (idx *Index) reparseChangedPath(ctx context.Context, absPath, relPath strin
 		idx.session.Forget(absPath)
 		return nil
 	}
-	w, err := idx.parseOne(ctx, relPath, codeparse.ID(row.Language))
+	w, ok, err := idx.parseOne(ctx, relPath, codeparse.ID(row.Language))
 	if err != nil {
 		return err
+	}
+	if !ok {
+		// C13-8: parseOne's own path-safety skip (pathsafe.ValidateRelPath) — this path now
+		// resolves outside idx.root (a symlink), so its existing row is simply left as-is rather
+		// than reparsed through it.
+		return nil
 	}
 	return idx.store.ReplaceFile(ctx, w)
 }
@@ -241,10 +247,13 @@ func (idx *Index) indexNewCandidates(ctx context.Context, candidates []string) {
 		if !ok {
 			continue
 		}
-		w, err := idx.parseOne(ctx, relPath, lang)
+		w, ok, err := idx.parseOne(ctx, relPath, lang)
 		if err != nil {
 			slog.Warn("codeindex: index new file", "scope", "watch", "path", relPath, "err", err)
 			continue
+		}
+		if !ok {
+			continue // C13-8: parseOne's own path-safety skip — never indexed.
 		}
 		if err := idx.store.ReplaceFile(ctx, w); err != nil {
 			slog.Warn("codeindex: store new file", "scope", "watch", "path", relPath, "err", err)

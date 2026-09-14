@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeparse"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/pathsafe"
 )
 
 // maxFileBytes is §5.4's per-file byte bound: a larger file is recorded tooLarge with no symbols.
@@ -140,6 +141,7 @@ func (idx *Index) parseStale(
 	}
 	type outcome struct {
 		write FileWrite
+		ok    bool // false: parseOne's own C13-8 path-safety skip — no row to write, not an error.
 		err   error
 	}
 
@@ -153,9 +155,9 @@ func (idx *Index) parseStale(
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				w, err := idx.parseOne(ctx, j.path, j.lang)
+				w, ok, err := idx.parseOne(ctx, j.path, j.lang)
 				select {
-				case outcomes <- outcome{write: w, err: err}:
+				case outcomes <- outcome{write: w, ok: ok, err: err}:
 				case <-ctx.Done():
 					return
 				}
@@ -190,6 +192,9 @@ func (idx *Index) parseStale(
 			}
 			continue
 		}
+		if !o.ok {
+			continue
+		}
 		writes = append(writes, o.write)
 	}
 	if firstErr != nil {
@@ -206,7 +211,15 @@ func (idx *Index) isStale(relPath string, existingByPath map[string]FileRow) boo
 	if !had {
 		return true
 	}
-	info, err := os.Stat(idx.absPath(relPath))
+	// C13-8: a path resolving outside idx.root (most likely a committed/untracked symlink) is
+	// never stat'd — pathsafe.ValidateRelPath, the same gate parseOne applies before actually
+	// opening it. Treated like the vanished-file case below: parseOne's own identical check is
+	// what actually matters (this is only enqueue-side, avoiding a doomed job).
+	full, err := pathsafe.ValidateRelPath(idx.root, relPath)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(full)
 	if err != nil {
 		// Vanished between enumeration and stat: not stale in the sense of "needs a fresh
 		// parse" — the deletion pass (comparing against the enumerated set, not the disk)
@@ -222,15 +235,25 @@ func (idx *Index) isStale(relPath string, existingByPath map[string]FileRow) boo
 // than a hard error — the caller's job is to make the cache agree with disk, and one unreadable
 // file (a permission change, a broken symlink) must not abort a whole Sync pass.
 //
+// The returned bool is false only for C13-8's own gate: a path resolving outside idx.root (a
+// symlink escaping the repository) is skipped entirely, silently, with no row written at all —
+// unlike a plain stat/read failure, which still gets an unreadable row (§5.4's own convention).
+// Every caller must check it before writing w to the store.
+//
 // Reparse rather than Parse: Session.Reparse already falls back to a fresh Parse when nothing is
 // resident for this path (first sync, or an evicted entry), so calling it unconditionally here —
 // rather than branching on whether this is "the first time" — gets every file the incremental
 // path for free the moment something keeps its tree resident (a prior Sync, or the watcher).
-func (idx *Index) parseOne(ctx context.Context, relPath string, lang codeparse.ID) (FileWrite, error) {
-	full := idx.absPath(relPath)
+func (idx *Index) parseOne(ctx context.Context, relPath string, lang codeparse.ID) (FileWrite, bool, error) {
+	full, err := pathsafe.ValidateRelPath(idx.root, relPath)
+	if err != nil {
+		// Mirrors codeworkspace/search.go's own gate 1: skip, don't read through it, and don't
+		// abort the whole Sync/watch pass over it either — it is simply never indexed.
+		return FileWrite{}, false, nil
+	}
 	info, statErr := os.Stat(full)
 	if statErr != nil {
-		return idx.unreadableWrite(relPath, lang), nil
+		return idx.unreadableWrite(relPath, lang), true, nil
 	}
 
 	content, sha, status := classifyAndRead(full)
@@ -240,7 +263,7 @@ func (idx *Index) parseOne(ctx context.Context, relPath string, lang codeparse.I
 		ContentSHA: sha[:], ParseStatus: status, ParsedAt: time.Now().UnixMilli(),
 	}
 	if status != StatusOK {
-		return w, nil
+		return w, true, nil
 	}
 
 	result, err := idx.session.Reparse(ctx, full, content, lang)
@@ -248,14 +271,14 @@ func (idx *Index) parseOne(ctx context.Context, relPath string, lang codeparse.I
 		// A genuine parse-pipeline error (a bad grammar registration, a cancelled context) is
 		// still reported as unreadable rather than aborting the whole Sync — the file's row is
 		// simply "we couldn't index this," retried on the next Sync.
-		return idx.unreadableWrite(relPath, lang), nil
+		return idx.unreadableWrite(relPath, lang), true, nil
 	}
 	w.HasError = result.HasError
 	w.LineCount = result.LineCount
 	w.Blocks = result.Blocks
 	w.Symbols = result.Symbols
 	w.References = result.References
-	return w, nil
+	return w, true, nil
 }
 
 func (idx *Index) unreadableWrite(relPath string, lang codeparse.ID) FileWrite {

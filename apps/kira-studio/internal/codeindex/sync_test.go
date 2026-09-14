@@ -228,6 +228,44 @@ func TestSync_RenamedFileIsDeletePlusCreate(t *testing.T) {
 	}
 }
 
+// TestSync_SymlinkEscapingRootIsNeverIndexed is C13-8: `git ls-files` (Enumerate) lists a tracked
+// or untracked symlink like any other path, and parseOne used to open/stat it via a plain
+// filepath.Join with no containment check — a symlink pointing outside the repository root (here,
+// at a "secret" file in a sibling temp dir) would have its target's content read and parsed into
+// the index. parseOne now runs it through pathsafe.ValidateRelPath first and skips it entirely.
+func TestSync_SymlinkEscapingRootIsNeverIndexed(t *testing.T) {
+	dir := initFixtureRepo(t)
+	outsideDir := t.TempDir()
+	secret := filepath.Join(outsideDir, "secret.js")
+	writeFile(t, outsideDir, "secret.js", "function leaked() {}\n")
+
+	writeFile(t, dir, "a.js", "function f() {}\n")
+	if err := os.Symlink(secret, filepath.Join(dir, "evil.js")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	idx := newTestIndex(t, dir, "repo-symlink-escape")
+	ctx := context.Background()
+
+	stats, err := idx.Sync(ctx)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if stats.FilesParsed != 1 {
+		t.Fatalf("FilesParsed = %d, want 1 (only a.js)", stats.FilesParsed)
+	}
+	if _, ok, _ := idx.store.GetFile(ctx, idx.repoID, "evil.js"); ok {
+		t.Fatal("expected no row at all for the symlink escaping the repo root -- not even an unreadable one")
+	}
+	syms, err := idx.store.FindSymbolsByName(ctx, idx.repoID, "leaked")
+	if err != nil || len(syms) != 0 {
+		t.Fatalf("expected the secret file's own symbol to never reach the index: syms=%v err=%v", syms, err)
+	}
+	if _, ok, _ := idx.store.GetFile(ctx, idx.repoID, "a.js"); !ok {
+		t.Fatal("expected a.js (a normal file alongside the symlink) to still be indexed")
+	}
+}
+
 // TestSync_FingerprintMismatchTruncatesRepo is §5.3's own last rule: a stored
 // meta.parser_fingerprint that disagrees with the binary's current one means the extraction
 // contract changed under the stored rows, so the WHOLE repository's rows are truncated and
