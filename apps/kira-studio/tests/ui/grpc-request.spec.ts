@@ -240,7 +240,7 @@ test('gRPC request — choosing a method seeds the Message editor with its templ
   // Selecting a method switches the request pane to Message (SchemaBrowser's own selectMethod)…
   await expect(page.locator('[data-testid="grpc-request-pane"]')).toContainText('pageSize');
   const editor = page.locator('[data-testid="grpc-message-editor"]');
-  await expect(editor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(editor).toBeVisible();
   expect(await editorText(editor)).toBe('{\n  "pageSize": 0\n}');
   // …and the toolbar's method chip and select both reflect the chosen method.
   await expect(page.locator('[data-testid="grpc-method-chip"]')).toContainText(

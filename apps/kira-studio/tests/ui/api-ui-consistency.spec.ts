@@ -404,7 +404,7 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   const { window: page } = await relaunch({ control: CONTROL });
 
   const body = page.locator('[data-testid="http-request-pane"]');
-  await expect(body.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(body.locator('.monaco-host')).toBeVisible();
 
   const resolvedSpan = body.locator('.kira-ed-var');
   const unknownSpan = body.locator('.kira-ed-var-unknown');
@@ -417,9 +417,13 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
   // rules generate opaque `mtk*` class names rather than semantic ones (the same reason
   // http-request-body.spec.ts's own hasTokenColor() walks every descendant by colour instead of a
   // class selector), so the key's colour is found the same way here.
-  const [resolvedColor, unknownColor, keyColor] = await Promise.all([
-    resolvedSpan.evaluate((el) => getComputedStyle(el).color),
-    unknownSpan.evaluate((el) => getComputedStyle(el).color),
+  // `toHaveCSS`/`expect.poll` (auto-retrying), not a one-shot `evaluate()`: Monaco's own debounced
+  // marker pass (`scheduleLint`, independent of these decorations) can re-render `.view-lines`'
+  // span DOM shortly after mount, and a plain `evaluate()` can catch that mid-churn.
+  await expect(resolvedSpan).toHaveCSS('color', 'rgb(78, 201, 176)');
+  await expect(unknownSpan).toHaveCSS('color', 'rgb(204, 167, 0)');
+  let keyColor = '';
+  const readKeyColor = (): Promise<string> =>
     body.evaluate((el) => {
       for (const node of el.querySelectorAll('.view-lines span')) {
         if (
@@ -433,11 +437,14 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
         }
       }
       return '';
-    }),
-  ]);
-  expect(resolvedColor).toBe('rgb(78, 201, 176)');
-  expect(unknownColor).toBe('rgb(204, 167, 0)');
-  expect(keyColor).not.toBe('');
+    });
+  await expect
+    .poll(async () => {
+      keyColor = await readKeyColor();
+      return keyColor;
+    })
+    .not.toBe('');
+  const resolvedColor = await resolvedSpan.evaluate((el) => getComputedStyle(el).color);
   expect(resolvedColor).not.toBe(keyColor);
 
   // Hovering the resolved reference shows its value — through Monaco's own native hover widget
@@ -450,7 +457,7 @@ test('the request body: a resolved {{variable}} has a colour of its own, hovers,
     resolvedBox.x + resolvedBox.width / 2,
     resolvedBox.y + resolvedBox.height / 2,
   );
-  const hover = page.locator('.monaco-hover');
+  const hover = page.locator('.monaco-hover:not(.hidden)');
   await expect(hover).toBeVisible();
   await expect(hover).toContainText('api.example.com');
 
@@ -495,7 +502,7 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
   const { window: page } = await relaunch({ control: CONTROL });
 
   const body = page.locator('[data-testid="http-request-pane"]');
-  await expect(body.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(body.locator('.monaco-host')).toBeVisible();
 
   const resolvedSpan = body.locator('.kira-ed-var');
   await expect(resolvedSpan).toHaveCount(1);
@@ -506,7 +513,7 @@ test('the request body {{variable}} hover escapes the editor pane and adopts the
     resolvedBox.y + resolvedBox.height / 2,
   );
 
-  const hover = page.locator('.monaco-hover');
+  const hover = page.locator('.monaco-hover:not(.hidden)');
   await expect(hover).toBeVisible();
 
   // D7's first half: escapes both named clipping ancestors, and is mounted as a direct child of
@@ -1164,7 +1171,7 @@ test('the bulk editor: toggle, edit, live summary and rename warning, Apply thro
 
   await page.click('[data-testid="variables-bulk-toggle"]');
   const editor = page.locator('[data-testid="variables-bulk-textarea"]');
-  await expect(editor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(editor).toBeVisible();
   // The secret's own line is seeded empty, with the fixed marker comment above it (D21) — the
   // seed already proves the renderer never had a plaintext to write out.
   expect(await editorText(editor)).toContain('secret — the value is not shown here');

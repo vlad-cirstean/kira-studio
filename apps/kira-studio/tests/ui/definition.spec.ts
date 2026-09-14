@@ -159,7 +159,7 @@ const CONTROL: ControlSnapshot[] = [
 
 async function switchToSource(view: import('@playwright/test').Locator) {
   await view.locator('[data-testid="definition-pane-source"]').click();
-  await expect(view.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(view.locator('.monaco-host')).toBeVisible();
 }
 
 async function switchToStructure(view: import('@playwright/test').Locator) {
@@ -211,7 +211,7 @@ test('Definition tab — Structure/Source, columns menu, notes, read-only, cache
   await expect(definitionView.locator('[data-testid="definition-pane-structure"]')).toHaveClass(
     /on/,
   );
-  await expect(definitionView.locator('[data-testid="monaco-host"]')).toHaveCount(0);
+  await expect(definitionView.locator('.monaco-host')).toHaveCount(0);
 
   // --- scenario 2: Structure sections, and the relocated Columns menu ---------------------
   const columnsSection = definitionView.locator('[data-testid="definition-columns"]');

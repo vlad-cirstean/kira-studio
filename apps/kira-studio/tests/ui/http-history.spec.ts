@@ -143,7 +143,7 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   await expect(page.locator('[data-testid="http-status-hint"]')).toHaveCount(0);
 
   const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');
-  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(bodyEditor.locator('.monaco-host')).toBeVisible();
   expect(await editorText(bodyEditor)).toBe('{\n  "error": "not found"\n}');
 
   await page.click('[data-testid="http-history-back"]');
@@ -270,7 +270,7 @@ test('Http history — restore, and the storage notices', async ({ relaunch }) =
   await rows.nth(1).click();
   await expect(page.locator('[data-testid="http-history-binary-note"]')).toBeVisible();
   await expect(
-    page.locator('[data-testid="http-response-pane"] .response-body [data-testid="monaco-host"]'),
+    page.locator('[data-testid="http-response-pane"] .response-body .monaco-host'),
   ).toHaveCount(0);
 
   // Back to History, then the storage-truncated entry: both notices render together (F9).
@@ -671,7 +671,7 @@ test('Http history — a stored entry’s Raw view shows what was sent (P18 D8)'
   await expect(page.locator('[data-testid="http-history-request-truncated"]')).toBeVisible();
 
   const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
-  await expect(requestEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(requestEditor).toBeVisible();
   const requestText = await editorText(requestEditor);
   expect(requestText).toContain('POST https://api.example.com/orders HTTP/1.1');
   expect(requestText).toContain('Authorization: Bearer {{token}}');

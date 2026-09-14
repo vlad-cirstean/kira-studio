@@ -89,7 +89,7 @@ test('import populates a new tab, and the first tab is left intact', async ({ re
   await expect(page.locator('[data-testid="http-request-pane-body"]')).toContainText('Body (JSON)');
   await page.click('[data-testid="http-request-pane-body"]');
   const pane = page.locator('[data-testid="http-request-pane"]');
-  await expect(pane.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(pane.locator('.monaco-host')).toBeVisible();
   expect(await editorText(pane)).toContain('{"id":1}');
 
   // The first tab's own contents are untouched by the import.

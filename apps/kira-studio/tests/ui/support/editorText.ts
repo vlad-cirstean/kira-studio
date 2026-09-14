@@ -1,4 +1,4 @@
-import type { Locator } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 
 // P60a §9.1/OQ-3: Monaco virtualises lines — `.view-lines` only ever contains the currently
 // rendered subset of a large document, unlike CodeMirror's `.cm-content` (whose `innerText` was
@@ -8,11 +8,24 @@ import type { Locator } from '@playwright/test';
 // hooks already use, rather than a `page.evaluate` over a `window.monaco` global that isn't
 // otherwise exposed. This is the one place every UI spec reads a Monaco host's full document from.
 
-/** `container` is any Locator wrapping exactly one `MonacoHost` mount (a pane, a dialog body, a
- *  row) — finds that host's own root and reads its full text. Empty string if the attribute is
- *  absent (host still pending its first paint, or not a MonacoHost at all). */
+/** `container` is any Locator either wrapping exactly one `MonacoHost` mount (a pane, a dialog
+ *  body, a row whose own `data-testid` sits on an ancestor — `.monaco-host` is then a descendant)
+ *  or the mount's own root directly (a site that passes its `data-testid` straight onto
+ *  `<MonacoHost>`, which now lands on that root itself via `$attrs` fallthrough — `container` IS
+ *  `.monaco-host` there, not its parent). `descendant-or-self` covers both without the caller
+ *  needing to know which shape its own testid produced. Finds that host's own root and reads its
+ *  full text; empty string if the attribute is absent (host still pending its first paint, or not
+ *  a MonacoHost at all). */
 export async function editorText(container: Locator): Promise<string> {
-  const host = container.locator('[data-testid="monaco-host"]');
+  const host = container.locator(
+    'xpath=./descendant-or-self::*[contains(concat(" ", normalize-space(@class), " "), " monaco-host ")]',
+  );
+  // `getAttribute` alone does not retry on the *value* — the host element itself renders
+  // synchronously (`.monaco-host`'s own div is the host's single root, present even while still
+  // `pending`, §3.3), but `data-kira-editor-text` isn't set until `loadMonaco()` actually resolves
+  // and the model exists. `toHaveAttribute` with a catch-all pattern auto-retries exactly that —
+  // present at all (any value, including a legitimately empty document) — before the plain read.
+  await expect(host).toHaveAttribute('data-kira-editor-text', /^[\s\S]*$/);
   return (await host.getAttribute('data-kira-editor-text')) ?? '';
 }
 
@@ -24,6 +37,7 @@ export async function editorText(container: Locator): Promise<string> {
 export async function diffEditorText(
   container: Locator,
 ): Promise<{ original: string; modified: string }> {
+  await expect(container).toHaveAttribute('data-kira-diff-original-text', /^[\s\S]*$/);
   const [original, modified] = await Promise.all([
     container.getAttribute('data-kira-diff-original-text'),
     container.getAttribute('data-kira-diff-modified-text'),

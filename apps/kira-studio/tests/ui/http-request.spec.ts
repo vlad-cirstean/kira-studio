@@ -97,11 +97,11 @@ test('Http request — send, view a JSON response, and Params-table <-> URL sync
 
   // Pretty (default) shows the indented form; Raw shows the compact bytes exactly as sent.
   const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');
-  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(bodyEditor.locator('.monaco-host')).toBeVisible();
   expect(await editorText(bodyEditor)).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
 
   await page.click('[data-testid="http-response-view-raw"]');
-  expect(await bodyEditor.innerText()).toBe(RESPONSE_BODY);
+  expect(await editorText(bodyEditor)).toBe(RESPONSE_BODY);
 
   // The Headers pane shows a known header row.
   await page.click('[data-testid="http-response-pane-headers"]');
@@ -247,7 +247,7 @@ test('Http request — restore from saved state, no reconnect gate', async ({ re
   // requestPane restored to 'body' — the JSON body shows immediately, byte-identical to what was
   // saved (no beautify is ever applied on restore).
   const bodyEditor = page.locator('[data-testid="http-request-pane"]');
-  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(bodyEditor.locator('.monaco-host')).toBeVisible();
   expect(await editorText(bodyEditor)).toBe('{"name":"gizmo"}');
 
   await page.click('[data-testid="http-request-pane-headers"]');

@@ -253,7 +253,7 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
 
   await page.click('[data-testid="generate-data-preview-toggle"]');
   const previewBody = page.locator('[data-testid="generate-data-preview"]');
-  await expect(previewBody.locator('[data-testid="monaco-host"]')).toBeVisible({ timeout: 10_000 });
+  await expect(previewBody.locator('.monaco-host')).toBeVisible({ timeout: 10_000 });
   const previewText = await editorText(previewBody);
   expect(previewText).toContain('INSERT INTO "app"."composite_pk"');
 

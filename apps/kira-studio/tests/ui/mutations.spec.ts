@@ -266,7 +266,7 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   await page.click('[data-testid="toolbar-preview-command"]');
   const previewPanel = page.locator('[data-testid="preview-command-panel"]');
   await expect(previewPanel).toBeVisible();
-  await expect(previewPanel.locator('[data-testid="monaco-host"]')).toBeVisible({
+  await expect(previewPanel.locator('.monaco-host')).toBeVisible({
     timeout: 10_000,
   });
   const previewText = await editorText(previewPanel);

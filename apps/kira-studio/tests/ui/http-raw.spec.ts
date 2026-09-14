@@ -64,7 +64,7 @@ test('Http raw — the inspector, exact fidelity', async ({ relaunch }) => {
   await expect(fidelity).toContainText('exact bytes this app wrote to the connection');
 
   const requestEditor = page.locator('[data-testid="http-wire-request-editor"]');
-  await expect(requestEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(requestEditor).toBeVisible();
   const requestEditorText = await editorText(requestEditor);
   expect(requestEditorText).toContain('GET /v2/orders?a=1 HTTP/1.1');
   expect(requestEditorText).toContain('Host: api.example.com');
@@ -191,7 +191,7 @@ test('Http raw — a stored entry reconstructs its raw view (P18 D8)', async ({ 
   // P8's source swap.
   await page.click('[data-testid="http-response-pane-body"]');
   const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');
-  await expect(bodyEditor.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(bodyEditor.locator('.monaco-host')).toBeVisible();
   expect(await editorText(bodyEditor)).toBe('{\n  "id": 1,\n  "name": "Ada"\n}');
 });
 
@@ -206,7 +206,7 @@ test('Http raw — the editor', async ({ relaunch }) => {
   await expect(dialog).toBeVisible();
 
   const editorHost = dialog.locator('[data-testid="edit-raw-textarea"]');
-  await expect(editorHost.locator('[data-testid="monaco-host"]')).toBeVisible();
+  await expect(editorHost).toBeVisible();
   // D9: pre-substitution — {{base_url}} appears literally in the generated buffer.
   const initialText = await editorText(editorHost);
   expect(initialText).toContain('{{base_url}}');
