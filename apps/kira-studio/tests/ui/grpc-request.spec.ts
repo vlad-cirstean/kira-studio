@@ -708,6 +708,38 @@ test('gRPC request — Beautify formats the request message', async ({ relaunch 
   expect(await editorText(editor)).toBe(BEAUTIFIED);
 });
 
+// P60a §4.7/§12.1: the v1.4 regression this migration's own undo boundary
+// (`MonacoHost.vue`'s `doc` watcher — two `model.pushStackElement()` calls around
+// `pushEditOperations()`, never `model.setValue()`) exists to keep fixed. A Beautify (an
+// external write, same path as the `doc` prop round trip) must not merge into the undo stack
+// entry a keystroke right before it left open — one Ctrl/Cmd+Z after Beautify undoes only the
+// formatting, landing back on what was typed, not on the pre-typing seed.
+test('gRPC request — one undo after Beautify undoes only the beautify, not the typing before it (v1.4 regression)', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.tabsList, response: [grpcTab({ message: '{"a":1}' })] },
+  ];
+  const { window: page } = await relaunch({ control: CONTROL });
+  await expect(page.locator('[data-testid="grpc-request-view"]')).toBeVisible();
+
+  const editor = page.locator('[data-testid="grpc-message-editor"]');
+  await editor.locator('.view-lines').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Backspace'); // drop the seed's own closing '}' before extending it
+  await page.keyboard.type(',"b":2}');
+  const TYPED = '{"a":1,"b":2}';
+  await expect.poll(() => editorText(editor)).toBe(TYPED);
+
+  await page.click('[data-testid="grpc-beautify"]');
+  const BEAUTIFIED = '{\n  "a": 1,\n  "b": 2\n}';
+  await expect.poll(() => editorText(editor)).toBe(BEAUTIFIED);
+
+  await editor.locator('.view-lines').click();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+  expect(await editorText(editor)).toBe(TYPED);
+});
+
 // P13 D12: clearGrpcHistory has been implemented and bound since P11/P12, reachable from
 // nowhere until CallHistoryList.vue's own toolbar. F20's structural guard (the delete control is
 // no longer a <button> nested inside a <button>) lives in api-ui-consistency.spec.ts; this test
