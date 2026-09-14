@@ -10,6 +10,7 @@
    names); it is placed beside it because both exist for the same reason. */
 @import "./vscode-bridge.css";
 @import "./primitives.css";
+@import "./review-decorations.css";
 
 /* Maps the token set into Tailwind v4's CSS-first config, so utilities like
    `bg-chrome` / `text-muted` exist alongside the raw custom properties. */
