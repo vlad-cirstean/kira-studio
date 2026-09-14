@@ -48,6 +48,11 @@ function createSearchState<M extends { row: number }>(): {
 
   function clearSearchState(tabId: string): void {
     delete searchState[tabId];
+    // P63: BrowseView.vue's split keys its own preview pane's keyvalue search state
+    // `${tabId}::preview` — not a real tab id, so it never closes on its own; it dies only when
+    // the browse tab that owns it does. A no-op for every instance of this factory that never has
+    // one (grid/documents/stream), harmless to widen generically here rather than per view.
+    delete searchState[`${tabId}::preview`];
   }
   registerTabRuntimeCleanup(clearSearchState);
 

@@ -22,6 +22,8 @@ export function visibleRowsOf(scope: string): { from: number; to: number } | nul
 
 function clearVisibleRows(scope: string): void {
   delete visibleRows[scope];
+  // P63: widens the same way shared/page/search.ts's own clearSearchState does — see its comment.
+  delete visibleRows[`${scope}::preview`];
 }
 
 registerTabRuntimeCleanup(clearVisibleRows);

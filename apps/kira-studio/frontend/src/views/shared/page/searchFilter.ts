@@ -18,6 +18,8 @@ export function setSearchFiltering(tabId: string, on: boolean): void {
 
 function clearSearchFilterState(tabId: string): void {
   delete searchFilterState[tabId];
+  // P63: widens the same way search.ts's own clearSearchState does — see its comment.
+  delete searchFilterState[`${tabId}::preview`];
 }
 
 registerTabRuntimeCleanup(clearSearchFilterState);
