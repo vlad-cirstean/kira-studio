@@ -318,3 +318,134 @@ test('a repo workspace: quick open fuzzy-finds and opens a file', async ({ relau
   await expect(quickOpen()).toHaveCount(0);
   await expect(fileTab).toHaveAttribute('data-preview', 'false');
 });
+
+// C11 §11/S16 — deliberately shallow (the plan's own words): the deep review behaviour (a real
+// branch comparison, marking, comments) needs a real repository and is the manual recipe's job
+// (docs/v1.5/plans/C11-code-review-native.md §15 step 7), not a UI spec. This asserts only that
+// switching the panel to Review actually mounts the real @kira/git-ui ReviewView.vue bundle over
+// the native git stream and renders something real (its own branch picker) rather than an empty
+// container — the one thing neither typecheck nor a Go test can reach for this phase, the same
+// role the diff-tab/search/quick-open specs above already play for C6/C7/C9.
+//
+// repo/git/transport.ts speaks the native git JSON-RPC protocol (@kira/git-ipc's rpc.ts) over a
+// Wails Stream — an entirely different wire (and mocking mechanism, `window._wails.streamFactory`)
+// than mockRuntime.ts's `control.*` Call endpoint or mockStream.ts's own FlatBuffers bulk-data
+// protocol, and one this repo has no existing mock for (C10 never added a UI test for its own
+// graph mount for the identical reason). installGitStreamMock below is a minimal, purpose-built
+// stand-in — real enough to answer the three requests this shallow path actually needs
+// (app.init, repo.list, refs.list) and silent (never crashing, just never resolving) for every
+// other method, which is exactly what a real bootstrap() tolerates: review.session.load and
+// review.resolveBase are awaited but never block the branch picker from rendering.
+async function installGitStreamMock(page: import('@playwright/test').Page): Promise<void> {
+  await page.evaluate((gitRepoId: string) => {
+    const w =
+      (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ??
+      {};
+    (window as unknown as { _wails: typeof w })._wails = w;
+    const existingFactory = w.streamFactory;
+
+    interface MockSocket {
+      binaryType: string;
+      onopen: ((ev: unknown) => void) | null;
+      onmessage: ((ev: { data: ArrayBuffer }) => void) | null;
+      onclose: ((ev: unknown) => void) | null;
+      onerror: ((ev: unknown) => void) | null;
+      readyState: number;
+      send(data: string): void;
+      close(): void;
+    }
+
+    function deliver(socket: MockSocket, envelope: unknown): void {
+      const bytes = new TextEncoder().encode(JSON.stringify(envelope));
+      setTimeout(() => socket.onmessage?.({ data: bytes.buffer }), 0);
+    }
+
+    function createGitMockSocket(): MockSocket {
+      const socket: MockSocket = {
+        binaryType: 'arraybuffer',
+        onopen: null,
+        onmessage: null,
+        onclose: null,
+        onerror: null,
+        readyState: 0,
+        send(data: string) {
+          let envelope: { version: number; body?: { t?: string; id?: number; method?: string } };
+          try {
+            envelope = JSON.parse(data);
+          } catch {
+            return;
+          }
+          const frame = envelope.body;
+          if (frame?.t !== 'req' || frame.id === undefined) return;
+          // @kira/git-ipc's rpc.ts frame union: {t:'res', id, ok:true, result}.
+          const resultByMethod: Record<string, unknown> = {
+            'app.init': {
+              contractVersion: envelope.version,
+              serverVersion: 'ui-test',
+              git: { kind: 'ok', path: '/usr/bin/git', version: '2.40.0' },
+            },
+            'repo.list': { candidates: [], activeRepoId: gitRepoId },
+            'refs.list': {
+              branches: [
+                {
+                  refname: 'refs/heads/main',
+                  kind: 'branch',
+                  shortName: 'main',
+                  objectId: '0'.repeat(40),
+                  peeledObjectId: undefined,
+                  upstream: undefined,
+                  track: undefined,
+                  committerDate: 0,
+                  isHead: true,
+                  checkedOutIn: undefined,
+                  annotation: undefined,
+                },
+              ],
+              remoteBranches: [],
+              tags: [],
+              head: { kind: 'branch', name: 'main' },
+            },
+          };
+          const method = frame.method;
+          if (method === undefined || !(method in resultByMethod)) return; // hang forever
+          deliver(socket, {
+            version: envelope.version,
+            body: { t: 'res', id: frame.id, ok: true, result: resultByMethod[method] },
+          });
+        },
+        close() {
+          socket.readyState = 3;
+        },
+      };
+      setTimeout(() => {
+        socket.readyState = 1;
+        socket.onopen?.({});
+      }, 0);
+      return socket;
+    }
+
+    w.streamFactory = (name: string) =>
+      name === 'git' ? createGitMockSocket() : existingFactory?.(name);
+  }, REPO.repoId);
+}
+
+test('a repo workspace: switching the panel to Review mounts the review sidebar', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+  // Must land before the repo workspace ever opens (ensureWorkspaceShell mounts the pinned graph
+  // tab immediately, which is what first calls Stream('git') — repo/git/transport.ts's
+  // gitTransportFor is lazy, unlike bridge/port.ts's own module-scope Stream('engine'), so
+  // page.evaluate (not page.addInitScript) is both sufficient and correct here.
+  await installGitStreamMock(page);
+
+  await repoRow(page).dblclick();
+  await page.locator('[data-testid="repo-view-review"]').click();
+
+  await expect(page.locator('[data-testid="repo-review-host"]')).toBeVisible();
+  // The "no branch chosen yet" picker — ReviewView.vue's own branch selector — with a real branch
+  // row from the mocked refs.list, not an empty container.
+  const picker = page.locator('[data-testid="review-no-branch"]');
+  await expect(picker).toBeVisible();
+  await expect(picker.getByText('main', { exact: true })).toBeVisible();
+});
