@@ -199,6 +199,12 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return downloadObject(ctx, client, bucket, key, req.DestPath, op)
 }
 
+// KeyTypes — caps.KeyTypes is false; unreachable. An S3 object has no per-item engine-level
+// "type" the way a redis key's TYPE command reports one (caps.go's own comment).
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("s3", "key types")
+}
+
 // Cancel is index.ts's cancel — a permanent no-op, for the identical reason sqs's own Cancel
 // names: no server-side kill mechanism exists, so the op's own context.Context, passed directly
 // to every SDK call in catalog.go/read.go/mutate.go/transfer.go (P58d D3, never

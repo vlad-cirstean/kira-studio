@@ -244,6 +244,52 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("redis", "file transfer")
 }
 
+// KeyTypes is P63 §4.3: each path's TYPE, in the order given, one TYPE pipeline per distinct db
+// index (BrowseView.vue's own window is capped at 200 paths, well under one round trip's worth,
+// but a level can still mix keys from different db indices in principle — grouping keeps this
+// correct rather than assuming every path shares one).
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	set, err := a.requireSet()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, len(paths))
+	keys := make([]string, len(paths))
+	dbIndices := make([]int, len(paths))
+	for i, p := range paths {
+		dbIndex, key, err := a.resolveKeyTarget(p)
+		if err != nil {
+			return nil, err
+		}
+		keys[i] = key
+		dbIndices[i] = dbIndex
+	}
+	dbOrder, byDB := groupByDB(dbIndices)
+
+	for _, dbIndex := range dbOrder {
+		if err := adapters.CheckCancelled(ctx); err != nil {
+			return nil, err
+		}
+		conn, err := set.get(ctx, dbIndex)
+		if err != nil {
+			return nil, err
+		}
+		indices := byDB[dbIndex]
+		dbKeys := make([]string, len(indices))
+		for j, idx := range indices {
+			dbKeys[j] = keys[idx]
+		}
+		types, err := keyTypes(ctx, conn, dbKeys)
+		if err != nil {
+			return nil, err
+		}
+		for j, idx := range indices {
+			out[idx] = types[j]
+		}
+	}
+	return out, nil
+}
+
 // Cancel is index.ts's cancel (D7/D8): CheckCancelled between bounded SCAN-family rounds is fully
 // sufficient on its own — every op this adapter issues is either a bounded SCAN-family loop or a
 // single fast command — so this stays a permanent no-op rather than attempting a CLIENT KILL that

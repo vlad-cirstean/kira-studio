@@ -202,3 +202,57 @@ func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, nam
 	}
 	return adapters.TreeChildren{Nodes: nodes}, nil
 }
+
+// typer is the one *goredis.Client method keyTypes needs (mirrors scanner's own discipline, P58f
+// D14) — declared here so catalog_test.go can drive it with a fake instead of a live server.
+type typer interface {
+	Pipeline() goredis.Pipeliner
+}
+
+// groupByDB partitions parallel dbIndices/keys slices (index i is one path's own resolved db
+// index) into per-db-index batches, each carrying its own indices back into a caller's `out`
+// slice — the shape Adapter.KeyTypes needs to route each db index through its own connection
+// while still writing every result back in the original, caller-given order. `order` is the
+// db indices in first-seen order, so a caller iterating it visits each db index exactly once. A
+// free function so catalog_test.go can verify the routing/ordering discipline without a live
+// dbConnectionSet.
+func groupByDB(dbIndices []int) (order []int, byDB map[int][]int) {
+	byDB = map[int][]int{}
+	for i, dbIndex := range dbIndices {
+		if _, seen := byDB[dbIndex]; !seen {
+			order = append(order, dbIndex)
+		}
+		byDB[dbIndex] = append(byDB[dbIndex], i)
+	}
+	return order, byDB
+}
+
+// keyTypes is P63 §4.3's pipelined TYPE batch: one round trip for every key in `keys`, answered in
+// the same order they were given. TYPE never errors for a missing key — it replies "none" — so a
+// key deleted between the SCAN that found it and this call reports "none" here rather than failing
+// the whole batch; the renderer's own redisTypeIcon falls back to the generic glyph for that case.
+func keyTypes(ctx context.Context, conn typer, keys []string) ([]string, error) {
+	if len(keys) == 0 {
+		return []string{}, nil
+	}
+	pipe := conn.Pipeline()
+	cmds := make([]*goredis.StatusCmd, len(keys))
+	for i, key := range keys {
+		cmds[i] = pipe.Type(ctx, key)
+	}
+	// Exec's own error is non-nil only when a command in the pipeline actually failed — TYPE has
+	// no failure mode short of a connection error, so this is the real "something went wrong" case,
+	// not a per-key "not found" one (that's "none", answered successfully).
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, mapError(err)
+	}
+	out := make([]string, len(keys))
+	for i, cmd := range cmds {
+		t, err := cmd.Result()
+		if err != nil {
+			return nil, mapError(err)
+		}
+		out[i] = t
+	}
+	return out, nil
+}

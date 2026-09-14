@@ -54,6 +54,21 @@ func (s *TreeService) SchemaColumns(args TreeDescribeArgs) (tree.SchemaColumnsRe
 	return s.Deps.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
 }
 
+// TreeKeyTypesArgs is P63 §4.3's per-key type batch — Paths is capped client-side at 200
+// (BrowseView.vue's own visible-range window), never enforced here: the adapter pipelines
+// whatever it's given, and the renderer alone owns the batching discipline.
+type TreeKeyTypesArgs struct {
+	ConnectionID string   `json:"connectionId"`
+	Paths        []string `json:"paths"`
+}
+
+func (s *TreeService) KeyTypes(args TreeKeyTypesArgs) ([]string, error) {
+	if args.ConnectionID == "" {
+		return nil, ipcerr.BadRequest("connectionId is required")
+	}
+	return s.Deps.Tree.KeyTypes(args.ConnectionID, args.Paths)
+}
+
 // TreeInvalidateArgs's Path nil drops the whole connection; non-nil drops one node.
 type TreeInvalidateArgs struct {
 	ConnectionID string  `json:"connectionId"`

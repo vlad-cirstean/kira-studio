@@ -9,11 +9,14 @@ import (
 // no FK navigation, a shell-style console. Cancel is true and honest despite Cancel() returning
 // false permanently (C9) — CheckCancelled between bounded SCAN-family rounds is fully effective.
 var caps = adapters.Caps{
-	Tabular:         false,
-	Documents:       false,
-	KeyValue:        true,
-	Stream:          false,
-	KeyBrowser:      true, // P41: a db index's key namespace is unbounded — browsed in a Browse tab
+	Tabular:    false,
+	Documents:  false,
+	KeyValue:   true,
+	Stream:     false,
+	KeyBrowser: true, // P41: a db index's key namespace is unbounded — browsed in a Browse tab
+	// P63 §4.3: catalog.go's own KeyTypes pipelines TYPE per path, windowed by the renderer to the
+	// visible rows rather than the whole (up to 200 000-key) level.
+	KeyTypes:        true,
 	DefaultPageKind: page.PageKindKeyValue,
 	SQL:             true,
 	// P23 D10: stays false permanently — a key's type/TTL/memory usage are already on every

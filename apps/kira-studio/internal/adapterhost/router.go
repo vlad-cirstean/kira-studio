@@ -250,6 +250,33 @@ func (r *Router) SchemaColumns(ctx context.Context, connectionID string, path mo
 	return relations, nil
 }
 
+// KeyTypes is P63 §4.3's tree.Backend method — mirrors SchemaColumns' shape, uncached (tree/
+// service.go's own KeyTypes never reads/writes the metadata cache, see its doc comment).
+func (r *Router) KeyTypes(ctx context.Context, connectionID string, paths []model.NodePath) ([]string, error) {
+	adapter, err := requireLiveAdapter(connectionID)
+	if err != nil {
+		return nil, err
+	}
+	id := connectionID
+	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "keyTypes"},
+		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+			types, err := adapter.KeyTypes(ctx, paths, op)
+			if err != nil {
+				return nil, err
+			}
+			op.SetRows(len(types))
+			return types, nil
+		})
+	if err != nil {
+		return nil, err
+	}
+	types := value.([]string)
+	if types == nil {
+		types = []string{}
+	}
+	return types, nil
+}
+
 // ---- bridge.Canceller ----
 
 // Cancel asks the in-process scheduler — the only place an op can be running now that P58f's

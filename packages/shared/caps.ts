@@ -29,6 +29,11 @@ export interface Caps {
    *  tree shows the containers only (a redis `database`, an s3 `bucket`); the space itself is
    *  navigated in a Browse tab (§8.18). True for redis and s3, false for the other nine. */
   keyBrowser: boolean;
+  /** P63 §4.3: the adapter implements KeyTypes() — a batch of paths answered with each one's
+   *  engine-level value type, in one round trip. True only for redis (Browse's per-key type
+   *  icon/badge); false for the other nine, s3 included (an object has no per-item "type" the way
+   *  a redis key's TYPE command reports one). */
+  keyTypes: boolean;
   defaultPageKind: PageKind; // §5.1 "Default view" column — ADDED to §5's list (D4)
 
   // ---- language surfaces
@@ -90,6 +95,7 @@ export const capsSchema = /*#__PURE__*/ z.object({
   keyValue: z.boolean(),
   stream: z.boolean(),
   keyBrowser: z.boolean(),
+  keyTypes: z.boolean(),
   defaultPageKind: pageKindSchema,
   sql: z.boolean(),
   definition: z.boolean(),

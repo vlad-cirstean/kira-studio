@@ -91,6 +91,10 @@ type Adapter interface {
 	// false returns E_UNSUPPORTED. Honours ctx mid-stream and leaves no file behind on
 	// cancellation or failure.
 	DownloadObject(ctx context.Context, req model.ObjectDownloadRequest, op *OpCtx) (model.ObjectTransferResult, error)
+
+	// KeyTypes answers each path's engine-level value type, in the order given. Gated by
+	// Caps().KeyTypes; every adapter with that flag false returns E_UNSUPPORTED.
+	KeyTypes(ctx context.Context, paths []model.NodePath, op *OpCtx) ([]string, error)
 }
 
 // Deps is the Go analogue of adapter.ts's AdapterDeps.

@@ -383,6 +383,12 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("postgres", "file transfer")
 }
 
+// KeyTypes — caps.KeyTypes is false; unreachable. A relational table's rows have no per-item
+// engine-level "type" the way a redis key does.
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("postgres", "key types")
+}
+
 // Cancel is index.ts's cancel.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	a.mu.Lock()

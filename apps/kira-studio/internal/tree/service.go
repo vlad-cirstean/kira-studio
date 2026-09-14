@@ -35,6 +35,8 @@ type Backend interface {
 	Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error)
 	// SchemaColumns is P22c D1/D2's schema-wide sibling of Describe.
 	SchemaColumns(ctx context.Context, connectionID string, path model.NodePath) ([]model.RelationColumns, error)
+	// KeyTypes is P63 §4.3's per-key type batch — each path's engine-level value type, in order.
+	KeyTypes(ctx context.Context, connectionID string, paths []model.NodePath) ([]string, error)
 }
 
 type ChildrenResult struct {
@@ -251,6 +253,33 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 		_ = s.meta.Put(connectionID, path, "columns", encoded)
 	}
 	return SchemaColumnsResult{Relations: relations, Source: "server"}, nil
+}
+
+// KeyTypes is P63 §4.3's per-key type batch. Deliberately uncached, unlike Children/Describe/
+// Definition/SchemaColumns above: those each answer one node's own metadata, cached per (path,
+// kind) in the metadata_cache table; this answers a caller-chosen batch of up to 200 sibling
+// paths (BrowseView.vue's own visible-range window), which has no single node identity to cache
+// against and would otherwise grow one cache row per distinct window instead of per node.
+func (s *Service) KeyTypes(connectionID string, paths []string) ([]string, error) {
+	if err := s.requireConnected(connectionID); err != nil {
+		return nil, err
+	}
+	nodePaths := make([]model.NodePath, len(paths))
+	for i, p := range paths {
+		nodePath, err := model.DecodePath(connectionID, p)
+		if err != nil {
+			return nil, ipcerr.Internal(err.Error())
+		}
+		nodePaths[i] = nodePath
+	}
+	types, err := s.backend.KeyTypes(context.Background(), connectionID, nodePaths)
+	if err != nil {
+		return nil, err
+	}
+	if types == nil {
+		types = []string{}
+	}
+	return types, nil
 }
 
 // Invalidate drops L1 for one node (path non-nil) or the whole connection (path nil). No push of

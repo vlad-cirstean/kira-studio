@@ -41,6 +41,7 @@ func (f *fakeStates) StateOf(connectionID string) model.ConnectionState {
 type fakeBackend struct {
 	childrenN      atomic.Int64
 	schemaColumnsN atomic.Int64
+	keyTypesN      atomic.Int64
 	// childrenErr, when set, makes the next Children call fail instead of answering — used by
 	// TestStalePayloadIsNotDropped to prove a failed re-fetch never destroys the stale cache row.
 	childrenErr error
@@ -73,6 +74,17 @@ func (b *fakeBackend) SchemaColumns(ctx context.Context, connectionID string, pa
 	return []model.RelationColumns{
 		{Name: "x", Kind: "table", Columns: []model.ColumnMeta{{Name: "id", Position: 1, DataType: "integer"}}},
 	}, nil
+}
+
+// KeyTypes echoes each path's own last segment name as its "type" — enough for a caller to check
+// order preservation without this fake needing to understand redis's real type vocabulary.
+func (b *fakeBackend) KeyTypes(ctx context.Context, connectionID string, paths []model.NodePath) ([]string, error) {
+	b.keyTypesN.Add(1)
+	out := make([]string, len(paths))
+	for i, p := range paths {
+		out[i] = p.Segments[len(p.Segments)-1].Name
+	}
+	return out, nil
 }
 
 type harness struct {

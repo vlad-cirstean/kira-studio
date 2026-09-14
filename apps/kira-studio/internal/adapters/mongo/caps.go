@@ -14,6 +14,7 @@ var caps = adapters.Caps{
 	KeyValue:        false,
 	Stream:          false,
 	KeyBrowser:      false,
+	KeyTypes:        false,
 	DefaultPageKind: page.PageKindDocument,
 	SQL:             true,
 	Definition:      true,

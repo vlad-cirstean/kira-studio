@@ -25,6 +25,7 @@ type Caps struct {
 	KeyValue        bool          `json:"keyValue"`
 	Stream          bool          `json:"stream"`
 	KeyBrowser      bool          `json:"keyBrowser"`
+	KeyTypes        bool          `json:"keyTypes"`
 	DefaultPageKind page.PageKind `json:"defaultPageKind"`
 	SQL             bool          `json:"sql"`
 	Definition      bool          `json:"definition"`

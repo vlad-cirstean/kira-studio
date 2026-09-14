@@ -208,6 +208,12 @@ func (a *Adapter) DownloadObject(ctx context.Context, req model.ObjectDownloadRe
 	return model.ObjectTransferResult{}, adapters.Unsupported("kafka", "file transfer")
 }
 
+// KeyTypes — caps.KeyTypes is false; unreachable. A topic's messages have no per-item
+// engine-level "type" the way a redis key does.
+func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adapters.OpCtx) ([]string, error) {
+	return nil, adapters.Unsupported("kafka", "key types")
+}
+
 // Cancel is index.ts's cancel — a permanent no-op (P10's D6/D14, P32 D22). Unlike a sibling that
 // carries adapters.RunWithAbortRace, Kafka has no server-side kill mechanism at all — a fetch is a
 // request the broker answers or times out, there is no equivalent of pg_cancel_backend or KILL
