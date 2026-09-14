@@ -288,7 +288,7 @@ frameworks. On Linux that leaves two doors, and neither was opened here:
 Consequently `scripts/verify-packaging.sh` degrades honestly off macOS: with no bundle it prints one
 "skipped A1/A3/A5/A6/N2" note and one "skipped A4/N3" note and passes on the static checks alone,
 and even with a bundle it would skip A1/A3/A5/A6/N2 for want of `codesign`/`PlistBuddy`. **A green
-`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9), not that any
+`verify:packaging` on Linux proves only the static checks (S1/S2/S5/S6/S7/S8/S9/S10), not that any
 bundle is correct.** S9 (G10 — the extension manifest's `version` matches `build/config.yml`'s
 `info.version`) is a pure string comparison over two committed files, so it runs — and means
 something — even without a bundle; A6 (the bundled `.vsix` exists, is non-empty and `PK`-prefixed)
@@ -411,13 +411,28 @@ P29 added three more static checks, guarding §2.1/§2.2's own findings against 
   `window.__kiraGridEngine` shipping unconditionally, and catches the next hook added the same way.
 - **S8** — `apps/kira-studio/main.go` calls no `os.Getenv` at all — true since `KIRA_G1_BLANK` was
   deleted. A precise, low-false-positive invariant for the app's own entry point.
+- **S10** — no reference under `apps/` or `packages/` to `browser_download_url` or
+  `releases/download` — see P66 below, the guard that stops a later phase quietly turning the
+  availability banner into a downloader.
 
 There is no publish provider, no update feed, no `latest-mac.yml`, and no `.blockmap` — the last of
 those was an electron-builder differential-update artifact that has no equivalent here, so it is absent
 by construction rather than deleted per build.
 
-**What a future auto-update would require, in order:** code signing and notarization (SPEC.md §1/§3),
-then a SPEC.md scope change reversing "no auto-update", then an update feed and updater wiring.
+**P66 (v1.6) added an update-*availability* check — still not auto-update.** A tagged release build
+polls `GET https://api.github.com/repos/vlad-cirstean/kira-studio/releases/latest` (`internal/
+appupdate`, no `gh` CLI dependency — public metadata needs no per-user credential) and, when the
+tag is newer than the running build, shows a status-bar banner (`internal/bridge/update.go`,
+`frontend/src/workbench/StatusBar.vue`). Clicking it opens that release's GitHub page in the OS
+browser. It downloads nothing and installs nothing — S10 above is what keeps that true. A dev/test
+build (`buildinfo.Version` one of `0.0.0`/`0.0.0-dev`/`0.0.0-unknown`) makes no request at all. And
+because `release.yml`'s own release is created as a **draft** (step 3 above) that a human publishes
+by hand (step 4), **a draft release is invisible to the check** — `/releases/latest` excludes drafts
+and prereleases by construction, so nothing shows up until a human actually publishes.
+
+**What a future real auto-update (download + install) would require, in order:** code signing and
+notarization (SPEC.md §1/§3), then a SPEC.md scope change reversing "no auto-update", then an update
+feed and updater wiring.
 
 **Whether the release workflow has actually run:** *no — the first tag pushed will be the first real
 exercise of `release.yml`.*

@@ -104,6 +104,10 @@ footprint. The budget numbers (and what's measured) live in
   window — *Window → New Window*, ⇧⌘N (P8) — but only from a Go-side menu command, never from a
   renderer-initiated call: `JavaScriptCanOpenWindowsAutomatically: Disabled` (Renderer security
   surface, below) is unchanged, and the renderer never calls `window.open` or its own equivalent.
+  P66's update-availability check is a Go-side request for exactly this reason: `internal/
+  appupdate` fetches GitHub's release metadata itself, and the status-bar banner's click opens the
+  OS browser through `internal/shell`'s own seam (`NewDeferredBrowser`) — the renderer calls a
+  nullary `OpenReleasePage()` and neither sends nor receives a URL (UI architecture, below).
 
 ## Adapter contract
 
@@ -2581,6 +2585,41 @@ and **40.9x** in transient heap; Go's own base64 encoding (P58 D5) inflated it *
 is not what any kind uses today: P11 replaced it with a FlatBuffers frame decoded as zero-copy typed-
 array views, landing at +0.01–1.7% over raw buffer bytes with no transient heap copy on decode at all
 (`docs/PERF.md` §2.7).
+
+**Update-availability banner (P66, v1.6).** The status bar's right-hand group can show one more
+item, `[data-testid="update-available"]`, first in that group so the three existing readouts
+(`app-metrics`, `cache-size`, `engine-status`) keep their positions. `StatusBar.vue`'s left readout
+is unaffected — LAW 14 governs it, not this feature.
+
+- **What is checked.** `internal/appupdate.Checker` makes one plain `net/http` GET against
+  `https://api.github.com/repos/vlad-cirstean/kira-studio/releases/latest` — no dependency on
+  `internal/ghclient` (gated on a working, authenticated `gh` CLI — wrong precondition for a check
+  that should run for every user) or `internal/httpclient` (the user-facing request builder,
+  answering a different question). The two are reused only for their GitHub API version header
+  value, restated rather than imported.
+- **An untagged build never checks.** `buildinfo.Version` being one of the three dev sentinels
+  (`0.0.0`, `0.0.0-dev`, `0.0.0-unknown` — every `go run`/`go test`/local `wails3 task` build)
+  suppresses the check entirely: no request, no cache write, no goroutine. Only a tagged release
+  build (the version `release.yml` writes from the git tag) ever reaches the network.
+- **Cadence.** The renderer (`state/appUpdate.ts`) polls hourly after the first window mounts, off
+  the boot critical path; the Go side caches the real answer for 6 hours after a successful check
+  and 30 minutes after a failed one (`singleflight.Group` collapses concurrent callers — multiple
+  windows share one in-flight request), so the actual network cadence is Go's, not the renderer's.
+- **A failed check is silence, not a surface.** A network error, a `404` (no published release —
+  `release.yml` creates every release as a draft a human publishes by hand; a draft is invisible to
+  `/releases/latest` by construction), and a `403` (rate-limited) are all the same outcome: no
+  banner, no error dialog, no console output, logged at debug level and nothing more.
+- **Nothing is ever downloaded or installed.** The banner is availability-only; clicking it opens
+  the release's GitHub page in the OS browser. `scripts/verify-packaging.sh`'s S10 enforces this
+  statically (no `browser_download_url`/`releases/download` reference under `apps/` or `packages/`).
+- **The renderer never sends or receives a URL.** `internal/bridge.UpdateService.OpenReleasePage()`
+  is nullary; Go decides the URL (`Checker.ReleaseURL()`, validated by `safeReleaseURL` — https,
+  `github.com`, this repository's own `/releases/` path, or the constant `/releases` page
+  otherwise) and opens it through `internal/shell`'s `NewDeferredBrowser` seam, the same
+  deferred-adapter shape `NewDeferredDialogs` already uses. `internal/shell` stays the only package
+  importing `pkg/application` (unchanged). This matters because Wails' `BrowserManager.OpenURL`
+  validates nothing itself and macOS `open` will act on any scheme it recognises — `safeReleaseURL`
+  is the only check that ever runs before a URL reaches it.
 
 ## Git module (v1.3)
 

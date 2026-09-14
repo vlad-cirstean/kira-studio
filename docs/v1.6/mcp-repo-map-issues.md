@@ -166,6 +166,21 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   new golden-fixture ones). No non-trivial finding in P64b's own new surface — every call returned
   the expected, correctly-scoped result.
 
+- **P66 (implementation)**: same `ConnectionRefused`/stale-token pattern as every entry above — no
+  live server at session start, built (`bun run mcp:repo-map:build`), started
+  (`bun run mcp:repo-map`, backgrounded), found one stale hashed token file under
+  `/root/.kira-studio/` and deleted it, restarted to mint a fresh bearer token, called it over plain
+  HTTP/JSON-RPC per the headless steps throughout. Used it while implementing (`search_symbols` for
+  `NewDeferredDialogs` to confirm the exact shape to model `NewDeferredBrowser` on;
+  `find_references {"symbol":"NewDeferredBrowser"}` after writing it, correctly returning the one
+  real call site in `main.go`). Mandatory dogfood check: `outline_file` against the brand-new
+  `internal/appupdate/checker.go` (written this same phase, so this doubles as "does the index pick
+  up a file created mid-session without a restart" — yes: 21 nodes, complete and correctly ordered).
+  One trivial slip, my own: called `outline_file` with `path` out of habit — rejected ("unexpected
+  additional properties"); the real parameter is `file`, exactly as P63's own entry already logged.
+  Not a new finding, just a repeat of not reading `tools/list` first; fixed inline by doing so. No
+  non-trivial finding this phase.
+
 - **P64c (implementation)**: same leftover-orphaned-process pattern as every entry above — a
   `kira-repo-map`/`bun run scripts/mcp-repo-map.ts` pair from an earlier session was already
   running at session start (`ConnectionRefused` for the native tool surface, expected), consuming
