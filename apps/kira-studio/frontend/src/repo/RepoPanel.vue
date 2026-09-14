@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { repoIdOfWorkspace } from '@shared/domain/workspace';
-import { computed, onMounted, onUnmounted, reactive } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, watch } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
 import { codeRepoRecord } from '../state/coderepos';
+import { ensureReviewPanelWidth } from '../state/layout';
 import { workspaceState } from '../state/workspace';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PanelShell from '../theme/primitives/PanelShell.vue';
 import SegmentedControl from '../theme/primitives/SegmentedControl.vue';
 import RepoFileTree from './RepoFileTree.vue';
+import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
 import { repoSearchView, setRepoSearchView } from './state/search';
@@ -22,15 +24,40 @@ const repoName = computed(() => codeRepoRecord(repoId.value)?.name ?? '');
 const local = reactive({ search: '' });
 
 // C7 D9: lives in repo/state/search.ts, not component state, so switching workspaces and back
-// does not reset it.
+// does not reset it. C11 §5.3: 'review' joins files/search as this segment's third value.
 const view = computed({
   get: () => repoSearchView(repoId.value),
-  set: (v: 'files' | 'search') => setRepoSearchView(repoId.value, v),
+  set: (v: 'files' | 'search' | 'review') => setRepoSearchView(repoId.value, v),
 });
 const viewOptions = [
   { value: 'files' as const, label: 'Files', testid: 'repo-view-files' },
   { value: 'search' as const, label: 'Search', testid: 'repo-view-search' },
+  { value: 'review' as const, label: 'Review', testid: 'repo-view-review' },
 ];
+
+// C11 §8.4/§5.3: this panel is one persistent component instance across every repo workspace
+// (WorkbenchShell.vue's `<component :is="activeModePanel" />` carries no per-repo key, unlike a
+// tab), so "kept alive with v-show while the workspace is open" (§8.4) is tracked per repoId here
+// rather than with a single boolean — switching to a DIFFERENT repo's workspace and back remounts
+// (review.session.save/load, S6, is exactly the resume path that makes that safe) while switching
+// between this SAME repo's Files/Search/Review segments never does, since the set entry it added
+// on first activation never goes away.
+const reviewActivatedRepoIds = reactive(new Set<string>());
+// A watcher, not the computed setter above, because setRepoSearchView also has a second caller
+// (hostHandlers.ts's review.open, via "Review branch changes") this component's own setter is
+// never in the call path for.
+watch(
+  view,
+  (v) => {
+    if (v !== 'review') return;
+    reviewActivatedRepoIds.add(repoId.value);
+    // §14 OQ2: widen once, only if the user has never manually resized the panel — checked inside
+    // ensureReviewPanelWidth itself (state/layout.ts's own widthUserSet). 320px: VS Code's ~300px
+    // sidebar default, rounded up a little for the review panes' own extra density.
+    ensureReviewPanelWidth(320);
+  },
+  { immediate: true },
+);
 
 function onRefresh(): void {
   void refreshRepoTree(repoId.value);
@@ -98,7 +125,15 @@ onUnmounted(() => {
                a first open this fast. -->
           <RepoFileTree class="repo-tree" :repo-id="repoId" :search="local.search" />
         </template>
-        <RepoSearchView v-else class="repo-tree" :repo-id="repoId" />
+        <RepoSearchView v-else-if="view === 'search'" class="repo-tree" :repo-id="repoId" />
+        <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown, never
+             destroyed, by a Files<->Review or Search<->Review switch within this same repo. -->
+        <RepoReviewView
+          v-if="reviewActivatedRepoIds.has(repoId)"
+          v-show="view === 'review'"
+          class="repo-tree"
+          :repo-id="repoId"
+        />
       </div>
     </template>
   </PanelShell>

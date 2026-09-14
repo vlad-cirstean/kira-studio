@@ -64,8 +64,22 @@ export function toggleOperationsPanel(): void {
   patchLayout({ panel: { operations: { visible: !layoutState.panel.operations.visible } } });
 }
 
+// C11 §14 OQ2: this is the panel's own resize handle (WorkbenchShell.vue's `@resize`) — its only
+// call site — so a call here is always a real user drag. Sets widthUserSet alongside width so
+// ensureReviewPanelWidth below never widens a panel the user has already sized for themselves.
 export function setProjectWidth(width: number): void {
-  patchLayout({ panel: { project: { width } } });
+  patchLayout({ panel: { project: { width, widthUserSet: true } } });
+}
+
+/** C11 §14 OQ2 (S14): the review segment's first-activation widen — only when the user has never
+ *  manually resized the panel (setProjectWidth above is the sole thing that ever sets
+ *  widthUserSet), and only when the current width is already narrower than `minWidth`. Never
+ *  touches widthUserSet itself: this is Kira widening its own default, not the user resizing it,
+ *  so a later genuine drag is still the first one recorded. */
+export function ensureReviewPanelWidth(minWidth: number): void {
+  const project = layoutState.panel.project;
+  if (project.widthUserSet || project.width >= minWidth) return;
+  patchLayout({ panel: { project: { width: minWidth } } });
 }
 
 export function setCellEditorHeight(height: number): void {
