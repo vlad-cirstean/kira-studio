@@ -82,12 +82,14 @@ duplicated here; this file only points at them.
   time, so the commit log is the durable record. Carry forward only a genuinely still-open item (see
   "Known open items"), never a running narrative of what each round found.
 - No per-phase PRs. One feature branch per chapter.
-- **`P` phase numbers form one running sequence across every `P`-lettered chapter, not per-chapter.**
-  v1.1/v1.2/v1.4/v1.6/v1.8 continue one counter (v1.6 topped out at `P70`; v1.8 starts at `P71`).
-  Before opening a new `P` chapter, scan every prior chapter's `SPEC.md` for the highest `P` number
-  used, not just the chapter immediately before it — a chapter that takes a fresh letter instead
-  (v1.5's `C`, v1.7's `M`) doesn't consume `P`'s counter, so the next `P` chapter continues from the
-  last chapter that actually used `P`, wherever it sits in the timeline.
+- **Every chapter uses `P` phase numbers, one running sequence across the whole repo, not
+  per-chapter.** v1.1/v1.2/v1.4/v1.6/v1.8 continue one counter (v1.6 topped out at `P70`; v1.8
+  starts at `P71`). Before opening a new chapter, scan every prior chapter's `SPEC.md` for the
+  highest `P` number used across all of them, not just the chapter immediately before it, and
+  continue from there — regardless of whether that chapter was shaped as independent misc phases or
+  one cohesive subsystem. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and stay
+  as shipped, never renumbered after landing; every chapter from here on, cohesive-subsystem chapters
+  included, uses `P`.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`, no
   skipped validation to make something demo. Scope left out of a phase stays out entirely, never
   half-implemented.
