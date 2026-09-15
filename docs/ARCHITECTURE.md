@@ -5,18 +5,20 @@ driver/dependency choices, protocol constraints, capability quirks, structural r
 behind them — organized by subsystem/engine so a future session can look something up without
 reconstructing it from phase-history prose. Environment-specific operational notes (running
 Docker in Claude Code's own sandbox, working around a proxy block, which env var a headless
-Linux box needs) belong in `CLAUDE.md`, not here.
+Linux box needs) belong in `docs/DEV_ENVIRONMENT.md`, not here.
 
 The tree outranks this file — if they disagree, the tree is right and this file needs
 fixing, not the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
-`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`), **this file is authoritative for behavior**: each
-`SPEC.md` records what that chapter was *specified* to be, phase by phase, kept as
-originally written rather than corrected to match later reality — see each chapter's own
-`README.md` for what those folders are and aren't.
+`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`, `docs/v1.4/`, `docs/v1.5/`, `docs/v1.6/`), **this file is
+authoritative for behavior**: each `SPEC.md` records what that chapter was *specified* to be,
+phase by phase, kept as originally written rather than corrected to match later reality — see
+each chapter's own `README.md` for what those folders are and aren't.
 
 **Related documents:** [`docs/PERF.md`](PERF.md) (performance budgets and measured results),
 [`docs/PACKAGING.md`](PACKAGING.md) (macOS build and packaging verification),
 [`docs/design/kira-design-system/`](design/kira-design-system/) (the workbench visual reference),
+[`docs/DEV_ENVIRONMENT.md`](DEV_ENVIRONMENT.md) (how to build, run and test this repo in
+whatever sandbox a session happens to be in),
 [`CLAUDE.md`](../CLAUDE.md) (the working agreement for changes to this repo).
 
 ## Stack
@@ -449,7 +451,10 @@ connection-flow change out of scope for this pass.
 
 ## Storage
 
-`~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`) and `logs/`.
+`~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`), `logs/`, the git module's own
+`review.db`, `codeindex.db` (plus its `-wal`/`-shm`), `git.sock`/`git.sock.lock`, the
+per-repository sync flocks `codeindex-sync-<12 hex>.lock`, and the repo-map MCP tokens
+`mcp-repo-map-*-token.json` — each covered in its own paragraph below.
 
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
 Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
@@ -1101,9 +1106,10 @@ the nav-level reason (a repository is an instance inside the Git module, not a s
 - **The pin is a property of the tab *kind*, not a per-tab flag.** `repo-graph` is the only pinned
   kind (`TabKindDef.pinned`) — permanently first (`tabsForWorkspace`'s own stable partition, pinned
   tabs first in array order, then the rest), unclosable, un-reorderable, un-duplicable. This phase
-  builds the mechanism and an honest placeholder view for that slot (`views/repo/RepoGraphView.vue`,
-  *"The commit graph for this repository is not available yet"* — no stubbed handler, no `TODO`);
-  **C9 replaces exactly one `TAB_VIEWS['repo-graph']` line** with the real `packages/git-ui` mount.
+  (C5) built the mechanism behind an honest placeholder view for that slot
+  (`views/repo/RepoGraphView.vue`, no stubbed handler, no `TODO`); **C10 replaced the
+  `TAB_VIEWS['repo-graph']` mapping** (`workbench/tabViews.ts`) with the real `packages/git-ui`
+  mount (`RepoGraphTabView`).
 - **The file list is `codeindex.EnumerateAll`** (`internal/codeindex`, C1's own `Enumerate`
   widened to drop its parseable-extension filter, D6) — the same `git ls-files -z --cached --others
   --exclude-standard` argv, so a project tree and C1's own parse pipeline can never disagree about
@@ -1847,12 +1853,14 @@ proposed, is declined with a reason.**
 flag exactly as before — a template-only wrapper, not a behaviour change, and the artefact a future
 `packages/api-ui` (still not built — see below) would extend rather than replace.
 
-**`packages/api-ui` does not exist, and the reason is a measurement, not neglect.** The module
-mounts 43 `theme/primitives/*` imports across eleven distinct Vue components, plus `CodiconIcon`,
-`CodeMirrorHost.vue`, `editor/theme`, `beautify`/`format`/`clipboard`, and
-`views/shared/viewOp.ts` — extracting a UI package first needs `packages/ui-kit` (`theme/**` plus
-`primitives.css`/`tokens.css`/`base.css` plus those three utility modules), which **90 of this
-renderer's 287 source files import**. Moving `theme/**` out from under the phase that styles the
+**`packages/api-ui` does not exist, and the reason is a measurement, not neglect.** At P12, the
+module mounted 43 `theme/primitives/*` imports across eleven distinct Vue components, plus
+`CodiconIcon`, `editor/CodeMirrorHost.vue` (since replaced by `editor/MonacoHost.vue`, P60a/P60b),
+`editor/theme`, `beautify`/`format`/`clipboard`, and `views/shared/viewOp.ts` — extracting a UI
+package first needs `packages/ui-kit` (`theme/**` plus `primitives.css`/`tokens.css`/`base.css`
+plus those three utility modules), which **90 of the renderer's 287 source files imported at
+P12** (both figures have grown by two chapters since, but the argument stands regardless of the
+exact current counts). Moving `theme/**` out from under the phase that styles the
 Api module against it next would be exactly backwards. This phase instead makes the
 remaining couplings small and lint-fenced (`api/tabs.ts`, `bridge/apiControl.ts`, and `biome.json`'s
 own six rules) so that a later `packages/ui-kit` extraction turns `packages/api-ui` into a move
@@ -2220,20 +2228,25 @@ every mount regardless of pane or live response — the same "fetch once, uncaug
 `collectionsList`/`variablesListEnvironments` already use — which is what lets a restored tab say
 "N past responses" before the user ever opens the pane.
 
-**Comparing two entries reaches for `@codemirror/merge` for the one thing it's actually built for
-— the body — and a plain keyed comparison for headers, not the same algorithm twice (P8).**
-`ResponseDiffDialog.vue` mounts a real `MergeView`, both sides read-only, line-aligned and
-intra-line-highlighted; both bodies are pretty-printed through the same `beautifyJson`/`beautifyXml`
-the live pane already uses, but only when both sides are the *same* recognised format — a diff of
-two minified 40 KB single lines tells the user nothing, and pretty-printing is lossless by
-construction (P2), so it never misrepresents what came back. The headers table, by contrast, is
-reduced to added/removed/changed/unchanged by header **name** rather than by the library's own
-text-diff: headers are a keyed structure, not ordered prose, so a name-keyed comparison stays
-correct even when two servers emit the same set in a different order, and needs no diff algorithm
-of its own — @codemirror/merge's actual diff/LCS machinery earns its keep in the body view, not
-here. The library is a lazy chunk (`views/httprequest/mergeEntry.ts`, the same one-line
-dynamic-`import()` entry-file shape as `sqlFormatterEntry.ts` and the two `fakerEntry.ts` files,
-above), fetched only the first time anyone presses **Compare**, so it costs no launch bytes. A is
+**Comparing two entries reaches for Monaco's diff editor for the one thing it's actually built for
+— the body — and a plain keyed comparison for headers, not the same algorithm twice (P8; moved
+onto Monaco in P60a, `6bc45255`, which deleted `@codemirror/merge` from the dependency tree).**
+`ResponseDiffDialog.vue` mounts a real diff editor (`mod.editor.createDiffEditor`, reached through
+the same shared `loadMonaco()` boundary every other Monaco surface uses), both sides read-only,
+line-aligned and intra-line-highlighted (`renderSideBySide: true`,
+`hideUnchangedRegions: { enabled: true }`); both bodies are pretty-printed through the same
+`beautifyJson`/`beautifyXml` the live pane already uses, but only when both sides are the *same*
+recognised format — a diff of two minified 40 KB single lines tells the user nothing, and
+pretty-printing is lossless by construction (P2), so it never misrepresents what came back. The
+headers table, by contrast, is reduced to added/removed/changed/unchanged by header **name**
+rather than by a text-diff: headers are a keyed structure, not ordered prose, so a name-keyed
+comparison stays correct even when two servers emit the same set in a different order, and needs
+no diff algorithm of its own — Monaco's own diff/LCS machinery earns its keep in the body view,
+not here. `@codemirror/merge`'s own former chunk (`views/httprequest/mergeEntry.ts`, P8) is gone;
+the diff editor now shares the one lazy `monacoEntry` chunk `loadMonaco()` fetches and memoizes for
+every other editor surface in the app (the cell editor, the request/response body editors), not a
+separate per-feature chunk of its own — fetched once, the first time any Monaco surface mounts, not
+specifically on **Compare**. A is
 fixed as the chronologically older of the two selected entries, never by click order, so the diff's
 direction is never a surprise; a binary body on either side withholds only the body level, with the
 summary and headers levels still shown and the reason stated inline.
@@ -2305,8 +2318,10 @@ two numbers the two had drifted into.
 diagnostics/hover providers (`views/console/sqlLanguageService.ts`, `sqlDiagnostics.ts`,
 `sqlHover.ts`) read one `DdlSchema` (`state/schemaColumns.ts`'s `effectiveSchema`), itself layered
 in precedence order: a user-pasted DDL document (`connection_ddl`, below), parsed via
-`@codemirror/lang-sql`'s own per-dialect Lezer parser, still wins wholesale the moment it declares
-any table; with none, P22c's metadata cache (`state/schemaColumns.ts`'s `schemaColumnsState`,
+`packages/shared/domain/sql-tokens.ts`'s own hand-rolled tokenizer (`views/console/ddl.ts`, P60b
+— replaced `@codemirror/lang-sql`'s per-dialect Lezer parser when the dependency was removed
+app-wide), still wins wholesale the moment it declares any table; with none, P22c's metadata cache
+(`state/schemaColumns.ts`'s `schemaColumnsState`,
 filled from the same `kira:tree:schemaColumns` call the tree's own container rows already warm)
 fills in real column-aware completion with no manual step; with neither, P4 falls back to bare
 relation names read straight from the tree's own already-loaded node cache
@@ -2315,7 +2330,9 @@ relation names read straight from the tree's own already-loaded node cache
 `rootContainerPathFor`/`rootRelationNames` resolve the single container a root console actually
 runs against (or union whatever containers the tree already has loaded) from data already in the
 renderer, never a new round trip. Only when all three are empty does a console fall back to
-`@codemirror/lang-sql`'s own bare keyword completion, unchanged from before P18. No schema
+`packages/shared/domain/sql-keywords.ts`'s own bare keyword completion
+(`views/console/sqlKeywordCompletion.ts`, P60b — replaced `@codemirror/lang-sql`'s own vocabulary),
+unchanged in shape from before P18. No schema
 introspection is ever issued *from the language layer itself* — every fetch above is triggered by a
 view's own lifecycle hook (tab activation, tree expansion), never from a `CompletionSource`.
 
@@ -3086,11 +3103,13 @@ to Go.
 collision-aware middleware** (`flip`/`shift`/`size`), rendered teleported so no `overflow: hidden`
 ancestor can clip it. The audit establishing this is stated per *mechanism*, not per module,
 because a first pass concluded one frontend was clear on the strength of its most common mechanism
-and missed a second: a native `title` attribute, a CodeMirror `hoverTooltip` (whose container
-defaults to the editor's own DOM node unless `parent: document.body` is set explicitly, and which
-carries its own hardcoded `z-index` uncoordinated with this app's `--kira-z-tooltip` token), and
-any bespoke click-point popup are each their own path. A module is not clear because one of its
-mechanisms is.
+and missed a second: a native `title` attribute, a Monaco hover/suggest widget (whose container
+defaults to the editor's own DOM node unless reparented to `document.body` explicitly — P60a hit
+exactly this failure mode, `789fc4c7`, "actually reparent Monaco hover/suggest widgets to
+`document.body`" — and which by default carries Monaco's own theme variables uncoordinated with
+this app's tokens, until P67c themed Monaco's menu/suggest/list widgets from the Kira palette,
+`e7e2c546`), and any bespoke click-point popup are each their own path. A module is not clear
+because one of its mechanisms is.
 
 **A webview panel can instantiate correctly and still be invisible, which is why the guard asserts
 pixels.** A shipped build once rendered the graph with a correct `aria-rowcount` while the panel
