@@ -1997,6 +1997,15 @@ onMounted(() => {
   // watch (below) only fires on a *change*, so the first value needs setting here too.
   navColumns = navColumnsFor(rt()?.meta ?? null);
 
+  // M7 finding #5: this component remounts on every tab switch (`:key="activeTab.id"` in
+  // MainView.vue), which resets maskRulesByColumn/maskTagCache/maskTransform — all component-
+  // scoped `let`s above — back to empty. Without this call, the dataSourceState() built just below
+  // would silently bake in `undefined` for activeMaskTransform even when mask preview is already
+  // on for this tab, rendering real values while the toggle still reads "on". Cheap in the common
+  // remount case: state/maskRules.ts's own in-memory store already has this connection's rules
+  // loaded from the earlier mount, so this is a synchronous re-fold, not a re-fetch.
+  refreshMaskFolding();
+
   dataSource = createGridDataSource(dataSourceState(p, order));
 
   // Real-interaction fix (§5 D8's own header-height gap, found chasing the header interaction
@@ -2252,6 +2261,20 @@ onMounted(() => {
   const pendingFocus = consumeCellFocus(props.tabId);
   if (pendingFocus && !applyCellFocusRequest(pendingFocus)) {
     requestCellFocus(props.tabId, pendingFocus);
+  }
+
+  // M7 finding #5 (cont'd): refreshMaskFolding() above fixes the synchronous fold, but a
+  // correlating rule's tags still need this connection's own key plus a fresh HMAC pass over the
+  // current page — maskTagCache was reset to empty by the remount too. Mirrors the pageVersion
+  // watch's own async tail (below) exactly: render synchronously (already done, correct but
+  // tag-less, by the `grid.render()` above), then fill tags in once the async pass resolves.
+  if (maskPreviewOn()) {
+    void refreshMaskTagCache().then(() => {
+      if (!grid || !dataSource) return;
+      dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
+      grid.invalidateAllRows();
+      grid.render();
+    });
   }
 });
 

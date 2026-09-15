@@ -11,6 +11,10 @@ import {
 } from './support/postgresFixture';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
+function tabLocator(page: import('@playwright/test').Page, tabId: string) {
+  return page.locator(`[data-testid="tab"][data-tab-id="${tabId}"]`);
+}
+
 // M5 §8's own UI spec: mark a column PII from the grid header menu, verify the preview masks it
 // and locks editing everywhere a write could otherwise happen, then turn it off and verify the
 // real value and normal editing both return.
@@ -272,4 +276,32 @@ test('grid mask preview — mark a column PII, preview masks and locks editing, 
   await expect(page.locator('[data-testid="toolbar-add-row"]')).toBeEnabled();
   await gridCell(page, 0, 'email').click();
   await expect(panel).not.toHaveAttribute('data-read-only-reason');
+
+  // M7 finding #5: turn the preview back on, then switch away and back to this same tab (a table
+  // row's own "Open query console" needs no extra IPC mocking — it registers editor commands only,
+  // ConsoleSavedMenu.vue's own queriesListConsole fetch is gated behind a popover this never opens).
+  // SlickGridHost remounts on every tab switch (MainView.vue's `:key="activeTab.id"`), resetting
+  // its component-scoped mask state — before this fix that reset left the remounted grid showing
+  // real values while the toggle and badge still read "masked"/"read-only".
+  await toggle.click();
+  await expect(toggle).toHaveClass(/is-active/);
+  await expect(gridCell(page, 0, 'email')).toHaveText('m•••••••••••••@acme.example');
+
+  const customersTabId = await page
+    .locator('[data-testid="tab"]')
+    .first()
+    .getAttribute('data-tab-id');
+  if (!customersTabId) throw new Error('expected the customers tab to have an id');
+
+  await openRowMenu(page, CUSTOMERS_PATH);
+  await page.click('[data-testid="menu-item-open-console"]');
+  await expect(page.locator('[data-testid="tab"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="data-grid"]')).toHaveCount(0);
+
+  await tabLocator(page, customersTabId).click();
+  await expect(grid).toBeVisible();
+  await expect(toggle).toHaveClass(/is-active/);
+  await expect(gridCell(page, 0, 'email')).toHaveText('m•••••••••••••@acme.example');
+  await expect(gridCell(page, 0, 'email')).toHaveClass(/cell-masked/);
+  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-only');
 });
