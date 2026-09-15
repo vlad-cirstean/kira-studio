@@ -74,6 +74,20 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
     checks. Needs its own pass in `internal/repomap`'s Go declaration/reference resolution before
     a future phase can rely on `find_references` for struct-field navigation.
 
+  Reproduced during M2 planning on a second field (`ConnectionFields.McpEnabled`, eight live uses,
+  `find_references`/`search_symbols` both return nothing) — same defect class, not a new entry.
+  Gates M2's implementation per this log's own rule; scheduled as **M1c**, a dedicated fix pass
+  between M1ab and M2 (`docs/v1.7/SPEC.md`).
+
+- **M2 (planning)**: `find_implementations` rejects a `limit` argument outright while
+  `search_symbols`/`find_references`/`search_files` all accept one — trivial, an inconsistent
+  argument surface across the eight tools, not fixed here. No workaround needed (result sets were
+  small enough not to need limiting).
+
+- **M2 (planning)**: initial sync on this repository ran past 60s in this session; every call
+  issued in that window returned an `isError` "still building" result. Trivial — retried after sync
+  finished, no fix needed (index-build time is P64c's own concern, not a new defect).
+
 <!--
 Entry template:
 
