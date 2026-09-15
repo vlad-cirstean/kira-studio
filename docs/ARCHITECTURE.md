@@ -3810,20 +3810,26 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   new preflight, a new dialog and a `ContractVersion` bump — out of scope until a phase actually
   asks for it.
 
-C14's architecture/security review:
-- **`internal/codeindex/watch.go`'s `Watcher.Close()` doesn't cancel an in-flight full `Sync`** —
-  can block for the sync's whole duration (minutes on a large repo after an fsnotify overflow/
-  rescan trigger), and this stall propagates into several teardown/shutdown code paths, one of which
-  holds `Registry.mu` while blocked.
-- **The initial-sync goroutine in `codeworkspace/session.go`/`repomap/server.go` isn't joined before
-  `Index.Close`/`store.Close()`** — a narrow race where a still-running parse worker can touch
-  already-closed state.
-- **A `Session.EnsureIndex` vs `Close` race can leak a watcher goroutine** in a narrow timing
-  window.
-- **Watcher writes arriving during the initial sync's one large transaction can be dropped** after a
-  5-second busy-timeout on a very large repo (unmeasured, theoretical).
+Architecture/security:
+- **`codeworkspace/session.go`'s initial-sync goroutine (`EnsureIndex`) isn't joined before
+  `Close()` touches the index it's still writing to.** `repomap/instance.go`'s equivalent path is
+  fixed (`syncDone`, closed by `runInitialSync`; `close()` waits on it before calling `idx.Close()`)
+  — `codeworkspace.Session.Close()` cancels the sync context and calls `watcher.Close()`/
+  `index.Close()` immediately after, with no equivalent wait, so a still-running parse worker can
+  touch state `index.Close()` just freed.
+- **A `Session.EnsureIndex` vs `Close` race can leak a watcher goroutine.** `EnsureIndex` sets
+  `s.index`/`s.graph`/`s.ready`/`s.cancel` under lock, then calls `idx.Watch` and assigns
+  `s.watcher` *unlocked* and after a second lock/unlock — if `Close()` (which snapshots every field
+  and clears them under one lock, then runs `closeOnce`) interleaves between those two steps, the
+  watcher `EnsureIndex` assigns afterward is never captured by the already-run `Close()` and never
+  closed by a second call (`closeOnce` no-ops it).
+- **Watcher writes arriving during the initial sync's one large transaction can be dropped past
+  SQLite's busy-timeout on a very large repo — narrowed, not closed.** `f15309ca` added a bounded
+  `SQLITE_BUSY`/`LOCKED` retry (`replaceFilesTxWithBusyRetry`, 5 attempts × 200ms) around every
+  batch write, stretching the effective tolerance past the DSN's 5s `busy_timeout`; still unmeasured
+  and still theoretical for a repository large enough to exhaust the retry budget too.
 
-C14's correctness review:
+Correctness:
 - **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
   is never cleared when consumed via the live-event path** (`review.target`, for an already-mounted
   review view) — only the cold-mount path (`takePendingReviewTarget`) ever drains it. Checked
@@ -3835,7 +3841,7 @@ C14's correctness review:
   empty list with no retry banner**, unlike `loadDiff`'s own C13-9 treatment — a transient failure
   looks identical to "all comments were deleted."
 
-C14's performance review:
+Performance:
 - **`repo/state/fileTree.ts`'s tree-filter computed has per-row reactive dependency tracking**
   costing 3-3.5x at the 200,000-file cap (C13-6's `markRaw` covered the tree structure but not the
   `status`/`expanded` reactive lookups inside the filter).
@@ -3848,11 +3854,3 @@ C14's performance review:
 - **A restored session on app boot starts every restored repo's index sync with no cross-repo
   concurrency limiter** — likely fine in practice (incremental after first run) but unmeasured at
   scale.
-- **No standalone merge or rebase operation exists anywhere in this stack** (P67b §1.5) — not in
-  `gitsession/ops.go`'s `opTable` (the 22 kinds `op.run` serves), not in `OpRequest`
-  (`packages/git-ipc/src/contract.ts`), not in `packages/git-ui`'s menus, not in the VS Code
-  extension. Merge and rebase are reachable only as `remote.run` kind `pull`'s three strategies
-  (`PullStrategy = 'ff-only' | 'merge' | 'rebase'`) and inside `stack.restack`'s own rebase
-  executor — never as a user-invoked operation against two arbitrary branches. Building one needs a
-  new `op.run` kind, a new `opSpec` with its own undo policy, a new preflight, a new dialog, and a
-  `ContractVersion` bump — a real feature, not a one-line gap.
