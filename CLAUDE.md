@@ -164,7 +164,13 @@ Headless setup, for a session with no GUI:
 1. `bun run mcp:repo-map:build` — once per clone, since the first build is slow (cgo).
 2. `bun run mcp:repo-map` — rebuilds (cached, sub-second), then serves in the foreground; background
    it, since the next steps need the same shell. It serves this worktree's root.
-   `bun run mcp:repo-map --repo <path>` serves another checkout instead.
+   `bun run mcp:repo-map --repo <path>` serves another checkout instead. **If the startup banner
+   says "Using this repository's existing token" instead of printing a `claude mcp add` command**,
+   a prior session (in this container, within the last 7 days) already minted one — this session
+   has no way to know that plaintext and cannot call the server at all as-is. This is now the
+   common case in a multi-session container, not an edge case: delete that repository's
+   `mcp-repo-map-*-token.json` under `KIRA_HOME` and restart to mint a fresh one before continuing
+   to step 3/4, rather than debugging what looks like a 401.
 3. `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
    "Authorization: Bearer <token>"` — the command it prints on startup; use the host and port from
    that printed banner, not this literal — 8765 is only the first choice, and a second concurrent

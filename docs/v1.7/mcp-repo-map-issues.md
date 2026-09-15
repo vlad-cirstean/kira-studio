@@ -114,6 +114,27 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   matches it) — read the output and extract the right PID, never pipe `pgrep -af`'s output straight
   into `kill`.
 
+- **M4 (planning)**: `find_references{"symbol":"GeneratorId"}` returns 5 hits, all `.ts` — the type
+  is also consumed from three `.vue` script-block sites (`GenerateDataDialog.vue`, the dialog that
+  owns the generator picker, the most relevant consumer for a phase about the generator catalogue).
+  Same class as v1.6's P60a/P63/P67e Vue blind-spot entries, but the first instance of it biting on
+  a *type consumed from* a `.vue` file rather than a definition/reference inside one. No fix
+  attempted (Vue is out of repo-map's confirmed scope); noted since it's a slightly different shape
+  of the known gap.
+
+- **M4 (planning) — M1c reconfirmed on more unrelated material**: `search_symbols` correctly returns
+  `field NameHeuristic.generatorId` and `field Recipe.generatorId` with exact lines, in TypeScript.
+  Third confirmation of the M1c fix holding, not a new finding.
+
+- **M4 (planning) — token-restart friction (M3's #4) recurred a third consecutive pass.** Fixed
+  inline this time: `CLAUDE.md`'s headless-setup step 2 now names this explicitly as "the common
+  case in a multi-session container" and tells a session to delete-and-restart immediately rather
+  than debug a 401. Trivial, closed.
+
+- **M4 (planning)**: `pgrep -af` self-match reconfirmed exactly as this log's existing entry
+  describes — two rows, the real server process and the invoking shell. No new information; killed
+  correctly by PID.
+
 <!--
 Entry template:
 
