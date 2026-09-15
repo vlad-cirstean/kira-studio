@@ -209,10 +209,27 @@ func runesEqual(a, b []rune) bool {
 // genuine (often unterminated) comment, silently swallowing everything after it, including the
 // real `;` that should have tripped ClassifySQL's embedded-statement guard — a permission-gate
 // bypass, not just a cosmetic parse difference.
+//
+// MySQL/MariaDB "executable comment" aware (finding #2, M7): `/*! ... */` (and MariaDB's own
+// `/*M! ... */`), optionally followed by a version-gate number (`/*!50000 ... */`), is not an
+// ordinary comment on those two dialects — the server strips only the marker and the closing `*/`
+// and runs the body between them as real SQL. Confirmed against a real MariaDB server: `/*!COMMIT*/
+// /*!SET SESSION tx_read_only = OFF*/ DELETE FROM users` executes all three statements, though the
+// body of each looks exactly like an ordinary block comment to a naive scanner. Before this fix,
+// StripSQLComments discarded the body along with the marker, so AssertNoTransactionEscalation saw
+// none of the smuggled COMMIT/SET and ClassifySQL never saw the smuggled `INTO OUTFILE` either —
+// both a read-only-escalation and an MCP write-gate bypass. This scanner has no dialect argument
+// (see the package doc note on ClassifySQL for why: one shared classifier serves five dialects with
+// no per-dialect parser), so the marker is always treated as non-comment, the safe direction: on a
+// dialect without this syntax (Postgres/SQLite/ClickHouse), a real comment that happens to start
+// with `/*!` or `/*M!` stays visible as literal text instead of being stripped, which can only turn
+// a would-be ClassRead into a false ClassUnknown — never hide a write behind what looked like a
+// stripped comment.
 func StripSQLComments(s string) string {
 	r := []rune(s)
 	var out strings.Builder
 	depth := 0
+	execComment := false
 	for i := 0; i < len(r); {
 		switch {
 		case depth == 0 && (r[i] == '\'' || r[i] == '"' || r[i] == '`'):
@@ -232,7 +249,19 @@ func StripSQLComments(s string) string {
 				i++
 			}
 			out.WriteByte(' ')
+		case execComment && depth == 0 && r[i] == '*' && i+1 < len(r) && r[i+1] == '/':
+			execComment = false
+			i += 2
+			out.WriteByte(' ')
 		case r[i] == '/' && i+1 < len(r) && r[i+1] == '*':
+			if depth == 0 && !execComment {
+				if markerLen := execCommentMarkerLen(r, i); markerLen > 0 {
+					execComment = true
+					i += markerLen
+					out.WriteByte(' ')
+					break
+				}
+			}
 			depth++
 			i += 2
 		case depth > 0 && r[i] == '*' && i+1 < len(r) && r[i+1] == '/':
@@ -249,6 +278,28 @@ func StripSQLComments(s string) string {
 		}
 	}
 	return out.String()
+}
+
+// execCommentMarkerLen reports the rune length of a MySQL/MariaDB executable-comment opening
+// marker at r[i] — `/*!`, `/*M!`/`/*m!`, each optionally followed by a run of digits (the
+// version-gate number) — or 0 when r[i:] does not open one. Digits are consumed as part of the
+// marker (not SQL body): they gate which server version runs the body, they are never themselves
+// part of the statement.
+func execCommentMarkerLen(r []rune, i int) int {
+	n := len(r)
+	j := i + 2 // past "/*"
+	switch {
+	case j < n && r[j] == '!':
+		j++
+	case j+1 < n && (r[j] == 'M' || r[j] == 'm') && r[j+1] == '!':
+		j += 2
+	default:
+		return 0
+	}
+	for j < n && r[j] >= '0' && r[j] <= '9' {
+		j++
+	}
+	return j - i
 }
 
 // AssertNoTransactionEscalation is a console-Execute-only backstop for postgres/mysqlfamily (P2

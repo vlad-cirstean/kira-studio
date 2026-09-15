@@ -69,6 +69,15 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 		{"rollback to a named savepoint without keyword", []string{"ROLLBACK TO sp1"}, false},
 		{"savepoint itself is not rejected", []string{"SAVEPOINT sp1"}, false},
 		{"commit mentioned mid-statement is not rejected", []string{"SELECT 'please COMMIT' AS note"}, false},
+		// M7 finding #2 (high): MySQL/MariaDB executes the body of `/*! ... */`/`/*M! ... */` as
+		// real SQL — confirmed against a real MariaDB server that `/*!COMMIT*/ /*!SET SESSION
+		// tx_read_only = OFF*/ DELETE FROM users` ends the wrapping read-only transaction and flips
+		// the session writable, though a naive comment-stripping scanner sees only whitespace here.
+		{"mysql executable comment commit is rejected", []string{"/*!COMMIT*/"}, true},
+		{"mariadb executable comment commit is rejected", []string{"/*M!COMMIT*/"}, true},
+		{"mysql executable comment tx_read_only off is rejected", []string{"/*!SET SESSION tx_read_only = OFF*/"}, true},
+		{"version-gated executable comment commit is rejected", []string{"/*!50000COMMIT*/"}, true},
+		{"ordinary block comment commit is still just a comment", []string{"/* COMMIT */ SELECT 1"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

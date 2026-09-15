@@ -32,6 +32,14 @@ func TestClassifySQL(t *testing.T) {
 		{"line comment marker inside a string is not a real comment", "SELECT '--' ; DROP TABLE users", adapters.ClassUnknown},
 		{"dollar-quoted string hides no comment marker either", "SELECT $$/*$$ ; DROP TABLE users", adapters.ClassUnknown},
 
+		// M7 finding #2 (high): MySQL/MariaDB executes the body of a `/*! ... */` (MariaDB's own
+		// `/*M! ... */`) executable comment as real SQL — it must not disappear like an ordinary
+		// comment, or the MCP write gate's own INTO special-case never sees it.
+		{"mysql executable comment reveals into outfile as a write", "SELECT * FROM users /*! INTO OUTFILE '/tmp/x.csv' */", adapters.ClassWrite},
+		{"mysql version-gated executable comment reveals into outfile", "SELECT * FROM users /*!50000 INTO OUTFILE '/tmp/x.csv' */", adapters.ClassWrite},
+		{"mariadb executable comment reveals into outfile as a write", "SELECT * FROM users /*M! INTO OUTFILE '/tmp/x.csv' */", adapters.ClassWrite},
+		{"ordinary block comment containing into is still just a comment", "SELECT * FROM users /* INTO OUTFILE '/tmp/x.csv' */", adapters.ClassRead},
+
 		{"with select body reads", "WITH x AS (SELECT * FROM t) SELECT * FROM x", adapters.ClassRead},
 		{"with a data-modifying cte writes", "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x", adapters.ClassWrite},
 		{"with followed by insert writes", "WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x", adapters.ClassWrite},
