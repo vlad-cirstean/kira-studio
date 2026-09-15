@@ -343,6 +343,11 @@ const filesActions = computed<DetailActions | undefined>(() => {
       if (!repo) throw new Error('ReviewView: goToFile called with no active repo');
       return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
     },
+    async openPullRequest({ number }) {
+      const repo = repoId.value;
+      if (!repo) throw new Error('ReviewView: openPullRequest called with no active repo');
+      await bridge.request('pr.openExternal', { repoId: repo, number });
+    },
   };
 });
 

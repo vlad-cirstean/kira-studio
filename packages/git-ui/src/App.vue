@@ -485,6 +485,17 @@ function handleGridContextMenu(detail: { row: number; x: number; y: number }): v
   contextMenuState.value = detail;
 }
 
+/** P74 §3.3: mirrors `AppToolbar.vue`'s own `openExternalCapability` computed — the same
+ *  capability, read here too since `CommitGrid.vue`'s inline PR badge needs it independently of
+ *  the toolbar's branch picker. */
+const gridOpenExternalCapability = computed(
+  () => actions.value?.capabilities.openExternal ?? false,
+);
+
+function handleGridOpenPullRequest(number: number): void {
+  void actions.value?.openPullRequest({ number });
+}
+
 const commitMenuSections = computed<MenuSection[]>(() => {
   const state = contextMenuState.value;
   if (!state) return [];
@@ -1550,6 +1561,7 @@ onBeforeUnmount(() => {
               :search="searchState"
               :pr="prState"
               :stack="stackState"
+              :open-external-capability="gridOpenExternalCapability"
               v-bind="initialScrollRowProp"
               @update:column-widths="columnWidths = $event"
               @scroll="scrollRow = $event"
@@ -1560,6 +1572,7 @@ onBeforeUnmount(() => {
               @context-menu="handleGridContextMenu"
               @ref-context-menu="handleGridRefContextMenu"
               @stash-context-menu="handleStashContextMenu"
+              @open-pull-request="handleGridOpenPullRequest"
             />
             <LoadMoreButton :graph-view="graphView" :page-size="pageSize" />
             <span class="kv-visually-hidden" data-testid="chunk-source">{{

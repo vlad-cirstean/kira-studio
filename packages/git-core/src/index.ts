@@ -119,6 +119,7 @@ export type {
 } from './model/status.ts';
 export { dirtyPathsFrom, summarizeStatus } from './model/status.ts';
 export { isAnnotated, tagTargetCommit } from './model/tag.ts';
+export type { Browser } from './ports/browser.ts';
 export type { Clipboard } from './ports/clipboard.ts';
 export type { CredentialPrompt, CredentialRequest } from './ports/credentialPrompt.ts';
 export type { Disposable } from './ports/disposable.ts';

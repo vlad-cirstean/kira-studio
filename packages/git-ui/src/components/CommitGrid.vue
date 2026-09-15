@@ -48,6 +48,11 @@ const props = defineProps<{
   /** G24 D9: the graph indicator's own PR source — optional so a caller with nothing to show yet
    *  gets a plain, badge-free message column, mirroring `search`'s own default. */
   pr?: PrState;
+  /** P74 §3.3: same capability `AppToolbar.vue` threads into `BranchPicker.vue`/`StackList.vue` —
+   *  gates whether the inline PR badge (`refBadges.ts`'s `buildPrBadge`) is a clickable button or
+   *  a plain, inert span. Required, not optional: a caller with no PR source at all still passes
+   *  `false` explicitly, the same posture `detailOpen` already takes. */
+  openExternalCapability: boolean;
   /** G26 D-4.13: the message column's own stack-decoration source — optional so a caller with no
    *  stack view mounted gets plain, undecorated branch badges, mirroring `pr`'s own default. */
   stack?: StackState;
@@ -93,6 +98,12 @@ const emit = defineEmits<{
    *  carries the exact index, and its `sha` field the exact sha), so `App.vue` reads both back
    *  from the store instead of this component re-deriving them from badge text. */
   (e: 'stashContextMenu', detail: { row: number; x: number; y: number }): void;
+  /** P74 §3.3: a click landed on the inline PR badge (`refBadges.ts`'s `data-pr-number`) —
+   *  reported as a plain PR number rather than this component calling `DetailActions.openPullRequest`
+   *  itself, mirroring `refContextMenu`/`stashContextMenu`'s own "report, don't act" convention;
+   *  `App.vue` is the one place with `actions` at hand. Never fires alongside `openDetail`/
+   *  `toggleDetail` — `handleClick`'s own hit-test returns before either would run. */
+  (e: 'openPullRequest', number: number): void;
 }>();
 
 const MIN_COLUMN_WIDTH = 40;
@@ -265,6 +276,7 @@ function currentColumns(): Column<CommitRecord>[] {
       // — `columns.ts`'s own `messageFormatter` already treats both as "render nothing", so this
       // accessor only needs to pass `PrState.bySha`'s own map lookup straight through.
       prsFor: (sha) => props.pr?.bySha.value.get(sha),
+      openExternalCapability: props.openExternalCapability,
     },
     { stackInfoFor },
     { compact: props.detailOpen },
@@ -351,6 +363,19 @@ function handleClick(row: number): void {
   pendingFocusRow = row;
   if (wasSelected) emit('toggleDetail');
   else emit('openDetail');
+}
+
+/** P74 §3.3: a click landing on the inline PR badge (`refBadges.ts`'s `data-pr-number`, present
+ *  only when `openExternalCapability` gated it to a real `<button>`) opens that PR instead of
+ *  selecting the row — the same "hit-test ahead of the ordinary click" shape
+ *  `handleContextMenu`'s own `data-ref-kind` check already uses for a right-click. Returns the PR
+ *  number when it claimed the click, `undefined` when the click should fall through to
+ *  `handleClick` unchanged. */
+function prNumberFromClick(event: MouseEvent | undefined): number | undefined {
+  const badgeEl =
+    event?.target instanceof Element ? event.target.closest<HTMLElement>('[data-pr-number]') : null;
+  const raw = badgeEl?.dataset.prNumber;
+  return raw !== undefined ? Number(raw) : undefined;
 }
 
 /** §6.4: "right-click selects the row [first]", then (P6 W14) opens `RowContextMenu.vue` at the
@@ -695,7 +720,11 @@ onMounted(() => {
   const initialRange = instance.getRenderedRange();
   applyAccessibility({ startRow: initialRange.top, endRow: initialRange.bottom });
 
-  instance.onClick.subscribe((_event, args) => handleClick(args.row));
+  instance.onClick.subscribe((event, args) => {
+    const prNumber = prNumberFromClick(event.getNativeEvent<MouseEvent>());
+    if (prNumber !== undefined) emit('openPullRequest', prNumber);
+    else handleClick(args.row);
+  });
   instance.onScroll.subscribe(() => {
     if (scrollRaf !== 0) return;
     scrollRaf = requestAnimationFrame(() => {
@@ -1219,6 +1248,14 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   color: var(--kv-badge-fg);
   border: 2px solid transparent;
   box-sizing: border-box;
+  /* P74 §3.3: a badge is sometimes a `<button>` now (`refBadges.ts`'s `buildPrBadge`,
+     `BranchPicker.vue`/`StackList.vue`'s own PR badges) — `background-color`/`border-color` on the
+     `-pr--<state>` classes below already win over the UA button stylesheet by cascade origin, but
+     `appearance`/`font-family`/`margin` do not, so those three are reset here once for every badge
+     rather than per interactive site. A no-op for the far more common `<span>` badge. */
+  appearance: none;
+  font-family: inherit;
+  margin: 0;
 }
 
 .kv-badge-pill,
@@ -1283,12 +1320,15 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   border-color: var(--kv-panel-border);
 }
 
-/* G24 D9: the per-commit/per-branch PR badge — a real <a href>, so it needs its own link reset
-   (no underline, inherits the badge's own colour rather than the browser default blue/visited).
-   State travels as one of these four classes, never as text (§7's "no colour-only meaning" is
-   already satisfied by the "#123" number plus the tooltip naming the state in words). */
+/* G24 D9/P74 §3.3: the per-commit/per-branch PR badge — a `<button>` when clickable, a plain
+   `<span>` otherwise (never an `<a href>`: see `refBadges.ts`'s own doc comment on why). State
+   travels as one of these four classes, never as text (§7's "no colour-only meaning" is already
+   satisfied by the "#123" number plus the tooltip naming the state in words). */
 .kv-badge-pr {
   text-decoration: none;
+}
+
+button.kv-badge-pr {
   cursor: pointer;
 }
 

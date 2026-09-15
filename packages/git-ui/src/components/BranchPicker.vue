@@ -59,6 +59,13 @@ const props = defineProps<{
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a plain,
    *  badge-free picker (mirrors `CommitGrid.vue`'s own `pr` prop). */
   pr?: PrState;
+  /** P74 §3.3: whether this host can open a URL in the external browser — gates this picker's own
+   *  PR badge, and `StackList.vue`'s, on the same capability `CommitMeta.vue`'s PR row/icon gate
+   *  on. `false` renders the number as plain, non-interactive text. */
+  openExternalCapability: boolean;
+  /** P74 §3.3: `AppToolbar.vue`'s own `openPullRequest` — threaded down rather than reimplemented
+   *  here or in `StackList.vue`. */
+  openPullRequest: (number: number) => void;
 }>();
 
 const PR_STATE_LABEL: Readonly<Record<string, string>> = {
@@ -407,14 +414,20 @@ onBeforeUnmount(() => {
                   >{{ row.isHead ? "●" : "" }}</span
                 >
                 <span class="kv-branch-row-name">{{ row.shortName }}</span>
-                <a
-                  v-if="prFor(row.shortName)"
-                  :href="prFor(row.shortName)!.url"
+                <button
+                  v-if="prFor(row.shortName) && openExternalCapability"
+                  type="button"
                   class="kv-badge kv-badge-pill kv-badge-pr"
                   :class="`kv-badge-pr--${prFor(row.shortName)!.state}`"
                   v-kui-tooltip="prTooltip(row.shortName)"
-                  @click.stop
-                  >#{{ prFor(row.shortName)!.number }}</a
+                  @click.stop="openPullRequest(prFor(row.shortName)!.number)"
+                >#{{ prFor(row.shortName)!.number }}</button>
+                <span
+                  v-else-if="prFor(row.shortName)"
+                  class="kv-badge kv-badge-pill kv-badge-pr"
+                  :class="`kv-badge-pr--${prFor(row.shortName)!.state}`"
+                  v-kui-tooltip="prTooltip(row.shortName)"
+                  >#{{ prFor(row.shortName)!.number }}</span
                 >
                 <span v-if="row.checkedOutIn" class="kv-branch-badge" v-kui-tooltip="`Checked out in ${row.checkedOutIn}`">
                   worktree
@@ -512,6 +525,8 @@ onBeforeUnmount(() => {
           :ops="ops"
           :pr="pr"
           :write-capability="writeCapability"
+          :open-external-capability="openExternalCapability"
+          :open-pull-request="openPullRequest"
           @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
           @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />

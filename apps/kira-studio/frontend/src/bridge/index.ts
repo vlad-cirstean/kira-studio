@@ -7,6 +7,7 @@ import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
+import * as GitHubService from '@bindings/githubservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as MaskRulesService from '@bindings/maskrulesservice.js';
@@ -79,6 +80,10 @@ const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
   updateStatus: (): Promise<WailsModels.UpdateStatus> => unwrap(UpdateService.Status()),
   updateOpenReleasePage: (): Promise<void> => unwrap(UpdateService.OpenReleasePage()),
+  // P74 §3.3: pr.openExternal's own OS-browser leg — the renderer names a PR by number over the
+  // git socket (pr.browserUrl composes the URL server-side); this is only the final "open it" hop.
+  githubOpenPullRequestUrl: (url: string): Promise<void> =>
+    unwrap(GitHubService.OpenPullRequestURL({ url })),
   settingsGetAll: (): Promise<Settings> =>
     unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),
   settingsSet: (patch: SettingsPatch): Promise<Settings> =>

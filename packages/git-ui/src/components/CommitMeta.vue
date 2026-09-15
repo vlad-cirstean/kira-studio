@@ -151,7 +151,7 @@ interface PrDetailView {
   readonly prs: readonly {
     readonly number: number;
     readonly title: string;
-    readonly url: string;
+    readonly state: string;
     readonly stateLabel: string;
   }[];
   readonly reason: string | undefined;
@@ -172,7 +172,7 @@ const prDetail = computed<PrDetailView | undefined>(() => {
     prs: result.prs.map((pr) => ({
       number: pr.number,
       title: pr.title,
-      url: pr.url,
+      state: pr.state,
       stateLabel: PR_STATE_LABEL[pr.state] ?? pr.state,
     })),
   };
@@ -255,6 +255,18 @@ async function openAllChanges(): Promise<void> {
     );
   }
 }
+
+/** P74 §3.3: the "Pull request" row's own external-open action — composes/opens the URL host-side
+ *  (`DetailActions.openPullRequest`'s own doc comment), this pane only ever names the PR number. */
+async function openPullRequest(number: number): Promise<void> {
+  try {
+    await props.actions.openPullRequest({ number });
+  } catch (err) {
+    props.actions.announce(
+      `Couldn't open the pull request — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 </script>
 
 <template>
@@ -333,13 +345,20 @@ async function openAllChanges(): Promise<void> {
         <template v-if="prDetail">
           <dt>Pull request</dt>
           <dd v-if="prDetail.kind === 'prs'" class="kv-meta-pr">
-            <a
-              v-for="pr in prDetail.prs"
-              :key="pr.number"
-              :href="pr.url"
-              class="kv-meta-pr-link"
-              >#{{ pr.number }} {{ pr.title }} — {{ pr.stateLabel }}</a
-            >
+            <div v-for="pr in prDetail.prs" :key="pr.number" class="kv-meta-pr-row">
+              <span class="kv-badge kv-badge-pill kv-badge-pr" :class="`kv-badge-pr--${pr.state}`">
+                {{ pr.stateLabel }}
+              </span>
+              <button
+                v-if="actions.capabilities.openExternal"
+                type="button"
+                class="kv-meta-pr-link"
+                @click="openPullRequest(pr.number)"
+              >
+                #{{ pr.number }} {{ pr.title }}
+              </button>
+              <span v-else class="kv-meta-pr-link">#{{ pr.number }} {{ pr.title }}</span>
+            </div>
           </dd>
           <dd v-else-if="prDetail.kind === 'none'">No pull request</dd>
           <dd v-else class="kv-meta-pr-unavailable" data-testid="pr-unavailable">
@@ -500,8 +519,29 @@ async function openAllChanges(): Promise<void> {
   gap: var(--kv-s-1);
 }
 
+.kv-meta-pr-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-1);
+}
+
+/* A <button> when actions.capabilities.openExternal, a plain <span> otherwise (the template's own
+   v-if/v-else) — reset either way so the row reads identically, interactive or not. */
 .kv-meta-pr-link {
-  color: var(--kv-badge-pr-open-fg);
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+button.kv-meta-pr-link {
+  cursor: pointer;
+}
+
+button.kv-meta-pr-link:hover {
+  text-decoration: underline;
 }
 
 .kv-meta-pr-unavailable {

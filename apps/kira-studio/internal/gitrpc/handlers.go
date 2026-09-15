@@ -222,6 +222,8 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 				return r.handleCommitResolvePr(ctx, c, params)
 			case "branch.resolvePr":
 				return r.handleBranchResolvePr(ctx, c, params)
+			case "pr.browserUrl":
+				return r.handlePrBrowserUrl(ctx, c, params)
 			case "worktree.list":
 				return r.handleWorktreeList(ctx, c, params)
 			case "preflight.worktreeAdd":

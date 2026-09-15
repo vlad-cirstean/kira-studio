@@ -2,6 +2,7 @@ package gitsession
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -458,6 +459,22 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 		return okResult(nil)
 	}
 	return okResult([]ghclient.PR{*latest})
+}
+
+// PrBrowserURL is pr.browserUrl's own orchestration (P74 §3.3): composes the PR's own github.com
+// URL server-side, never trusting a URL the renderer might supply (bridge.GitHubService's own doc
+// comment). false when github.enabled is off or there is no GitHub remote — the same "disabled
+// collapses to nothing" posture PrLookupResult already takes; the caller renders that as the PR
+// number staying plain text.
+func (e *RepoEntry) PrBrowserURL(ctx context.Context, number int) (string, bool) {
+	if !e.githubEnabled() {
+		return "", false
+	}
+	repo, ok := e.githubRepo(ctx)
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("https://github.com/%s/pull/%d", repo.Path(), number), true
 }
 
 // maxEagerPurgeBranches bounds D8's own eager post-fetch re-resolve pass, triggered by refsChanged

@@ -123,7 +123,14 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'REQUEST_KEY_MAP' below for the same total-over-'RequestKey' exhaustiveness reason every request
 // key is, but does not itself require this version bump (extension-only methods never did). No new
 // event, no new capability, no new 'UiActionKind' member, no SQL migration.
-export const CONTRACT_VERSION = 35;
+// P74 §3.3 (2026-09-15): 35 -> 36, for one new Go-served request, 'pr.browserUrl' (composes a
+// PR's github.com URL server-side; params: repoId/number, result: {url: string|null}) and one new
+// extension-answered request, 'pr.openExternal' (params: repoId/number, result: {}), which
+// requests 'pr.browserUrl' over the socket and hands the URL to the host's own browser-open path
+// -- never answered by the Go server itself, the same "editor.*-shaped" precedent 'editor.openDiff'
+// already set. One new 'app.init' capability, 'openExternal' (both hosts report true). No SQL
+// migration.
+export const CONTRACT_VERSION = 36;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -233,6 +240,8 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'review.session.load': true,
   'commit.resolvePr': true,
   'branch.resolvePr': true,
+  'pr.browserUrl': true,
+  'pr.openExternal': true,
   'worktree.list': true,
   'preflight.worktreeAdd': true,
   'preflight.worktreeRemove': true,

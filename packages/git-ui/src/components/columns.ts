@@ -81,9 +81,13 @@ const NO_LANE_COLOR_CONTEXT: LaneColorContext = { colorOf: () => undefined };
  *  has to distinguish those five itself. */
 export interface PrContext {
   readonly prsFor: (sha: string) => readonly PrRecord[] | undefined;
+  /** P74 §3.3: same capability `BranchPicker.vue`/`StackList.vue` gate their own PR badges on —
+   *  threaded here so `buildPrBadge` can build an inert `<span>` instead of a clickable button
+   *  when the host has no way to open a URL externally. */
+  readonly openExternalCapability: boolean;
 }
 
-const NO_PR_CONTEXT: PrContext = { prsFor: () => undefined };
+const NO_PR_CONTEXT: PrContext = { prsFor: () => undefined, openExternalCapability: false };
 
 /** G26 D-4.10/F12: the message column's own accessor onto a branch's stack decoration — a fourth
  *  instance of `MessageSearchContext`/`LaneColorContext`/`PrContext`'s own convention, re-read on
@@ -126,7 +130,7 @@ function messageFormatter(
     );
     // G24 D9: the PR badge shares the same row-1 strip, placed after the ref badges.
     const prs = prCtx.prsFor(dataContext.sha);
-    const prBadge = prs !== undefined ? buildPrBadge(prs) : null;
+    const prBadge = prs !== undefined ? buildPrBadge(prs, prCtx.openExternalCapability) : null;
     if (badges !== null || prBadge !== null) {
       // P7 (item 1): the same condition that decides whether the badges-row element exists at
       // all also decides whether the row is tall enough to show it — `rowMetadata` below makes

@@ -44,3 +44,24 @@ func (r *Router) handleBranchResolvePr(ctx context.Context, c *gitsession.Conn, 
 	}
 	return prLookupResultFrom(entry.ResolveBranchPr(ctx, p.Branch)), nil
 }
+
+// handlePrBrowserUrl is pr.browserUrl's own handler (P74 §3.3) — a thin projection of
+// (*gitsession.RepoEntry).PrBrowserURL onto the wire's own {url: string|null} shape.
+func (r *Router) handlePrBrowserUrl(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+	var p PrBrowserUrlParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, ipcerr.BadRequest("gitrpc: pr.browserUrl: invalid params")
+	}
+	if p.RepoID == "" || p.Number <= 0 {
+		return nil, ipcerr.BadRequest("gitrpc: pr.browserUrl: repoId and a positive number are required")
+	}
+	entry, err := entryFor(c, p.RepoID)
+	if err != nil {
+		return nil, err
+	}
+	urlStr, ok := entry.PrBrowserURL(ctx, p.Number)
+	if !ok {
+		return PrBrowserUrlResult{URL: nil}, nil
+	}
+	return PrBrowserUrlResult{URL: &urlStr}, nil
+}

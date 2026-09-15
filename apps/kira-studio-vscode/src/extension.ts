@@ -37,6 +37,7 @@ import { isPaletteCommand, MUTATING_COMMANDS, OTHER_COMMANDS } from './commands.
 import { ConnectionManager, type ConnectionState, toWireConnectionState } from './connection.ts';
 import { goToFileFromDiffCommand, openCommitInGraphCommand } from './diffToolbar.ts';
 import { KiraGraphViewProvider } from './panelView.ts';
+import { VsCodeBrowser } from './ports/browser.ts';
 import { VsCodeClipboard } from './ports/clipboard.ts';
 import { VsCodeCredentialPrompt } from './ports/credentialPrompt.ts';
 import { VsCodeEditorIntegration } from './ports/editorIntegration.ts';
@@ -340,6 +341,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // G25 D6/D14: the "Open in New Window" port and the workspace-trust probe behind
   // capabilities.runPrepareScript.
   const windows = new VsCodeWindows();
+  // P74 §3.3: the PR row's/badge's external-open action.
+  const browser = new VsCodeBrowser();
   // G7 D4/D21: the migrated, previously-unused credential port — this phase's own relay is its
   // first (and only) caller.
   const credentialPrompt = new VsCodeCredentialPrompt();
@@ -413,6 +416,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     editor,
     logger,
     windows,
+    browser,
     isWorkspaceTrusted: () => vscode.workspace.isTrusted,
     revealReview: (repoId, branch) => reviewProvider.reviewBranch(repoId, branch),
     renderReviewComments: (repoId, branchTip, path, branch) =>

@@ -277,17 +277,28 @@ export function pickBestPr(prs: readonly PrRecord[]): PrRecord | undefined {
  *  is nothing to show — every non-resolved-with-a-PR outcome (not-yet-resolved, in-flight,
  *  `disabled`, `unavailable`, or resolved-with-none) is exactly this `null` (D9's own "inert,
  *  never noisy" rule): the caller never has to branch on which of those five it actually got.
- *  Rendered as a real `<a href>` (F11: no `ExternalOpener` port needed — the webview's own
- *  external-link handling takes it from there) with the PR's state carried as a CSS class, never
- *  as text (`kv-badge-pr--<state>`) — width is scarce, and the tooltip already names the state in
- *  words. */
-export function buildPrBadge(prs: readonly PrRecord[]): HTMLAnchorElement | null {
+ *  P74 §3: never a real `<a href>` — under Wails an anchor click navigates the app's own window
+ *  itself rather than opening a browser tab (there is no separate tab to open one in), the same
+ *  defect class `CommitMeta.vue`/`BranchPicker.vue`/`StackList.vue`'s own PR links carried before
+ *  §3's fix. `openExternalCapability` gates a `<button data-pr-number>` (click routed through
+ *  `CommitGrid.vue`'s own `onClick` delegation to `DetailActions.openPullRequest`, which composes
+ *  and opens the URL host-side) vs. a plain, inert `<span>` — the same button/span split
+ *  `BranchPicker.vue`/`StackList.vue` already use, applied here since this file has no `v-if` of
+ *  its own. The PR's state is carried as a CSS class, never as text (`kv-badge-pr--<state>`) —
+ *  width is scarce, and the tooltip already names the state in words. */
+export function buildPrBadge(
+  prs: readonly PrRecord[],
+  openExternalCapability: boolean,
+): HTMLElement | null {
   const best = pickBestPr(prs);
   if (best === undefined) return null;
 
-  const badge = document.createElement('a');
+  const badge = document.createElement(openExternalCapability ? 'button' : 'span');
   badge.className = `kv-badge kv-badge-pill kv-badge-pr kv-badge-pr--${best.state}`;
-  badge.href = best.url;
+  if (badge instanceof HTMLButtonElement) {
+    badge.type = 'button';
+    badge.dataset.prNumber = String(best.number);
+  }
   const extra = prs.length > 1 ? ` (+${prs.length - 1} more)` : '';
   badge.setAttribute('data-kui-tip', `${best.title} — ${PR_STATE_LABEL[best.state]}${extra}`);
 
