@@ -51,6 +51,17 @@ func (inst *repoInstance) text(body string) (*mcp.CallToolResult, any, error) {
 	return textResult(body)
 }
 
+// errText is errResult with §2.4's degraded notice prepended, mirroring text — for the rare
+// errResult answer that is itself an index-derived claim (P68b's absent-file message), so a
+// degraded or partial index never presents "no indexed file at X" as a settled fact. Every other
+// errResult caller is pure argument validation, where the index state is irrelevant.
+func (inst *repoInstance) errText(body string) (*mcp.CallToolResult, any, error) {
+	if n := inst.indexNotice(); n != "" {
+		body = n + "\n" + body
+	}
+	return errResult(body)
+}
+
 // repoField is embedded in every navigation/search tool's own input struct (P67d §3.4): which
 // attached repository to query. Omit when only one is attached — Server.pick (attach.go) resolves
 // the rest.
@@ -409,9 +420,12 @@ func (s *Server) outlineFile(ctx context.Context, _ *mcp.CallToolRequest, in out
 	if err != nil {
 		return errResult(err.Error())
 	}
-	nodes, err := inst.graph.Outline(ctx, rel)
+	nodes, indexed, err := inst.graph.Outline(ctx, rel)
 	if err != nil {
 		return nil, nil, err
+	}
+	if !indexed {
+		return inst.errText(absentFileReason(inst.root, rel))
 	}
 	return inst.text(renderOutline(rel, nodes))
 }

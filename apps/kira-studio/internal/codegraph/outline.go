@@ -9,20 +9,23 @@ import (
 
 // Outline returns path's definition tree — a parent-id walk over rows C1 already linked, no file
 // bytes read. Root-level nodes (ParentID nil) come first, each ordered by StartByte; every level
-// below is ordered the same way.
-func (g *Graph) Outline(ctx context.Context, path string) ([]Node, error) {
+// below is ordered the same way. indexed reports whether path has a row in the file index at all —
+// false means "never indexed" (nodes is always nil then), distinct from a real, indexed file that
+// genuinely has zero definitions (indexed true, nodes nil). The caller needs both to tell "no such
+// file" from "no definitions".
+func (g *Graph) Outline(ctx context.Context, path string) (nodes []Node, indexed bool, err error) {
 	file, ok, err := g.store.GetFile(ctx, g.repoID, path)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if !ok {
-		return nil, nil
+		return nil, false, nil
 	}
 	symbols, err := g.store.SymbolsInFile(ctx, file.ID)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
-	return buildOutline(symbols), nil
+	return buildOutline(symbols), true, nil
 }
 
 func buildOutline(symbols []codeindex.SymbolRow) []Node {

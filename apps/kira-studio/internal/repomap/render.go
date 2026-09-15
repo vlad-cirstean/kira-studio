@@ -175,7 +175,9 @@ func renderFileSearch(query string, hits []codegraph.FileHit) string {
 const maxOutlineNodes = 500
 
 // renderOutline renders path's definition tree, indented, capped at maxOutlineNodes total nodes
-// across the whole tree.
+// across the whole tree. The caller guarantees path is an indexed file (P68b: outlineFile routes
+// the absent-file case to absentFileReason before ever reaching here) — an empty nodes here always
+// means a real, indexed file with zero definitions, never "no such file".
 func renderOutline(path string, nodes []codegraph.Node) string {
 	if len(nodes) == 0 {
 		return fmt.Sprintf("%s has no indexed definitions", path)

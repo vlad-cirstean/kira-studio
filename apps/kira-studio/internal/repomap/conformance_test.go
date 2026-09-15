@@ -2,6 +2,8 @@ package repomap
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -112,6 +114,92 @@ func TestFindDefinitionGoTypeSymbolOnly(t *testing.T) {
 	}
 	if !strings.Contains(text, `1 definition for "grpcCoalescer"`) || !strings.Contains(text, "type grpcCoalescer") {
 		t.Fatalf("want a resolved definition for grpcCoalescer, got: %s", text)
+	}
+}
+
+// TestOutlineFileAbsentVsDefinitionFree is the P68b dogfooding regression: outline_file rendered
+// the identical "has no indexed definitions" sentence for a real, indexed, definition-free file and
+// for a path that was never indexed at all (typo, unindexed-language file on disk, directory) — an
+// agent couldn't tell a wrong path from an empty answer. Root cause: codegraph.Graph.Outline already
+// looked the file up via GetFile and discarded the answer.
+func TestOutlineFileAbsentVsDefinitionFree(t *testing.T) {
+	home := t.TempDir()
+	root := t.TempDir()
+	store := codeindex.OpenStoreAt(home)
+	t.Cleanup(func() { _ = store.Close() })
+
+	seed(t, store, "main.go", []codeparse.Symbol{mkSym("function", "Main", 0, 0, 20, 5)})
+	// blank.css: an indexed file, genuinely zero definitions — the control case.
+	seed(t, store, "blank.css", nil)
+	// real.md: exists on disk, never seeded into the index — a language this index doesn't cover.
+	if err := os.WriteFile(filepath.Join(root, "real.md"), []byte("# hello\n"), 0o644); err != nil {
+		t.Fatalf("write real.md: %v", err)
+	}
+	// typo.go: neither seeded nor on disk — absent outright.
+
+	srv, err := New(Config{Home: home})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = srv.Close() })
+	if _, err := srv.Attach(RepoSpec{
+		Key: "outline", RepoID: testRepoID, Root: root, GitPath: "", Runner: gitclient.NewExecRunner(),
+	}); err != nil {
+		t.Fatalf("Attach: %v", err)
+	}
+
+	callText := func(t *testing.T, file string) (string, bool) {
+		t.Helper()
+		res, _, err := srv.outlineFile(context.Background(), nil, outlineFileArgs{File: file})
+		if err != nil {
+			t.Fatalf("outlineFile(%s): %v", file, err)
+		}
+		text := ""
+		if len(res.Content) > 0 {
+			if tc, ok := res.Content[0].(*mcp.TextContent); ok {
+				text = tc.Text
+			}
+		}
+		return text, res.IsError
+	}
+
+	const definitionFreeText = "blank.css has no indexed definitions"
+
+	blankText, blankIsErr := callText(t, "blank.css")
+	if blankIsErr {
+		t.Fatalf("blank.css: got IsError, want a normal result: %s", blankText)
+	}
+	if !strings.Contains(blankText, definitionFreeText) {
+		t.Fatalf("blank.css: got %q, want it to contain %q", blankText, definitionFreeText)
+	}
+
+	typoText, typoIsErr := callText(t, "typo.go")
+	if !typoIsErr {
+		t.Fatalf("typo.go: want IsError, got a normal result: %s", typoText)
+	}
+	if strings.Contains(typoText, "has no indexed definitions") {
+		t.Fatalf("typo.go: regressed to the definition-free sentence: %s", typoText)
+	}
+
+	realText, realIsErr := callText(t, "real.md")
+	if !realIsErr {
+		t.Fatalf("real.md: want IsError, got a normal result: %s", realText)
+	}
+	if strings.Contains(realText, "has no indexed definitions") {
+		t.Fatalf("real.md: regressed to the definition-free sentence: %s", realText)
+	}
+
+	// The finding itself, pinned: an absent path (typo.go, real.md) must never render the same
+	// text as a genuinely indexed, genuinely empty file (blank.css) — nor the same text as each
+	// other, since each absent case has its own distinct, actionable reason.
+	if typoText == blankText {
+		t.Fatalf("typo.go rendered the same text as the definition-free control: %s", typoText)
+	}
+	if realText == blankText {
+		t.Fatalf("real.md rendered the same text as the definition-free control: %s", realText)
+	}
+	if typoText == realText {
+		t.Fatalf("typo.go and real.md rendered identical text, want distinct reasons: %s", typoText)
 	}
 }
 

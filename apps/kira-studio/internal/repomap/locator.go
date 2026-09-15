@@ -3,10 +3,12 @@ package repomap
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codegraph"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/pathsafe"
 )
 
 // locateArgs is every navigation tool's own shared input (§6.1) — file/line/column/symbol, plus
@@ -47,6 +49,34 @@ func relFile(root, file string) (string, error) {
 		return "", fmt.Errorf("%s is not inside this repository (%s)", file, root)
 	}
 	return rel, nil
+}
+
+// absentFileReason explains why outline_file found no index row for rel — rel has already passed
+// relFile, so this is the P68b distinction: a real "no such file" (typo, unindexed language,
+// directory, out-of-repo escape) versus a real, indexed file that genuinely has zero definitions
+// (renderOutline's own "has no indexed definitions", which this function never renders). Stats
+// through pathsafe.ValidateRelPath — the same containment check sourceForOneFile uses — rather than
+// os.Stat directly, so a relative ".." escape that relFile alone passes through is still caught
+// here as "not inside this repository", not misreported as a stat error.
+func absentFileReason(root, rel string) string {
+	abs, err := pathsafe.ValidateRelPath(root, rel)
+	if err != nil {
+		return fmt.Sprintf("%s is not inside this repository (%s)", rel, root)
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Sprintf("no indexed file at %s, and no such file on disk — call search_files to find the right path", rel)
+		}
+		return fmt.Sprintf("no indexed file at %s (%s is unreadable)", rel, rel)
+	}
+	if info.IsDir() {
+		return fmt.Sprintf("%s is a directory, not a file — call search_files with it as pathPrefix to list indexed files under it", rel)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Sprintf("%s is not a regular file", rel)
+	}
+	return fmt.Sprintf("%s exists but is not indexed — its language is not one this index covers, or it is excluded — call search_files to see what is indexed", rel)
 }
 
 // exactSymbolMatches narrows hits (a prefix search's own results, §4.3 in C2) down to the ones
