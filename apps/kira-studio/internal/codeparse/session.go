@@ -3,10 +3,18 @@ package codeparse
 import (
 	"container/list"
 	"context"
+	"errors"
 	"sync"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
+
+// errParseFailed marks a nil tree that came back from the parser with ctx still live — parsing
+// failed for a reason other than the caller's own cancellation. Parse/Reparse must never turn
+// this into a silent (Result{}, nil) success (Group 0's second-order bug: a poisoned nil-error
+// return reads to codeindex as StatusOK with zero symbols, which isStale then treats as
+// permanently fresh — the file goes silently and permanently unindexed).
+var errParseFailed = errors.New("codeparse: parse returned no tree")
 
 // Range is a plain file-coordinate byte+point range — Tree.ChangedRanges' own output shape,
 // carried out of the package as data (§1.4: never a *sitter.Node).
@@ -192,9 +200,9 @@ func (s *Session) Parse(ctx context.Context, path string, content []byte, lang I
 	}
 	defer s.checkinParser(container, parser)
 
-	tree := parser.ParseCtx(ctx, content, nil)
-	if tree == nil {
-		return Result{}, ctx.Err()
+	tree, err := parseWithOptions(ctx, parser, content, nil)
+	if err != nil {
+		return Result{}, err
 	}
 
 	result, err := s.extract(tree, content, lang)
@@ -240,10 +248,10 @@ func (s *Session) Reparse(ctx context.Context, path string, newContent []byte, l
 	}
 
 	entry.tree.Edit(&edit)
-	newTree := parser.ParseCtx(ctx, newContent, entry.tree)
-	if newTree == nil {
+	newTree, err := parseWithOptions(ctx, parser, newContent, entry.tree)
+	if err != nil {
 		entry.tree.Close()
-		return Result{}, ctx.Err()
+		return Result{}, err
 	}
 	changedRanges := toRanges(entry.tree.ChangedRanges(newTree))
 	entry.tree.Close()
@@ -256,6 +264,38 @@ func (s *Session) Reparse(ctx context.Context, path string, newContent []byte, l
 	result.ChangedRanges = changedRanges
 	s.cachePut(path, newContent, newTree, lang)
 	return result, nil
+}
+
+// parseWithOptions parses content (oldTree nil for a fresh Parse, or the resident tree for an
+// incremental Reparse) via the non-deprecated ParseWithOptions/ProgressCallback API rather than
+// the deprecated ParseCtx (Group 0): ParseCtx spawns a goroutine that writes to
+// Parser.CancellationFlag() on ctx cancellation, but that pointer is NULL unless
+// ts_parser_set_cancellation_flag was explicitly called — which nothing here does — so a
+// cancellation mid-parse is a guaranteed nil-pointer SIGSEGV in an orphan goroutine no caller can
+// recover from. ProgressCallback runs synchronously inside the parse call itself instead, so no
+// goroutine outlives it and there is nothing left to write to after the parse returns.
+//
+// Returns a real error whenever tree comes back nil: ctx's own error if ctx was actually
+// cancelled, or errParseFailed otherwise — never (nil, nil). A nil tree with a nil error would
+// read to Parse/Reparse's own callers as success (see errParseFailed's doc).
+func parseWithOptions(ctx context.Context, parser *sitter.Parser, content []byte, oldTree *sitter.Tree) (*sitter.Tree, error) {
+	tree := parser.ParseWithOptions(func(i int, _ sitter.Point) []byte {
+		if i < len(content) {
+			return content[i:]
+		}
+		return nil
+	}, oldTree, &sitter.ParseOptions{
+		ProgressCallback: func(sitter.ParseState) bool {
+			return ctx.Err() != nil
+		},
+	})
+	if tree == nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return nil, errParseFailed
+	}
+	return tree, nil
 }
 
 // extract runs the right symbol/reference/block pipeline for lang over tree's own root: Inject
