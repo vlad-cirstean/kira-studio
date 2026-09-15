@@ -1,7 +1,9 @@
+import type { MaskKind, MaskRule } from '@shared/domain/mask';
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
 import type { MenuItem } from '../../state/contextMenu';
+import { maskRulesFor, removeMaskRule, upsertMaskRule } from '../../state/maskRules';
 import { openDataTab } from '../../state/tabs';
 import {
   type RowSnapshot,
@@ -19,7 +21,7 @@ import {
   stageDelete,
   stageNull,
 } from './pendingChanges';
-import { setFilter, setProjection, setSort } from './state';
+import { setFilter, setMaskPreview, setProjection, setSort } from './state';
 
 // F1/P21 round 1: the pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
 // the table/view's primary-key columns, which is empty for any relation with no primary key (every
@@ -460,6 +462,67 @@ export interface HeaderMenuContext {
   currentProjection: string[] | null;
   allColumnNames: string[];
   columnValues: () => string[]; // the loaded page's values only (§8.5's own scope boundary)
+  // M5 §6.7: the "Mark column as PII" submenu's own inputs — the grid already holds both at the
+  // point this menu opens, so no new metadata path is needed to resolve the qualified table name
+  // Upsert wants (qualifiedNameForPath, above, does that).
+  connectionId: string;
+  tablePath: string;
+}
+
+// M5 §6.7/§2.3: the six kinds offered from the header menu, in the same display order §2.3's own
+// table uses. Deliberately not exhaustive of every field a rule carries (keepHint/correlate stay
+// at their sensible defaults here — the Privacy tab, §7.4, is where those get tuned) — "mark this
+// column PII" is meant to be one click, not a form.
+const MASK_KIND_CHOICES: { kind: MaskKind; label: string }[] = [
+  { kind: 'name', label: 'Name' },
+  { kind: 'email', label: 'Email' },
+  { kind: 'text', label: 'Text' },
+  { kind: 'number', label: 'Number' },
+  { kind: 'date', label: 'Date' },
+  { kind: 'redact', label: 'Redact' },
+];
+
+// §2.3: number never correlates (a bucket is many-to-one); date defaults off ("a masked date is a
+// poor join key"). Every other kind defaults on — the join-preserving behaviour is the point.
+function defaultCorrelateFor(kind: MaskKind): boolean {
+  return kind !== 'number' && kind !== 'date';
+}
+
+// The header menu's own scoping choice: matches by column name alone (case-insensitive), the same
+// rule §4.2 uses for render-time matching — so "Not PII" and the checked kind reflect whatever
+// rule is actually masking this column today, even one authored in the Privacy tab against a
+// different table_name (or '*'). A rule this menu itself writes always uses THIS tab's own
+// qualified table name (qualifiedNameForPath, below) — so repeat visits from the same tab's header
+// menu edit the same row rather than accumulating duplicates; only a rule already present under a
+// different table_name is left in place by "Not PII" here (removing every rule matching a column
+// name across every table would reach outside this menu's own tab-scoped intent).
+function existingMaskRule(ctx: HeaderMenuContext): MaskRule | undefined {
+  const lower = ctx.columnName.toLowerCase();
+  const rules = maskRulesFor(ctx.connectionId).filter((r) => r.columnName.toLowerCase() === lower);
+  if (rules.length === 0) return undefined;
+  const tableName = qualifiedNameForPath(ctx.connectionId, ctx.tablePath) || '*';
+  return rules.find((r) => r.tableName === tableName) ?? rules[0];
+}
+
+async function markColumnMaskKind(ctx: HeaderMenuContext, kind: MaskKind): Promise<void> {
+  const existing = existingMaskRule(ctx);
+  const tableName =
+    existing?.tableName ?? qualifiedNameForPath(ctx.connectionId, ctx.tablePath) ?? '*';
+  await upsertMaskRule(ctx.connectionId, {
+    tableName: tableName || '*',
+    columnName: ctx.columnName,
+    kind,
+    keepHint: true,
+    correlate: defaultCorrelateFor(kind),
+  });
+  // §6.7: "the effect is immediately visible" — toggling preview on for this tab is what makes
+  // marking a column PII feel like it did something, right where the user was looking.
+  setMaskPreview(ctx.tabId, true);
+}
+
+async function clearColumnMask(ctx: HeaderMenuContext): Promise<void> {
+  const existing = existingMaskRule(ctx);
+  if (existing) await removeMaskRule(ctx.connectionId, existing.id);
 }
 
 // D7: Sort asc/desc/Clear sort, Hide column/Show all columns, Copy column name/values.
@@ -539,6 +602,32 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       // Cmd/Ctrl+C — a binding that worked before this phase but was never shown anywhere.
       shortcut: 'grid.copy',
       run: () => copyText(ctx.columnValues().join('\n')),
+    },
+    { type: 'separator' },
+    {
+      type: 'submenu',
+      id: 'mark-pii',
+      label: 'Mark column as PII',
+      icon: 'shield',
+      items: [
+        ...MASK_KIND_CHOICES.map(
+          ({ kind, label }): MenuItem => ({
+            type: 'item',
+            id: `mask-${kind}`,
+            label,
+            checked: existingMaskRule(ctx)?.kind === kind,
+            run: () => markColumnMaskKind(ctx, kind),
+          }),
+        ),
+        { type: 'separator' },
+        {
+          type: 'item',
+          id: 'mask-none',
+          label: 'Not PII',
+          checked: !existingMaskRule(ctx),
+          run: () => clearColumnMask(ctx),
+        },
+      ],
     },
   ];
 }

@@ -26,6 +26,10 @@ export function createDisplayValueExtractor(
   tabId: string,
   page: TabularPage,
   columnOrder: string[],
+  // M5 §6.2: the grid preview's own transform, resolved by SlickGridHost.vue's dataSourceState
+  // from the tab's rules and this page's columns — `undefined` when mask preview is off, in
+  // which case this extractor is byte-for-byte what it was before M5.
+  maskTransform?: (view: CellView, field: string) => CellView,
 ): (item: RowHandle, field: string) => CellView {
   const fieldToPageCol = new Map<string, number>();
   for (let i = 0; i < columnOrder.length; i++) {
@@ -60,7 +64,11 @@ export function createDisplayValueExtractor(
     }
     const pageCol = fieldToPageCol.get(field) ?? -1;
     if (pageCol < 0) return { text: '', isNull: true, truncated: false };
-    return cell(tabId, item.row, pageCol);
+    const view = cell(tabId, item.row, pageCol);
+    // M5 §6.2: applied last, over whatever the existing pipeline produced — never mutates `view`
+    // itself (maskPreview.ts's own header comment on why that matters: `cell()`'s own return
+    // value is memoised by page.ts's `store.cachedView`).
+    return maskTransform ? maskTransform(view, field) : view;
   };
 }
 

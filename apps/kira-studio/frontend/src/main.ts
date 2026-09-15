@@ -12,6 +12,7 @@ import { codeReposState, hydrateCodeRepos } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
 import { hydrateDbMcp, hydrateDbMcpApprovals } from './state/dbmcp';
 import { hydrateGitClients } from './state/gitClients';
+import { loadMaskRuleCounts } from './state/maskRules';
 import { hydrateOps } from './state/ops';
 import { hydrateRepoMap } from './state/repomap';
 import { ensureWorkspaceShell } from './state/repoTabs';
@@ -294,6 +295,10 @@ async function bootstrap(): Promise<void> {
     hydrateLayout(),
     hydrateSettings(),
     hydrateConnections(),
+    // M5 §7.5/§6.2: every connection's own masked-column count — the Settings glance's data, and
+    // the toolbar's own "does this connection have any masked columns at all" visibility check
+    // (deleteRowTooltip's own standing rule: a permanently inert control is worse than no control).
+    loadMaskRuleCounts(),
     hydrateCodeRepos(),
     hydrateGitClients(),
     hydrateRepoMap(),

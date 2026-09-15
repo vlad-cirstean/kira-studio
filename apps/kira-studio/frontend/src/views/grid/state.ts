@@ -42,6 +42,11 @@ export interface DataViewRuntime {
   hasMore: boolean;
   selection: Selection | null;
   searchOpen: boolean;
+  /** M5 §6.2: this tab's own masking preview toggle — per-tab, session-only, never persisted (a
+   *  masked view must not silently outlive the session and leave a user reading buckets as real
+   *  numbers tomorrow). A preview convenience, not a security boundary (§6.1) — the MCP path is
+   *  the real one. */
+  maskPreview: boolean;
 }
 
 function defaultRuntime(): DataViewRuntime {
@@ -59,6 +64,7 @@ function defaultRuntime(): DataViewRuntime {
     hasMore: false,
     selection: null,
     searchOpen: false,
+    maskPreview: false,
   };
 }
 
@@ -66,6 +72,17 @@ const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen 
   createRuntimeStore<DataViewRuntime>(defaultRuntime);
 
 export { runtime, setSearchOpen, toggleSearchOpen };
+
+/** M5 §6.2. `hasPending` (views/grid/pendingChanges.ts) gates both directions here, at the one
+ *  caller (DataToolbar.vue's toggle button) rather than duplicated at every setter — see that
+ *  file's own comment for why a staged change and a live preview must never coexist. */
+export function setMaskPreview(tabId: string, on: boolean): void {
+  ensureRuntime(tabId).maskPreview = on;
+}
+export function toggleMaskPreview(tabId: string): void {
+  const rt = ensureRuntime(tabId);
+  rt.maskPreview = !rt.maskPreview;
+}
 
 // D4: `runtime` is this view's per-tab record — closeTab has no way to import this leaf module
 // directly (reality 18), so it registers here instead. P67 §5.2: also drops that tab's own

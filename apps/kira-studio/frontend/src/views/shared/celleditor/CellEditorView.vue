@@ -109,6 +109,8 @@ const isEditable = computed(
 );
 const readOnlyChipText = computed(() => {
   switch (readOnlyReason.value) {
+    case 'masked':
+      return 'Masked preview';
     case 'connection-read-only':
       return 'Connection is read-only';
     case 'value-truncated':
@@ -121,6 +123,9 @@ const readOnlyChipText = computed(() => {
 });
 const readOnlyChipTitle = computed(() => {
   switch (readOnlyReason.value) {
+    case 'masked':
+      // M5 §6.5: the one reason here the user can fix immediately, unlike the other three.
+      return 'Values are masked for this tab — turn the preview off in the toolbar to see and edit the stored value.';
     case 'connection-read-only':
       return undefined;
     case 'value-truncated':

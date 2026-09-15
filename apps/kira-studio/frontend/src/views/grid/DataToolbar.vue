@@ -3,6 +3,7 @@ import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openGenerateDataDialog } from '../../state/fakeData';
+import { maskRulesState } from '../../state/maskRules';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import PagerControls from '../shared/page/PagerControls.vue';
@@ -10,7 +11,13 @@ import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import { getPage, pageVersion } from './page';
-import { addInsertRow, discardInsertRow, pendingFor, stageDelete } from './pendingChanges';
+import {
+  addInsertRow,
+  discardInsertRow,
+  hasPending,
+  pendingFor,
+  stageDelete,
+} from './pendingChanges';
 import { matchedRows } from './search';
 import { rowsForSelection } from './slick/rowValues';
 import {
@@ -22,6 +29,7 @@ import {
   runCount,
   runtime,
   setPageSize,
+  toggleMaskPreview,
   toggleSearchOpen,
 } from './state';
 
@@ -48,9 +56,33 @@ const caps = computed(() => {
 // (assertKeyIsPrimaryKey); gating that button too would just be a second, redundant guard.
 // Delete is different, and P28 D8 separates the two: it has no per-cell rejection path to fall
 // through to — it stages straight into pendingChanges — so an unactionable click there is silent.
+//
+// M5 §6.4: `&& !rt.value?.maskPreview` is the edit lockout's own toolbar half — SlickGridHost.vue's
+// canEditTable() closes the grid's own inline paths, this one closes Add/Generate/Delete, all of
+// which derive from this single computed.
 const isWritable = computed(
-  () => !!caps.value?.writable && !connectionRecord(props.tab.connectionId)?.readOnly,
+  () =>
+    !!caps.value?.writable &&
+    !connectionRecord(props.tab.connectionId)?.readOnly &&
+    !rt.value?.maskPreview,
 );
+
+// M5 §6.2: rendered only when this tab's connection has at least one masked column — a
+// permanently inert toggle is worse than no toggle (deleteRowTooltip's own standing rule, just
+// below: name the condition, never a silently-disabled control with nothing to explain it).
+const hasMaskRules = computed(() => (maskRulesState.counts[props.tab.connectionId ?? ''] ?? 0) > 0);
+// §6.4: turning the preview on while something is staged would mask the very text the user
+// staged, with no way to tell staged text from stored text inside the transform — simpler to
+// forbid the combination outright than to build that distinction for a case nobody needs.
+const hasPendingChanges = computed(() => hasPending(props.tab.id));
+const maskPreviewTooltip = computed(() => {
+  if (hasPendingChanges.value) return 'Commit or discard pending changes first';
+  return rt.value?.maskPreview ? 'Turn off the masking preview' : 'Preview masked values';
+});
+function onToggleMaskPreview(): void {
+  if (hasPendingChanges.value) return;
+  toggleMaskPreview(props.tab.id);
+}
 
 // P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
 // addressable row to DELETE (a MergeTree PRIMARY KEY is a sparse index, not a unique key), so
@@ -78,17 +110,24 @@ const canDeleteRows = computed(
 // key a property of the table, and an empty selection the one the user can act on right now.
 const deleteRowTooltip = computed(() => {
   if (canDeleteRows.value) return 'Delete selected row(s)';
+  if (rt.value?.maskPreview) return 'Values are masked — turn the preview off to edit';
   if (!isWritable.value) return 'Connection is read-only';
   if (!caps.value?.canDelete) return 'This connection does not support deleting rows';
   if (!hasPrimaryKey.value) return 'This table has no primary key, so a row cannot be addressed';
   return 'Select one or more rows first';
 });
 
-const canGenerateData = computed(() =>
-  canGenerateDataFor(caps.value, connectionRecord(props.tab.connectionId)?.readOnly),
+// M5 §6.4: canGenerateDataFor doesn't know about mask preview (fakeData/generate.ts's own
+// predicate, reused unchanged by DataView.vue's palette entry too) — checked separately here, and
+// named ahead of every reason that predicate itself covers.
+const canGenerateData = computed(
+  () =>
+    canGenerateDataFor(caps.value, connectionRecord(props.tab.connectionId)?.readOnly) &&
+    !rt.value?.maskPreview,
 );
 const generateDataTooltip = computed(() => {
   if (canGenerateData.value) return 'Generate data…';
+  if (rt.value?.maskPreview) return 'Values are masked — turn the preview off to edit';
   if (connectionRecord(props.tab.connectionId)?.readOnly) return 'Connection is read-only';
   return 'This connection does not support generating rows';
 });
@@ -255,7 +294,13 @@ function onDeleteRow(): void {
       icon="add"
       data-testid="toolbar-add-row"
       :disabled="!isWritable"
-      v-tooltip="isWritable ? 'Add a row' : 'Connection is read-only'"
+      v-tooltip="
+        isWritable
+          ? 'Add a row'
+          : rt?.maskPreview
+            ? 'Values are masked — turn the preview off to edit'
+            : 'Connection is read-only'
+      "
       @click="onAddRow"
     />
     <IconButton
@@ -278,6 +323,15 @@ function onDeleteRow(): void {
       v-tooltip="'Search this page'"
       data-testid="toolbar-search"
       @click="onToggleSearch"
+    />
+    <IconButton
+      v-if="hasMaskRules"
+      icon="eye-closed"
+      :active="!!rt?.maskPreview"
+      :disabled="hasPendingChanges"
+      data-testid="toolbar-mask-preview"
+      v-tooltip="maskPreviewTooltip"
+      @click="onToggleMaskPreview"
     />
   </div>
 </template>

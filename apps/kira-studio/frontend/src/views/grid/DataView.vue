@@ -70,6 +70,10 @@ const pathPrefix = computed(() => ancestorPathPrefix(props.tab.connectionId, pro
 // this badge appears only once the user has actually pressed Σ, never before.
 const columnCount = computed(() => rt.value?.meta?.columns.length ?? null);
 const isWritable = computed(() => !!caps.value?.writable && !connRecord.value?.readOnly);
+// M5 §6.4: the grid-writable-badge's own reason — masked reads as read-only, since it is (the
+// preview toggle can't be on while anything is pending, so this never has to distinguish "masked
+// but would otherwise be writable" from "genuinely read-only" for the badge's one-word purpose).
+const effectivelyWritable = computed(() => isWritable.value && !rt.value?.maskPreview);
 const primaryKeyLabel = computed(() => {
   const names = rt.value?.meta?.columns.filter((c) => c.isPrimaryKey).map((c) => c.name) ?? [];
   return names.length ? `PK ${names.join(', ')}` : null;
@@ -124,7 +128,9 @@ function onStop(): void {
 // to lean on — shares canGenerateDataFor with DataToolbar.vue's own button (P12 round 1 F16) so
 // the two can't drift apart the way this file's own predicate once did.
 function onGenerateData(): void {
-  if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly)) return;
+  // M5 §6.4: the same lockout DataToolbar.vue's own Generate button applies — this is the
+  // command-palette/keyboard-shortcut path to the identical action, and must not bypass it.
+  if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly) || rt.value?.maskPreview) return;
   openGenerateDataDialog(props.tab.id);
 }
 
@@ -188,7 +194,7 @@ function onCloseSearch(): void {
           >{{ columnCount }} columns</span
         >
         <span class="p-badge" data-testid="grid-writable-badge">{{
-          isWritable ? 'read-write' : 'read-only'
+          effectivelyWritable ? 'read-write' : 'read-only'
         }}</span>
         <span v-if="rt?.count" class="p-badge" data-testid="grid-row-count-badge"
           >Σ {{ rt.count.value.toLocaleString() }} rows</span
@@ -255,6 +261,7 @@ function onCloseSearch(): void {
           testid-prefix=""
           row-noun="rows"
           :api="pageSearchApi"
+          :mask-preview-on="!!rt?.maskPreview"
           @go-to-match="onGoToMatch"
           @close="onCloseSearch"
         />
@@ -290,6 +297,18 @@ function onCloseSearch(): void {
           class="error-strip"
         >
           <span>{{ rt.actionError }}</span>
+        </MessageStrip>
+        <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
+             stored data — a preview convenience (§6.1), not the security boundary, but a user
+             switching tabs or taking a screenshot must not mistake a bucket string for a literal
+             value. -->
+        <MessageStrip
+          v-if="rt?.maskPreview"
+          tone="note"
+          icon="eye-closed"
+          data-testid="mask-preview-strip"
+        >
+          <span>Values shown are masked for this preview — not the stored data. Editing is off while it's on.</span>
         </MessageStrip>
         <div class="grid-area">
           <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />

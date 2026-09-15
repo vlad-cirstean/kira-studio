@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { foldRulesByColumn, type MaskingRule } from '@shared/domain/mask';
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
@@ -25,6 +26,7 @@ import {
 } from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, openContextMenu, runMenuShortcut } from '../../state/contextMenu';
+import { correlationKeyFor, loadMaskRules, maskRulesFor } from '../../state/maskRules';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
@@ -62,6 +64,7 @@ import {
   requestCellFocus,
   unregisterGridHost,
 } from './focusRequest';
+import { buildMaskTagCache, createMaskPreviewTransform } from './maskPreview';
 import { cellMenu, type FkNavContext, headerMenu, rowMenu } from './menu';
 import {
   addInsertRow,
@@ -178,7 +181,7 @@ function cellFormatter(
   columnDef: KiraColumn,
   dataContext: RowHandle,
 ): string | FormatterResultWithText | HTMLElement {
-  const view = value as { text: string; isNull: boolean; truncated: boolean };
+  const view = value as { text: string; isNull: boolean; truncated: boolean; masked?: boolean };
   // C9/§5 D9 — the one place a formatter returns DOM, against `-iter2-pacing` D5's measured
   // "text, never DOM" rule: bounded to the insert region alone (typically 1-5 rows), and the
   // normal path just above/below is untouched. Self-contained once built: every keystroke stages
@@ -202,14 +205,20 @@ function cellFormatter(
   const hasNav = isFk || (!view.isNull && navColumns.pk.has(name));
   const navClasses = hasNav ? (isFk ? 'fk has-nav' : 'has-nav') : '';
   if (view.isNull) return { text: 'NULL', addClasses: 'cell-null' };
+  // M5 §6.2: the one visual affordance keeping a user from misreading the preview as real data —
+  // `.cell-masked` (slickTheme.css) styles the `#TAG` suffix muted. `view.masked` is only ever
+  // true from maskPreview.ts's own transform, never from the plain decode path, so this is a no-op
+  // (`addClasses` stays exactly what it was) whenever the preview is off.
+  const maskedClass = view.masked ? 'cell-masked' : '';
+  const classes = [navClasses, maskedClass].filter(Boolean).join(' ');
   if (view.truncated) {
     return {
       text: view.text,
-      addClasses: navClasses ? `cell-truncated ${navClasses}` : 'cell-truncated',
+      addClasses: classes ? `cell-truncated ${classes}` : 'cell-truncated',
       toolTip: 'value truncated at 64 KB',
     };
   }
-  return navClasses ? { text: view.text, addClasses: navClasses } : view.text;
+  return classes ? { text: view.text, addClasses: classes } : view.text;
 }
 
 function rt() {
@@ -232,15 +241,35 @@ function caps() {
   const connectionId = tab()?.connectionId;
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 }
+// M5 §6.4: this tab's own masking preview toggle. A plain function, not a computed — the same
+// "every other call site is an event handler outside SlickGrid's own render path" reasoning
+// hasPrimaryKey/isWritable already give, just above (D0).
+function maskPreviewOn(): boolean {
+  return !!rt()?.maskPreview;
+}
+
 // Gates whether double-click/Enter starts an inline edit (D8/C8) — the toolbar's own add/preview/
 // commit/discard buttons are gated on writability alone, never on hasPrimaryKey.
+//
+// M5 §6.4: `&& !maskPreviewOn()` is the whole edit lockout — the worst bug this feature could ship
+// is a user committing a masked value into their database, and every write path already routes
+// through this one predicate: the `editable` grid option (the `canEditTableReactive` watch,
+// below), `SelectedCell.onEdit`/`onRevert` (the publication watch further down, which reads
+// `canEditTable()` directly), `cellFormatter`'s insert-row `<input>` branch (no insert row can
+// exist while masked, since it is add-row's own isWritable in DataToolbar.vue that gets one too),
+// and `onPaste` (`if (!canEditTable()) return;`, above).
 function canEditTable(): boolean {
-  return isWritable() && hasPrimaryKey() && !!caps()?.canUpdate;
+  return isWritable() && hasPrimaryKey() && !!caps()?.canUpdate && !maskPreviewOn();
 }
 // P36 D26: deliberately not folded into canEditTable — an engine could offer one of
 // canUpdate/canDelete without the other.
+//
+// M5 §6.4: `&& !maskPreviewOn()` added defensively, beyond the plan's own explicit list (which
+// names canEditTable and DataToolbar.vue's isWritable, not this) — a row delete is still a write
+// path against rows the user cannot currently read clearly, and the same lockout principle
+// applies: never let masked-preview state reach a real mutation.
 function canDeleteRows(): boolean {
-  return isWritable() && hasPrimaryKey() && !!caps()?.canDelete;
+  return isWritable() && hasPrimaryKey() && !!caps()?.canDelete && !maskPreviewOn();
 }
 
 // §5 D8 — a `computed` purely to trigger the `editable`-sync watch below via `grid.setOptions`
@@ -307,11 +336,46 @@ function currentOrder(): string[] {
 // Thin, tabId/page/order-bound wrappers over rowValues.ts's own pure functions — every call site
 // in this file already has props.tabId and currentOrder() on hand, so binding them here once
 // keeps those call sites reading exactly like DataGrid.vue's own did.
+//
+// M5 §6.5/§6.6: the ONE place this file's own `displayCell` masks — every call site (the
+// SelectedCell publish watch below, so the cell editor panel shows the masked text; the context
+// menus' own `text`/copy paths, so "copy follows display" per §6.6) reads through here, so a
+// future call site inherits the masking rule for free rather than needing its own opt-in. A
+// staged edit (`view.staged`) is never masked — moot in practice (the toggle is disabled while
+// `hasPending`, so nothing can be staged while masked), kept as an explicit early return rather
+// than relying on that invariant holding here too.
 function displayCell(row: number, displayCol: number): DisplayCellView {
-  return rvDisplayCell(props.tabId, getPage(props.tabId), currentOrder(), row, displayCol);
+  const view = rvDisplayCell(props.tabId, getPage(props.tabId), currentOrder(), row, displayCol);
+  if (view.staged || !maskPreviewOn() || maskRulesByColumn.size === 0) return view;
+  const field = currentOrder()[displayCol];
+  if (!field) return view;
+  const masked = createMaskPreviewTransform(maskRulesByColumn, maskTagCache)(view, field);
+  return { ...view, text: masked.text, isNull: masked.isNull, truncated: masked.truncated };
 }
+// M5 §6.6: "copy follows display" — row copy must not paste real values while the preview is
+// showing masked ones. Post-processes rvRowSnapshot's own values through the same transform
+// `displayCell` above uses. (Duplicate row is a write path, not a read one — `duplicateAsInsert`,
+// menu.ts's own `run`, reads `cell()` directly rather than through this wrapper at all, but it
+// never runs while masked regardless: menu.ts's own `disabled: !ctx.canEdit` already blocks it,
+// since `canEditTable()` folds in `!maskPreviewOn()`.)
 function rowSnapshot(row: number): RowSnapshot {
-  return rvRowSnapshot(props.tabId, getPage(props.tabId), currentOrder(), row);
+  const snap = rvRowSnapshot(props.tabId, getPage(props.tabId), currentOrder(), row);
+  if (!maskPreviewOn() || maskRulesByColumn.size === 0) return snap;
+  const transform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
+  const values: Record<string, string | null> = {};
+  for (const name of snap.columns) {
+    const raw = snap.values[name];
+    if (raw === null) {
+      values[name] = null;
+      continue;
+    }
+    const masked = transform(
+      { text: raw, isNull: false, truncated: snap.truncated?.has(name) ?? false },
+      name,
+    );
+    values[name] = masked.text;
+  }
+  return { ...snap, values };
 }
 
 function currentDialect() {
@@ -331,14 +395,27 @@ function columnDescriptor(name: string): ColumnDescriptor | undefined {
 function rowsForColumnOps(rowCount: number): number[] {
   return rvRowsForColumnOps(currentDisplayRows(), rowCount);
 }
+// M5 §6.6: "copy follows display", the copy-column-values path — mirrors rowSnapshot's own
+// post-processing above, for the identical reason (rvColumnValuesFor reads through rowValues.ts's
+// own unmasked `displayCell`, not this file's masking-aware wrapper).
 function columnValuesFor(displayCol: number): string[] {
-  return rvColumnValuesFor(
+  const values = rvColumnValuesFor(
     props.tabId,
     getPage(props.tabId),
     currentOrder(),
     currentDisplayRows(),
     displayCol,
   );
+  if (!maskPreviewOn() || maskRulesByColumn.size === 0) return values;
+  const field = currentOrder()[displayCol];
+  if (!field) return values;
+  const rule = maskRulesByColumn.get(field.toLowerCase());
+  if (!rule) return values;
+  const transform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
+  // rvColumnValuesFor already collapsed NULL to '' (its own contract, matching every other
+  // column-values consumer) — masking that empty string is a no-op regardless (Apply's own
+  // "empty stays empty" universal rule), so no NULL-awareness is lost by transforming it anyway.
+  return values.map((text) => transform({ text, isNull: false, truncated: false }, field).text);
 }
 
 // FIX-8: PK/FK stated as a label, never inferred from colour alone — mirrors DataGrid.vue's own
@@ -499,6 +576,38 @@ function insertRowColumns(order: readonly string[]): NonNullable<ItemMetadata['c
   return columns;
 }
 
+// M5 §6.2/§6.3: this tab's own folded mask rules (by lowercased column name) and precomputed tag
+// cache. Plain module-scope-shaped `let`s, not `ref`/`reactive` — the same D0 rule everything else
+// on this synchronous render path follows (`formatterCtx`, `editorCtx`): `dataSourceState` reads
+// them synchronously, and the two refresh functions below (async, since resolving the correlation
+// key and computing HMAC tags both are) are the only writers, always followed by a `setState` +
+// `invalidateAllRows` + `render` to actually show the result — never awaited inline from
+// `dataSourceState` itself, which must stay synchronous.
+let maskRulesByColumn = new Map<string, MaskingRule>();
+let maskTagCache = new Map<string, string>();
+
+// Re-resolves maskRulesByColumn from this tab's own connection — cheap (state/maskRules.ts's own
+// in-memory store, no IPC round trip when already loaded).
+function refreshMaskFolding(): void {
+  const connectionId = tab()?.connectionId;
+  maskRulesByColumn = connectionId ? foldRulesByColumn(maskRulesFor(connectionId)) : new Map();
+}
+
+// Rebuilds the tag cache for the CURRENT page against the CURRENT folding — §6.3's own "precompute
+// tags per page, not per render". Async (resolving the key and signing each distinct value both
+// are); callers re-render once this resolves. A page with nothing to correlate (no key yet, or no
+// correlating rule) clears the cache rather than leaving a prior page's tags behind.
+async function refreshMaskTagCache(): Promise<void> {
+  const connectionId = tab()?.connectionId;
+  const p = getPage(props.tabId);
+  if (!connectionId || !p || maskRulesByColumn.size === 0) {
+    maskTagCache = new Map();
+    return;
+  }
+  const key = await correlationKeyFor(connectionId);
+  maskTagCache = await buildMaskTagCache(p, maskRulesByColumn, key);
+}
+
 // C9 — the `GridDataSourceState` builder itself, factored out once this stopped being the single
 // mount-time-only object it was through C8: the pageVersion watch already rebuilt it wholesale on
 // every reload, and now an insert-count change (below) needs the identical shape for a narrower
@@ -507,6 +616,12 @@ function insertRowColumns(order: readonly string[]): NonNullable<ItemMetadata['c
 function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDataSourceState {
   const inserts = pendingFor(props.tabId)?.inserts ?? [];
   const insertColumns = inserts.length > 0 ? insertRowColumns(order) : undefined;
+  // M5 §6.2: `undefined` when mask preview is off (or this tab has no masked columns at all) —
+  // the extractor is then byte-for-byte what it was before M5.
+  const maskTransform =
+    maskPreviewOn() && maskRulesByColumn.size > 0
+      ? createMaskPreviewTransform(maskRulesByColumn, maskTagCache)
+      : undefined;
   return {
     index: { displayRows: currentDisplayRows(), pageRowCount: p?.rowCount ?? 0 },
     inserts,
@@ -515,7 +630,7 @@ function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDa
       ? (handle) => (handle.insertId !== undefined ? insertColumns : undefined)
       : undefined,
     extractValue: p
-      ? createDisplayValueExtractor(props.tabId, p, order)
+      ? createDisplayValueExtractor(props.tabId, p, order, maskTransform)
       : () => ({ text: '', isNull: true, truncated: false }),
   };
 }
@@ -1616,6 +1731,9 @@ function onHeaderContextMenuHandler(displayCol: number, e: MouseEvent): void {
       currentProjection: tab()?.state.projection ?? null,
       allColumnNames: getPage(props.tabId)?.columns.map((c) => c.name) ?? [],
       columnValues: () => columnValuesFor(displayCol),
+      // M5 §6.7: the "Mark column as PII" submenu's own inputs.
+      connectionId: tab()?.connectionId ?? '',
+      tablePath: tab()?.path ?? '',
     }),
   );
 }
@@ -1852,6 +1970,11 @@ onMounted(() => {
   const el = rootRef.value;
   if (!el) return;
   gridRootEl = el;
+
+  // M5 §6.2: proactively loaded (not deferred to the first toggle) so `refreshMaskFolding()` has
+  // real data the instant the user actually turns the preview on, rather than an empty map.
+  const connectionId = tab()?.connectionId;
+  if (connectionId) void loadMaskRules(connectionId);
 
   const t = tab();
   const p = getPage(props.tabId);
@@ -2185,6 +2308,19 @@ watch(
     // had no matching page at request time) can finally be satisfied.
     const pendingFocus = consumeCellFocus(props.tabId);
     if (pendingFocus) applyCellFocusRequest(pendingFocus);
+
+    // M5 §6.3: "on every pageVersion bump while it is on" — a freshly loaded page has an entirely
+    // different set of distinct values, so the previous tag cache no longer applies. The redaction
+    // above already rendered synchronously (correct, tag-less) the instant this watch fired; this
+    // fills the tags in a moment later, once the async HMAC pass resolves.
+    if (maskPreviewOn()) {
+      void refreshMaskTagCache().then(() => {
+        if (!grid || !dataSource) return;
+        dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
+        grid.invalidateAllRows();
+        grid.render();
+      });
+    }
   },
 );
 
@@ -2277,6 +2413,25 @@ watch(canEditTableReactive, (editable) => {
   grid?.setOptions({ editable });
 });
 
+// M5 §6.2/§6.3: the mask preview toggle itself — `runtime` is a real `reactive()` map (D0's own
+// note on `canEditTableReactive`, above, restated: `rt()?.maskPreview` needs no `pageVersion.n`
+// read the way plain-`Map`-backed page state does), so this getter re-fires on every toggle.
+// `dataSource.setState` swaps the extractor closure; `invalidateAllRows` + `render` are what
+// `shared/slick/dataSource.ts:174-183`'s own header comment says `setState` exists to be followed
+// by — the page store itself is never touched (a mask preview is a display-layer transform only).
+watch(
+  () => rt()?.maskPreview,
+  async () => {
+    refreshMaskFolding();
+    await refreshMaskTagCache();
+    if (!grid || !dataSource) return;
+    const p = getPage(props.tabId);
+    dataSource.setState(dataSourceState(p, currentOrder()));
+    grid.invalidateAllRows();
+    grid.render();
+  },
+);
+
 // P22 Pass B, C14 — DataGrid.vue's own `selectionTarget()`/publish watch (its own comment: "the
 // cell editor's target"), ported: `onSelectedRangesChanged`/`onGridActiveCellChanged` above already
 // keep `rt().selection` current for the grid's own visual selection layer, but never told the cell
@@ -2294,7 +2449,9 @@ function selectionTarget(): { row: number; col: number } | null {
   return null;
 }
 watch(
-  [() => rt()?.selection, () => pageVersion.n, () => props.tabId],
+  // M5 §6.5: `rt()?.maskPreview` added so toggling the preview republishes the current selection
+  // (and its `masked` flag/`value`) even when the selection itself hasn't changed.
+  [() => rt()?.selection, () => pageVersion.n, () => props.tabId, () => rt()?.maskPreview],
   () => {
     const p = getPage(props.tabId);
     const t = tab();
@@ -2316,6 +2473,11 @@ watch(
       return;
     }
     const targetRow = target.row;
+    // M5 §6.5: `displayCell()` (this file's own wrapper, above) already applies the mask
+    // transform when the preview is on — `view.text` here is already the masked text, so the
+    // panel's own display needs no change beyond the `masked` flag itself.
+    const masked =
+      !view.isNull && maskPreviewOn() && maskRulesByColumn.has(column.name.toLowerCase());
     const selected: SelectedCell = {
       tabId: props.tabId,
       connectionId: t.connectionId,
@@ -2325,11 +2487,15 @@ watch(
       row: targetRow,
       value: view.isNull ? null : view.text,
       truncated: view.truncated,
+      masked,
       hasPrimaryKey: hasPrimaryKey(),
       // Same eligibility as the grid's own inline (double-click) edit (D8/C8): writable connection,
       // a primary key to identify the row, and the row isn't already staged for delete. Stages into
       // the exact same pending-change set the inline editor already feeds, so the panel's save and
-      // the grid's own inline edit can never disagree about a cell's value.
+      // the grid's own inline edit can never disagree about a cell's value. `canEditTable()`
+      // already folds in `!maskPreviewOn()` (M5 §6.4), so onEdit/onRevert are undefined for free
+      // whenever `masked` above is true — the panel's own read-only lockout and this cell's own
+      // masked-ness can never disagree.
       onEdit:
         canEditTable() && !isDeleted(targetRow)
           ? (newValue: string) => stageEdit(props.tabId, targetRow, column.name, newValue)

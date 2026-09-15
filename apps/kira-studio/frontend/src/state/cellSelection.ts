@@ -18,6 +18,12 @@ export interface SelectedCell {
   value: string | null;
   /** The engine cut this value at MAX_CELL_BYTES; the rest was never fetched (D14). */
   truncated: boolean;
+  /** M5 §6.5: true when `value` is the grid's own mask-preview redaction, not the stored value —
+   *  `ReadOnlyReason`'s `'masked'` arm (views/shared/celleditor/state.ts) reads this first, ahead
+   *  of every other reason, since it is the one the user can fix by toggling the preview off.
+   *  `undefined`/absent means "this view has no masking concept at all" (every publisher other
+   *  than the grid), which `readOnlyReasonFor` treats identically to `false`. */
+  masked?: boolean;
   /** Whether the page has a primary key at all (P5 D14) — computed once here, since whether a
    *  page has one is grid-only knowledge and `views/shared/celleditor/` may not import `views/grid/`. */
   hasPrimaryKey: boolean;

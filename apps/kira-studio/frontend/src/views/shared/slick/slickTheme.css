@@ -471,6 +471,14 @@
   margin-left: var(--kira-s-1);
 }
 
+/* M5 §6.2: the grid mask preview's own visual affordance — a masked cell (its redaction and any
+   `#TAG` correlation suffix) reads muted, distinct from a real value at a glance. Not italic
+   (cell-null's own signal for "this isn't data at all") — a masked cell still has the shape of
+   real data, only redacted. */
+.slick-grid-host .slick-cell.cell-masked {
+  color: var(--kira-fg-muted);
+}
+
 /* §6 D5/C5 — the setCellCssStyles seam's own CSS layers: SlickGrid's own 'kira-cell-selected'
    (the whole selection's fill, F2) and the app's own 'kira-sel-edges'/'kira-staged'/
    'kira-search' (D5's table). Declared after the type-colour rules above so the cascade enforces

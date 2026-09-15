@@ -16,6 +16,11 @@ const props = defineProps<{
   testidPrefix: string;
   rowNoun: string;
   api: PageSearchApi<M>;
+  /** M5 §6.6: the grid's own mask preview state — this component is shared with documents/
+   *  keyvalue, neither of which has a masking concept, so this stays `undefined` (falsy) there.
+   *  Search itself is unaffected either way (it always scans stored values, §6.1's own "not a
+   *  security boundary" framing) — this only controls whether the one-line note below shows. */
+  maskPreviewOn?: boolean;
 }>();
 
 const emit = defineEmits<{ goToMatch: [match: M]; close: [] }>();
@@ -360,6 +365,12 @@ onUnmounted(() => {
           loaded {{ rowNoun }}
         </template>
         <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded {{ rowNoun }}</template>
+      </span>
+      <!-- M5 §6.6: search stays over raw stored values even while the grid's own preview shows
+           masked ones — a surprising mismatch otherwise ("why did my search for a real name match
+           a row showing buckets"), named here rather than left implicit. -->
+      <span v-if="maskPreviewOn" class="p-xs dim" :data-testid="`${testidPrefix}search-mask-note`">
+        search matches stored values, not displayed ones
       </span>
     </template>
     <IconButton

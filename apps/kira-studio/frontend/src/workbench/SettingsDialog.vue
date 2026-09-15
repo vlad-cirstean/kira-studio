@@ -25,6 +25,7 @@ import {
   setDbMcpEnabled,
 } from '../state/dbmcp';
 import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
+import { maskRulesState } from '../state/maskRules';
 import {
   hydrateRepoMap,
   installRepoMapClaudeCode,
@@ -1218,6 +1219,17 @@ async function onSave(): Promise<void> {
                   <span v-if="mcpDescriptionFirstLine(conn)" class="helper-text">{{
                     mcpDescriptionFirstLine(conn)
                   }}</span>
+                  <!-- M5 §7.5: extends this existing read-only glance — no second full editor
+                       here (M2's own established split); editing lives in the connection's own
+                       Privacy tab. -->
+                  <span
+                    v-if="maskRulesState.counts[conn.id]"
+                    class="helper-text"
+                    :data-testid="`db-mcp-connection-masked-${conn.id}`"
+                    >{{ maskRulesState.counts[conn.id] }} masked column{{
+                      maskRulesState.counts[conn.id] === 1 ? '' : 's'
+                    }}</span
+                  >
                 </div>
                 <Checkbox
                   :model-value="conn.mcpEnabled"

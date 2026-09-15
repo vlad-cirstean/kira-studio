@@ -9,6 +9,7 @@ import * as FiltersService from '@bindings/filtersservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
+import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
@@ -36,6 +37,7 @@ import type {
   GitVsixStatus,
 } from '@shared/domain/git';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
+import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { AppMode } from '@shared/domain/mode';
 import type { OpRecord } from '@shared/domain/ops';
 import type {
@@ -178,6 +180,32 @@ const studioControl = {
     unwrap(ConnectionsService.States()).then((r) => trust<ConnectionState[]>(r ?? [])),
   connectionsSecretsStatus: (): Promise<SecretStorageStatus> =>
     unwrap(ConnectionsService.SecretsStatus()).then((r) => trust<SecretStorageStatus>(r)),
+
+  // M5 §7.2/§9: the Privacy tab, the grid header menu, and the grid preview's own local tag
+  // computation all share these — see state/maskRules.ts for the one store that wraps them.
+  maskRulesList: (connectionId: string): Promise<MaskRule[]> =>
+    unwrap(MaskRulesService.List({ connectionId })).then((r) => trust<MaskRule[]>(r ?? [])),
+  // The generated MaskRuleFields.kind is a TS `enum` (wails3's binding generator turns Go's named
+  // MaskKind consts into one, unlike this app's other string-const-typed fields, which stay plain
+  // `string`) — a plain string-literal object is not structurally assignable to it, so this widens
+  // at the call boundary the same documented way `trust` narrows on the way out (rpc.ts's own
+  // comment): the Go value is always one of the valid members regardless of which TS shape names it.
+  maskRulesUpsert: (connectionId: string, fields: MaskRuleFields): Promise<MaskRule> =>
+    unwrap(
+      MaskRulesService.Upsert({
+        connectionId,
+        fields,
+      } as unknown as Parameters<typeof MaskRulesService.Upsert>[0]),
+    ).then((r) => trust<MaskRule>(r)),
+  maskRulesRemove: (id: string): Promise<void> => unwrap(MaskRulesService.Remove({ id })),
+  maskRulesRegenerateKey: (connectionId: string): Promise<void> =>
+    unwrap(MaskRulesService.RegenerateKey({ connectionId })),
+  maskRulesCounts: (): Promise<Record<string, number>> =>
+    unwrap(MaskRulesService.Counts()).then((r) => trust<Record<string, number>>(r ?? {})),
+  // §6.3: the raw correlation key, hex-encoded — the one seam that sends it to the renderer, for
+  // the grid preview's own local tag computation. "" means the connection needs no key.
+  maskRulesCorrelationKey: (connectionId: string): Promise<string> =>
+    unwrap(MaskRulesService.CorrelationKey({ connectionId })),
   onConnectionState: (cb: (state: ConnectionState) => void): (() => void) =>
     on(CHANNEL.connectionState, cb),
   onConnectionMetadataInvalidated: (cb: (connectionId: string) => void): (() => void) =>

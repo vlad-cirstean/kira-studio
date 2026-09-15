@@ -10,11 +10,19 @@ import {
   FILE_KINDS,
   MIN_SERVER_VERSION,
 } from '@shared/domain/connection';
+import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { confirmDialog } from '../state/confirmDialog';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
+import {
+  loadMaskRules,
+  maskRulesFor,
+  regenerateMaskKey,
+  removeMaskRule,
+  upsertMaskRule,
+} from '../state/maskRules';
 import { schemaDialectFor } from '../state/schemas';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
@@ -87,6 +95,9 @@ function mcpModeOptions(
 
 const draft = computed(() => connectionsState.dialog.draft);
 const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
+// M5 §7: the Privacy tab operates against the real, saved connection — a brand-new (unsaved)
+// connection has no id yet, so its own pane shows a "save first" message instead (below).
+const editingConnectionId = computed(() => connectionsState.dialog.editingId);
 // M3 §9.1: whether this kind has an EXPLAIN this app can parse at all — the auto-explain checkbox
 // is disabled (never hidden) for the rest, since the setting is visible where it's set rather than
 // discovered missing.
@@ -107,10 +118,16 @@ const engineSearch = ref('');
 
 // P28 §4.2: step 2's own tab strip — General/Advanced/Pre-connect. Reset to 'General' whenever
 // step 2 is (re-)entered so "Change engine → back" never lands on a stale tab.
-type DetailTab = 'General' | 'Advanced' | 'Pre-connect' | 'MCP';
+type DetailTab = 'General' | 'Advanced' | 'Pre-connect' | 'MCP' | 'Privacy';
 const activeTab = ref<DetailTab>('General');
 watch(step, (s) => {
   if (s === 'details') activeTab.value = 'General';
+});
+// M5 §7.2: lazily loaded the first time the Privacy tab is actually opened — a rule takes effect
+// immediately server-side, so unlike every other tab there is no draft to seed from `draft.value`
+// at mount; this just needs the current, real rule set on screen.
+watch(activeTab, (tab) => {
+  if (tab === 'Privacy') void ensureMaskRulesLoaded();
 });
 
 const showPassword = ref(false);
@@ -383,6 +400,113 @@ const isFileStyle = computed(() => !!draft.value && FILE_KINDS.has(draft.value.k
 // immediately above.
 const isSqlKind = computed(() => !!draft.value && schemaDialectFor(draft.value.kind) !== undefined);
 
+// M5 §7: the Privacy tab's own state. A rule takes effect immediately (§7.2's own "not part of
+// the connection's save/cancel draft") — no local draft copy, this reads state/maskRules.ts
+// directly and every control here writes straight through it.
+const maskRules = computed(() =>
+  editingConnectionId.value ? maskRulesFor(editingConnectionId.value) : [],
+);
+
+// §7.4: table — placeholder `*`, column, kind. Reset after a successful Add.
+const newMaskTable = ref('');
+const newMaskColumn = ref('');
+const newMaskKind = ref<MaskKind>('redact');
+const maskRuleError = ref<string | null>(null);
+
+// §2.3, verbatim: the per-kind one-line explanation shown under the kind select.
+const MASK_KIND_EXPLANATION: Record<MaskKind, string> = {
+  name: 'Keeps initials and word lengths — "Maria Gonzalez" becomes "M•••• G•••••••".',
+  email: 'Keeps the domain and the local part’s first letter and length.',
+  text: 'Keeps nothing but a bucketed length — no first character, no exact length.',
+  number:
+    'Shows an order of magnitude, never a joinable key — use a text/redact rule, or mark ' +
+    'a numeric identifier column with a kind other than number, for a value that must join.',
+  date: 'Keeps the year, destroys month/day/time.',
+  redact:
+    'Keeps nothing at all — the right default when unsure, or when the shape itself is sensitive.',
+};
+
+// keepHint's own label changes per kind (§7.4); hidden for the four kinds where it means nothing.
+const KEEP_HINT_LABEL: Partial<Record<MaskKind, string>> = {
+  name: 'Keep initials',
+  email: 'Keep domain',
+  date: 'Keep year',
+};
+
+async function ensureMaskRulesLoaded(): Promise<void> {
+  if (editingConnectionId.value) await loadMaskRules(editingConnectionId.value);
+}
+
+async function onAddMaskRule(): Promise<void> {
+  const connectionId = editingConnectionId.value;
+  const columnName = newMaskColumn.value.trim();
+  if (!connectionId || !columnName) return;
+  maskRuleError.value = null;
+  const fields: MaskRuleFields = {
+    tableName: newMaskTable.value.trim() || '*',
+    columnName,
+    kind: newMaskKind.value,
+    keepHint: true,
+    correlate: newMaskKind.value !== 'number' && newMaskKind.value !== 'date',
+  };
+  try {
+    await upsertMaskRule(connectionId, fields);
+    newMaskTable.value = '';
+    newMaskColumn.value = '';
+    newMaskKind.value = 'redact';
+  } catch (err) {
+    maskRuleError.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+async function onChangeMaskRuleKind(ruleId: string, kind: MaskKind): Promise<void> {
+  const connectionId = editingConnectionId.value;
+  const rule = maskRules.value.find((r) => r.id === ruleId);
+  if (!connectionId || !rule) return;
+  await upsertMaskRule(connectionId, {
+    tableName: rule.tableName,
+    columnName: rule.columnName,
+    kind,
+    keepHint: rule.keepHint,
+    correlate: kind === 'number' ? false : rule.correlate,
+  });
+}
+
+async function onToggleMaskRuleFlag(
+  ruleId: string,
+  field: 'keepHint' | 'correlate',
+): Promise<void> {
+  const connectionId = editingConnectionId.value;
+  const rule = maskRules.value.find((r) => r.id === ruleId);
+  if (!connectionId || !rule) return;
+  await upsertMaskRule(connectionId, {
+    tableName: rule.tableName,
+    columnName: rule.columnName,
+    kind: rule.kind,
+    keepHint: field === 'keepHint' ? !rule.keepHint : rule.keepHint,
+    correlate: field === 'correlate' ? !rule.correlate : rule.correlate,
+  });
+}
+
+async function onRemoveMaskRule(ruleId: string): Promise<void> {
+  const connectionId = editingConnectionId.value;
+  if (!connectionId) return;
+  await removeMaskRule(connectionId, ruleId);
+}
+
+async function onRegenerateMaskKey(): Promise<void> {
+  const connectionId = editingConnectionId.value;
+  if (!connectionId) return;
+  const ok = await confirmDialog(
+    'Regenerating the correlation key changes every masked correlation tag for this connection. ' +
+      'Masked results already given to an AI client, or saved anywhere outside this app, will no ' +
+      'longer correlate with results produced after the change. The real values are not affected, ' +
+      'and this cannot be undone.',
+  );
+  if (!ok) return;
+  await regenerateMaskKey(connectionId);
+}
+
 // P35 D15: the SQLite-specific filter list — chooseOpen's own filters payload is generic, so a
 // second file kind would pass a different list here rather than this being hardcoded lower down.
 async function onBrowseDatabaseFile(): Promise<void> {
@@ -536,6 +660,17 @@ const preconnectText = computed({
               @click="activeTab = 'MCP'"
             >
               MCP
+            </button>
+            <button
+              type="button"
+              class="p-tab"
+              role="tab"
+              :class="{ 'is-active': activeTab === 'Privacy' }"
+              :aria-selected="activeTab === 'Privacy'"
+              data-testid="connection-tab-privacy"
+              @click="activeTab = 'Privacy'"
+            >
+              Privacy
             </button>
           </nav>
 
@@ -777,7 +912,7 @@ const preconnectText = computed({
           </label>
           </div>
 
-          <div v-else class="tab-pane" role="tabpanel">
+          <div v-else-if="activeTab === 'MCP'" class="tab-pane" role="tabpanel">
           <label class="field checkbox">
             <Checkbox v-model="draft.mcpEnabled" data-testid="connection-mcp-enabled" />
             <span>Expose to the database MCP server</span>
@@ -848,6 +983,95 @@ const preconnectText = computed({
             These govern the MCP server only — the Read-only flag on the Advanced tab is what
             governs this app's own console.
           </p>
+          </div>
+
+          <div v-else class="tab-pane" role="tabpanel">
+          <p class="helper-text">
+            Rules redact values for this connection's MCP clients and for the data viewer's
+            masking preview. They never change stored data.
+          </p>
+
+          <template v-if="!editingConnectionId">
+            <p class="helper-text">Save this connection first to manage masking rules.</p>
+          </template>
+          <template v-else>
+            <div v-if="maskRules.length" class="mask-rule-list" data-testid="mask-rule-list">
+              <div v-for="rule in maskRules" :key="rule.id" class="mask-rule-row" :data-testid="`mask-rule-${rule.id}`">
+                <span class="mask-rule-target mono" :title="`${rule.tableName}.${rule.columnName}`"
+                  >{{ rule.tableName }}.{{ rule.columnName }}</span
+                >
+                <select
+                  class="p-select bordered"
+                  :value="rule.kind"
+                  data-testid="mask-rule-kind"
+                  @change="onChangeMaskRuleKind(rule.id, ($event.target as HTMLSelectElement).value as MaskKind)"
+                >
+                  <option value="name">Name</option>
+                  <option value="email">Email</option>
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="redact">Redact</option>
+                </select>
+                <label v-if="KEEP_HINT_LABEL[rule.kind]" class="field checkbox mask-rule-flag">
+                  <Checkbox
+                    :model-value="rule.keepHint"
+                    data-testid="mask-rule-keep-hint"
+                    @update:model-value="onToggleMaskRuleFlag(rule.id, 'keepHint')"
+                  />
+                  <span>{{ KEEP_HINT_LABEL[rule.kind] }}</span>
+                </label>
+                <label class="field checkbox mask-rule-flag">
+                  <Checkbox
+                    :model-value="rule.correlate"
+                    :disabled="rule.kind === 'number'"
+                    data-testid="mask-rule-correlate"
+                    @update:model-value="onToggleMaskRuleFlag(rule.id, 'correlate')"
+                  />
+                  <span>Correlate</span>
+                </label>
+                <IconButton
+                  icon="trash"
+                  data-testid="mask-rule-remove"
+                  v-tooltip="'Not PII — remove this rule'"
+                  @click="onRemoveMaskRule(rule.id)"
+                />
+              </div>
+            </div>
+            <p v-else class="helper-text">No masking rules yet on this connection.</p>
+
+            <div class="mask-rule-add field-row">
+              <TextField v-model="newMaskTable" placeholder="*" size="md" data-testid="mask-rule-add-table" />
+              <TextField v-model="newMaskColumn" placeholder="column" size="md" data-testid="mask-rule-add-column" />
+              <select v-model="newMaskKind" class="p-select bordered" data-testid="mask-rule-add-kind">
+                <option value="name">Name</option>
+                <option value="email">Email</option>
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="date">Date</option>
+                <option value="redact">Redact</option>
+              </select>
+              <AppButton kind="dialog" data-testid="mask-rule-add" @click="onAddMaskRule">Add</AppButton>
+            </div>
+            <p class="helper-text">{{ MASK_KIND_EXPLANATION[newMaskKind] }}</p>
+            <span v-if="maskRuleError" class="field-error" data-testid="mask-rule-error">{{ maskRuleError }}</span>
+
+            <AppButton kind="dialog" data-testid="mask-regenerate-key" @click="onRegenerateMaskKey">
+              Regenerate correlation key
+            </AppButton>
+
+            <template v-if="!isFileStyle">
+              <MessageStrip
+                v-if="secretStatus?.insecureFallback"
+                tone="warn"
+                data-testid="mask-key-credential-note"
+              >
+                Development fallback: the correlation key is obfuscated with a built-in key, not a
+                real keychain, on this platform — an attacker with filesystem access could recover
+                it. The redaction itself is unaffected; it stays uninvertible regardless.
+              </MessageStrip>
+            </template>
+          </template>
           </div>
 
           <span
@@ -1160,5 +1384,40 @@ const preconnectText = computed({
 .kind-name {
   font-size: var(--kira-t-lg);
   color: var(--kira-fg);
+}
+
+/* M5 §7.4: the Privacy tab's rule list/add-row — a scrollable list of narrow rows, each one
+   table.column + kind + flags + remove, mirroring .field-row's own row-of-controls shape. */
+.mask-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-2);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.mask-rule-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-2) 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.mask-rule-target {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--kira-fg);
+}
+
+.mask-rule-flag {
+  flex: 0 0 auto;
+}
+
+.mask-rule-add {
+  align-items: center;
 }
 </style>
