@@ -59,7 +59,6 @@ import BranchPicker from './BranchPicker.vue';
 import PullStrategyPicker from './PullStrategyPicker.vue';
 // biome-ignore lint/style/useImportType: the template instantiates this — see above
 import RefreshButton from './RefreshButton.vue';
-import RepoPicker from './RepoPicker.vue';
 import { remoteNamesFrom } from './rowMenuModel.ts';
 import UndoButton from './UndoButton.vue';
 
@@ -83,7 +82,6 @@ const props = defineProps<{
   searchOpen: boolean;
 }>();
 const emit = defineEmits<{
-  (event: 'repo-opened', repoId: string): void;
   /** `docs/plans/P9.md` W14: opens `StashDialog.vue`'s create mode — owned by `App.vue`, exactly
    *  like `createBranchHere`/`createTagHere`'s own dialog state, since this button has no
    *  pre-flight endpoint of its own to preview first (the dialog IS the confirm step). */
@@ -278,7 +276,6 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (§6.2's own layout, not a page banner). -->
   <div class="kv-toolbar" role="toolbar" aria-label="Kira Version toolbar">
-    <RepoPicker :repo-state="repoState" @repo-opened="(repoId) => emit('repo-opened', repoId)" />
     <BranchPicker
       ref="branchPickerRef"
       :refs="refsState"

@@ -13,8 +13,8 @@ export class VsCodeWorkspaceRoots implements WorkspaceRoots {
     const folders = vscode.workspace.workspaceFolders ?? [];
     return Promise.resolve(
       // G27 D7: fsPath is filesystem-sourced (a VS Code Uri), compared against a git-sourced
-      // `root` elsewhere (RepoPicker.vue:33, fixed here rather than there per F12) — normalized
-      // at this one ingestion point.
+      // `root` elsewhere, fixed here rather than there per F12 — normalized at this one
+      // ingestion point.
       folders.map((folder) => ({ path: nfcPath(folder.uri.fsPath), label: folder.name })),
     );
   }
