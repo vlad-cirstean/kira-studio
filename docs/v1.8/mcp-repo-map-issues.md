@@ -54,3 +54,24 @@ v1.7's M1c.
     selector expression), one language over.
   - **Fix**: needs a dedicated pass in `internal/repomap`'s TypeScript reference extraction. Not
     scheduled here.
+
+- **P73 (planning) — the same gap is not specific to a `const`: a *function* referenced as a value
+  is missed too.** Narrows the entry above rather than adding a second one.
+
+  - **Found in**: P73 (planning)
+  - **Status**: Open, same root cause as the entry above. Not fixed in P73, per this log's own rule.
+  - **Query/tool call**: `find_references {"symbol":"repoFileIcon"}`
+  - **Expected**: one reference —
+    `apps/kira-studio/frontend/src/state/tabKinds.ts:431` (`icon: repoFileIcon`), the function used
+    as a value in an object literal.
+  - **Actual**: `no references found`.
+  - **Contrast, same session, same tree**: `find_references` on `setiIconFor` returned all 14 call
+    sites across `packages/git-ui/`, `apps/kira-studio/frontend/` and a `.vue` file;
+    `renderMarkdownReading` returned its single call site. So `call`-kind edges resolve correctly
+    across package and `.vue` boundaries; it is the non-call read that is missing.
+  - **Why it matters**: restates the entry above with a wider scope — the miss is **any non-call
+    read**, whatever the symbol's kind, not `const` objects specifically. A fix pass scoped to
+    `const` declarations would leave this case open. P73's §2.4 dead-code table was verified by
+    grep for exactly this reason.
+  - **Fix**: same dedicated pass in `internal/repomap`'s TypeScript reference extraction. Not
+    scheduled here.
