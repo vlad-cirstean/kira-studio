@@ -515,6 +515,33 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   deliberately **not** ported into `codegraph/search.go`'s `less()` — that would invent a language
   preference where no anchor exists (P64b plan §0.1).
 
+- **P68 (code review, dimension 1) — `outline_file` cannot distinguish "this file has no indexed
+  definitions" from "this path does not exist". Open.**
+
+  P67f closed this exact class for the not-yet-indexed case (`render.go`'s empty string vs.
+  `notReadyResult`), but the absent-*file* case survives in `renderOutline` (`render.go:181`):
+  `len(nodes) == 0` renders `"%s has no indexed definitions"` with no check that the path is a real,
+  enumerated file.
+
+  - `outline_file {"file":"apps/kira-studio/internal/codegraph/graph.go"}` →
+    `apps/kira-studio/internal/codegraph/graph.go has no indexed definitions`. No such file exists;
+    the package's file is `codegraph.go`.
+  - `outline_file {"file":"apps/kira-studio/internal/does-not-exist-at-all.go"}` → identical
+    sentence, verbatim.
+  - A real, indexed, definition-bearing file answers normally
+    (`outline_file {"file":"apps/kira-studio/internal/codegraph/codegraph.go"}` → 20+ nodes), so
+    the index is warm and this is not the cold-start case.
+
+  Cost is a wrong conclusion, not a slow one: during this review the first call above read as
+  "`graph.go` exists but carries no definitions", so `codegraph`'s query-scoping code was briefly
+  assumed absent rather than merely mis-addressed. An agent has no way to tell a typo'd path from a
+  genuinely definition-free file, and the honest recovery — fall back to `search_files` on every
+  miss — is precisely the extra round trip this server exists to remove.
+
+  `search_files` already answers the underlying question (it returns the `file` rows), and
+  `sourceForOneFile` already distinguishes `file not found` from `unreadable` for its own source
+  lines, so both halves of the distinction exist in-package. Per the process above, not fixed here.
+
 <!--
 Entry template:
 
