@@ -178,13 +178,42 @@ func maskEmail(value string, keepHint bool) string {
 // maskText keeps nothing but a bucketed length (§2.3 `text`) — no first character, no exact
 // length, both of which are themselves fingerprints over free text.
 func maskText(value string) string {
-	n := uniseg.GraphemeClusterCount(value)
+	n := boundedGraphemeCount(value, maskTextGraphemeCap)
 	return bullet + bullet + bullet + " (text, " + lengthBucket(n) + " chars)"
 }
 
 // textBucketEdges are the fixed, data-independent boundaries §2.3 names: 0 exactly, then doubling
 // from 8. Never derived from the column's own distribution — a quantile bucket would leak it.
 var textBucketEdges = []int{1, 8, 16, 32, 64, 128, 256, 512}
+
+// maskTextGraphemeCap is textBucketEdges' own top edge. lengthBucket only ever needs to tell "n is
+// below this edge" from "n is at or beyond it" — every count at or beyond it collapses to the same
+// "512+" bucket — so boundedGraphemeCount can stop counting the instant it proves that, rather than
+// walking every remaining grapheme boundary of a very long value for a distinction the bucket label
+// never surfaces.
+const maskTextGraphemeCap = 512
+
+// boundedGraphemeCount counts value's own grapheme clusters one at a time via uniseg's own
+// incremental API, stopping as soon as the count reaches limit. For any value with fewer than
+// limit graphemes this returns the exact count (identical to uniseg.GraphemeClusterCount); for a
+// longer one it returns limit — sufficient for lengthBucket, which treats every n >= limit the
+// same.
+func boundedGraphemeCount(value string, limit int) int {
+	n := 0
+	state := -1
+	for len(value) > 0 {
+		var cluster string
+		cluster, value, _, state = uniseg.FirstGraphemeClusterInString(value, state)
+		if cluster == "" {
+			break
+		}
+		n++
+		if n >= limit {
+			return n
+		}
+	}
+	return n
+}
 
 // lengthBucket maps a grapheme count to its bucket label ("1-8", "8-16", ... "512+" — §2.3's own
 // literal names). Exported (capitalised name) would invite callers to bypass Apply's own dispatch;

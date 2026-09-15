@@ -142,9 +142,30 @@ function lengthBucket(n: number): string {
   return `${last}+`;
 }
 
+// MASK_TEXT_GRAPHEME_CAP is TEXT_BUCKET_EDGES' own top edge. lengthBucket only ever needs to tell
+// "n is below this edge" from "n is at or beyond it" — every count at or beyond it collapses to
+// the same "512+" bucket — so boundedGraphemeCount can break out of the segmenter loop the instant
+// it proves that, rather than segmenting the rest of a very long value for a distinction the
+// bucket label never surfaces.
+const MASK_TEXT_GRAPHEME_CAP = 512;
+
+// boundedGraphemeCount mirrors graphemeCount but stops iterating once the count reaches limit. For
+// any string with fewer than limit graphemes this returns the exact count (identical to
+// graphemeCount); for a longer one it returns limit — sufficient for lengthBucket, which treats
+// every n >= limit the same.
+function boundedGraphemeCount(s: string, limit: number): number {
+  if (s === '') return 0;
+  let n = 0;
+  for (const _ of graphemeSegmenter.segment(s)) {
+    n++;
+    if (n >= limit) break;
+  }
+  return n;
+}
+
 // maskText keeps nothing but a bucketed length — no first character, no exact length.
 function maskText(value: string): string {
-  const n = graphemeCount(value);
+  const n = boundedGraphemeCount(value, MASK_TEXT_GRAPHEME_CAP);
   return `${BULLET}${BULLET}${BULLET} (text, ${lengthBucket(n)} chars)`;
 }
 
