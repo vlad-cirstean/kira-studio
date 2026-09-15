@@ -143,12 +143,51 @@ function isNonAscii(c: string): boolean {
   return code !== undefined && code > 127;
 }
 
+// M7 finding #18: charCodeAt range checks in place of a fresh regex test per character — this
+// scanner calls these once per source character, so the regex engine's own per-call overhead
+// (construction of a match state, even for one character) added up across a large document.
 function isIdentStart(c: string | undefined): boolean {
-  return c !== undefined && (/[A-Za-z_]/.test(c) || isNonAscii(c));
+  if (c === undefined) return false;
+  const code = c.charCodeAt(0);
+  if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95) return true; // A-Z a-z _
+  return isNonAscii(c);
 }
 
 function isIdentPart(c: string | undefined): boolean {
-  return c !== undefined && (/[\w$]/.test(c) || isNonAscii(c));
+  if (c === undefined) return false;
+  const code = c.charCodeAt(0);
+  if (
+    (code >= 48 && code <= 57) || // 0-9
+    (code >= 65 && code <= 90) || // A-Z
+    (code >= 97 && code <= 122) || // a-z
+    code === 95 || // _
+    code === 36 // $
+  )
+    return true;
+  return isNonAscii(c);
+}
+
+// Same character set `\s` matches (ASCII + the Unicode space separators/line terminators/BOM),
+// as charCodeAt range checks — this scanner calls it once per source character.
+function isWhitespace(c: string): boolean {
+  const code = c.charCodeAt(0);
+  return (
+    code === 0x20 ||
+    code === 0x09 ||
+    code === 0x0a ||
+    code === 0x0d ||
+    code === 0x0c ||
+    code === 0x0b ||
+    code === 0xa0 ||
+    code === 0x1680 ||
+    (code >= 0x2000 && code <= 0x200a) ||
+    code === 0x2028 ||
+    code === 0x2029 ||
+    code === 0x202f ||
+    code === 0x205f ||
+    code === 0x3000 ||
+    code === 0xfeff
+  );
 }
 
 // digits, `1.5`, `1e6`/`1e-6`, `0x…`.
@@ -176,7 +215,9 @@ function scanNumberEnd(source: string, start: number): number {
   return i;
 }
 
-const OPERATOR_RE = /^[=<>+\-*/%|!]+/;
+// Sticky (`y`), not `^`-anchored: `lastIndex` positions the match at `i` directly, so scanLevel
+// below tests in place with no per-call `source.slice(i)` allocation (M7 finding #18).
+const OPERATOR_RE = /[=<>+\-*/%|!]+/y;
 
 // One flat level of tokens (the root document, or a Parens' own contents) — a Parens is produced
 // here directly (nested via a normal recursive call, not a caller-managed stack — the recursion is
@@ -199,7 +240,7 @@ function scanLevel(
 
     if (insideParens && c === ')') return { nodes, next: i };
 
-    if (/\s/.test(c)) {
+    if (isWhitespace(c)) {
       i++;
       continue;
     }
@@ -277,7 +318,8 @@ function scanLevel(
       continue;
     }
 
-    const opMatch = OPERATOR_RE.exec(source.slice(i));
+    OPERATOR_RE.lastIndex = i;
+    const opMatch = OPERATOR_RE.exec(source);
     if (opMatch) {
       nodes.push(leaf('Operator', i, i + opMatch[0].length));
       i += opMatch[0].length;
