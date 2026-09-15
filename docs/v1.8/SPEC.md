@@ -277,6 +277,111 @@ run), `bun typecheck/lint` clean, both `bun run build` (desktop) and `bun run bu
 1456/1456 unit tests (`bun run test:unit`), 275/275 `ui`+`ui-timing` Playwright tests (`bun run
 test:ui`, 7.9m). No other known gaps against the plan.
 
+## P75 result
+
+Landed per plan (`docs/v1.8/plans/P75-review-tab-navigation-polish.md`), 6 commits (`b5c40f47`..
+`c426acec`), in the plan's own §9.1 order.
+
+**§1 (collapsed-row "Open all changes").** Root cause confirmed exactly as the plan's own §1.1
+found it, not SPEC's original guess (stale references into the pre-P72 graph-navigation API): every
+row-action bundle `ReviewCommitRow`'s `openAllChanges`/"Open in graph" call through was built per
+*expansion*, `#createRowActions(repoId)` inside `expand()` — so a row never expanded had no bundle
+at all, and its own "Open all changes" read `undefined`. Fixed by moving the bundle to session scope
+(`ReviewSessionState.rowActions`, set in `setTarget`/cleared in `clearTarget`, reused rather than
+rebuilt by `expand()`), reachable before a row is ever expanded.
+
+**§2 ("Open in graph").** Root cause confirmed exactly as the plan's own §2.1/§2.2 found it, also
+not SPEC's guess (a stale session-scoped commit list `reviewSession.ts` builds): the anchor was a
+`command:kiraVersion.openCommitInGraph?…` URI, a VS Code webview escape hatch with no handler at any
+layer in Kira Studio's own Wails WebView — both hosts already implement the reveal behind different
+existing mechanisms, only the shared component's own route to either was missing. Fixed with a new
+contract request, `graph.revealCommit` (`{repoId, sha} -> {revealed}`), answered locally by both
+hosts (desktop: `hostHandlers.ts`, reusing the blame-reveal stash/activate sequence
+`blameAnnotation.ts` used to duplicate; VS Code: `proxyHandlers.ts` calling into
+`graphProvider.runUiAction('revealCommit', …)`). Contract version 36 → 37, `stash_test.go`'s
+`TestContractVersion_Is36` renamed to `Is37`, `graphChunkFrame.{bin,json}` regenerated
+(`KIRA_GIT_FIXTURES=write`) — the same three stale-artifact classes P74's own result section named,
+this time caught before landing rather than by a follow-up commit, since this phase ran the fixture
+regen and `TestGitrpcDispatch_EveryMethodIsClassified` as part of the commit itself (confirmed no
+new `internal/bridge/gitstream.go` allowlist entry needed — `graph.revealCommit` is host-answered,
+same class as `review.open`).
+
+**§3 (comment compose zone unclickable).** Root cause confirmed as the plan's §3.1 found it: pinned
+`monaco-editor@0.56.0` appends `.view-zones` before `.view-lines` in `.lines-content`, and
+`.view-lines` carries `position: absolute; z-index: auto` with no z-index of its own — a later
+positioned sibling with `z-index: auto` loses every hit test to it. Fixed with `z-index: 10` (VS
+Code's own value for its view-zone widgets) on both view zones this repo creates: the compose zone
+and the pre-existing error-banner zone's Retry button, which the plan's own corroboration paragraph
+named as sharing the same defect. Also: the compose zone's fixed 120px height is now a starting
+guess only, corrected once via a `nextTick`-deferred `scrollHeight` measurement of the mounted
+`.review-thread` root plus `layoutZone`, so a long existing comment scrolls inside its own box
+instead of clipping; `user-select: text` added to `.review-thread` (Monaco's `.view-lines` layer
+otherwise won text selection inside the zone too).
+
+**§4 (mark-reviewed control).** Landed as one atomic commit, per the plan's own "half-converted is
+worse than either end state." `FileTree.vue`'s `KuiButton` icon toggle replaced with a real
+`<input type="checkbox">` reusing the package's own square-checkbox CSS (`app-shell.css`, P67c D8)
+rather than a hand-rolled variant; `indeterminate` gets its own codicon-dash glyph and fill
+(`\eacc`, sharing every other declaration with `:checked` in one rule), not a third color on a
+two-state control. Moved from the row's trailing cluster (where it shifted position with the
+`+N/-N` counts' own width, row to row) to the leading edge, with a same-width empty slot on
+directory rows so the whole tree keeps one aligned checkbox column. `click.prevent` since
+`ReviewFilesState.mark`'s server answer is this control's only state — an optimistic native toggle
+would contradict it for the round trip's duration.
+
+**§5 (reviewed line tint persists after full review).** Fixed in both hosts' own `paint()`
+(`reviewDecorations.ts` desktop, `reviewMarking.ts` VS Code extension) with the same three-line
+`coverage({start: 1, end: lineCount}, reviewedRanges) === 'full'` guard the plan specified, reusing
+the exact helper the per-hunk branch beside it already calls — a fully-reviewed file's whole-line
+tint is now skipped; the per-hunk glyph, the overview ruler for a partial review, and the file
+tree's own checked box are all unchanged.
+
+**§8 (tests).** `fakeReviewHost.ts` gained a sixth-through-eighth scripted response
+(`review.files` with three `none`/`partial`/`full` entries, `editor.openAllChanges`,
+`graph.revealCommit`), each recorded onto its own `window.__*Calls` array the same way
+`editor.openDiff` already was. `review-interaction.spec.ts`'s old "Open in graph reaches a
+document-level listener" case is replaced, not extended — its whole mechanism (a bubble-phase
+`document` click interceptor standing in for VS Code's own command-URI link handler) no longer
+exists once §2 removed the anchor; the new case asserts the plain `graph.revealCommit` bridge call
+instead. New cases: "Open all changes" on a never-expanded row sends `editor.openAllChanges` and
+writes to `[data-testid="live-announcements"]`; the Files pane's reviewed control is
+`input[type="checkbox"]` with correct `checked`/`indeterminate` across all three `review.files`
+rows. Per the plan's own §8 bar, no dedicated unit test was added for §1/§2/§4/§5 — each is either a
+type-checked guard/optional removal, a routing change with no decision structure, or a `coverage()`
+call into an already-tested helper.
+
+**Known gap, stated per the plan's own §8, not invented coverage.** §3's z-index fix and §5's
+desktop-side tint guard live in `reviewDecorations.ts`, reachable only from a mounted review diff
+tab; `repo-workspace.spec.ts`'s `gitStreamMock` still answers only `app.init`/`repo.list`/
+`refs.list` with no streaming support (P74's own result section already recorded this), so no
+harness in this repo can open a review diff to exercise either fix, and extending that mock is out
+of this phase's scope. No GUI is available in this sandbox either (the same constraint P74's own
+§5.1 footnote named), so verification here is by mechanism, not a literal click-through: confirmed
+the exact Monaco layering defect by reading the pinned `monaco-editor@0.56.0` source
+(`.view-zones`/`.view-lines` paint order, `.view-lines`'s own `z-index: auto`), confirmed `z-index:
+10` is applied to both of this repo's view zones, and confirmed §5's guard reuses the identical
+`coverage()` call the already-tested per-hunk branch beside it makes. A real click-through (open a
+review diff, click a gutter `+`, type and submit; mark a file reviewed and confirm the tint clears
+while hunk glyphs stay) was not performed and is not claimed.
+
+**One deliberate deviation, not a gap.** `transport.ts`'s `emitUiAction`/
+`localEmittersByCodeRepoId` are unchanged even though `blameAnnotation.ts`'s rewrite (§2.3) removed
+their only caller — the plan's own §7 file table does not list `transport.ts`, deleting them would
+cascade into `localEmittersByCodeRepoId`'s only other read site (a bigger ripple than the plan
+describes), and both remain a legitimate general-purpose primitive for a future non-hostHandler
+caller that needs to push `ui.action` from outside a host handler closure.
+
+Independently re-verified: `go build/vet` clean, `go test ./...` clean, `bun typecheck/lint` clean,
+both `bun run build` (desktop) and `bun run build:vscode` succeed, 1456/1456 unit tests (`bun run
+test:unit`), 40/40 VS Code webview interaction/layout specs (`bun run test:webview`, including the
+new/replaced review-interaction cases) across two full runs. `bun run test:ui` (`ui`+`ui-timing`)
+had 2-3 failures per full run, a different set each time (`cell-editor.spec.ts`'s <250ms bound,
+`console-format.spec.ts`'s note-visibility timeout, `grpc-request.spec.ts`'s debounce-timing
+assertion, `interaction.spec.ts`'s hard 120s timeout) — none in a file this phase's diff touches,
+and every one passed standalone or in a small isolated batch; the same full-parallel-run wall-clock
+contention P73's own result section already documented for this exact pair of specs. No other known
+gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
