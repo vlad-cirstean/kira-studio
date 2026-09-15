@@ -1358,7 +1358,7 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   // =============================================================================================
   // D7/D8: header context menu — Sort asc/desc/Clear sort, Hide column/Show all columns,
-  // Copy column name/values.
+  // Copy column name/values. M5 §6.7 adds "Mark column as PII" as a trailing submenu.
   // =============================================================================================
   await rightClick(headerCell(page, 'entity_id'));
   expect(await menuItemIds(page)).toEqual([
@@ -1371,6 +1371,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
     '--separator--',
     'copy-column-name',
     'copy-column-values',
+    '--separator--',
+    'mark-pii',
   ]);
   await page.click('[data-testid="menu-item-sort-asc"]');
   await expect(headerCell(page, 'entity_id')).toHaveAttribute('data-sort', 'asc');

@@ -62,6 +62,12 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   connectionsConnect: 'ConnectionsService.Connect',
   connectionsDisconnect: 'ConnectionsService.Disconnect',
   connectionsStates: 'ConnectionsService.States',
+  maskRulesList: 'MaskRulesService.List',
+  maskRulesUpsert: 'MaskRulesService.Upsert',
+  maskRulesRemove: 'MaskRulesService.Remove',
+  maskRulesRegenerateKey: 'MaskRulesService.RegenerateKey',
+  maskRulesCounts: 'MaskRulesService.Counts',
+  maskRulesCorrelationKey: 'MaskRulesService.CorrelationKey',
   treeChildren: 'TreeService.Children',
   treeKeyTypes: 'TreeService.KeyTypes',
   treeDescribe: 'TreeService.Describe',
@@ -261,6 +267,13 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.queriesHistoryRecord]: 'null',
   [IPC.treeInvalidate]: 'null',
   [IPC.treeDescribe]: JSON.stringify({ meta: EMPTY_OBJECT_META, source: 'server' }),
+  // M5 §6.2: SlickGridHost.vue's own onMounted loads a tab's connection's mask rules
+  // unconditionally (so folding is ready the instant the preview is toggled on) — a spec with no
+  // maskRulesList snapshot of its own gets "no rules configured", the correct default for every
+  // connection this chapter's own fixtures predate, not a fixture miss.
+  [IPC.maskRulesList]: '[]',
+  [IPC.maskRulesCounts]: '{}',
+  [IPC.maskRulesCorrelationKey]: '""',
   // P22c D3: every SQL console/data-tab fetches its container's cached columns on
   // mount/activation (state/schemaColumns.ts's ensureSchemaColumns) — a spec with no
   // treeSchemaColumns snapshot of its own gets "nothing cached for this container yet", the same

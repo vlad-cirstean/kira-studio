@@ -26,7 +26,12 @@ import {
 } from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, openContextMenu, runMenuShortcut } from '../../state/contextMenu';
-import { correlationKeyFor, loadMaskRules, maskRulesFor } from '../../state/maskRules';
+import {
+  correlationKeyFor,
+  loadMaskRules,
+  maskRulesFor,
+  maskRulesLoaded,
+} from '../../state/maskRules';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
@@ -1973,8 +1978,11 @@ onMounted(() => {
 
   // M5 §6.2: proactively loaded (not deferred to the first toggle) so `refreshMaskFolding()` has
   // real data the instant the user actually turns the preview on, rather than an empty map.
+  // `maskRulesState` is module-level (not per-component), so a tab that's simply reactivating —
+  // its SlickGridHost remounting on tab-switch, not a genuinely new table — must not re-fetch
+  // rules already cached for this connection from an earlier mount.
   const connectionId = tab()?.connectionId;
-  if (connectionId) void loadMaskRules(connectionId);
+  if (connectionId && !maskRulesLoaded(connectionId)) void loadMaskRules(connectionId);
 
   const t = tab();
   const p = getPage(props.tabId);

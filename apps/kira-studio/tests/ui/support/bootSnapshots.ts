@@ -12,11 +12,12 @@ const KEYCHAIN_AVAILABLE: SecretStorageStatus = {
 };
 
 /**
- * The five-call `Promise.all` `apps/kira-studio/frontend/src/main.ts`'s `bootstrap()` fires before `mount()` —
+ * The `Promise.all` `apps/kira-studio/frontend/src/main.ts`'s `bootstrap()` fires before `mount()` —
  * `layoutGetAll`/`settingsGetAll`/`connectionsList`+`connectionsStates`+`connectionsSecretsStatus`
- * (`hydrateConnections`)/`opsRecent`/`tabsList` — answered with an empty, healthy app: defaults,
- * no connections, no ops, no tabs. This is what a fresh `KIRA_HOME` gave every `tests/e2e/` spec
- * for free before P57; here it is one array every `tests/ui/` spec's `relaunch()` starts from.
+ * (`hydrateConnections`)/`maskRulesCounts` (M5 §7.5/§6.2, `loadMaskRuleCounts`)/`opsRecent`/
+ * `tabsList` — answered with an empty, healthy app: defaults, no connections, no masked columns,
+ * no ops, no tabs. This is what a fresh `KIRA_HOME` gave every `tests/e2e/` spec for free before
+ * P57; here it is one array every `tests/ui/` spec's `relaunch()` starts from.
  *
  * `windowsEnsure` (P8) runs sequentially *before* this `Promise.all`, not inside it — always a
  * no-op void call here (`mockRuntime.ts`'s own `WILDCARD_DEFAULTS`, not listed in this array,
@@ -32,6 +33,7 @@ export const EMPTY_BOOT_SNAPSHOTS: readonly ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   { channel: IPC.connectionsStates, response: [] },
   { channel: IPC.connectionsSecretsStatus, response: KEYCHAIN_AVAILABLE },
+  { channel: IPC.maskRulesCounts, response: {} },
   { channel: IPC.opsRecent, response: [] },
   { channel: IPC.tabsList, response: [] },
 ];
