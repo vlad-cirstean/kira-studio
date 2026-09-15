@@ -339,8 +339,9 @@ onUnmounted(() => {
 }
 
 /* D14: every value below is an existing --kira-* token — no new literal. Tailwind's preflight
-   zeroes margin/padding on `*` and list-style on lists, so every block element below restates its
-   own spacing; that is expected here, not a workaround. */
+   zeroes margin/padding on `*`, font-size/font-weight on headings, and list-style on lists, so
+   every block element below restates its own spacing (and headings their own scale, P73 §7); that
+   is expected here, not a workaround. */
 .md-reading {
   flex: 1;
   min-height: 0;
@@ -365,9 +366,26 @@ onUnmounted(() => {
   font-weight: 600;
   line-height: 1.3;
 }
+/* P73 §7(b): em, not --kira-t-xl (tokens.css: deliberately a 20px literal that ignores Appearance)
+   — resolves against .md-reading's own font-size, so the scale tracks the Appearance font-size
+   setting for free. Headings don't nest, so nothing compounds. */
 .md-reading :deep(h1) {
   padding-bottom: var(--kira-s-3);
+  font-size: 1.6em;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.md-reading :deep(h2) {
+  font-size: 1.4em;
+}
+.md-reading :deep(h3) {
+  font-size: 1.2em;
+}
+.md-reading :deep(h4) {
+  font-size: 1.05em;
+}
+.md-reading :deep(h5),
+.md-reading :deep(h6) {
+  font-size: 1em;
 }
 .md-reading :deep(p) {
   margin: 0 0 var(--kira-s-4);
@@ -411,9 +429,14 @@ onUnmounted(() => {
   border-radius: var(--kira-radius-sm);
   max-width: none;
 }
+/* P73 §7(a): more specific than :deep(code) above, so fenced code wins without touching that
+   rule — a fenced block matches Monaco's own size exactly. Inline code deliberately stays at
+   --kira-t-sm (the step-down exists so a same-px monospace run doesn't outsize the prose around
+   it, which doesn't apply inside a standalone block). */
 .md-reading :deep(pre code) {
   background: none;
   padding: 0;
+  font-size: var(--kira-t-md);
 }
 .md-reading :deep(table) {
   margin: 0 0 var(--kira-s-4);
