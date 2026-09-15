@@ -5,8 +5,11 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
@@ -28,14 +31,23 @@ import (
 //
 // ForConn's dispatch table is a plain `switch method { case "...": ... }` inside a func literal,
 // not a data structure reflection can enumerate — so this derives the REAL case set the only way
-// available short of a go/analysis pass: parses handlers.go's own source and walks every switch
-// statement whose tag is the identifier `method`, collecting every case's string literal(s). Ignores
-// the `default` clause (its CaseClause.List is nil) and any switch with a different tag (there is
-// only one shape of dispatch switch in this file, but the walk does not assume that).
+// available short of a go/analysis pass: parses every non-test .go file under internal/gitrpc/ (not
+// one hard-coded file — a dispatch switch that moves to, or is added in, a different file in that
+// package must still be found) and walks every switch statement whose tag is the identifier
+// `method`, collecting every case's string literal(s). Ignores the `default` clause (its
+// CaseClause.List is nil) and any switch with a different tag (there is only one shape of dispatch
+// switch in this package today, but the walk does not assume that).
 func TestGitrpcDispatch_EveryMethodIsClassified(t *testing.T) {
 	dispatched := dispatchedGitrpcMethods(t)
-	if len(dispatched) == 0 {
-		t.Fatal("derived zero dispatched methods from internal/gitrpc/handlers.go -- the AST walk below is almost certainly broken, not the source file suddenly empty")
+	// A floor, not just "> 0": both switches this walk finds today live in handlers.go, so a change
+	// that moves or adds one to a different file in the package would still leave len(dispatched) >
+	// 0 (the other switch alone) — silently finding FEWER methods, with every one of a moved/added
+	// switch's own methods then unclassified with zero test signal, exactly the gap this test exists
+	// to close. 50 sits comfortably under the ~55 methods Router.ForConn dispatches today (gitstream.go's
+	// own doc comment), so a genuine drop below it fails loudly instead of passing vacuously.
+	const minDispatchedMethods = 50
+	if len(dispatched) < minDispatchedMethods {
+		t.Fatalf("derived only %d dispatched methods from every .go file in internal/gitrpc/ -- want at least %d; the AST walk is almost certainly missing a switch (moved/renamed file, changed tag name), not the source suddenly shrinking", len(dispatched), minDispatchedMethods)
 	}
 
 	classified := map[string]bool{}
@@ -156,47 +168,62 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 	}
 }
 
-// dispatchedGitrpcMethods parses internal/gitrpc/handlers.go (a sibling package under the same
-// module, read as source text rather than imported — nothing here depends on gitrpc's own build)
-// and returns every string literal case label from every `switch method { ... }` statement in it.
+// dispatchedGitrpcMethods parses every non-test .go file directly under internal/gitrpc/ (a sibling
+// package under the same module, read as source text rather than imported — nothing here depends on
+// gitrpc's own build) and returns every string literal case label from every `switch method { ... }`
+// statement found in any of them — not just handlers.go, so a dispatch switch that moves to, or is
+// added in, a different file in that package is still found (Group 4, P68 review: the original
+// single-file walk silently found fewer methods on such a move, with the guard below (len == 0)
+// never catching it since the file it *did* still hold onto still had at least one switch).
 func dispatchedGitrpcMethods(t *testing.T) []string {
 	t.Helper()
-	const path = "../gitrpc/handlers.go"
+	const dir = "../gitrpc"
 
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, nil, 0)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Fatalf("parse %s: %v", path, err)
+		t.Fatalf("read dir %s: %v", dir, err)
 	}
 
+	fset := token.NewFileSet()
 	var methods []string
-	ast.Inspect(file, func(n ast.Node) bool {
-		sw, ok := n.(*ast.SwitchStmt)
-		if !ok {
-			return true
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
 		}
-		tag, ok := sw.Tag.(*ast.Ident)
-		if !ok || tag.Name != "method" {
-			return true
+		path := filepath.Join(dir, name)
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", path, err)
 		}
-		for _, stmt := range sw.Body.List {
-			clause, ok := stmt.(*ast.CaseClause)
+		ast.Inspect(file, func(n ast.Node) bool {
+			sw, ok := n.(*ast.SwitchStmt)
 			if !ok {
-				continue
+				return true
 			}
-			for _, expr := range clause.List { // nil (skipped entirely) for `default:`
-				lit, ok := expr.(*ast.BasicLit)
-				if !ok || lit.Kind != token.STRING {
+			tag, ok := sw.Tag.(*ast.Ident)
+			if !ok || tag.Name != "method" {
+				return true
+			}
+			for _, stmt := range sw.Body.List {
+				clause, ok := stmt.(*ast.CaseClause)
+				if !ok {
 					continue
 				}
-				value, err := strconv.Unquote(lit.Value)
-				if err != nil {
-					t.Fatalf("unquote case label %s: %v", lit.Value, err)
+				for _, expr := range clause.List { // nil (skipped entirely) for `default:`
+					lit, ok := expr.(*ast.BasicLit)
+					if !ok || lit.Kind != token.STRING {
+						continue
+					}
+					value, err := strconv.Unquote(lit.Value)
+					if err != nil {
+						t.Fatalf("unquote case label %s in %s: %v", lit.Value, path, err)
+					}
+					methods = append(methods, value)
 				}
-				methods = append(methods, value)
 			}
-		}
-		return true
-	})
+			return true
+		})
+	}
 	return methods
 }
