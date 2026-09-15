@@ -11,8 +11,8 @@ import (
 
 const connectionSelectColumns = `
 	id, name, kind, color, mode, read_only, host, port, database, username, uri,
-	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, sort_order,
-	created_at, updated_at
+	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	sort_order, created_at, updated_at
 `
 
 type ConnectionsRepo struct {
@@ -30,17 +30,17 @@ type rowScanner interface {
 // unlike settings/layout, a bad connection row must not make the whole app unlaunchable.
 func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	var (
-		c                              model.ConnectionSummary
-		host, database, username, uri  sql.NullString
-		port                           sql.NullInt64
-		options                        sql.NullString
-		preconnect                     sql.NullString
-		readOnly, sidecar, autoExplain int
+		c                                          model.ConnectionSummary
+		host, database, username, uri              sql.NullString
+		port                                       sql.NullInt64
+		options                                    sql.NullString
+		preconnect                                 sql.NullString
+		readOnly, sidecar, autoExplain, mcpEnabled int
 	)
 	if err := row.Scan(
 		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
 		&username, &uri, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
-		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
+		&mcpEnabled, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -61,6 +61,7 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	c.ReadOnly = readOnly != 0
 	c.PreconnectSidecar = sidecar != 0
 	c.AutoExplain = autoExplain != 0
+	c.McpEnabled = mcpEnabled != 0
 	if host.Valid {
 		c.Host = &host.String
 	}
@@ -165,13 +166,13 @@ func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, create
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
 			created_at, updated_at, sort_order
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, createdAt, createdAt, sortOrder,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), createdAt, createdAt, sortOrder,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -198,12 +199,13 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 		UPDATE connections
 		   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 		       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-		       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, updated_at = ?
+		       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+		       updated_at = ?
 		 WHERE id = ?
 	`,
 		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, updatedAt, connID,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), updatedAt, connID,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
 	}
@@ -246,13 +248,13 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
 			created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, createdAt, createdAt, sortOrder, secretEnc,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), createdAt, createdAt, sortOrder, secretEnc,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -296,14 +298,14 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
+			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
 			created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			(SELECT password FROM connections WHERE id = ?))
 	`,
 		toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, createdAt, createdAt, sortOrder, fromConnectionID,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), createdAt, createdAt, sortOrder, fromConnectionID,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
 	}
@@ -342,25 +344,26 @@ func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFiel
 			UPDATE connections
 			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, updated_at = ?,
-			       password = ?
+			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+			       updated_at = ?, password = ?
 			 WHERE id = ?
 		`,
 			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec, updatedAt, secretEnc, connID,
+			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), updatedAt, secretEnc, connID,
 		)
 	} else {
 		_, execErr = r.DB.Exec(`
 			UPDATE connections
 			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, updated_at = ?
+			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+			       updated_at = ?
 			 WHERE id = ?
 		`,
 			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec, updatedAt, connID,
+			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), updatedAt, connID,
 		)
 	}
 	if execErr != nil {

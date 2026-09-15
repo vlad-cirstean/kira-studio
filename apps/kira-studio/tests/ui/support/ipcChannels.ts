@@ -138,6 +138,11 @@ export const IPC = {
   repoMapRegenerate: 'kira:repomap:regenerate',
   repoMapInstallClaudeCode: 'kira:repomap:installClaudeCode',
 
+  dbMcpStatus: 'kira:dbmcp:status',
+  dbMcpSetEnabled: 'kira:dbmcp:setEnabled',
+  dbMcpRegenerate: 'kira:dbmcp:regenerate',
+  dbMcpInstallClaudeCode: 'kira:dbmcp:installClaudeCode',
+
   updateStatus: 'kira:update:status',
   updateOpenReleasePage: 'kira:update:openReleasePage',
 

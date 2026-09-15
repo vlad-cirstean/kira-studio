@@ -48,6 +48,13 @@ type CodeIntelSettings struct {
 	McpServerEnabled bool `json:"mcpServerEnabled"`
 }
 
+// DbMcpSettings mirrors CodeIntelSettings exactly (M1 §6.2) — the embedded DB MCP server
+// instance's persisted on/off record (internal/bridge/dbmcp.go owns the actual start/stop side
+// effect).
+type DbMcpSettings struct {
+	ServerEnabled bool `json:"serverEnabled"`
+}
+
 type Settings struct {
 	Appearance AppearanceSettings `json:"appearance"`
 	Data       DataSettings       `json:"data"`
@@ -55,6 +62,7 @@ type Settings struct {
 	Advanced   AdvancedSettings   `json:"advanced"`
 	Git        GitSettings        `json:"git"`
 	CodeIntel  CodeIntelSettings  `json:"codeIntel"`
+	DbMcp      DbMcpSettings      `json:"dbMcp"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -82,6 +90,7 @@ func DefaultSettings() Settings {
 			GitPath:                  "",
 		},
 		CodeIntel: CodeIntelSettings{McpServerEnabled: false},
+		DbMcp:     DbMcpSettings{ServerEnabled: false},
 	}
 }
 
@@ -122,6 +131,11 @@ type CodeIntelPatch struct {
 	McpServerEnabled *bool `json:"mcpServerEnabled,omitempty"`
 }
 
+// DbMcpPatch mirrors DbMcpSettings' own `.partial()` shape (M1 §6.2).
+type DbMcpPatch struct {
+	ServerEnabled *bool `json:"serverEnabled,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Data       *DataPatch       `json:"data,omitempty"`
@@ -129,6 +143,7 @@ type SettingsPatch struct {
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
 	CodeIntel  *CodeIntelPatch  `json:"codeIntel,omitempty"`
+	DbMcp      *DbMcpPatch      `json:"dbMcp,omitempty"`
 }
 
 // ValidRowDensity mirrors settings.ts's rowDensitySchema.

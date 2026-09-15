@@ -2,6 +2,7 @@ import * as AppService from '@bindings/appservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as DataGripService from '@bindings/datagripservice.js';
+import * as DbMcpService from '@bindings/dbmcpservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
@@ -25,6 +26,7 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
+import type { DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type {
   GitClient,
@@ -305,6 +307,15 @@ const studioControl = {
     unwrap(RepoMapService.Regenerate()).then((r) => trust<RepoMapStatus>(r)),
   repoMapInstallClaudeCode: (): Promise<RepoMapInstallResult> =>
     unwrap(RepoMapService.InstallClaudeCode()).then((r) => trust<RepoMapInstallResult>(r)),
+
+  dbMcpStatus: (): Promise<DbMcpStatus> =>
+    unwrap(DbMcpService.Status()).then((r) => trust<DbMcpStatus>(r)),
+  dbMcpSetEnabled: (enabled: boolean): Promise<DbMcpStatus> =>
+    unwrap(DbMcpService.SetEnabled({ enabled })).then((r) => trust<DbMcpStatus>(r)),
+  dbMcpRegenerate: (): Promise<DbMcpStatus> =>
+    unwrap(DbMcpService.Regenerate()).then((r) => trust<DbMcpStatus>(r)),
+  dbMcpInstallClaudeCode: (): Promise<DbMcpInstallResult> =>
+    unwrap(DbMcpService.InstallClaudeCode()).then((r) => trust<DbMcpInstallResult>(r)),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

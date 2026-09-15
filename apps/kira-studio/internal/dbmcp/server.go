@@ -1,0 +1,217 @@
+// Package dbmcp is the local DB MCP server (docs/v1.7/plans/M1-db-mcp-server-core.md): a protocol
+// front end that lists this app's own connections, browses their metadata and runs a query —
+// through the existing adapter layer (internal/adapterhost, internal/tree, internal/connections),
+// never a parallel path. Sibling to internal/repomap, same transport pattern (go-sdk/mcp,
+// loopback-only Streamable HTTP, mcpauth for the bearer token) but a separate package, a separate
+// mcp.Server, a separate listener (DefaultPort 8766) and a separate token file — the two servers
+// serve unrelated things with opposite trust postures (§3.1), so nothing is shared beyond the
+// token mechanism and KIRA_HOME itself.
+//
+// Unlike internal/repomap there is no headless binary (cmd/kira-db-mcp): the DB server needs the
+// app's own live adapters, keychain-backed secrets and op-log/throttle/cancel machinery (§3.1),
+// none of which a second process could reach without duplicating them. It runs when Kira Studio
+// runs, embedded only (internal/bridge/dbmcp.go).
+//
+// This package imports nothing from internal/bridge (internal/layering_test.go enforces it).
+package dbmcp
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"sync"
+	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// DefaultPort is the port this instance tries first — adjacent to repo-map's 8765 (§3.2); a second
+// instance on one machine (there is at most one per KIRA_HOME in practice) falls back to an
+// OS-assigned ephemeral one automatically (http.go).
+const DefaultPort = 8766
+
+// TokenProvider resolves this instance's own 7-day-rotating token — the DB server's analogue of
+// repomap.TokenProvider, same seam, but no repo-id slug to key on: one DB MCP instance exists per
+// app process per KIRA_HOME, with no second identity to key several apart by (§2.2).
+type TokenProvider func() (rec mcpauth.Record, plain string, minted bool, err error)
+
+// ConnectionsReader is dbmcp's own consumer-declared interface (A11) over *connections.Service —
+// only the three methods list_connections/access.go/run_query actually need.
+type ConnectionsReader interface {
+	List() ([]model.ConnectionSummary, error)
+	StateOf(connectionID string) model.ConnectionState
+	Connect(connectionID string) (model.ConnectionState, error)
+}
+
+// MetadataReader is dbmcp's own consumer-declared interface over *tree.Service — list_children/
+// describe_table/describe_schema's own backend.
+type MetadataReader interface {
+	Children(connectionID, path string, refresh bool) (tree.ChildrenResult, error)
+	Describe(connectionID, path string, refresh bool, tabID *string) (tree.DescribeResult, error)
+	SchemaColumns(connectionID, path string, refresh bool) (tree.SchemaColumnsResult, error)
+}
+
+// QueryRunner is dbmcp's own consumer-declared interface over *adapterhost.Router's Execute seam —
+// run_query's only path into the adapter layer, the same one the console's own run() uses.
+type QueryRunner interface {
+	Execute(ctx context.Context, req adapterhost.ExecuteRequestWire) (adapterhost.ExecuteResponse, error)
+}
+
+// Config is everything New needs. Zero-value Home takes the documented default; the other four
+// fields are required.
+type Config struct {
+	// Home overrides KIRA_HOME (a debugging seam, mirroring repomap.Config's own) — empty means
+	// config.KiraHome().
+	Home string
+	// Token resolves this instance's own auth record — required.
+	Token TokenProvider
+	// Conns/Tree/Query are the three backend seams (§3.3) — *connections.Service, *tree.Service and
+	// *adapterhost.Router satisfy these structurally once Router.Execute exists.
+	Conns ConnectionsReader
+	Tree  MetadataReader
+	Query QueryRunner
+	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
+	Logger *slog.Logger
+}
+
+// Server is the DB MCP server's one embedded instance — no index to build, so unlike
+// repomap.Server it needs no readiness gate, sync lock or watcher (§3.3): New binds and returns,
+// Close shuts the listener down.
+type Server struct {
+	cfg Config
+	log *slog.Logger
+
+	// tokenMu guards token/tokenPlain/tokenMinted: Regenerate (bridge.DbMcpService's own
+	// restart-recovery action) mutates these on a live, already-serving instance, concurrently with
+	// tokenVerifier reading them on every in-flight request (http.go) — repomap.Server's identical
+	// discipline.
+	tokenMu     sync.RWMutex
+	token       mcpauth.Record
+	tokenPlain  string
+	tokenMinted bool
+
+	mcp *mcp.Server
+
+	httpState // http.go's own fields (listener, *http.Server)
+
+	closeOnce sync.Once
+}
+
+// serverVersion mirrors the app's own declared version — no ldflags plumbing invented for this
+// phase alone, the same call repomap/server.go's own serverVersion makes.
+const serverVersion = "0.0.0"
+
+// instructions is §4's own one paragraph: the steer that decides whether any of this pays off.
+const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel."
+
+// New resolves cfg, mints or loads this instance's own token, builds the five-tool mcp.Server, and
+// binds the HTTP listener (§3.2's default-then-fallback port selection) — but does not yet accept
+// connections; call Serve for that.
+func New(cfg Config) (*Server, error) {
+	if cfg.Home == "" {
+		cfg.Home = config.KiraHome()
+	}
+	log := cfg.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	if cfg.Token == nil {
+		return nil, fmt.Errorf("dbmcp: Config.Token is required")
+	}
+	if cfg.Conns == nil || cfg.Tree == nil || cfg.Query == nil {
+		return nil, fmt.Errorf("dbmcp: Config.Conns, Config.Tree and Config.Query are required")
+	}
+
+	tokenRec, tokenPlain, tokenMinted, err := cfg.Token()
+	if err != nil {
+		return nil, fmt.Errorf("dbmcp: resolve token: %w", err)
+	}
+
+	s := &Server{
+		cfg:         cfg,
+		log:         log,
+		token:       tokenRec,
+		tokenPlain:  tokenPlain,
+		tokenMinted: tokenMinted,
+	}
+	s.mcp = s.buildMCPServer()
+
+	if err := s.bindHTTP(); err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// buildMCPServer constructs the five-tool mcp.Server (§4) — pure registration, no I/O of its own;
+// every handler closes over s and calls into s.cfg.Conns/Tree/Query through access.go's gates.
+func (s *Server) buildMCPServer() *mcp.Server {
+	srv := mcp.NewServer(&mcp.Implementation{
+		Name:    "kira-db",
+		Title:   "Kira Studio databases",
+		Version: serverVersion,
+	}, &mcp.ServerOptions{Instructions: instructions})
+
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "list_connections",
+		Description: "List every database connection this app has exposed to MCP, with its kind, read-only flag, live status and (once connected) capabilities.",
+	}, s.listConnections)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "list_children",
+		Description: "List one container's own children — databases, schemas, tables, keys, topics, buckets, whatever this connection's own engine has at that level. Omit path for the connection's top level.",
+	}, s.listChildren)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "describe_table",
+		Description: "Describe one table, view or collection's own columns, primary key, foreign keys, indexes and row estimate.",
+	}, s.describeTable)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "describe_schema",
+		Description: "Describe every table and view's columns in one database or schema in a single call — cheaper than one describe_table call per table.",
+	}, s.describeSchema)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "run_query",
+		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Results are capped by maxRows; the query itself still runs in full.",
+	}, s.runQuery)
+
+	return srv
+}
+
+// Token returns the plaintext token (empty unless this construction — or a subsequent SetToken —
+// actually minted a fresh one; a hash cannot be reversed) and whether one is currently held.
+func (s *Server) Token() (plain string, minted bool) {
+	s.tokenMu.RLock()
+	defer s.tokenMu.RUnlock()
+	return s.tokenPlain, s.tokenMinted
+}
+
+// TokenExpiry returns the currently-held record's own expiry instant (zero for a record that has
+// not yet been stamped — see mcpauth.LoadOrMintTTL).
+func (s *Server) TokenExpiry() time.Time {
+	s.tokenMu.RLock()
+	defer s.tokenMu.RUnlock()
+	return s.token.ExpiresAt
+}
+
+// SetToken replaces this instance's own live auth record — bridge.DbMcpService's Regenerate
+// action, safe to call while requests are in flight: the very next request is checked against the
+// new record, never a stale in-memory copy.
+func (s *Server) SetToken(rec mcpauth.Record, plain string) {
+	s.tokenMu.Lock()
+	defer s.tokenMu.Unlock()
+	s.token = rec
+	s.tokenPlain = plain
+	s.tokenMinted = true
+}
+
+// Close shuts the HTTP listener down. Idempotent.
+func (s *Server) Close() error {
+	var err error
+	s.closeOnce.Do(func() {
+		err = s.closeHTTP()
+	})
+	return err
+}

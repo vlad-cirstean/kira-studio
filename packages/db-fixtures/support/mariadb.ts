@@ -136,6 +136,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
     options: {},
     autoExplain: false,
     throttlePerSec: 0,
+    mcpEnabled: false,
     password: PASSWORD,
   };
 

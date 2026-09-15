@@ -11,6 +11,7 @@ const DEFAULT_STATUS: RepoMapStatus = {
   command: '',
   claudeAvailable: false,
   probed: [],
+  expiresAt: '',
   error: '',
   repos: [],
 };

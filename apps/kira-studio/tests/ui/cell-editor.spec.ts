@@ -164,6 +164,7 @@ function connectionCreateArgs(name: string, color: string, readOnly = false) {
     preconnectSidecar: false,
     autoExplain: false,
     throttlePerSec: 0,
+    mcpEnabled: false,
   };
 }
 

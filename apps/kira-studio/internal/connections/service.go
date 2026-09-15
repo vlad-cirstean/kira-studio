@@ -471,6 +471,9 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 // destination-unchanged edit actually connects to. Leaving it out of the compare (the same way
 // Name/Color/ReadOnly/AutoExplain are) is what keeps "edit the throttle → Test connection" still
 // injecting the stored password instead of silently testing with none.
+//
+// M1 §6.1: McpEnabled joins the same exception list for the same reason — it gates whether this
+// connection is exposed to the DB MCP server, never what it connects to.
 func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
 	return in.Kind == stored.Kind &&
 		in.Mode == stored.Mode &&

@@ -25,6 +25,9 @@ type ConnectionFields struct {
 	// P28 §5.3: commands per second this connection is paced to; 0 = unlimited (default). A
 	// first-class column, not an options_json key — see the migration's own comment for why.
 	ThrottlePerSec float64 `json:"throttlePerSec"`
+	// M1 §6.1: whether this connection is exposed to the local DB MCP server. Deny by default. A
+	// first-class column, not an options_json key — see the migration's own comment for why.
+	McpEnabled bool `json:"mcpEnabled"`
 }
 
 // ConnectionSummary mirrors packages/shared/domain/connection.ts's connectionSummarySchema.
