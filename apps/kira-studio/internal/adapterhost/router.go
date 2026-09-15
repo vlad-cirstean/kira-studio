@@ -277,6 +277,16 @@ func (r *Router) KeyTypes(ctx context.Context, connectionID string, paths []mode
 	return types, nil
 }
 
+// ---- dbmcp.QueryRunner ----
+
+// Execute forwards to the dispatcher's own Execute — the in-process peer of dataframe.go's
+// "data:execute" case, which the console's own run() calls through. internal/dbmcp's run_query
+// tool is this seam's other caller (M1 §1.3/§4.5): same throttling, op-logging, cancellation,
+// panic recovery and each adapter's own read-only wrap, nothing re-implemented.
+func (r *Router) Execute(ctx context.Context, req ExecuteRequestWire) (ExecuteResponse, error) {
+	return r.dispatcher.Execute(ctx, req)
+}
+
 // ---- bridge.Canceller ----
 
 // Cancel asks the in-process scheduler — the only place an op can be running now that P58f's
