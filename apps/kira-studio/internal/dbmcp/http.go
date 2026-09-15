@@ -6,11 +6,22 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// closeHTTPGraceTimeout bounds closeHTTP's own graceful Shutdown wait (finding #17, M6):
+// http.Server.Shutdown given context.Background() blocks until every in-flight handler returns,
+// with no deadline of its own — a run_query handler parked in ApprovalBroker.Request (M2 §5.3)
+// would never return on its own, so an unbounded Shutdown here would hang the whole app-quit path
+// on it. bridge/dbmcp.go's stopLocked unblocks that handler first (AbandonAll before Close), so
+// this deadline is normally never reached — it exists as the hard backstop for whatever ordering
+// mistake or slow handler reaches it anyway, matching mcpinstall/exec.go's own
+// grace-then-force shape.
+const closeHTTPGraceTimeout = 5 * time.Second
 
 // mcpPath mirrors repomap/http.go's own choice — every `claude mcp add --transport http` example
 // ends in "/mcp".
@@ -92,5 +103,13 @@ func (s *Server) closeHTTP() error {
 	if s.http == nil {
 		return nil
 	}
-	return s.http.Shutdown(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), closeHTTPGraceTimeout)
+	defer cancel()
+	if err := s.http.Shutdown(ctx); err != nil {
+		// Shutdown's own deadline lapsed (or another error) — Close never blocks on an in-flight
+		// handler, dropping any connection still open rather than hanging the app-quit path on it.
+		_ = s.http.Close()
+		return err
+	}
+	return nil
 }

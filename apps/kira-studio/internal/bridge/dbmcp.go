@@ -148,15 +148,23 @@ func (s *DbMcpService) explainThreshold() int {
 }
 
 // stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
+//
+// AbandonAll runs before Close, not after (finding #17, M6): a run_query handler mid-flight can be
+// parked in ApprovalBroker.Request (M2 §5.3) waiting on a human who will never answer once the
+// server is going away. Close's own closeHTTP calls http.Server.Shutdown, which waits for every
+// in-flight handler to return — closing before abandoning would have that handler, and Shutdown
+// itself, both wait on each other with nothing left to break the deadlock but closeHTTP's own
+// backstop timeout. Abandoning first lets the parked handler return immediately (ApprovalAbandoned),
+// so Shutdown's ordinary graceful drain finds nothing left in flight.
 func (s *DbMcpService) stopLocked() {
 	if s.server == nil {
 		return
 	}
+	// The broker itself stays usable — a later re-enable within the same app run constructs a
+	// fresh server against it.
+	s.Approvals.AbandonAll()
 	_ = s.server.Close()
 	s.server = nil
-	// M2 §5.3: nothing left blocked on a broker nobody will answer again. The broker itself stays
-	// usable — a later re-enable within the same app run constructs a fresh server against it.
-	s.Approvals.AbandonAll()
 }
 
 // startIfEnabled is main.go's own boot-time call, mirroring StartRepoMapIfEnabled's own posture
