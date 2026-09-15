@@ -1,0 +1,52 @@
+package dbmcp
+
+import (
+	"fmt"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+)
+
+// resolveEnabled looks up connectionID among every connection this app knows and returns it only
+// if McpEnabled is true — deny by default (§6.1). A connection that exists but is not exposed
+// reports the exact same "no such connection" text an unknown id would: its existence is not an
+// AI client's business (§4.1's own rule for list_connections, applied here to a client that names
+// one directly instead of discovering it).
+func (s *Server) resolveEnabled(connectionID string) (model.ConnectionSummary, error) {
+	conns, err := s.cfg.Conns.List()
+	if err != nil {
+		return model.ConnectionSummary{}, err
+	}
+	for _, c := range conns {
+		if c.ID != connectionID {
+			continue
+		}
+		if !c.McpEnabled {
+			break
+		}
+		return c, nil
+	}
+	return model.ConnectionSummary{}, fmt.Errorf("no connection %q exposed to MCP", connectionID)
+}
+
+// capsOf extracts the live adapter's own Caps from a connection's current state. Caps are only
+// knowable once connected — adapterhost.Router.Connect stores adapter.Caps() on ConnectResult,
+// carried through to ConnectionState.Caps — so a never-connected or currently-disconnected
+// connection reports ok=false rather than a guess (§4.1: "capabilities are not knowable for a
+// connection that has never connected — say nothing rather than guess").
+func capsOf(state model.ConnectionState) (adapters.Caps, bool) {
+	if state.Status != "connected" {
+		return adapters.Caps{}, false
+	}
+	caps, ok := state.Caps.(adapters.Caps)
+	return caps, ok
+}
+
+// connectForQuery connects connectionID on demand — run_query's own §6.3 rule. Exposing a
+// connection to MCP (resolveEnabled's own gate) is the human's explicit, per-connection consent;
+// Connect is the same deduplicated path the UI uses, so the connection visibly comes up in the app
+// rather than opening invisibly. A failure is returned as-is, not retried — its own error state
+// text is what the caller sees.
+func (s *Server) connectForQuery(connectionID string) (model.ConnectionState, error) {
+	return s.cfg.Conns.Connect(connectionID)
+}
