@@ -101,25 +101,24 @@ if [ "$NEED_INSTALL" = "1" ]; then
   INSTALLED_TOOLCHAIN="$GO_DIRECTIVE"
 fi
 
-# Bindings regeneration is delegated to the task itself (P3 D11's preferred branch, P20 D8) rather
-# than a second hand-typed flag list — `common:generate:bindings` now has a correct fingerprint
-# (P20 D3) over its own sources, so this call is the *authority* on whether a source change needs a
-# rebuild.
-#
-# What sources can't see is the wails3 CLI's own identity: whether it is the pinned version, and
-# whether the Go toolchain it was built with matches go.mod's directive (P20 F5/F6/F7 — the old
-# script's directory-presence gate let a stale-toolchain generation survive a CLI reinstall
-# indefinitely). A stamp of that identity, next to Task's own cache so both are cleared together,
-# decides whether this step runs on an *identity* change. P12 round 2 finding #8: the stamp alone
-# can't detect a manually-deleted (or interrupted-mid-generation) bindings directory, since nothing
-# re-derives it from `frontend/bindings/` itself — so the directory's own presence is checked too,
-# same as the old gate did, alongside the stamp rather than instead of it.
+# Bindings regeneration is delegated to the task itself (P3 D11's preferred branch, P20 D8) —
+# `common:generate:bindings` has a correct content checksum (P20 D3) over its own Go/TS sources
+# (confirmed directly: touching a Go source file this task reads flips it from "up to date" to a
+# real ~7s regen; reverting it drops back to a ~0.2s no-op run), so it's called unconditionally
+# below, every setup.sh run. It's the sources it can't see that need a stamp: the wails3 CLI's own
+# identity, and whether its build toolchain matches go.mod's directive (P20 F5/F6/F7). Task's
+# per-task checksum cache survives a CLI reinstall, so on its own a "same sources, new/reinstalled
+# CLI" run reports "up to date" and skips regenerating even though a different generator binary can
+# produce different output for identical input — the stale-toolchain bug P20 F5/F6/F7 names. Wiping
+# Task's cache on an identity change forces the unconditional call below to do a real regen instead
+# of trusting a checksum computed under the old binary.
 BINDINGS_DIR="$ROOT_DIR/apps/kira-studio/frontend/bindings"
 STAMP_FILE="$ROOT_DIR/apps/kira-studio/.task/bindings.stamp"
 STAMP="$PINNED_VERSION|$GO_DIRECTIVE|$INSTALLED_TOOLCHAIN"
 if [ ! -d "$BINDINGS_DIR" ] || [ ! -f "$STAMP_FILE" ] || [ "$(cat "$STAMP_FILE")" != "$STAMP" ]; then
-  echo "setup: wails3 task common:generate:bindings"
-  (cd "$ROOT_DIR/apps/kira-studio" && wails3 task common:generate:bindings)
+  rm -rf "$ROOT_DIR/apps/kira-studio/.task"
   mkdir -p "$(dirname "$STAMP_FILE")"
   printf '%s' "$STAMP" >"$STAMP_FILE"
 fi
+echo "setup: wails3 task common:generate:bindings"
+(cd "$ROOT_DIR/apps/kira-studio" && wails3 task common:generate:bindings)
