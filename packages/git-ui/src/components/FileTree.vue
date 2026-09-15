@@ -437,16 +437,6 @@ function dirOf(path: string): string {
 function reviewStatusFor(path: string): ReviewFileStatus | undefined {
   return props.reviewStates?.get(path);
 }
-function reviewToggleIcon(path: string): string {
-  switch (reviewStatusFor(path)?.kind) {
-    case 'full':
-      return 'codicon-pass-filled';
-    case 'partial':
-      return 'codicon-circle-large-filled';
-    default:
-      return 'codicon-circle-large-outline';
-  }
-}
 function reviewToggleTitle(path: string): string {
   const kind = reviewStatusFor(path)?.kind ?? 'none';
   return kind === 'none' ? 'Mark reviewed' : 'Mark unreviewed';
@@ -518,6 +508,9 @@ function reviewToggleTitle(path: string): string {
         @contextmenu="onRowContextMenu($event, row)"
       >
         <template v-if="row.kind === 'directory'">
+          <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
+               rows' checkbox column aligned underneath it. -->
+          <span v-if="reviewStates" class="kv-file-tree-review-slot" aria-hidden="true"></span>
           <span
             class="codicon kv-file-tree-chevron"
             :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
@@ -535,6 +528,21 @@ function reviewToggleTitle(path: string): string {
           </span>
         </template>
         <template v-else>
+          <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
+               +N/-N counts' own width and crowded the pane's scrollbar. A real checkbox (not a
+               toggle button) so the partial state gets a correct native `aria-checked="mixed"` for
+               free, and `.prevent` because the server's answer is this control's only state
+               (`ReviewFilesState.mark` applies `result.review`, not an optimistic local toggle). -->
+          <input
+            v-if="reviewStates"
+            type="checkbox"
+            class="kv-file-tree-review-toggle"
+            :checked="reviewStatusFor(row.node.change.path)?.kind === 'full'"
+            :indeterminate="reviewStatusFor(row.node.change.path)?.kind === 'partial'"
+            v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
+            :aria-label="reviewToggleTitle(row.node.change.path)"
+            @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
+          />
           <span
             class="kv-file-tree-icon"
             :style="fileIconStyle(row.node.path)"
@@ -578,16 +586,6 @@ function reviewToggleTitle(path: string): string {
             aria-hidden="true"
             >●</span
           >
-          <KuiButton
-            v-if="reviewStates"
-            variant="icon"
-            class="kv-file-tree-review-toggle"
-            v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
-            :aria-pressed="reviewStatusFor(row.node.change.path)?.kind === 'full'"
-            @click.stop="emit('toggleReviewed', row.node.change.path)"
-          >
-            <span class="codicon" :class="reviewToggleIcon(row.node.change.path)" aria-hidden="true"></span>
-          </KuiButton>
         </template>
       </div>
 
@@ -807,8 +805,11 @@ function reviewToggleTitle(path: string): string {
   flex-shrink: 0;
 }
 
-.kv-file-tree-review-toggle[aria-pressed='true'] {
-  color: var(--kv-diff-added-fg);
+/* P75 §4.3: a directory row has nothing to mark, but the file rows below it must still line up
+   under one checkbox column — same width as the checkbox itself. */
+.kv-file-tree-review-slot {
+  width: 14px;
+  flex-shrink: 0;
 }
 
 .kv-file-tree-show-all {
