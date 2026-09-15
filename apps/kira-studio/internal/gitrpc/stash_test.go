@@ -41,12 +41,11 @@ func initStashRpcRepo(t *testing.T) string {
 	return dir
 }
 
-// TestContractVersion_Is36 is P7 item 2's own literal exit-criteria assertion, moved forward again
-// (35 -> 36, P74 §3.3's pr.openExternal/pr.browserUrl bump) in the same commit that bumps the
-// constant — missed by 165b376b itself, caught by this phase's own full-suite verification pass.
-func TestContractVersion_Is36(t *testing.T) {
-	if ContractVersion != 36 {
-		t.Fatalf("ContractVersion = %d, want 36", ContractVersion)
+// TestContractVersion_Is37 is P7 item 2's own literal exit-criteria assertion, moved forward again
+// (36 -> 37, P75 §2.3's graph.revealCommit bump) in the same commit that bumps the constant.
+func TestContractVersion_Is37(t *testing.T) {
+	if ContractVersion != 37 {
+		t.Fatalf("ContractVersion = %d, want 37", ContractVersion)
 	}
 }
 

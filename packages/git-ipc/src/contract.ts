@@ -2198,6 +2198,20 @@ export type Contract = {
       params: { repoId: string };
       result: { readonly cancelled: boolean };
     };
+    // ---- P75 §2.3: reveal a review commit in the graph, from either host -------------------
+    /** Replaces the review row's old `command:kiraVersion.openCommitInGraph?…` anchor (VS Code's
+     *  own webview link escape hatch, unreachable outside a VS Code webview — `RepoReviewView.vue`
+     *  mounts the same row component in a Wails WebView, where no `command:` handler exists at any
+     *  layer). Host-answered in both hosts, never reaching Go (like `review.open`/
+     *  `editor.openRangeDiff`): the desktop answers by emitting/stashing `ui.action`'s own
+     *  `revealCommit` onto the pinned graph tab; the extension answers via
+     *  `graphProvider.runUiAction('revealCommit', …)`. `revealed: false` is a real, non-stub
+     *  answer — the desktop genuinely cannot reveal when this window has no record of the
+     *  repository, or its workspace has no pinned graph tab open. */
+    'graph.revealCommit': {
+      params: { repoId: string; sha: string };
+      result: { readonly revealed: boolean };
+    };
   };
   events: {
     'repo.changed': { repoId: string; kind: 'refsChanged' | 'worktreeChanged' };

@@ -103,6 +103,10 @@ export interface CreateProxyHandlersDeps {
   // never imports vscode.WebviewViewProvider; extension.ts breaks the construction cycle (the
   // provider needs `handlers`, `handlers` needs this function) with a `let` binding.
   readonly revealReview: (repoId: string, branch: string) => void;
+  // P75 §2.3: `graph.revealCommit`'s own implementation — reveals the graph view and (if resolved)
+  // pushes the reveal, or queues it for the next cold resolve (`runUiAction` is total). Supplied
+  // as a plain function for the same reason `revealReview` is: this file never imports `vscode`.
+  readonly revealCommitInGraph: (repoId: string, sha: string) => void;
   // G13 D9: plain-data callbacks into reviewComments.ts's controller — kept as functions, not a
   // controller instance, for the same reason revealReview is: this file never imports `vscode`.
   // Called after editor.openRangeDiff opens the branch-tip side of a diff, so its comment threads
@@ -193,6 +197,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     browser,
     isWorkspaceTrusted,
     revealReview,
+    revealCommitInGraph,
     renderReviewComments,
     notifyCommentsMutated,
     refreshReviewMarking,
@@ -481,6 +486,12 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     'review.open': async ({ repoId, branch }) => {
       revealReview(repoId, branch);
       return {};
+    },
+    // P75 §2.3: replaces the review row's own `command:kiraVersion.openCommitInGraph` webview
+    // anchor — host-answered like review.open just above, never reaching the server.
+    'graph.revealCommit': async ({ repoId, sha }) => {
+      revealCommitInGraph(repoId, sha);
+      return { revealed: true };
     },
     // G11 D1/§4.3: forwarded verbatim — none of the three is a host capability, and the seventh
     // and last of those was closed above (review.open).

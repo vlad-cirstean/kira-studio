@@ -34,8 +34,9 @@ import {
   openRepoFileTab,
   openRepoReviewDiffTab,
 } from '../../state/repoTabs';
+import { activateTab } from '../../state/tabs';
 import { setRepoSearchView } from '../state/search';
-import { loadReviewSession, saveReviewSession } from './reviewSession';
+import { loadReviewSession, pinnedGraphTabId, saveReviewSession } from './reviewSession';
 
 // C11 §8.2/§8.4 (S13): review.open's own cold-mount hand-off. The local event bus (S4) only
 // reaches a `transport.on('review.target', ...)` subscriber that already exists — a first-ever
@@ -62,10 +63,14 @@ export function takePendingReviewTarget(
 // identical race — a repo-file tab can be active before the pinned graph tab has ever mounted, so
 // a `ui.action` emitted straight onto the transport (`transport.ts`'s `emitUiAction`) would have
 // nothing listening. Mirrors `pendingReviewTargetByCodeRepoId` above exactly: stashed here,
-// consumed once by `RepoGraphView.vue`'s own mount as `MountOptions.pendingUiAction`.
+// consumed once by `RepoGraphView.vue`'s own mount as `MountOptions.pendingUiAction`. P75 §2.3:
+// the review row's "Open in graph" (`graph.revealCommit`, below) hits the same race and shares
+// this one stash rather than a second copy of it.
 const pendingBlameRevealByCodeRepoId = new Map<string, { repoId: string; sha: string }>();
 
-export function stashPendingBlameReveal(
+// P75 §2.3: no longer exported — blameAnnotation.ts's own revealBlameCommit is gone, replaced by
+// one `graph.revealCommit` request this file now answers itself (below), reusing this same stash.
+function stashPendingBlameReveal(
   codeRepoId: string,
   target: { repoId: string; sha: string },
 ): void {
@@ -141,8 +146,12 @@ export interface HostHandlersDeps {
    *  for (one transport per repo workspace, §8). */
   readonly codeRepoId: string;
   /** C11 §8.1: this transport's own local event emitter — `review.open`'s handler is the one host
-   *  handler that ever needs to push an event rather than just answer a request. */
-  readonly emitLocal: <K extends EventKey>(method: K, payload: EventPayload<K>) => void;
+   *  handler that pushes an event with no caller needing to know whether anything was listening.
+   *  P75 §2.3: typed `boolean`, matching `transport.ts`'s own `local.emit` (returning since P68) —
+   *  `graph.revealCommit`'s handler needs that to decide between "delivered live" and "stash for
+   *  the next cold mount", the same distinction `emitUiAction` already made for the blame reveal
+   *  this handler absorbs. */
+  readonly emitLocal: <K extends EventKey>(method: K, payload: EventPayload<K>) => boolean;
 }
 
 type HostHandler<K extends RequestKey> = (
@@ -362,6 +371,26 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       if (!layoutState.panel.project.visible) toggleProjectPanel();
       deps.emitLocal('review.target', { repoId: gitRepoId, branch });
       return {};
+    },
+
+    // P75 §2.3: the review row's own "Open in graph" — replaces the old VS Code-only `command:`
+    // URI anchor. Absorbs P62 §4.5's blameAnnotation.ts::revealBlameCommit body verbatim (this
+    // file already owns the pending-reveal map that logic stashes into): emit live first, stash
+    // only if nothing was listening (Group 6, P68 review — stashing unconditionally left a
+    // pending entry no mount ever consumed, replaying a stale target on the graph tab's next
+    // remount). `revealed: false` for a codeRepoId or graph-tab miss is a real answer, not a stub
+    // — the caller announces it.
+    'graph.revealCommit': async ({ repoId: gitRepoId, sha }) => {
+      const codeRepoId = codeRepoIdFor(gitRepoId);
+      if (codeRepoId === undefined) return { revealed: false };
+      const graphTabId = pinnedGraphTabId(codeRepoId);
+      if (!graphTabId) return { revealed: false };
+      const target = { repoId: gitRepoId, sha };
+      if (!deps.emitLocal('ui.action', { action: 'revealCommit', target })) {
+        stashPendingBlameReveal(codeRepoId, target);
+      }
+      activateTab(graphTabId);
+      return { revealed: true };
     },
 
     // C11 §8.3: answered entirely inside this host, never reaching Go (§3.3) — the durable half of

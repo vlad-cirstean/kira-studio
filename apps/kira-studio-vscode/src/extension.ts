@@ -419,6 +419,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     browser,
     isWorkspaceTrusted: () => vscode.workspace.isTrusted,
     revealReview: (repoId, branch) => reviewProvider.reviewBranch(repoId, branch),
+    // P75 §2.3: graphProvider is declared just below, but this closure only runs once a request
+    // arrives (well after activate() returns), so this needs no `let` forward-declaration break
+    // the way reviewProvider (assigned above) does.
+    revealCommitInGraph: (repoId, sha) =>
+      graphProvider.runUiAction('revealCommit', { repoId, sha }),
     renderReviewComments: (repoId, branchTip, path, branch) =>
       reviewComments.renderThreadsForKey(repoId, branchTip, path, branch),
     notifyCommentsMutated: (repoId, branch) => reviewComments.notifyCommentsMutated(repoId, branch),

@@ -138,7 +138,10 @@ package gitrpc
 // pr.browserUrl over the socket and hands the URL to the host's own browser-open path -- never
 // answered by this Go server itself, the same "editor.*-shaped" precedent editor.openDiff already
 // set. One new app.init capability, openExternal (both hosts report true). No SQL migration.
-const ContractVersion = 36
+// P75 §2.3: 36 -> 37, for one new host-answered request, graph.revealCommit (params: repoId/sha,
+// result: {revealed: boolean}) -- replaces the review row's VS Code-only command: URI anchor with
+// a real request both hosts answer locally, never reaching this server. No SQL migration.
+const ContractVersion = 37
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

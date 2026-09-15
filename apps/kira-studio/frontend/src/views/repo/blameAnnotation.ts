@@ -15,11 +15,7 @@
  */
 import { formatAbsoluteDate, formatRelativeDate } from '@kira/git-core';
 import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
-import { codeRepoIdFor, stashPendingBlameReveal } from '../../repo/git/hostHandlers';
-import { pinnedGraphTabId } from '../../repo/git/reviewSession';
-import { emitUiAction } from '../../repo/git/transport';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
-import { activateTab } from '../../state/tabs';
 import type { MonacoModule } from './monaco';
 
 type CodeEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
@@ -76,31 +72,6 @@ function hoverMessage(result: BlameResult): { value: string }[] {
     { value: subject.length > 0 ? subject : '(no commit message)' },
     { value: `${result.author}, ${formatAbsoluteDate(result.authorTimeSeconds)}` },
   ];
-}
-
-/** §4.5: routes the annotation's context-menu action to the pinned graph tab — mirrors C11's own
- *  `review.open` cold-mount race (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`): a file
- *  tab can be active before the graph tab has ever mounted, so a `ui.action` emitted straight onto
- *  the transport would have nothing listening. Stash-then-activate covers the cold case;
- *  `emitUiAction` covers the case where the graph is already live. A codeRepoId or graph-tab miss
- *  (this file's own repo isn't open as a workspace, or has never mounted a graph tab — neither
- *  should happen in practice) is a silent no-op, the same posture every other cold-path guard in
- *  this module already takes.
- */
-function revealBlameCommit(gitRepoId: string, sha: string): void {
-  const codeRepoId = codeRepoIdFor(gitRepoId);
-  if (codeRepoId === undefined) return;
-  const graphTabId = pinnedGraphTabId(codeRepoId);
-  if (!graphTabId) return;
-  const target = { repoId: gitRepoId, sha };
-  // Group 6 (P68 review): emit live FIRST and only stash when nothing was actually listening — the
-  // common case (the graph tab is already mounted, since it's pinned) delivers immediately here, so
-  // stashing unconditionally on top of that left a pending entry no mount ever consumed, surviving
-  // to replay a stale target on the graph tab's NEXT remount (takePendingBlameReveal's own doc
-  // comment promises that can't happen).
-  const consumed = emitUiAction(codeRepoId, { action: 'revealCommit', target });
-  if (!consumed) stashPendingBlameReveal(codeRepoId, target);
-  activateTab(graphTabId);
 }
 
 /** Attaches the blame layer to an already-mounted, read-only file editor. Call once per mount
@@ -243,7 +214,12 @@ export function attachBlameAnnotation(
       const line = editor.getPosition()?.lineNumber;
       const result = line === undefined ? undefined : cache.get(line);
       if (!result || result.sha === UNCOMMITTED_BLAME_SHA) return;
-      revealBlameCommit(deps.gitRepoId, result.sha);
+      // P75 §2.3: one request — hostHandlers.ts owns the stash/activate sequence this used to
+      // duplicate (the review row's own "Open in graph" needed the identical logic).
+      void deps.transport.request('graph.revealCommit', {
+        repoId: deps.gitRepoId,
+        sha: result.sha,
+      });
     },
   });
 

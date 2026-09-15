@@ -41,12 +41,6 @@ const props = defineProps<{
    *  `FileTree` (which renders no toolbar of its own). */
   listMode: FileListMode;
   filter: string;
-  /** G14 D10: the open repository — needed only for the row's "Open in graph" hover action below,
-   *  which reaches `kiraVersion.openCommitInGraph` through a `command:` URI (VS Code's own webview
-   *  escape hatch for invoking an already-contributed command, gated by `enableCommandUris` on
-   *  this webview's own options) rather than a new bridge request — D8 makes no RPC/contract
-   *  change, and a command URI is not one: it never touches the Contract type. */
-  repoId: string | undefined;
 }>();
 
 const emit = defineEmits<{
@@ -63,10 +57,9 @@ const dateText = computed(() =>
 
 /** G-UX D5 (item 5): the row-action cluster (Open all changes, Open in graph) sits inside this
  *  header; a click on it is not a request to expand the row. Guarded here rather than stopped at
- *  each action, because one of those actions is a `command:` anchor VS Code's own bubble-phase
- *  link interceptor must be allowed to see — a `stopPropagation()` on the anchor itself (the old
- *  shape) prevents that interceptor from ever observing the click, so the command URI is never
- *  delivered to the host (F6). */
+ *  each action. P75 §2.3: "Open in graph" is a plain `KuiButton` now (no more `command:` anchor
+ *  VS Code's own bubble-phase link interceptor needed to see), but the guard stays — it is still
+ *  correct for keeping either action's click from also toggling the row. */
 function onRowClick(event: MouseEvent): void {
   if ((event.target as Element | null)?.closest('.kv-review-row-actions')) return;
   emit('focus-row');
@@ -151,15 +144,16 @@ async function openAllChanges(): Promise<void> {
   }
 }
 
-// G14 D8 row action 3 / D10: a `command:` URI (see the `repoId` prop's own doc comment above) —
-// `undefined` only while no repo is open yet, in which case the anchor renders `href="#"` and the
-// row's own `commit` guard means this template branch cannot actually be reached without a commit,
-// which in turn cannot exist without a repository already open.
-const openInGraphHref = computed(() => {
-  if (!props.repoId) return '#';
-  const args = [{ repoId: props.repoId, sha: props.sha }];
-  return `command:kiraVersion.openCommitInGraph?${encodeURIComponent(JSON.stringify(args))}`;
-});
+// G14 D8 row action 3 / D10, replaced P75 §2.3: was a `command:kiraVersion.openCommitInGraph`
+// anchor (VS Code's own webview escape hatch) — inert in Kira Studio, which mounts this same
+// component in a Wails WebView with no `command:` handler at any layer. Now a real request both
+// hosts answer locally.
+async function revealInGraph(): Promise<void> {
+  const { revealed } = await props.actions.revealInGraph({ sha: props.sha });
+  if (!revealed) {
+    props.actions.announce("Couldn't reveal this commit — no graph is open for this repository.");
+  }
+}
 
 // G12 D12: opens VS Code's native diff directly — no in-webview diff mode to flip into. `sha`'s
 // own parentIndex is this row's current merge-parent selection, exactly what commit.detail was
@@ -230,22 +224,17 @@ function onOpenFile(index: number, pinned: boolean): void {
           aria-label="Open all changes"
           @click="openAllChanges"
         />
-        <!-- G-UX D5 (item 5): no @click.stop -- a stopPropagation() on this anchor's own listener
-             prevents VS Code's bubble-phase link interceptor (registered on the webview document)
-             from ever observing the click, so the command: URI is never delivered to the host
-             (F6). onRowClick's own .kv-review-row-actions guard above is what keeps this click
-             from also toggling the row -- the correct fix reaches up the tree, not down.
-             G34 D15: this must stay a real <a href="command:…"> (VS Code's own link interceptor is
-             what delivers the command URI), so it wears the button classes directly rather than
-             becoming a KuiButton — bespoke in *element* only, never in appearance. -->
-        <a
-          class="kui-button kui-button--icon"
+        <!-- P75 §2.3: a real KuiButton now — no more command: anchor VS Code's own bubble-phase
+             link interceptor needed to observe directly, since the reveal is a bridge request.
+             onRowClick's own .kv-review-row-actions guard above still keeps this click from also
+             toggling the row. -->
+        <KuiButton
+          variant="icon"
+          icon="codicon-git-commit"
           v-kui-tooltip="'Open in graph'"
           aria-label="Open in graph"
-          :href="openInGraphHref"
-        >
-          <span class="codicon codicon-git-commit" aria-hidden="true"></span>
-        </a>
+          @click="revealInGraph"
+        />
       </span>
     </div>
 
@@ -386,7 +375,7 @@ function onOpenFile(index: number, pinned: boolean): void {
 
 /* G34 D14: `.kv-review-row-action` is gone — its `:hover` painted the *selection* blue, not a
    hover tint (F9 in the G34 plan); `.kui-button`/`.kui-button--icon`'s own hover is correct and
-   is what both the KuiButton above and the `<a class="kui-button kui-button--icon">` now get. */
+   is what both row-action KuiButtons above get. */
 
 .kv-review-row-body {
   border-top: 1px solid var(--kv-panel-border);

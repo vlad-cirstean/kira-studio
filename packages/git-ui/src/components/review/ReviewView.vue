@@ -353,6 +353,11 @@ const filesActions = computed<DetailActions | undefined>(() => {
       if (!repo) throw new Error('ReviewView: openPullRequest called with no active repo');
       await bridge.request('pr.openExternal', { repoId: repo, number });
     },
+    async revealInGraph({ sha }) {
+      const repo = repoId.value;
+      if (!repo) return { revealed: false };
+      return bridge.request('graph.revealCommit', { repoId: repo, sha });
+    },
   };
 });
 
@@ -911,7 +916,6 @@ watch(
               :focused="index === focusedRow"
               :list-mode="listMode"
               :filter="filter"
-              :repo-id="repoId"
               @toggle="toggleRow(sha)"
               @focus-row="focusRow(index)"
             />

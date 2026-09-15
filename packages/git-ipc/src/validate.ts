@@ -130,7 +130,11 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // -- never answered by the Go server itself, the same "editor.*-shaped" precedent 'editor.openDiff'
 // already set. One new 'app.init' capability, 'openExternal' (both hosts report true). No SQL
 // migration.
-export const CONTRACT_VERSION = 36;
+// P75 §2.3 (2026-09-15): 36 -> 37, for one new host-answered request, 'graph.revealCommit'
+// (params: repoId/sha, result: {revealed: boolean}) -- replaces the review row's VS Code-only
+// `command:` URI anchor with a real request both hosts answer locally, never reaching Go (the
+// same 'editor.*-shaped' precedent above). No new event, no new capability, no SQL migration.
+export const CONTRACT_VERSION = 37;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -252,6 +256,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'preflight.restack': true,
   'stack.restack': true,
   'stack.cancelRestack': true,
+  'graph.revealCommit': true,
 };
 const EVENT_KEY_MAP: Record<EventKey, true> = {
   'repo.changed': true,

@@ -189,6 +189,7 @@ function stubHandlers(
       'preflight.restack': notImplemented,
       'stack.restack': notImplemented,
       'stack.cancelRestack': notImplemented,
+      'graph.revealCommit': notImplemented,
       ...requestOverrides,
     },
     streams: {
