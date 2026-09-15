@@ -45,7 +45,7 @@ const (
 type Rule struct {
 	Kind Kind
 	// KeepHint controls each kind's own small hint (§2.3): the initials for name, the domain for
-	// email, the year for date. Meaningless for text/number/id/redact.
+	// email, the year for date. Meaningless for text/number/redact.
 	KeepHint bool
 	// Correlate emits the keyed correlation tag (§2.4) alongside the redaction. Always false in
 	// effect for KindNumber (Apply enforces this itself, defensively, on top of the storage-layer

@@ -12,11 +12,11 @@ CREATE TABLE connection_mask_rules (
   -- (plan §4.2): it is what makes a rule legible in the UI and what the grid's header menu writes.
   table_name    TEXT NOT NULL,
   column_name   TEXT NOT NULL,
-  -- name | email | text | number | id | date | redact
+  -- name | email | text | number | date | redact
   mask_kind     TEXT NOT NULL,
   -- Keep this kind's own small hint: the initials for `name`, the domain for `email`, the year for
-  -- `date`. Meaningless for text/number/id/redact, stored anyway so the column stays one flag
-  -- rather than three kind-specific ones.
+  -- `date`. Meaningless for text/number/redact, stored anyway so the column stays one flag rather
+  -- than three kind-specific ones.
   keep_hint     INTEGER NOT NULL DEFAULT 1,
   -- Emit the keyed correlation tag (plan §2.4). Forced 0 for `number` (a bucket is many-to-one,
   -- so tagging it would be dishonest — internal/mask.Apply enforces this regardless of this flag).
