@@ -262,7 +262,9 @@ func main() {
 	// C3 §7.4/D7: the repo-map MCP server's embedded instance — owned by this app's own lifecycle,
 	// same posture as gitSock just above. StartIfEnabled's own failure (no repository resolved at
 	// this process's cwd, a bind conflict) is logged, never fatal, mirroring gitSock.Start().
-	repoMapSvc := &bridge.RepoMapService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{})}
+	repoMapSvc := &bridge.RepoMapService{
+		Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Discovery: gitDiscovery, Runner: gitRunner,
+	}
 	bridge.StartRepoMapIfEnabled(repoMapSvc)
 
 	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
@@ -275,6 +277,10 @@ func main() {
 	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
 		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
 		IndexStore: codeIndexStore,
+		// P67d §6.2/§6.4: a removed repository's live MCP grant is revoked immediately, not merely
+		// at the next restart; a rename re-keys the live instance so a `repo` argument stays honest.
+		OnRepoRemoved: func(id string) { bridge.RepoMapNotifyRepoRemoved(repoMapSvc, id) },
+		OnRepoRenamed: func(id, name string) { bridge.RepoMapNotifyRepoRenamed(repoMapSvc, id, name) },
 	}
 
 	events := bridge.NewEvents(emitter)

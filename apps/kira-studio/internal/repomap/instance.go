@@ -22,11 +22,11 @@ type repoInstance struct {
 	repoID string
 	root   string
 
-	store *codeindex.Store // the Server's own store, borrowed — never closed here
-	idx   *codeindex.Index
-	graph *codegraph.Graph
+	store   *codeindex.Store // the Server's own store, borrowed — never closed here
+	idx     *codeindex.Index
+	graph   *codegraph.Graph
 	watcher *codeindex.Watcher
-	log   *slog.Logger
+	log     *slog.Logger
 
 	// lockMu guards lock — written by runInitialSync's own background goroutine, read and cleared
 	// by close, which can run concurrently with it (Detach racing a still-in-flight initial sync is

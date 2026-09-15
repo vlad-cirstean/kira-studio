@@ -2,11 +2,14 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
@@ -25,45 +28,124 @@ type RepoMapInstaller interface {
 // server identity (Implementation.Name, server.go).
 const repoMapServerName = "kira-repo-map"
 
-// RepoMapService is the Code intelligence tab's whole surface (docs/v1.5/plans/
-// C3-mcp-repo-map-server.md §7.4): Status, SetEnabled, Regenerate, InstallClaudeCode. Unlike
-// GitClientsService's GitVsix (an install action over a file that already exists on disk), this
-// service owns the embedded *repomap.Server's actual lifecycle (§0 D7's correction) — constructed
+// repoMapTokenSlug is the embedded instance's own app-scoped token file slug (P67d §6.3, D2): one
+// token now covers every granted repository, so it is no longer keyed by a single repo_id the way
+// the headless binary's per-repository files still are (cmd/kira-repo-map, mcpauth.Slug). Distinct
+// by construction from any 12-hex slug, so the two file families never collide.
+const repoMapTokenSlug = "app"
+
+// RepoMapService is the Code intelligence tab's whole surface (docs/v1.6/plans/
+// P67d-repo-map-settings-toggle.md): general enable/disable of one embedded *repomap.Server plus
+// per-repository grant/revoke over whichever repositories are imported (code_repos, owned by
+// CodeWorkspaceService/P67b's Git module). Unlike GitVsix (an install action over a file that
+// already exists on disk), this service owns the embedded server's actual lifecycle — constructed
 // and started when the setting turns on (or already is, at boot), stopped when it turns off or the
-// app quits.
+// app quits; repositories are attached/detached independently of that lifecycle as grants change.
 type RepoMapService struct {
 	Deps      appcore.Deps
 	Installer RepoMapInstaller
+	// Discovery/Runner resolve the git executable and run every Attach's own git calls — the same
+	// seam CodeWorkspaceService uses (gitrpc's own Deps.Discovery/Deps.Runner precedent).
+	Discovery *gitclient.Discovery
+	Runner    gitclient.Runner
+	// Home overrides KIRA_HOME (a test seam, mirrors CodeWorkspaceService.Home) — empty means
+	// config.KiraHome().
+	Home string
 
 	mu     sync.Mutex
 	server *repomap.Server
+	// keys tracks code_repos.id -> the live key currently attached for it, only while server != nil
+	// and that repository is attached. Lets a removal (whose row may already be gone by the time
+	// the hook runs) or a rename detach/rekey without a storage read.
+	keys map[string]string
+	// attachErrs tracks code_repos.id -> the last Attach failure for a granted row (git unavailable,
+	// a key collision) — cleared on the next successful attach. Distinct from a live instance's own
+	// Degraded (a sync failure, surfaced straight from repomap.RepoInfo instead).
+	attachErrs map[string]string
 }
 
 // RepoMapStatus is the wire projection every method below returns.
 type RepoMapStatus struct {
-	Running         bool     `json:"running"`
-	Repo            string   `json:"repo"`
+	Running bool `json:"running"`
+	// URL is the embedded server's own MCP endpoint (replaces the old single-repository Repo
+	// field, P67d §6.1 — nothing renders a single repository's own root any more, since one server
+	// now serves however many are granted).
+	URL             string   `json:"url"`
 	Command         string   `json:"command"`
 	ClaudeAvailable bool     `json:"claudeAvailable"`
 	Probed          []string `json:"probed"`
-	// Error names why Running is false despite the setting being on — no repository resolved at
-	// the app's own working directory, or a bind failure (§3.2's own honestly-stated limitation).
-	// "" whenever Running is true, or the setting is simply off.
+	// Error is a server-wide failure (a bind failure starting the listener) — "" whenever Running
+	// is true, or the setting is simply off. A per-repository failure lives on that repository's
+	// own RepoMapRepoStatus.Error instead.
 	Error string `json:"error"`
+	// Repos is every imported repository (CodeRepos.List's own order), whether or not it is
+	// granted and whether or not the server is running — the "Repository access" list's whole data
+	// source.
+	Repos []RepoMapRepoStatus `json:"repos"`
+}
+
+// RepoMapRepoStatus is one imported repository's own MCP access row.
+type RepoMapRepoStatus struct {
+	ID   string `json:"id"`   // code_repos.id
+	Name string `json:"name"` // code_repos.name
+	Root string `json:"root"`
+	// Key is what an MCP client passes as `repo` — "" until this repository is actually attached
+	// (Serving), never a preview of a key that might not end up being used.
+	Key     string `json:"key"`
+	Enabled bool   `json:"enabled"` // the persisted grant (code_repos.mcp_enabled)
+	Serving bool   `json:"serving"` // attached right now
+	Ready   bool   `json:"ready"`   // initial sync finished
+	Error   string `json:"error"`   // attach or sync failure; "" normally
+}
+
+// home resolves this service's own KIRA_HOME override (a test seam), the way
+// CodeWorkspaceService.home does.
+func (s *RepoMapService) home() string {
+	if s.Home != "" {
+		return s.Home
+	}
+	return config.KiraHome()
 }
 
 func (s *RepoMapService) statusLocked() RepoMapStatus {
-	inst := s.Installer.Status()
-	st := RepoMapStatus{ClaudeAvailable: inst.ClaudePath != "", Probed: inst.Probed}
-	if s.server == nil {
-		return st
+	installStatus := s.Installer.Status()
+	st := RepoMapStatus{ClaudeAvailable: installStatus.ClaudePath != "", Probed: installStatus.Probed}
+
+	rows, err := s.Deps.Repos.CodeRepos.List()
+	if err != nil {
+		slog.Warn("repo-map: list repos for status", "scope", "repomap", "err", err)
+		rows = nil
 	}
-	st.Running = true
-	st.Repo = s.server.Root()
-	// Command is "" whenever no plaintext is currently held (an app restart with the setting
-	// already on, §0 D8) — the Code intelligence tab shows a Regenerate action instead.
-	if plain, minted := s.server.Token(); minted {
-		st.Command = mcpinstall.Command(repoMapServerName, s.server.URL(), plain)
+
+	live := make(map[string]repomap.RepoInfo, len(rows))
+	if s.server != nil {
+		st.Running = true
+		st.URL = s.server.URL()
+		// Command is "" whenever no plaintext is currently held (an app restart with the setting
+		// already on) — the Code intelligence tab shows a Regenerate action instead.
+		if plain, minted := s.server.Token(); minted {
+			st.Command = mcpinstall.Command(repoMapServerName, s.server.URL(), plain)
+		}
+		for _, ri := range s.server.Repos() {
+			live[ri.RepoID] = ri
+		}
+	}
+
+	st.Repos = make([]RepoMapRepoStatus, 0, len(rows))
+	for _, r := range rows {
+		rs := RepoMapRepoStatus{ID: r.ID, Name: r.Name, Root: r.Root, Enabled: r.McpEnabled}
+		if e := s.attachErrs[r.ID]; e != "" {
+			rs.Error = e
+		}
+		if ri, ok := live[r.RepoID]; ok {
+			rs.Serving = true
+			rs.Key = ri.Key
+			rs.Ready = ri.Ready
+			if ri.Degraded != "" && rs.Error == "" {
+				rs.Error = ri.Degraded
+			}
+		}
+		st.Repos = append(st.Repos, rs)
 	}
 	return st
 }
@@ -75,40 +157,164 @@ func (s *RepoMapService) Status() RepoMapStatus {
 	return s.statusLocked()
 }
 
-// tokenProviderFor resolves the embedded instance's own repomap.TokenProvider: mint always mints
-// fresh and persists over any existing file (an explicit enable, §0 D8's own "regenerated when the
-// toggle turns on"); !mint loads an existing token or mints only if none exists yet (the app-boot-
-// with-the-leaf-already-true path, StartIfEnabled below).
-func tokenProviderFor(home string, mint bool) repomap.TokenProvider {
-	return func(repoID string) (mcpauth.Record, string, bool, error) {
-		path := mcpauth.Path(home, mcpauth.Slug(repoID))
-		if !mint {
-			plain, rec, minted, err := mcpauth.LoadOrMint(path)
-			return rec, plain, minted, err
+// normalizeRepoKey turns name into a `repo` argument-shaped token (P67d §6.2): lowercase, any run
+// of characters outside [a-z0-9._-] collapsed to one '-', leading/trailing '-' trimmed, falling
+// back to "repo" when that leaves nothing.
+func normalizeRepoKey(name string) string {
+	lower := strings.ToLower(name)
+	var b strings.Builder
+	prevDash := false
+	for _, r := range lower {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-':
+			b.WriteRune(r)
+			prevDash = false
+		case !prevDash:
+			b.WriteByte('-')
+			prevDash = true
 		}
-		plain, rec, err := mcpauth.Mint()
-		if err != nil {
-			return mcpauth.Record{}, "", false, err
+	}
+	key := strings.Trim(b.String(), "-")
+	if key == "" {
+		return "repo"
+	}
+	return key
+}
+
+// repoKeys derives every row's own client-facing key from its code_repos.name (normalizeRepoKey),
+// deterministic for a given row order: a collision within rows appends -2, -3, … in list order, so
+// a key is stable across restarts unless the user renames a repository (the rename hook re-derives
+// and Rekeys, syncAttachedKeysLocked below).
+func repoKeys(rows []model.CodeRepo) map[string]string {
+	counts := make(map[string]int, len(rows))
+	keys := make(map[string]string, len(rows))
+	for _, r := range rows {
+		base := normalizeRepoKey(r.Name)
+		n := counts[base]
+		counts[base] = n + 1
+		key := base
+		if n > 0 {
+			key = fmt.Sprintf("%s-%d", base, n+1)
 		}
-		if err := mcpauth.Save(path, rec); err != nil {
-			return mcpauth.Record{}, "", false, err
+		keys[r.ID] = key
+	}
+	return keys
+}
+
+// grantedRowsLocked returns every imported repository currently granted MCP access, in
+// CodeRepos.List's own order.
+func (s *RepoMapService) grantedRowsLocked() ([]model.CodeRepo, error) {
+	rows, err := s.Deps.Repos.CodeRepos.List()
+	if err != nil {
+		return nil, err
+	}
+	granted := make([]model.CodeRepo, 0, len(rows))
+	for _, r := range rows {
+		if r.McpEnabled {
+			granted = append(granted, r)
 		}
-		return rec, plain, true, nil
+	}
+	return granted, nil
+}
+
+// syncAttachedKeysLocked recomputes every granted row's own desired key (repoKeys) and Rekeys any
+// already-attached instance whose live key has drifted from it — a rename, or a new grant landing
+// on a name that collides with an already-attached one, can shift another row's own dedupe suffix,
+// not just the row that changed.
+func (s *RepoMapService) syncAttachedKeysLocked(granted []model.CodeRepo) {
+	desired := repoKeys(granted)
+	for _, r := range granted {
+		want := desired[r.ID]
+		have, attached := s.keys[r.ID]
+		if !attached || have == want {
+			continue
+		}
+		if err := s.server.Rekey(have, want); err != nil {
+			slog.Warn("repo-map: rekey", "scope", "repomap", "repo", r.Name, "err", err)
+			continue
+		}
+		s.keys[r.ID] = want
 	}
 }
 
-// startLocked constructs and starts a new embedded instance if one is not already running. mu
-// must be held by the caller.
-func (s *RepoMapService) startLocked(mint bool) error {
+// attachGrantedLocked attaches every currently-granted repository that is not already attached
+// (repomap.Server.Attach is itself idempotent, so re-running this after a grant or at boot only
+// ever adds what's missing), then syncs every attached key. A per-row Attach failure is logged and
+// recorded in that row's own attachErrs entry; it never fails the others and never fails the
+// server. mu must be held by the caller.
+func (s *RepoMapService) attachGrantedLocked(ctx context.Context) {
+	if s.server == nil {
+		return
+	}
+	granted, err := s.grantedRowsLocked()
+	if err != nil {
+		slog.Warn("repo-map: list repos", "scope", "repomap", "err", err)
+		return
+	}
+	if len(granted) == 0 {
+		return
+	}
+
+	settings, err := s.Deps.Repos.Settings.GetAll()
+	if err != nil {
+		slog.Warn("repo-map: read settings", "scope", "repomap", "err", err)
+		return
+	}
+	status := s.Discovery.Status(ctx, settings.Git.GitPath)
+	if status.Kind != "ok" {
+		errText := "git is unavailable: " + status.Kind
+		if s.attachErrs == nil {
+			s.attachErrs = make(map[string]string)
+		}
+		for _, r := range granted {
+			if _, attached := s.keys[r.ID]; !attached {
+				s.attachErrs[r.ID] = errText
+			}
+		}
+		slog.Warn("repo-map: git unavailable, not attaching granted repositories", "scope", "repomap", "kind", status.Kind)
+		return
+	}
+
+	if s.keys == nil {
+		s.keys = make(map[string]string)
+	}
+	desired := repoKeys(granted)
+	for _, r := range granted {
+		if _, already := s.keys[r.ID]; already {
+			continue
+		}
+		key := desired[r.ID]
+		if _, err := s.server.Attach(repomap.RepoSpec{
+			Key: key, RepoID: r.RepoID, Root: r.Root, GitPath: status.Path, Runner: s.Runner,
+		}); err != nil {
+			slog.Warn("repo-map: attach", "scope", "repomap", "repo", r.Name, "err", err)
+			if s.attachErrs == nil {
+				s.attachErrs = make(map[string]string)
+			}
+			s.attachErrs[r.ID] = err.Error()
+			continue
+		}
+		s.keys[r.ID] = key
+		delete(s.attachErrs, r.ID)
+	}
+	s.syncAttachedKeysLocked(granted)
+}
+
+// startLocked constructs and starts a new embedded instance if one is not already running, loading
+// (or, on a first-ever enable, minting) this app's own token — P67d §6.3, D2: an explicit enable no
+// longer mints unconditionally, since one app-scoped token now covers every granted repository and
+// silently invalidating it on every toggle-off-and-on would break a working registration for no
+// reason the user asked for. mu must be held by the caller.
+func (s *RepoMapService) startLocked() error {
 	if s.server != nil {
 		return nil
 	}
-	home := config.KiraHome()
-	srv, err := repomap.New(context.Background(), repomap.Config{
-		Home:   home,
-		Token:  tokenProviderFor(home, mint),
-		Logger: slog.Default(),
-	})
+	home := s.home()
+	plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, repoMapTokenSlug))
+	if err != nil {
+		return err
+	}
+	srv, err := repomap.New(repomap.Config{Home: home, Token: rec, TokenPlain: plain, Logger: slog.Default()})
 	if err != nil {
 		return err
 	}
@@ -118,27 +324,30 @@ func (s *RepoMapService) startLocked(mint bool) error {
 			slog.Warn("repo-map embedded server", "scope", "repomap", "err", err)
 		}
 	}()
+	s.attachGrantedLocked(context.Background())
 	return nil
 }
 
-// stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
+// stopLocked stops and drops the embedded instance, if any, along with every per-repository
+// tracking state it owned. mu must be held by the caller.
 func (s *RepoMapService) stopLocked() {
 	if s.server == nil {
 		return
 	}
 	_ = s.server.Close()
 	s.server = nil
+	s.keys = nil
+	s.attachErrs = nil
 }
 
 // startIfEnabled is main.go's own boot-time call (gitSock.Start()'s own placement and "never
-// fatal" posture, §3.2/D7): if the setting is already on from a prior session, start the embedded
-// instance now, loading its existing token rather than minting a fresh one (no explicit toggle
-// click happened here). A failure (no repository resolved, a bind conflict) is logged, never
-// fatal — the app boots regardless, exactly like `git.sock`'s own listener.
+// fatal" posture): if the setting is already on from a prior session, start the embedded instance
+// now and attach every currently-granted repository. A failure (a bind conflict, git unavailable)
+// is logged, never fatal — the app boots regardless, exactly like `git.sock`'s own listener.
 //
 // Unexported, reached only through StartRepoMapIfEnabled below — not a method Wails' binding
-// generator would otherwise expose to the renderer as an IPC call alongside Status/SetEnabled/
-// Regenerate/InstallClaudeCode, which are the only methods this service means to cross the wire.
+// generator would otherwise expose to the renderer as an IPC call alongside the methods this
+// service means to cross the wire.
 func (s *RepoMapService) startIfEnabled() {
 	settings, err := s.Deps.Repos.Settings.GetAll()
 	if err != nil {
@@ -150,7 +359,7 @@ func (s *RepoMapService) startIfEnabled() {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.startLocked(false); err != nil {
+	if err := s.startLocked(); err != nil {
 		slog.Warn("repo-map: start at boot", "scope", "repomap", "err", err)
 	}
 }
@@ -163,14 +372,55 @@ func (s *RepoMapService) stop() {
 	s.stopLocked()
 }
 
+// onRepoRemoved is CodeWorkspaceService.OnRepoRemoved's own hook target (main.go wires it) —
+// detaches the removed repository's live instance immediately, by its last-known key (keys, above)
+// since the code_repos row is already gone by the time this runs.
+func (s *RepoMapService) onRepoRemoved(id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.attachErrs, id)
+	if s.server == nil {
+		return
+	}
+	if key, ok := s.keys[id]; ok {
+		s.server.Detach(key)
+		delete(s.keys, id)
+	}
+}
+
+// onRepoRenamed is CodeWorkspaceService.OnRepoRenamed's own hook target — re-derives every granted
+// row's own key against the new name and Rekeys whichever attached instances drifted (possibly more
+// than just id's own, per syncAttachedKeysLocked's own doc comment).
+func (s *RepoMapService) onRepoRenamed(id, _ string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.server == nil {
+		return
+	}
+	if _, attached := s.keys[id]; !attached {
+		return
+	}
+	granted, err := s.grantedRowsLocked()
+	if err != nil {
+		slog.Warn("repo-map: list repos for rename", "scope", "repomap", "err", err)
+		return
+	}
+	s.syncAttachedKeysLocked(granted)
+}
+
 // StartRepoMapIfEnabled and StopRepoMap are main.go's own boot/shutdown hooks for the embedded
 // instance, package-level functions rather than exported methods on RepoMapService precisely so
 // Wails' binding generator (which inspects only the exported methods of a *registered service*
 // type) never offers them to the renderer — a wire-callable Stop or a redundant StartIfEnabled
-// would let a bug or a stray call bypass the settings leaf entirely (§7.1's own "the toggle is the
-// only lifecycle control this phase adds," §9).
-func StartRepoMapIfEnabled(s *RepoMapService) { s.startIfEnabled() }
-func StopRepoMap(s *RepoMapService)           { s.stop() }
+// would let a bug or a stray call bypass the settings leaf entirely. RepoMapNotifyRepoRemoved and
+// RepoMapNotifyRepoRenamed are the same shape, for CodeWorkspaceService's own removal/rename hooks
+// (main.go).
+func StartRepoMapIfEnabled(s *RepoMapService)               { s.startIfEnabled() }
+func StopRepoMap(s *RepoMapService)                         { s.stop() }
+func RepoMapNotifyRepoRemoved(s *RepoMapService, id string) { s.onRepoRemoved(id) }
+func RepoMapNotifyRepoRenamed(s *RepoMapService, id, name string) {
+	s.onRepoRenamed(id, name)
+}
 
 // RepoMapSetEnabledArgs is SetEnabled's own argument shape.
 type RepoMapSetEnabledArgs struct {
@@ -178,9 +428,8 @@ type RepoMapSetEnabledArgs struct {
 }
 
 // SetEnabled patches the settings leaf and starts or stops the embedded instance in the same call
-// (§7.1: the toggle bypasses the dialog's draft/Save flow entirely, an instant action). Turning on
-// always mints a fresh token (§0 D8), even if a file already exists for this repository from a
-// previous enable — a deliberate, explicit re-enable is exactly the event D8 ties regeneration to.
+// (the toggle bypasses the dialog's draft/Save flow entirely, an instant action). Starting attaches
+// every currently-granted repository; nothing is exposed if none are granted yet (P67d §8 item 1).
 func (s *RepoMapService) SetEnabled(args RepoMapSetEnabledArgs) (RepoMapStatus, error) {
 	merged, err := s.Deps.Repos.Settings.Set(model.SettingsPatch{
 		CodeIntel: &model.CodeIntelPatch{McpServerEnabled: &args.Enabled},
@@ -193,7 +442,7 @@ func (s *RepoMapService) SetEnabled(args RepoMapSetEnabledArgs) (RepoMapStatus, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if args.Enabled {
-		if err := s.startLocked(true); err != nil {
+		if err := s.startLocked(); err != nil {
 			slog.Warn("repo-map: start on enable", "scope", "repomap", "err", err)
 			st := s.statusLocked()
 			st.Error = err.Error()
@@ -205,17 +454,50 @@ func (s *RepoMapService) SetEnabled(args RepoMapSetEnabledArgs) (RepoMapStatus, 
 	return s.statusLocked(), nil
 }
 
+// RepoMapSetRepoEnabledArgs is SetRepoEnabled's own argument shape.
+type RepoMapSetRepoEnabledArgs struct {
+	ID      string `json:"id"`
+	Enabled bool   `json:"enabled"`
+}
+
+// SetRepoEnabled grants or revokes one imported repository's own MCP access (the "Repository
+// access" list's own checkbox): persists the grant, then attaches or detaches the live instance if
+// the server is currently running — a grant made while the server is off simply persists, and takes
+// effect the next time it starts.
+func (s *RepoMapService) SetRepoEnabled(args RepoMapSetRepoEnabledArgs) (RepoMapStatus, error) {
+	if args.ID == "" {
+		return RepoMapStatus{}, ipcerr.BadRequest("id is required")
+	}
+	if err := s.Deps.Repos.CodeRepos.SetMcpEnabled(args.ID, args.Enabled); err != nil {
+		return RepoMapStatus{}, ipcerr.Internal(err.Error())
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.server != nil {
+		if args.Enabled {
+			s.attachGrantedLocked(context.Background())
+		} else if key, ok := s.keys[args.ID]; ok {
+			s.server.Detach(key)
+			delete(s.keys, args.ID)
+			delete(s.attachErrs, args.ID)
+		}
+	}
+	return s.statusLocked(), nil
+}
+
 // Regenerate mints a fresh token for the already-running embedded instance without touching the
-// setting or its lifecycle (§0 D8's restart-recovery path: an app restart loaded the existing
-// hash+salt but has no plaintext to show). A no-op, returning the current status unchanged, when
-// nothing is running.
+// setting, its lifecycle, or any repository's own attachment (P67d §6.3: the app-scoped token
+// covers every granted repository, so regeneration is the one explicit, user-initiated way to force
+// a fresh one — replacing D8's old "every enable mints fresh" rule). A no-op, returning the current
+// status unchanged, when nothing is running.
 func (s *RepoMapService) Regenerate() RepoMapStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.server == nil {
 		return s.statusLocked()
 	}
-	path := mcpauth.Path(config.KiraHome(), mcpauth.Slug(s.server.RepoID()))
+	path := mcpauth.Path(s.home(), repoMapTokenSlug)
 	plain, rec, err := mcpauth.Mint()
 	if err != nil {
 		slog.Warn("repo-map: regenerate token", "scope", "repomap", "err", err)
@@ -242,7 +524,7 @@ func toWireInstallResult(r mcpinstall.Result) RepoMapInstallResult {
 	return RepoMapInstallResult{Outcome: r.Outcome, Detail: r.Detail, Probed: r.Probed}
 }
 
-// InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract (§7.2), following
+// InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract, following
 // connections.Service.Reveal/gitvsix.Installer.Install's precedent. A no-op result (outcome
 // notFound) when nothing is running: there is nothing to register yet.
 func (s *RepoMapService) InstallClaudeCode(ctx context.Context) RepoMapInstallResult {

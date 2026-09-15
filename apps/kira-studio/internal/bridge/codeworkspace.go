@@ -40,6 +40,14 @@ type CodeWorkspaceService struct {
 	// Home overrides KIRA_HOME for the sync lock (C6 §3.3) — empty means config.KiraHome(); a test
 	// seam, mirroring repomap.Config.Home.
 	Home string
+	// OnRepoRemoved and OnRepoRenamed are P67d §6.2's own hooks into bridge.RepoMapService (wired
+	// in main.go, not referenced by type here — the same "two service structs in one package,
+	// wired by main.go" shape bridge.Sources already uses for event wiring): a removed repository's
+	// live MCP grant must be revoked immediately, not merely at the next restart, and a rename must
+	// re-key the live instance so `list_repos`/a tool call's own `repo` argument stay honest. Both
+	// nil-checked before use — not every construction site (a test, for one) needs them wired.
+	OnRepoRemoved func(id string)
+	OnRepoRenamed func(id, name string)
 }
 
 type CodeWorkspaceIDArgs struct {
@@ -169,6 +177,9 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 	if err != nil {
 		return model.CodeRepo{}, ipcerr.Internal(err.Error())
 	}
+	if s.OnRepoRenamed != nil {
+		s.OnRepoRenamed(args.ID, args.Name)
+	}
 	return rec, nil
 }
 
@@ -183,6 +194,9 @@ func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 		return ipcerr.Internal(err.Error())
 	}
 	s.Registry.Close(args.ID)
+	if s.OnRepoRemoved != nil {
+		s.OnRepoRemoved(args.ID)
+	}
 	return nil
 }
 
