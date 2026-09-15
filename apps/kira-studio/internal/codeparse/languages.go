@@ -44,6 +44,14 @@ const (
 	Svelte     ID = "svelte"
 )
 
+// KnownIDs returns every language ID this package knows about, in a stable (alphabetical, by its
+// own lowercase string value) order — the one vocabulary every caller that validates a
+// caller-supplied language string (repomap's locator, P69d §A.4 commit 4) reads from, rather than
+// hand-copying the twelve constants above.
+func KnownIDs() []ID {
+	return []ID{CSS, Go, HTML, Java, JavaScript, JSON, Python, Rust, Svelte, TSX, TypeScript, Vue}
+}
+
 // grammarCtor returns the raw grammar pointer a bindings/go package exposes. Kept private to this
 // file: sitter.NewLanguage(ptr) turns it into a *sitter.Language, itself never exported past this
 // package (§1.4 covers Tree/Node explicitly; Language gets the same treatment for the same reason

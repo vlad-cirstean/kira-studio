@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codegraph"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeparse"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/pathsafe"
 )
 
@@ -79,10 +80,51 @@ func absentFileReason(root, rel string) string {
 	return fmt.Sprintf("%s exists but is not indexed — its language is not one this index covers, or it is excluded — call search_files to see what is indexed", rel)
 }
 
+// knownLanguageVocabulary is normalizeLanguages' own caller-facing vocabulary text, built once from
+// codeparse.KnownIDs' own stable order rather than hand-copied.
+var knownLanguageVocabulary = func() string {
+	ids := codeparse.KnownIDs()
+	names := make([]string, len(ids))
+	for i, id := range ids {
+		names[i] = string(id)
+	}
+	return strings.Join(names, ", ")
+}()
+
+// normalizeLanguages lower-cases and trims each of languages and rejects any value outside
+// codeparse.KnownIDs' own vocabulary as a caller-correctable message — before this, an unrecognized
+// or miscased language (`"Go"`, `"GO"`, `"golang"`) silently matched nothing rather than erroring,
+// since codeindex's own SQL filter compares directly against the stored, always-lowercase value
+// (§A.2-d). A nil/empty languages is untouched: no filter, not an error.
+func normalizeLanguages(languages []string) ([]string, string) {
+	if len(languages) == 0 {
+		return nil, ""
+	}
+	known := make(map[string]bool, len(codeparse.KnownIDs()))
+	for _, id := range codeparse.KnownIDs() {
+		known[string(id)] = true
+	}
+	out := make([]string, len(languages))
+	for i, l := range languages {
+		norm := strings.ToLower(strings.TrimSpace(l))
+		if !known[norm] {
+			return nil, fmt.Sprintf("unknown language %q — languages must be one of: %s", l, knownLanguageVocabulary)
+		}
+		out[i] = norm
+	}
+	return out, ""
+}
+
 // locate resolves args into a codegraph.Query per §6.1's five rules. A returned error is a genuine
 // internal fault (a database error from the rule-4 symbol search); everything caller-correctable is
 // carried in locateResult.msg/ambiguous/empty instead.
 func locate(ctx context.Context, graph *codegraph.Graph, root string, args locateArgs) (locateResult, error) {
+	normalized, msg := normalizeLanguages(args.Languages)
+	if msg != "" {
+		return locateResult{msg: msg}, nil
+	}
+	args.Languages = normalized
+
 	switch {
 	case args.File != "":
 		rel, err := relFile(root, args.File)

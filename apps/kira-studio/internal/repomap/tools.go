@@ -166,7 +166,7 @@ func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in 
 type findReferencesArgs struct {
 	locatorFields
 	repoField
-	Mode              string   `json:"mode,omitempty" jsonschema:"'resolved' (default, precise — runs the resolver) or 'name_only' (cheaper, unresolved — every reference sharing the name, grep-shaped recall over precision)."`
+	Mode              string   `json:"mode,omitempty" jsonschema:"'resolved' (default, precise — runs the resolver) or 'nameOnly'/'name_only' (cheaper, unresolved — every reference sharing the name, grep-shaped recall over precision)."`
 	Kinds             []string `json:"kinds,omitempty" jsonschema:"Restrict to these reference kinds, e.g. call, import."`
 	IncludeDefinition bool     `json:"includeDefinition,omitempty" jsonschema:"Include the definition's own location as a Site alongside its uses."`
 	Limit             int      `json:"limit,omitempty" jsonschema:"Max references returned. Default 100, max 500."`
@@ -176,6 +176,24 @@ const (
 	findReferencesDefaultLimit = 100
 	findReferencesMaxLimit     = 500
 )
+
+// parseRefMode accepts an empty mode (default Resolved), "resolved", and both spellings of
+// NameOnly — the schema always documented "name_only" while the code only ever compared against
+// "nameOnly" (codegraph.NameOnly's own string value), so every unrecognized value including the
+// documented spelling silently fell back to Resolved instead of erroring (§A.2-f). Anything else is
+// now a caller-correctable rejection rather than a silent wrong mode.
+func parseRefMode(mode string) (codegraph.RefMode, bool) {
+	switch mode {
+	case "":
+		return codegraph.Resolved, true
+	case string(codegraph.Resolved):
+		return codegraph.Resolved, true
+	case string(codegraph.NameOnly), "name_only":
+		return codegraph.NameOnly, true
+	default:
+		return "", false
+	}
+}
 
 func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in findReferencesArgs) (*mcp.CallToolResult, any, error) {
 	inst, early := s.pick(in.Repo)
@@ -194,9 +212,9 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 		return early, nil, nil
 	}
 
-	mode := codegraph.Resolved
-	if in.Mode == string(codegraph.NameOnly) {
-		mode = codegraph.NameOnly
+	mode, ok := parseRefMode(in.Mode)
+	if !ok {
+		return errResult(fmt.Sprintf("unknown mode %q — mode must be one of: resolved, nameOnly (or name_only)", in.Mode))
 	}
 	limit := clamp(in.Limit, findReferencesDefaultLimit, findReferencesMaxLimit)
 
@@ -352,9 +370,16 @@ func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in s
 	if in.Query == "" {
 		return errResult("query is required")
 	}
+	// search_symbols has its own Languages field on the identical SymbolSearch path the locator's
+	// languages goes through — route it through the same normalizeLanguages rather than leaving one
+	// tool validating and its sibling silently case-sensitive (§A.4 commit 4).
+	languages, msg := normalizeLanguages(in.Languages)
+	if msg != "" {
+		return errResult(msg)
+	}
 	limit := clamp(in.Limit, searchSymbolsDefaultLimit, searchSymbolsMaxLimit)
 	targets, err := inst.graph.SearchSymbols(ctx, codegraph.SymbolSearch{
-		Text: in.Query, Substring: in.Substring, Kinds: in.Kinds, Languages: in.Languages,
+		Text: in.Query, Substring: in.Substring, Kinds: in.Kinds, Languages: languages,
 		PathPrefix: in.PathPrefix, Limit: limit,
 	})
 	if err != nil {
