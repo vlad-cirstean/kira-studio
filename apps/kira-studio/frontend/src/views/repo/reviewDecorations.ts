@@ -582,6 +582,9 @@ export function attachReviewDecorations(
       hunkCollection.clear();
       commentCollection.clear();
       addGlyphCollection.clear();
+      // 7d (P68 review): this module is what leases deps.transport (gitTransportFor, called once
+      // per mount by RepoDiffView.vue) — nothing else holds a reference to release it.
+      deps.transport.dispose();
     },
   };
 }

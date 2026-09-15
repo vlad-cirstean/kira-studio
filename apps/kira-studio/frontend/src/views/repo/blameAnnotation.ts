@@ -110,9 +110,15 @@ function revealBlameCommit(gitRepoId: string, sha: string): void {
   if (codeRepoId === undefined) return;
   const graphTabId = pinnedGraphTabId(codeRepoId);
   if (!graphTabId) return;
-  stashPendingBlameReveal(codeRepoId, { repoId: gitRepoId, sha });
+  const target = { repoId: gitRepoId, sha };
+  // Group 6 (P68 review): emit live FIRST and only stash when nothing was actually listening — the
+  // common case (the graph tab is already mounted, since it's pinned) delivers immediately here, so
+  // stashing unconditionally on top of that left a pending entry no mount ever consumed, surviving
+  // to replay a stale target on the graph tab's NEXT remount (takePendingBlameReveal's own doc
+  // comment promises that can't happen).
+  const consumed = emitUiAction(codeRepoId, { action: 'revealCommit', target });
+  if (!consumed) stashPendingBlameReveal(codeRepoId, target);
   activateTab(graphTabId);
-  emitUiAction(codeRepoId, { action: 'revealCommit', target: { repoId: gitRepoId, sha } });
 }
 
 /** Attaches the blame layer to an already-mounted, read-only file editor. Call once per mount
@@ -196,15 +202,25 @@ export function attachBlameAnnotation(
       cache.set(line, result);
       if (line === lastLine) paint(result);
     } catch {
-      cache.set(line, null);
+      // 5b: an ABORTED request (cancelPending's own inFlight.abort(), or a fresh resolveLine for a
+      // later line) is not a resolved miss — the cache's own doc comment says a cached `null` means
+      // exactly that (untracked path, line past EOF, a genuine RPC error), never "we didn't wait to
+      // find out". Caching it anyway combined with 5a's bug meant arrowing through lines faster than
+      // responses land accumulated permanently blame-less lines that never retried, even on revisit.
+      if (!controller.signal.aborted) cache.set(line, null);
       if (line === lastLine) paint(null);
     }
   }
 
   function refresh(): void {
-    cancelPending();
     const line = editor.getPosition()?.lineNumber;
+    // 5a: the `line === lastLine` early return must come BEFORE cancelPending — a same-line cursor
+    // move (a horizontal arrow key, a column click, a reveal-selection) used to cancel the request
+    // already running for THIS line before this check ever ran, and since lastLine already equalled
+    // line, nothing restarted it: no annotation ever appeared for that line. This file's own nearby
+    // comment already says the opposite is intended ("a horizontal cursor move must not re-fire").
     if (line === undefined || line === lastLine) return;
+    cancelPending();
     lastLine = line;
 
     const cached = cache.get(line);
@@ -259,6 +275,12 @@ export function attachBlameAnnotation(
       unsubscribeRepoChanged();
       revealAction.dispose();
       collection.clear();
+      // 7d: this module is what leases deps.transport (gitTransportFor, called once per mount by
+      // RepoFileView.vue's own syncBlameAnnotation) — nothing else holds a reference to release it,
+      // so releasing it here is the only place that ever happens. unsubscribeRepoChanged above
+      // already dropped this handle's own `on` subscription; dispose() only needs to release the
+      // lease itself now.
+      deps.transport.dispose();
     },
   };
 }

@@ -92,6 +92,9 @@ async function mount(): Promise<void> {
       errorMessage.value = 'This repository is not open.';
       return;
     }
+    // 7d (P68 review): this lease is only ever used for the two requests below, so it is released
+    // as soon as they settle rather than left to leak for the rest of the mount (unlike the
+    // review-decorations lease further down, which reviewDecorations.ts's own dispose() now owns).
     const transport = gitTransportFor(repoId);
     try {
       const [leftResult, rightResult] = await Promise.all([
@@ -103,6 +106,8 @@ async function mount(): Promise<void> {
       state.value = 'error';
       errorMessage.value = err instanceof Error ? err.message : String(err);
       return;
+    } finally {
+      transport.dispose();
     }
   }
 

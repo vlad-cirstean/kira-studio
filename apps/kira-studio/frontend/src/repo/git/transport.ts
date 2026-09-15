@@ -54,7 +54,10 @@ const LOCAL_EVENT_KEYS: ReadonlySet<EventKey> = new Set(['review.target', 'ui.ac
  *  transport (per repo workspace), matching `remote.on`'s own scoping. */
 function createLocalEmitter(): {
   on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void;
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void;
+  /** Returns whether any listener was actually registered for `method` — emitUiAction's own callers
+   *  (Group 6, P68 review) need to tell "delivered live" apart from "nothing was listening" to
+   *  decide whether a cold-mount stash is still needed. */
+  emit<K extends EventKey>(method: K, payload: EventPayload<K>): boolean;
 } {
   const handlersByMethod = new Map<EventKey, Set<(payload: unknown) => void>>();
   return {
@@ -71,7 +74,10 @@ function createLocalEmitter(): {
       };
     },
     emit(method, payload) {
-      for (const handler of handlersByMethod.get(method) ?? []) handler(payload);
+      const handlers = handlersByMethod.get(method);
+      if (!handlers || handlers.size === 0) return false;
+      for (const handler of handlers) handler(payload);
+      return true;
     },
   };
 }
@@ -120,12 +126,14 @@ const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
 // one that actually owns each repo workspace's local emitter — can be asked directly.
 const localEmittersByCodeRepoId = new Map<string, ReturnType<typeof createLocalEmitter>>();
 
-/** A no-op for a codeRepoId whose graph tab (and therefore transport) was never mounted — nothing
- *  is listening yet, the same "cold" outcome every other local-bus emission already tolerates
- *  (`review.open`'s own `emitLocal` call has the identical property while the review sidebar is
- *  unmounted). */
-export function emitUiAction(codeRepoId: string, payload: EventPayload<'ui.action'>): void {
-  localEmittersByCodeRepoId.get(codeRepoId)?.emit('ui.action', payload);
+/** A no-op (returning false) for a codeRepoId whose graph tab (and therefore transport) was never
+ *  mounted — nothing is listening yet, the same "cold" outcome every other local-bus emission
+ *  already tolerates (`review.open`'s own `emitLocal` call has the identical property while the
+ *  review sidebar is unmounted). Returns whether any listener actually consumed it, so a caller
+ *  (`blameAnnotation.ts`'s `revealBlameCommit`, Group 6) can fall back to a cold-mount stash only
+ *  when this was truly a no-op. */
+export function emitUiAction(codeRepoId: string, payload: EventPayload<'ui.action'>): boolean {
+  return localEmittersByCodeRepoId.get(codeRepoId)?.emit('ui.action', payload) ?? false;
 }
 
 function createNativeGitTransport(codeRepoId: string): Transport {
@@ -209,17 +217,28 @@ function createNativeGitTransport(codeRepoId: string): Transport {
 }
 
 /** An `AbortController` that aborts as soon as either input signal does. Not `AbortSignal.any` —
- *  this repo does not rely on it anywhere else, and this is the phase's only use. */
+ *  this repo does not rely on it anywhere else, and this is the phase's only use.
+ *
+ * 8c (P68 review): `{once:true}` alone only removes the listener on the signal that actually
+ * fired — `b`'s own long-lived signal is `leaseOf`'s `streams.signal`, which outlives this one
+ * `stream()` call for the whole mount, so its listener (closing over `controller`) leaked for the
+ * mount's own lifetime every time `a` (the caller's per-call signal) fired first, the normal case.
+ * `onAbort` now removes both listeners itself the first time either fires, so `once:true` is no
+ * longer needed on either registration. */
 function linkAbort(a: AbortSignal, b?: AbortSignal): AbortSignal {
   if (!b) return a;
   const controller = new AbortController();
-  const onAbort = () => controller.abort();
   if (a.aborted || b.aborted) {
     controller.abort();
-  } else {
-    a.addEventListener('abort', onAbort, { once: true });
-    b.addEventListener('abort', onAbort, { once: true });
+    return controller.signal;
   }
+  const onAbort = () => {
+    a.removeEventListener('abort', onAbort);
+    b.removeEventListener('abort', onAbort);
+    controller.abort();
+  };
+  a.addEventListener('abort', onAbort);
+  b.addEventListener('abort', onAbort);
   return controller.signal;
 }
 
