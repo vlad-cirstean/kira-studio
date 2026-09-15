@@ -48,7 +48,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
 | Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use. Not the only hand-written query text in the package any more: P64 (type aliases/enums/module consts, TypeScript/TSX) and P64b (package-level const/var for Go, module consts for JavaScript, a widened constant value list for TypeScript/TSX) each add their own repo-authored `p64[b]_declarations.scm` files beside `c2_implements.scm` — `queries.go`'s own `Provenance` table is the current, authoritative list of every repo-authored query file (§4.1's own "no hand-written queries" gets a narrow, named exception here, tracked there rather than re-counted in prose as the set keeps growing) |
 | MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
-| Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import list); `.json`/`.jsonc` reuse the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
+| Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). All 84 basic languages Monaco ships get a registered Monarch grammar as of P67c (`views/repo/monacoEntry.ts`'s own `register.all.js` import, up from 19); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
 | Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own three substring filters (`CommandPalette.vue`, the tree's own name filter, `search_files`'s SQL `LIKE`) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
 | Git graph in the native workspace (C10) | The four `packages/*` workspaces the VS Code extension already used — `@kira/git-ui`, `@kira/git-ipc`, `@kira/git-core`, `@kira/kira-ui` — added to `apps/kira-studio/frontend/package.json` as `workspace:*`, plus `seti-icons` (a `git-ui` dependency) | No reimplementation and no new runtime dependency of its own: `git-ui` publishes `main: ./src/index.ts` and compiles from source the same way `@shared` does, so there is no separate build step, but its `.vue` files now typecheck under `typecheck:web` too. Statically imported (`RepoGraphView.vue`), not behind a dynamic `import()` boundary — the graph is the pinned first tab of every repo workspace, not an occasional feature — so its cost lands in the eager `index-*.js`/`index-*.css` bundle rather than a lazy chunk: measured (`bun run build`, this phase's own before/after), **+507 KB raw / +159 KB gzip** JS and **+72 KB raw / +11 KB gzip** CSS, plus one new `layout.worker-*.js` chunk (5 KB raw, git-ui's own graph lane-layout worker, loaded as a Worker script the same way `editor.worker` already is, so it carries no separate gzip line). The `monacoEntry-*.js` chunk (C5/C6) is untouched — Monaco's own dynamic-import boundary is unaffected. See "Git graph in the native workspace (C10)" below |
 
@@ -1099,15 +1099,42 @@ the nav-level reason (a repository is an instance inside the Git module, not a s
 - **Monaco (`monaco-editor`, viewer-only) renders the file** — see the Stack table's own row above
   for the package-layout correction this phase found (no `edcore.main.js` in the pinned version;
   `monaco-editor/features/register.all.js` is its real equivalent) and the measured chunk size.
-  Nineteen languages get a registered Monarch grammar (`views/repo/monacoEntry.ts`'s own import
-  list: typescript, javascript, java, python, go, rust, html, css, scss, less, markdown, yaml, xml,
-  shell, sql, dockerfile, ini, graphql, protobuf); `.json`/`.jsonc` reuse the JavaScript grammar
-  (Monaco ships no JSON basic-language in this version either — its JSON coloring lives inside the
-  excluded JSON language *service*); `.vue`/`.svelte` color as plain HTML (no Monaco grammar exists
-  for either, so a `<script>` block colors as HTML text, not TypeScript — Known open items, below).
+  **P67c widened this from 19 registered languages to all 84 Monaco ships** —
+  `views/repo/monacoEntry.ts` imports upstream's own `languages/definitions/register.all.js` bundle
+  instead of 19 individual `register.js` imports (measured: ~12 KB raw / ~3 KB gzip added to the
+  chunk — each grammar body still stays behind its own lazy `loader: () => import(...)`, so nothing
+  extra loads eagerly), and `views/repo/language.ts`'s extension table was rebuilt against every
+  `register.js`'s own `extensions` list rather than memory. **`.json`/`.jsonc` no longer reuse the
+  JavaScript grammar** — that Monarch has one generic `string` rule, so a `package.json`'s keys and
+  values painted the same color; `.json`/`.jsonc` now register against Monaco's own worker-free
+  tokenizer (`languages/features/json/tokenization.js`, a real `TokensProvider` whose only
+  dependency is the bundled jsonc-parser scanner — no `jsonMode`, no `workerManager`, no
+  `json.worker`), which tells `string.key.json` apart from `string.value.json`. **A TypeScript/
+  JavaScript decorator (`@Component`) no longer paints red** — 0.56.0's shared JS/TS Monarch
+  tokenizer has no rule for `@` at all (not in `common`, not in the `symbols` regex), so it fell
+  through to `defaultToken: "invalid"`; `views/repo/monarch/decorators.ts`'s `withDecorators()`
+  shallow-clones that shared tokenizer object (mutating in place would edit a module-level export
+  both languages reference) and prepends one rule emitting an `annotation` token, the same scope
+  Java's own grammar already uses for `@Override`. `.vue`/`.svelte` still color as plain HTML (no
+  Monaco grammar exists for either, so a `<script>` block colors as HTML text, not TypeScript —
+  Known open items, below) and `toml` still colors via the `ini` grammar (no TOML grammar ships).
   Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`) — never a language-
   service worker, which is what actually disables IntelliSense/diagnostics rather than merely
   hiding its UI.
+- **P67c also re-themed the menu/suggest/list/find/peek widgets and fixed the overflow container's
+  own missing palette.** `editor/monaco.ts#overflowWidgetsContainer()` (the shared `document.body`
+  node every `MonacoHost.vue` reparents its hover/suggest/parameter-hint widgets into) now also
+  carries the `monaco-editor` class — Monaco scopes every `--vscode-*` custom property it defines to
+  `.monaco-editor, .monaco-diff-editor, .monaco-component` (`standaloneThemeService.js`), so a plain
+  `document.body` child carried none of them at all, matching upstream's own convention for the
+  multi-diff editor's own overflow node. `editor/monacoTheme.ts#defineKiraTheme` grew from ~16
+  `colors` keys to ~46 — `menu.*`, the rest of `editorSuggestWidget.*`, `list.*`, `dropdown.*`,
+  `input.*`, `widget.border`/`.shadow`, `scrollbarSlider.*`, `peekView*`, `editor.findMatch*` and
+  `textLink.*` — so the context menu and the rest of these widgets stop falling back to `vs-dark`'s
+  own hardcoded literals. `editor/monaco.ts#normalizeColor` gained an `rgba()`-to-`#RRGGBBAA`
+  branch for this: `editor.defineTheme`'s `colors` values go through `Color.fromHex`, which accepts
+  only hex forms and returns *red*, not an error, on anything else, and a translucent token
+  (`--kira-scrollbar`, `--kira-search-match`) normalizes to `rgba(...)` before this branch existed.
 **Diff tabs and navigation (C6): a real index per open repository, go-to-definition/hover, and a
 worktree-vs-HEAD diff tab — still entirely read-only.**
 
@@ -1245,6 +1272,43 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   it; the diff editor runs it against `getModifiedEditor()` specifically, since
   `IStandaloneDiffEditor` itself has no `getAction` and the worktree pane is the one whose content
   matches the file on disk.
+
+**Markdown reading view (P67c): a Source/Reading toggle on a markdown file, opt-in and per tab.**
+
+- **Only a true `markdown` file grows the toggle** (`views/repo/language.ts`'s `monacoLanguageFor`
+  returning `'markdown'` — `.md`/`.markdown`/`.mdown`/… but never `.mdx`, which colors as its own
+  Monaco language). Every other file type is byte-identical to before this phase — no wrapper
+  element, no toolbar.
+- **Opens on Source, like every other file type** — a reading view is opt-in, not a default flip
+  for markdown specifically. The choice persists per tab via `repoFileTabStateSchema`'s
+  `markdownReading` field (`.default(false)`, following `revealLine`'s own discipline so a tab saved
+  before this field existed still restores).
+- **The Monaco container uses `v-show`, never `v-if`, on toggle** — `v-if` would dispose and
+  recreate the editor widget, losing scroll position/selection/find state on every round trip;
+  `automaticLayout: true` re-measures off a `ResizeObserver`, which does fire when `v-show` restores
+  the container's size, so the toggle needs no `editor.layout()` call of its own (one is still made,
+  belt-and-braces, on the transition back to Source).
+- **`markdown-it` (MIT, pinned 15.0.2, npm), dynamically imported** (`views/repo/markdownReading.ts`)
+  — never in the boot bundle, and never even fetched by a session that opens no markdown file.
+  Chosen over `marked` specifically for its default `html: false`, which **escapes** raw HTML in the
+  source rather than passing it through — this view renders a file straight off disk inside the
+  app's own privileged WKWebView, so that default removes the need for a second dependency (a
+  DOMPurify-style sanitizer) entirely. `linkify: true`/`typographer: false`/`breaks: false` round out
+  the options object; do not flip `html` to `true`.
+- **Every anchor click in the reading pane is neutered.** There is no back button in this webview —
+  an accidental navigation would strand the user with no way home short of a restart. The click
+  handler calls `preventDefault()` unconditionally; a same-page `#anchor` link still scrolls to its
+  heading (`markdownReading.ts`'s own `heading_open` renderer override assigns each heading a
+  GitHub-style slug id, numbered on collision), anything else is left inert with its target
+  surfaced through the link's own `title` attribute (a `link_open` renderer override) instead of
+  ever being followed. **Opening an external link is explicitly out of scope** — `internal/bridge/
+  update.go`'s `OpenReleasePage()` is nullary specifically because `OpenURL` (`pkg/application`)
+  validates nothing at all, and a markdown file's own link is exactly as untrusted as any other
+  renderer-supplied string; reversing that needs its own vetted bridge method (a scheme allow-list
+  at minimum), not a sub-feature of a reading view.
+- **No syntax highlighting inside a fenced code block** — `markdown-it`'s `highlight` hook plus
+  Monaco's `editor.colorize()` would do it, but `colorize` is async per block and this is a reading
+  view, not a second editor; a fenced block renders as themed monospace instead.
 
 **Quick open (C9): ⌘P, fuzzy file finder, renderer-side matching over C5's own tree listing.**
 
@@ -3121,6 +3185,16 @@ the host's own theme. `theme/vscode-bridge.css` defines those names from Kira's 
 tokens (several of which are themselves already a direct port of the identical VS Code workbench
 colour id), additive and with zero changes to `git-ui`'s own token layer.
 
+**Checkboxes (P67c).** The 14 raw `<input type="checkbox">` elements across 9 dialogs
+(RepoSettingsDialog, StashDialog, TagDialog, BranchDialog, RevertDialog, WorktreeDialog,
+CherryPickDialog, ForcePushDialog, ResetDialog) had no checkbox CSS anywhere in this package —
+each drew the platform's own native widget. `theme/app-shell.css` (the package's one
+document-level stylesheet) gained one rule scoped to `.kv-mount-root input[type="checkbox"]`, in
+`--kv-*`/`--vscode-*` vocabulary (never `--kira-*` — this package also renders inside the VS Code
+extension host), visually matching the host app's own `.p-check` primitive: 14px box, 3px radius,
+`appearance: none`, the already-imported codicon font's own `\eab2` glyph as a `::after`
+pseudo-element for the check mark. No markup change across the 9 dialogs.
+
 ### Code review, ported natively (C11)
 
 C10's native graph left the review sidebar out — `review.open` had no native surface and
@@ -3581,18 +3655,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   exists for either, so a `<script>` block's contents color as HTML text, not as TypeScript/
   JavaScript — the alternative is a hand-written SFC Monarch grammar, which `CLAUDE.md`'s
   library-reuse-first rule declines.
-- **The suggest widget and marker-hover widget's own packaged background/border colours don't
-  apply once reparented to the shared overflow container** (P60b dogfooding, `editor/MonacoHost.vue`
-  §4.8). `editor/monacoTheme.ts`'s `editorSuggestWidget.background`/`.border` entries resolve
-  correctly and the CSS custom property they back is confirmed present at the reparented widget's
-  own location — but a direct `document.styleSheets` scan at render time found zero loaded rules
-  setting a background for `.suggest-widget` at all in this app's Vite/ESM bundling of
-  `monaco-editor`, so `getComputedStyle` reads transparent regardless. Purely cosmetic (both
-  widgets are fully interactive, and the gap is invisible against this app's own uniformly dark
-  chrome) — for now, `tests/ui/autocomplete.spec.ts`'s own D8 test asserts font consistency
-  instead of the chrome-colour match it used to. Root-causing which of Monaco's own packaged
-  stylesheets should be loading this rule, and isn't, is a real follow-up, not chased inside P60b
-  (a language-service phase, not an asset-pipeline one).
+- **`vscode-bridge.css`'s `:root`-scoped `--vscode-*` tokens tie with Monaco's own
+  `.monaco-editor, .monaco-diff-editor, .monaco-component` scope on specificity** (P67c §3.3).
+  `theme/vscode-bridge.css` declares ~35 `--vscode-*` names at bare `:root` (0,1,0 specificity) so
+  `packages/git-ui` renders in Kira's palette; that is the same specificity as Monaco's own
+  `standaloneThemeService.js`-generated rule, so only document order decides a tie, and Monaco's
+  stylesheet (created and appended to `document.head` at runtime) currently wins. Benign today:
+  P67c's own `defineKiraTheme` extension means both sides resolve every overlapping name from the
+  same `--kira-*` token, so a future order flip would be cosmetically harmless — but restructuring
+  `vscode-bridge.css` off `:root` is its own `packages/git-ui` contract change, not attempted here.
 - **A repository open in the native workspace while the embedded repo-map MCP server serves the
   same repository parses every saved file twice** (C6 §3.1). Two independent `codeindex.Index`
   instances in one process, each with its own watcher, each reacting to the identical file-save
