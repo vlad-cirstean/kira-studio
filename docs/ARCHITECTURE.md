@@ -3672,6 +3672,21 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   assembled from stored rows at all, let alone compared against an interface's. A data limit, not
   an effort estimate: closing it needs a receiver-capturing query and a schema column, not more
   resolver logic.
+- **Every parse leaks one `go-pointer` registry entry** (P69d). `go-tree-sitter@v0.25.0`'s
+  `ParseWithOptions` saves its `*ParseOptions` into `mattn/go-pointer`'s package-global map
+  (`parser.go:350`, and `:477`/`:548`/`:631`/`query.go:788`) with no matching `Unref` anywhere in
+  the package — an upstream bug, and v0.25.0 is the newest published version, so there is nothing
+  to upgrade to. `codeparse.Session` passes options on every parse (it is the only mid-parse
+  cancellation mechanism the library offers that does not SIGSEGV), so each parse permanently
+  retains one `C.malloc(1)` and one map entry: measured **75.6 B of Go heap and 239 B of RSS per
+  parse**, ≈ 0.43 MiB of RSS for one full index of this repository's 1,878 files, growing across
+  re-indexes for a process's lifetime. Not fixable in our own code: `pointer.Save` mints a fresh
+  key per call regardless of the value, so reusing one pooled `ParseOptions` still leaks one entry
+  per parse (measured 43.7 B/parse, 42% less and still unbounded) while forcing a rewrite of the
+  per-parse cancellation handoff P69c had just stabilised. Passing no options at all removes the
+  leak entirely and removes mid-parse cancellation with it. Closing this needs the upstream
+  one-line fix — `ParseCtx` is already marked for removal in 0.26, so that file is in flux — or
+  vendoring tree-sitter's whole C runtime, which `CLAUDE.md`'s library-reuse rule declines.
 - **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
   open and on an explicit Refresh action only — a file created, deleted or modified outside the app
   is not reflected until one of those happens. `codeindex`'s own worktree watcher covers only
