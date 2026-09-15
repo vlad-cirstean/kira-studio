@@ -46,7 +46,7 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.5/` today) needs an
+- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.6/` today) needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -87,10 +87,11 @@ duplicated here; this file only points at them.
   half-implemented.
 - **Reach for an existing, well-maintained library before hand-rolling non-trivial infrastructure**
   — a parser, a virtualizer, a positioning engine, retry/backoff, and similar. This repo already
-  relies on CodeMirror, zod, sql-formatter and SlickGrid rather than reimplementing them. A
+  relies on Monaco, zod, sql-formatter and SlickGrid rather than reimplementing them. A
   hand-rolled version earns its keep only against a real requirement no library meets (e.g.
-  spelling-preserving timestamp re-encoding) — name that requirement when declining a library, not
-  just that existing code already works.
+  spelling-preserving timestamp re-encoding, or the parse tree P60b's SQL tokenizer replaced after
+  the library carrying it was removed app-wide) — name that requirement when declining a library,
+  not just that existing code already works.
 - **Only fully open-source libraries** — no community edition of a dual-licensed product, no
   non-commercial-only tier, no functionality gated behind a paid/Enterprise tier. Check the license
   at the package level *and* for the specific feature used, not just the headline badge (AG Grid
@@ -165,14 +166,17 @@ Headless setup, for a session with no GUI:
    it, since the next steps need the same shell. It serves this worktree's root.
    `bun run mcp:repo-map --repo <path>` serves another checkout instead.
 3. `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
-   "Authorization: Bearer <token>"` — the command it prints on startup. **In an agent-harness
+   "Authorization: Bearer <token>"` — the command it prints on startup; use the host and port from
+   that printed banner, not this literal — 8765 is only the first choice, and a second concurrent
+   instance lands on an OS-assigned ephemeral port. **In an agent-harness
    session (this one, and every subagent spawned in it) this registers but never actually surfaces
    the eight tools** — the tool manifest here is fixed when the session starts, not read from MCP
    config at runtime, confirmed by checking a genuinely fresh sibling session: it saw zero MCP
    servers configured, not just this one missing. Run the command anyway (`claude mcp list` then
    reports "✓ Connected", useful as a smoke check the server itself is healthy) but don't expect
    `ToolSearch` or a native `mcp__kira-repo-map__*` tool call to work.
-4. **Call it over plain HTTP/JSON-RPC instead** — the actual working path in this harness:
+4. **Call it over plain HTTP/JSON-RPC instead** — the actual working path in this harness. Same
+   banner-port caveat as step 3 — `8765` below is illustrative, not a constant:
    ```
    curl -s http://127.0.0.1:8765/mcp -H "Authorization: Bearer <token>" \
      -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
@@ -194,9 +198,9 @@ note instead of a command; an already-registered client keeps working. To mint a
 that repository's `mcp-repo-map-*-token.json` and restart the server.
 
 **Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.6/`
-today). Trivial (config, registration,
-wiring): fix inline, log one line. Non-trivial (wrong result, missing tool, crash): log a full entry
-and fix nothing in that phase — the next phase waits for a dedicated fix pass to close it.
+today). Trivial (config, registration, wiring): fix inline, log one line. Non-trivial (wrong
+result, missing tool, crash): log a full entry and fix nothing in that phase — the next phase
+waits for a dedicated fix pass to close it.
 
 Development use only. The shipped end-user surface — the Settings dialog's Code intelligence tab —
 is product, not process; `docs/ARCHITECTURE.md` describes it and how the server works,
