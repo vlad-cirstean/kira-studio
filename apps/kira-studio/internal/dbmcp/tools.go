@@ -134,8 +134,12 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		maxRows = runQueryMaxMaxRows
 	}
 
-	if _, err := s.connectForQuery(args.ConnectionID); err != nil {
+	state, err := s.connectForQuery(args.ConnectionID)
+	if err != nil {
 		return toolError(err)
+	}
+	if state.Status != "connected" {
+		return errResult(connectStateError(state))
 	}
 
 	resp, err := s.cfg.Query.Execute(ctx, adapterhost.ExecuteRequestWire{

@@ -45,8 +45,25 @@ func capsOf(state model.ConnectionState) (adapters.Caps, bool) {
 // connectForQuery connects connectionID on demand — run_query's own §6.3 rule. Exposing a
 // connection to MCP (resolveEnabled's own gate) is the human's explicit, per-connection consent;
 // Connect is the same deduplicated path the UI uses, so the connection visibly comes up in the app
-// rather than opening invisibly. A failure is returned as-is, not retried — its own error state
-// text is what the caller sees.
+// rather than opening invisibly. Already-connected is left alone: Connect's own semantics tear a
+// live connection down and rebuild it unconditionally, so calling it on every run_query would churn
+// the adapter, drop its cached metadata and re-run the pre-connect script on every already-open
+// connection. A failure is returned as-is, not retried — its own error state text is what the
+// caller sees (connectStateError below).
 func (s *Server) connectForQuery(connectionID string) (model.ConnectionState, error) {
+	if state := s.cfg.Conns.StateOf(connectionID); state.Status == "connected" {
+		return state, nil
+	}
 	return s.cfg.Conns.Connect(connectionID)
+}
+
+// connectStateError formats a non-connected ConnectionState as run_query's connect-failure text
+// (§6.3): doConnect encodes a failed connect as a state with err == nil, so the caller must read
+// the state's own Status/Error rather than falling through to Execute and getting a generic
+// dispatcher error instead of the connection's real failure reason.
+func connectStateError(state model.ConnectionState) string {
+	if state.Error != nil && *state.Error != "" {
+		return fmt.Sprintf("connect failed (%s): %s", state.Status, *state.Error)
+	}
+	return fmt.Sprintf("connect failed: %s", state.Status)
 }

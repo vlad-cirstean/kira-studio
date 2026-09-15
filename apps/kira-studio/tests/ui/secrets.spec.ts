@@ -103,6 +103,7 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
     preconnectSidecar: false,
     autoExplain: false,
     throttlePerSec: 0,
+    mcpEnabled: false,
   });
 
   const { window: page } = await relaunch({

@@ -143,6 +143,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   repoMapRegenerate: 'RepoMapService.Regenerate',
   repoMapInstallClaudeCode: 'RepoMapService.InstallClaudeCode',
 
+  dbMcpStatus: 'DbMcpService.Status',
+  dbMcpSetEnabled: 'DbMcpService.SetEnabled',
+  dbMcpRegenerate: 'DbMcpService.Regenerate',
+  dbMcpInstallClaudeCode: 'DbMcpService.InstallClaudeCode',
+
   updateStatus: 'UpdateService.Status',
   updateOpenReleasePage: 'UpdateService.OpenReleasePage',
 
@@ -313,6 +318,18 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     probed: [],
     error: '',
     repos: [],
+  }),
+  // M1 §6.2: hydrateDbMcp() joins the same unconditional-every-boot Promise.all as
+  // gitVsixStatus/repoMapStatus above, same reasoning — nothing in tests/ui/ seeds a dbmcp
+  // fixture, so "off, nothing running" is the honest default for a dev-server run under
+  // Playwright.
+  [IPC.dbMcpStatus]: JSON.stringify({
+    running: false,
+    command: '',
+    claudeAvailable: false,
+    probed: [],
+    expiresAt: '',
+    error: '',
   }),
   // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
   // no-committed-fixture-will-ever-snapshot-this reasoning as gitVsixStatus/repoMapStatus above.
