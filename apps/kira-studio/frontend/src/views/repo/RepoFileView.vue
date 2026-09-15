@@ -234,8 +234,11 @@ async function mount(): Promise<void> {
   // into a nested closure — re-binding to a fresh `const` gives it a plain `string` type of its
   // own, captured below with no cast needed.
   const workspaceCodeRepoId: string = repoId;
+  // `blame.line` always blames the working tree (contract.ts:1718) — a revision-pinned tab shows
+  // different bytes, so its line numbers do not correspond.
+  const blameable = gitRepoId !== undefined && rev === null;
   function syncBlameAnnotation(): void {
-    if (settingsState.appearance.inlineBlame && gitRepoId) {
+    if (settingsState.appearance.inlineBlame && blameable && gitRepoId) {
       if (!blameHandle) {
         blameHandle = attachBlameAnnotation(mod, editor, {
           transport: gitTransportFor(workspaceCodeRepoId),
