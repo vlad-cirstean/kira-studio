@@ -135,6 +135,42 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   describes — two rows, the real server process and the invoking shell. No new information; killed
   correctly by PID.
 
+- **M5 (planning) — M1c reconfirmed on live, real usage, not just a synthetic query**: `find_references`
+  on `McpAutoExplain` correctly found its one real read site (`dbmcp/tools.go:195`), cross-checked
+  against `Grep` to confirm no other occurrence was missed. Fourth confirmation the fix holds.
+
+- **M5 (planning) — `find_implementations` still rejects a `limit` argument**, third consecutive
+  phase to hit this (first logged M2, reconfirmed M3/M4/M5). Trivial, one wasted round trip each
+  time. Worth its own small consistency pass across the eight tools' argument surfaces at some
+  point — not urgent enough to gate a phase, but recurring often enough to flag plainly here.
+
+- **M5 (planning) — `.vue` may no longer be a dead zone for repo-map, contradicting a claim
+  M1ab's own phase selection relied on.**
+
+  - **Found in**: M5 (planning)
+  - **Status**: Open, but **does not gate M5's implementation** — this log's own gating rule exists
+    for a wrong result, a missing tool, or a crash; this is the opposite (a capability working
+    better than documented), so there is nothing broken to fix before building on top of it. Needs
+    direct confirmation at a convenient point (M6/M7's review scope is a natural fit), not a
+    dedicated pass first.
+  - **Query/tool call**: `search_symbols`, `read_symbol`, `outline_file` against `.vue` SFCs
+    (`cellFormatter` and its surrounding grid display code) during M5's own navigation.
+  - **Expected, per the standing assumption**: zero results against a `.vue` file, per v1.6's
+    P60a/P63/P67e entries and per `docs/v1.7/SPEC.md`'s own Sequencing paragraph, which names this
+    exact "confirmed dead zone" as the reason M1 (not any other phase) was chosen as the M1ab A/B
+    candidate — a real result would have undercut that choice's isolation logic.
+  - **Actual**: all three tools returned real, useful results against `.vue` SFCs — `read_symbol`
+    returned `cellFormatter`'s full body with its comment block; the whole grid-display seam for
+    M5's own planning was traced through repo-map instead of reading ~3,300 lines by hand.
+  - **Fix**: none attempted — this may not be a defect to fix at all, but a capability that
+    genuinely improved (candidate causes named, not confirmed: P67f's read-reference work, or
+    M1c's `extractionVersion` 3→4 full reindex). Needs a direct, deliberate re-test against the
+    same P60a/P63/P67e cases that established the original "dead zone" finding, to confirm whether
+    it's now closed chapter-wide or was specific to this one file/query shape. Until then, treat
+    `.vue` support as "worth trying," not "known to fail" — but don't retroactively treat M1ab's own
+    candidate-selection reasoning as wrong; it was accurate against the evidence available at the
+    time.
+
 <!--
 Entry template:
 
