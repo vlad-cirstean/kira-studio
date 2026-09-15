@@ -51,6 +51,15 @@ func TestClassifySQL(t *testing.T) {
 		{"explain analyze select is a read", "EXPLAIN ANALYZE SELECT * FROM t", adapters.ClassRead},
 		{"explain analyze create is ddl", "EXPLAIN ANALYZE CREATE TABLE t (id int)", adapters.ClassDDL},
 
+		// M6 finding #2 (high): Postgres's parenthesised EXPLAIN option-list form must also be
+		// recognized as running the target statement when ANALYZE is one of the options — the
+		// token right after EXPLAIN there is "(ANALYZE)"/"(ANALYZE,", never bare "ANALYZE".
+		{"explain parenthesized analyze delete is a write", "EXPLAIN (ANALYZE, BUFFERS) DELETE FROM users", adapters.ClassWrite},
+		{"explain parenthesized bare analyze delete is a write", "EXPLAIN (ANALYZE) DELETE FROM users", adapters.ClassWrite},
+		{"explain parenthesized analyze select is a read", "EXPLAIN (ANALYZE) SELECT * FROM t", adapters.ClassRead},
+		{"explain parenthesized options without analyze is read", "EXPLAIN (BUFFERS, COSTS FALSE) DELETE FROM users", adapters.ClassRead},
+		{"explain unbalanced parenthesized options is unknown", "EXPLAIN (ANALYZE DELETE FROM users", adapters.ClassUnknown},
+
 		{"insert writes", "INSERT INTO t VALUES (1)", adapters.ClassWrite},
 		{"update writes", "UPDATE t SET x = 1", adapters.ClassWrite},
 		{"delete writes", "DELETE FROM t", adapters.ClassWrite},

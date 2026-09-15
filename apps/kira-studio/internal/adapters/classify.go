@@ -68,6 +68,48 @@ func isSQLWordBoundary(r rune) bool {
 	return !(r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'))
 }
 
+// explainAnalyzeTarget inspects the (already comment/semicolon-stripped) text following the
+// EXPLAIN keyword and reports whether ANALYZE was requested — either the bare `EXPLAIN ANALYZE
+// ...` form or Postgres's parenthesised option-list form, `EXPLAIN (ANALYZE) ...` / `EXPLAIN
+// (ANALYZE, BUFFERS) ...` — since either genuinely executes the target statement, unlike a plain
+// EXPLAIN (finding #2, M6: the parenthesised form was previously missed entirely, since the token
+// right after EXPLAIN there is `(ANALYZE)`/`(ANALYZE,`, never exactly "ANALYZE"). target is what
+// remains to classify when hasAnalyze is true. ok is false only when rest opens with `(` but the
+// option list never balances — the caller must not default to ClassRead over text it can't parse,
+// since an unparseable option list might be hiding ANALYZE inside it.
+func explainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool) {
+	if strings.HasPrefix(rest, "(") {
+		r := []rune(rest)
+		depth := 0
+		end := -1
+		for i, ch := range r {
+			switch ch {
+			case '(':
+				depth++
+			case ')':
+				depth--
+				if depth == 0 {
+					end = i
+				}
+			}
+			if end >= 0 {
+				break
+			}
+		}
+		if end < 0 {
+			return false, "", false
+		}
+		options := string(r[1:end])
+		target = strings.TrimSpace(string(r[end+1:]))
+		return sqlWordBoundaryContainsAny(options, map[string]bool{"ANALYZE": true}), target, true
+	}
+	fields := strings.Fields(rest)
+	if len(fields) > 0 && strings.EqualFold(fields[0], "ANALYZE") {
+		return true, strings.TrimSpace(rest[len(fields[0]):]), true
+	}
+	return false, rest, true
+}
+
 // ClassifySQL classifies statement by its leading keyword over comment-stripped text. It is
 // leading-keyword classification, not a parser — see the package doc note on OpClass for what
 // that does and does not guarantee.
@@ -114,10 +156,16 @@ func ClassifySQL(statement string) OpClass {
 		return ClassRead
 	case keyword == "EXPLAIN":
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
-		restFields := strings.Fields(rest)
-		if len(restFields) > 0 && strings.EqualFold(restFields[0], "ANALYZE") {
-			// EXPLAIN ANALYZE genuinely runs the statement — classify what follows.
-			return ClassifySQL(strings.TrimSpace(rest[len(restFields[0]):]))
+		hasAnalyze, target, ok := explainAnalyzeTarget(rest)
+		if !ok {
+			// A leading parenthesised option list this scanner can't balance might be hiding
+			// ANALYZE inside it — never assume ClassRead over an option list it can't parse.
+			return ClassUnknown
+		}
+		if hasAnalyze {
+			// EXPLAIN ANALYZE (bare or Postgres's `EXPLAIN (ANALYZE, ...)` form) genuinely runs
+			// the statement — classify what follows.
+			return ClassifySQL(target)
 		}
 		return ClassRead
 	case sqlWriteKeywords[keyword]:
