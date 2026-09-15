@@ -95,6 +95,9 @@ var allowedMethods = map[string]struct{}{
 	"stash.list": {}, "stash.show": {}, "globalStash.list": {},
 	"undo.peek": {}, "search.run": {},
 	"commit.resolvePr": {}, "branch.resolvePr": {},
+	// pr.browserUrl: a plain read (P74 §3.3) — composes and re-validates a PR's URL for the host's
+	// own browser-open path, same shape as commit.resolvePr/branch.resolvePr just above.
+	"pr.browserUrl": {},
 	"worktree.list": {}, "stack.list": {},
 	// repoSettings.set: §4.4 says it only ever writes Kira's own SQLite, never the repository — true,
 	// but two of its patch fields are write-only surface this stream must still refuse at the FIELD
