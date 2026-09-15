@@ -168,6 +168,42 @@ leftover found on independent review — two comments in `mask.go`/migration `00
 removed `id` kind — fixed in a follow-up commit (`4aba9458`) rather than editing the landed commits.
 
 | **M6 Code review, round 1** | Three parallel Opus subagents, one per dimension — architecture/security, functional correctness, performance/resource efficiency — findings-only, per `CLAUDE.md`'s own process. Scope is wider than a normal round, by explicit instruction: this chapter's own diff (M1ab, M2-M5) as the primary target, **plus a dedicated pass over v1.6's diff** (`origin/main`..v1.6's tip — P60-P70's actual changes), plus anything else either reviewer notices while in adjacent code. One sequential Sonnet subagent then fixes every finding judged real | After M1ab, M2-M5 land: a review needs a finished tree, and the v1.6-focused half needs v1.6 fully landed (already true) |
+**M6 result**: three parallel Opus reviewers converged on 19 real findings (2 found independently by
+two reviewers each, folded to one item apiece); one further finding — the correlation tag's
+chosen-plaintext oracle (an AI client can inject a literal value to learn its tag, then invert other
+tags on the connection) — was carved out **by explicit instruction**: not a defect under this app's
+actual threat model (accidental-leakage prevention, not adversarial-exfiltration resistance), so
+documented only (`docs/ARCHITECTURE.md`'s Known open items), never fixed. One sequential Sonnet
+subagent fixed the other 19 and landed 19 commits (`accaadf8`..`67b21707`), most severe first: a
+**critical** permission-gate bypass (`StripSQLComments` was quote-unaware, so a comment marker
+inside a string literal swallowed a real embedded `;`, letting a smuggled DDL/write statement
+execute under `deny` via Postgres's simple-query protocol — now quote/dollar-quote-aware, ported
+from `sql-lex.ts`); a **high** EXPLAIN misclassification (Postgres's parenthesised `EXPLAIN
+(ANALYZE, ...)` form wasn't recognized, so a real DELETE classified as a read); a masking bypass via
+column aliasing/expressions (an aliased or transformed masked column matched no rule by exact name,
+returning the real value — now refused rather than silently unmasked); a masked-value leak through
+verbatim adapter error text (a type-cast error embeds the literal it failed on); plus 15 further
+functional/performance fixes (approval-dialog truncation, duplicate-connection mask-rule copying,
+stale grid preview, header-menu pending-changes bypass, `Stricter()` kind-ordering, a Redis
+glob-escape panic, empty-string preview divergence, `run_query` silently dropping extra-statement
+pages, a bearer-token argv-exposure item documented as an open item (no env/stdin alternative in the
+installed `claude` CLI), Go/TS masking parity gaps, an `sql-lex.ts` span-end clamp, and four
+performance fixes — `Intl.Segmenter`/mask-preview memoization, dbmcp shutdown ordering, HMAC
+key-import caching, and a 1Hz timer that ran for the app's lifetime instead of only while a dialog
+was open). Two bugs beyond the 19 named findings surfaced and were fixed as part of the same
+commits that touched their code: `dataSourceState`'s cell extractor used the always-on mask
+transform instead of the preview-gated one, and the approval/pairing dialogs' deny-button
+autofocus only ever worked on the very first app-lifetime render. Independently re-verified (not
+just the subagent's own report): `go build/vet` clean; targeted `-race` runs of every touched
+package (`mask`, `dbmcp`, `bridge`, `connections`, `storage`, `adapters/redis`) green; the two most
+severe findings' exact repro payloads (`SELECT '/*' AS a; CREATE TABLE pwned(x int)` →
+`ClassUnknown`, `EXPLAIN (ANALYZE, BUFFERS) DELETE FROM users` → `ClassWrite`) reproduced directly
+against `ClassifySQL`, both correct; `bun typecheck`/`lint` clean; `bun run test:unit` 1435/0; full
+`tests/ui/` suite 274/274. The two claimed non-regressions were independently confirmed, not taken
+on faith: `internal/ipcfixture`'s failure reproduces identically at the pre-fix commit and matches
+`docs/ARCHITECTURE.md`'s already-documented staleness entry; `internal/gitsock`'s timeout occurred
+only under full-suite `-race` resource contention and passed cleanly in isolation, in a package none
+of the 19 fixes touch.
 | **M7 Code review, round 2** | The same three-dimension cycle, run again in full — against the tree M6's fixes leave, plus the same wider v1.6-focused scope, re-read fresh rather than trusting M6's summary — per `CLAUDE.md`'s "repeat the whole loop" rule. A round finding nothing real says so rather than manufacturing a finding | After M6's fixes land |
 | **M8 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's new subsystem — a second MCP server, its permissions/anonymization/Faker model, and its Settings-dialog toggle — the same "read the current tree, don't trust prose" bar v1.6's own P70 used | Last of all: needs both review rounds' fixes landed first |
 
