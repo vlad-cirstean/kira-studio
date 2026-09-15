@@ -3703,6 +3703,19 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   Closing it needs running the suite's own regeneration path (extend, per `CLAUDE.md`'s own P25/P26
   guidance) against a current schema.
 
+- **M5's correlation tag doesn't verify a masked value's provenance** (M6 round 1, architecture/
+  functional-correctness findings). The tag lets an AI client tell two masked cells apart or match
+  them (same real value → same tag) without seeing the real value — but it's computed from whatever
+  text lands in a result column matching a masked column's name, with no check that the value
+  actually came from a real table row. A query like `SELECT 'Maria Gonzalez' AS name` gets tagged
+  the same as a real row holding that name, so a client that deliberately probes with guessed values
+  can build a tag-to-value lookup table. **Accepted, not a defect to fix**: this app's threat model
+  for masking is accidental exposure to an AI client, not an adversarial client trying to exfiltrate
+  data on purpose — by explicit decision. Fixing it for real would need per-adapter SQL parsing to
+  confirm a column is a genuine table reference rather than a literal/expression, which is out of
+  proportion to a threat this app doesn't defend against. Noted here so a future review doesn't
+  re-flag it as new.
+
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
   `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets
