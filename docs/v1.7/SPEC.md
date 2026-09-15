@@ -97,6 +97,39 @@ to only what M1-M5 touch.
 | **M7 Code review, round 2** | The same three-dimension cycle, run again in full — against the tree M6's fixes leave, plus the same wider v1.6-focused scope, re-read fresh rather than trusting M6's summary — per `CLAUDE.md`'s "repeat the whole loop" rule. A round finding nothing real says so rather than manufacturing a finding | After M6's fixes land |
 | **M8 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's new subsystem — a second MCP server, its permissions/anonymization/Faker model, and its Settings-dialog toggle — the same "read the current tree, don't trust prose" bar v1.6's own P70 used | Last of all: needs both review rounds' fixes landed first |
 
+## M1ab result
+
+Both arms implemented to real shipping quality from commit `b46eac88`, verified independently
+(re-run, not trusted from either arm's self-report).
+
+**Tokens/tool calls** (arm A = with repo-map MCP, arm B = without, Grep/Read only):
+
+| | Arm A | Arm B |
+|---|---|---|
+| Tokens | 516,104 | 451,263 |
+| Tool calls | 339 | 332 |
+| Wall clock | ~49 min | ~43 min |
+
+The MCP-assisted arm used more tokens and more tool calls, not fewer. Repo-map saved specific
+whole-file reads (`outline_file` on `page/builder.go` avoided ~10 unneeded `read_symbol` calls;
+`read_symbol` sized `dbmcp`'s consumer interfaces without reading `tree.Service`'s 300 lines) but
+that didn't net an overall efficiency win on this phase. Recorded plainly since it cuts against the
+working assumption that repo-map saves tokens on backend-heavy work — continuing v1.6 P65's own
+practice of reporting the number whether or not it favors the tool.
+
+**Quality**: independent review found both arms fully implemented the plan's §7 file list, both
+pass `go build/vet/test` and `bun typecheck/lint/build`, both include the `MkdirAll` fix (§2.6), no
+stubs or shortcuts in either. Each had one real defect: arm A's `run_query` forced a full
+reconnect (live adapter torn down, cache dropped, pre-connect script re-run) on every call, even to
+an already-connected connection, and didn't surface a failed connect's own error text; two
+Playwright fixtures (`preconnect.spec.ts`, `secrets.spec.ts`) also missed the new `mcpEnabled`
+field. Arm B never hydrated `settingsState.dbMcp` from persisted settings, so the Database MCP
+panel — including Regenerate — reads as disabled and hidden after every app restart, even when the
+server is actually running.
+
+**Outcome**: arm A lands as M1's real deliverable, per this row's design, once its three defects are
+fixed (fix commit(s) noted here after merge). Arm B discarded after comparison.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
