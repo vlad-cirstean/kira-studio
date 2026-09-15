@@ -40,6 +40,8 @@ export const CHANNEL = {
   // C7 D7: a repository-wide search's coalesced file groups, delivered via EmitTo (one window
   // only) — grpcCall's own shape, restated for a payload that shares no field with it.
   codeSearch: 'kira:code:search',
+  // M2 §7.1: the prompt-mode approval queue's live snapshot — gitPairing's own shape.
+  dbMcpApproval: 'kira:dbmcp:approval',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

@@ -26,7 +26,7 @@ import type {
   ConnectionSummary,
 } from '@shared/domain/connection';
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
-import type { DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
+import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type {
   GitClient,
@@ -316,6 +316,14 @@ const studioControl = {
     unwrap(DbMcpService.Regenerate()).then((r) => trust<DbMcpStatus>(r)),
   dbMcpInstallClaudeCode: (): Promise<DbMcpInstallResult> =>
     unwrap(DbMcpService.InstallClaudeCode()).then((r) => trust<DbMcpInstallResult>(r)),
+  dbMcpPendingApprovals: (): Promise<DbMcpApprovalSnapshot> =>
+    unwrap(DbMcpService.PendingApprovals()).then((r) => trust<DbMcpApprovalSnapshot>(r)),
+  dbMcpApproveQuery: (requestId: string): Promise<DbMcpApprovalSnapshot> =>
+    unwrap(DbMcpService.ApproveQuery({ requestId })).then((r) => trust<DbMcpApprovalSnapshot>(r)),
+  dbMcpDenyQuery: (requestId: string): Promise<DbMcpApprovalSnapshot> =>
+    unwrap(DbMcpService.DenyQuery({ requestId })).then((r) => trust<DbMcpApprovalSnapshot>(r)),
+  onDbMcpApprovalChanged: (cb: (snap: DbMcpApprovalSnapshot) => void): (() => void) =>
+    on(CHANNEL.dbMcpApproval, cb),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

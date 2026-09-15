@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ConnectionKind } from '@shared/domain/connection';
+import type { ConnectionKind, McpPermissionMode } from '@shared/domain/connection';
 import {
   AWS_STYLE_KINDS,
   CONNECTION_THROTTLE_RANGE,
@@ -23,6 +23,7 @@ import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
+import SegmentedControl from '../theme/primitives/SegmentedControl.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
 
@@ -70,6 +71,19 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
 ]);
 const kinds = connectionKindSchema.options;
 
+// M2 §7.2: the MCP tab's three permission rows, one SegmentedControl per class — mcpModeOptions(x)
+// builds each row's own per-button testids (connection-mcp-<class>-<mode>) under the row's own
+// data-testid (connection-mcp-<class>) prefix.
+function mcpModeOptions(
+  cls: 'read' | 'write' | 'ddl',
+): readonly { value: McpPermissionMode; label: string; testid: string }[] {
+  return [
+    { value: 'deny', label: 'Deny', testid: `connection-mcp-${cls}-deny` },
+    { value: 'allow', label: 'Allow', testid: `connection-mcp-${cls}-allow` },
+    { value: 'prompt', label: 'Ask me', testid: `connection-mcp-${cls}-prompt` },
+  ];
+}
+
 const draft = computed(() => connectionsState.dialog.draft);
 const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
 // P25 D8: reported once at startup (state/connections.ts's hydrateConnections()), never changes
@@ -86,7 +100,7 @@ const engineSearch = ref('');
 
 // P28 §4.2: step 2's own tab strip — General/Advanced/Pre-connect. Reset to 'General' whenever
 // step 2 is (re-)entered so "Change engine → back" never lands on a stale tab.
-type DetailTab = 'General' | 'Advanced' | 'Pre-connect';
+type DetailTab = 'General' | 'Advanced' | 'Pre-connect' | 'MCP';
 const activeTab = ref<DetailTab>('General');
 watch(step, (s) => {
   if (s === 'details') activeTab.value = 'General';
@@ -286,6 +300,7 @@ const TAB_FOR_FIELD: Record<string, DetailTab> = {
   uri: 'General',
   preconnect: 'Pre-connect',
   throttlePerSec: 'Advanced',
+  mcpDescription: 'MCP',
 };
 
 async function onSave(): Promise<void> {
@@ -504,6 +519,17 @@ const preconnectText = computed({
             >
               Pre-connect
             </button>
+            <button
+              type="button"
+              class="p-tab"
+              role="tab"
+              :class="{ 'is-active': activeTab === 'MCP' }"
+              :aria-selected="activeTab === 'MCP'"
+              data-testid="connection-tab-mcp"
+              @click="activeTab = 'MCP'"
+            >
+              MCP
+            </button>
           </nav>
 
           <div v-if="activeTab === 'General'" class="tab-pane" role="tabpanel">
@@ -711,7 +737,7 @@ const preconnectText = computed({
           </div>
           </div>
 
-          <div v-else class="tab-pane" role="tabpanel">
+          <div v-else-if="activeTab === 'Pre-connect'" class="tab-pane" role="tabpanel">
           <div class="field">
             <label>Pre-connect command <span class="dim">— optional</span></label>
             <textarea
@@ -742,6 +768,70 @@ const preconnectText = computed({
               script.
             </span>
           </label>
+          </div>
+
+          <div v-else class="tab-pane" role="tabpanel">
+          <label class="field checkbox">
+            <Checkbox v-model="draft.mcpEnabled" data-testid="connection-mcp-enabled" />
+            <span>Expose to the database MCP server</span>
+            <span class="helper-text">
+              Nothing is exposed by default. The same switch lives in Settings' Database MCP
+              section — either one toggles the other.
+            </span>
+          </label>
+
+          <div class="field">
+            <label>Description <span class="dim">— what this database is for</span></label>
+            <textarea
+              v-model="draft.mcpDescription"
+              class="p-textarea mono"
+              rows="3"
+              maxlength="1000"
+              :disabled="!draft.mcpEnabled"
+              data-testid="connection-mcp-description"
+              @keydown="wrapSelectionOnType"
+            />
+            <span v-if="fieldErrors.mcpDescription" class="field-error">{{ fieldErrors.mcpDescription }}</span>
+            <span v-else class="helper-text">
+              An AI client reads this verbatim as connection metadata — never interpreted by this
+              app.
+            </span>
+          </div>
+
+          <div class="field">
+            <label>Read <span class="dim">— SELECT and its engine equivalents</span></label>
+            <SegmentedControl
+              v-model="draft.mcpReadMode"
+              :options="mcpModeOptions('read')"
+              :disabled="!draft.mcpEnabled"
+              data-testid="connection-mcp-read"
+            />
+          </div>
+          <div class="field">
+            <label>Write <span class="dim">— INSERT/UPDATE/DELETE and equivalents</span></label>
+            <SegmentedControl
+              v-model="draft.mcpWriteMode"
+              :options="mcpModeOptions('write')"
+              :disabled="!draft.mcpEnabled"
+              data-testid="connection-mcp-write"
+            />
+          </div>
+          <div class="field">
+            <label>DDL <span class="dim">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></label>
+            <SegmentedControl
+              v-model="draft.mcpDdlMode"
+              :options="mcpModeOptions('ddl')"
+              :disabled="!draft.mcpEnabled"
+              data-testid="connection-mcp-ddl"
+            />
+          </div>
+          <span class="helper-text">
+            A statement this app cannot classify is treated as whichever of the three is strictest.
+          </span>
+          <p class="helper-text">
+            These govern the MCP server only. The Read-only flag on the Advanced tab is what
+            governs this app's own console.
+          </p>
           </div>
 
           <span

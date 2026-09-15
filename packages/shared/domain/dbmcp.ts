@@ -24,3 +24,24 @@ export const dbMcpInstallResultSchema = /*#__PURE__*/ z.object({
   probed: z.array(z.string()),
 });
 export type DbMcpInstallResult = z.infer<typeof dbMcpInstallResultSchema>;
+
+// M2 §5/§7.1: the prompt-mode approval queue — bridge/dbmcp.go's DbMcpApprovalRequest/
+// DbMcpApprovalSnapshot, gitPairingRequestSchema/gitPairingSnapshotSchema's own shape. statement
+// is capped at 4000 (rune-safe) characters on the wire; truncated says whether it was cut.
+export const dbMcpApprovalSchema = /*#__PURE__*/ z.object({
+  requestId: z.string(),
+  connectionId: z.string(),
+  connectionName: z.string(),
+  kind: z.string(),
+  class: /*#__PURE__*/ z.enum(['read', 'write', 'ddl', 'unknown']),
+  statement: z.string(),
+  truncated: z.boolean(),
+  expiresAtMs: z.number(),
+});
+export type DbMcpApproval = z.infer<typeof dbMcpApprovalSchema>;
+
+export const dbMcpApprovalSnapshotSchema = /*#__PURE__*/ z.object({
+  pending: dbMcpApprovalSchema.nullable(),
+  queued: z.number(),
+});
+export type DbMcpApprovalSnapshot = z.infer<typeof dbMcpApprovalSnapshotSchema>;

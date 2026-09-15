@@ -7,8 +7,12 @@ withDefaults(
     modelValue: T;
     options: readonly { value: T; label: string; title?: string; testid?: string }[];
     size?: 'sm' | 'md';
+    // M2 §7.2: the MCP tab's three permission rows disable (not hide) while mcpEnabled is false —
+    // real disabled buttons, unlike a passed-through `disabled` attr (which would land on this
+    // component's root div and do nothing, since a plain <div> has no such semantics).
+    disabled?: boolean;
   }>(),
-  { size: 'sm' },
+  { size: 'sm', disabled: false },
 );
 
 defineEmits<{ 'update:modelValue': [value: T] }>();
@@ -21,6 +25,7 @@ defineEmits<{ 'update:modelValue': [value: T] }>();
       :key="opt.value"
       type="button"
       :class="{ on: opt.value === modelValue }"
+      :disabled="disabled"
       v-tooltip="opt.title"
       :data-testid="opt.testid"
       @click="$emit('update:modelValue', opt.value)"

@@ -71,6 +71,11 @@ export const CONNECTION_COLOR_CHOICES: readonly ConnectionColor[] = PALETTE_COLO
 export const connectionModeSchema = /*#__PURE__*/ z.enum(['fields', 'uri']);
 export type ConnectionMode = z.infer<typeof connectionModeSchema>;
 
+// M2: a connection's per-operation MCP permission — deny/allow/prompt, mirroring the Go side's
+// model.ValidMcpPermissionMode.
+export const mcpPermissionModeSchema = /*#__PURE__*/ z.enum(['deny', 'allow', 'prompt']);
+export type McpPermissionMode = z.infer<typeof mcpPermissionModeSchema>;
+
 // The plain object shape, with no refinement — kept separate so both connectionInputSchema
 // (which adds the fields/uri superRefine below) and connectionSummarySchema (which cannot
 // .omit() from a refined schema) can each build off it independently.
@@ -116,6 +121,16 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // stored row has no such key. A first-class column, not an options_json key — the migration's
   // own comment carries the full argument (an access grant must not be settable by pasting a URI).
   mcpEnabled: z.boolean().default(false),
+  // M2: free-text "what this DB is for", passed to an AI client as connection metadata
+  // (list_connections). Never interpreted by this app.
+  mcpDescription: z.string().max(1000).default(''),
+  // M2: per-operation MCP permission, one of deny/allow/prompt. `.default` is load-bearing the
+  // same way mcpEnabled's is — an older stored row has no such key. Defaults tighten what M1
+  // shipped (an exposed connection could previously be written to): read allow, write prompt, DDL
+  // deny.
+  mcpReadMode: mcpPermissionModeSchema.default('allow'),
+  mcpWriteMode: mcpPermissionModeSchema.default('prompt'),
+  mcpDdlMode: mcpPermissionModeSchema.default('deny'),
 });
 
 // SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes

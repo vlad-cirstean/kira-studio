@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ConnectionSummary } from '@shared/domain/connection';
 import {
   CACHE_L2_BUDGET_MB_RANGE,
   defaultSettings,
@@ -331,11 +332,17 @@ const dbMcpInstallMessage = computed(() => {
 
 const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpState.status.expiresAt));
 
-// §6.1: deny by default, edited here rather than in ConnectionDialog.vue — P67d's own shape for
-// the same problem on the repo-map side, and it keeps this phase's entire allow-list inside one
-// template block in this one file.
+// M1 §6.1: exposure itself (deny by default) stays an instant toggle here, P67d's own shape for
+// the same problem on the repo-map side. M2 §7.3: the three permission modes and the description
+// are edited in the connection's own MCP tab, not here — this list stays a read-only glance plus
+// the one control it already had.
 async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promise<void> {
   await setConnectionMcpEnabled(id, enabled);
+}
+
+// M2 §7.3: the row's own description glance — first line only, "" when unset.
+function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
+  return conn.mcpDescription.split('\n', 1)[0] ?? '';
 }
 
 const fontFamilyUnavailable = computed(() => !fontStackAvailable(draft.appearance.fontFamily));
@@ -1182,19 +1189,40 @@ async function onSave(): Promise<void> {
               Deny by default — only connections checked here are visible to an AI client through
               this server.
             </p>
-            <label
-              v-for="conn in connectionsState.records"
-              :key="conn.id"
-              class="field checkbox"
+            <p class="muted-note">
+              A newly exposed connection defaults to read allow, write prompt, DDL deny — this
+              migration tightened what an already-exposed connection allowed too. Edit a
+              connection's own three modes and description in its MCP tab.
+            </p>
+            <ul
+              v-if="connectionsState.records.length"
+              class="db-mcp-connections-list"
+              data-testid="db-mcp-connections-list"
             >
-              <Checkbox
-                :model-value="conn.mcpEnabled"
-                :data-testid="`db-mcp-connection-${conn.id}`"
-                @update:model-value="(v: boolean) => onToggleConnectionMcpEnabled(conn.id, v)"
-              />
-              <span>{{ conn.name }}</span>
-            </label>
-            <p v-if="connectionsState.records.length === 0" class="muted-note">
+              <li
+                v-for="conn in connectionsState.records"
+                :key="conn.id"
+                class="db-mcp-connection-row"
+                :data-testid="`db-mcp-connection-row-${conn.id}`"
+              >
+                <div class="db-mcp-connection-info">
+                  <span class="db-mcp-connection-name">{{ conn.name }}</span>
+                  <span class="helper-text"
+                    >read {{ conn.mcpReadMode }} · write {{ conn.mcpWriteMode }} · DDL
+                    {{ conn.mcpDdlMode }}</span
+                  >
+                  <span v-if="mcpDescriptionFirstLine(conn)" class="helper-text">{{
+                    mcpDescriptionFirstLine(conn)
+                  }}</span>
+                </div>
+                <Checkbox
+                  :model-value="conn.mcpEnabled"
+                  :data-testid="`db-mcp-connection-${conn.id}`"
+                  @update:model-value="(v: boolean) => onToggleConnectionMcpEnabled(conn.id, v)"
+                />
+              </li>
+            </ul>
+            <p v-else class="muted-note" data-testid="db-mcp-connections-empty">
               No connections yet — add one first.
             </p>
           </template>
@@ -1549,6 +1577,39 @@ async function onSave(): Promise<void> {
 }
 
 .repomap-repo-name {
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  overflow-wrap: break-word;
+}
+
+/* M2 §7.3: the "Exposed connections" list's own per-row glance — repomap-repo-row's own shape. */
+.db-mcp-connections-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.db-mcp-connection-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+}
+
+.db-mcp-connection-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+  min-width: 0;
+}
+
+.db-mcp-connection-name {
   color: var(--kira-fg);
   font-size: var(--kira-t-sm);
   overflow-wrap: break-word;

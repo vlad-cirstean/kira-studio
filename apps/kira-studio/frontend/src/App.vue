@@ -22,6 +22,7 @@ import { activateNextTab, activatePrevTab, closeTab } from './state/tabs';
 import AppTooltip from './workbench/AppTooltip.vue';
 import ConfirmDialog from './workbench/ConfirmDialog.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
+import DbMcpApprovalDialog from './workbench/DbMcpApprovalDialog.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
@@ -92,6 +93,7 @@ onUnmounted(() => {
   <UploadObjectDialog v-if="uploadDialogState.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <GitPairingDialog />
+  <DbMcpApprovalDialog />
   <GitCredentialDialog />
   <ConfirmDialog />
   <ContextMenu />

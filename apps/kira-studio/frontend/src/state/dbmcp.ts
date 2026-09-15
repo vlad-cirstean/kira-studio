@@ -1,4 +1,4 @@
-import type { DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
+import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { settingsState } from './settings';
@@ -17,10 +17,41 @@ const DEFAULT_STATUS: DbMcpStatus = {
 export const dbMcpState = reactive({
   status: DEFAULT_STATUS as DbMcpStatus,
   installResult: null as DbMcpInstallResult | null,
+  // M2 §5: the prompt-mode approval queue — state/gitClients.ts's own pending/queued shape,
+  // applied to run_query's approval broker instead of git pairing.
+  approval: { pending: null, queued: 0 } as DbMcpApprovalSnapshot,
 });
 
 export async function hydrateDbMcp(): Promise<void> {
   dbMcpState.status = await control.dbMcpStatus();
+}
+
+function applyApprovalSnapshot(snap: DbMcpApprovalSnapshot): void {
+  dbMcpState.approval.pending = snap.pending;
+  dbMcpState.approval.queued = snap.queued;
+}
+
+let unsubscribeApproval: (() => void) | null = null;
+
+// M2 §5.3: PendingApprovals() is what implements "held with no Kira Studio window open yet" from
+// the renderer's side, gitPairingPending's own precedent — the request already exists server-side;
+// this is only the first render of it.
+export async function hydrateDbMcpApprovals(): Promise<void> {
+  applyApprovalSnapshot(await control.dbMcpPendingApprovals());
+  unsubscribeApproval?.();
+  unsubscribeApproval = control.onDbMcpApprovalChanged(applyApprovalSnapshot);
+}
+
+// approveQuery/denyQuery apply the returned snapshot directly (bridge/dbmcp.go's own contract: the
+// current snapshot, not an action-result enum) so the clicking window updates immediately, without
+// waiting for its own broadcast to arrive — the broadcast still arrives and reapplies the same
+// value, a harmless no-op.
+export async function approveQuery(requestId: string): Promise<void> {
+  applyApprovalSnapshot(await control.dbMcpApproveQuery(requestId));
+}
+
+export async function denyQuery(requestId: string): Promise<void> {
+  applyApprovalSnapshot(await control.dbMcpDenyQuery(requestId));
 }
 
 // repomap.ts's own D7/§7.1 rationale applies verbatim: the toggle applies immediately, bypassing

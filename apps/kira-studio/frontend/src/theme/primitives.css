@@ -486,6 +486,10 @@
   background: var(--kira-bg-input);
   color: var(--kira-fg);
 }
+.p-seg > *:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
 
 /* ---------- P7 tab ---------- */
 .p-tab {
