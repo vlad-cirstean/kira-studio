@@ -321,7 +321,58 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   checked against a grep — no misses, no false positives. No new finding, trivial or otherwise; the
   split package resolves and navigates correctly.
 
+- **P69 (code review, round 2, dimension 3)**: same stale-token pattern as every entry above —
+  killed the prior server by PID, deleted `/root/.kira-studio/mcp-repo-map-*-token.json`, restarted
+  to mint a fresh bearer token, called it over plain HTTP/JSON-RPC. Index confirmed warm and current
+  throughout: `list_repos` returned the one attached repository ready, `outline_file` on
+  `internal/repomap/server.go` listed all 11 declarations at their exact current lines (including
+  this chapter's own new ones), `search_symbols {"query":"readyTimeout"}` resolved to
+  `server.go:30:5`, and `find_references {"symbol":"runInitialSync"}` returned its one real call
+  site (`attach.go:122`). One new non-trivial finding, below.
+
 ### Non-trivial
+
+- **P69 (code review, round 2) — `find_references` still returns nothing for a package-level
+  constant read as a plain identifier operand (call argument, comparison, arithmetic). Open.**
+
+  A narrower survivor of the P67e entry below, which `ddd15b00`/`0bfef238` closed only for `range`
+  clauses and index expressions. `queries/go/p67f_reads.scm` captures exactly two patterns —
+  `(range_clause right: (identifier))` and `(index_expression operand: (identifier))` — and
+  `queries/javascript/p67f_reads.scm` the `for_in_statement`/`subscript_expression` equivalents.
+  An identifier read in argument or operand position is captured by neither, and the vendored
+  `go/tags.scm` captures a reference only in a `call_expression`'s function position or as a
+  `type_identifier`. Reproduced on six names, three Go files plus one TypeScript module, all on the
+  warm index described in the Log entry above — every one returned `no references found`:
+
+  - `readyTimeout` (`internal/repomap/server.go:30`), read at `instance.go:117`
+    (`time.After(readyTimeout)`), `:125`, `:138` and `:182`.
+  - `syncLockPollInterval` (`internal/codeindex/synclock_unix.go:39`), read at `:65`
+    (`time.Sleep(syncLockPollInterval)`).
+  - `watchDebounce` (`internal/codeindex/watch.go:21`), read at `:100`
+    (`time.NewTimer(watchDebounce)`).
+  - `maxFileBytes` (`internal/codeindex/sync.go:20`), read at `:441` (`make([]byte,
+    maxFileBytes+1)`) and `:448` (`len(buf) > maxFileBytes`).
+  - `sourceLineMaxBytes` (`internal/repomap/source.go:20`), read at `source.go:85`, `:86`, `:158`
+    and `:159`.
+  - `PREVIEW_ROW_LIMIT` (`frontend/src/views/grid/fkPreview.ts:35`), read at `:83`
+    (`Math.min(page.rowCount, PREVIEW_ROW_LIMIT)`) and `:94`.
+
+  `find_definition` and `search_symbols` resolve every one of these names correctly, so this is a
+  reference-capture gap, not a symbol-table or sync-timing one. Impact is the same silent-wrong-
+  answer shape P67e logged: "where is this bound actually applied?" is exactly the question a
+  timeout/limit constant invites, and the answer comes back a confident "nowhere". Argument and
+  operand position is also the commonest way a constant is read at all, so the remaining gap is
+  wider than the two shapes already fixed.
+
+  Not fixed here, per the process above — this round reports findings only. Fix shape: add an
+  `(argument_list (identifier) @name @reference.read)` capture plus binary/comparison operand
+  captures to `queries/go/p67f_reads.scm`, and the `arguments`/`binary_expression` equivalents to
+  `queries/javascript/p67f_reads.scm`, bumping `extractionVersion` to force the rebuild. Measure the
+  new row count against P67f's own stop gate before shipping: a bare-identifier capture is far
+  broader than `range`/index, so local variables and parameters will dominate it — P67f's JS/TS pass
+  added 1617 `read` rows, and this one plausibly adds an order of magnitude more, which is a real
+  index-size and insert-throughput question (`insertRef` is already 80% of the write phase, P64c
+  §1.4) rather than a free win.
 
 - **P67e (implementation) — `find_references` returns nothing for a package-level variable that is
   only ever read via `range` or an index expression (`x[k]`), never called. Fixed (`ddd15b00`,
