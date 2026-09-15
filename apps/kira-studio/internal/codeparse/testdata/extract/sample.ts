@@ -83,3 +83,50 @@ function p69bHelperReads(): void {
   const cmp = p69bLeft < p69bRight;
   p69bConsume(p69bObj.val);
 }
+
+// M1c: interface/type-literal/class member fields, and non-call member reads (docs/v1.7/plans/
+// M1c-repomap-struct-field-fix.md §2.2/§2.4/§4.3). Fixture names prefixed m1c per the fixture's own
+// rule above.
+interface M1cInterface {
+  m1cPropA: number;
+  m1cPropB: string;
+}
+
+type M1cTypeLiteral = {
+  m1cLiteralProp: number;
+};
+
+declare const m1cIfaceVal: M1cInterface;
+declare const m1cLiteralVal: M1cTypeLiteral;
+
+class M1cClass {
+  m1cField = 1;
+  #m1cPrivate = 2;
+
+  m1cMethod(): number {
+    return this.m1cField;
+  }
+
+  // A `#private` field is deliberately not captured (§2.2): neither this declaration nor this read
+  // earns a "field" row.
+  m1cReadPrivate(): number {
+    return this.#m1cPrivate;
+  }
+}
+
+const m1cInstance = new M1cClass();
+
+function m1cHelperReads(): void {
+  const a = m1cIfaceVal.m1cPropA;
+  const b = m1cIfaceVal.m1cPropB;
+  const c = m1cLiteralVal.m1cLiteralProp;
+  const d = m1cInstance.m1cField;
+  m1cInstance.m1cMethod(); // called: one "call" row, no duplicate "field" row (§2.6)
+  const f = m1cInstance.m1cMethod; // method value, not called: one "field" row
+  m1cInstance.m1cReadPrivate();
+  void a;
+  void b;
+  void c;
+  void d;
+  void f;
+}

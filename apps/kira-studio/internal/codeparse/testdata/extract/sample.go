@@ -91,3 +91,37 @@ func p69bHelperReads(buf []byte) {
 	p69bConsume(p67fSampleContainerVal.items)
 	_ = buf[:p69bArg]
 }
+
+// M1c: struct field declarations and non-call selector reads (docs/v1.7/plans/
+// M1c-repomap-struct-field-fix.md §2.1/§4.2). Fixture names prefixed m1c per the fixture's own rule
+// above — this fixture is indexed alongside the rest of the repository by the live MCP server, and
+// a colliding name would make find_references ambiguous.
+type m1cStruct struct {
+	M1cExported   int
+	m1cUnexported int
+}
+
+func (s m1cStruct) M1cMethod() int { return s.M1cExported }
+
+var m1cStructVal m1cStruct
+
+// M1c: exercises the new "field" symbol/reference rows, §2.6's call-duplicate suppression (a called
+// selector earns only "call", not "call" + "field"), and §8.1's declined composite-literal-key case
+// (a keyed field in T{Field: value} is not a selector_expression, so it earns no "field" row).
+func m1cHelperReads() {
+	_ = m1cStructVal.M1cExported
+	_ = m1cStructVal.m1cUnexported
+	_ = m1cStructVal.M1cMethod() // called: one "call" row, no duplicate "field" row
+	f := m1cStructVal.M1cMethod  // method value, not called: one "field" row
+	_ = f
+	_ = m1cStruct{M1cExported: 1} // keyed composite literal: no "field" reference row (§8.1)
+}
+
+// M1c: an anonymous, function-local struct — the source_file anchor (§2.1) must exclude its field
+// from the symbol table.
+func m1cAnonStruct() {
+	type m1cLocalStruct struct {
+		X int
+	}
+	_ = m1cLocalStruct{X: 1}
+}

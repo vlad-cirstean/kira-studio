@@ -70,3 +70,23 @@ function p69bHelperReads() {
   const cmp = p69bLeft < p69bRight;
   p69bConsume(p69bObj.val);
 }
+
+// M1c: class field declarations and non-call member reads (docs/v1.7/plans/
+// M1c-repomap-struct-field-fix.md §2.3/§2.4/§4.3). Fixture names prefixed m1c per the fixture's own
+// rule above.
+class M1cClass {
+  m1cField = 1;
+
+  m1cMethod() {
+    return this.m1cField;
+  }
+}
+
+const m1cInstance = new M1cClass();
+
+function m1cHelperReads() {
+  const a = m1cInstance.m1cField;
+  m1cInstance.m1cMethod(); // called: one "call" row, no duplicate "field" row (§2.6)
+  const f = m1cInstance.m1cMethod; // method value, not called: one "field" row
+  return [a, f];
+}

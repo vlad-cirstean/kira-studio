@@ -101,6 +101,14 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"constant", "p69bObj", -1},
 				{"function", "p69bConsume", -1},
 				{"function", "p69bHelperReads", -1},
+				// M1c (docs/v1.7/plans/M1c-repomap-struct-field-fix.md §2.3/§2.4/§4.3): a class
+				// field declaration, a read of it, and a called selector (one "call" row, no
+				// duplicate "field" row, §2.6) plus a method value (one "field" row).
+				{"class", "M1cClass", -1},
+				{"field", "m1cField", 18},
+				{"method", "m1cMethod", 18},
+				{"constant", "m1cInstance", -1},
+				{"function", "m1cHelperReads", -1},
 			},
 			// P69b adds the new "arguments"/"binary_expression" read patterns (docs/v1.6/plans/
 			// P69b-repo-map-bare-identifier-reads.md §4.1/§6.2): the two pre-existing fixture
@@ -129,6 +137,18 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"read", "p69bLeft"},
 				{"read", "p69bRight"},
 				{"call", "p69bConsume"},
+				// M1c: p69bObj.val (the existing "non-identifier call argument" line above) now also
+				// earns a "field" reference — a member_expression call argument matches
+				// m1c_member_reads.scm same as any other. Then the dedicated M1c block: the class
+				// body's own selector read (this.m1cField), the `new M1cClass()` "class" reference,
+				// the instance read, the called selector's single "call" row, and the method value's
+				// own "field" row.
+				{"field", "val"},
+				{"field", "m1cField"},
+				{"class", "M1cClass"},
+				{"field", "m1cField"},
+				{"call", "m1cMethod"},
+				{"field", "m1cMethod"},
 			},
 		},
 		{
@@ -183,6 +203,22 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"constant", "p69bObj", -1},
 				{"function", "p69bConsume", -1},
 				{"function", "p69bHelperReads", -1},
+				// M1c (docs/v1.7/plans/M1c-repomap-struct-field-fix.md §2.2/§2.4/§4.3): an interface
+				// with two properties, a type-literal with one, and a class with a public field and a
+				// `#private` one (the private field earns neither a symbol nor a reference row —
+				// it's a private_property_identifier, a different node kind m1c_members.scm does not
+				// match, and so is every read of it).
+				{"interface", "M1cInterface", -1},
+				{"field", "m1cPropA", 23},
+				{"field", "m1cPropB", 23},
+				{"type", "M1cTypeLiteral", -1},
+				{"field", "m1cLiteralProp", 26},
+				{"class", "M1cClass", -1},
+				{"field", "m1cField", 28},
+				{"method", "m1cMethod", 28},
+				{"method", "m1cReadPrivate", 28},
+				{"constant", "m1cInstance", -1},
+				{"function", "m1cHelperReads", -1},
 			},
 			// P69b: same incidental-row growth as sample.js above ("name" from helper2(name)'s
 			// call argument and from "hi " + name's binary operand), plus the same dedicated
@@ -210,6 +246,25 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"read", "p69bLeft"},
 				{"read", "p69bRight"},
 				{"call", "p69bConsume"},
+				// M1c: p69bObj.val (the existing "non-identifier call argument" line above) now also
+				// earns a "field" reference, same as sample.js. Then the dedicated M1c block: the two
+				// `declare const` type annotations, the class body's own selector read
+				// (this.m1cField), the `new M1cClass()` "class" reference, the interface/type-literal
+				// property reads, the instance field read, the called selector's single "call" row
+				// (no duplicate "field" row, §2.6), the method value's own "field" row, and the
+				// `#private` read's plain "call" row with no "field" row at either end.
+				{"field", "val"},
+				{"type", "M1cInterface"},
+				{"type", "M1cTypeLiteral"},
+				{"field", "m1cField"},
+				{"class", "M1cClass"},
+				{"field", "m1cPropA"},
+				{"field", "m1cPropB"},
+				{"field", "m1cLiteralProp"},
+				{"field", "m1cField"},
+				{"call", "m1cMethod"},
+				{"field", "m1cMethod"},
+				{"call", "m1cReadPrivate"},
 			},
 		},
 		{
@@ -251,6 +306,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"variable", "p67fSampleReadMap", -1},
 				{"variable", "p67fSampleNestedMap", -1},
 				{"type", "p67fSampleContainer", -1},
+				// M1c (docs/v1.7/plans/M1c-repomap-struct-field-fix.md §4.2): the struct's own two
+				// fields, invisible before m1c_fields.scm — parented to p67fSampleContainer (index
+				// 16) via ordinary range containment, same as any other nested symbol.
+				{"field", "m", 16},
+				{"field", "items", 16},
 				{"variable", "p67fSampleContainerVal", -1},
 				{"function", "p67fHelperReads", -1},
 				{"variable", "p69bArg", -1},
@@ -258,6 +318,21 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"variable", "p69bRight", -1},
 				{"function", "p69bConsume", -1},
 				{"function", "p69bHelperReads", -1},
+				// M1c: a named struct with an exported and an unexported field, a method, a selector
+				// read of each field, a called selector (one "call" row, no duplicate "field" row,
+				// §2.6), a method value (no call: one "field" row), a keyed composite literal (no
+				// "field" reference row, §8.1's declined scope), and an anonymous function-local
+				// struct (no "field" symbol row: the source_file anchor, §2.1, excludes it —
+				// m1cLocalStruct itself still earns the pre-existing, unrelated "type" row every
+				// type_spec earns regardless of nesting).
+				{"type", "m1cStruct", -1},
+				{"field", "M1cExported", 26},
+				{"field", "m1cUnexported", 26},
+				{"method", "M1cMethod", -1},
+				{"variable", "m1cStructVal", -1},
+				{"function", "m1cHelperReads", -1},
+				{"function", "m1cAnonStruct", -1},
+				{"type", "m1cLocalStruct", 32},
 			},
 			refs: []refRow{
 				{"type", "Greeter"},
@@ -278,15 +353,21 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "p67fSampleContainer"},
 				{"read", "p67fSampleReadMap"},
 				{"read", "p67fSampleReadMap"},
+				// M1c: p67fSampleContainerVal.items (range operand, sample.go:72) and .m (index
+				// operand, sample.go:74) each now also earn a "field" reference — the existing
+				// comment's claim that they "produce no read row at all" stays true and stays put
+				// (they still don't; "field" is a different, additional kind).
+				{"field", "items"},
+				{"field", "m"},
 				{"read", "p67fSampleNestedMap"},
 				// P69b: p69bConsume's own parameter types ("int", "byte" for buf []byte) are
 				// ordinary pre-existing "type" reference captures, incidental to adding parameters
 				// at all — not new in this phase. p69bConsume(p69bArg) earns "call"+"read"; the
 				// comparison earns both operands; p69bConsume(p67fSampleContainerVal.items) earns
-				// only "call" (selector argument, no row); buf[:p69bArg] earns two rows — "buf"
-				// (the slice's own operand field, also newly captured for the slice form) and
-				// "p69bArg" (the slice's end bound, the case this phase's repro finding names
-				// explicitly).
+				// "call" plus M1c's own new "field" row for that same selector argument; buf[:p69bArg]
+				// earns two rows — "buf" (the slice's own operand field, also newly captured for the
+				// slice form) and "p69bArg" (the slice's end bound, the case this phase's repro
+				// finding names explicitly).
 				{"type", "int"},
 				{"type", "byte"},
 				{"call", "p69bConsume"},
@@ -294,8 +375,30 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"read", "p69bLeft"},
 				{"read", "p69bRight"},
 				{"call", "p69bConsume"},
+				{"field", "items"},
 				{"read", "buf"},
 				{"read", "p69bArg"},
+				// M1c: the dedicated block above — receiver/field/return types (ordinary "type"
+				// rows), the two field reads, the called selector's single "call" row with no
+				// duplicate "field" row (§2.6), the method value's own "field" row, the keyed
+				// composite literal's "type" row with no "field" row for its key (§8.1), and the
+				// anonymous struct's own "type" rows (both the declaration's self-reference and its
+				// own composite literal), still with no "field" row for X.
+				{"type", "m1cStruct"},
+				{"type", "int"},
+				{"type", "int"},
+				{"type", "m1cStruct"},
+				{"type", "int"},
+				{"field", "M1cExported"},
+				{"type", "m1cStruct"},
+				{"field", "M1cExported"},
+				{"field", "m1cUnexported"},
+				{"call", "M1cMethod"},
+				{"field", "M1cMethod"},
+				{"type", "m1cStruct"},
+				{"type", "m1cLocalStruct"},
+				{"type", "int"},
+				{"type", "m1cLocalStruct"},
 			},
 		},
 		{
