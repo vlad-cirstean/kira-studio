@@ -3890,3 +3890,14 @@ Performance:
 - **A restored session on app boot starts every restored repo's index sync with no cross-repo
   concurrency limiter** — likely fine in practice (incremental after first run) but unmeasured at
   scale.
+
+- **The dbmcp bearer token reaches `claude mcp add` in plaintext argv** (`internal/mcpinstall/
+  install.go`'s `Install`/`Command`, M6 round-1 finding), visible to any other local process or
+  user that can list argv (`ps`, `/proc/<pid>/cmdline`) for the short window the `claude mcp add`
+  child runs. Checked directly against the installed `claude` CLI (`claude mcp add --help`): `-H/
+  --header` takes only a literal value, with no env-var or stdin form for an arbitrary header —
+  `--client-secret`'s `MCP_CLIENT_SECRET` env fallback is OAuth-specific and does not apply to a
+  custom `Authorization` header. Not fixed here per `CLAUDE.md`'s library-reuse rule: inventing a
+  side-channel (a temp file, a wrapper script) to work around a CLI's own flag surface is exactly
+  the hand-rolled-infrastructure case that rule declines. Closing this needs an upstream `claude
+  mcp add` flag (e.g. a header-from-env or header-from-file form) or a request to add one.
