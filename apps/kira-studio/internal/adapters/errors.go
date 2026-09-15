@@ -225,6 +225,25 @@ func runesEqual(a, b []rune) bool {
 // with `/*!` or `/*M!` stays visible as literal text instead of being stripped, which can only turn
 // a would-be ClassRead into a false ClassUnknown — never hide a write behind what looked like a
 // stripped comment.
+//
+// Nesting itself is only confirmed for two of the five dialects (M7 finding #13): the paragraph
+// above verified Postgres and MySQL/MariaDB against a real server; SQLite and ClickHouse follow the
+// C89 convention instead, where the *first* `*/` ends the comment regardless of an inner `/*` — one
+// shared scanner with no dialect argument (same reason execCommentMarkerLen's own default applies
+// unconditionally) means SQLite/ClickHouse get treated as nesting too. That is still the safe
+// direction, not merely an untested one: treating a non-nesting dialect as if it nested can only
+// over-strip (swallow more of the statement as "comment" than that server actually would), and an
+// over-stripped statement heads toward ClassUnknown (an empty or truncated leading-keyword scan) or
+// a false read, never a hidden write — the one property ClassifySQL's callers actually depend on.
+// A `/* /* */ DROP ... */` sequence that this scanner reads as one nested comment would, on the
+// real non-nesting server, instead end at the first `*/`, leaving a dangling `*/` afterward that is
+// itself a syntax error on every dialect checked — so the divergence has no known statement shape
+// that both parses on the real server and smuggles a different classification through this
+// scanner. AssertNoTransactionEscalation's and ClassifySQL's own embedded-semicolon guard is the
+// actual backstop for a genuine multi-statement payload regardless: neither depends on comment
+// nesting being dialect-correct, only on a `;` inside a comment/string never being mistaken for one
+// outside it, which quote-awareness (above) and this scanner's char-by-char scan both already give
+// unconditionally.
 func StripSQLComments(s string) string {
 	r := []rune(s)
 	var out strings.Builder
