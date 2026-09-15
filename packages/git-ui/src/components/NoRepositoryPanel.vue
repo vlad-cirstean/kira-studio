@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /**
- * §6.2's "no repository open" state: "the repo picker, prompted, and nothing else." Distinct
- * from `RepoPicker.vue`'s toolbar dropdown (a small trigger button that opens a popup) — this is
- * the main content area itself when there is nothing else to show, so it renders the same
- * candidate list inline rather than behind another click. G-UX D4: the workspace's own folders
- * are the only source of repositories — when none of them is a Git repository, this panel says so
- * plainly instead of offering a folder-picking dialog.
+ * §6.2's "no repository open" state: "the repo picker, prompted, and nothing else." The main
+ * content area itself when there is nothing else to show — renders the candidate list inline.
+ * G-UX D4: the workspace's own folders are the only source of repositories — when none of them
+ * is a Git repository, this panel says so plainly instead of offering a folder-picking dialog.
+ * P72: this is now the only repo-switch affordance git-ui ships (the toolbar dropdown, which
+ * duplicated this list behind a popup, was removed — redundant with Studio's own left sidebar and
+ * VS Code's one-repo-per-window model).
  */
 import type { RepoCandidate } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
