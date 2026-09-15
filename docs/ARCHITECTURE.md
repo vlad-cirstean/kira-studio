@@ -7,12 +7,12 @@ reconstructing it from phase-history prose. Environment-specific operational not
 Docker in Claude Code's own sandbox, working around a proxy block, which env var a headless
 Linux box needs) belong in `docs/DEV_ENVIRONMENT.md`, not here.
 
-The tree outranks this file — if they disagree, the tree is right and this file needs
-fixing, not the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
-`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`, `docs/v1.4/`, `docs/v1.5/`, `docs/v1.6/`), **this file is
-authoritative for behavior**: each `SPEC.md` records what that chapter was *specified* to be,
-phase by phase, kept as originally written rather than corrected to match later reality — see
-each chapter's own `README.md` for what those folders are and aren't.
+The tree outranks this file — if they disagree, the tree is right and this file needs fixing, not
+the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
+`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`, `docs/v1.4/`, `docs/v1.5/`, `docs/v1.6/`, `docs/v1.7/`),
+**this file is authoritative for behavior**: each `SPEC.md` records what that chapter was
+*specified* to be, phase by phase, kept as originally written rather than corrected to match later
+reality — see each chapter's own `README.md` for what those folders are and aren't.
 
 **Related documents:** [`docs/PERF.md`](PERF.md) (performance budgets and measured results),
 [`docs/PACKAGING.md`](PACKAGING.md) (macOS build and packaging verification),
@@ -49,7 +49,7 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
 | Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use. Not the only hand-written query text in the package any more: P64 (type aliases/enums/module consts, TypeScript/TSX) and P64b (package-level const/var for Go, module consts for JavaScript, a widened constant value list for TypeScript/TSX) each add their own repo-authored `p64[b]_declarations.scm` files beside `c2_implements.scm` — `queries.go`'s own `Provenance` table is the current, authoritative list of every repo-authored query file (§4.1's own "no hand-written queries" gets a narrow, named exception here, tracked there rather than re-counted in prose as the set keeps growing) |
-| MCP server (C3) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) |
+| MCP servers (C3, second server M1) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) — measured at C3, marking the SDK's own arrival in the graph; `internal/dbmcp` (M1) is app code on top of that same already-linked graph, not a new dependency tree, so this figure is not re-measured for the second server |
 | Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). All 84 basic languages Monaco ships get a registered Monarch grammar as of P67c (`views/repo/monacoEntry.ts`'s own `register.all.js` import, up from 19); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
 | Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own three substring filters (`CommandPalette.vue`, the tree's own name filter, `search_files`'s SQL `LIKE`) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
 | Git graph in the native workspace (C10) | The four `packages/*` workspaces the VS Code extension already used — `@kira/git-ui`, `@kira/git-ipc`, `@kira/git-core`, `@kira/kira-ui` — added to `apps/kira-studio/frontend/package.json` as `workspace:*`, plus `seti-icons` (a `git-ui` dependency) | No reimplementation and no new runtime dependency of its own: `git-ui` publishes `main: ./src/index.ts` and compiles from source the same way `@shared` does, so there is no separate build step, but its `.vue` files now typecheck under `typecheck:web` too. Statically imported (`RepoGraphView.vue`), not behind a dynamic `import()` boundary — the graph is the pinned first tab of every repo workspace, not an occasional feature — so its cost lands in the eager `index-*.js`/`index-*.css` bundle rather than a lazy chunk: measured (`bun run build`, this phase's own before/after), **+507 KB raw / +159 KB gzip** JS and **+72 KB raw / +11 KB gzip** CSS, plus one new `layout.worker-*.js` chunk (5 KB raw, git-ui's own graph lane-layout worker, loaded as a Worker script the same way `editor.worker` already is, so it carries no separate gzip line). The `monacoEntry-*.js` chunk (C5/C6) is untouched — Monaco's own dynamic-import boundary is unaffected. See "Git graph in the native workspace (C10)" below |
@@ -453,8 +453,9 @@ connection-flow change out of scope for this pass.
 
 `~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`), `logs/`, the git module's own
 `review.db`, `codeindex.db` (plus its `-wal`/`-shm`), `git.sock`/`git.sock.lock`, the
-per-repository sync flocks `codeindex-sync-<12 hex>.lock`, and the repo-map MCP tokens
-`mcp-repo-map-*-token.json` — each covered in its own paragraph below.
+per-repository sync flocks `codeindex-sync-<12 hex>.lock`, the repo-map MCP tokens
+`mcp-repo-map-*-token.json`, and the DB MCP server's own token `mcp-db-token.json` (one per
+`KIRA_HOME`, no slug) — each covered in its own paragraph below.
 
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
 Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
@@ -564,11 +565,37 @@ schema_version(version)
 settings(key, value)                                   -- fonts, sizes, budgets, toggles
 connections(id, name, kind, color, mode, read_only, host, port, database, username, password,
             uri, options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec,
-            created_at, updated_at, sort_order)
+            created_at, updated_at, sort_order, mcp_enabled, mcp_description, mcp_read_mode,
+            mcp_write_mode, mcp_ddl_mode, mcp_auto_explain, mask_correlation_key)
+                                                       -- v1.7: mcp_enabled (0/1, default 0, 0020);
+                                                       -- mcp_description ('', 0021); mcp_read_mode
+                                                       -- ('allow', 0021), mcp_write_mode ('prompt',
+                                                       -- 0021), mcp_ddl_mode ('deny', 0021) — the
+                                                       -- three independent MCP permission modes;
+                                                       -- mcp_auto_explain (1, 0022); mask_correlation_key
+                                                       -- ('', 0023) is a kira:v3 envelope under the
+                                                       -- mask-key secret scope, read/written only by
+                                                       -- MaskKeysRepo, deliberately absent from
+                                                       -- ConnectionFields (0023's own header comment)
 connection_tree_filters(connection_id, scope, value)    -- hide/show rules; a set, no id/ordering
                                                        -- (P28 D12) — no per-row size cap: a person
                                                        -- picks these from the tree, doesn't type them
 connection_ddl(connection_id, ddl, updated_at)          -- pasted DDL for the SQL language service
+connection_mask_rules(id, connection_id, table_name, column_name, mask_kind, keep_hint,
+                       correlate, created_at, updated_at)
+                                                       -- M5/0023; connection_id ON DELETE CASCADE;
+                                                       -- table_name '*' matches any table, matching
+                                                       -- itself is by column_name alone; mask_kind is
+                                                       -- name|email|text|number|date|redact;
+                                                       -- uniqueness is case-insensitive
+                                                       -- (lower(table_name), lower(column_name));
+                                                       -- correlate is forced 0 for number, enforced in
+                                                       -- internal/mask.Apply regardless of the stored
+                                                       -- flag. A table, not an options_json key,
+                                                       -- because options round-trips through the
+                                                       -- connection URI and the Copy URI menu item, so
+                                                       -- a privacy rule must not be settable or
+                                                       -- clearable by pasting a URI
 saved_queries(id, connection_id, path, name, kind, body, pinned, created_at, used_at)
                                                        -- saved filters/queries per table + console
 filter_history(id, connection_id, path, where_text, order_by_json, used_at)
@@ -663,8 +690,13 @@ code_repos(id, name, root, repo_id, sort_order, created_at, mcp_enabled)  -- C5,
                                                        -- it explicitly
 ```
 
-`kira.db` is at migration **0019** as of P67d (`0019_p67d_repo_map_access.sql`) — `code_repos.
-mcp_enabled` on top of C5's `code_repos` plus `tabs.workspace_id` (above).
+`kira.db` is at migration **0023** as of M5: `0020` added `connections.mcp_enabled`
+(deny-by-default MCP exposure); `0021` added the three independent permission columns
+`mcp_read_mode`/`mcp_write_mode`/`mcp_ddl_mode` plus `mcp_description`; `0022` added
+`mcp_auto_explain` (auto-force-EXPLAIN on `run_query`); `0023` created `connection_mask_rules` and
+added `connections.mask_correlation_key`. Prior high-water mark: migration **0019** as of P67d
+(`0019_p67d_repo_map_access.sql`) — `code_repos.mcp_enabled` on top of C5's `code_repos` plus
+`tabs.workspace_id` (above).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
 startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
@@ -1078,10 +1110,18 @@ Each instance binds its own port (a fixed default first, an OS-assigned ephemera
 never `0.0.0.0`, always `127.0.0.1`). Token files diverge by design since P67d: the embedded
 instance now mints/loads **one app-scoped token** covering every granted repository
 (`mcp-repo-map-app-token.json`, `mcpauth.Path(home, "app")` — an explicit enable uses
-`mcpauth.LoadOrMint`, not an unconditional fresh `Mint`, since one registration now covers every
-grant and a toggle-off-and-on must not silently invalidate it; the explicit Regenerate action is the
-one way to force a fresh one), while the headless binary keeps its original one-token-per-repository
-files (`internal/mcpauth`: `crypto/rand`, base64url on the wire, `sha256(salt‖token)` at rest —
+`mcpauth.LoadOrMintTTL(…, mcpauth.TTL)`, not an unconditional fresh `MintTTL`, since one registration
+now covers every grant and a toggle-off-and-on must not silently invalidate it; the explicit
+Regenerate action is the one way to force a fresh one). Every token now carries a fixed **7-day**
+expiry (`mcpauth.TTL`, M1) applied uniformly to both servers, with `Record.ExpiresAt` zero meaning
+"not yet stamped" so a pre-M1 file on disk is stamped on load with no migration and no file-format
+version. Rotation happens only at a moment a human can read the fresh plaintext — server start, or
+an explicit Regenerate — never mid-flight. A lapsed token gets a distinct, actionable message rather
+than a bare 401: `mcpauth.TokenVerifier` names the server (`"kira-repo-map"` or `"kira-db"`) and the
+expiry instant, and points the caller at the re-registration command Settings shows.
+
+The headless binary keeps its original one-token-per-repository files (`internal/mcpauth`:
+`crypto/rand`, base64url on the wire, `sha256(salt‖token)` at rest —
 `git_clients`' own trust-store shape, one JSON file per instance under `KIRA_HOME` rather than a
 database table, since `kira.db` is never opened by this server package and a `codeindex.db` table
 would mean a second connection pool for a two-column read). Every request is checked — the SDK's own
@@ -1094,7 +1134,10 @@ any local process's for the asking regardless of who is meant to be the only cal
 --scope user <name> <url> --header "Authorization: Bearer <token>"`, verified against the real CLI):
 the Settings dialog's Code intelligence tab shows the command before its Install button, never the
 reverse, and the button re-resolves `claude`'s own location fresh on every click rather than trusting
-a cached probe. No VS Code MCP registration of any kind is attempted.
+a cached probe. No VS Code MCP registration of any kind is attempted. `internal/mcpinstall` is reused
+as-is by the DB MCP server's own Settings section (`internal/bridge/dbmcp.go` takes the same
+`RepoMapInstaller` interface rather than declaring a second, identical one), which shows its own
+command before its own Install button the same way.
 
 ### The native code workspace (C5-C9)
 
@@ -3673,6 +3716,14 @@ its Go suite and the TypeScript twin's. And the transport's perf probes (`TestGr
 nothing** — they print one `key=value` line each. That is deliberate: a hard threshold in a suite
 that also runs on real macOS hardware would be flaky in exactly the way "re-measurement, not
 re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
+
+**v1.7 added two more Go/TS parity-fixture pairs, the same technique
+`tests/unit/go-ts-vocabulary-parity.spec.ts` established.** `internal/queryplan/parse_test.go` and
+`tests/unit/explain-plan.spec.ts` both read the same EXPLAIN-plan fixture set
+(`tests/fixtures/explain-plans/`), pinning the Go EXPLAIN-parser port against the frontend parser it
+was ported from — drift in either fails on the same bytes. `internal/mask/parity_test.go` and
+`tests/unit/mask-parity.spec.ts` do the same for masking, both reading 60 shared fixture pairs under
+`tests/fixtures/mask/`.
 
 **Parallelism.** `playwright.config.ts` runs five projects (v1.4 P27 added `ui-timing`, v1.4 P6
 added `visual`): `ui`, `ui-timing`, `ipc-frontend`, `e2e-real` and `visual`, every one but
