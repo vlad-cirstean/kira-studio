@@ -46,7 +46,7 @@ function handlersWithGoToTarget(result: unknown) {
   return createHostHandlers({
     remoteRequest,
     codeRepoId: 'unused-in-these-tests',
-    emitLocal: () => {},
+    emitLocal: () => false,
   });
 }
 

@@ -67,6 +67,12 @@ export interface DetailActions {
    *  composes/opens the URL itself. A no-op (never called) when `capabilities.openExternal` is
    *  false; callers gate the button on that themselves, same convention `openInEditor` uses. */
   openPullRequest(params: { number: number }): Promise<void>;
+  /** P75 §2.3: reveals and selects `sha` in the graph — review-row-only today
+   *  (`ReviewCommitRow.vue`'s "Open in graph"), implemented in every bundle because
+   *  `DetailActions` is one interface, the same way `openPullRequest` is (P74 §3.3).
+   *  `revealed: false` is a real answer (no pinned graph tab / repo not known to this window),
+   *  not a stub — callers announce it. */
+  revealInGraph(params: { sha: string }): Promise<{ revealed: boolean }>;
 }
 
 export function createDetailActions(
@@ -112,6 +118,11 @@ export function createDetailActions(
       const repo = repoId();
       if (!repo) throw new Error('createDetailActions: openPullRequest called with no active repo');
       await bridge.request('pr.openExternal', { repoId: repo, number });
+    },
+    async revealInGraph({ sha }) {
+      const repo = repoId();
+      if (!repo) return { revealed: false };
+      return bridge.request('graph.revealCommit', { repoId: repo, sha });
     },
   };
 }
