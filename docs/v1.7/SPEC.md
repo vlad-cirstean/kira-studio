@@ -127,8 +127,20 @@ field. Arm B never hydrated `settingsState.dbMcp` from persisted settings, so th
 panel — including Regenerate — reads as disabled and hidden after every app restart, even when the
 server is actually running.
 
-**Outcome**: arm A lands as M1's real deliverable, per this row's design, once its three defects are
-fixed (fix commit(s) noted here after merge). Arm B discarded after comparison.
+**Outcome**: arm A's three defects fixed in two follow-up passes on `v1.7-m1ab-arm-a` — the reconnect
+churn and error-surfacing fix (`8e2542d9`) plus a regression test (`access_test.go`), then a full
+sweep of the `mcpEnabled` fixture gap across every `tests/ui/` spec after the first pass's own fix
+turned out to miss instances beyond the two specs it targeted (`764f6e61`). Both independently
+re-verified against the actual pre-M1 base commit, not trusted from self-report — a claim that one
+of the fixture failures was "pre-existing" turned out to be wrong (the base commit passes cleanly
+once actually built; it was a real regression). Landed on `v1.7` via merge commit `dfa45459`
+(non-fast-forward, since `v1.7` gained two doc-only commits after the worktrees branched); go
+build/vet/test, bun typecheck/lint, and the full `tests/ui/` Playwright suite (269/269, real
+webkit, correct `KIRA_DEBUG_HOOKS=1` test build) all independently re-run clean post-merge. One
+pre-existing, unrelated `internal/repomap` test failure (a `git`-invocation panic, reproduces
+identically on arm B and on code the M1 diff never touches — a sandbox git-path issue, not a code
+defect) and one pre-existing `internal/gitsock` timing flake (passes 3/3 in isolation) were
+confirmed unrelated, not fixed. Arm B (`v1.7-m1ab-arm-b`) discarded after comparison.
 
 ## Layout
 
