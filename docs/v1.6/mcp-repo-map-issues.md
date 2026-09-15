@@ -425,7 +425,7 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   does not address this. Not investigated further — out of P69c's scope.
 
 - **P69b (planning) — `TestParseConcurrentCancellationDoesNotCrash` aborts the whole `codeparse`
-  test binary on a tree-sitter C assertion. Open.**
+  test binary on a tree-sitter C assertion. Fixed (`84fb06f8`).**
 
   Found by running `go test`, not by calling the MCP server, but it sits inside the repo-map
   indexing pipeline and is logged here because that is where this chapter's repo-map defects live.
@@ -466,8 +466,62 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   456 progress checkpoints of one parse, every one of the 156 that land in the balancing phase
   aborts, and none of the 300 in the parse loop do. Merely dropping `p.Reset()` is worse, not
   better — it trades the abort for a resumed parse returning the *previous* file's tree at 416 of
-  those 456 points. Fix: Close a parser whose parse returned nil instead of pooling it. Still open;
-  the plan is written, the implementation is not landed.
+  those 456 points.
+
+  **Fix (P69c, `84fb06f8` + `d2fab09f` + `71ac6d04`)**: `checkinParser` now Closes a parser whose
+  parse returned no tree instead of pooling it, and never calls `Reset()` on the ones it does pool
+  — a parser only reaches `checkinParser` after a parse that returned a tree, which guarantees
+  `ts_parser_parse` already ran its own internal reset and cleared `canceled_balancing` itself, so
+  nothing pooled ever carries state from a previous parse. `Parse`/`Reparse` also skip an
+  already-cancelled `ctx` up front, an efficiency guard (fewer wasted parser allocations after a
+  cancel), not the correctness fix.
+
+  Verified on `84fb06f8`'s own tree, all numbers fresh, not carried over from planning: the new
+  regression test (`TestParseAfterCancelledParseIsCorrect`, sweeps a cancellation deadline across
+  ~200 steps spanning a full parse and re-checks a baseline parse after every step) aborts 3/3 runs
+  against the pre-fix commit, passes 5/5 post-fix with 100-120/200 steps actually cancelling per
+  run. **250 isolated process invocations** of `go test -run
+  'TestParseConcurrentCancellationDoesNotCrash|TestParseAfterCancelledParseIsCorrect'
+  ./internal/codeparse/` (separate processes, not `-count=250`, since one process abort would kill
+  a combined run and hide how many iterations actually ran): 250/250 passed, 0 failures.
+  `go test -race -count=20 ./internal/codeparse/`: clean, 129.9s. `go test -race -count=5
+  ./internal/codeindex/ ./internal/repomap/`: `codeindex` clean; `internal/repomap` failed on an
+  unrelated pre-existing race, logged separately below (not caused by this fix — reproduced
+  identically on pre-phase HEAD `e6831f34`). Full `go test ./...` stayed green apart from that same
+  pre-existing `internal/repomap` race.
+
+- **P69c (implementation) — `internal/repomap`'s `TestDetachDrainsInFlightCall` fails under `-race`
+  on a pre-existing, unrelated data race. Open.**
+
+  Found running this phase's own verification step (`go test -race -count=5 ./internal/codeindex/
+  ./internal/repomap/`), not by calling the MCP server, but logged here per the same process —
+  a non-trivial finding hit while working this chapter, out of P69c's own scope (`codeparse`
+  parser-pool safety, not `repomap`'s attach/detach lifecycle). Confirmed pre-existing and unrelated
+  to this phase's changes: reproduces identically on pre-phase HEAD `e6831f34`, in a throwaway
+  worktree, before any P69c commit — `go test -race -run TestDetachDrainsInFlightCall -count=5
+  ./internal/repomap/` fails there too.
+
+  ```
+  WARNING: DATA RACE
+  Write at 0x... by goroutine ...:
+    internal/repomap.TestDetachDrainsInFlightCall.func1()
+        attach_test.go:155
+  Previous read at 0x... by goroutine ...:
+    internal/repomap.(*repoInstance).close.1()
+        instance.go:212
+  --- FAIL: TestDetachDrainsInFlightCall (0.13s)
+  ```
+
+  `attach_test.go:155` is `defer func() { readyTimeout = old }()`, restoring the package-level
+  `readyTimeout` var once `TestDetachDrainsInFlightCall` itself returns. `instance.go:212` is
+  `close()`'s own `time.After(readyTimeout)` inside a goroutine `Server.Detach` spawns
+  (`attach.go:172-175`: `go func() { inst.inflight.Wait(); inst.close() }()`) to run `close()` only
+  after in-flight callers drain. The test's third subtest calls `Detach` and asserts on its
+  synchronous effects, but never waits for that background goroutine to finish before the outer
+  test function returns and its `defer` fires — so the deferred restore can race the spawned
+  goroutine's read of the same package-level var. Not a `codeparse` issue and not touched by this
+  phase's commits; logged for a future fix pass (the test would need to drain that goroutine, e.g.
+  via a hook or a bounded wait, before restoring `readyTimeout`).
 
 - **P69 (code review, round 2) — `find_references` still returns nothing for a package-level
   constant read as a plain identifier operand (call argument, comparison, arithmetic). Fixed
