@@ -382,6 +382,103 @@ and every one passed standalone or in a small isolated batch; the same full-para
 contention P73's own result section already documented for this exact pair of specs. No other known
 gaps against the plan.
 
+## P76 result
+
+Landed per plan (`docs/v1.8/plans/P76-blame-widget-worktree-creation.md`), 5 commits (`1eae573a`..
+`ee340945`), in the plan's own §13.1 order. No Go file touched, no contract change, no
+`CONTRACT_VERSION` bump — confirmed by `go build/vet/test` staying fully cached across the whole
+run.
+
+**§2 (the revision-pinned guard).** A real, pre-existing bug, exactly as the plan named it: P74
+added revision-pinned `repo-file` tabs (`rev !== null`, read via `file.read`, never the worktree),
+but `RepoFileView.vue`'s `blameable` check never grew a matching guard — `blame.line` "always
+blames the working tree," so a revision-pinned tab's blame annotation had been showing worktree
+blame against different bytes since P74 landed. Fixed with the one added condition the plan
+specified: `blameable = gitRepoId !== undefined && rev === null`.
+
+**§4 (controller extraction).** `blameLine.ts` now owns the `blame.line` request/debounce/cache/
+cancellation lifecycle, moved out of `blameAnnotation.ts` verbatim, including both bug-fix comments
+at their fix sites (5a: the same-line early return must precede `cancelPending`; 5b: an aborted
+request must never be cached as a miss). `blameAnnotation.ts` keeps only the Monaco decoration/
+hover/reveal-action rendering, now driven by a `BlameLineController` instead of holding the
+lifecycle itself. The controller exposes `gitRepoId`/`transport` (beyond the plan's own minimal
+sketch) so the reveal action can call `graph.revealCommit` with no second transport lease — the
+controller already holds both.
+
+**§5 (status-bar blame item).** `state/blameStatus.ts` is a new owner-token store (mirroring
+`cacheStats.ts`/`appMetrics.ts`'s own pattern, so `workbench/` never imports `views/repo/` or
+`repo/git/` directly). `RepoFileView.vue` now creates the blame controller whenever `blameable`
+(regardless of the `inlineBlame` setting — §5.3's deliberate call: the setting governs only the
+inline annotation's own renderer), claims the store, and publishes the controller's state to it;
+`inlineBlame` toggling only attaches/detaches `blameAnnotation.ts`'s renderer, never the controller
+itself. `StatusBar.vue` renders the claimed state as a left-side item (`data-testid="blame-status"`,
+author/relative-date/subject text, absolute-date tooltip), clicking it calls
+`graph.revealCommit` verbatim — no new contract method, per the plan's own reuse of P75's request.
+
+**§8/§9 (create-worktree row action).** `createWorktreeHere` (`plainItem`, not `gatedItem` —
+`worktreeAdd` is not in `GATED_OP_KINDS`, so it stays enabled through an in-progress operation) is
+now offered in `buildRefMenu`'s `branch`/`remoteBranch` arms and in `buildRowMenu`'s commit-row
+menu, never `tag` (a tag is a point; its own commit row already offers the detached item) and never
+either read-only builder. `WorktreeCreateSeed` (`state/worktrees.ts`) replaces
+`WorktreeDialog.vue`'s boolean `createOpen` with `createRequest: WorktreeCreateSeed | undefined`, a
+seeded reset watch applying `mode`/`branch`/`startPoint` defaults on open. All three call sites
+wired: `App.vue`'s commit-row case (`{mode: 'detach', startPoint: sha}`) and ref-row case
+(`existingBranch`/`branch` for a local branch, `newBranch`/`branch`+`startPoint` for a remote one,
+via `localNameForRemoteBranch`), and `BranchPicker.vue`'s own identical ref-row case, forwarded
+through `AppToolbar.vue`/`WorktreeList.vue`'s widened `create-worktree` emit (`WorktreeList.vue`
+itself needed no code change — its own create button already forwards no seed, i.e. `{}`, unchanged
+in shape).
+
+**§12 (tests).** `blame-line-controller.spec.ts` — the one earned unit test, six cases per the
+plan's own table (same-line in-flight, a later line superseding an earlier one, an aborted request
+never cached, a genuine RPC failure cached as a miss, `repo.changed` scoped to its own repo, the
+all-zero sha resolving to `'uncommitted'`). `rowMenuModel.test.ts` gained five cases proving
+`createWorktreeHere` is un-gated and correctly scoped (present+enabled on branch/remoteBranch rows
+mid-operation, absent for tag, present in `buildRowMenu`, absent from both read-only builders).
+
+`repo-workspace.spec.ts`'s git-stream mock (`gitStreamMock.ts`) gained an optional, additive third
+parameter merged into its own `resultByMethod` — opt-in per call, so every existing caller
+(`repo-graph-lifecycle.spec.ts`'s bootstrap() included) keeps hanging on every method beyond
+`app.init`/`repo.list`/`refs.list` exactly as before. One new test uses it twice: once answering
+`repo.open`/`blame.line` to prove the status-bar item follows the cursor with the mocked
+author/subject, and once — for the revision-pinned half — answering the same two plus `file.read`
+(seeding a `repo-file` tab with `rev` set directly via `IPC.tabsList`, since the real navigation
+paths to one need `graph.stream`/`file.goToTarget`, out of this mock's scope per the plan's §10).
+Both `repo.open`/`blame.line` are deliberately left *resolvable* in the revision-pinned half too —
+a resolvable trap, not an absent one: had §2's guard been missing, the controller would still have
+called them and the item would wrongly have appeared, so its absence here actually proves the
+guard rather than passing vacuously because nothing could answer.
+
+**One test-infrastructure snag found and fixed while writing that test, not part of the plan's own
+scope.** `mockRuntime.ts`'s `inferredBootMode()` (the "no explicit `windowsEnsure` snapshot" boot-
+mode inference already used by other specs in this file) maps a `tabsList` boot tab's `kind`
+straight through `TAB_KIND_MODE`, whose `repo-file`/`repo-graph` entry is the fixed sentinel
+`'repo'` — never a real `AppMode` — because deriving the actual mode for a repo tab needs
+`workspaceKeyOf`/`moduleOfWorkspace`, not that flat table. Seeding a `repo-file` tab as the active
+boot tab with no explicit `windowsEnsure` snapshot therefore fed `workspaceState.active` (`state/
+mode.ts:44`'s `hydrateMode`) the literal string `'repo'`, which crashed `WorkbenchShell.vue`'s
+`MODES[moduleOfWorkspace(workspaceState.active)]` lookup on the very first render — not a bug in
+this phase's own code, and not fixed in `mockRuntime.ts` itself (out of scope, and the restored-tab
+test earlier in this same file already established the correct way around it). Worked around the
+same way that earlier test does: an explicit `{channel: IPC.windowsEnsure, response: {mode:
+'studio'}}` snapshot, sidestepping the inference entirely; the test's own explicit `openGitModule`
++ `repoRow.dblclick()` sequence is what actually activates the seeded workspace and reveals its
+pre-seeded active tab.
+
+Independently re-verified: `go build/vet` clean, `go test ./...` clean (fully cached — confirming no
+Go file changed), `bun typecheck/lint` clean, both `bun run build` (desktop) and `bun run
+build:vscode` succeed, 1467/1467 unit tests (`bun run test:unit`), 40/40 VS Code webview
+interaction/layout specs (`bun run test:webview`). `bun run test:ui` (`ui`+`ui-timing`): one full
+run had a single failure, `cell-editor.spec.ts`'s <250ms bound; a second run (forced to re-execute
+`ui` as `ui-timing`'s own dependency) hit a different single failure,
+`repo-workspace.spec.ts`'s own pre-existing "search streams results out of order" test — neither in
+a file this phase's diff touches beyond adding an unrelated new test to the same spec file, and both
+confirmed passing standalone; `ui-timing`'s own `budgets.spec.ts` interaction-budget test ran
+borderline-over-bound (13ms/18ms against a 12ms p50) alone too, the same sandbox wall-clock
+sensitivity `budgets.spec.ts`'s own in-file comment already names, unrelated to any file this phase
+touched. The same full-parallel-run flakiness class P73/P74/P75's own result sections already
+documented, not a regression. No other known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
