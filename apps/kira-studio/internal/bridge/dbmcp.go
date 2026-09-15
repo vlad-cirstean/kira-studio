@@ -2,11 +2,9 @@ package bridge
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
@@ -288,46 +286,10 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.server.URL(), plain))
 }
 
-// dbMcpApprovalStatementCap bounds DbMcpApprovalRequest.Statement on the wire — a generated
-// statement can be large, and the approval dialog renders it; Truncated says whether it was cut.
-const dbMcpApprovalStatementCap = 4000
-
-// dbMcpApprovalStatementHalf is how much of the head and of the tail capApprovalStatement shows
-// when a statement exceeds the cap — half each, so the visible text still totals dbMcpApprovalStatementCap.
-const dbMcpApprovalStatementHalf = dbMcpApprovalStatementCap / 2
-
-// capApprovalStatement shows the first and last dbMcpApprovalStatementHalf bytes of s, with a
-// clear "... N bytes omitted ..." marker between them, when s exceeds the cap. Head-only display
-// (finding #5, M6) let a statement's real effect hide entirely past the visible window — e.g.
-// `UPDATE customers SET tier='basic' WHERE id=1 /* <4KB filler> */ OR 1=1` showed a human a narrow
-// single-row update while the unseen tail turned it into a full-table write, with the dialog's own
-// note claiming "the full text still runs" despite giving no way to see what that meant. Showing
-// the tail too means a hidden clause tacked onto the end is never past the visible window; cuts
-// land at rune boundaries on both ends so a multi-byte character straddling one never produces
-// invalid UTF-8 on the wire.
-func capApprovalStatement(s string) (text string, truncated bool) {
-	if len(s) <= dbMcpApprovalStatementCap {
-		return s, false
-	}
-	headEnd := dbMcpApprovalStatementHalf
-	for headEnd > 0 && !utf8.RuneStart(s[headEnd]) {
-		headEnd--
-	}
-	tailStart := len(s) - dbMcpApprovalStatementHalf
-	for tailStart < len(s) && !utf8.RuneStart(s[tailStart]) {
-		tailStart++
-	}
-	if tailStart < headEnd {
-		tailStart = headEnd
-	}
-	marker := fmt.Sprintf("\n\n... %d bytes omitted ...\n\n", tailStart-headEnd)
-	return s[:headEnd] + marker + s[tailStart:], true
-}
-
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own
 // approvalPlanFrom already caps at this same figure (M3 §6.2), so this is a defense-in-depth
-// re-application at the wire boundary, the same posture capApprovalStatement already takes for
-// the statement text.
+// re-application at the wire boundary. Unlike the statement text below it, eliding some of these
+// issues never hides part of the statement itself from the human approving it.
 const dbMcpApprovalPlanIssuesCap = 10
 
 // DbMcpApprovalPlanIssue is dbmcp.ApprovalPlanIssue's wire projection.
@@ -376,7 +338,6 @@ type DbMcpApprovalRequest struct {
 	Kind           string `json:"kind"`
 	Class          string `json:"class"`
 	Statement      string `json:"statement"`
-	Truncated      bool   `json:"truncated"`
 	ExpiresAtMs    int64  `json:"expiresAtMs"`
 	// Reason is M3's own "permission" | "heavy" — every M2-era request is "permission" (M3 §6.2).
 	Reason string             `json:"reason"`
@@ -392,11 +353,14 @@ type DbMcpApprovalSnapshot struct {
 func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 	out := DbMcpApprovalSnapshot{Queued: snap.Queued}
 	if snap.Pending != nil {
-		statement, truncated := capApprovalStatement(snap.Pending.Statement)
 		out.Pending = &DbMcpApprovalRequest{
 			RequestID: snap.Pending.RequestID, ConnectionID: snap.Pending.ConnectionID,
 			ConnectionName: snap.Pending.ConnectionName, Kind: snap.Pending.Kind,
-			Class: string(snap.Pending.Class), Statement: statement, Truncated: truncated,
+			// Statement carries the full text, uncapped (M7 finding — a byte cap that elided the
+			// middle let a hidden clause sit entirely inside the omitted span; the dialog's own
+			// `.statement` is a fixed-height scroll container (DbMcpApprovalDialog.vue), so nothing
+			// here bounds the DOM by hiding text a human is being asked to approve).
+			Class: string(snap.Pending.Class), Statement: snap.Pending.Statement,
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
 			Reason:      string(snap.Pending.Reason),
 			Plan:        toWireApprovalPlan(snap.Pending.Plan),
