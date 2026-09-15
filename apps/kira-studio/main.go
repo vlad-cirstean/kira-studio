@@ -211,6 +211,7 @@ func main() {
 	connectionsSvc := connections.New(connections.Deps{
 		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
 		Cipher: cipher, Auth: authorizer, Backend: router, Preconnect: preconnectSupervisor,
+		MaskRules: repositories.MaskRules,
 	})
 	connectionsSvc.Start()
 	deps.Connections = connectionsSvc

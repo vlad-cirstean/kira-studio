@@ -138,6 +138,51 @@ func (r *MaskRulesRepo) findExisting(connectionID, tableName, columnName string)
 	return &rec, nil
 }
 
+// CopyForConnection copies every mask rule on fromConnectionID onto toConnectionID, each under a
+// fresh id from ids (one per row, same order ListForConnection returns them — lower(table_name),
+// lower(column_name)) — connections.Service.Duplicate's own use (finding #6, M6): a duplicated
+// connection that carried over the source's MCP exposure without its mask rules would immediately
+// expose PII the original was protecting. ids is minted by the caller (uuid.NewString(), the same
+// way Upsert's own id argument is) rather than here, keeping this repo layer free of a uuid
+// dependency the way the rest of it already is. mask_correlation_key lives on `connections`, not
+// this table, and is never touched here — InsertDuplicateWithSecret's own doc comment gives the
+// reasoning for why a duplicate must mint its own key rather than inherit the source's.
+func (r *MaskRulesRepo) CopyForConnection(fromConnectionID, toConnectionID string, ids []string, now string) error {
+	rows, err := r.ListForConnection(fromConnectionID)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	if len(ids) != len(rows) {
+		return fmt.Errorf("repos/maskrules: CopyForConnection: %d ids for %d rules", len(ids), len(rows))
+	}
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		return fmt.Errorf("repos/maskrules: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	for i, row := range rows {
+		if _, err := tx.Exec(`
+			INSERT INTO connection_mask_rules
+				(id, connection_id, table_name, column_name, mask_kind, keep_hint, correlate, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+			ids[i], toConnectionID, row.TableName, row.ColumnName, string(row.Kind),
+			boolToInt(row.KeepHint), boolToInt(row.Correlate), now, now,
+		); err != nil {
+			return fmt.Errorf("repos/maskrules: copy %s/%s.%s to %s: %w", fromConnectionID, row.TableName, row.ColumnName, toConnectionID, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("repos/maskrules: commit: %w", err)
+	}
+	return nil
+}
+
 // Remove deletes one rule by id. Not an error when id matches no row (Service.Remove's own
 // idempotent "not PII any more" semantics).
 func (r *MaskRulesRepo) Remove(id string) error {

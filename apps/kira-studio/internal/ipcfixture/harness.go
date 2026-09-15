@@ -79,7 +79,7 @@ func NewApp(t *testing.T) *App {
 	pre := preconnect.New()
 	connectionsSvc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Backend: router, Preconnect: pre,
+		Cipher: cipher, Backend: router, Preconnect: pre, MaskRules: r.MaskRules,
 	})
 	connectionsSvc.Start()
 	t.Cleanup(connectionsSvc.Shutdown)

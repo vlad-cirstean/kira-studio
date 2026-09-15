@@ -100,6 +100,11 @@ type Deps struct {
 	Auth       Authorizer
 	Backend    Backend
 	Preconnect *preconnect.Supervisor
+	// MaskRules is M5's rule store — Duplicate's own use (finding #6, M6): a duplicated connection
+	// must carry over the source's mask rules, not just its MCP exposure, or it silently exposes
+	// PII the original was protecting. Nil is tolerated (a test harness with nothing to duplicate
+	// against masking need not set it) — Duplicate then skips copying rather than panicking.
+	MaskRules *repos.MaskRulesRepo
 }
 
 // attempt is one in-flight Connect(id) call, shared by every caller that asks for the same id
@@ -390,8 +395,36 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
+	// Finding #6, M6: ConnectionFields (copied above via InsertDuplicateWithSecret) carries the
+	// source's MCP exposure (McpEnabled/read/write/DDL modes), but mask rules live in a separate
+	// table keyed by connection_id and are never copied by that INSERT. Without this, a duplicated
+	// connection that was masked-and-MCP-exposed becomes immediately MCP-exposed with zero mask
+	// rules, silently exposing whatever PII the original was protecting.
+	if s.deps.MaskRules != nil {
+		if err := s.copyMaskRules(id, newID); err != nil {
+			return model.ConnectionSummary{}, wrapErr(err)
+		}
+	}
 	s.emitListChanged()
 	return created, nil
+}
+
+// copyMaskRules copies every mask rule on fromID onto toID, one fresh uuid per row — Duplicate's
+// own step (finding #6, M6). Minting ids here, in this package, rather than in the repo layer
+// keeps repos/maskrules.go free of a uuid dependency the rest of that package doesn't have.
+func (s *Service) copyMaskRules(fromID, toID string) error {
+	existing, err := s.deps.MaskRules.ListForConnection(fromID)
+	if err != nil {
+		return err
+	}
+	if len(existing) == 0 {
+		return nil
+	}
+	ids := make([]string, len(existing))
+	for i := range existing {
+		ids[i] = uuid.NewString()
+	}
+	return s.deps.MaskRules.CopyForConnection(fromID, toID, ids, model.NowISO())
 }
 
 func (s *Service) Remove(id string) error {

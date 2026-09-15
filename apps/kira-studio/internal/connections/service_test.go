@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
@@ -175,7 +176,7 @@ func newHarness(t *testing.T) *harness {
 
 	svc := connections.New(connections.Deps{
 		Conns: r.Connections, Secrets: secretsRepo, Metadata: r.Metadata,
-		Cipher: cipher, Auth: auth, Backend: backend, Preconnect: pre,
+		Cipher: cipher, Auth: auth, Backend: backend, Preconnect: pre, MaskRules: r.MaskRules,
 	})
 	svc.Start()
 	t.Cleanup(svc.Shutdown)
@@ -1003,5 +1004,74 @@ func TestDuplicateCopiesThePasswordAtomically(t *testing.T) {
 	}
 	if original == nil || *original != "s3cret" {
 		t.Errorf("original's stored password = %v, want unchanged %q", original, "s3cret")
+	}
+}
+
+// TestDuplicateCopiesMaskRules is finding #6 (M6): ConnectionFields carries MCP exposure over to a
+// duplicate, but mask rules live in a separate table keyed by connection_id and were never copied
+// — a duplicated connection that was masked-and-MCP-exposed became immediately MCP-exposed with
+// zero mask rules, silently exposing whatever PII the original was protecting.
+func TestDuplicateCopiesMaskRules(t *testing.T) {
+	h := newHarness(t)
+	created := mustCreate(t, h.svc, fieldsInput("masked-source"))
+
+	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
+		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail, KeepHint: true, Correlate: true,
+	}, model.NowISO()); err != nil {
+		t.Fatalf("MaskRules.Upsert: %v", err)
+	}
+	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
+		TableName: "customers", ColumnName: "ssn", Kind: model.MaskKindRedact,
+	}, model.NowISO()); err != nil {
+		t.Fatalf("MaskRules.Upsert: %v", err)
+	}
+
+	dup, err := h.svc.Duplicate(created.ID)
+	if err != nil {
+		t.Fatalf("Duplicate: %v", err)
+	}
+
+	dupRules, err := h.repos.MaskRules.ListForConnection(dup.ID)
+	if err != nil {
+		t.Fatalf("MaskRules.ListForConnection(duplicate): %v", err)
+	}
+	if len(dupRules) != 2 {
+		t.Fatalf("duplicate has %d mask rules, want 2 (copied from the source)", len(dupRules))
+	}
+	if dupRules[0].ColumnName != "email" || dupRules[0].Kind != model.MaskKindEmail || !dupRules[0].Correlate {
+		t.Errorf("duplicate rule[0] = %+v, want the source's email rule copied verbatim", dupRules[0])
+	}
+	if dupRules[1].ColumnName != "ssn" || dupRules[1].Kind != model.MaskKindRedact {
+		t.Errorf("duplicate rule[1] = %+v, want the source's ssn rule copied verbatim", dupRules[1])
+	}
+
+	// Fresh ids and a connection_id pointing at the duplicate, not the source.
+	for _, r := range dupRules {
+		if r.ConnectionID != dup.ID {
+			t.Errorf("copied rule ConnectionID = %q, want %q", r.ConnectionID, dup.ID)
+		}
+	}
+
+	// The source's own rules must be untouched by the copy.
+	sourceRules, err := h.repos.MaskRules.ListForConnection(created.ID)
+	if err != nil {
+		t.Fatalf("MaskRules.ListForConnection(source): %v", err)
+	}
+	if len(sourceRules) != 2 {
+		t.Fatalf("source has %d mask rules after Duplicate, want unchanged 2", len(sourceRules))
+	}
+
+	// A source with no mask rules at all duplicates cleanly with none — not an error.
+	plain := mustCreate(t, h.svc, fieldsInput("unmasked-source"))
+	plainDup, err := h.svc.Duplicate(plain.ID)
+	if err != nil {
+		t.Fatalf("Duplicate(no rules): %v", err)
+	}
+	noRules, err := h.repos.MaskRules.ListForConnection(plainDup.ID)
+	if err != nil {
+		t.Fatalf("MaskRules.ListForConnection(no-rules duplicate): %v", err)
+	}
+	if len(noRules) != 0 {
+		t.Fatalf("no-rules duplicate has %d mask rules, want 0", len(noRules))
 	}
 }
