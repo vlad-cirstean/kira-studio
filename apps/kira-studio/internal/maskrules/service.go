@@ -5,6 +5,7 @@
 package maskrules
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"sync"
@@ -154,6 +155,44 @@ func (s *Service) MaskSetFor(connectionID string) (mask.Set, error) {
 	set := mask.Set{Masker: mask.New(key), Rules: folded}
 	s.store(connectionID, set)
 	return set, nil
+}
+
+// CorrelationKeyHex returns connectionID's own correlation key, hex-encoded, minting one first
+// (§2.5's own lazy creation) if the connection has at least one correlating rule and none exists
+// yet. "" means the connection needs no key at all. This is NOT one of the plan's originally named
+// bridge methods (§4.6 lists List/Upsert/Remove/RegenerateKey/Counts) — it is added because §6.3's
+// own design (the grid preview computing tags locally via Web Crypto, to match MCP's output
+// byte-for-byte) is otherwise impossible: the renderer has no other way to obtain the raw key. Per
+// §6.1, the renderer is not the adversary the MCP path defends against — exposing the key to it
+// mirrors how a connection password already reaches the renderer for editing (connections.Reveal)
+// — but this is still the one seam that ever sends the key outside this process, so it must never
+// be reachable from anything but the grid preview's own local tag computation.
+//
+// Folding is deliberately NOT applied before checking "does anything correlate": a raw rule with
+// correlate=true that later loses a §4.2 fold to a stricter, non-correlating rule on the same
+// column still triggers a mint here. That mints a key that ends up unused for that particular
+// column — harmless (an unused key sitting in the store, never surfaced anywhere) rather than a
+// correctness bug, and far simpler than re-deriving the fold just to decide whether to mint.
+func (s *Service) CorrelationKeyHex(connectionID string) (string, error) {
+	rows, err := s.rules.ListForConnection(connectionID)
+	if err != nil {
+		return "", err
+	}
+	needsKey := false
+	for _, r := range rows {
+		if r.Correlate {
+			needsKey = true
+			break
+		}
+	}
+	if !needsKey {
+		return "", nil
+	}
+	key, err := s.keys.EnsureKey(connectionID)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(key), nil
 }
 
 func (s *Service) store(connectionID string, set mask.Set) {

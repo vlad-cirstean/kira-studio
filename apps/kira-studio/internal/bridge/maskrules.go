@@ -69,3 +69,15 @@ func (s *MaskRulesService) RegenerateKey(args MaskRulesRegenerateKeyArgs) error 
 func (s *MaskRulesService) Counts() (map[string]int, error) {
 	return s.Deps.MaskRules.Counts()
 }
+
+// CorrelationKey returns connectionID's own correlation key, hex-encoded ("" when none is needed)
+// — the one seam that sends the raw key to the renderer, for the grid preview's own local tag
+// computation (§6.3). Not part of the plan's originally named bridge methods; see
+// maskrules.Service.CorrelationKeyHex's own comment for why it exists and why it is scoped this
+// narrowly.
+func (s *MaskRulesService) CorrelationKey(args MaskRulesListArgs) (string, error) {
+	if args.ConnectionID == "" {
+		return "", ipcerr.BadRequest("connectionId is required")
+	}
+	return s.Deps.MaskRules.CorrelationKeyHex(args.ConnectionID)
+}
