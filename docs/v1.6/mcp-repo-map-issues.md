@@ -563,7 +563,7 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   pre-existing `internal/repomap` race.
 
 - **P69c (implementation) — `internal/repomap`'s `TestDetachDrainsInFlightCall` fails under `-race`
-  on a pre-existing, unrelated data race. Open.**
+  on a pre-existing, unrelated data race. Fixed (`4d331da6`).**
 
   Found running this phase's own verification step (`go test -race -count=5 ./internal/codeindex/
   ./internal/repomap/`), not by calling the MCP server, but logged here per the same process —
@@ -594,6 +594,22 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   goroutine's read of the same package-level var. Not a `codeparse` issue and not touched by this
   phase's commits; logged for a future fix pass (the test would need to drain that goroutine, e.g.
   via a hook or a bounded wait, before restoring `readyTimeout`).
+
+  **Fix (P69e, `4d331da6`)**: `Server` now counts its own drain goroutines (a `detachWG
+  sync.WaitGroup` field), `Detach`'s drain goroutine `Add`/`Done`s around itself, and `Close` joins
+  `detachWG` before closing the shared store. `TestDetachDrainsInFlightCall` waits its own drain out
+  (new `detachDrained`/`mustDrain` helpers) before its `defer` restores `readyTimeout`. Two
+  corrections against this entry's own prose, found re-verifying against live source rather than
+  trusting it: the test has **two** subtests, not three, and **both** leak a drain goroutine, not
+  only the one the trace above named — the trace only ever shows whichever one is still inside
+  `close()` when the `defer` fires, so fixing just that subtest would have left the race live.
+  §3.3's mutation check (temporarily replacing the drain goroutine with a synchronous `inst.close()`)
+  confirmed the new ordering assertion actually detects the regression it exists to catch: fails on
+  the first run with `Detach closed the instance while a call was still in flight`. Post-fix
+  measurements: `go test -race -run TestDetachDrainsInFlightCall -count=20 ./internal/repomap/`
+  clean on 3/3 invocations (was a `DATA RACE` on 3/3 before the fix); `-count=100` clean (17.7s);
+  `go test -race ./internal/repomap/...` clean, and `-count=5` clean; `go build ./...` and
+  `go vet ./...` both clean.
 
 - **P69 (code review, round 2) — `find_references` still returns nothing for a package-level
   constant read as a plain identifier operand (call argument, comparison, arithmetic). Fixed
