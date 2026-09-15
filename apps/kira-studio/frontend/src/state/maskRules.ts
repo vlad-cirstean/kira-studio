@@ -62,6 +62,14 @@ export async function regenerateMaskKey(connectionId: string): Promise<void> {
   await control.maskRulesRegenerateKey(connectionId);
   // Force the next correlationKeyFor to refetch — every existing tag is now stale.
   delete maskRulesState.correlationKeys[connectionId];
+  // M7 finding #12: SlickGridHost's own maskPreview/rules watch depends on this array's identity
+  // (`maskRulesState.byConnection[connectionId]`), not its contents, and neither that nor
+  // `maskPreview` itself changes here — without this, a tab whose preview is already open on this
+  // connection keeps showing its now-stale tag cache (computed under the old key) until some
+  // unrelated toggle or reload happens to refresh it. Reassigning to a shallow copy (same rules,
+  // new reference) forces that watch to re-run without actually changing any rule.
+  const rules = maskRulesState.byConnection[connectionId];
+  if (rules) maskRulesState.byConnection[connectionId] = [...rules];
 }
 
 function hexToBytes(hex: string): Uint8Array {
