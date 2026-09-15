@@ -19,40 +19,60 @@ export * from 'monaco-editor/editor/editor.api.js';
 
 import { languages } from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/features/register.all.js';
+import { withDecorators } from './monarch/decorators';
 
-// §9.4's registered set — one import per language, each registering a lazy Monarch loader
-// (registerLanguage's own `languages.registerTokensProviderFactory`, upstream's mechanism, not
-// ours) so a language's own tokenizer data loads only once a file of that language is actually
-// opened, on top of this chunk's own lazy load.
-import 'monaco-editor/languages/definitions/typescript/register.js';
-import 'monaco-editor/languages/definitions/javascript/register.js';
-import 'monaco-editor/languages/definitions/java/register.js';
-import 'monaco-editor/languages/definitions/python/register.js';
-import 'monaco-editor/languages/definitions/go/register.js';
-import 'monaco-editor/languages/definitions/rust/register.js';
-import 'monaco-editor/languages/definitions/html/register.js';
-import 'monaco-editor/languages/definitions/css/register.js';
-import 'monaco-editor/languages/definitions/scss/register.js';
-import 'monaco-editor/languages/definitions/less/register.js';
-import 'monaco-editor/languages/definitions/markdown/register.js';
-import 'monaco-editor/languages/definitions/yaml/register.js';
-import 'monaco-editor/languages/definitions/xml/register.js';
-import 'monaco-editor/languages/definitions/shell/register.js';
-import 'monaco-editor/languages/definitions/sql/register.js';
-import 'monaco-editor/languages/definitions/dockerfile/register.js';
-import 'monaco-editor/languages/definitions/ini/register.js';
-import 'monaco-editor/languages/definitions/graphql/register.js';
-import 'monaco-editor/languages/definitions/protobuf/register.js';
+// D3 (P67c §2.3): upstream's own "every basic language" bundle, replacing what used to be 19
+// individual `register.js` imports. Every grammar body still stays behind its own lazy `loader: ()
+// => import(...)` inside its `register.js` (measured at ~15 KB raw for the 65 newly-added
+// registrations, `register.all.js` itself is 81 one-line imports) — this only widens which
+// extensions Monaco recognizes at all instead of falling back to `plaintext`. Two ids it also
+// registers — `typescript`/`javascript` — are re-registered below with a patched tokenizer; see D2.
+import 'monaco-editor/languages/definitions/register.all.js';
 
-// D9: Monaco ships no `languages/definitions/json` in this version either — its JSON coloring
-// lives inside the excluded `vs/language/json` service. Registered here directly (rather than
-// through upstream's own `registerLanguage` helper, which is internal to the definitions package)
-// with the exact same lazy-loader shape: `.json`/`.jsonc` color with the JavaScript Monarch
-// definition, loaded only once a JSON file is actually opened.
+// D1 (P67c §2.1): 0.56.0 ships no `languages/definitions/json` — that grammar was, until now,
+// borrowed from JavaScript's Monarch, which has one generic `string` rule and so colors every key
+// and value identically. `languages/features/json/tokenization.js` is a real, worker-free
+// `TokensProvider` (its only dependency is the bundled jsonc-parser scanner — no `jsonMode`, no
+// `workerManager`, no `json.worker`, so D7's one-worker guard below is untouched) that tells
+// `string.key.json` apart from `string.value.json`.
 languages.register({ id: 'json', extensions: ['.json', '.jsonc'], aliases: ['JSON', 'json'] });
 languages.registerTokensProviderFactory('json', {
+  // `true` = tolerate comments: `.jsonc` shares this id, and a commented tsconfig.json is
+  // ordinary. Strict JSON is unaffected — the scanner only ever *additionally* recognises them.
   create: async () =>
-    (await import('monaco-editor/languages/definitions/javascript/javascript.js')).language,
+    (
+      await import('monaco-editor/languages/features/json/tokenization.js')
+    ).createTokenizationSupport(true),
+});
+
+// D2 (P67c §2.2): `typescript.js`/`javascript.js` share one tokenizer object by reference
+// (`javascript.js`'s own `tokenizer: language$1.tokenizer`), and neither's `common` rule list nor
+// its `symbols` regex (`/[=><!~?:&|+\-*\/\^%]+/`) matches `@` — a decorator falls through to
+// `defaultToken: "invalid"` and paints red. `withDecorators` prepends one rule emitting `annotation`
+// (matching Java's own grammar convention for `@Foo`) against a shallow clone, never the shared
+// original. Registered here rather than left to `register.all.js`'s own `typescript/register.js` /
+// `javascript/register.js` (imported above): `TokenizationRegistry.registerFactory` disposes
+// whichever factory was registered for a language id first and keeps only the latest (verified
+// against `tokenizationRegistry.js`'s own `registerFactory`), so ours must run *after* the
+// `register.all.js` import above to be the one Monaco actually uses — the opposite of "first
+// registration wins," which was this plan's own untested assumption. `languages.register()` is not
+// repeated here: `register.all.js` already registered both ids with their full extension/alias/
+// mimetype list, and a second call would only duplicate entries in that merged array. Language
+// *configuration* (brackets, comments, auto-closing pairs) needs no duplicate call either —
+// `register.all.js`'s own `typescript/register.js`/`javascript/register.js` already wired
+// `languages.onLanguageEncountered(id, ...)` to load the same module and call
+// `setLanguageConfiguration`, an independent registry from the tokenizer factory we override above.
+languages.registerTokensProviderFactory('typescript', {
+  create: async () =>
+    withDecorators(
+      (await import('monaco-editor/languages/definitions/typescript/typescript.js')).language,
+    ),
+});
+languages.registerTokensProviderFactory('javascript', {
+  create: async () =>
+    withDecorators(
+      (await import('monaco-editor/languages/definitions/javascript/javascript.js')).language,
+    ),
 });
 
 // P60a §4.2/§7 step 3: `kira-mongo`/`kira-redis` — two Monarch definitions this app owns, a direct

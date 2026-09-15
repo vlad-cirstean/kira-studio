@@ -35,11 +35,29 @@ function tokenRules(): { token: string; foreground: string }[] {
     { token: 'string.escape', foreground: bare(string) },
     { token: 'number', foreground: bare(number) },
     { token: 'keyword', foreground: bare(keyword) },
+    // D4 checked and declined a separate `type.identifier` row (TS/JS emit it for any `[A-Z]…`
+    // identifier): `ThemeTrieElement.match` (tokenization.js) walks the dotted scope by segment and
+    // falls back to the nearest registered ancestor, so `type.identifier` already resolves to this
+    // `type` rule with no extra entry needed.
     { token: 'type', foreground: bare(keyword) },
     { token: 'constant', foreground: bare(keyword) },
     { token: 'keyword.control', foreground: bare(control) },
     { token: 'variable.name', foreground: bare(property) },
+    // Not dead: `ini.js` (`key=value`), `less.js`, `lua.js`, `julia.js`, `scala.js`, `abap.js` and
+    // `clojure.js` all still emit a bare `key` token — several only reachable since D3 registered
+    // their grammars at all (verified with a grep across every `languages/definitions/*/*.js`).
     { token: 'key', foreground: bare(property) },
+    // D1/D4: Monaco's own JSON tokenizer (`languages/features/json/tokenization.js`) emits
+    // `string.key.json` for an object key and `string.value.json` for a string value — distinct
+    // scopes so a package.json's keys and values no longer share one color. `string.value` is
+    // explicit (not left to inherit `string`'s own rule) so it can never accidentally pick up
+    // `string.key`'s color if the trie shape ever changes upstream.
+    { token: 'string.key', foreground: bare(property) },
+    { token: 'string.value', foreground: bare(string) },
+    // D2: the decorator/annotation token `withDecorators` (monarch/decorators.ts) prepends for
+    // TypeScript/JavaScript — also what Java's own grammar already emits for `@Override`, which
+    // had no rule before this and fell back to plain `editor.foreground`.
+    { token: 'annotation', foreground: bare(fn) },
     { token: 'attribute.name', foreground: bare(attribute) },
     { token: 'identifier', foreground: bare(name) },
     { token: 'variable', foreground: bare(name) },

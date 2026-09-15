@@ -21,3 +21,19 @@ declare module 'monaco-editor/languages/definitions/javascript/javascript.js' {
   export const language: languages.IMonarchLanguage;
   export const conf: languages.LanguageConfiguration;
 }
+
+// D2 (P67c §2.2): same shape, `typescript.js` — monacoEntry.ts imports it directly so `withDecorators`
+// (monarch/decorators.ts) can patch its `common` tokenizer rules before registering it.
+declare module 'monaco-editor/languages/definitions/typescript/typescript.js' {
+  import type { languages } from 'monaco-editor';
+  export const language: languages.IMonarchLanguage;
+  export const conf: languages.LanguageConfiguration;
+}
+
+// D1 (P67c §2.1): the worker-free JSON tokenizer monacoEntry.ts registers `json`'s tokens provider
+// factory with — untyped for the same reason as the two declarations above (no sibling .d.ts ships
+// for a module under `languages/features/*`, only for a `register.js` entry point).
+declare module 'monaco-editor/languages/features/json/tokenization.js' {
+  import type { languages } from 'monaco-editor';
+  export function createTokenizationSupport(supportComments: boolean): languages.TokensProvider;
+}
