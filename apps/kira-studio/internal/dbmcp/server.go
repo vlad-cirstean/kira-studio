@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
@@ -56,10 +57,15 @@ type MetadataReader interface {
 	SchemaColumns(connectionID, path string, refresh bool) (tree.SchemaColumnsResult, error)
 }
 
-// QueryRunner is dbmcp's own consumer-declared interface over *adapterhost.Router's Execute seam —
-// run_query's only path into the adapter layer, the same one the console's own run() uses.
+// QueryRunner is dbmcp's own consumer-declared interface over *adapterhost.Router's Execute and
+// ClassifyStatement seams — run_query's only path into the adapter layer, the same one the
+// console's own run() uses.
 type QueryRunner interface {
 	Execute(ctx context.Context, req adapterhost.ExecuteRequestWire) (adapterhost.ExecuteResponse, error)
+	// ClassifyStatement answers what one statement would do (M2's permission gate) — an adapter
+	// error (or one that does not implement adapters.StatementClassifier) yields ClassUnknown, never
+	// a fatal error the caller must special-case.
+	ClassifyStatement(ctx context.Context, connectionID, statement string) (adapters.OpClass, error)
 }
 
 // Config is everything New needs. Zero-value Home takes the documented default; the other four
@@ -75,6 +81,10 @@ type Config struct {
 	Conns ConnectionsReader
 	Tree  MetadataReader
 	Query QueryRunner
+	// Approvals is the prompt-mode broker (M2 §5) — required, constructed once in main.go and
+	// outliving Server start/stop so the event subscription wired at boot stays valid across a
+	// server restart.
+	Approvals *ApprovalBroker
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
 	Logger *slog.Logger
 }
@@ -107,7 +117,7 @@ type Server struct {
 const serverVersion = "0.0.0"
 
 // instructions is §4's own one paragraph: the steer that decides whether any of this pays off.
-const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel."
+const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`."
 
 // New resolves cfg, mints or loads this instance's own token, builds the five-tool mcp.Server, and
 // binds the HTTP listener (§3.2's default-then-fallback port selection) — but does not yet accept
@@ -125,6 +135,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.Conns == nil || cfg.Tree == nil || cfg.Query == nil {
 		return nil, fmt.Errorf("dbmcp: Config.Conns, Config.Tree and Config.Query are required")
+	}
+	if cfg.Approvals == nil {
+		return nil, fmt.Errorf("dbmcp: Config.Approvals is required")
 	}
 
 	tokenRec, tokenPlain, tokenMinted, err := cfg.Token()
@@ -174,7 +187,7 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	}, s.describeSchema)
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_query",
-		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Results are capped by maxRows; the query itself still runs in full.",
+		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Results are capped by maxRows; the query itself still runs in full. Each connection's read/write/DDL permission is checked first: a denied class is refused, and a class set to prompt waits for the user to approve it, which can take up to two minutes.",
 	}, s.runQuery)
 
 	return srv

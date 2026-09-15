@@ -287,6 +287,22 @@ func (r *Router) Execute(ctx context.Context, req ExecuteRequestWire) (ExecuteRe
 	return r.dispatcher.Execute(ctx, req)
 }
 
+// ClassifyStatement answers what one console statement would do on connectionID's live adapter —
+// dbmcp's own permission gate (M2). Deliberately outside RunOp: it issues no server work of its
+// own (redis's COMMAND table is fetched once per connection set and cached), and the Execute it
+// gates is the op that belongs in the op-log.
+func (r *Router) ClassifyStatement(ctx context.Context, connectionID, statement string) (adapters.OpClass, error) {
+	adapter, err := requireLiveAdapter(connectionID)
+	if err != nil {
+		return adapters.ClassUnknown, err
+	}
+	classifier, ok := adapter.(adapters.StatementClassifier)
+	if !ok {
+		return adapters.ClassUnknown, nil
+	}
+	return classifier.ClassifyStatement(ctx, statement)
+}
+
 // ---- bridge.Canceller ----
 
 // Cancel asks the in-process scheduler — the only place an op can be running now that P58f's
