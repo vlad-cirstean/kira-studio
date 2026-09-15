@@ -77,12 +77,18 @@ function maskWord(word: string, keepHint: boolean): string {
   return g[0] + BULLET.repeat(n - 1);
 }
 
+// NAME_WORD_SPLIT_RE mirrors Go's strings.Fields (unicode.IsSpace) rather than plain `\s`: JS's
+// `\s` does not match U+0085 (NEL), a character unicode.IsSpace does treat as whitespace, so a
+// name value containing one would split into a different word count in each language without
+// this — U+0085 added explicitly to close that gap.
+const NAME_WORD_SPLIT_RE = /[\s]+/;
+
 // maskName keeps each whitespace-separated word's first grapheme (when keepHint) plus its own
 // grapheme length, destroying every other character. A value with no words at all (empty after
 // trimming whitespace — not the empty-string case apply already handles) falls through to
 // REDACT_LITERAL rather than echoing "".
 function maskName(value: string, keepHint: boolean): string {
-  const words = value.split(/\s+/).filter((w) => w.length > 0);
+  const words = value.split(NAME_WORD_SPLIT_RE).filter((w) => w.length > 0);
   if (words.length === 0) return REDACT_LITERAL;
   return words.map((w) => maskWord(w, keepHint)).join(' ');
 }
@@ -121,9 +127,13 @@ function maskText(value: string): string {
   return `${BULLET}${BULLET}${BULLET} (text, ${lengthBucket(n)} chars)`;
 }
 
-// NUMERIC_RE accepts the same plain-decimal/scientific shapes strconv.ParseFloat does, and rejects
-// what JS's own permissive `Number()` would otherwise silently accept (hex literals, "", whitespace
-// coercing to 0).
+// NUMERIC_RE is the canonical accept/reject gate for maskNumber, on both sides (mask.go's own
+// numericAcceptRE mirrors this exactly, checked before its ParseFloat call): plain-decimal and
+// scientific-notation shapes only. Deliberately narrower than strconv.ParseFloat's own Go-literal
+// grammar (which additionally accepts `_` digit separators and hex floats like "0x1p4") — a real
+// DB driver never emits either as a numeric column's text representation, so this stays the
+// stricter, shared shape rather than widening Go to match a grammar TS's permissive `Number()`
+// already had to be walled off from (hex literals, "", whitespace coercing to 0).
 const NUMERIC_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
 // PLAIN_DECIMAL_RE matches an unsigned plain decimal literal — digits, optionally one `.` and more

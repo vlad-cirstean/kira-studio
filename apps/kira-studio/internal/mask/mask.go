@@ -219,11 +219,23 @@ func maskNumber(value string) string {
 // stay exact.
 var plainDecimalRE = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?$`)
 
+// numericAcceptRE is the canonical accept/reject gate for maskNumber, on both sides (mask.ts's own
+// NUMERIC_RE mirrors this exactly). Checked before strconv.ParseFloat, since ParseFloat alone
+// accepts the whole Go floating-point literal grammar — `_` digit separators ("1_000") and hex
+// floats ("0x1p4") included — which a real DB driver never emits as a numeric column's text
+// representation, and which mask.ts's own regex-based gate never accepted either; without this
+// check a value shaped like a Go literal but not a plain number would bucket in Go while falling
+// through to redact in TS (finding #14, M6).
+var numericAcceptRE = regexp.MustCompile(`^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$`)
+
 // decadeRange formats value's own fixed-power-of-ten bucket (§2.3/§2.4's own "boundaries are fixed
 // powers of ten, never data-derived"). ok is false when value does not parse as a real number at
 // all (adapters.Error-free — this package never touches the adapter layer).
 func decadeRange(value string) (string, bool) {
 	trimmed := strings.TrimSpace(value)
+	if !numericAcceptRE.MatchString(trimmed) {
+		return "", false
+	}
 	v, err := strconv.ParseFloat(trimmed, 64)
 	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
 		return "", false
