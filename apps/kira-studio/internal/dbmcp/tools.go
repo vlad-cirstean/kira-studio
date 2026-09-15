@@ -257,6 +257,14 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		Statements:   []string{args.SQL},
 	})
 	if err != nil {
+		// Finding #4, M6: a Postgres/MySQL driver error routinely embeds the offending value (a
+		// failed type-cast error names the literal it couldn't parse) — on a connection with
+		// active mask rules, the adapter's raw message could leak a real, unmasked value one row
+		// at a time (SELECT email::int FROM customers LIMIT 1 OFFSET n). Scoped to masked
+		// connections only; an unmasked connection keeps full error detail for debuggability.
+		if mk != nil {
+			return maskedToolError(err)
+		}
 		return toolError(err)
 	}
 	if len(resp.Pages) == 0 {
@@ -365,6 +373,18 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		return errResult("this connection's MCP permissions are misconfigured for read statements; change them in the connection's MCP tab")
 	}
 
+	// Finding #4, M6: same masked-error scoping as run_query — a composed EXPLAIN still plans
+	// against the connection's real data, so keep the adapter's driver error value-free here too
+	// when this connection has active mask rules.
+	set, err := s.cfg.MaskRules.MaskSetFor(args.ConnectionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	var mk *maskset
+	if !set.Empty() {
+		mk = &set
+	}
+
 	resp, err := s.cfg.Query.Execute(ctx, adapterhost.ExecuteRequestWire{
 		OpID:         uuid.NewString(),
 		ConnectionID: args.ConnectionID,
@@ -372,6 +392,9 @@ func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args 
 		Statements:   statements,
 	})
 	if err != nil {
+		if mk != nil {
+			return maskedToolError(err)
+		}
 		return toolError(err)
 	}
 

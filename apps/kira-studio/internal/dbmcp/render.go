@@ -82,6 +82,25 @@ func toolError(err error) (*mcp.CallToolResult, any, error) {
 	return nil, nil, err
 }
 
+// maskedToolError is toolError's own sibling for a query executed against a connection with
+// active mask rules (finding #4, M6): a Postgres/MySQL driver error routinely embeds the value
+// that failed — a type-cast error names the literal it couldn't parse, for instance — so passing
+// the adapter's message straight through leaked the real, unmasked value one row at a time (e.g.
+// SELECT email::int FROM customers LIMIT 1 OFFSET n). The code (whatever adapters.CodeOf/ipcerr
+// already parsed out) is kept, since it carries no row data; the message is replaced with a fixed,
+// value-free description. An internal fault (neither an *adapters.Error nor an *ipcerr.Error)
+// still returns as a bare Go error, same as toolError — there is no adapter message to withhold.
+func maskedToolError(err error) (*mcp.CallToolResult, any, error) {
+	if code, ok := adapters.CodeOf(err); ok {
+		return errResult(fmt.Sprintf("%s: query failed (message withheld — this connection has active PII masking rules)", code))
+	}
+	var ipcErr *ipcerr.Error
+	if errors.As(err, &ipcErr) {
+		return errResult(fmt.Sprintf("%s: query failed (message withheld — this connection has active PII masking rules)", ipcErr.Code))
+	}
+	return nil, nil, err
+}
+
 // --- list_connections' own response shape (§4.1) ---
 
 // connectionCapabilities is list_connections' own "capabilities" object — present only when the

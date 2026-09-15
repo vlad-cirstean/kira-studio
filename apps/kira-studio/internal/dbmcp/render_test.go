@@ -1,11 +1,14 @@
 package dbmcp
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mask"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // TestRenderTabularPageNullVersusEmptyString is §8's own named hazard: a NULL row and an empty
@@ -366,6 +369,36 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 	pg2 := b2.Finish(page.UnpagedPosition(1))
 	if _, err := renderPage(pg2, 200, nil, &set, "SELECT email FROM customers"); err != nil {
 		t.Fatalf("renderPage(masked column by its own name) = %v, want no error", err)
+	}
+}
+
+// TestMaskedToolErrorWithholdsAdapterMessage is finding #4 (M6): a Postgres/MySQL driver error
+// routinely embeds the offending value (e.g. a failed type-cast error names the literal it could
+// not parse) — over a connection with active mask rules, maskedToolError must keep the parsed
+// error code (no row data) but never the adapter's own message text.
+func TestMaskedToolErrorWithholdsAdapterMessage(t *testing.T) {
+	leaky := adapters.New(adapters.CodeQuery, `invalid input syntax for type integer: "person@example.com"`, nil)
+
+	result, _, err := maskedToolError(leaky)
+	if err != nil {
+		t.Fatalf("maskedToolError(adapter error) returned a Go error %v, want an IsError result (nil error)", err)
+	}
+	if !result.IsError {
+		t.Fatal("maskedToolError(adapter error).IsError = false, want true")
+	}
+	text := result.Content[0].(*mcp.TextContent).Text
+	if strings.Contains(text, "person@example.com") {
+		t.Fatalf("maskedToolError leaked the adapter's raw message: %q", text)
+	}
+	if !strings.Contains(text, string(adapters.CodeQuery)) {
+		t.Fatalf("maskedToolError dropped the error code: %q", text)
+	}
+
+	// A genuine internal fault (no adapter/ipcerr code) is unaffected — still a bare Go error,
+	// same as toolError, since there is no adapter message to withhold in the first place.
+	internal := errors.New("dbmcp: something else entirely")
+	if _, _, err := maskedToolError(internal); err == nil {
+		t.Fatal("maskedToolError(internal fault) = nil error, want the original error returned")
 	}
 }
 
