@@ -183,8 +183,12 @@ func (s *Session) checkoutParser(grammar ID) (*sitter.Parser, error) {
 	return p, nil
 }
 
+// checkinParser returns p to the pool. p reaches here only after a parse that returned a tree:
+// ts_parser_parse runs ts_parser_reset on its own exit: path, and clears canceled_balancing
+// before that, so p is already clean — nothing here needs re-resetting. A parse that returned nil
+// is never checked in here; the caller Closes it instead (see Parse/Reparse), since a cancelled
+// parse leaves state (canceled_balancing) that no public API can clear in place.
 func (s *Session) checkinParser(grammar ID, p *sitter.Parser) {
-	p.Reset() // clears any cancellation flag left over from a cancelled parse before reuse.
 	s.parserMu.Lock()
 	s.parsers[grammar] = append(s.parsers[grammar], p)
 	s.parserMu.Unlock()
@@ -198,12 +202,13 @@ func (s *Session) Parse(ctx context.Context, path string, content []byte, lang I
 	if err != nil {
 		return Result{}, err
 	}
-	defer s.checkinParser(container, parser)
 
 	tree, err := parseWithOptions(ctx, parser, content, nil)
 	if err != nil {
+		parser.Close() // cancelled or failed parse: state no public API can clear, never pool it.
 		return Result{}, err
 	}
+	s.checkinParser(container, parser)
 
 	result, err := s.extract(tree, content, lang)
 	if err != nil {
@@ -226,18 +231,11 @@ func (s *Session) Reparse(ctx context.Context, path string, newContent []byte, l
 		return s.Parse(ctx, path, newContent, lang)
 	}
 
-	container := containerOf(lang)
-	parser, err := s.checkoutParser(container)
-	if err != nil {
-		entry.tree.Close()
-		return Result{}, err
-	}
-	defer s.checkinParser(container, parser)
-
 	edit, hasEdit := DeriveEdit(entry.content, newContent)
 	if !hasEdit {
 		// Byte-identical content: nothing to reparse (§7.2 names this explicitly — "an
-		// unchanged file" produces no edit at all). Re-cache as-is and return its extraction.
+		// unchanged file" produces no edit at all). Re-cache as-is and return its extraction. No
+		// parser is checked out for this path at all.
 		result, err := s.extract(entry.tree, newContent, lang)
 		if err != nil {
 			entry.tree.Close()
@@ -247,12 +245,21 @@ func (s *Session) Reparse(ctx context.Context, path string, newContent []byte, l
 		return result, nil
 	}
 
-	entry.tree.Edit(&edit)
-	newTree, err := parseWithOptions(ctx, parser, newContent, entry.tree)
+	container := containerOf(lang)
+	parser, err := s.checkoutParser(container)
 	if err != nil {
 		entry.tree.Close()
 		return Result{}, err
 	}
+
+	entry.tree.Edit(&edit)
+	newTree, err := parseWithOptions(ctx, parser, newContent, entry.tree)
+	if err != nil {
+		entry.tree.Close()
+		parser.Close() // cancelled or failed parse: state no public API can clear, never pool it.
+		return Result{}, err
+	}
+	s.checkinParser(container, parser)
 	changedRanges := toRanges(entry.tree.ChangedRanges(newTree))
 	entry.tree.Close()
 
@@ -273,7 +280,11 @@ func (s *Session) Reparse(ctx context.Context, path string, newContent []byte, l
 // ts_parser_set_cancellation_flag was explicitly called — which nothing here does — so a
 // cancellation mid-parse is a guaranteed nil-pointer SIGSEGV in an orphan goroutine no caller can
 // recover from. ProgressCallback runs synchronously inside the parse call itself instead, so no
-// goroutine outlives it and there is nothing left to write to after the parse returns.
+// goroutine outlives it — but that is not itself a safety property: the callback feeds the exact
+// same internal ts_parser__check_progress cancellation path as the deprecated flag it replaces,
+// and cancelling by either mechanism abandons the parse without running tree-sitter's own reset.
+// A parser this returns a nil tree from must be discarded by the caller, never checked back into
+// the pool (see checkinParser's own doc).
 //
 // Returns a real error whenever tree comes back nil: ctx's own error if ctx was actually
 // cancelled, or errParseFailed otherwise — never (nil, nil). A nil tree with a nil error would
