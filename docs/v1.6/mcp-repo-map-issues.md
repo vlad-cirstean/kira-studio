@@ -330,7 +330,54 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   `server.go:30:5`, and `find_references {"symbol":"runInitialSync"}` returned its one real call
   site (`attach.go:122`). One new non-trivial finding, below.
 
+- **P69b (planning)**: same `ConnectionRefused`/stale-token pattern as every entry above — no server
+  at session start, built, started, deleted the one stale hashed token file under
+  `/root/.kira-studio/`, restarted to mint a fresh bearer token, called it over plain HTTP/JSON-RPC
+  throughout. Killed by PID, never `pkill`, per P63's own note. Reproduced the open non-trivial
+  entry below exactly as logged (all six names, all `no references found`), then used three
+  throwaway probe builds to measure the fix before writing it up; every probe reverted, tree clean.
+  Two notes for a future session. First, **`codeindex.db` is shared across worktrees** — it held
+  four repo roots here, so an unscoped `select count(*) from reference` reads 507,983 where this
+  repository's own figure is 141,973. Scope every count by `repo_id`; this pass got it wrong first
+  time and the 3.6x error is not obvious from the number alone. Second, editing a `.scm` query file
+  alone is enough to force the full truncate-and-rebuild (`Fingerprint` hashes each query file's
+  bytes) — `extractionVersion` does **not** need bumping for a query-only change, contrary to the
+  fix shape the entry below suggests. A full reparse of this repository took 248 s. One new
+  non-trivial finding, below, unrelated to this phase's own subject.
+
 ### Non-trivial
+
+- **P69b (planning) — `TestParseConcurrentCancellationDoesNotCrash` aborts the whole `codeparse`
+  test binary on a tree-sitter C assertion. Open.**
+
+  Found by running `go test`, not by calling the MCP server, but it sits inside the repo-map
+  indexing pipeline and is logged here because that is where this chapter's repo-map defects live.
+  Reproducible on clean HEAD `13b9d107` with no server running: **4 of 4** isolated runs failed
+  (`go test -count=1 -run TestParseConcurrentCancellationDoesNotCrash
+  ./apps/kira-studio/internal/codeparse/`). In a whole-package run it is intermittent, roughly 2 in
+  3.
+
+  ```
+  codeparse.test: .../go-tree-sitter@v0.25.0/src/./parser.c:2197:
+      ts_parser_parse: Assertion `self->finished_tree.ptr' failed.
+  SIGABRT: abort
+  signal arrived during cgo execution
+  ```
+
+  Stack: `codeparse/session.go:282` `parseWithOptions` → `(*Parser).ParseWithOptions` →
+  `_Cfunc_ts_parser_parse_with_options`, from `session_test.go:97`'s worker goroutine — eight
+  goroutines each racing a 1 ms `context.WithTimeout` against a parse, which is exactly what the
+  test exists to exercise.
+
+  This is the same surface commit `b412286b` ("replace deprecated `ParseCtx` with
+  `ParseWithOptions` to stop a SIGSEGV") addressed. The crash mode changed from SIGSEGV to a C-level
+  assertion; the underlying "cancel mid-parse leaves the parser unusable" problem did not go away.
+  The test's own name is the assertion being violated.
+
+  Impact is not test-only: `Session.Parse` is the live indexing path, and a cancelled parse (a
+  watcher-triggered resync racing a shutdown, a request deadline) aborting the process would take
+  the whole server down, not return an error. Not investigated further — out of P69b's scope, which
+  is a reference-capture fix, and per the process above this round reports rather than fixes.
 
 - **P69 (code review, round 2) — `find_references` still returns nothing for a package-level
   constant read as a plain identifier operand (call argument, comparison, arithmetic). Open.**
