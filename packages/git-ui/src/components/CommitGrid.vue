@@ -803,6 +803,12 @@ watch(
 watch(
   () => props.pr?.generation.value,
   () => {
+    // P72 §5.1: `rowMetadata` (columns.ts) derives a row's `height` from `rowHasBadges`, which
+    // reads `prsFor` — a PR resolution can flip a row between the compact and expanded height
+    // without a row-count change, exactly the case `invalidateRowHeights`'s own doc comment (and
+    // the token-change listener above) calls out as needing this explicit call, or SlickGrid's
+    // row-position index goes stale against the new heights (the scroll-flicker symptom).
+    grid?.invalidateRowHeights();
     grid?.invalidateAllRows();
     grid?.render();
   },
