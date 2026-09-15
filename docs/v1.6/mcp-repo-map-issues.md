@@ -380,7 +380,8 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   is a reference-capture fix, and per the process above this round reports rather than fixes.
 
 - **P69 (code review, round 2) — `find_references` still returns nothing for a package-level
-  constant read as a plain identifier operand (call argument, comparison, arithmetic). Open.**
+  constant read as a plain identifier operand (call argument, comparison, arithmetic). Fixed
+  (`752ffb83`).**
 
   A narrower survivor of the P67e entry below, which `ddd15b00`/`0bfef238` closed only for `range`
   clauses and index expressions. `queries/go/p67f_reads.scm` captures exactly two patterns —
@@ -420,6 +421,38 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   added 1617 `read` rows, and this one plausibly adds an order of magnitude more, which is a real
   index-size and insert-throughput question (`insertRef` is already 80% of the write phase, P64c
   §1.4) rather than a free win.
+
+  **Fix (P69b, `fa4ab77b` + `752ffb83`)**: shipped as planned (`docs/v1.6/plans/
+  P69b-repo-map-bare-identifier-reads.md`), captures plus a resolver fix, in that order. Query side
+  (`752ffb83`): `argument_list`/`arguments` and both `binary_expression` operands in both `.scm`
+  files, plus Go's own `slice_expression` bounds and operand (closes the `sourceLineMaxBytes:159`
+  slice-bound case this entry's own repro lists). `extractionVersion` did **not** move — a `.scm`
+  edit alone already changes the fingerprint and forces the rebuild, confirmed live.
+
+  The capture alone was not shippable: planning-time probing found 73% of the new rows unreachable
+  (a name matching no symbol anywhere) and the rest genuinely over-matching —
+  `find_references {"symbol":"path"}` went from 2 correct hits to 589 wrong ones (unrelated Go/TS
+  locals sharing the name), a Go-only language fix only brought it to 184. The whole argument in one
+  line: **`path` 2 → 589 → 0.** `resolve.go` (`fa4ab77b`, landed first) clamps a `"read"` reference's
+  candidates to tier ≤ 1 (same file or directory) before resolving — every read site this phase
+  indexes is already tier ≤ 1 by construction, so nothing real is lost — and separately fixes the
+  memo sentinel's `Language` field, never set before, which had left the existing Go
+  package-privacy rule unreachable from every `ReferencesTo` call, not only `"read"` ones.
+
+  Verified live against a rebuilt server, full reparse (210s), `codeindex.db` scoped to this repo's
+  own `repo_id`: all six repro names now resolve to their real read sites, including
+  `sourceLineMaxBytes:159`. Precision: `path`/`dir`/`out` → no references found, `id` → exactly 2,
+  `name`/`page`/`row` → the ambiguous-symbol prompt, not a wrong reference list. P67e's/P67f's own
+  read cases (`EXTENSION_LANGUAGE`, `EnumNamesRedisType`, `allowedMethods`) still answer identically.
+  Row counts, this repo's own `repo_id` only: `read` 5,261 → 68,165 (+62,904), total reference rows
+  141,973 → 204,916 (+44.3%). `call`/`type` moved by +27/+12 (93,788→93,815, 41,221→41,233) —
+  traced file-by-file against an independently rebuilt baseline at the plan's own pre-phase commit
+  and reconciled exactly to new source this phase's own two commits added (the new codegraph
+  regression test, the new `resolve.go` call site, the new fixture bodies), not to any pattern
+  matching outside those files; `class`/`implementation` (1,632/71) exactly unchanged. Existing
+  `codeparse`/`codegraph`/`repomap` suites stayed green (a separately tracked, pre-existing cgo
+  cancellation crash in `TestParseConcurrentCancellationDoesNotCrash`, P69c, reproduces identically
+  on the pre-phase commit and is unrelated to this fix).
 
 - **P67e (implementation) — `find_references` returns nothing for a package-level variable that is
   only ever read via `range` or an index expression (`x[k]`), never called. Fixed (`ddd15b00`,

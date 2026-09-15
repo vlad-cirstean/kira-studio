@@ -984,23 +984,36 @@ degraded: the last full sync of … failed (…); results may be incomplete.` pr
 sync stands failed — the one window (a failed sync, never retried) nothing can wait out — clearing
 itself the moment a later sync succeeds; empty and costs nothing in the normal case.
 
-**P64b's Go package-level `const`/`var` are indexed as definitions with reference rows only for a
-`range`/index-expression read.** Go's grammar has no `const_identifier` node kind distinguishing a
-constant's use from any other identifier use, so `find_references` on a Go constant returns empty by
-construction for most read shapes (a call argument, a selector base, an assignment RHS) — that is
-the honest answer, not "unused." **P67f (§3)** narrows this rather than closes it: a name read as a
-`range` clause's own operand or an `index_expression`'s operand now earns a `read` reference row
-(`queries/go/p67f_reads.scm`, and `queries/javascript/p67f_reads.scm` for JavaScript/TypeScript/TSX/
-Vue alike) — specifically where a *named collection* is consulted, the shape a session asking "where
-is this allowlist actually read?" needs and the one the P67e dogfooding log's own repro hit. A
-blanket `identifier`/`field_identifier` reference pattern covering every read position was measured
-and declined for the rest of that surface, both times: P64b's own whole-identifier measurement
-(257,971 new reference rows for Go alone against a then-current whole-repo total of 134,068, a 2.9x
-blowup) and P67f's narrower one (selector-base reads alone, 64,652 rows for one position against the
-range/index fix's own ~3.7k) — a name-based resolver ranking every local `err` as a candidate either
-way. `find_definition`, `search_symbols`, `outline_file` and `read_symbol` all work normally for
-these; `find_references` returns rows for a `range`/index read, still structurally empty for every
-other read shape.
+**P64b's Go package-level `const`/`var` are indexed as definitions with reference rows for a
+`range`/index-expression, call-argument, binary-operand or Go slice-bound read; a selector base or an
+assignment RHS still returns empty by construction.** Go's grammar has no `const_identifier` node
+kind distinguishing a constant's use from any other identifier use, so a name-based capture has to
+pick specific grammar positions rather than "every read" — the two uncaptured shapes are the honest
+answer for those positions, not "unused." **P67f (§3)** first narrowed this to a `range` clause's own
+operand and an `index_expression`'s operand (`queries/go/p67f_reads.scm`, and
+`queries/javascript/p67f_reads.scm` for JavaScript/TypeScript/TSX/Vue alike) — the shape a session
+asking "where is this allowlist actually read?" needs and the one the P67e dogfooding log's own repro
+hit. **P69b** (`docs/v1.6/plans/P69b-repo-map-bare-identifier-reads.md`) added the commonest read
+shape of all — a bare identifier passed as a call argument or used as a comparison/arithmetic
+operand — plus Go's own slice bounds (`raw[:n]`) and slice operand. The capture alone is not
+shippable: a bare identifier carries no import or qualification evidence, so without a resolver
+change it over-matches badly (measured: `find_references {"symbol":"path"}` went from 2 correct hits
+to 589 wrong ones, unrelated same-named locals repo-wide). `resolveName` (`codegraph/resolve.go`)
+now clamps a `"read"` reference's candidates to tier ≤ 1 (same file or same directory) before
+resolving — every read site any of these patterns capture is already tier ≤ 1 by construction (a
+package-level constant is consulted inside its own package), so this closes the over-match without
+losing real capability, and brought the `path` case to 0 cross-directory false positives. A blanket
+`identifier`/`field_identifier` reference pattern covering every remaining read position (a selector
+base, an assignment RHS) was measured and declined each time it came up: P64b's own whole-identifier
+measurement (257,971 new reference rows for Go alone against a then-current whole-repo total of
+134,068, a 2.9x blowup), P67f's narrower one (selector-base reads alone, 64,652 rows for one position
+against the range/index fix's own ~3.7k), and P69b's own (argument/operand/slice rows: +62,904 `read`
+rows, +44.3% total reference rows, scoped to this repo's own `repo_id`) — a name-based resolver
+ranking every local `err` as a candidate either way, and the tier clamp narrows what a cross-directory
+read can answer rather than removing the ambiguity a selector base or an assignment RHS would add.
+`find_definition`, `search_symbols`, `outline_file` and `read_symbol` all work normally for these;
+`find_references` now answers for every read shape this section names except a selector base and an
+assignment RHS.
 
 **C8 adds one source line under each hit — the one place this server reads a file's own bytes,
 never a whole file.** `find_definition`, `find_references`, `find_implementations` and
