@@ -41,7 +41,11 @@ export async function buildMaskTagCache(
     const chunk = page.chunks[col];
     for (let row = 0; row < page.rowCount; row++) {
       if (isNull(chunk, row)) continue;
-      distinct.add(cellText(chunk, row, decoder));
+      const value = cellText(chunk, row, decoder);
+      // apply()/Apply() never tag an empty string (short-circuit to '' before tagging) — matching
+      // that here keeps this cache from minting a tag createMaskPreviewTransform must never use.
+      if (value === '') continue;
+      distinct.add(value);
     }
   }
   if (distinct.size === 0) return cache;
@@ -73,6 +77,9 @@ export function createMaskPreviewTransform(
 ): (view: CellView, field: string) => MaskedCellView {
   return (view, field) => {
     if (view.isNull) return view;
+    // Mirror apply()/Apply()'s own value === '' short-circuit: an empty string carries nothing to
+    // hide and is never tagged there, so the preview must not mask or tag it here either.
+    if (view.text === '') return view;
     const rule = rules.get(field.toLowerCase());
     if (!rule) return view;
     const visible = applyVisible(rule, view.text);
