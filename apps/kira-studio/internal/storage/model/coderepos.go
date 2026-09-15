@@ -12,6 +12,10 @@ type CodeRepo struct {
 	RepoID    string `json:"repoId"`
 	SortOrder int    `json:"sortOrder"`
 	CreatedAt string `json:"createdAt"`
+	// McpEnabled is P67d's own per-repository grant: whether this repository is servable to an MCP
+	// client while the Code intelligence server is running. Defaults to false for every existing
+	// and future row — nothing is exposed until a user grants it explicitly.
+	McpEnabled bool `json:"mcpEnabled"`
 }
 
 // Validate asserts the identity fields no SQL constraint covers, the same discipline
