@@ -44,10 +44,12 @@ function treeRow(page: import('@playwright/test').Page, path: string) {
   return page.locator(`[data-testid="repo-tree-row"][data-path="${path}"]`);
 }
 
+// P72 §7: the pinned graph tab now renders in `tab-strip-pinned`, a sibling of `tab-strip-row`
+// rather than a descendant of it — `tab-strip-wrapper` is the common ancestor of both.
 function tab(page: import('@playwright/test').Page, kind?: string) {
   return kind
-    ? page.locator(`[data-testid="tab-strip-row"] [data-testid="tab"][data-tab-kind="${kind}"]`)
-    : page.locator('[data-testid="tab-strip-row"] [data-testid="tab"]');
+    ? page.locator(`[data-testid="tab-strip-wrapper"] [data-testid="tab"][data-tab-kind="${kind}"]`)
+    : page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');
 }
 
 async function openGitModule(page: import('@playwright/test').Page): Promise<void> {
@@ -90,12 +92,14 @@ test('bug 2 regression: a cold repo open reaches the graph with no boot-retry cl
   await expect(page.locator('[data-testid="boot-retry"]')).toHaveCount(0);
 });
 
-// Bug 1 (§2): opening a file (or anything that unmounts RepoGraphView.vue, e.g. a tab switch) tore
-// down the ONE shared Transport every mount in the repo workspace shared — gitTransportFor's own
-// cache handed back the same now-dead object, so returning to the pinned graph tab (or switching
-// the panel to Review, sharing that same transport) hit a boot error instead of remounting live.
-// The fix (repo/git/transport.ts's per-mount lease, §2.1) makes each mount's own dispose() release
-// only its own subscriptions, never the shared socket.
+// Bug 1 (§2): opening a file (or anything that unmounts RepoGraphView.vue, e.g. a tab switch —
+// P72 §3 made a plain tab switch a KeepAlive deactivation instead, but closing the tab or an LRU
+// eviction past KEEP_ALIVE_MAX still unmounts it the same way) tore down the ONE shared Transport
+// every mount in the repo workspace shared — gitTransportFor's own cache handed back the same
+// now-dead object, so returning to the pinned graph tab (or switching the panel to Review, sharing
+// that same transport) hit a boot error instead of remounting live. The fix (repo/git/transport.ts's
+// per-mount lease, §2.1) makes each mount's own dispose() release only its own subscriptions, never
+// the shared socket.
 test('bug 1 regression: opening a file and returning to the graph tab keeps the graph (and Review) alive', async ({
   relaunch,
 }) => {
@@ -107,7 +111,12 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
 
-  // Open a file from the tree — this unmounts RepoGraphView.vue (MainView.vue's own :key="activeTab.id").
+  // Open a file from the tree — P72 §3: RepoGraphView.vue is now KeepAlive-included
+  // (MainView.vue), so this deactivates it rather than unmounting it; a deactivated component's
+  // DOM moves to Vue's internal storage container, outside the live document tree, so it's still
+  // unreachable here exactly as a genuine unmount would be (verified empirically, not assumed:
+  // a standalone Chromium + WebKit repro confirmed `document.querySelector`/a Playwright locator
+  // both return zero matches for a deactivated component's host element).
   await treeRow(page, 'a.ts').click();
   await expect(page.locator('[data-testid="repo-file-editor"]')).toBeVisible();
   await expect(page.locator('[data-testid="repo-graph-host"]')).toHaveCount(0);

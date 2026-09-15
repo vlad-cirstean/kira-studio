@@ -75,10 +75,12 @@ function treeRow(page: import('@playwright/test').Page, path: string) {
   return page.locator(`[data-testid="repo-tree-row"][data-path="${path}"]`);
 }
 
+// P72 §7: the pinned graph tab now renders in `tab-strip-pinned`, a sibling of `tab-strip-row`
+// rather than a descendant of it — `tab-strip-wrapper` is the common ancestor of both.
 function tab(page: import('@playwright/test').Page, kind?: string) {
   return kind
-    ? page.locator(`[data-testid="tab-strip-row"] [data-testid="tab"][data-tab-kind="${kind}"]`)
-    : page.locator('[data-testid="tab-strip-row"] [data-testid="tab"]');
+    ? page.locator(`[data-testid="tab-strip-wrapper"] [data-testid="tab"][data-tab-kind="${kind}"]`)
+    : page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');
 }
 
 function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api' | 'git') {
@@ -144,7 +146,9 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and stu
   // The Studio strip never shows a repo tab — switching back shows Studio's own (empty) strip.
   await page.locator('[data-testid="mode-tab"][data-mode="studio"]').click();
   await expect(page.locator('[data-testid="tab-strip-empty"]')).toBeVisible();
-  await expect(page.locator('[data-testid="tab-strip-row"] [data-testid="tab"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]')).toHaveCount(
+    0,
+  );
 });
 
 // C6 §10/§16: the diff tab's own vocabulary and a real createDiffEditor mount under WebKit — the

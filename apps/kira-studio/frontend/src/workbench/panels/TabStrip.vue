@@ -128,6 +128,14 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
 // additionally always shows its pinned graph tab first.
 const tabs = computed(() => tabsForWorkspace(workspaceState.active));
 
+// P72 §7: split out of `tabs` so the template can render the pinned tab in a fixed leading slot,
+// outside `.tab-strip`'s own `overflow-x: auto` — previously it scrolled away with everything
+// else. `tabsForWorkspace`'s own pinned-first partition is unchanged; this only stops flattening
+// it back into one list. In practice at most one tab is ever pinned (the repo-graph tab,
+// `tabKinds.ts`), but this reads off `isPinned` generically rather than assuming that.
+const pinnedTabs = computed(() => tabs.value.filter((tab) => isPinned(tab)));
+const scrollingTabs = computed(() => tabs.value.filter((tab) => !isPinned(tab)));
+
 // Selecting a tab from anywhere other than this strip itself (a tree double-click, Cmd/Ctrl+click
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
 // active tab could be selected yet scrolled out of view, with nothing on screen indicating a
@@ -179,79 +187,136 @@ function onDragEnd(): void {
 </script>
 
 <template>
-  <div
-    v-if="tabs.length > 0"
-    ref="stripRef"
-    class="tab-strip"
-    data-testid="tab-strip-row"
-    @wheel="onWheel"
-  >
-    <button
-      v-for="tab in tabs"
-      :key="tab.id"
-      type="button"
-      class="p-tab"
-      :class="{
-        'is-active': tab.active,
-        'is-dragging': dragId === tab.id,
-        'is-preview': isPreview(tab.id),
-        'is-pinned': isPinned(tab),
-        'is-incognito': isIncognito(tab.id),
-      }"
-      data-testid="tab"
-      :data-tab-id="tab.id"
-      :data-tab-kind="tab.kind"
-      :data-active="tab.active"
-      :data-preview="isPreview(tab.id)"
-      :data-pinned="isPinned(tab)"
-      :data-incognito="isIncognito(tab.id)"
-      :data-color="colorFor(tab)"
-      :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
-      :draggable="!isPinned(tab)"
-      @click="onClick(tab)"
-      @auxclick.middle="onMiddleClick(tab)"
-      @contextmenu.prevent="onContextMenu($event, tab)"
-      @dragstart="onDragStart(tab.id)"
-      @dragover.prevent="onDragOver(tab.id)"
-      @dragend="onDragEnd"
-    >
-      <span class="p-tab-rail" />
-      <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
-      <CodiconIcon
-        v-if="isIncognito(tab.id)"
-        name="eye-closed"
-        :size="12"
-        class="tab-incognito"
-        v-tooltip="'Incognito — nothing from this tab is saved'"
-      />
-      <span class="tab-title">{{ titleFor(tab) }}</span>
-      <CodiconIcon
-        v-if="badgeFor(tab)"
-        :name="badgeFor(tab)!.icon"
-        :size="12"
-        class="tab-badge"
-        v-tooltip="badgeFor(tab)!.tooltip"
-        data-testid="tab-badge"
-      />
-      <span
-        v-if="!isPinned(tab)"
-        class="tab-close"
-        role="button"
-        aria-label="Close tab"
-        data-testid="tab-close"
-        @click="onClose($event, tab)"
+  <div v-if="tabs.length > 0" class="tab-strip-wrapper" data-testid="tab-strip-wrapper">
+    <!-- P72 §7: the pinned tab's own fixed leading slot — a sibling of `.tab-strip`, outside its
+         `overflow-x: auto`, so it never scrolls away. Icon-only: the repo name moves to the
+         tooltip/`aria-label` (`titleFor`), the chrome is one glyph. Never draggable (§6.1) and
+         never has a close button (`tabKinds.ts`'s `pinned: true` already refuses both), so
+         neither is wired here at all rather than guarded per-tab. -->
+    <div v-if="pinnedTabs.length > 0" class="tab-strip-pinned" data-testid="tab-strip-pinned">
+      <button
+        v-for="tab in pinnedTabs"
+        :key="tab.id"
+        type="button"
+        class="p-tab is-pinned"
+        :class="{ 'is-active': tab.active }"
+        data-testid="tab"
+        :data-tab-id="tab.id"
+        :data-tab-kind="tab.kind"
+        :data-active="tab.active"
+        data-pinned="true"
+        :draggable="false"
+        :aria-label="titleFor(tab)"
+        v-tooltip="titleFor(tab)"
+        @click="onClick(tab)"
+        @contextmenu.prevent="onContextMenu($event, tab)"
       >
-        <CodiconIcon name="close" :size="13" />
-      </span>
-    </button>
+        <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
+      </button>
+      <span class="tab-strip-separator" aria-hidden="true"></span>
+    </div>
+    <div ref="stripRef" class="tab-strip" data-testid="tab-strip-row" @wheel="onWheel">
+      <button
+        v-for="tab in scrollingTabs"
+        :key="tab.id"
+        type="button"
+        class="p-tab"
+        :class="{
+          'is-active': tab.active,
+          'is-dragging': dragId === tab.id,
+          'is-preview': isPreview(tab.id),
+          'is-incognito': isIncognito(tab.id),
+        }"
+        data-testid="tab"
+        :data-tab-id="tab.id"
+        :data-tab-kind="tab.kind"
+        :data-active="tab.active"
+        :data-preview="isPreview(tab.id)"
+        data-pinned="false"
+        :data-incognito="isIncognito(tab.id)"
+        :data-color="colorFor(tab)"
+        :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
+        draggable="true"
+        @click="onClick(tab)"
+        @auxclick.middle="onMiddleClick(tab)"
+        @contextmenu.prevent="onContextMenu($event, tab)"
+        @dragstart="onDragStart(tab.id)"
+        @dragover.prevent="onDragOver(tab.id)"
+        @dragend="onDragEnd"
+      >
+        <span class="p-tab-rail" />
+        <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
+        <CodiconIcon
+          v-if="isIncognito(tab.id)"
+          name="eye-closed"
+          :size="12"
+          class="tab-incognito"
+          v-tooltip="'Incognito — nothing from this tab is saved'"
+        />
+        <span class="tab-title">{{ titleFor(tab) }}</span>
+        <CodiconIcon
+          v-if="badgeFor(tab)"
+          :name="badgeFor(tab)!.icon"
+          :size="12"
+          class="tab-badge"
+          v-tooltip="badgeFor(tab)!.tooltip"
+          data-testid="tab-badge"
+        />
+        <span
+          class="tab-close"
+          role="button"
+          aria-label="Close tab"
+          data-testid="tab-close"
+          @click="onClose($event, tab)"
+        >
+          <CodiconIcon name="close" :size="13" />
+        </span>
+      </button>
+    </div>
   </div>
   <!-- Empty.html: with no tab open the strip is not hidden — it keeps its height so the layout
        does not jump the moment the first tab appears, but shows no label or action of its own
        (MainView's own empty state already covers "what do I do now"). -->
-  <div v-else class="tab-strip is-empty" data-testid="tab-strip-empty"></div>
+  <div v-else class="tab-strip-wrapper is-empty" data-testid="tab-strip-empty"></div>
 </template>
 
 <style scoped>
+/* P72 §7: the actual flex row — `.tab-strip-pinned` (fixed) and `.tab-strip` (scrolling) are its
+   two children, so the pinned tab sits outside the latter's own `overflow-x` entirely instead of
+   scrolling away with it. */
+.tab-strip-wrapper {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.tab-strip-wrapper.is-empty {
+  padding: 0 var(--kira-s-2);
+}
+
+.tab-strip-pinned {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 0 0 4px;
+  flex-shrink: 0;
+}
+
+.p-tab.is-pinned {
+  padding: 0 var(--kira-s-2);
+}
+
+/* The visible "and after it the tab bar begins" boundary the request asked for. */
+.tab-strip-separator {
+  align-self: stretch;
+  width: var(--kira-border-width);
+  margin: 4px 2px 4px 0;
+  background: var(--kira-border);
+  flex-shrink: 0;
+}
+
 .tab-strip {
   height: 100%;
   display: flex;
@@ -260,6 +325,7 @@ function onDragEnd(): void {
   padding: 2px 4px 0;
   overflow-x: auto;
   overflow-y: hidden;
+  min-width: 0;
   /* Scrolls with too many tabs open, but the track itself stays hidden — reachable by wheel
      (onWheel above), trackpad, or drag either way, with no visible scrollbar chrome. */
   scrollbar-width: none;
@@ -325,9 +391,5 @@ function onDragEnd(): void {
 
 .tab-close:hover {
   background: var(--kira-hover);
-}
-
-.tab-strip.is-empty {
-  padding: 0 var(--kira-s-2);
 }
 </style>
