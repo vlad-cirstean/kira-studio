@@ -8,22 +8,17 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// logLevelSettingKey is the one leaf G18 D14 collapses onto the sentinel repo id — kept as a
-// named constant so the substitution below (and every doc comment referencing it) never risks the
-// magic string drifting out of step with itself.
+// logLevelSettingKey names the one leaf that used to carry G18 D14's sentinel-row special case —
+// kept as a named constant so the two ordinary reads/writes below (Get, Set) never risk the magic
+// string drifting out of step with itself.
 const logLevelSettingKey = "logLevel"
 
 // worktreePrepareScriptKey/worktreeBasePathKey are G25 D10's own two new leaves — ordinary
-// per-repo rows, no sentinel substitution (unlike logLevel).
+// per-repo rows, same shape as every other leaf including logLevel now (P72 §9.2).
 const (
 	worktreePrepareScriptKey = "worktreePrepareScript"
 	worktreeBasePathKey      = "worktreeBasePath"
 )
-
-// sentinelRepoID is D14's reserved, permanently collision-free non-repo key: internal/gitclient/
-// repo.go's RepoID is always a non-empty absolute path (or git-dir path for a bare repo), so ""
-// can never collide with a real one.
-const sentinelRepoID = ""
 
 // GitRepoSettingsRepo reads and writes the `git_repo_settings` table — G18 D3's per-repo sibling
 // of SettingsRepo, one JSON-valued row per (repo_id, key) leaf rather than a blob per repository.
@@ -33,22 +28,14 @@ type GitRepoSettingsRepo struct {
 
 const gitRepoSettingsSelectSQL = `SELECT key, value FROM git_repo_settings WHERE repo_id = ?`
 
-// resolveRepoID is G18 D14's whole special case, in one place: every key behaves exactly as the
-// caller's own repoID says, except logLevelSettingKey, which is silently redirected to the
-// sentinel row regardless of which real repo id was passed. Every caller above this repo — the
-// RPC handlers, RepoSettingsState, the dialog's own request plumbing — passes a real repoId for
-// every key, log.level included, and is never made aware this substitution happened.
-func resolveRepoID(repoID, key string) string {
-	if key == logLevelSettingKey {
-		return sentinelRepoID
-	}
-	return repoID
-}
-
 // Get reads repoID's stored settings, falling back to model.DefaultGitRepoSettings() leaf by leaf
-// for anything never written. logLevel is read from the sentinel row (D14), transparently to the
-// caller — a Get(repoA) and a Get(repoB) return the identical logLevel whenever either has ever
-// been Set.
+// for anything never written. P72 §9.2: logLevel is read from repoID's own row like every other
+// leaf — the sentinel-row substitution G18 D14 gave it (redirecting every repo's read/write onto
+// one shared `repo_id = ""` row) is deleted along with `instanceWide`'s only user
+// (`SETTINGS['kiraVersion.log.level']`, `@kira/git-core`); Kira Studio's own equivalent is now the
+// independent, genuinely app-wide `advanced.gitLogLevel`. A pre-existing sentinel row from before
+// this change stays in the table, unread by this method — deleting it is a migration this change
+// does not need.
 func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) {
 	result := model.DefaultGitRepoSettings()
 
@@ -65,12 +52,7 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	leaf(stored, "githubEnabled", &result.GithubEnabled)
 	leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
 	leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
-
-	sentinelStored, err := r.selectAllFor(sentinelRepoID)
-	if err != nil {
-		return model.GitRepoSettings{}, err
-	}
-	leafValid(sentinelStored, logLevelSettingKey, &result.LogLevel, model.ValidLogLevel)
+	leafValid(stored, logLevelSettingKey, &result.LogLevel, model.ValidLogLevel)
 
 	return result, nil
 }
@@ -144,7 +126,6 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		}
 	}
 	if patch.LogLevel != nil {
-		// D14: resolveRepoID redirects this one write to the sentinel row regardless of repoID.
 		if err := r.upsert(tx, repoID, logLevelSettingKey, *patch.LogLevel); err != nil {
 			return model.GitRepoSettings{}, err
 		}
@@ -172,7 +153,6 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 }
 
 func (r *GitRepoSettingsRepo) upsert(tx *sql.Tx, repoID, key string, value any) error {
-	resolved := resolveRepoID(repoID, key)
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return fmt.Errorf("repos/gitreposettings: encode %s: %w", key, err)
@@ -180,9 +160,9 @@ func (r *GitRepoSettingsRepo) upsert(tx *sql.Tx, repoID, key string, value any) 
 	if _, err := tx.Exec(
 		`INSERT INTO git_repo_settings (repo_id, key, value) VALUES (?, ?, ?)
 		   ON CONFLICT(repo_id, key) DO UPDATE SET value = excluded.value`,
-		resolved, key, string(encoded),
+		repoID, key, string(encoded),
 	); err != nil {
-		return fmt.Errorf("repos/gitreposettings: upsert %s/%s: %w", resolved, key, err)
+		return fmt.Errorf("repos/gitreposettings: upsert %s/%s: %w", repoID, key, err)
 	}
 	return nil
 }

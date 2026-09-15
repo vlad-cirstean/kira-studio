@@ -182,11 +182,14 @@ describe('repoSettingKeys', () => {
 });
 
 describe('instanceWide (G18 D10/D14)', () => {
-  test('kiraVersion.log.level is the only instanceWide: true key', () => {
+  // P72 §9.2: kiraVersion.log.level was the only key that ever set instanceWide — its
+  // cross-repo-collapse special case is now deleted rather than generalised (advanced.gitLogLevel,
+  // packages/shared/domain/settings.ts, is Kira Studio's own independent app-wide replacement), so
+  // no key sets it any more. instanceWide itself stays on SettingDef as a documented capability.
+  test('no key currently sets instanceWide: true', () => {
     for (const key of repoSettingKeys()) {
       const def: SettingDef<unknown> = SETTINGS[key];
-      const expected = key === 'kiraVersion.log.level';
-      expect(Boolean(def.instanceWide)).toBe(expected);
+      expect(Boolean(def.instanceWide)).toBe(false);
     }
   });
 });

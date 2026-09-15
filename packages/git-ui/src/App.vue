@@ -120,6 +120,11 @@ const props = defineProps<{
    *  success/failure, not the host's live socket state; see that class's own doc comment on why
    *  the two are kept separate). */
   hostConnectionState: EventPayload<'connection.changed'>['state'];
+  /** P72 §9.1: Kira Studio's own app-wide `appearance.dateFormat`, read once at mount time — see
+   *  `main.ts`'s own `MountOptions.dateFormat` doc comment for the full shape (not reactive, and
+   *  `undefined` under `'vscode'`/`'harness'`, where `PersistedViewState.dateFormat` stays the
+   *  only source). Preferred over the persisted value below whenever present. */
+  dateFormat?: DateFormat;
 }>();
 
 const bridge = new BridgeClient(props.transport, props.hostConnectionState);
@@ -184,7 +189,7 @@ const bootError = ref<string | undefined>(undefined);
 
 const detailOpen = ref(true);
 const columnWidths = ref<ColumnWidths>(DEFAULT_COLUMN_WIDTHS);
-const dateFormat = ref<DateFormat>('relative');
+const dateFormat = ref<DateFormat>(props.dateFormat ?? 'relative');
 const detailWidth = ref(DEFAULT_DETAIL_WIDTH);
 const scrollRow = ref(0);
 /** G-UX D9: the graph search row's own open/closed state — closed by default, toggled by `/`/
@@ -1023,7 +1028,10 @@ async function bootstrap(): Promise<void> {
     lastPersisted = persisted;
     detailOpen.value = persisted.detailOpen;
     columnWidths.value = persisted.columnWidths;
-    dateFormat.value = persisted.dateFormat;
+    // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat mount option wins over whatever
+    // this webview last persisted for itself — 'vscode'/'harness' never pass one, so persisted
+    // stays the only source there, unchanged.
+    dateFormat.value = props.dateFormat ?? persisted.dateFormat;
     detailWidth.value = persisted.detailWidth;
     initialScrollRow.value = persisted.scrollRow;
     detailState.setListMode(persisted.fileListMode);

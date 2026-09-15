@@ -388,6 +388,13 @@ function onInlineBlameChange(checked: boolean): void {
   draft.appearance.inlineBlame = checked;
 }
 
+// P72 §9.1: relative-vs-absolute commit timestamps in the git graph, moved here from the per-repo
+// RepoSettingsDialog.vue — a reading preference about the person, not the repository.
+function onDateFormatChange(e: Event): void {
+  draft.appearance.dateFormat = (e.target as HTMLSelectElement)
+    .value as Settings['appearance']['dateFormat'];
+}
+
 const rowPreviewHeight = computed(() => (draft.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function onDefaultPageSizeChange(e: Event): void {
@@ -411,6 +418,14 @@ function onExpensiveQueryRowsInput(e: Event): void {
 
 function onFetchAutoIntervalInput(e: Event): void {
   draft.git.fetchAutoIntervalMinutes = Number((e.target as HTMLInputElement).value);
+}
+
+// P72 §9.2: kira-version's own diagnostic log verbosity, moved here from the per-repo
+// RepoSettingsDialog.vue's kiraVersion.log.level — genuinely installation-wide, not a per-repo
+// fact, so this is now the one control that sets it.
+function onGitLogLevelChange(e: Event): void {
+  draft.advanced.gitLogLevel = (e.target as HTMLSelectElement)
+    .value as Settings['advanced']['gitLogLevel'];
 }
 
 // G7 D17: `*` matches any run of characters except `/` — the same rule gitpreflight.
@@ -772,6 +787,29 @@ async function onSave(): Promise<void> {
                 @click="resetLeaf('appearance', 'inlineBlame')"
               />
             </div>
+
+            <label class="field">
+              <div class="field-head">
+                <span>Commit date</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-appearance-dateFormat"
+                  :disabled="isAtDefault('appearance', 'dateFormat')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('appearance', 'dateFormat')"
+                />
+              </div>
+              <select
+                class="p-select bordered md"
+                data-testid="settings-date-format"
+                :value="draft.appearance.dateFormat"
+                @change="onDateFormatChange"
+              >
+                <option value="relative">Relative (3 days ago)</option>
+                <option value="absolute">Absolute (2024-12-30 22:48)</option>
+              </select>
+              <span class="helper-text">The git graph's own commit timestamps.</span>
+            </label>
           </template>
 
           <template v-else-if="activeSection === 'Data'">
@@ -1304,6 +1342,32 @@ async function onSave(): Promise<void> {
                 expensive by the console's Explain button and by auto-explain. Not comparable
                 across engines' own cost figures — see the plan panel's own note.</span
               >
+            </label>
+
+            <label class="field">
+              <div class="field-head">
+                <span>Git log level</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-advanced-gitLogLevel"
+                  :disabled="isAtDefault('advanced', 'gitLogLevel')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('advanced', 'gitLogLevel')"
+                />
+              </div>
+              <select
+                class="p-select bordered md"
+                data-testid="settings-git-log-level"
+                :value="draft.advanced.gitLogLevel"
+                @change="onGitLogLevelChange"
+              >
+                <option value="off">Off</option>
+                <option value="error">Error</option>
+                <option value="warn">Warn</option>
+                <option value="info">Info</option>
+                <option value="debug">Debug</option>
+              </select>
+              <span class="helper-text">Verbosity of kira-version's own diagnostic log, for every repository.</span>
             </label>
           </template>
       </section>

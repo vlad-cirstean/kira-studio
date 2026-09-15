@@ -169,10 +169,10 @@ describe('RepoSettingsState', () => {
     state.dispose();
   });
 
-  // G18 §3.18/§4.12: this is the client-side half of D14's own sentinel collapse — a
-  // repoSettings.changed event naming a DIFFERENT repo must still update log.level (the one
-  // instance-wide field), while leaving every other field alone (it belongs to that other repo).
-  test('repoSettings.changed from a different repo updates only log.level (D14)', async () => {
+  // P72 §9.2: replaces G18 §3.18/§4.12's own D14 sentinel-collapse guard — a repoSettings.changed
+  // event naming a DIFFERENT repo must now be ignored entirely, log.level included; the cross-repo
+  // collapse it used to carry is deleted.
+  test('repoSettings.changed from a different repo is ignored entirely', async () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const state = new RepoSettingsState(bridge);
@@ -193,8 +193,10 @@ describe('RepoSettingsState', () => {
       },
     });
 
-    expect(state.settings.value['kiraVersion.log.level']).toBe('debug');
-    // /repos/b's own pull.strategy must NOT have overwritten /repos/a's.
+    // /repos/b's own write must NOT have touched /repos/a's state at all, log.level included.
+    expect(state.settings.value['kiraVersion.log.level']).toBe(
+      SETTINGS['kiraVersion.log.level'].default,
+    );
     expect(state.settings.value['kiraVersion.pull.strategy']).toBe('rebase');
     state.dispose();
   });
@@ -217,10 +219,10 @@ describe('RepoSettingsState', () => {
   });
 });
 
-// G18 D13/D10: the dialog-facing half of D14 — exactly one of the seven repo-sourced settings is
-// marked instanceWide, and it is log.level.
-describe('instanceWide flag the dialog reads off SETTINGS directly (D13)', () => {
-  test('kiraVersion.log.level is instanceWide; the other six are not', () => {
+// P72 §9.2: replaces G18 D13/D10's own guard — instanceWide's only user (kiraVersion.log.level)
+// is gone, so no repo-sourced key sets it any more.
+describe('instanceWide flag the dialog would read off SETTINGS directly (D13)', () => {
+  test('no repo-sourced key is instanceWide', () => {
     const repoKeys: SettingKey[] = [
       'kiraVersion.graph.pageSize',
       'kiraVersion.graph.scope',
@@ -232,8 +234,7 @@ describe('instanceWide flag the dialog reads off SETTINGS directly (D13)', () =>
     ];
     for (const key of repoKeys) {
       const def: SettingDef<unknown> = SETTINGS[key];
-      const expected = key === 'kiraVersion.log.level';
-      expect(Boolean(def.instanceWide)).toBe(expected);
+      expect(Boolean(def.instanceWide)).toBe(false);
     }
   });
 });

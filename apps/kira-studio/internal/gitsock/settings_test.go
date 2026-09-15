@@ -30,12 +30,13 @@ func recvRepoSettingsChanged(c *testClient) gitrpc.RepoSettingsChangedPayload {
 	return payload
 }
 
-// TestIntegration_RepoSettingsLogLevelCollapsesAcrossRealRepos is G18 §3.5/§3.18's own end-to-end
-// proof, over the real socket and the real per-test SQLite database (not a fake): repoSettings.set
-// for kiraVersion.log.level on repo A is visible via repoSettings.get on repo B (D14's own
-// cross-repo sentinel collapse), and repoSettings.changed reaches a connection that only ever
-// opened the OTHER repo (D7's fan-out, D14's instance-wide field together).
-func TestIntegration_RepoSettingsLogLevelCollapsesAcrossRealRepos(t *testing.T) {
+// TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos is P72 §9.2's own end-to-end proof,
+// over the real socket and the real per-test SQLite database (not a fake), replacing G18 §3.5/
+// §3.18's collapse test: repoSettings.set for kiraVersion.log.level on repo A is NOT visible via
+// repoSettings.get on repo B — D14's cross-repo sentinel collapse is deleted, so log.level is an
+// ordinary per-repo leaf now. repoSettings.changed still reaches a connection that only ever
+// opened the OTHER repo (D7's fan-out is unconditional on which key changed, unaffected by this).
+func TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos(t *testing.T) {
 	t.Parallel()
 	server, sockPath, _, _ := newIntegrationServer(t)
 
@@ -67,25 +68,26 @@ func TestIntegration_RepoSettingsLogLevelCollapsesAcrossRealRepos(t *testing.T) 
 		t.Fatalf("repoSettings.set(a) result.LogLevel = %q, want %q", setResult.LogLevel, "debug")
 	}
 
-	// B, even though it never opened (or heard of) repo A, must have received
-	// repoSettings.changed for A's own write too (D7's fan-out) — drained here, before B's own
-	// request below, since a plain request() (unlike remote.run's own requestIgnoringEvents) reads
-	// exactly one frame and requires it to be the matching response; a queued event ahead of it
-	// would otherwise be mistaken for one (the same race remote_test.go's own "a fresh connection
-	// may still carry queued repo.changed events" comment names for a different event).
+	// B, even though it never opened (or heard of) repo A, must still have received
+	// repoSettings.changed for A's own write (D7's fan-out is a general mechanism, not conditioned
+	// on which key changed) — drained here, before B's own request below, since a plain request()
+	// (unlike remote.run's own requestIgnoringEvents) reads exactly one frame and requires it to be
+	// the matching response; a queued event ahead of it would otherwise be mistaken for one (the
+	// same race remote_test.go's own "a fresh connection may still carry queued repo.changed
+	// events" comment names for a different event).
 	changed := recvRepoSettingsChanged(clientB)
 	if changed.RepoID != repoIDA || changed.Settings.LogLevel != "debug" {
 		t.Fatalf("repoSettings.changed on B = %+v, want repoId=%s logLevel=debug", changed, repoIDA)
 	}
 
-	// B, which has never touched log.level itself, must read it back the same way — real storage,
-	// not a fake, proving D14's sentinel collapse actually happens end to end.
+	// B, which has never touched log.level itself, must read back its OWN default — real storage,
+	// not a fake, proving the sentinel collapse no longer happens end to end.
 	getResp := requestOK(t, clientB, "repoSettings.get", map[string]any{"repoId": repoIDB})
 	var getResult gitrpc.RepoSettingsSnapshot
 	if err := json.Unmarshal(getResp.Result, &getResult); err != nil {
 		t.Fatalf("unmarshal repoSettings.get result: %v", err)
 	}
-	if getResult.LogLevel != "debug" {
-		t.Fatalf("repoSettings.get(b).LogLevel = %q, want %q (sentinel collapse across real repos)", getResult.LogLevel, "debug")
+	if getResult.LogLevel != "info" {
+		t.Fatalf("repoSettings.get(b).LogLevel = %q, want %q (the default — unscoped by a's write)", getResult.LogLevel, "info")
 	}
 }

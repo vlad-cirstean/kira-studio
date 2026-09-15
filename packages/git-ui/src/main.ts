@@ -4,7 +4,7 @@ import { createApp, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
 import type { ReviewTarget } from './state/review.ts';
-import type { ViewStateStore } from './state/viewState.ts';
+import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 // G16 D1/D2: the document-level height chain and gutter reset. Imported first so it is the base
 // every other stylesheet layers onto.
 import './theme/app-shell.css';
@@ -52,6 +52,17 @@ export interface MountOptions {
    *  local of that name (`BridgeClient.connectionState`, the cold-boot `app.init` success/failure
    *  signal), and a same-named prop would collide with it as a Vue template key. */
   readonly hostConnectionState: EventPayload<'connection.changed'>['state'];
+  /** P72 §9.1: only meaningful when `view === "graph"` — Kira Studio's own app-wide
+   *  `appearance.dateFormat` (`packages/shared/domain/settings.ts`), read once at mount time and
+   *  preferred over `PersistedViewState.dateFormat` when present (`App.vue`'s own `bootstrap()`).
+   *  `undefined`/absent keeps today's behaviour: `PersistedViewState`'s own stored value, or its
+   *  `'relative'` default — the shape every pre-P72 call site (and every test that constructs
+   *  `MountOptions` without this field) already gets for free. Not reactive: like
+   *  `hostConnectionState` above, this is the value as of this webview's cold mount, not a live
+   *  prop — a later change to the app-wide setting reaches an already-mounted graph on its next
+   *  remount (a closed tab, or a KeepAlive `:max` eviction, `RepoGraphView.vue`), not while it
+   *  stays cached. */
+  readonly dateFormat?: DateFormat;
 }
 
 /**
@@ -73,11 +84,11 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
   performance.mark('kira:page-parsed');
   performance.measure('kira:page-parsed', undefined, 'kira:page-parsed');
 
-  const { view = 'graph', target, pendingUiAction, ...rest } = opts;
+  const { view = 'graph', target, pendingUiAction, dateFormat, ...rest } = opts;
   const app: VueApp =
     view === 'review'
       ? createApp(ReviewView, { ...rest, target })
-      : createApp(AppRoot, { ...rest, pendingUiAction });
+      : createApp(AppRoot, { ...rest, pendingUiAction, dateFormat });
   // G20 D2: `v-kui-tooltip` — replaces every native `title`/`:title` attribute in this bundle.
   app.directive('kui-tooltip', vKuiTooltip);
   // G16 D1/D2: the other half of app-shell.css's `.kv-mount-root` rule — the class and the rule

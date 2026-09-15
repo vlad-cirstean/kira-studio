@@ -543,11 +543,11 @@ type ReviewCommentExportResult struct {
 // gitclient.GitStatus's own JSON tags already follow for GitStatus.
 // ---------------------------------------------------------------------------------------
 
-// RepoSettingsSnapshot is repoSettings.get/set's own result — the seven settings D1 moved into
-// their own per-repo table. Six are genuinely scoped by repoId; kiraVersion.log.level is not
-// (D14) — its value is shared across every repo this installation opens, a fact
-// storage/repos.GitRepoSettingsRepo resolves entirely on its own, invisibly to this type and every
-// handler using it.
+// RepoSettingsSnapshot is repoSettings.get/set's own result — the settings D1 moved into their
+// own per-repo table. P72 §9.2: kiraVersion.log.level used to be the one exception, its value
+// shared across every repo this installation opens (D14) — that collapse is now deleted (Kira
+// Studio gets its own independent, genuinely app-wide advanced.gitLogLevel control instead), so
+// every leaf here, log.level included, is genuinely scoped by repoId.
 type RepoSettingsSnapshot struct {
 	GraphPageSize         int      `json:"kiraVersion.graph.pageSize"`
 	GraphScope            string   `json:"kiraVersion.graph.scope"`
@@ -556,8 +556,7 @@ type RepoSettingsSnapshot struct {
 	ReviewBaseCandidates  []string `json:"kiraVersion.review.baseCandidates"`
 	PullStrategy          string   `json:"kiraVersion.pull.strategy"`
 	LogLevel              string   `json:"kiraVersion.log.level"`
-	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo (unlike LogLevel), default
-	// true.
+	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo, default true.
 	GithubEnabled bool `json:"kiraVersion.github.enabled"`
 	// WorktreePrepareScript/WorktreeBasePath are G25 D10/D16's own ninth and tenth leaves.
 	WorktreePrepareScript string `json:"kiraVersion.worktree.prepareScript"`
@@ -600,8 +599,8 @@ type RepoSettingsSetParams struct {
 // RepoSettingsChangedPayload is repoSettings.changed's own event payload (D4/D7) — emitted to
 // every currently connected client, not only the one that made the change, via
 // internal/notify.Emitter[T] (the same mechanism gitsock.Server's own clientsChanged already
-// uses). RepoID names which repo's own write triggered the emit; a viewer decides for itself
-// whether that repoId (or, for the instance-wide LogLevel, any repoId at all) is relevant.
+// uses), regardless of which key changed. RepoID names which repo's own write triggered the emit;
+// a viewer decides for itself whether that repoId is relevant.
 type RepoSettingsChangedPayload struct {
 	RepoID   string               `json:"repoId"`
 	Settings RepoSettingsSnapshot `json:"settings"`
