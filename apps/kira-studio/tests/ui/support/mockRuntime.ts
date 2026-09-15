@@ -139,6 +139,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
 
   repoMapStatus: 'RepoMapService.Status',
   repoMapSetEnabled: 'RepoMapService.SetEnabled',
+  repoMapSetRepoEnabled: 'RepoMapService.SetRepoEnabled',
   repoMapRegenerate: 'RepoMapService.Regenerate',
   repoMapInstallClaudeCode: 'RepoMapService.InstallClaudeCode',
 
@@ -306,11 +307,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // "off, nothing running" is the honest default for a dev-server run under Playwright.
   [IPC.repoMapStatus]: JSON.stringify({
     running: false,
-    repo: '',
+    url: '',
     command: '',
     claudeAvailable: false,
     probed: [],
     error: '',
+    repos: [],
   }),
   // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
   // no-committed-fixture-will-ever-snapshot-this reasoning as gitVsixStatus/repoMapStatus above.

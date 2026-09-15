@@ -18,12 +18,13 @@ function dialog(page: Page) {
 
 const ENABLED_STATUS = {
   running: true,
-  repo: '/repo',
+  url: 'http://127.0.0.1:8765/mcp',
   command:
     'claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header "Authorization: Bearer test-token"',
   claudeAvailable: true,
   probed: ['claude (on PATH)'],
   error: '',
+  repos: [],
 };
 
 test('off: no command, no Install button; on: command renders before the button', async ({
@@ -57,18 +58,21 @@ test('off: no command, no Install button; on: command renders before the button'
   expect(testIds).toEqual(['repomap-command', 'repomap-install-button']);
 });
 
-test('a repository resolution failure shows the error, not a command', async ({ relaunch }) => {
+test('a server-wide failure (e.g. a bind conflict) shows the error, not a command', async ({
+  relaunch,
+}) => {
   const { window: page } = await relaunch({
     control: [
       {
         channel: IPC.repoMapSetEnabled,
         response: {
           running: false,
-          repo: '',
+          url: '',
           command: '',
           claudeAvailable: false,
           probed: [],
-          error: 'repomap: no repository found for this working directory',
+          error: 'repomap: listen tcp 127.0.0.1:8765: bind: address already in use',
+          repos: [],
         },
       },
     ],
@@ -80,4 +84,61 @@ test('a repository resolution failure shows the error, not a command', async ({ 
   await expect(dialog(page).locator('[data-testid="repomap-error"]')).toBeVisible();
   await expect(dialog(page).locator('[data-testid="repomap-command"]')).toHaveCount(0);
   await expect(dialog(page).locator('[data-testid="repomap-install-button"]')).toHaveCount(0);
+});
+
+// P67d §7.4/§10: every imported repository is listed, one row per repository, with a checkbox
+// reflecting its own grant — and toggling an ungranted one calls RepoMapService.SetRepoEnabled
+// (asserted through the mock channel, since the Go side is not in the loop here).
+test('lists every imported repository with its own per-repository access checkbox', async ({
+  relaunch,
+}) => {
+  const STATUS_WITH_REPOS = {
+    ...ENABLED_STATUS,
+    repos: [
+      {
+        id: 'repo-1',
+        name: 'kira-studio',
+        root: '/home/user/kira-studio',
+        key: 'kira-studio',
+        enabled: true,
+        serving: true,
+        ready: true,
+        error: '',
+      },
+      {
+        id: 'repo-2',
+        name: 'other-repo',
+        root: '/home/user/other-repo',
+        key: '',
+        enabled: false,
+        serving: false,
+        ready: false,
+        error: '',
+      },
+    ],
+  };
+  const { window: page, control } = await relaunch({
+    control: [
+      { channel: IPC.repoMapSetEnabled, response: STATUS_WITH_REPOS },
+      { channel: IPC.repoMapSetRepoEnabled, response: STATUS_WITH_REPOS },
+    ],
+  });
+  await openSettings(page);
+  await page.click('[data-testid="settings-section-Code intelligence"]');
+  await page.click('[data-testid="settings-code-intel-enabled"]');
+
+  await expect(dialog(page).locator('[data-testid="repomap-repo-row-repo-1"]')).toBeVisible();
+  await expect(dialog(page).locator('[data-testid="repomap-repo-row-repo-2"]')).toBeVisible();
+  await expect(dialog(page).locator('[data-testid="repomap-repo-toggle-repo-1"]')).toBeChecked();
+  await expect(
+    dialog(page).locator('[data-testid="repomap-repo-toggle-repo-2"]'),
+  ).not.toBeChecked();
+
+  await page.click('[data-testid="repomap-repo-toggle-repo-2"]');
+
+  await expect
+    .poll(() => control.log().some((entry) => entry.channel === IPC.repoMapSetRepoEnabled))
+    .toBe(true);
+  const call = control.log().find((entry) => entry.channel === IPC.repoMapSetRepoEnabled);
+  expect(call?.args).toEqual({ id: 'repo-2', enabled: true });
 });

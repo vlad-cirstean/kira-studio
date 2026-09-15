@@ -134,6 +134,7 @@ export const IPC = {
 
   repoMapStatus: 'kira:repomap:status',
   repoMapSetEnabled: 'kira:repomap:setEnabled',
+  repoMapSetRepoEnabled: 'kira:repomap:setRepoEnabled',
   repoMapRegenerate: 'kira:repomap:regenerate',
   repoMapInstallClaudeCode: 'kira:repomap:installClaudeCode',
 
