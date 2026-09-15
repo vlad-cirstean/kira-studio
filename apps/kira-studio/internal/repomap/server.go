@@ -103,6 +103,9 @@ type Server struct {
 	// hold this slot idle for however long that wait takes.
 	initialSyncSem chan struct{}
 
+	// detachWG counts Detach's own asynchronous drain goroutines (attach.go) — Close joins them.
+	detachWG sync.WaitGroup
+
 	mcp *mcp.Server
 
 	httpState // http.go's own fields (listener, *http.Server) — split out for that file's own cohesion
@@ -240,6 +243,8 @@ func (s *Server) Close() error {
 			inst.inflight.Wait()
 			inst.close()
 		}
+
+		s.detachWG.Wait()
 
 		_ = s.store.Close()
 	})

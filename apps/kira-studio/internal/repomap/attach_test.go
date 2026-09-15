@@ -144,6 +144,26 @@ func newDrainTestInstance(t *testing.T, repoID string) (*repoInstance, *codeinde
 	}, store
 }
 
+// detachDrained reports Server.Detach's own asynchronous drain goroutine (attach.go) finishing: the
+// returned channel closes once every drain outstanding at call time has run close(). Call it after
+// Detach, and only where no further Detach can start (sync.WaitGroup forbids an Add from zero
+// concurrent with a Wait).
+func detachDrained(s *Server) <-chan struct{} {
+	drained := make(chan struct{})
+	go func() { s.detachWG.Wait(); close(drained) }()
+	return drained
+}
+
+// mustDrain waits that channel out, bounded — a stuck drain fails the test instead of hanging it.
+func mustDrain(t *testing.T, drained <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-drained:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Detach's drain goroutine did not finish within 5s")
+	}
+}
+
 // TestDetachDrainsInFlightCall is P67d §3.3's own drain guarantee, proven under -race: (1) a call
 // already resolved via pick, still doing real work against the graph when Detach runs, completes
 // normally rather than racing a concurrent close; (2) a call that arrives after Detach's synchronous
@@ -172,6 +192,15 @@ func TestDetachDrainsInFlightCall(t *testing.T) {
 		go func() { s.Detach(inst.key); close(detachDone) }()
 		<-detachDone // Detach's own map removal is synchronous — safe to rely on here.
 
+		drained := detachDrained(s)
+
+		// The drain half is asynchronous and must still be waiting: inflight is held below.
+		select {
+		case <-drained:
+			t.Fatal("Detach closed the instance while a call was still in flight")
+		case <-time.After(50 * time.Millisecond):
+		}
+
 		// A call arriving now can never resolve the repository, even though the call that already
 		// holds `inst` (above) has not finished yet.
 		if _, early := s.pick(""); early == nil || !strings.Contains(firstText(early), "no repositories are shared") {
@@ -189,6 +218,7 @@ func TestDetachDrainsInFlightCall(t *testing.T) {
 		}
 
 		inst.inflight.Done() // the real handler shape: deferred right after pick resolved
+		mustDrain(t, drained)
 	})
 
 	t.Run("a call blocked in waitReady wakes promptly on revoke, not on readyTimeout", func(t *testing.T) {
@@ -214,6 +244,7 @@ func TestDetachDrainsInFlightCall(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 
 		s.Detach(inst.key)
+		drained := detachDrained(s)
 
 		select {
 		case err := <-waitDone:
@@ -223,5 +254,6 @@ func TestDetachDrainsInFlightCall(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatal("waitReady did not wake promptly on Detach — it is blocking on readyTimeout (1m) instead of done")
 		}
+		mustDrain(t, drained)
 	})
 }

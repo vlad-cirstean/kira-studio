@@ -170,7 +170,9 @@ func (s *Server) Detach(key string) {
 	s.reposMu.Unlock()
 
 	close(inst.done)
+	s.detachWG.Add(1)
 	go func() {
+		defer s.detachWG.Done()
 		inst.inflight.Wait()
 		inst.close()
 	}()
