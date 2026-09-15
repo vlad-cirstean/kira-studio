@@ -300,6 +300,15 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   is the right tool for a field, not `find_definition` on the field name alone. No new non-trivial
   finding.
 
+- **P67d (planning)**: same `ConnectionRefused`/stale-token pattern as every entry above — built,
+  started, deleted the one stale hashed token file under `/root/.kira-studio/`, restarted to mint a
+  fresh bearer token, called it over plain HTTP/JSON-RPC. `find_references {"symbol":
+  "RepoMapService","omitSource":true}` returned all 12 real sites (11 in
+  `internal/bridge/repomap.go`, 1 in `main.go:265`), checked against a grep — no misses, no false
+  positives. Note for a future session: `pkill -f kira-repo-map` still kills the calling shell here
+  (P67f's own note), so start the server as a genuine background task instead. No new finding,
+  trivial or otherwise.
+
 ### Non-trivial
 
 - **P67e (implementation) — `find_references` returns nothing for a package-level variable that is
