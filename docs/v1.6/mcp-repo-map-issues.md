@@ -345,7 +345,84 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   fix shape the entry below suggests. A full reparse of this repository took 248 s. One new
   non-trivial finding, below, unrelated to this phase's own subject.
 
+- **P69c (planning)**: same `ConnectionRefused`/stale-token pattern as every entry above — no server
+  at session start, started it, killed it by PID, deleted the one stale hashed token file under
+  `/root/.kira-studio/`, restarted to mint a fresh bearer token, called it over plain HTTP/JSON-RPC
+  throughout. Note for a future session: the server binds a **random high port** (46717 this pass,
+  38721 the run before), not the `8765` CLAUDE.md's own setup section names — read the port off the
+  startup line, never assume it. Used `find_references` on `checkinParser`/`checkoutParser`/`Reparse`
+  to sweep this phase's own call sites; those three answered correctly and matched a grep. Two new
+  non-trivial findings, below, both unrelated to this phase's own subject: `find_references`'s `file`
+  argument does not scope results to that file's definition, and `go-tree-sitter` v0.25.0 leaks a
+  `go-pointer` registry entry on every `ParseWithOptions` call. The crash this phase exists to fix is
+  the still-open entry below; planning reproduced it 3 of 4 isolated runs on `28edadc7` and the fix
+  is specified in `docs/v1.6/plans/P69c-codeparse-cancel-crash.md`, unimplemented as of this commit.
+
 ### Non-trivial
+
+- **P69c (planning) — `find_references`'s `file` argument does not scope results to the definition
+  in that file. Open.**
+
+  Found while navigating `internal/codeparse` during P69c's planning pass, against a freshly started
+  server on a warm index of this worktree. `file` (with or without `line`) is the documented way to
+  disambiguate a name, and is what the tool's own ambiguity message tells the caller to add — but it
+  neither narrows a reference list nor preserves a correct one.
+
+  Under-matching, the clean repro:
+
+  - `find_references {"symbol":"Forget"}` → **6 references**, all correct (`codeindex/sync.go:172`,
+    `codeindex/watch.go:240`, plus test sites).
+  - `find_references {"symbol":"Forget","file":"apps/kira-studio/internal/codeparse/session.go","line":102}`
+    → **`no references found`**. Line 102 is `Forget`'s own definition.
+
+  Over-matching, the other direction:
+
+  - `find_references {"symbol":"Parse","file":"apps/kira-studio/internal/codeparse/session.go"}` and
+    the `line`/`column` form pinned exactly to `session.go:194:19` (`func (s *Session) Parse`) both
+    return **38 references**, led by `flag.Parse()`, `url.Parse()` and `time.Parse()` — different
+    functions in different packages. The position is accepted and then ignored for filtering.
+
+  Two smaller facets in the same area, from the same pass:
+
+  - `languages` widens its own candidate set: `find_references {"symbol":"Close"}` reports 25
+    candidate symbols, `{"symbol":"Close","languages":["go"]}` reports **35**.
+  - The accepted language spelling is silently case-sensitive. `["go"]` works; `["Go"]`, `["GO"]`
+    and `["golang"]` each return `no references found` rather than an unknown-language error — a
+    wrong answer, not a failure, for a caller who capitalised it.
+  - `find_definition` with `file`+`line`+`column` and no `symbol` returns
+    `no definitions found for ""`, so the position-only form does not resolve a symbol at a
+    position at all.
+
+  Distinct from the P69/P67e read-capture entries below, which were about which references get
+  *indexed*; this is about which indexed references get *returned* once a `file` is supplied. Not
+  investigated further — out of P69c's scope, which is the `codeparse` crash, and per the process
+  above this pass reports rather than fixes.
+
+- **P69c (planning) — `go-tree-sitter` v0.25.0 leaks a `go-pointer` registry entry on every
+  `ParseWithOptions` call. Open.**
+
+  Read out of the pinned module source while establishing the C cancellation contract for this
+  phase's own fix; not found by calling the MCP server, but logged here because it sits in the
+  repo-map indexing pipeline exactly as the crash entry below does.
+
+  `parser.go:332-333` saves the input payload and `defer`s its `pointer.Unref` correctly.
+  `parser.go:350` then does `payload: pointer.Save(options)` for the parse options with **no matching
+  `Unref` anywhere in the package** — confirmed by grep: five `pointer.Save` calls for options
+  (`parser.go:350`, `:477`, `:548`, `:631`, `query.go:788`), zero corresponding `Unref`s.
+
+  `mattn/go-pointer@v0.0.1` implements `Save` as a `C.malloc(1)` plus an entry in a package-global
+  `map[unsafe.Pointer]interface{}` behind a global `sync.RWMutex`. So every `ParseWithOptions` call
+  permanently leaks one 1-byte C allocation plus a map entry retaining the `*ParseOptions` and its
+  `ProgressCallback` closure (which in `codeparse`'s use captures the caller's `context.Context`).
+
+  Impact is small per call and unbounded over a process lifetime: `codeparse.Session` calls
+  `ParseWithOptions` once per file per parse, so a full index of this repository is on the order of
+  10^4-10^5 permanently retained entries, in a map every concurrent parse then contends on through
+  that global mutex. Upstream bug, not a `codeparse` one — v0.25.0 is the newest published version
+  (`proxy.golang.org` lists only `v0.23.0`, `v0.23.1`, `v0.24.0`, `v0.25.0`), so there is nothing to
+  upgrade to; closing it means either an upstream fix or not passing `*ParseOptions` at all. P69c's
+  own commit 2 (skip a parse whose context is already cancelled) reduces the call rate slightly but
+  does not address this. Not investigated further — out of P69c's scope.
 
 - **P69b (planning) — `TestParseConcurrentCancellationDoesNotCrash` aborts the whole `codeparse`
   test binary on a tree-sitter C assertion. Open.**
@@ -378,6 +455,19 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   watcher-triggered resync racing a shutdown, a request deadline) aborting the process would take
   the whole server down, not return an error. Not investigated further — out of P69b's scope, which
   is a reference-capture fix, and per the process above this round reports rather than fixes.
+
+  **Root cause (P69c planning, `docs/v1.6/plans/P69c-codeparse-cancel-crash.md`)**: a parser-reuse
+  hazard, not a race. `ts_parser_parse` returns without running `ts_parser_reset` on both of its
+  cancellation exits (`src/parser.c:2158-2161` and `:2198-2201`), and the balancing exit also sets
+  `canceled_balancing = true`. `ts_parser_reset` releases `finished_tree` but never clears
+  `canceled_balancing` — the flag has no public setter at all — so `checkinParser`'s own `p.Reset()`
+  produces exactly the state the assertion forbids, and the next parse on that pooled parser jumps
+  to `balance:` and aborts. Measured deterministically: sweeping the cancellation point across all
+  456 progress checkpoints of one parse, every one of the 156 that land in the balancing phase
+  aborts, and none of the 300 in the parse loop do. Merely dropping `p.Reset()` is worse, not
+  better — it trades the abort for a resumed parse returning the *previous* file's tree at 416 of
+  those 456 points. Fix: Close a parser whose parse returned nil instead of pooling it. Still open;
+  the plan is written, the implementation is not landed.
 
 - **P69 (code review, round 2) — `find_references` still returns nothing for a package-level
   constant read as a plain identifier operand (call argument, comparison, arithmetic). Fixed
