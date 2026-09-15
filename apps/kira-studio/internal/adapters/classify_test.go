@@ -25,6 +25,13 @@ func TestClassifySQL(t *testing.T) {
 		{"embedded semicolon is unknown", "SELECT 1; DROP TABLE t", adapters.ClassUnknown},
 		{"embedded semicolon mid-statement", "DROP TABLE t; SELECT 1", adapters.ClassUnknown},
 
+		// M6 finding #1 (critical): a comment marker hidden inside a string literal must not be
+		// read as a real comment, swallowing the real embedded ";" that follows and letting the
+		// statement misclassify as a plain read.
+		{"block comment marker inside a string is not a real comment", "SELECT '/*' AS a; CREATE TABLE pwned(x int)", adapters.ClassUnknown},
+		{"line comment marker inside a string is not a real comment", "SELECT '--' ; DROP TABLE users", adapters.ClassUnknown},
+		{"dollar-quoted string hides no comment marker either", "SELECT $$/*$$ ; DROP TABLE users", adapters.ClassUnknown},
+
 		{"with select body reads", "WITH x AS (SELECT * FROM t) SELECT * FROM x", adapters.ClassRead},
 		{"with a data-modifying cte writes", "WITH x AS (DELETE FROM t RETURNING *) SELECT * FROM x", adapters.ClassWrite},
 		{"with followed by insert writes", "WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x", adapters.ClassWrite},

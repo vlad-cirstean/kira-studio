@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 // ErrorCode is the Go analogue of errors.ts's AdapterErrorCode — a closed set, verbatim from
@@ -120,6 +121,76 @@ func endsTransaction(stmt string) bool {
 	}
 }
 
+// scanQuote reports the end index (exclusive) of a quoted run opened by r[i] (one of `'`, `"`,
+// `` ` ``) — the same doubled-quote escaping rule every dialect here honours (`''`, `""`, `` `` ``
+// repeats the quote character as content rather than closing). Runs to len(r) — the caller's own
+// EOF — when unterminated, never past it.
+//
+// Backslash is deliberately never treated as an escape here, unlike sql-lex.ts's own default
+// (packages/shared/domain/sql-lex.ts): this scanner backs every SQL dialect this app supports
+// without knowing which one is live, and Postgres's own standard-conforming strings (the default
+// since 9.1) do not honour a backslash escape at all. Assuming one when the live dialect is
+// Postgres would extend a quoted span past where Postgres itself ends it, hiding a real statement
+// separator inside what this scanner would wrongly still consider a string — exactly the class of
+// bug this function exists to close (finding #1, M6). Treating backslash as an ordinary character
+// only ever makes a detected span shorter than or equal to the real one on every dialect (MySQL
+// included, where backslash is an escape by default): worst case a real escaped quote closes our
+// span early and leftover text reads as loose SQL, costing a false ClassUnknown — never a missed
+// statement boundary the far more dangerous direction.
+func scanQuote(r []rune, i int) int {
+	quote := r[i]
+	j := i + 1
+	for j < len(r) {
+		if r[j] == quote {
+			if j+1 < len(r) && r[j+1] == quote {
+				j += 2
+				continue
+			}
+			return j + 1
+		}
+		j++
+	}
+	return j
+}
+
+// scanDollarQuote reports the end index (exclusive) of a Postgres dollar-quoted string opened by
+// r[i] == '$' (`$$...$$` or `$tag$...$tag$`, mirroring sql-lex.ts's own regexp), or -1 when r[i]
+// doesn't actually open one — a bare `$` used as an ordinary character (a `$1` placeholder, a
+// MySQL identifier) rather than a quote.
+func scanDollarQuote(r []rune, i int) int {
+	n := len(r)
+	j := i + 1
+	if j < n && (unicode.IsLetter(r[j]) || r[j] == '_') {
+		j++
+		for j < n && (unicode.IsLetter(r[j]) || unicode.IsDigit(r[j]) || r[j] == '_') {
+			j++
+		}
+	}
+	if j >= n || r[j] != '$' {
+		return -1
+	}
+	tagEnd := j + 1
+	tag := r[i:tagEnd]
+	for k := tagEnd; k+len(tag) <= n; k++ {
+		if runesEqual(r[k:k+len(tag)], tag) {
+			return k + len(tag)
+		}
+	}
+	return n
+}
+
+func runesEqual(a, b []rune) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // StripSQLComments replaces every SQL comment — a line comment (`--` to end of line) or a block
 // comment (`/* ... */`) — with a single space, preserving token boundaries the same way real SQL
 // treats a comment as lexical whitespace (confirmed against a real server: `READ/*x*/WRITE` parses
@@ -130,12 +201,32 @@ func endsTransaction(stmt string) bool {
 // its own matching, correctly-nested */, swallowing the inner comment and the "x" between them —
 // which a single non-nesting regexp pass cannot express, so this scans by rune and tracks depth
 // instead.
+//
+// Quote-aware (finding #1, M6): a `'`, `"`, `` ` `` or Postgres dollar-quote opened outside any
+// comment is skipped over as one atomic run before comment markers are even considered inside it,
+// so `--`/`/*` appearing inside a string literal — e.g. `SELECT '/*' ; DROP TABLE users` — is never
+// mistaken for a real comment start. Before this, such a marker inside a quote was read as a
+// genuine (often unterminated) comment, silently swallowing everything after it, including the
+// real `;` that should have tripped ClassifySQL's embedded-statement guard — a permission-gate
+// bypass, not just a cosmetic parse difference.
 func StripSQLComments(s string) string {
 	r := []rune(s)
 	var out strings.Builder
 	depth := 0
 	for i := 0; i < len(r); {
 		switch {
+		case depth == 0 && (r[i] == '\'' || r[i] == '"' || r[i] == '`'):
+			end := scanQuote(r, i)
+			out.WriteString(string(r[i:end]))
+			i = end
+		case depth == 0 && r[i] == '$':
+			if end := scanDollarQuote(r, i); end >= 0 {
+				out.WriteString(string(r[i:end]))
+				i = end
+			} else {
+				out.WriteRune(r[i])
+				i++
+			}
 		case depth == 0 && r[i] == '-' && i+1 < len(r) && r[i+1] == '-':
 			for i < len(r) && r[i] != '\n' {
 				i++
