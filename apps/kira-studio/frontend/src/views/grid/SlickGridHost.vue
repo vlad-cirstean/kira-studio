@@ -31,6 +31,7 @@ import {
   loadMaskRules,
   maskRulesFor,
   maskRulesLoaded,
+  maskRulesState,
 } from '../../state/maskRules';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
@@ -2427,8 +2428,17 @@ watch(canEditTableReactive, (editable) => {
 // `dataSource.setState` swaps the extractor closure; `invalidateAllRows` + `render` are what
 // `shared/slick/dataSource.ts:174-183`'s own header comment says `setState` exists to be followed
 // by — the page store itself is never touched (a mask preview is a display-layer transform only).
+//
+// M6 finding #7: also watches this tab's own connection entry in `maskRulesState.byConnection` —
+// `refreshMaskFolding` was previously only ever re-run from this same watch, so marking (or
+// un-marking) a column PII via the header menu while preview was already on left
+// `maskRulesByColumn` stale: a newly-masked column kept showing real values, a newly-unmasked one
+// kept showing bulleted output, despite the header menu's own checkbox and the toolbar's "masked"
+// banner both already reflecting the change. `loadMaskRules` reassigns the array at this key on
+// every write, so watching it (rather than deep-watching its contents) is enough to catch every
+// upsert/remove for the tab's current connection.
 watch(
-  () => rt()?.maskPreview,
+  [() => rt()?.maskPreview, () => maskRulesState.byConnection[tab()?.connectionId ?? '']],
   async () => {
     refreshMaskFolding();
     await refreshMaskTagCache();

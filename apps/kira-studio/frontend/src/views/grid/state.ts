@@ -16,7 +16,7 @@ import type { Selection } from '../shared/slick/selection';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { clearCellFocus } from './focusRequest';
 import { setPage } from './page';
-import { clearPending, registerFullPrimaryKeyAccessor } from './pendingChanges';
+import { clearPending, hasPending, registerFullPrimaryKeyAccessor } from './pendingChanges';
 
 // P19 D7: the type itself moved to views/shared/slick/selection.ts (the file that already owns
 // its geometry, and which views/console/ now needs too) — re-exported here so every existing
@@ -73,14 +73,21 @@ const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen 
 
 export { runtime, setSearchOpen, toggleSearchOpen };
 
-/** M5 §6.2. `hasPending` (views/grid/pendingChanges.ts) gates both directions here, at the one
- *  caller (DataToolbar.vue's toggle button) rather than duplicated at every setter — see that
- *  file's own comment for why a staged change and a live preview must never coexist. */
+/** M5 §6.2. The pending-changes guard lives here, not at any one caller (M6 finding #8: it used
+ *  to sit only at DataToolbar.vue's own toggle button, so menu.ts's `markColumnMaskKind` — marking
+ *  a column PII via the header menu — could turn preview on directly, bypassing it, while a cell
+ *  edit or insert row was staged. That left `maskPreview` and pending changes coexisting, a state
+ *  nothing downstream (the toolbar's disabled toggle, DataView.vue's edit-action gating,
+ *  SlickGridHost's own "no insert row while masked" assumption) was written to handle. Centralizing
+ *  the guard here means no caller, menu or toolbar or otherwise, can ever turn preview on while a
+ *  change is pending — the one place this invariant needs to hold. */
 export function setMaskPreview(tabId: string, on: boolean): void {
+  if (on && hasPending(tabId)) return;
   ensureRuntime(tabId).maskPreview = on;
 }
 export function toggleMaskPreview(tabId: string): void {
   const rt = ensureRuntime(tabId);
+  if (!rt.maskPreview && hasPending(tabId)) return;
   rt.maskPreview = !rt.maskPreview;
 }
 
