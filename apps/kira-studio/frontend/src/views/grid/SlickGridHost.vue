@@ -596,10 +596,16 @@ let maskTagCache = new Map<string, string>();
 let maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 
 // Re-resolves maskRulesByColumn from this tab's own connection — cheap (state/maskRules.ts's own
-// in-memory store, no IPC round trip when already loaded).
-function refreshMaskFolding(): void {
+// in-memory store, no IPC round trip when already loaded). Split out from refreshMaskFolding below
+// so a caller about to rebuild maskTagCache too (refreshMaskTagCache always reassigns
+// maskTransform itself) does not also construct one here, only to discard it unused a line later.
+function foldMaskRulesOnly(): void {
   const connectionId = tab()?.connectionId;
   maskRulesByColumn = connectionId ? foldRulesByColumn(maskRulesFor(connectionId)) : new Map();
+}
+
+function refreshMaskFolding(): void {
+  foldMaskRulesOnly();
   maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 }
 
@@ -2483,7 +2489,7 @@ watch(canEditTableReactive, (editable) => {
 watch(
   [() => rt()?.maskPreview, () => maskRulesState.byConnection[tab()?.connectionId ?? '']],
   async () => {
-    refreshMaskFolding();
+    foldMaskRulesOnly();
     try {
       await refreshMaskTagCache();
     } catch (err) {
