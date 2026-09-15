@@ -120,6 +120,23 @@ type scanner interface {
 	Scan(ctx context.Context, cursor uint64, match string, count int64) *goredis.ScanCmd
 }
 
+// escapeGlobPrefix backslash-escapes redis MATCH's glob metacharacters (`* ? [ ] \`) in a literal
+// namespace prefix, so a segment name that happens to contain one (e.g. "a*b:") scans as that
+// literal text instead of as a wildcard — an unescaped prefix can both miss real children (glob
+// swallows too much) and pull in unrelated keys that only coincidentally match the pattern.
+func escapeGlobPrefix(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch r {
+		case '*', '?', '[', ']', '\\':
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 // listNamespaceChildren ports catalog.ts's listNamespaceChildren: the ':'-splitting SCAN walk.
 // namespaceSegments is just the local segments collected while descending the tree, joined back
 // into a scan prefix here, never reconstructed from a leaf.
@@ -128,6 +145,7 @@ func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, nam
 	if len(namespaceSegments) > 0 {
 		prefix = strings.Join(namespaceSegments, ":") + ":"
 	}
+	matchPattern := escapeGlobPrefix(prefix) + "*"
 	namespaceNodes := map[string]model.TreeNode{}
 	var namespaceOrder []string
 	keyNodes := map[string]model.TreeNode{}
@@ -139,12 +157,17 @@ func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, nam
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return adapters.TreeChildren{}, err
 		}
-		keys, nextCursor, err := conn.Scan(ctx, cursor, prefix+"*", scanCount).Result()
+		keys, nextCursor, err := conn.Scan(ctx, cursor, matchPattern, scanCount).Result()
 		if err != nil {
 			return adapters.TreeChildren{}, mapError(err)
 		}
 		cursor = nextCursor
 		for _, key := range keys {
+			// Defensive, not load-bearing given the escaping above: skip rather than panic on a
+			// key MATCH somehow returned that doesn't actually start with the literal prefix.
+			if !strings.HasPrefix(key, prefix) {
+				continue
+			}
 			rest := key[len(prefix):]
 			sep := strings.IndexByte(rest, ':')
 			if sep < 0 {

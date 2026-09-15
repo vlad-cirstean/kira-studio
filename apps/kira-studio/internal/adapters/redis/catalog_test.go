@@ -214,6 +214,38 @@ func TestGroupByDB_HonoursDBIndexAndOrder(t *testing.T) {
 	}
 }
 
+func TestListNamespaceChildren_EscapesGlobMetacharactersInPrefix(t *testing.T) {
+	fake := &fakeScanner{round: func(int) ([]string, uint64) {
+		return []string{"a*b:x"}, 0
+	}}
+	_, err := listNamespaceChildren(context.Background(), fake, "db0", []string{"a*b"}, adapters.NewOpCtx("op1"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.calls) != 1 {
+		t.Fatalf("expected 1 scan call, got %d", len(fake.calls))
+	}
+	want := `a\*b:*`
+	if fake.calls[0].match != want {
+		t.Fatalf("MATCH pattern = %q, want %q (literal '*' in the segment must be escaped)", fake.calls[0].match, want)
+	}
+}
+
+func TestListNamespaceChildren_SkipsKeyThatDoesNotActuallyStartWithPrefix(t *testing.T) {
+	// Defensive: even if a server ever returned a key that MATCH found but that doesn't literally
+	// start with the requested prefix, slicing it must not panic — the key is skipped instead.
+	fake := &fakeScanner{round: func(int) ([]string, uint64) {
+		return []string{"other", "a:x"}, 0
+	}}
+	result, err := listNamespaceChildren(context.Background(), fake, "db0", []string{"a"}, adapters.NewOpCtx("op1"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Nodes) != 1 || result.Nodes[0].Name != "a:x" {
+		t.Fatalf("got %v, want only the key actually under prefix \"a:\"", result.Nodes)
+	}
+}
+
 func TestListNamespaceChildren_AlreadyCancelledContextFailsBeforeFirstScan(t *testing.T) {
 	fake := &fakeScanner{round: func(int) ([]string, uint64) { return nil, 0 }}
 	ctx, cancel := context.WithCancel(context.Background())
