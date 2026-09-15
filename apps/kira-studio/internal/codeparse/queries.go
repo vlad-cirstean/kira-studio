@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/javascript/p67f_reads.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/go/p67f_reads.scm queries/rust/tags.scm
+//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/javascript/p67f_reads.scm queries/javascript/m1c_members.scm queries/javascript/m1c_member_reads.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/typescript/m1c_members.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/go/p67f_reads.scm queries/go/m1c_fields.scm queries/rust/tags.scm
 var queryFS embed.FS
 
 // QuerySource is one query file's provenance (§4.1/NOTICES.md): a future license or version audit
@@ -72,6 +72,29 @@ var Provenance = []QuerySource{
 	// shape, nothing this repository's ESM actually writes. JavaScript only (§2.6): TypeScript/TSX
 	// already carry the equivalent coverage via their own p64_declarations.scm files.
 	{JavaScript, thisRepo, "queries/javascript/p64b_declarations.scm", ""},
+
+	// M1c-authored struct/class/interface field query (docs/v1.7/plans/M1c-repomap-struct-field-fix.md
+	// §2.1) — the vendored tags.scm has no field_declaration pattern, so a Go struct field is never a
+	// symbol, and captures a selector_expression only in a call_expression's function position, so a
+	// plain `x.Field` read produces no reference row.
+	{Go, thisRepo, "queries/go/m1c_fields.scm", ""},
+
+	// M1c-authored member query, TypeScript/TSX half (§2.2) — typescript/tags.scm captures
+	// method_signature/abstract_method_signature but no data member, so an interface property, a
+	// type-literal property and a class field are all invisible to search_symbols.
+	{TypeScript, thisRepo, "queries/typescript/m1c_members.scm", ""},
+	{TSX, thisRepo, "queries/typescript/m1c_members.scm", ""},
+
+	// M1c-authored member query, JavaScript half (§2.3) — javascript/tags.scm captures
+	// method_definition but not field_definition; the node's field name and its own kind both differ
+	// from TypeScript's public_field_definition, so one shared file cannot compile against both.
+	{JavaScript, thisRepo, "queries/javascript/m1c_members.scm", ""},
+
+	// M1c-authored member-read query (§2.4) — the same gap as m1c_fields.scm one language family
+	// over: member_expression is captured only in a call_expression's function position, so `obj.prop`
+	// as a value produces no reference row. One file, registered on JavaScript, TypeScript and TSX
+	// alike (below), since member_expression/property_identifier are plain syntax all three share.
+	{JavaScript, thisRepo, "queries/javascript/m1c_member_reads.scm", ""},
 }
 
 // querySourcePaths maps a symbol-bearing language id to every embedded query file compiled into
@@ -84,10 +107,10 @@ var Provenance = []QuerySource{
 var querySourcePaths = map[ID][]string{
 	Java:       {"queries/java/tags.scm"},
 	Python:     {"queries/python/tags.scm", "queries/python/c2_implements.scm"},
-	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm", "queries/javascript/p64b_declarations.scm", "queries/javascript/p67f_reads.scm"},
-	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm", "queries/javascript/p67f_reads.scm"},
-	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm", "queries/javascript/p67f_reads.scm"},
-	Go:         {"queries/go/tags.scm", "queries/go/p64b_declarations.scm", "queries/go/p67f_reads.scm"},
+	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm", "queries/javascript/p64b_declarations.scm", "queries/javascript/p67f_reads.scm", "queries/javascript/m1c_members.scm", "queries/javascript/m1c_member_reads.scm"},
+	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm", "queries/javascript/p67f_reads.scm", "queries/typescript/m1c_members.scm", "queries/javascript/m1c_member_reads.scm"},
+	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm", "queries/javascript/p67f_reads.scm", "queries/typescript/m1c_members.scm", "queries/javascript/m1c_member_reads.scm"},
+	Go:         {"queries/go/tags.scm", "queries/go/p64b_declarations.scm", "queries/go/p67f_reads.scm", "queries/go/m1c_fields.scm"},
 	Rust:       {"queries/rust/tags.scm"},
 }
 

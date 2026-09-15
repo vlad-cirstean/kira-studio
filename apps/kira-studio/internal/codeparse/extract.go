@@ -44,7 +44,7 @@ type Symbol struct {
 // a JavaScript member call, the reference node's own range (StartByte/EndByte) starts before the
 // name and would otherwise never match a cursor placed on it.
 type Reference struct {
-	Kind       string // 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read'
+	Kind       string // 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read' | 'field'
 	Name       string
 	StartByte  int
 	EndByte    int
@@ -69,6 +69,7 @@ var definitionKinds = map[string]bool{
 
 var referenceKinds = map[string]bool{
 	"call": true, "type": true, "implementation": true, "import": true, "class": true, "read": true,
+	"field": true,
 }
 
 // extractSymbols runs id's vendored tags.scm query (S2) over root and returns the file's own symbols
@@ -169,8 +170,31 @@ func extractSymbols(root *sitter.Node, source []byte, id ID) ([]Symbol, []Refere
 		// bare `(package_clause "package" (package_identifier) @name)`) produces no row at all.
 	}
 
+	references = dropCallDuplicateFields(references)
 	linkParents(symbols)
 	return symbols, references, nil
+}
+
+// dropCallDuplicateFields removes a "field" reference covering the identical NAME range as a "call"
+// reference from the same root. A method call is captured twice by design — tags.scm's own call
+// pattern and M1c's selector/member pattern both match `c.Greet()` — and the call is the more
+// specific of the two, so find_references lists a call site once rather than twice. Keyed on the
+// name range, not the node span: the two patterns' spans deliberately differ.
+func dropCallDuplicateFields(references []Reference) []Reference {
+	calls := map[[2]int]bool{}
+	for _, r := range references {
+		if r.Kind == "call" {
+			calls[[2]int{r.NameStartByte, r.NameEndByte}] = true
+		}
+	}
+	out := references[:0]
+	for _, r := range references {
+		if r.Kind == "field" && calls[[2]int{r.NameStartByte, r.NameEndByte}] {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
 }
 
 // linkParents computes each symbol's containment parent (§4.2: "a parent symbol computed by
