@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
@@ -40,6 +41,7 @@ type App struct {
 	ConnectionsSvc *bridge.ConnectionsService
 	TreeSvc        *bridge.TreeService
 	OpsSvc         *bridge.OpsService
+	MaskRulesSvc   *bridge.MaskRulesService
 }
 
 // NewApp builds one App per test, in a fresh temp KIRA_HOME, and registers cleanup in the reverse
@@ -84,8 +86,13 @@ func NewApp(t *testing.T) *App {
 
 	treeSvc := tree.New(r.Connections, r.Metadata, router, connectionsSvc)
 
+	// M5 §4.6/§9: the same "needs a Cipher, constructed separately" shape as secretsRepo above.
+	maskKeysRepo := repos.NewMaskKeys(db.DB, cipher)
+	maskRulesSvc := maskrules.New(r.MaskRules, maskKeysRepo)
+
 	appDeps := appcore.Deps{
 		DB: db.DB, Repos: r, Connections: connectionsSvc, Tree: treeSvc, Router: router,
+		MaskRules: maskRulesSvc,
 	}
 
 	return &App{
@@ -93,6 +100,7 @@ func NewApp(t *testing.T) *App {
 		ConnectionsSvc: &bridge.ConnectionsService{Deps: appDeps},
 		TreeSvc:        &bridge.TreeService{Deps: appDeps},
 		OpsSvc:         &bridge.OpsService{Deps: appDeps, Canceller: router},
+		MaskRulesSvc:   &bridge.MaskRulesService{Deps: appDeps},
 	}
 }
 

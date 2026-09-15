@@ -41,6 +41,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
@@ -110,6 +111,9 @@ func main() {
 	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
 	// secretsRepo just above.
 	repositories.Variables = repos.NewVariables(db.DB, cipher)
+	// M5 §2.5/§3.2: the per-connection correlation key column, same "needs a Cipher" shape.
+	maskKeysRepo := repos.NewMaskKeys(db.DB, cipher)
+	maskRulesSvc := maskrules.New(repositories.MaskRules, maskKeysRepo)
 
 	// G1 §3.7: the git socket listener. Start's error is logged, never fatal (D5) — the app must
 	// boot even when the git socket could not, e.g. a second instance already serving it.
@@ -179,6 +183,7 @@ func main() {
 		Repos:       repositories,
 		ApiVars:     apiVarsSvc,
 		GitRegistry: gitRegistry,
+		MaskRules:   maskRulesSvc,
 	}
 
 	// Read from the just-migrated (possibly still-default) settings row, same as production would
@@ -369,6 +374,7 @@ func main() {
 			application.NewService(&bridge.TabsService{Deps: deps}),
 			application.NewService(&bridge.WindowsService{Deps: deps}),
 			application.NewService(&bridge.ConnectionsService{Deps: deps}),
+			application.NewService(&bridge.MaskRulesService{Deps: deps}),
 			application.NewService(&bridge.TreeService{Deps: deps}),
 			application.NewService(&bridge.EngineService{Deps: deps}),
 			application.NewService(&bridge.OpsService{Deps: deps, Canceller: router}),

@@ -117,6 +117,7 @@ func (s *DbMcpService) startLocked(mint bool) error {
 		Tree:             s.Deps.Tree,
 		Query:            s.Deps.Router,
 		Approvals:        s.Approvals,
+		MaskRules:        s.Deps.MaskRules,
 		ExplainThreshold: s.explainThreshold,
 		Logger:           slog.Default(),
 	})

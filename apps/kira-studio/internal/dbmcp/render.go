@@ -4,12 +4,37 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mask"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// maskset aliases mask.Set — dbmcp's own name for the resolved per-connection masking state at
+// call sites (renderPage's own mk parameter), kept distinct from the type's home package for
+// readability; MaskRules.MaskSetFor returns the exact same type.
+type maskset = mask.Set
+
+// maskingRefusedError is render's own "cannot mask a document/stream page" refusal (plan §4.4) — a
+// distinct type so runQuery can tell it apart from a genuine internal render fault and surface it
+// as a caller-correctable IsError result (§5.3's split) rather than a raw Go error.
+type maskingRefusedError struct{ msg string }
+
+func (e *maskingRefusedError) Error() string { return e.msg }
+
+// newMaskingRefusedError builds §4.4's own refusal text for pageKind ("document" or "stream"),
+// bodyNoun naming what that page kind carries instead of columns ("a document body", "a stream
+// message body").
+func newMaskingRefusedError(pageKind, bodyNoun string) error {
+	return &maskingRefusedError{msg: fmt.Sprintf(
+		"this connection has PII masking rules, which cannot be applied to a %s result; masking rules address table columns, and %s has none — narrow the query to a projection, or remove the rules in the connection's Privacy tab",
+		pageKind, bodyNoun,
+	)}
+}
 
 // textResult wraps text as a successful *mcp.CallToolResult — repomap/tools.go's own shape (Out is
 // any everywhere here too, so the SDK publishes no output schema and every answer is one
@@ -86,6 +111,34 @@ type connectionView struct {
 	Description string `json:"description,omitempty"`
 	// Permissions is M2's per-operation MCP mode, always present.
 	Permissions connectionPermissions `json:"permissions"`
+	// MaskedColumns is M5 §4.5's own addition: "table.column: kind" per rule, sorted, capped at 50
+	// with a trailing "+N more" entry — so a client that does not know a column is masked does not
+	// misread a bucket string (e.g. "[1000-10000)") as a literal value. Omitted when the connection
+	// has no rules at all.
+	MaskedColumns []string `json:"maskedColumns,omitempty"`
+}
+
+// maskedColumnsMaxListed is §4.5's own cap — 50 entries, then a trailing "+N more" summary rather
+// than an unbounded list for a connection with hundreds of masked columns.
+const maskedColumnsMaxListed = 50
+
+// maskedColumnsFor formats rules as list_connections' own "table.column: kind" strings, sorted,
+// capped per maskedColumnsMaxListed.
+func maskedColumnsFor(rules []model.MaskRule) []string {
+	if len(rules) == 0 {
+		return nil
+	}
+	entries := make([]string, len(rules))
+	for i, r := range rules {
+		entries[i] = fmt.Sprintf("%s.%s: %s", r.TableName, r.ColumnName, r.Kind)
+	}
+	sort.Strings(entries)
+	if len(entries) <= maskedColumnsMaxListed {
+		return entries
+	}
+	out := append([]string{}, entries[:maskedColumnsMaxListed]...)
+	out = append(out, fmt.Sprintf("+%d more", len(entries)-maskedColumnsMaxListed))
+	return out
 }
 
 // --- run_query's own projection (§5.2) — a projection because rows cross to the frontend as
@@ -181,22 +234,29 @@ func cellAt(chunk page.Chunk, row int) *string {
 // renderPage projects one page.Page into its own JSON-ready envelope, capped at maxRows. plan is
 // run_query's own auto-force-explain result (nil when auto-force-explain is off, the statement
 // was not explainable, or the plan-only EXPLAIN failed) — M5's own seam (M1 §9), now taking a plan
-// summary alongside the page (M3 §5.3).
-func renderPage(p page.Page, maxRows int, plan *planSummary) (any, error) {
+// summary alongside the page (M3 §5.3). mk is the connection's resolved masking state (M5 §4.2);
+// nil means no rules on this connection, and the projection behaves exactly as it does today.
+func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset) (any, error) {
 	switch pg := p.(type) {
 	case page.TabularPage:
-		r := renderTabularPage(pg, maxRows)
+		r := renderTabularPage(pg, maxRows, mk)
 		r.Plan = plan
 		return r, nil
 	case page.DocumentPage:
+		if mk != nil && !mk.Empty() {
+			return nil, newMaskingRefusedError("document", "a document body")
+		}
 		r := renderDocumentPage(pg, maxRows)
 		r.Plan = plan
 		return r, nil
 	case page.KeyValuePage:
-		r := renderKeyValuePage(pg, maxRows)
+		r := renderKeyValuePage(pg, maxRows, mk)
 		r.Plan = plan
 		return r, nil
 	case page.StreamPage:
+		if mk != nil && !mk.Empty() {
+			return nil, newMaskingRefusedError("stream", "a stream message body")
+		}
 		r := renderStreamPage(pg, maxRows)
 		r.Plan = plan
 		return r, nil
@@ -215,17 +275,51 @@ func cappedReturned(rowCount, maxRows int) int {
 	return rowCount
 }
 
-func renderTabularPage(pg page.TabularPage, maxRows int) tabularResult {
+// columnRules resolves columns against mk once — §4.2's own cost rule ("the lookup is per column,
+// once per call, never per row"). A nil mk or one with no matching column yields a nil slice, so
+// the row loop below pays one nil check per cell and nothing more.
+func columnRules(columns []page.ColumnDescriptor, mk *maskset) []*mask.Rule {
+	if mk == nil || mk.Empty() {
+		return nil
+	}
+	rules := make([]*mask.Rule, len(columns))
+	matched := false
+	for i, c := range columns {
+		if r, ok := mk.RuleFor(c.Name); ok {
+			rr := r
+			rules[i] = &rr
+			matched = true
+		}
+	}
+	if !matched {
+		return nil
+	}
+	return rules
+}
+
+func renderTabularPage(pg page.TabularPage, maxRows int, mk *maskset) tabularResult {
 	returned := cappedReturned(pg.RowCount, maxRows)
 	columns := make([]tabularColumn, len(pg.Columns))
 	for i, c := range pg.Columns {
 		columns[i] = tabularColumn{Name: c.Name, DataType: c.DataType, TypeClass: string(c.TypeClass)}
 	}
+	rules := columnRules(pg.Columns, mk)
+	var masker *mask.Masker
+	if rules != nil {
+		masker = mk.Masker
+		if masker == nil {
+			masker = mask.New(nil)
+		}
+	}
 	rows := make([][]*string, returned)
 	for r := 0; r < returned; r++ {
 		row := make([]*string, len(pg.Chunks))
 		for c, chunk := range pg.Chunks {
-			row[c] = cellAt(chunk, r)
+			v := cellAt(chunk, r)
+			if rules != nil && rules[c] != nil {
+				v = masker.MaskNullable(*rules[c], v)
+			}
+			row[c] = v
 		}
 		rows[r] = row
 	}
@@ -245,11 +339,22 @@ func renderDocumentPage(pg page.DocumentPage, maxRows int) documentResult {
 	return documentResult{Kind: "document", Documents: docs, RowCount: pg.RowCount, Returned: returned, Truncated: returned < pg.RowCount}
 }
 
-func renderKeyValuePage(pg page.KeyValuePage, maxRows int) keyValueResult {
+// renderKeyValuePage also masks (§4.3): a Redis hash field or an S3 metadata key is column-shaped,
+// so a rule whose column_name matches keyValueEntry.Field masks that entry's Value. Resolved per
+// entry, not once per call like renderTabularPage's columns — a keyvalue page has no fixed column
+// set (Field varies row to row), so there is no per-column list to precompute against.
+func renderKeyValuePage(pg page.KeyValuePage, maxRows int, mk *maskset) keyValueResult {
 	returned := cappedReturned(pg.RowCount, maxRows)
 	entries := make([]keyValueEntry, returned)
 	for r := 0; r < returned; r++ {
-		entries[r] = keyValueEntry{Field: cellAt(pg.Fields, r), Value: cellAt(pg.Values, r)}
+		field := cellAt(pg.Fields, r)
+		value := cellAt(pg.Values, r)
+		if mk != nil && !mk.Empty() && field != nil {
+			if masked, matched := mk.ApplyColumn(*field, value); matched {
+				value = masked
+			}
+		}
+		entries[r] = keyValueEntry{Field: field, Value: value}
 	}
 	return keyValueResult{
 		Kind: "keyvalue", RedisType: pg.RedisType, TTLMs: pg.TTLMs, MemoryBytes: pg.MemoryBytes,

@@ -1,8 +1,10 @@
 package dbmcp
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mask"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
 
@@ -25,7 +27,7 @@ func TestRenderTabularPageNullVersusEmptyString(t *testing.T) {
 	}
 	pg := b.Finish(page.UnpagedPosition(2))
 
-	rendered := renderTabularPage(pg, 200)
+	rendered := renderTabularPage(pg, 200, nil)
 	if rendered.Kind != "tabular" {
 		t.Fatalf("Kind = %q, want tabular", rendered.Kind)
 	}
@@ -75,7 +77,7 @@ func TestRenderTabularPageTruncation(t *testing.T) {
 		t.Fatal("builder did not truncate the oversized cell — test setup is wrong, not the code under test")
 	}
 
-	rendered := renderTabularPage(pg, 2)
+	rendered := renderTabularPage(pg, 2, nil)
 	if rendered.RowCount != 4 {
 		t.Fatalf("RowCount = %d, want 4 (the full result, not the capped one)", rendered.RowCount)
 	}
@@ -121,7 +123,7 @@ func TestRenderKeyValuePage(t *testing.T) {
 	b.Push("field1", "value1")
 	pg := b.Finish(page.UnpagedPosition(1))
 
-	rendered := renderKeyValuePage(pg, 200)
+	rendered := renderKeyValuePage(pg, 200, nil)
 	if rendered.Kind != "keyvalue" {
 		t.Fatalf("Kind = %q, want keyvalue", rendered.Kind)
 	}
@@ -165,29 +167,29 @@ func TestRenderStreamPage(t *testing.T) {
 func TestRenderPageDispatchesByKind(t *testing.T) {
 	tb := page.NewTabularPageBuilder(nil)
 	tabular := tb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(tabular, 200, nil); err != nil {
+	if _, err := renderPage(tabular, 200, nil, nil); err != nil {
 		t.Fatalf("renderPage(TabularPage): %v", err)
 	}
 
 	db := page.NewDocumentPageBuilder(false)
 	doc := db.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(doc, 200, nil); err != nil {
+	if _, err := renderPage(doc, 200, nil, nil); err != nil {
 		t.Fatalf("renderPage(DocumentPage): %v", err)
 	}
 
 	kvb := page.NewKeyValuePageBuilder("string", nil, nil, false)
 	kv := kvb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(kv, 200, nil); err != nil {
+	if _, err := renderPage(kv, 200, nil, nil); err != nil {
 		t.Fatalf("renderPage(KeyValuePage): %v", err)
 	}
 
 	sb := page.NewStreamPageBuilder(nil)
 	stream := sb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(stream, 200, nil); err != nil {
+	if _, err := renderPage(stream, 200, nil, nil); err != nil {
 		t.Fatalf("renderPage(StreamPage): %v", err)
 	}
 
-	if _, err := renderPage(unknownPage{}, 200, nil); err == nil {
+	if _, err := renderPage(unknownPage{}, 200, nil, nil); err == nil {
 		t.Fatal("renderPage(unrecognised kind) = nil error, want an error naming the unhandled type")
 	}
 }
@@ -199,3 +201,146 @@ type unknownPage struct{}
 func (unknownPage) PageKind() page.PageKind { return page.PageKind("unknown") }
 func (unknownPage) Size() int               { return 0 }
 func (unknownPage) Rows() int               { return 0 }
+
+// --- M5 §8: masking applied per column, not per row; NULL untouched; a document/stream page
+// refused when rules exist; a keyvalue entry masked by its Field name. ---
+
+// TestColumnRulesResolvesOncePerColumn pins §4.2's own cost rule directly: columnRules builds one
+// index-aligned []*mask.Rule from the column list, called exactly once by renderTabularPage before
+// its row loop (source fact) — this test is what would break if that call moved inside the loop
+// and started re-resolving per cell.
+func TestColumnRulesResolvesOncePerColumn(t *testing.T) {
+	columns := []page.ColumnDescriptor{
+		{Name: "id", DataType: "int4", TypeClass: page.TypeClassNumber},
+		{Name: "Email", DataType: "text", TypeClass: page.TypeClassText},
+		{Name: "note", DataType: "text", TypeClass: page.TypeClassText},
+	}
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{
+		"email": {Kind: mask.KindRedact},
+	}}
+	rules := columnRules(columns, &set)
+	if len(rules) != 3 {
+		t.Fatalf("columnRules len = %d, want 3 (index-aligned with columns)", len(rules))
+	}
+	if rules[0] != nil {
+		t.Fatalf("rules[0] (id, no rule) = %+v, want nil", rules[0])
+	}
+	if rules[1] == nil || rules[1].Kind != mask.KindRedact {
+		t.Fatalf("rules[1] (Email, matches lowercase rule \"email\") = %+v, want a redact rule", rules[1])
+	}
+	if rules[2] != nil {
+		t.Fatalf("rules[2] (note, no rule) = %+v, want nil", rules[2])
+	}
+
+	if got := columnRules(columns, nil); got != nil {
+		t.Fatalf("columnRules(nil Set) = %+v, want nil", got)
+	}
+	empty := mask.Set{}
+	if got := columnRules(columns, &empty); got != nil {
+		t.Fatalf("columnRules(empty Set) = %+v, want nil", got)
+	}
+}
+
+// TestRenderTabularPageMasksEveryRowByColumn confirms the per-column resolve is actually applied
+// to every row, not just the first — masking must not silently stop after one row.
+func TestRenderTabularPageMasksEveryRowByColumn(t *testing.T) {
+	b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "id", DataType: "int4", TypeClass: page.TypeClassNumber},
+		{Name: "email", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	for i := 0; i < 5; i++ {
+		id := "1"
+		email := "person@example.com"
+		if err := b.AppendRow([]*string{&id, &email}); err != nil {
+			t.Fatalf("AppendRow: %v", err)
+		}
+	}
+	pg := b.Finish(page.UnpagedPosition(5))
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+
+	rendered := renderTabularPage(pg, 200, &set)
+	for r, row := range rendered.Rows {
+		if row[0] == nil || *row[0] != "1" {
+			t.Fatalf("row %d col 0 (unmasked) = %v, want unchanged \"1\"", r, row[0])
+		}
+		if row[1] == nil || *row[1] != "[redacted]" {
+			t.Fatalf("row %d col 1 (masked) = %v, want \"[redacted]\"", r, row[1])
+		}
+	}
+}
+
+// TestRenderTabularPageNullPassesThroughUnmasked is §2.3's own universal rule, re-verified at the
+// render seam: a NULL cell in a masked column must stay NULL, never become "[redacted]" or any
+// other masked text — masking a NULL would invent a value that is not there.
+func TestRenderTabularPageNullPassesThroughUnmasked(t *testing.T) {
+	b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "email", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	if err := b.AppendRow([]*string{nil}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg := b.Finish(page.UnpagedPosition(1))
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+
+	rendered := renderTabularPage(pg, 200, &set)
+	if rendered.Rows[0][0] != nil {
+		t.Fatalf("NULL cell in a masked column rendered as %q, want nil (NULL untouched)", *rendered.Rows[0][0])
+	}
+}
+
+// TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist is §4.4's own decision: a document or
+// stream page is refused outright on a connection with at least one mask rule, never partially
+// masked — the plan's own reasoning is that a partial mask the user believes is total is worse
+// than a clear refusal.
+func TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist(t *testing.T) {
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"ssn": {Kind: mask.KindRedact}}}
+
+	db := page.NewDocumentPageBuilder(false)
+	db.Push("id-1", `{"a":1}`)
+	doc := db.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(doc, 200, nil, &set); err == nil {
+		t.Fatal("renderPage(DocumentPage, rules exist) = nil error, want a refusal")
+	} else if !strings.Contains(err.Error(), "document") {
+		t.Fatalf("renderPage(DocumentPage) error = %q, want it to name the document page kind", err.Error())
+	}
+
+	sb := page.NewStreamPageBuilder(nil)
+	sb.Push(page.StreamRow{Body: "payload"})
+	stream := sb.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(stream, 200, nil, &set); err == nil {
+		t.Fatal("renderPage(StreamPage, rules exist) = nil error, want a refusal")
+	} else if !strings.Contains(err.Error(), "stream") {
+		t.Fatalf("renderPage(StreamPage) error = %q, want it to name the stream page kind", err.Error())
+	}
+
+	// No rules at all (nil mk, or an empty Set): both page kinds render normally, unchanged.
+	if _, err := renderPage(doc, 200, nil, nil); err != nil {
+		t.Fatalf("renderPage(DocumentPage, no rules) = %v, want no error", err)
+	}
+	empty := mask.Set{}
+	if _, err := renderPage(stream, 200, nil, &empty); err != nil {
+		t.Fatalf("renderPage(StreamPage, empty Set) = %v, want no error", err)
+	}
+}
+
+// TestRenderKeyValuePageMasksByFieldName is §4.3's own extension: a Redis hash field (or an S3
+// metadata key) is column-shaped, so a rule whose column_name matches keyValueEntry.Field masks
+// that entry's Value — matched case-insensitively, the same as a tabular column.
+func TestRenderKeyValuePageMasksByFieldName(t *testing.T) {
+	b := page.NewKeyValuePageBuilder("hash", nil, nil, false)
+	b.Push("Email", "person@example.com")
+	b.Push("plan", "premium")
+	pg := b.Finish(page.UnpagedPosition(2))
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+
+	rendered := renderKeyValuePage(pg, 200, &set)
+	if len(rendered.Entries) != 2 {
+		t.Fatalf("len(Entries) = %d, want 2", len(rendered.Entries))
+	}
+	if *rendered.Entries[0].Field != "Email" || *rendered.Entries[0].Value != "[redacted]" {
+		t.Fatalf("Entries[0] = %+v, want Field unchanged and Value masked", rendered.Entries[0])
+	}
+	if *rendered.Entries[1].Field != "plan" || *rendered.Entries[1].Value != "premium" {
+		t.Fatalf("Entries[1] = %+v, want both fields unchanged (no matching rule)", rendered.Entries[1])
+	}
+}

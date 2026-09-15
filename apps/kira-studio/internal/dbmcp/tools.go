@@ -42,6 +42,12 @@ func (s *Server) listConnections(_ context.Context, _ *mcp.CallToolRequest, _ li
 		if caps, ok := capsOf(state); ok {
 			view.Capabilities = &connectionCapabilities{Query: caps.SQL, Describe: caps.Describe, SchemaColumns: caps.SchemaColumns}
 		}
+		// §4.5: cheap — one repo read per list_connections call, a human-frequency operation. A
+		// read failure degrades to "no masked columns reported" rather than failing the whole
+		// listing; the render path's own refusal (§4.4) is the real safety backstop regardless.
+		if rules, err := s.cfg.MaskRules.List(c.ID); err == nil {
+			view.MaskedColumns = maskedColumnsFor(rules)
+		}
 		out = append(out, view)
 	}
 	return jsonResult(out)
@@ -233,6 +239,17 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		}
 	}
 
+	// M5 §4.3: resolved before Execute, so a key-store failure fails the call before the query runs,
+	// not after — wasted adapter work on a call that cannot be rendered anyway.
+	set, err := s.cfg.MaskRules.MaskSetFor(args.ConnectionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	var mk *maskset
+	if !set.Empty() {
+		mk = &set
+	}
+
 	resp, err := s.cfg.Query.Execute(ctx, adapterhost.ExecuteRequestWire{
 		OpID:         uuid.NewString(),
 		ConnectionID: args.ConnectionID,
@@ -245,8 +262,15 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	if len(resp.Pages) == 0 {
 		return jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
 	}
-	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, s.cfg.ExplainThreshold()))
+	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, s.cfg.ExplainThreshold()), mk)
 	if err != nil {
+		// §4.4/§5.3: a document/stream page under active masking rules is caller-correctable
+		// (narrow the query, or remove the rules) — surfaced as an IsError result, not a raw Go
+		// error. Anything else here is a genuine internal render fault.
+		var refused *maskingRefusedError
+		if errors.As(err, &refused) {
+			return errResult(refused.Error())
+		}
 		return nil, nil, err
 	}
 	return jsonResult(rendered)

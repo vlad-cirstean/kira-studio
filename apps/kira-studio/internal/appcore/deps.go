@@ -9,6 +9,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 )
@@ -56,4 +57,8 @@ type Deps struct {
 	// wraps Repos.Variables instead, the same split CollectionsService already has between
 	// Repos.Collections and nothing else).
 	ApiVars *apivars.Service
+	// MaskRules is M5's rule-management service (docs/v1.7/plans/M5-anonymization-masking.md §4.6)
+	// — the bridge's own Privacy-tab/header-menu surface, and (via dbmcp.Config.MaskRules) the DB
+	// MCP server's masking seam.
+	MaskRules *maskrules.Service
 }
