@@ -3836,7 +3836,7 @@ re-derivation" warns against. Their numbers are in `docs/PERF.md` §2.13.
 `tests/unit/explain-plan.spec.ts` both read the same EXPLAIN-plan fixture set
 (`tests/fixtures/explain-plans/`), pinning the Go EXPLAIN-parser port against the frontend parser it
 was ported from — drift in either fails on the same bytes. `internal/mask/parity_test.go` and
-`tests/unit/mask-parity.spec.ts` do the same for masking, both reading 60 shared fixture pairs under
+`tests/unit/mask-parity.spec.ts` do the same for masking, both reading 66 shared fixture pairs under
 `tests/fixtures/mask/`.
 
 **Parallelism.** `playwright.config.ts` runs five projects (v1.4 P27 added `ui-timing`, v1.4 P6
