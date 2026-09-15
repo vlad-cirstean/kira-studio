@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import type { CommitRecord } from '@kira/git-core';
+import { CommitStore } from '@kira/git-core';
 import type {
   EventKey,
   EventPayload,
@@ -62,6 +64,39 @@ function tick(ms = 0): Promise<void> {
 }
 
 const REPO = '/repos/a';
+
+/** A deterministic 40-hex-char sha (`ShaTable`'s own width auto-detect needs a consistent
+ *  length across every append) — `n` distinguishes rows, never meant to look like a real hash.
+ *  `n` sits in the leading hex digits, not the trailing ones: `ShaTable`'s own index hashes each
+ *  sha's first 4 bytes (`hashFirstFourBytes`), so padding `n` on the right would give every row
+ *  in a large chain the same all-zero hash and turn every lookup into an O(n) linear probe. */
+function sha(n: number): string {
+  return n.toString(16).padStart(8, '0') + '0'.repeat(32);
+}
+
+function record(shaHex: string, parents: readonly string[]): CommitRecord {
+  return {
+    sha: shaHex,
+    parents,
+    author: { name: 'a', email: 'a@x.test', timestamp: 0 },
+    committer: { name: 'a', email: 'a@x.test', timestamp: 0 },
+    subject: 'c',
+    decoration: [],
+  };
+}
+
+/** A linear chain, tip first: `shas[0]` is the branch tip, `shas[i]`'s parent is `shas[i + 1]`,
+ *  the last entry a root commit. Appended tip-first (the real loading order) so every parent but
+ *  the last starts out unresolved — `CommitStore`'s own pending-parent resolution, exercised for
+ *  free rather than assumed away by appending in some other order. */
+function buildChain(length: number): { store: CommitStore; shas: string[] } {
+  const store = new CommitStore();
+  const shas = Array.from({ length }, (_, i) => sha(i));
+  for (let i = 0; i < length; i++) {
+    store.append(record(shas[i] as string, i + 1 < length ? [shas[i + 1] as string] : []));
+  }
+  return { store, shas };
+}
 
 describe('PrState — per-commit selection debounce', () => {
   test('selecting several shas within the debounce window issues exactly one request, for the last one', async () => {
@@ -344,6 +379,197 @@ describe('PrState — ensureSnapshot bounds its own fan-out', () => {
     await done;
 
     expect(transport.calls.filter((c) => c.method === 'branch.resolvePr').length).toBe(20);
+    pr.dispose();
+  });
+});
+
+// P74 §4.2/§10: rebuildAncestry's own bounded breadth-first walk — several interacting rules
+// (first-writer-wins, a budget cut-off, a tip the loaded window never reached) whose wrong
+// answers are invisible in a screenshot, CLAUDE.md's own bar for a dedicated test here.
+describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
+  test('walks every ancestor from a PR branch tip', async () => {
+    const { store, shas } = buildChain(3);
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'main',
+          headSha: shas[0],
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('main');
+
+    pr.rebuildAncestry(store);
+
+    expect(pr.prByAncestry.value.size).toBe(3);
+    for (const s of shas) expect(pr.prForCommit(s)?.[0]?.number).toBe(1);
+    pr.dispose();
+  });
+
+  test('first-writer-wins when two PR branches reach the same ancestor', async () => {
+    const shared = sha(0);
+    const a = sha(1);
+    const b = sha(2);
+    const store = new CommitStore();
+    store.append(record(a, [shared]));
+    store.append(record(b, [shared]));
+    store.append(record(shared, []));
+
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = (_method, params) => {
+      const branch = (params as { branch: string }).branch;
+      const headSha = branch === 'branchA' ? a : b;
+      const number = branch === 'branchA' ? 1 : 2;
+      return {
+        kind: 'ok',
+        prs: [
+          {
+            number,
+            title: 't',
+            url: 'u',
+            state: 'open',
+            headRef: branch,
+            headSha,
+            baseRef: 'main',
+            updatedAt: 0,
+          },
+        ],
+      };
+    };
+    // Sequential, not Promise.all — byBranch's own insertion order (and so the queue's seed
+    // order, "byBranch's own iteration order") depends on which resolveBranch settles first.
+    await pr.resolveBranch('branchA');
+    await pr.resolveBranch('branchB');
+
+    pr.rebuildAncestry(store);
+
+    // branchA resolved first, so its own PR wins the ancestor both tips share.
+    expect(pr.prForCommit(shared)?.[0]?.number).toBe(1);
+    expect(pr.prForCommit(a)?.[0]?.number).toBe(1);
+    expect(pr.prForCommit(b)?.[0]?.number).toBe(2);
+    pr.dispose();
+  });
+
+  test('a tip outside the loaded window contributes nothing', async () => {
+    const { store, shas } = buildChain(2);
+    const outsideSha = sha(999); // never appended to this store.
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = (_method, params) => {
+      const branch = (params as { branch: string }).branch;
+      const headSha = branch === 'loaded' ? shas[0] : outsideSha;
+      const number = branch === 'loaded' ? 1 : 2;
+      return {
+        kind: 'ok',
+        prs: [
+          {
+            number,
+            title: 't',
+            url: 'u',
+            state: 'open',
+            headRef: branch,
+            headSha,
+            baseRef: 'main',
+            updatedAt: 0,
+          },
+        ],
+      };
+    };
+    await pr.resolveBranch('loaded');
+    await pr.resolveBranch('missing');
+
+    pr.rebuildAncestry(store);
+
+    expect(pr.prByAncestry.value.size).toBe(2); // only the loaded branch's own two rows.
+    expect(pr.prForCommit(shas[0] as string)?.[0]?.number).toBe(1);
+    expect(pr.prForCommit(outsideSha)).toBeUndefined();
+    pr.dispose();
+  });
+
+  test('a budget cutoff stops the walk mid-history', async () => {
+    // `rebuildAncestry`'s own `budget` param (defaulted to PR_ANCESTRY_WALK_BUDGET everywhere
+    // except here) lets this prove the cutoff itself on a 5-row chain instead of building the
+    // real 50,000-row fixture the production default would need to exercise the same branch.
+    const { store, shas } = buildChain(5);
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'main',
+          headSha: shas[0],
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('main');
+
+    pr.rebuildAncestry(store, 3);
+
+    expect(pr.prByAncestry.value.size).toBe(3);
+    expect(pr.prForCommit(shas[2] as string)?.[0]?.number).toBe(1); // the last row the budget reaches.
+    expect(pr.prForCommit(shas[3] as string)).toBeUndefined(); // one row past the cutoff.
+    pr.dispose();
+  });
+
+  test('refsChanged clears prByAncestry, and so does a repo switch', async () => {
+    const { store, shas } = buildChain(2);
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'main',
+          headSha: shas[0],
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('main');
+    pr.rebuildAncestry(store);
+    expect(pr.prByAncestry.value.size).toBe(2);
+
+    transport.emit('repo.changed', { repoId: REPO, kind: 'refsChanged' });
+    expect(pr.prByAncestry.value.size).toBe(0);
+
+    // Re-populate, then prove a repo switch (not only refsChanged) clears it too.
+    await pr.resolveBranch('main');
+    pr.rebuildAncestry(store);
+    expect(pr.prByAncestry.value.size).toBe(2);
+    pr.setRepoId('/repos/b');
+    expect(pr.prByAncestry.value.size).toBe(0);
     pr.dispose();
   });
 });

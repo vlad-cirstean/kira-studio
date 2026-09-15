@@ -23,6 +23,7 @@ const {
   isPreview,
   moveTab,
   openTab,
+  promoteTab,
   tabsState,
 } = await import('../../frontend/src/state/tabs');
 
@@ -34,11 +35,12 @@ function freshWorkspace() {
   return repoWorkspaceKey(`test-${workspaceCounter}`);
 }
 
-function openFile(workspace: string, path: string, preview: boolean) {
+function openFile(workspace: string, path: string, preview: boolean, previewCohort = false) {
   return openTab('repo-file', null, path, () => defaultRepoFileTabState(), {
     reuse: true,
     workspaceId: workspace,
     preview,
+    previewCohort,
   });
 }
 
@@ -98,6 +100,79 @@ describe('C5 §5.2: the preview slot', () => {
     expect(isPreview(a.id)).toBe(true);
     expect(isPreview(b.id)).toBe(true);
     expect(a.id).not.toBe(b.id); // dedupe key includes workspaceId — never collapsed together
+  });
+});
+
+describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
+  test('a bulk open leaves every file previewed, none evicting the others', () => {
+    const ws = freshWorkspace();
+    const a = openFile(ws, 'a.ts', true, false); // first file: evicts nothing (slot was empty)
+    const b = openFile(ws, 'b.ts', true, true); // joins a's cohort
+    const c = openFile(ws, 'c.ts', true, true); // joins too
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, c.id]);
+    expect(isPreview(a.id)).toBe(true);
+    expect(isPreview(b.id)).toBe(true);
+    expect(isPreview(c.id)).toBe(true);
+    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([a.id, b.id, c.id]);
+  });
+
+  test('a later single-file preview evicts the whole prior cohort, not just one member', () => {
+    const ws = freshWorkspace();
+    const a = openFile(ws, 'a.ts', true, false);
+    const b = openFile(ws, 'b.ts', true, true);
+    const c = openFile(ws, 'c.ts', true, true);
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, c.id]);
+
+    const d = openFile(ws, 'd.ts', true, false); // a plain tree-click preview, not a bulk open
+    expect(tabsState.tabs.find((t) => t.id === a.id)).toBeUndefined();
+    expect(tabsState.tabs.find((t) => t.id === b.id)).toBeUndefined();
+    expect(tabsState.tabs.find((t) => t.id === c.id)).toBeUndefined();
+    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([d.id]);
+  });
+
+  test('a permanent open never evicts the cohort', () => {
+    const ws = freshWorkspace();
+    const a = openFile(ws, 'a.ts', true, false);
+    const b = openFile(ws, 'b.ts', true, true);
+    const permanent = openFile(ws, 'keep.ts', false);
+    expect(isPreview(a.id)).toBe(true);
+    expect(isPreview(b.id)).toBe(true);
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, permanent.id]);
+  });
+});
+
+describe('P74 §6: promoting a preview tab on double click', () => {
+  test('promoting one member of a cohort leaves the rest previewed', () => {
+    const ws = freshWorkspace();
+    const a = openFile(ws, 'a.ts', true, false);
+    const b = openFile(ws, 'b.ts', true, true);
+    const c = openFile(ws, 'c.ts', true, true);
+
+    promoteTab(b.id);
+    expect(isPreview(a.id)).toBe(true);
+    expect(isPreview(b.id)).toBe(false);
+    expect(isPreview(c.id)).toBe(true);
+    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([a.id, c.id]);
+  });
+
+  test('a promoted tab survives a later cohort-evicting preview open', () => {
+    const ws = freshWorkspace();
+    const a = openFile(ws, 'a.ts', true, false);
+    const b = openFile(ws, 'b.ts', true, true);
+    promoteTab(a.id);
+
+    const c = openFile(ws, 'c.ts', true, false); // evicts only b, the one still previewed
+    expect(tabsState.tabs.find((t) => t.id === a.id)).toBeDefined();
+    expect(tabsState.tabs.find((t) => t.id === b.id)).toBeUndefined();
+    expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, c.id]);
+  });
+
+  test('promoting a tab that is not in any preview cohort is a no-op', () => {
+    const ws = freshWorkspace();
+    const permanent = openFile(ws, 'p.ts', false);
+    promoteTab(permanent.id);
+    expect(isPreview(permanent.id)).toBe(false);
+    expect(tabsState.tabs.find((t) => t.id === permanent.id)).toBeDefined();
   });
 });
 

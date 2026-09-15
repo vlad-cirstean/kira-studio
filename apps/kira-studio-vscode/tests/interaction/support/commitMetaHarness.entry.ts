@@ -44,7 +44,11 @@ const detail = {
     { token: 'Signed-off-by', value: 'Fake Author <fake@example.com>' },
   ],
   signature: { status: 'N' as const, signer: '' },
-  decoration: [],
+  // P74 §10: a real decoration entry — commit-meta-clamp.spec.ts's own "Refs" case asserts the
+  // Refs <dt>/<dd> become visible after "Show more". An empty array (as this fixture had before
+  // this phase) can never exercise that branch: `hasDetails`/`buildRefBadges` both treat "no
+  // decoration" the same as "nothing to render", so the Refs row simply never appears either way.
+  decoration: [{ kind: 'branch' as const, name: 'main', isHead: true }],
   parentIndex: 0,
   files: [
     {
