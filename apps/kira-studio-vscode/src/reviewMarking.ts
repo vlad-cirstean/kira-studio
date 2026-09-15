@@ -302,7 +302,15 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
   }
 
   function paint(editor: vscode.TextEditor, state: MarkingState): void {
-    editor.setDecorations(reviewedType, state.reviewedRanges.map(toVscodeRange));
+    // P75 §5.3: same guard as the desktop host's reviewDecorations.ts — a fully-reviewed file
+    // needs no per-line tint, only the per-hunk glyph below and the file tree's own checked box.
+    const fullyReviewed =
+      state.lineCount > 0 &&
+      coverage({ start: 1, end: state.lineCount }, state.reviewedRanges) === 'full';
+    editor.setDecorations(
+      reviewedType,
+      fullyReviewed ? [] : state.reviewedRanges.map(toVscodeRange),
+    );
     if (state.stale || state.bodyKind !== 'text') {
       editor.setDecorations(actionableType, []);
       editor.setDecorations(reviewedHunkType, []);
