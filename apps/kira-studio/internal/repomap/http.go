@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/modelcontextprotocol/go-sdk/auth"
@@ -47,11 +48,24 @@ func (s *Server) bindHTTP() error {
 		AllowMissingExpiration: true,
 	})(handler)
 
+	// The go-sdk (v1.7.0) applies DNS-rebinding protection by default but explicitly does not
+	// apply cross-origin protection unless the caller wraps the handler itself (its own deprecation
+	// note on the removed in-SDK option names this exact replacement) — P67d §4.1: this server is
+	// no longer dev-only, so a browser tab on an unrelated origin must not be able to reach it just
+	// because it happens to be running on localhost.
 	mux := http.NewServeMux()
-	mux.Handle(mcpPath, protected)
+	mux.Handle(mcpPath, http.NewCrossOriginProtection().Handler(protected))
 
 	s.listener = ln
-	s.http = &http.Server{Handler: mux}
+	s.http = &http.Server{
+		Handler: mux,
+		// ReadHeaderTimeout bounds a slowloris-shaped client; IdleTimeout reclaims a connection
+		// that never issues a second request. WriteTimeout and ReadTimeout stay unset, deliberately
+		// (P67d §4.2): the Streamable HTTP transport holds long-lived server-to-client streams, and
+		// a slow client body on a long POST is not a threat on loopback the way a slow header is.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	return nil
 }
 
