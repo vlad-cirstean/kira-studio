@@ -85,6 +85,23 @@ as normal, but also re-review v1.6's diff (`origin/main`..v1.6's tip, i.e. what 
 changed) specifically, plus anything else either reviewer notices while in that code — not narrowed
 to only what M1-M5 touch.
 
+**Rebased onto v1.6's tip after M1ab landed**, once v1.6 progressed further (through P67d): both
+chapters touched `internal/repomap` independently — P67d made the repo-map server general and
+multi-repo (a "Repository access" list in Settings, one repo per checkbox) and M1 added 7-day token
+rotation retrofitted onto that same server's token. Both survive: the rotation now applies to
+P67d's one app-scoped token, not per-repo. Real conflicts in `internal/repomap/server.go`,
+`internal/bridge/repomap.go`, `cmd/kira-repo-map/main.go`, `conformance_test.go`, and
+`SettingsDialog.vue`, resolved by reading both sides' intent rather than picking one; independently
+re-verified (go build/vet/test, typecheck/lint, full `tests/ui/` suite including P67d's own
+`settings-code-intelligence.spec.ts`) — all clean. Both chapters also picked migration number 0019
+independently; M1's own migration is renumbered **`0020_m1_connection_mcp.sql`** post-rebase.
+`docs/v1.7/plans/M1-db-mcp-server-core.md` still says `0019` — the plan doc is never edited after
+landing, per `CLAUDE.md`; the shipped number is `0020`. **For M2's planning pass**: P67d's
+"per-entity access list in Settings, additive to a global toggle" pattern is worth considering
+for the Database MCP section too (an overview list of which connections are exposed, alongside the
+richer per-connection read/write/DDL editor `ConnectionDialog` owns) — not required, since M2's
+per-connection model is richer than a checkbox, but worth a deliberate yes/no rather than silence.
+
 | Phase | Deliverable | Why here |
 |---|---|---|
 | **M1 Local DB MCP server: list/metadata/query tools, 7-day rotating token** | Planned (`docs/v1.7/plans/M1-db-mcp-server-core.md`), implementation lands as part of **M1ab**. A new Go MCP server, sibling to `internal/repomap`, reusing its transport pattern (`go-sdk/mcp`, loopback-only streamable HTTP) but its own process/port/tool set: `list_connections` (every configured connection this app knows), `list_databases`/`list_schemas`/`describe_table` (metadata per adapter, routed through the existing `apps/kira-studio/internal/adapters/*` layer — no new metadata path), and `run_query` (executes through the same adapter query path the console UI uses). Auth is a static bearer token with a 7-day expiry that rotates, built directly into `internal/mcpauth` (not a sibling package) so both this server's token and the **existing repo-map server's token are retrofitted onto the same mechanism** — by explicit instruction, the repo-map server's own currently-non-expiring token gains the identical 7-day rotation, not a second scheme. The plan designs the expiry/rotation record shape, the rotation trigger (auto-remint on expiry vs. requiring a manual remint — and whether that differs between the two servers given the repo-map server's headless/no-GUI usage pattern, `CLAUDE.md`'s own section), and what a client sees when a token has lapsed (a distinct, actionable error, not a generic 401), plus the new server's start/stop lifecycle and storage-root question (share `KIRA_HOME` with the repo-map server or use a distinct root) | First: every later phase (permissions, EXPLAIN, Faker, anonymization) extends this server's tool set or its query path — nothing else in this chapter can start before it exists |
