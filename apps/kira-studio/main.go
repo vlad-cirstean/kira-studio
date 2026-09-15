@@ -267,6 +267,11 @@ func main() {
 	}
 	bridge.StartRepoMapIfEnabled(repoMapSvc)
 
+	// M1 §3.3: the DB MCP server's embedded instance — same posture as repoMapSvc just above, but
+	// no repository to resolve: it reads this app's own connections/tree/router straight from deps.
+	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{})}
+	bridge.StartDbMcpIfEnabled(dbMcpSvc)
+
 	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
 	// Index/Graph — opens nothing until first use (db.go's ensureOpen). The embedded repo-map
 	// server above keeps opening its own Store over the same file; two pools in one process are
@@ -315,6 +320,7 @@ func main() {
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
 		bridge.StopRepoMap(repoMapSvc)
+		bridge.StopDbMcp(dbMcpSvc)
 		codeWorkspaceSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
@@ -374,6 +380,7 @@ func main() {
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
 			application.NewService(repoMapSvc),
+			application.NewService(dbMcpSvc),
 			// C5 §3.3/C6 §7: the native code-viewing workspace's own bound service — Discovery/
 			// Runner mirror gitrpc's own seam rather than reusing gitRegistry (this workspace
 			// needs one read-only runner and the resolved git.path, never gitsession's refcounted
