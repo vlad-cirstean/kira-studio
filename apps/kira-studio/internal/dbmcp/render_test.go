@@ -167,29 +167,29 @@ func TestRenderStreamPage(t *testing.T) {
 func TestRenderPageDispatchesByKind(t *testing.T) {
 	tb := page.NewTabularPageBuilder(nil)
 	tabular := tb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(tabular, 200, nil, nil); err != nil {
+	if _, err := renderPage(tabular, 200, nil, nil, ""); err != nil {
 		t.Fatalf("renderPage(TabularPage): %v", err)
 	}
 
 	db := page.NewDocumentPageBuilder(false)
 	doc := db.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(doc, 200, nil, nil); err != nil {
+	if _, err := renderPage(doc, 200, nil, nil, ""); err != nil {
 		t.Fatalf("renderPage(DocumentPage): %v", err)
 	}
 
 	kvb := page.NewKeyValuePageBuilder("string", nil, nil, false)
 	kv := kvb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(kv, 200, nil, nil); err != nil {
+	if _, err := renderPage(kv, 200, nil, nil, ""); err != nil {
 		t.Fatalf("renderPage(KeyValuePage): %v", err)
 	}
 
 	sb := page.NewStreamPageBuilder(nil)
 	stream := sb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(stream, 200, nil, nil); err != nil {
+	if _, err := renderPage(stream, 200, nil, nil, ""); err != nil {
 		t.Fatalf("renderPage(StreamPage): %v", err)
 	}
 
-	if _, err := renderPage(unknownPage{}, 200, nil, nil); err == nil {
+	if _, err := renderPage(unknownPage{}, 200, nil, nil, ""); err == nil {
 		t.Fatal("renderPage(unrecognised kind) = nil error, want an error naming the unhandled type")
 	}
 }
@@ -298,7 +298,7 @@ func TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist(t *testing.T) {
 	db := page.NewDocumentPageBuilder(false)
 	db.Push("id-1", `{"a":1}`)
 	doc := db.Finish(page.UnpagedPosition(1))
-	if _, err := renderPage(doc, 200, nil, &set); err == nil {
+	if _, err := renderPage(doc, 200, nil, &set, ""); err == nil {
 		t.Fatal("renderPage(DocumentPage, rules exist) = nil error, want a refusal")
 	} else if !strings.Contains(err.Error(), "document") {
 		t.Fatalf("renderPage(DocumentPage) error = %q, want it to name the document page kind", err.Error())
@@ -307,19 +307,65 @@ func TestRenderPageRefusesDocumentAndStreamPagesWhenRulesExist(t *testing.T) {
 	sb := page.NewStreamPageBuilder(nil)
 	sb.Push(page.StreamRow{Body: "payload"})
 	stream := sb.Finish(page.UnpagedPosition(1))
-	if _, err := renderPage(stream, 200, nil, &set); err == nil {
+	if _, err := renderPage(stream, 200, nil, &set, ""); err == nil {
 		t.Fatal("renderPage(StreamPage, rules exist) = nil error, want a refusal")
 	} else if !strings.Contains(err.Error(), "stream") {
 		t.Fatalf("renderPage(StreamPage) error = %q, want it to name the stream page kind", err.Error())
 	}
 
 	// No rules at all (nil mk, or an empty Set): both page kinds render normally, unchanged.
-	if _, err := renderPage(doc, 200, nil, nil); err != nil {
+	if _, err := renderPage(doc, 200, nil, nil, ""); err != nil {
 		t.Fatalf("renderPage(DocumentPage, no rules) = %v, want no error", err)
 	}
 	empty := mask.Set{}
-	if _, err := renderPage(stream, 200, nil, &empty); err != nil {
+	if _, err := renderPage(stream, 200, nil, &empty, ""); err != nil {
 		t.Fatalf("renderPage(StreamPage, empty Set) = %v, want no error", err)
+	}
+}
+
+// TestRenderPageRefusesRenamedOrTransformedMaskedColumn is finding #3 (M6): an alias, a wrapping
+// expression, or a subquery all produce a result column name columnRules's exact-name match can't
+// see — without a refusal, the real value would return unmasked, the opposite of this design's
+// stated over-mask-on-ambiguity intent.
+func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+
+	b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "e", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	v := "person@example.com"
+	if err := b.AppendRow([]*string{&v}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg := b.Finish(page.UnpagedPosition(1))
+
+	if _, err := renderPage(pg, 200, nil, &set, "SELECT email AS e FROM customers"); err == nil {
+		t.Fatal("renderPage(aliased masked column) = nil error, want a refusal")
+	} else if !strings.Contains(err.Error(), "email") {
+		t.Fatalf("renderPage error = %q, want it to name the masked column", err.Error())
+	}
+
+	if _, err := renderPage(pg, 200, nil, &set, "SELECT lower(email) AS e FROM customers"); err == nil {
+		t.Fatal("renderPage(masked column wrapped in an expression) = nil error, want a refusal")
+	}
+
+	// A statement that never mentions "email" at all (the query genuinely has nothing to do with
+	// the masked column) must render normally — the refusal is about a mentioned-but-hidden
+	// column, not about column e being unrecognised on its own.
+	if _, err := renderPage(pg, 200, nil, &set, "SELECT id AS e FROM customers"); err != nil {
+		t.Fatalf("renderPage(unrelated column, same alias) = %v, want no error", err)
+	}
+
+	// The masked column selected under its own exact name renders normally, unaffected.
+	b2 := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "email", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	if err := b2.AppendRow([]*string{&v}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg2 := b2.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(pg2, 200, nil, &set, "SELECT email FROM customers"); err != nil {
+		t.Fatalf("renderPage(masked column by its own name) = %v, want no error", err)
 	}
 }
 

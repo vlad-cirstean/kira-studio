@@ -262,7 +262,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	if len(resp.Pages) == 0 {
 		return jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
 	}
-	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, s.cfg.ExplainThreshold()), mk)
+	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, s.cfg.ExplainThreshold()), mk, args.SQL)
 	if err != nil {
 		// §4.4/§5.3: a document/stream page under active masking rules is caller-correctable
 		// (narrow the query, or remove the rules) — surfaced as an IsError result, not a raw Go

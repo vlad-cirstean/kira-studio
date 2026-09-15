@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
+	"unicode"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
@@ -231,14 +233,78 @@ func cellAt(chunk page.Chunk, row int) *string {
 	return &text
 }
 
+// statementIdentifierWords splits statement into its word-shaped tokens (letters/digits/
+// underscore runs), lowercased — the same notion of "word" classify.go's own
+// sqlWordBoundaryContainsAny uses, applied here so a masked column name is matched by whole
+// identifier, never as a substring of an unrelated longer one (e.g. "email" must not match inside
+// "emails_sent").
+func statementIdentifierWords(statement string) map[string]bool {
+	words := map[string]bool{}
+	for _, f := range strings.FieldsFunc(statement, func(r rune) bool {
+		return !(r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r))
+	}) {
+		words[strings.ToLower(f)] = true
+	}
+	return words
+}
+
+// maskedColumnRenamedOrHidden reports the first masked column name (M5 §4.2's Set.Rules, already
+// lowercased) that statement's own text mentions by word but that the actual result set (columns)
+// carries no exact-name column for — i.e. an alias (`SELECT email AS e`), a wrapping expression
+// (`SELECT lower(email)`), or a subquery plausibly renamed or transformed it. Without this check,
+// columnRules's exact-name-only match sees nothing to mask on that result column and the real
+// value returns unmasked (finding #3, M6) — under-masking, the opposite of this design's stated
+// over-mask-on-ambiguity intent (mask.Set.RuleFor's own doc comment).
+func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.ColumnDescriptor) (string, bool) {
+	if mk == nil || mk.Empty() || statement == "" {
+		return "", false
+	}
+	present := make(map[string]bool, len(columns))
+	for _, c := range columns {
+		present[strings.ToLower(c.Name)] = true
+	}
+	words := statementIdentifierWords(statement)
+	// Deterministic across calls despite map iteration order, for a stable error message.
+	names := make([]string, 0, len(mk.Rules))
+	for name := range mk.Rules {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if present[name] {
+			continue
+		}
+		if words[name] {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// newMaskRenameRefusedError is §4.4's refusal, reused for the aliasing/expression case (finding
+// #3): the statement mentions a masked column that the result set does not carry under its own
+// name, so refuse rather than silently return it unmasked.
+func newMaskRenameRefusedError(column string) error {
+	return &maskingRefusedError{msg: fmt.Sprintf(
+		"this query renames or transforms a masked column (%q) — select it by its own name to see the masked value; the maskless raw form isn't permitted over this connection",
+		column,
+	)}
+}
+
 // renderPage projects one page.Page into its own JSON-ready envelope, capped at maxRows. plan is
 // run_query's own auto-force-explain result (nil when auto-force-explain is off, the statement
 // was not explainable, or the plan-only EXPLAIN failed) — M5's own seam (M1 §9), now taking a plan
 // summary alongside the page (M3 §5.3). mk is the connection's resolved masking state (M5 §4.2);
 // nil means no rules on this connection, and the projection behaves exactly as it does today.
-func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset) (any, error) {
+// statement is the original SQL text (finding #3, M6) — used only to catch a masked column
+// reaching the result set renamed or transformed past columnRules's exact-name match; empty for a
+// page kind rendered on some other path that has none to offer.
+func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statement string) (any, error) {
 	switch pg := p.(type) {
 	case page.TabularPage:
+		if name, hidden := maskedColumnRenamedOrHidden(statement, mk, pg.Columns); hidden {
+			return nil, newMaskRenameRefusedError(name)
+		}
 		r := renderTabularPage(pg, maxRows, mk)
 		r.Plan = plan
 		return r, nil
