@@ -243,7 +243,7 @@ func sanitiseBodyLine(raw []byte, truncated bool) sourceLine {
 // sourceFor reads the literal source line at each of hits' positions (C8 plan §4.2): group by
 // file, one open, one forward pass per file (D1), staleness stamped against the indexed row (D4).
 // Never returns an error — a path or store failure degrades one file's lines, never the response.
-func (s *Server) sourceFor(ctx context.Context, hits []hitPos) sourceLines {
+func (inst *repoInstance) sourceFor(ctx context.Context, hits []hitPos) sourceLines {
 	byPath := make(map[string][]int)
 	order := make([]string, 0, len(hits))
 	for _, h := range hits {
@@ -258,14 +258,14 @@ func (s *Server) sourceFor(ctx context.Context, hits []hitPos) sourceLines {
 		if ctx.Err() != nil {
 			return out
 		}
-		out[path] = s.sourceForOneFile(ctx, path, byPath[path])
+		out[path] = inst.sourceForOneFile(ctx, path, byPath[path])
 	}
 	return out
 }
 
 // sourceForOneFile resolves, opens, stats and reads one file's wanted rows, applying D5's whole
 // safe-failure table on any step that fails.
-func (s *Server) sourceForOneFile(ctx context.Context, path string, rows []int) map[int]sourceLine {
+func (inst *repoInstance) sourceForOneFile(ctx context.Context, path string, rows []int) map[int]sourceLine {
 	noteAll := func(reason string) map[int]sourceLine {
 		out := make(map[int]sourceLine, len(rows))
 		for _, row := range rows {
@@ -274,7 +274,7 @@ func (s *Server) sourceForOneFile(ctx context.Context, path string, rows []int) 
 		return out
 	}
 
-	abs, err := pathsafe.ValidateRelPath(s.root, path)
+	abs, err := pathsafe.ValidateRelPath(inst.root, path)
 	if err != nil {
 		return noteAll("path outside repository")
 	}
@@ -282,7 +282,7 @@ func (s *Server) sourceForOneFile(ctx context.Context, path string, rows []int) 
 	// A missing or errored index row leaves staleness simply unknown — read the line anyway,
 	// unstamped: an unknown is not a lie, and the index having no row yet for a path it just
 	// returned a hit from is itself a transient, not a fault (C8 plan §4.2 step b).
-	row, hadRow, _ := s.store.GetFile(ctx, s.repoID, path)
+	row, hadRow, _ := inst.store.GetFile(ctx, inst.repoID, path)
 
 	f, err := os.Open(abs) //nolint:gosec // abs already validated (pathsafe.ValidateRelPath).
 	if err != nil {
@@ -332,7 +332,7 @@ func (s *Server) sourceForOneFile(ctx context.Context, path string, rows []int) 
 // position position() renders, so the printed line number and the printed text can never disagree
 // (C8 plan §5). Returns nil immediately when omit is set (D8's opt-out), so a caller that wants the
 // old compact shape pays nothing for it.
-func (s *Server) sourceForTargets(ctx context.Context, omit bool, targets []codegraph.Target) sourceLines {
+func (inst *repoInstance) sourceForTargets(ctx context.Context, omit bool, targets []codegraph.Target) sourceLines {
 	if omit || len(targets) == 0 {
 		return nil
 	}
@@ -340,12 +340,12 @@ func (s *Server) sourceForTargets(ctx context.Context, omit bool, targets []code
 	for i, t := range targets {
 		hits[i] = hitPos{Path: t.Path, Row: t.NameSpan.Start.Row}
 	}
-	return s.sourceFor(ctx, hits)
+	return inst.sourceFor(ctx, hits)
 }
 
 // sourceForSites adapts a Site slice (find_references) to sourceFor — Site's own peer of
 // sourceForTargets.
-func (s *Server) sourceForSites(ctx context.Context, omit bool, sites []codegraph.Site) sourceLines {
+func (inst *repoInstance) sourceForSites(ctx context.Context, omit bool, sites []codegraph.Site) sourceLines {
 	if omit || len(sites) == 0 {
 		return nil
 	}
@@ -353,7 +353,7 @@ func (s *Server) sourceForSites(ctx context.Context, omit bool, sites []codegrap
 	for i, site := range sites {
 		hits[i] = hitPos{Path: site.Path, Row: site.NameSpan.Start.Row}
 	}
-	return s.sourceFor(ctx, hits)
+	return inst.sourceFor(ctx, hits)
 }
 
 // symbolSourceMaxBytes is read_symbol's own body byte ceiling (P64 §3.4) — independent of
@@ -415,17 +415,17 @@ type symbolSource struct {
 // to Note, never an error, exactly D5's table. docLookback is 0 to skip the doc walk entirely
 // (omitDoc); the body is additionally capped at symbolSourceMaxBytes, independent of how many
 // lines the caller already asked for by choosing endRow.
-func (s *Server) readSymbolRows(ctx context.Context, path string, startRow, endRow, docLookback int) symbolSource {
+func (inst *repoInstance) readSymbolRows(ctx context.Context, path string, startRow, endRow, docLookback int) symbolSource {
 	noteResult := func(reason string) symbolSource { return symbolSource{Note: reason} }
 
-	abs, err := pathsafe.ValidateRelPath(s.root, path)
+	abs, err := pathsafe.ValidateRelPath(inst.root, path)
 	if err != nil {
 		return noteResult("path outside repository")
 	}
 
 	// See sourceForOneFile's own doc comment: a missing/errored index row leaves staleness simply
 	// unknown, read anyway.
-	row, hadRow, _ := s.store.GetFile(ctx, s.repoID, path)
+	row, hadRow, _ := inst.store.GetFile(ctx, inst.repoID, path)
 
 	f, err := os.Open(abs) //nolint:gosec // abs already validated (pathsafe.ValidateRelPath).
 	if err != nil {

@@ -45,23 +45,33 @@ func run() int {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	srv, err := repomap.New(ctx, repomap.Config{
-		Repo: *repoFlag,
-		Home: home,
-		Token: func(repoID string) (mcpauth.Record, string, bool, error) {
-			plain, rec, minted, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(repoID)))
-			return rec, plain, minted, err
-		},
-		Logger: log,
-	})
+	// P67d §3.6: New no longer resolves a repository — construct the transport first (no token
+	// yet, so it fail-closed rejects everything), then AttachDir resolves *repoFlag (or this
+	// process's own cwd) the same way resolveRepo always has, then the token is minted/loaded
+	// against that repository's own slug, matching this binary's per-repository token file naming
+	// exactly as before.
+	srv, err := repomap.New(repomap.Config{Home: home, Logger: log})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "kira-repo-map:", err)
 		return 1
 	}
 	defer srv.Close()
 
+	info, err := srv.AttachDir(ctx, "", *repoFlag)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kira-repo-map:", err)
+		return 1
+	}
+
+	plain, rec, minted, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(info.RepoID)))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kira-repo-map:", err)
+		return 1
+	}
+	srv.SetToken(rec, plain)
+
 	fmt.Printf("Repo map MCP server listening on %s\n", srv.URL())
-	if plain, minted := srv.Token(); minted {
+	if minted {
 		fmt.Println("Register with:")
 		fmt.Printf("  claude mcp add --transport http --scope user kira-repo-map %s --header \"Authorization: Bearer %s\"\n", srv.URL(), plain)
 	} else {

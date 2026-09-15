@@ -3,6 +3,7 @@ package repomap
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codegraph"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -25,29 +26,36 @@ func errResult(text string) (*mcp.CallToolResult, any, error) {
 }
 
 // notReadyResult is §4.2's own "never an empty result while the index is still building" message.
-func (s *Server) notReadyResult(err error) (*mcp.CallToolResult, any, error) {
-	return errResult(fmt.Sprintf("repo-map index for %s: %s", s.root, err.Error()))
+func (inst *repoInstance) notReadyResult(err error) (*mcp.CallToolResult, any, error) {
+	return errResult(fmt.Sprintf("repo-map index for %s: %s", inst.root, err.Error()))
 }
 
 // indexNotice is P67f §2.4: W1's own surfacing (a failed initial or later full Sync leaves the
 // gate open on a partial index, with nowhere else a caller could see it). Empty — the normal case —
 // costs a caller nothing.
-func (s *Server) indexNotice() string {
-	st := s.idx.SyncState()
+func (inst *repoInstance) indexNotice() string {
+	st := inst.idx.SyncState()
 	if st.LastErr == nil {
 		return ""
 	}
-	return fmt.Sprintf("index degraded: the last full sync of %s failed (%s); results may be incomplete.", s.root, st.LastErr)
+	return fmt.Sprintf("index degraded: the last full sync of %s failed (%s); results may be incomplete.", inst.root, st.LastErr)
 }
 
 // text is textResult with §2.4's degraded notice prepended when one stands — on every response
 // while degraded, not only empty ones, since a partial index also returns incomplete non-empty
 // answers that would otherwise read as complete.
-func (s *Server) text(body string) (*mcp.CallToolResult, any, error) {
-	if n := s.indexNotice(); n != "" {
+func (inst *repoInstance) text(body string) (*mcp.CallToolResult, any, error) {
+	if n := inst.indexNotice(); n != "" {
 		body = n + "\n" + body
 	}
 	return textResult(body)
+}
+
+// repoField is embedded in every navigation/search tool's own input struct (P67d §3.4): which
+// attached repository to query. Omit when only one is attached — Server.pick (attach.go) resolves
+// the rest.
+type repoField struct {
+	Repo string `json:"repo,omitempty" jsonschema:"Which attached repository to query. Omit when only one is attached. Call list_repos to see the names."`
 }
 
 // locatorFields is embedded in every navigation tool's own input struct — §6.1's shared file/
@@ -71,12 +79,12 @@ func (f locatorFields) args() locateArgs {
 	return locateArgs{File: f.File, Line: f.Line, Column: f.Column, Symbol: f.Symbol, Languages: f.Languages}
 }
 
-// resolve runs §6.1's locate against this Server's own graph/root, translating locateResult into
+// resolve runs §6.1's locate against this instance's own graph/root, translating locateResult into
 // one of: a Query to proceed with, or an already-final *mcp.CallToolResult (ambiguous candidates,
 // an empty result rendered in the caller's own voice, or a caller-correctable error) — cutting
 // every navigation handler down to "resolve, then call the one Graph method it owns."
-func (s *Server) resolve(ctx context.Context, f locatorFields, emptyMsg func() string) (codegraph.Query, *mcp.CallToolResult, error) {
-	res, err := locate(ctx, s.graph, s.root, f.args())
+func (inst *repoInstance) resolve(ctx context.Context, f locatorFields, emptyMsg func() string) (codegraph.Query, *mcp.CallToolResult, error) {
+	res, err := locate(ctx, inst.graph, inst.root, f.args())
 	if err != nil {
 		return codegraph.Query{}, nil, err
 	}
@@ -85,11 +93,11 @@ func (s *Server) resolve(ctx context.Context, f locatorFields, emptyMsg func() s
 		result, _, _ := errResult(res.msg)
 		return codegraph.Query{}, result, nil
 	case res.ambiguous != nil:
-		src := s.sourceForTargets(ctx, f.OmitSource, res.ambiguous)
-		result, _, _ := s.text(renderAmbiguous(f.Symbol, res.ambiguous, src))
+		src := inst.sourceForTargets(ctx, f.OmitSource, res.ambiguous)
+		result, _, _ := inst.text(renderAmbiguous(f.Symbol, res.ambiguous, src))
 		return codegraph.Query{}, result, nil
 	case res.empty:
-		result, _, _ := s.text(emptyMsg())
+		result, _, _ := inst.text(emptyMsg())
 		return codegraph.Query{}, result, nil
 	default:
 		return res.query, nil, nil
@@ -100,20 +108,26 @@ func (s *Server) resolve(ctx context.Context, f locatorFields, emptyMsg func() s
 
 type findDefinitionArgs struct {
 	locatorFields
+	repoField
 }
 
 func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in findDefinitionArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
 	}
-	q, early, err := s.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no symbol named %q found", in.Symbol) })
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
+	}
+	q, early, err := inst.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no symbol named %q found", in.Symbol) })
 	if err != nil {
 		return nil, nil, err
 	}
 	if early != nil {
 		return early, nil, nil
 	}
-	targets, err := s.graph.DefinitionOf(ctx, q)
+	targets, err := inst.graph.DefinitionOf(ctx, q)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -125,14 +139,15 @@ func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if q.Point != nil {
 		resolvedFrom = position(q.Path, codegraph.Point{Row: q.Point.Row, Column: q.Point.Column})
 	}
-	src := s.sourceForTargets(ctx, in.OmitSource, targets)
-	return s.text(renderDefinitions(name, resolvedFrom, targets, src))
+	src := inst.sourceForTargets(ctx, in.OmitSource, targets)
+	return inst.text(renderDefinitions(name, resolvedFrom, targets, src))
 }
 
 // --- find_references ---
 
 type findReferencesArgs struct {
 	locatorFields
+	repoField
 	Mode              string   `json:"mode,omitempty" jsonschema:"'resolved' (default, precise — runs the resolver) or 'name_only' (cheaper, unresolved — every reference sharing the name, grep-shaped recall over precision)."`
 	Kinds             []string `json:"kinds,omitempty" jsonschema:"Restrict to these reference kinds, e.g. call, import."`
 	IncludeDefinition bool     `json:"includeDefinition,omitempty" jsonschema:"Include the definition's own location as a Site alongside its uses."`
@@ -145,10 +160,15 @@ const (
 )
 
 func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in findReferencesArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
 	}
-	q, early, err := s.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no references found for %q", in.Symbol) })
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
+	}
+	q, early, err := inst.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no references found for %q", in.Symbol) })
 	if err != nil {
 		return nil, nil, err
 	}
@@ -168,7 +188,7 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 		limit = findReferencesMaxLimit
 	}
 
-	refs, err := s.graph.ReferencesTo(ctx, q, codegraph.RefOpts{
+	refs, err := inst.graph.ReferencesTo(ctx, q, codegraph.RefOpts{
 		Mode: mode, Kinds: in.Kinds, IncludeDefinition: in.IncludeDefinition, Limit: limit,
 	})
 	if err != nil {
@@ -181,28 +201,34 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if name == "" && len(refs.Sites) > 0 {
 		name = refs.Sites[0].Name
 	}
-	src := s.sourceForSites(ctx, in.OmitSource, refs.Sites)
-	return s.text(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
+	src := inst.sourceForSites(ctx, in.OmitSource, refs.Sites)
+	return inst.text(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
 }
 
 // --- find_implementations ---
 
 type findImplementationsArgs struct {
 	locatorFields
+	repoField
 }
 
 func (s *Server) findImplementations(ctx context.Context, _ *mcp.CallToolRequest, in findImplementationsArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
 	}
-	q, early, err := s.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no implementations found for %q", in.Symbol) })
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
+	}
+	q, early, err := inst.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no implementations found for %q", in.Symbol) })
 	if err != nil {
 		return nil, nil, err
 	}
 	if early != nil {
 		return early, nil, nil
 	}
-	targets, err := s.graph.ImplementationsOf(ctx, q)
+	targets, err := inst.graph.ImplementationsOf(ctx, q)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -211,17 +237,18 @@ func (s *Server) findImplementations(ctx context.Context, _ *mcp.CallToolRequest
 		name = in.Symbol
 	}
 	language := ""
-	if file, ok, err := s.store.GetFile(ctx, s.repoID, q.Path); err == nil && ok {
+	if file, ok, err := inst.store.GetFile(ctx, inst.repoID, q.Path); err == nil && ok {
 		language = file.Language
 	}
-	src := s.sourceForTargets(ctx, in.OmitSource, targets)
-	return s.text(renderImplementations(name, language, targets, src))
+	src := inst.sourceForTargets(ctx, in.OmitSource, targets)
+	return inst.text(renderImplementations(name, language, targets, src))
 }
 
 // --- read_symbol ---
 
 type readSymbolArgs struct {
 	locatorFields
+	repoField
 	OmitDoc  bool `json:"omitDoc,omitempty" jsonschema:"Omit the doc comment preceding the declaration. Default false — included when present."`
 	MaxLines int  `json:"maxLines,omitempty" jsonschema:"Max body lines returned per target. Default 400, max 1000."`
 }
@@ -235,17 +262,22 @@ const (
 )
 
 func (s *Server) readSymbol(ctx context.Context, _ *mcp.CallToolRequest, in readSymbolArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
 	}
-	q, early, err := s.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no symbol named %q found", in.Symbol) })
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
+	}
+	q, early, err := inst.resolve(ctx, in.locatorFields, func() string { return fmt.Sprintf("no symbol named %q found", in.Symbol) })
 	if err != nil {
 		return nil, nil, err
 	}
 	if early != nil {
 		return early, nil, nil
 	}
-	targets, err := s.graph.DefinitionOf(ctx, q)
+	targets, err := inst.graph.DefinitionOf(ctx, q)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -254,7 +286,7 @@ func (s *Server) readSymbol(ctx context.Context, _ *mcp.CallToolRequest, in read
 		if name == "" {
 			name = in.Symbol
 		}
-		return s.text(fmt.Sprintf("no definitions found for %q", name))
+		return inst.text(fmt.Sprintf("no definitions found for %q", name))
 	}
 
 	maxLines := clamp(in.MaxLines, readSymbolDefaultMaxLines, readSymbolMaxMaxLines)
@@ -269,18 +301,19 @@ func (s *Server) readSymbol(ctx context.Context, _ *mcp.CallToolRequest, in read
 		if fullLines := endRow - startRow + 1; fullLines > maxLines {
 			cappedEnd = startRow + maxLines - 1
 		}
-		body := s.readSymbolRows(ctx, t.Path, startRow, cappedEnd, docLookback)
+		body := inst.readSymbolRows(ctx, t.Path, startRow, cappedEnd, docLookback)
 		if cappedEnd < endRow && body.Note == "" {
 			body.Truncated = true
 		}
 		bodies[i] = body
 	}
-	return s.text(renderSymbolSource(targets, bodies))
+	return inst.text(renderSymbolSource(targets, bodies))
 }
 
 // --- search_symbols ---
 
 type searchSymbolsArgs struct {
+	repoField
 	Query      string   `json:"query" jsonschema:"Symbol name to search for (prefix match by default)."`
 	Substring  bool     `json:"substring,omitempty" jsonschema:"Match query anywhere in the name, not just as a prefix."`
 	Kinds      []string `json:"kinds,omitempty" jsonschema:"Restrict to these symbol kinds, e.g. function, method, class."`
@@ -296,27 +329,33 @@ const (
 )
 
 func (s *Server) searchSymbols(ctx context.Context, _ *mcp.CallToolRequest, in searchSymbolsArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
+	}
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
 	}
 	if in.Query == "" {
 		return errResult("query is required")
 	}
 	limit := clamp(in.Limit, searchSymbolsDefaultLimit, searchSymbolsMaxLimit)
-	targets, err := s.graph.SearchSymbols(ctx, codegraph.SymbolSearch{
+	targets, err := inst.graph.SearchSymbols(ctx, codegraph.SymbolSearch{
 		Text: in.Query, Substring: in.Substring, Kinds: in.Kinds, Languages: in.Languages,
 		PathPrefix: in.PathPrefix, Limit: limit,
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	src := s.sourceForTargets(ctx, in.OmitSource, targets)
-	return s.text(renderSymbolSearch(in.Query, targets, src))
+	src := inst.sourceForTargets(ctx, in.OmitSource, targets)
+	return inst.text(renderSymbolSearch(in.Query, targets, src))
 }
 
 // --- search_files ---
 
 type searchFilesArgs struct {
+	repoField
 	Query      string `json:"query" jsonschema:"Substring to search for in indexed file paths — not a fuzzy finder."`
 	PathPrefix string `json:"pathPrefix,omitempty" jsonschema:"Restrict to files whose path starts with this."`
 	Limit      int    `json:"limit,omitempty" jsonschema:"Max results. Default 30, max 200."`
@@ -328,42 +367,80 @@ const (
 )
 
 func (s *Server) searchFiles(ctx context.Context, _ *mcp.CallToolRequest, in searchFilesArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
+	}
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
 	}
 	if in.Query == "" {
 		return errResult("query is required")
 	}
 	limit := clamp(in.Limit, searchFilesDefaultLimit, searchFilesMaxLimit)
-	hits, err := s.graph.SearchFiles(ctx, codegraph.FileSearch{Text: in.Query, PathPrefix: in.PathPrefix, Limit: limit})
+	hits, err := inst.graph.SearchFiles(ctx, codegraph.FileSearch{Text: in.Query, PathPrefix: in.PathPrefix, Limit: limit})
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.text(renderFileSearch(in.Query, hits))
+	return inst.text(renderFileSearch(in.Query, hits))
 }
 
 // --- outline_file ---
 
 type outlineFileArgs struct {
+	repoField
 	File string `json:"file" jsonschema:"Repository-relative (or absolute) path to the file."`
 }
 
 func (s *Server) outlineFile(ctx context.Context, _ *mcp.CallToolRequest, in outlineFileArgs) (*mcp.CallToolResult, any, error) {
-	if err := s.waitReady(ctx); err != nil {
-		return s.notReadyResult(err)
+	inst, early := s.pick(in.Repo)
+	if early != nil {
+		return early, nil, nil
+	}
+	defer inst.inflight.Done()
+	if err := inst.waitReady(ctx); err != nil {
+		return inst.notReadyResult(err)
 	}
 	if in.File == "" {
 		return errResult("file is required")
 	}
-	rel, err := relFile(s.root, in.File)
+	rel, err := relFile(inst.root, in.File)
 	if err != nil {
 		return errResult(err.Error())
 	}
-	nodes, err := s.graph.Outline(ctx, rel)
+	nodes, err := inst.graph.Outline(ctx, rel)
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.text(renderOutline(rel, nodes))
+	return inst.text(renderOutline(rel, nodes))
+}
+
+// --- list_repos ---
+
+type listReposArgs struct{}
+
+// listRepos is the eighth tool (P67d §3.5): dynamic `instructions` isn't an option (fixed at
+// mcp.NewServer time, server.go), while the attached set changes while the server runs, so this
+// is a cheap per-call listing instead. An empty list renders the identical sentence pick's own
+// "none attached" case uses.
+func (s *Server) listRepos(_ context.Context, _ *mcp.CallToolRequest, _ listReposArgs) (*mcp.CallToolResult, any, error) {
+	repos := s.Repos() // already attach order
+	if len(repos) == 0 {
+		return textResult("no repositories are shared with this server — grant one in Kira Studio's Settings → Code intelligence.")
+	}
+	var b strings.Builder
+	for _, r := range repos {
+		state := "ready"
+		switch {
+		case r.Degraded != "":
+			state = "degraded: " + r.Degraded
+		case !r.Ready:
+			state = "indexing"
+		}
+		fmt.Fprintf(&b, "%s\t%s\t%s\n", r.Key, r.Root, state)
+	}
+	return textResult(strings.TrimRight(b.String(), "\n"))
 }
 
 func clamp(v, def, max int) int {

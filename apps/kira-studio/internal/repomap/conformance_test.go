@@ -13,18 +13,19 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// newConformanceServer builds a real Server over a seeded codeindex.Store (the same ReplaceFile
-// seeding C2's own tests use, §11.3) without a real git repository — resolvedRepo is supplied
-// directly rather than discovered, since this test is about the tool/registration surface, not
-// repository discovery (locator_test.go and repo.go's own callers cover that separately).
+// newConformanceServer builds a real Server (with one repository already Attach'd) over a seeded
+// codeindex.Store (the same ReplaceFile seeding C2's own tests use, §11.3) without a real git
+// repository — Attach is given a resolved identity directly rather than discovered, since this test
+// is about the tool/registration surface, not repository discovery (locator_test.go and repo.go's
+// own callers cover that separately).
 func newConformanceServer(t *testing.T) *Server {
 	t.Helper()
 	home := t.TempDir()
 	root := t.TempDir()
-	store := codeindex.OpenStoreAt(home)
-	t.Cleanup(func() { _ = store.Close() })
 
-	if err := store.ReplaceFile(context.Background(), codeindex.FileWrite{
+	seedStore := codeindex.OpenStoreAt(home)
+	t.Cleanup(func() { _ = seedStore.Close() })
+	if err := seedStore.ReplaceFile(context.Background(), codeindex.FileWrite{
 		RepoID: testRepoID, Path: "main.go", Language: "go",
 		ParseStatus: codeindex.StatusOK, ParsedAt: time.Now().UnixMilli(),
 		ContentSHA: make([]byte, 32),
@@ -33,17 +34,21 @@ func newConformanceServer(t *testing.T) *Server {
 		t.Fatalf("seed: %v", err)
 	}
 
-	resolved := resolvedRepo{repoID: testRepoID, root: root, gitPath: "", runner: gitclient.NewExecRunner()}
-	srv, err := newServer(context.Background(), Config{
-		Token: func(repoID string) (mcpauth.Record, string, bool, error) {
-			plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(repoID)))
-			return rec, plain, true, err
-		},
-	}, home, store, resolved)
+	plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(testRepoID)))
 	if err != nil {
-		t.Fatalf("newServer: %v", err)
+		t.Fatalf("LoadOrMint: %v", err)
+	}
+	srv, err := New(Config{Home: home, Token: rec, TokenPlain: plain})
+	if err != nil {
+		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(func() { _ = srv.Close() })
+
+	if _, err := srv.Attach(RepoSpec{
+		Key: "conformance", RepoID: testRepoID, Root: root, GitPath: "", Runner: gitclient.NewExecRunner(),
+	}); err != nil {
+		t.Fatalf("Attach: %v", err)
+	}
 	return srv
 }
 
@@ -76,17 +81,16 @@ func TestFindDefinitionGoTypeSymbolOnly(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	resolved := resolvedRepo{repoID: testRepoID, root: root, gitPath: "", runner: gitclient.NewExecRunner()}
-	srv, err := newServer(context.Background(), Config{
-		Token: func(repoID string) (mcpauth.Record, string, bool, error) {
-			plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(repoID)))
-			return rec, plain, true, err
-		},
-	}, home, store, resolved)
+	srv, err := New(Config{Home: home})
 	if err != nil {
-		t.Fatalf("newServer: %v", err)
+		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(func() { _ = srv.Close() })
+	if _, err := srv.Attach(RepoSpec{
+		Key: "grpc", RepoID: testRepoID, Root: root, GitPath: "", Runner: gitclient.NewExecRunner(),
+	}); err != nil {
+		t.Fatalf("Attach: %v", err)
+	}
 
 	res, _, err := srv.findDefinition(context.Background(), nil, findDefinitionArgs{
 		locatorFields: locatorFields{Symbol: "grpcCoalescer"},
@@ -142,6 +146,7 @@ func TestConformanceListToolsAndCallEach(t *testing.T) {
 	want := map[string]bool{
 		"find_definition": false, "find_references": false, "find_implementations": false,
 		"search_symbols": false, "search_files": false, "outline_file": false, "read_symbol": false,
+		"list_repos": false,
 	}
 	for _, tool := range tools.Tools {
 		if _, ok := want[tool.Name]; !ok {
@@ -170,6 +175,7 @@ func TestConformanceListToolsAndCallEach(t *testing.T) {
 		{"search_files", map[string]any{"query": "main"}},
 		{"outline_file", map[string]any{"file": "main.go"}},
 		{"read_symbol", map[string]any{"symbol": "Main"}},
+		{"list_repos", map[string]any{}},
 	}
 	for _, c := range calls {
 		t.Run(c.name, func(t *testing.T) {

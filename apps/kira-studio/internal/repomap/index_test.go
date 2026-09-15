@@ -21,10 +21,10 @@ func TestWaitReadyBlocksThenProceeds(t *testing.T) {
 	// codeindex.Open's own initialization) so this test still proceeds past it immediately, the
 	// same as before P67f.
 	idx := codeindex.Open(nil, nil, "", "test-repo", "/repo")
-	s := &Server{root: "/repo", ready: make(chan struct{}), idx: idx}
+	inst := &repoInstance{root: "/repo", ready: make(chan struct{}), done: make(chan struct{}), idx: idx}
 
 	done := make(chan error, 1)
-	go func() { done <- s.waitReady(context.Background()) }()
+	go func() { done <- inst.waitReady(context.Background()) }()
 
 	select {
 	case err := <-done:
@@ -33,7 +33,7 @@ func TestWaitReadyBlocksThenProceeds(t *testing.T) {
 		// still blocked, as expected
 	}
 
-	close(s.ready)
+	close(inst.ready)
 
 	select {
 	case err := <-done:
@@ -53,8 +53,8 @@ func TestWaitReadyTimesOut(t *testing.T) {
 	readyTimeout = 20 * time.Millisecond
 	defer func() { readyTimeout = old }()
 
-	s := &Server{root: "/repo", ready: make(chan struct{})}
-	err := s.waitReady(context.Background())
+	inst := &repoInstance{root: "/repo", ready: make(chan struct{}), done: make(chan struct{})}
+	err := inst.waitReady(context.Background())
 	if err == nil {
 		t.Fatal("waitReady = nil, want a timeout error")
 	}
@@ -63,7 +63,7 @@ func TestWaitReadyTimesOut(t *testing.T) {
 	}
 }
 
-// TestWaitReadyRespectsContextCancellation covers Close-during-a-pending-wait (§11.2's fourth
+// TestWaitReadyRespectsContextCancellation covers Detach/Close-during-a-pending-wait (§11.2's fourth
 // claim): a cancelled context returns immediately rather than waiting out the full timeout.
 func TestWaitReadyRespectsContextCancellation(t *testing.T) {
 	old := readyTimeout
@@ -71,10 +71,10 @@ func TestWaitReadyRespectsContextCancellation(t *testing.T) {
 	defer func() { readyTimeout = old }()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Server{root: "/repo", ready: make(chan struct{})}
+	inst := &repoInstance{root: "/repo", ready: make(chan struct{}), done: make(chan struct{})}
 
 	done := make(chan error, 1)
-	go func() { done <- s.waitReady(ctx) }()
+	go func() { done <- inst.waitReady(ctx) }()
 	cancel()
 
 	select {
@@ -140,10 +140,10 @@ func TestWaitReadyWaitsOutInFlightSyncThenTimesOut(t *testing.T) {
 		time.Sleep(50 * time.Microsecond)
 	}
 
-	s := &Server{root: dir, ready: make(chan struct{}), idx: idx}
-	close(s.ready) // initial gate already open — §1.2 W2's own shape.
+	inst := &repoInstance{root: dir, ready: make(chan struct{}), done: make(chan struct{}), idx: idx}
+	close(inst.ready) // initial gate already open — §1.2 W2's own shape.
 
-	err = s.waitReady(context.Background())
+	err = inst.waitReady(context.Background())
 	if err == nil {
 		t.Fatal("waitReady = nil, want a reindexing timeout error")
 	}

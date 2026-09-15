@@ -14,9 +14,10 @@ import (
 )
 
 // ErrNoRepository is returned when neither gitclient.Identify nor the Store.ListRepos fallback
-// (§4.4) can name a repository for dir — the caller (cmd/kira-repo-map's main, or
-// bridge.RepoMapService starting the embedded instance) decides how to report it: exit(1) for the
-// headless binary, a degraded Settings-tab message for the embedded one (§3.2).
+// (§4.4) can name a repository for dir — reached only from AttachDir, the headless binary's own
+// entry point (cmd/kira-repo-map). The embedded instance never calls it: since P67d it resolves
+// every repository it serves from code_repos (bridge.RepoMapService), never from this process's own
+// working directory, so this is no longer a failure mode a packaged app's Settings tab can hit.
 var ErrNoRepository = errors.New("repomap: no repository found for this working directory")
 
 // resolvedRepo is what repository resolution (§4.1/§4.4) hands back to New.
