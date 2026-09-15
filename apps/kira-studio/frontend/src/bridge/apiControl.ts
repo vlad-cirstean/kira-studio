@@ -63,6 +63,8 @@ export const apiControl = {
   // scope — '' for a scratch tab, exactly like collectionId/environmentId's own "possibly empty"
   // shape above. Optional here (C3): a missing field decodes as Go's zero value ("") on the wire,
   // and state.ts's send() only starts actually passing it in C4.
+  // P71 §4: incognito mirrors itemId's own optional-on-the-TS-side shape — a missing field
+  // decodes as Go's zero value (false) on the wire.
   httpSend: (args: {
     opId: string;
     tabId: string;
@@ -73,10 +75,11 @@ export const apiControl = {
     collectionId: string;
     environmentId: string;
     itemId?: string;
+    incognito?: boolean;
   }): Promise<HttpResponseWire> =>
-    unwrap(HttpService.Send({ ...args, itemId: args.itemId ?? '' })).then((r) =>
-      trust<HttpResponseWire>(r),
-    ),
+    unwrap(
+      HttpService.Send({ ...args, itemId: args.itemId ?? '', incognito: args.incognito ?? false }),
+    ).then((r) => trust<HttpResponseWire>(r)),
 
   // P11 D3/D4: resolves a target's (or a .proto's) services and methods — reflection.Register's
   // own cache lives in Go (grpcclient's descriptorCache), never here; `reload` bypasses it (the
@@ -114,10 +117,16 @@ export const apiControl = {
     collectionId: string;
     environmentId: string;
     itemId?: string;
+    incognito?: boolean;
   }): Promise<GrpcCallResultWire> =>
-    unwrap(GrpcService.Call({ ...args, windowKey, itemId: args.itemId ?? '' })).then((r) =>
-      trust<GrpcCallResultWire>(r),
-    ),
+    unwrap(
+      GrpcService.Call({
+        ...args,
+        windowKey,
+        itemId: args.itemId ?? '',
+        incognito: args.incognito ?? false,
+      }),
+    ).then((r) => trust<GrpcCallResultWire>(r)),
 
   // P11 D8: one server-streaming call's coalesced message batches — EmitTo'd to this window only,
   // so a stream in one window never wakes another.

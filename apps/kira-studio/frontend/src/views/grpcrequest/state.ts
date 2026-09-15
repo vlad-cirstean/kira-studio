@@ -8,9 +8,10 @@ import type {
 } from '@shared/domain/grpc';
 import { markRaw } from 'vue';
 import { collectionIdFor } from '../../api/state/collections';
-import { activeEnvironmentId, mergedValuesAndSecrets } from '../../api/state/variables';
+import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
+import { isIncognito } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteGrpcCallRecorded } from './history';
@@ -153,7 +154,7 @@ async function resolveForDescribe(
   const tab = findGrpcRequestTab(tabId);
   if (!tab) return null;
   const collectionId = collectionIdFor(tab.state);
-  const environmentId = activeEnvironmentId.value;
+  const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   const first = resolveGrpcTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
@@ -175,7 +176,7 @@ export async function loadSchema(tabId: string, reload = false): Promise<void> {
   const myGen = ++rt.genId;
 
   const collectionId = collectionIdFor(tab.state);
-  const environmentId = activeEnvironmentId.value;
+  const environmentId = environmentIdForTab(tabId);
   try {
     let target = tab.state.target;
     let metadata: { name: string; value: string }[] = [];
@@ -286,7 +287,7 @@ export async function call(tabId: string): Promise<void> {
   rt.streaming = streaming;
 
   const collectionId = collectionIdFor(tab.state);
-  const environmentId = activeEnvironmentId.value;
+  const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   const first = resolveGrpcTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
@@ -314,6 +315,7 @@ export async function call(tabId: string): Promise<void> {
       collectionId,
       environmentId,
       itemId: tab.state.itemId ?? '',
+      incognito: isIncognito(tabId),
     });
     if (rt.opId !== opId) return; // superseded, or the streaming subscription already finished it
     rt.status = 'idle';
