@@ -181,18 +181,34 @@ function keyType(path: string): string | undefined {
   return rt.value?.keyTypes.get(path);
 }
 
+// 7c (P68 review): VirtualList's own `visible-range` emit fires up to once per animation frame
+// during a scroll fling — each distinct window used to issue its own IPC round trip even though
+// path-level dedup (ensureKeyTypes' own pending/keyTypes checks) only prevents REPEATING work, not
+// the round trip itself. Debounced by the same 150ms blameAnnotation.ts's own DEBOUNCE_MS already
+// uses, so a fling settles on one ensureKeyTypes call for its final window instead of one per frame.
+const KEY_TYPES_DEBOUNCE_MS = 150;
+let keyTypesDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+
 // VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
 // per §4.3, never the whole (up to 200 000-key) level.
 function onVisibleRange(range: { start: number; end: number }): void {
   if (!supportsKeyTypes.value) return;
-  const nodes = filteredNodes.value;
-  const paths: string[] = [];
-  for (let i = range.start; i < range.end && i < nodes.length; i++) {
-    const node = nodes[i];
-    if (node && node.kind === 'key') paths.push(node.path);
-  }
-  if (paths.length > 0) ensureKeyTypes(props.tab.id, paths);
+  if (keyTypesDebounceTimer !== undefined) clearTimeout(keyTypesDebounceTimer);
+  keyTypesDebounceTimer = setTimeout(() => {
+    keyTypesDebounceTimer = undefined;
+    const nodes = filteredNodes.value;
+    const paths: string[] = [];
+    for (let i = range.start; i < range.end && i < nodes.length; i++) {
+      const node = nodes[i];
+      if (node && node.kind === 'key') paths.push(node.path);
+    }
+    if (paths.length > 0) ensureKeyTypes(props.tab.id, paths);
+  }, KEY_TYPES_DEBOUNCE_MS);
 }
+
+onUnmounted(() => {
+  if (keyTypesDebounceTimer !== undefined) clearTimeout(keyTypesDebounceTimer);
+});
 
 // D12: a container descends; a leaf opens the existing keyvalue tab — the same tab kind the tree
 // has always opened a redis key / s3 object into.

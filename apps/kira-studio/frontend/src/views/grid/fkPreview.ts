@@ -56,6 +56,13 @@ export async function fetchReferencedRow(
       projection: null,
       filter,
       sort: null,
+      // 7a (P68 review) was raised as "pageSize: 10 fetches 10x the row this popover ever
+      // renders — drop it to 2, since PREVIEW_ROW_LIMIT (1) plus a hasMore boolean only needs a
+      // 2nd row to exist". Not applied: ReadRequestWire.pageSize (packages/shared/protocol/
+      // data-ops.ts) is a closed enum, `10 | 100 | 1000 | 10000` — 10 is already the SMALLEST
+      // value the wire schema accepts; a literal 2 fails readRequestWireSchema's own validation
+      // (an E_BAD_REQUEST on every preview fetch), not a smaller, cheaper read. 10 is already this
+      // call's own floor.
       pageSize: 10,
       cursor: { mode: 'offset', offset: 0 },
     });

@@ -9,6 +9,7 @@ import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
+import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { patchRepoFileTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
@@ -21,6 +22,18 @@ import { ensureNavigationRegistered } from './navigation';
 import { consumeReveal } from './reveal';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
+
+// 7e (P68 review): D11's own comment claims the reading view is "re-rendered at most once" since
+// the source never changes underneath it — true only within one mount. A mere tab switch away and
+// back destroys and remounts this component (MainView's own v-if, same as every other tab view),
+// which used to re-issue the IPC file read and re-run markdown-it plus a full DOM rebuild every
+// time. Cached by tab id, module-level so it survives the remount; invalidated by
+// registerTabRuntimeCleanup below, the same per-tab-close hook browse/state.ts and keyvalue/state.ts
+// already use for their own runtime maps.
+const markdownHtmlByTabId = new Map<string, string>();
+registerTabRuntimeCleanup((tabId) => {
+  markdownHtmlByTabId.delete(tabId);
+});
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
 
@@ -46,10 +59,18 @@ const VIEW_OPTIONS = [
 
 // D11: rendered lazily on first switch to Reading, then cached — a markdown file opened and never
 // toggled never pays `markdown-it`'s import cost, and a plain read-only view is re-rendered at most
-// once (its source text never changes underneath it).
+// once per tab, not once per mount (7e, P68 review: markdownHtmlByTabId above survives a tab
+// switch-away-and-back, since the source text never changes underneath it either way).
 async function ensureMarkdownRendered(): Promise<void> {
   if (renderedHtml.value !== null || !fileText.value) return;
-  renderedHtml.value = await renderMarkdownReading(fileText.value);
+  const cached = markdownHtmlByTabId.get(props.tab.id);
+  if (cached !== undefined) {
+    renderedHtml.value = cached;
+    return;
+  }
+  const html = await renderMarkdownReading(fileText.value);
+  markdownHtmlByTabId.set(props.tab.id, html);
+  renderedHtml.value = html;
 }
 
 function onViewChange(next: 'source' | 'reading'): void {

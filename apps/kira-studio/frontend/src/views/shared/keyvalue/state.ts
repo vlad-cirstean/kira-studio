@@ -100,6 +100,13 @@ export async function load(
       effectiveCursor = { mode: 'offset', offset: host.pageIndex * host.pageSize };
     }
   }
+  // 7b (P68 review): a load still in flight for this viewKey (the row this preview/tab was
+  // previously showing) must be CANCELLED, not just superseded client-side — beginOp below only
+  // stamps a fresh opId, so the stale response gets dropped here (the `rt.opId !== opId` checks),
+  // but the backend read it belongs to (a real Redis/S3 call) kept running to completion regardless.
+  // Rapidly clicking through N keys used to leave N-1 real backend reads running and discarded.
+  // Mirrors FkPreviewPopover.vue's own opsCancel-on-supersede pattern.
+  if (rt.opId) stopOp(rt);
   const opId = beginOp(rt);
 
   try {
