@@ -65,8 +65,15 @@ type connectionCapabilities struct {
 	SchemaColumns bool `json:"schemaColumns"`
 }
 
-// connectionView is list_connections' own per-connection element — M2's insertion point for the
-// free-text description field (§9).
+// connectionPermissions is list_connections' own "permissions" object (M2 §6.1) — always present,
+// so a client that knows a write will be refused can say so instead of composing one.
+type connectionPermissions struct {
+	Read  string `json:"read"`
+	Write string `json:"write"`
+	DDL   string `json:"ddl"`
+}
+
+// connectionView is list_connections' own per-connection element.
 type connectionView struct {
 	ID            string                  `json:"id"`
 	Name          string                  `json:"name"`
@@ -75,6 +82,10 @@ type connectionView struct {
 	Status        string                  `json:"status"`
 	ServerVersion *string                 `json:"serverVersion,omitempty"`
 	Capabilities  *connectionCapabilities `json:"capabilities,omitempty"`
+	// Description is M2's free-text "what this DB is for", passed verbatim — omitted when unset.
+	Description string `json:"description,omitempty"`
+	// Permissions is M2's per-operation MCP mode, always present.
+	Permissions connectionPermissions `json:"permissions"`
 }
 
 // --- run_query's own projection (§5.2) — a projection because rows cross to the frontend as

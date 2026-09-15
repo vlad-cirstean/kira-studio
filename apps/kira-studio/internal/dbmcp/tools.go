@@ -2,9 +2,11 @@ package dbmcp
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -26,7 +28,11 @@ func (s *Server) listConnections(_ context.Context, _ *mcp.CallToolRequest, _ li
 			continue
 		}
 		state := s.cfg.Conns.StateOf(c.ID)
-		view := connectionView{ID: c.ID, Name: c.Name, Kind: c.Kind, ReadOnly: c.ReadOnly, Status: state.Status}
+		view := connectionView{
+			ID: c.ID, Name: c.Name, Kind: c.Kind, ReadOnly: c.ReadOnly, Status: state.Status,
+			Description: c.McpDescription,
+			Permissions: connectionPermissions{Read: c.McpReadMode, Write: c.McpWriteMode, DDL: c.McpDdlMode},
+		}
 		if state.ServerVersion != nil {
 			view.ServerVersion = state.ServerVersion
 		}
@@ -121,9 +127,19 @@ type runQueryArgs struct {
 // demand (§6.3): exposing a connection to MCP is the human's own explicit consent, and Connect is
 // the same deduplicated path the UI uses, so the connection visibly comes up in the app rather than
 // opening invisibly.
+//
+// M2 §4.2's gate order: resolve (unchanged) → refuse before connecting if every mode denies →
+// clamp maxRows (unchanged) → connect (unchanged: classification needs the live adapter, and so
+// does execution) → classify → verdict → prompt if needed → execute (unchanged).
 func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQueryArgs) (*mcp.CallToolResult, any, error) {
-	if _, err := s.resolveEnabled(args.ConnectionID); err != nil {
+	summary, err := s.resolveEnabled(args.ConnectionID)
+	if err != nil {
 		return errResult(err.Error())
+	}
+
+	m := modesOf(summary)
+	if m.read == "deny" && m.write == "deny" && m.ddl == "deny" {
+		return errResult(fmt.Sprintf("connection %q's MCP permissions deny every statement class; change them in the connection's MCP tab", summary.Name))
 	}
 
 	maxRows := args.MaxRows
@@ -140,6 +156,42 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	}
 	if state.Status != "connected" {
 		return errResult(connectStateError(state))
+	}
+
+	// A classifier error degrades to ClassUnknown rather than failing the call — never a way to
+	// bypass the gate, and never a way to break a connection either.
+	class, err := s.cfg.Query.ClassifyStatement(ctx, args.ConnectionID, args.SQL)
+	if err != nil {
+		s.log.Warn("dbmcp: run_query: classification failed, treating as unknown", "connectionId", args.ConnectionID, "error", err)
+		class = adapters.ClassUnknown
+	}
+
+	switch verdict := verdictFor(m, class); verdict {
+	case "allow":
+		// fall through to Execute below.
+	case "deny":
+		return errResult(fmt.Sprintf("this connection's MCP permissions deny %s statements; change them in the connection's MCP tab", class))
+	case "prompt":
+		outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
+			ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
+			Class: class, Statement: args.SQL,
+		})
+		switch outcome {
+		case ApprovalApproved:
+			// fall through to Execute below.
+		case ApprovalDenied:
+			return errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
+		case ApprovalTimedOut:
+			return errResult(fmt.Sprintf("query against %q got no answer within 2 minutes", summary.Name))
+		case ApprovalAbandoned:
+			return errResult(fmt.Sprintf("the database MCP server stopped before the query against %q was answered", summary.Name))
+		default:
+			return errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
+		}
+	default:
+		// An unrecognised mode word cannot reach here — repos/connections.go's scan coerces any
+		// unreadable mode to "deny" before this method is ever called.
+		return errResult(fmt.Sprintf("this connection's MCP permissions are misconfigured for %s statements; change them in the connection's MCP tab", class))
 	}
 
 	resp, err := s.cfg.Query.Execute(ctx, adapterhost.ExecuteRequestWire{
