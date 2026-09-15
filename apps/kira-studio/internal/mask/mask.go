@@ -139,6 +139,28 @@ func maskName(value string, keepHint bool) string {
 	return strings.Join(parts, " ")
 }
 
+// firstGraphemeAndCount walks value's own grapheme clusters exactly once via uniseg's own
+// incremental API, returning the first cluster (empty when value is empty) alongside the total
+// count. maskWord's own need — mirrors packages/shared/domain/mask.ts's own firstGraphemeAndCount
+// (M7 finding #16): the previous shape called uniseg.GraphemeClusterCount (a full pass) and then
+// uniseg.FirstGraphemeClusterInString separately, re-deriving the first cluster it had already
+// walked past once inside the count.
+func firstGraphemeAndCount(value string) (first string, count int) {
+	state := -1
+	for len(value) > 0 {
+		var cluster string
+		cluster, value, _, state = uniseg.FirstGraphemeClusterInString(value, state)
+		if cluster == "" {
+			break
+		}
+		if count == 0 {
+			first = cluster
+		}
+		count++
+	}
+	return first, count
+}
+
 // maskWord masks one word: first grapheme + bullet run when keepHint, an all-bullet run of the
 // same grapheme length otherwise. A single-grapheme word (n==1) always gets the all-bullet form,
 // regardless of keepHint — "keep the first grapheme, destroy the rest" has zero characters left to
@@ -146,15 +168,24 @@ func maskName(value string, keepHint bool) string {
 // whole (caught by TestApplyNeverEchoesOriginalText). The length hint survives intact either way (a
 // single bullet still says "one grapheme"); only the content does not.
 func maskWord(w string, keepHint bool) string {
-	n := uniseg.GraphemeClusterCount(w)
+	first, n := firstGraphemeAndCount(w)
 	if n == 0 {
 		return ""
 	}
 	if !keepHint || n == 1 {
 		return strings.Repeat(bullet, n)
 	}
-	first, _, _, _ := uniseg.FirstGraphemeClusterInString(w, -1)
-	return first + strings.Repeat(bullet, n-1)
+	// M7 finding #16: `first + strings.Repeat(bullet, n-1)` allocated twice — Repeat's own buffer,
+	// then a second, bigger one for the `+` concatenation. bullet is a 3-byte rune (U+2022), so a
+	// masked word's output already runs up to 3x its input grapheme count in bytes; Grow pre-sizes
+	// the one allocation this needs to exactly that, once.
+	var b strings.Builder
+	b.Grow(len(first) + len(bullet)*(n-1))
+	b.WriteString(first)
+	for i := 0; i < n-1; i++ {
+		b.WriteString(bullet)
+	}
+	return b.String()
 }
 
 // maskEmail keeps the domain (in full, when keepHint) and the local part's first grapheme + length
