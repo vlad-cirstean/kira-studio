@@ -191,6 +191,12 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		maxRows = runQueryMaxMaxRows
 	}
 
+	// Read once per call, not per use below: ExplainThreshold's own doc comment ("read fresh on
+	// every call, never cached") is about staleness across separate runQuery invocations, not
+	// within one — a second read microseconds later in the same call cannot see a different
+	// setting, so it was a duplicate repo read (settings.GetAll()) for no correctness benefit.
+	threshold := s.cfg.ExplainThreshold()
+
 	state, err := s.connectForQuery(args.ConnectionID)
 	if err != nil {
 		return toolError(err)
@@ -250,7 +256,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
 			ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
 			Class: class, Statement: args.SQL, Reason: reason,
-			Plan: approvalPlanFrom(plan, s.cfg.ExplainThreshold()),
+			Plan: approvalPlanFrom(plan, threshold),
 		})
 		switch outcome {
 		case ApprovalApproved:
@@ -309,7 +315,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	if len(resp.Pages) == 0 {
 		return jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
 	}
-	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, s.cfg.ExplainThreshold()), mk, args.SQL)
+	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, threshold), mk, args.SQL)
 	if err != nil {
 		// §4.4/§5.3: a document/stream page under active masking rules is caller-correctable
 		// (narrow the query, or remove the rules) — surfaced as an IsError result, not a raw Go
