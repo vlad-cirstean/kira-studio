@@ -6,6 +6,20 @@
 // transport itself outlives that, cached per repo workspace by gitTransportFor, S17 disposes it;
 // each mount holds its own lease over that shared transport, P67b §2.1 — so this mount's own
 // unmount/dispose never tears down the graph tab's peers).
+//
+// P72 §3: `MainView.vue` now wraps this view in a `KeepAlive` (Studio only) — a tab switch away
+// deactivates it rather than destroying it, so `mountGraph()`'s own layout stays computed instead
+// of rebuilding from row 0 on every return (the "reload on tab focus" symptom). `defineOptions`'s
+// `name` is what makes `KeepAlive`'s `include` match this component at all; without it a
+// `<script setup>` component has no name and the include list matches nothing — a silent no-op.
+// Deactivation adds no new hook here: `onUnmounted`'s `handle?.unmount()` below still only runs
+// on genuine destruction (a closed tab, or a `:max` eviction), and reactivation needs no
+// imperative resize call — verified during implementation (not assumed) with a standalone
+// Chromium + WebKit repro reproducing this exact KeepAlive shape: `CommitGrid.vue`'s own
+// `ResizeObserver` reliably fired both the deactivate (0×0) and reactivate (real size)
+// transitions on both engines, so `scheduleResize()`'s existing `resizeCanvas()` +
+// `rebuildColumns()` path already runs on return. `MountHandle`'s own doc comment (`main.ts`)
+// names the fallback this would have needed had the observer not covered it.
 import type { MountHandle } from '@kira/git-ui';
 import type { RepoGraphTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
@@ -15,6 +29,8 @@ import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+
+defineOptions({ name: 'RepoGraphView' });
 
 const props = defineProps<{ tab: RepoGraphTabRecord }>();
 
