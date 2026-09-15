@@ -34,19 +34,73 @@ type RepoInfo struct {
 	Degraded          string // idx.SyncState().LastErr, "" when healthy
 }
 
+// attachFastPathLocked answers Attach's two "nothing to build" outcomes — this exact repository
+// already attached (Attach's own idempotency) or a key collision — under a read lock alone, without
+// building a new instance or touching disk. done is false when neither applies, meaning Attach must
+// actually build one (outside the lock, 3b below).
+func (s *Server) attachFastPathLocked(spec RepoSpec) (info RepoInfo, done bool, err error) {
+	s.reposMu.RLock()
+	defer s.reposMu.RUnlock()
+	if existing, ok := s.repos[spec.Key]; ok {
+		if existing.repoID == spec.RepoID && existing.root == spec.Root {
+			return existing.info(), true, nil
+		}
+		return RepoInfo{}, true, fmt.Errorf("repomap: attach: key %q is already attached to a different repository", spec.Key)
+	}
+	lower := strings.ToLower(spec.Key)
+	for k := range s.repos {
+		if strings.ToLower(k) == lower {
+			return RepoInfo{}, true, fmt.Errorf("repomap: attach: key %q collides (case-insensitively) with already-attached %q", spec.Key, k)
+		}
+	}
+	return RepoInfo{}, false, nil
+}
+
 // Attach registers spec as a newly-servable repository, starting its initial Sync in the background
 // and its filesystem watcher synchronously — mirroring the sequence a lone Server used to run at
 // construction, now runnable any number of times against one already-serving Server. Idempotent:
 // attaching a key whose RepoID+Root are unchanged returns the existing instance's RepoInfo and does
 // nothing else. Returns as soon as the instance is registered; never waits on the sync.
+//
+// 3b (P68 review): codeindex.Open/codegraph.New/idx.Watch() are built OUTSIDE reposMu — idx.Watch()
+// alone runs a synchronous `git ls-files` subprocess plus one fsnotify.Add per directory, which on a
+// large repository is multi-second work. Every navigation tool call resolves through Server.pick,
+// which takes reposMu.RLock(), so holding the write lock across that span used to stall every
+// already-attached repository's own queries (and list_repos/the Settings status read) for the
+// duration of any one repository's attach. The write lock is now held only for the fast-path check
+// above and the final registration below, re-checked for the same race there.
 func (s *Server) Attach(spec RepoSpec) (RepoInfo, error) {
 	if spec.Key == "" {
 		return RepoInfo{}, fmt.Errorf("repomap: attach: key is required")
 	}
+	if info, done, err := s.attachFastPathLocked(spec); done {
+		return info, err
+	}
 
+	idx := codeindex.Open(s.store, spec.Runner, spec.GitPath, spec.RepoID, spec.Root)
+	graph := codegraph.New(s.store, spec.RepoID)
+	runCtx, cancel := context.WithCancel(context.Background())
+
+	inst := &repoInstance{
+		key: spec.Key, repoID: spec.RepoID, root: spec.Root,
+		store: s.store, idx: idx, graph: graph, log: s.log, syncSem: s.initialSyncSem,
+		ready: make(chan struct{}), done: make(chan struct{}), syncDone: make(chan struct{}), cancel: cancel,
+	}
+	watcher, err := idx.Watch()
+	if err != nil {
+		// A watcher failure is not fatal to serving what has already synced — logged, not
+		// returned, the same posture a bind failure gets.
+		s.log.Warn("repo-map watcher", "scope", "repomap", "repo", spec.RepoID, "err", err)
+	}
+	inst.watcher = watcher
+
+	// Re-check under the write lock: spec.Key (or a case-insensitive collision) may have been
+	// claimed by a concurrent Attach while this one was building outside it. Losing that race means
+	// closing what was just speculatively built rather than registering it.
 	s.reposMu.Lock()
 	if existing, ok := s.repos[spec.Key]; ok {
 		s.reposMu.Unlock()
+		inst.discardUnregistered()
 		if existing.repoID == spec.RepoID && existing.root == spec.Root {
 			return existing.info(), nil
 		}
@@ -56,26 +110,10 @@ func (s *Server) Attach(spec RepoSpec) (RepoInfo, error) {
 	for k := range s.repos {
 		if strings.ToLower(k) == lower {
 			s.reposMu.Unlock()
+			inst.discardUnregistered()
 			return RepoInfo{}, fmt.Errorf("repomap: attach: key %q collides (case-insensitively) with already-attached %q", spec.Key, k)
 		}
 	}
-
-	idx := codeindex.Open(s.store, spec.Runner, spec.GitPath, spec.RepoID, spec.Root)
-	graph := codegraph.New(s.store, spec.RepoID)
-	runCtx, cancel := context.WithCancel(context.Background())
-
-	inst := &repoInstance{
-		key: spec.Key, repoID: spec.RepoID, root: spec.Root,
-		store: s.store, idx: idx, graph: graph, log: s.log,
-		ready: make(chan struct{}), done: make(chan struct{}), cancel: cancel,
-	}
-	watcher, err := idx.Watch()
-	if err != nil {
-		// A watcher failure is not fatal to serving what has already synced — logged, not
-		// returned, the same posture a bind failure gets.
-		s.log.Warn("repo-map watcher", "scope", "repomap", "repo", spec.RepoID, "err", err)
-	}
-	inst.watcher = watcher
 
 	s.repos[spec.Key] = inst
 	s.order = append(s.order, spec.Key)

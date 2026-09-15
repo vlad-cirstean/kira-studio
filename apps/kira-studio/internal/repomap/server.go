@@ -74,6 +74,15 @@ type Server struct {
 	repos   map[string]*repoInstance
 	order   []string // attach order, for a stable list_repos/Repos()
 
+	// initialSyncSem bounds how many repositories' own initial full Sync (attach.go's Attach,
+	// runInitialSync) run at once — capacity 1, so N attached repositories never multiply
+	// codeindex/sync.go's own syncWorkers() bound by N (P68 review, performance finding 3a):
+	// codeindex's own worker cap already bounds ONE Sync's own CPU/SQLite-write impact; nothing
+	// above this Server bounded how many Syncs could be doing that at once. A watcher-driven
+	// rescan is not gated by this — it is incremental and per-file, not the multi-second full pass
+	// this exists to bound.
+	initialSyncSem chan struct{}
+
 	mcp *mcp.Server
 
 	httpState // http.go's own fields (listener, *http.Server) — split out for that file's own cohesion
@@ -99,13 +108,14 @@ func New(cfg Config) (*Server, error) {
 	store := codeindex.OpenStoreAt(home)
 
 	s := &Server{
-		home:        home,
-		log:         log,
-		store:       store,
-		token:       cfg.Token,
-		tokenPlain:  cfg.TokenPlain,
-		tokenMinted: cfg.TokenPlain != "",
-		repos:       make(map[string]*repoInstance),
+		home:           home,
+		log:            log,
+		store:          store,
+		token:          cfg.Token,
+		tokenPlain:     cfg.TokenPlain,
+		tokenMinted:    cfg.TokenPlain != "",
+		repos:          make(map[string]*repoInstance),
+		initialSyncSem: make(chan struct{}, 1),
 	}
 
 	s.mcp = s.buildMCPServer()

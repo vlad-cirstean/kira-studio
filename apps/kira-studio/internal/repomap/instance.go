@@ -46,6 +46,20 @@ type repoInstance struct {
 	done   chan struct{}
 	cancel context.CancelFunc
 
+	// syncSem is the owning Server's own initialSyncSem — borrowed, never closed here. nil in a
+	// repoInstance a test builds directly (attach_test.go), which skips the gate entirely.
+	syncSem chan struct{}
+
+	// syncDone is closed when runInitialSync's own background goroutine actually returns — distinct
+	// from ready, which opens as soon as the FIRST idx.Sync call finishes but says nothing about
+	// whether runInitialSync's goroutine itself has fully unwound (P68 review: close, below, used to
+	// race it). cancel() only requests cancellation; a parse worker mid-idx.session.Reparse finishes
+	// that call before honouring ctx, so idx.Sync can still be running — and still checking
+	// tree-sitter parsers in and out of codeparse.Session's pool — for a while after cancel()
+	// returns. close() waits on this (bounded) before touching idx, so idx.Close() never frees
+	// pool/LRU structures a still-running worker is about to write back into.
+	syncDone chan struct{}
+
 	closeOnce sync.Once
 }
 
@@ -53,6 +67,22 @@ type repoInstance struct {
 // regardless of outcome — a Sync error still opens the gate (a tool call then gets whatever
 // codegraph can answer from an empty or partial index, which is honest; it does not hang forever).
 func (inst *repoInstance) runInitialSync(ctx context.Context, home string) {
+	defer close(inst.syncDone)
+
+	// 3a: wait for a free slot before doing any real work — bounds how many repositories' initial
+	// Sync run at once, process-wide, to codeindex/sync.go's own single-Sync worker cap rather than
+	// N times it. A revoke/detach while still queued (ctx cancelled before a slot frees up) returns
+	// with ready never opened — correct, since nothing was ever synced; waitReady's own `done`/ctx
+	// cases (not this instance's ready gate) are what unblock a caller in that case.
+	if inst.syncSem != nil {
+		select {
+		case inst.syncSem <- struct{}{}:
+			defer func() { <-inst.syncSem }()
+		case <-ctx.Done():
+			return
+		}
+	}
+
 	lock, acquired, err := codeindex.AcquireSyncLock(home, inst.repoID, codeindex.DefaultSyncLockTimeout)
 	if err != nil {
 		inst.log.Warn("repo-map sync lock", "scope", "repomap", "repo", inst.repoID, "err", err)
@@ -126,12 +156,32 @@ func (inst *repoInstance) info() RepoInfo {
 	return RepoInfo{Key: inst.key, RepoID: inst.repoID, Root: inst.root, Ready: ready, Degraded: degraded}
 }
 
-// close mirrors Server.Close's own former per-repo half: cancel, stop the watcher, release the sync
-// lock if held, close the index — never the store, which the Server owns. Idempotent, and only ever
-// called once inflight has drained to zero (Server.Detach).
+// discardUnregistered closes an instance Attach built speculatively outside reposMu (3b, attach.go)
+// but lost the race to register — runInitialSync was never started for it, so its own syncDone gate
+// is closed here first, letting close()'s bounded wait return immediately rather than time out
+// waiting on a goroutine that will never run.
+func (inst *repoInstance) discardUnregistered() {
+	close(inst.syncDone)
+	inst.close()
+}
+
+// close mirrors Server.Close's own former per-repo half: cancel, wait for the initial sync goroutine
+// to actually stop, stop the watcher, release the sync lock if held, close the index — never the
+// store, which the Server owns. Idempotent, and only ever called once inflight has drained to zero
+// (Server.Detach).
 func (inst *repoInstance) close() {
 	inst.closeOnce.Do(func() {
 		inst.cancel()
+		// Bounded (readyTimeout, the same bound a tool call's own waitReady already trusts) so a
+		// sync stuck past cancellation can never hang a revoke or app shutdown forever — logged, not
+		// fatal, the same posture every other close-path failure in this file takes. A repoInstance
+		// built directly by a test (no syncDone) has a nil channel here, which blocks forever in the
+		// select below and always falls through to the timeout branch, never panics.
+		select {
+		case <-inst.syncDone:
+		case <-time.After(readyTimeout):
+			inst.log.Warn("repo-map: close: initial sync still running past timeout, closing under it", "scope", "repomap", "repo", inst.repoID)
+		}
 		if inst.watcher != nil {
 			_ = inst.watcher.Close()
 		}

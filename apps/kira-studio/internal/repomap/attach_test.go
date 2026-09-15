@@ -131,10 +131,16 @@ func newDrainTestInstance(t *testing.T, repoID string) (*repoInstance, *codeinde
 	t.Cleanup(idx.Close)
 	graph := codegraph.New(store, repoID)
 
+	// syncDone pre-closed: this helper bypasses Attach's own `go inst.runInitialSync(...)` entirely,
+	// so there is no such goroutine for close() (instance.go) to wait on — closing it here up front
+	// is the same "nothing to run" case Attach's own discardUnregistered handles for a speculative
+	// instance that lost its registration race.
+	syncDone := make(chan struct{})
+	close(syncDone)
 	return &repoInstance{
 		key: repoID, repoID: repoID, root: root,
 		store: store, idx: idx, graph: graph, log: slog.Default(),
-		ready: make(chan struct{}), done: make(chan struct{}), cancel: func() {},
+		ready: make(chan struct{}), done: make(chan struct{}), syncDone: syncDone, cancel: func() {},
 	}, store
 }
 
