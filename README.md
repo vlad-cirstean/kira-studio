@@ -3,16 +3,21 @@
 [![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
 
 A native macOS workbench combining a visual database client (DataGrip/DBeaver class, ten database
-engines) and an HTTP/gRPC API client (Postman/Insomnia class) — built on Wails (Go) and Vue 3, one
-app you switch between with a mode button.
+engines), an HTTP/gRPC API client (Postman/Insomnia class), and a git client with code intelligence
+(a VS Code-adjacent workspace: file tree, Monaco viewer, diffs, go-to-definition, search) — built
+on Wails (Go) and Vue 3, one app you switch between with a mode button.
 
 ## Status
 
-- **Beta.** The database client (**Studio**) shipped through its v1.1 chapter and the API client
-  (**Api**) through v1.2. The git client is the v1.3 chapter and is **headless**: the git backend
-  runs inside this app, and its frontend is **Kira Version**, a VS Code extension bundled in the
-  DMG. Expect bugs and breaking changes between builds. See [Development](#development) and
-  [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
+- **Beta.** The database client (**Studio**) shipped through its v1.1 chapter, the API client
+  (**Api**) through v1.2, and the git backend through v1.3 — headless at first, with its only
+  frontend **Kira Version**, a VS Code extension bundled in the DMG. v1.5 added a native code
+  intelligence workspace inside Kira Studio's own window — import a repository, browse and diff its
+  files, navigate its code — and v1.6 (the current chapter) made **git** a full peer of
+  **Studio**/**Api** (its own mode, its own native graph and code-review layer) and enabled real
+  git-write operations from that native surface. The VS Code extension remains a fully supported
+  second frontend over the same backend. Expect bugs and breaking changes between builds. See
+  [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
 - **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
   v1. One consequence: because each new build is unsigned, macOS treats it as a different
@@ -82,7 +87,7 @@ A couple of things worth knowing up front:
 - **Data grid** — virtualized both axes, pagination with 10/100/1k/10k page sizes, count-all on
   request, column projection, server-side `WHERE`/`ORDER BY` with history and saved filters,
   in-page find toolbar, stop button.
-- **Cell editor** — a CodeMirror panel with format autodetect (JSON, XML, SQL, base64, hex, epoch,
+- **Cell editor** — a Monaco panel with format autodetect (JSON, XML, SQL, base64, hex, epoch,
   ISO-8601, UUID, URL, CSV), manual override, and indented/compact beautify.
 - **Document, key/value and stream views** — MongoDB documents with per-`_id` expand state and an
   add/edit/delete document action; Redis keyspace with per-type renderers and TTL, plus
@@ -91,8 +96,10 @@ A couple of things worth knowing up front:
   against the server, with no staging or preview — that model is specific to the SQL grid below.
 - **Mutations (SQL grid)** — add/delete row and cell edits staged as a per-tab pending-change set
   with an exact command preview; commit or rollback; nothing reaches the database until commit.
-- **PK/FK navigation** — jump from a key cell to referencing or referenced rows in a pre-filtered
-  new tab, driven by cached FK metadata (PostgreSQL/MariaDB).
+- **PK/FK navigation** — click an outbound-FK cell's nav button for a read-only preview popover
+  first, with two actions: *Open in new tab* (jump straight to the referencing/referenced rows in a
+  pre-filtered new tab) or *Edit this record* (opens the same pre-filtered tab with the caret
+  already landed in edit mode), driven by cached FK metadata (PostgreSQL/MariaDB).
 - **Query console** — a per-connection console tab, run-statement/run-all, results in the grid,
   saved queries.
 - **Operations panel** — every DB operation live, with duration, rows, command, cancel, re-run,
@@ -141,14 +148,46 @@ A couple of things worth knowing up front:
 - **gRPC support** — unary and streaming calls alongside HTTP, sharing the same collections,
   environments and variables.
 
-## Git features (Kira Version)
+## Code intelligence features
 
-Git is the third module, and the only one that isn't in this window. The backend runs inside Kira
-Studio — spawn discipline, porcelain parsing, the paged log walk, pre-flight hazard analysis, every
-write — and the frontend is **Kira Version**, a VS Code extension that dials a Unix socket at
-`~/.kira-studio/git.sock`. Kira Studio's own window gets no git mode, tab or panel; its only
-git-facing surfaces are a *Connected editors* pane and a *Git* section in Settings. The `.vsix`
-ships inside the DMG rather than through the Marketplace, and installs from a button on that pane.
+- **Repository import** — import a git repository beside a database connection; it opens as its own
+  independent workspace, with its own isolated tab set.
+- **Project tree and file viewer** — every tracked/untracked-but-not-ignored file, opened read-only
+  into Monaco; refreshes on workspace open and on an explicit Refresh, not live.
+- **Diff tabs** — worktree-vs-HEAD diffs in Monaco's own diff editor.
+- **Code navigation** — go-to-definition and hover, backed by a tree-sitter code graph built in Go
+  and cached in SQLite; covers Java, Python, JavaScript, TypeScript/TSX, Go and Rust, plus
+  HTML/CSS/JSON/Svelte and Vue (parsed as an HTML container with per-block injection). Go-to-
+  implementation returns nothing for Go specifically — interfaces there are structural, and the
+  index doesn't yet capture a method's receiver type.
+- **Search** — in-file via Monaco's own find widget; repository-wide in Go, with streamed results
+  and no `ripgrep` subprocess.
+- **Quick Open (⌘P)** — a fuzzy file finder over the open repository.
+- **Git graph, natively** — the same `packages/git-ui` graph the VS Code extension uses, mounted as
+  each workspace's pinned first tab, with the code-review layer (inline AI-review gutter icons,
+  PR-review threads) alongside it.
+- **Inline git blame** — a per-line annotation over the file viewer, toggled by an Appearance
+  setting.
+- **Markdown reading view** — a rendered-Markdown toggle beside the raw view, per tab.
+- **Repo-map MCP server** — a local MCP server exposing the same code graph to an AI client (Claude
+  Code and similar), off by default and enabled per repository from Settings → Code intelligence.
+  The exact registration command is shown before the Install button, deliberately — enabling it is
+  never a silent action.
+
+## Git features
+
+The git backend runs inside Kira Studio — spawn discipline, porcelain parsing, the paged log walk,
+pre-flight hazard analysis, every write — and serves two frontends over it: a native **Git** module
+in this window (its own `AppMode`, with a pinned native graph tab and a native code-review layer,
+both described under Code intelligence above), and **Kira Version**, a VS Code extension that dials
+the same backend over a Unix socket at `~/.kira-studio/git.sock`. The `.vsix` ships inside the DMG
+rather than through the Marketplace, and installs from a *Connected editors* pane in Settings.
+
+The capabilities below are all backend capabilities, reachable from both frontends, except where
+noted: the native surface performs fetch/pull/push/force-push, undo, restack, stash and worktree
+operations, with a native credential prompt for HTTPS remotes, but conflict resolution, a worktree
+prepare script's shell execution, opening a worktree window, and setting the global git path stay
+extension-only for now.
 
 - **Commit graph** — a virtualized, lane-drawn log over the whole ref set, paged and streamed from
   the backend as binary FlatBuffers chunks; per-lane ref badges, a checked-out-HEAD indicator, and
@@ -209,10 +248,11 @@ Two limits worth knowing up front:
 - [Bun](https://bun.sh) — the package manager, script runner and test runner for the Vue frontend
   and its test suites. Bun is tooling only; nothing ships an embedded Node runtime.
 - Xcode command-line tools, for packaging.
-- **For the git module:** [Git](https://git-scm.com) 2.38 or newer on `PATH`, and
-  [VS Code](https://code.visualstudio.com) 1.134+ to install the bundled *Kira Version* extension
-  into. Optional: the [GitHub CLI](https://cli.github.com) (`gh`), already logged in, for PR links
-  — without it the PR indicator simply stays blank and nothing else changes.
+- **For the git module:** [Git](https://git-scm.com) 2.38 or newer on `PATH`. The native Git module
+  needs nothing beyond that. Optional: [VS Code](https://code.visualstudio.com) 1.134+, to install
+  the bundled *Kira Version* extension into as a second frontend, and the
+  [GitHub CLI](https://cli.github.com) (`gh`), already logged in, for PR links — without it the PR
+  indicator simply stays blank and nothing else changes.
 - **Optional, for the DB test suite and the local fixture stack:** [Colima](https://github.com/abiosoft/colima)
   with a running Docker-compatible daemon.
 
@@ -278,8 +318,10 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 | `bun run package` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage` runs `bun run setup` first, same as `dev`). The packaged `kira-version.vsix` is copied into the bundle *before* signing, so the signature covers it |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
-**App data:** the app keeps `kira.db`, `logs/`, the git module's own `review.db`, and its
-`git.sock`/`git.sock.lock` under `~/.kira-studio/`. The `KIRA_HOME` environment variable relocates
+**App data:** the app keeps `kira.db`, `logs/`, the git module's own `review.db`, `codeindex.db`
+(plus its `-wal`/`-shm`), its `git.sock`/`git.sock.lock`, the per-repository sync flocks
+`codeindex-sync-<12 hex>.lock`, and the repo-map MCP tokens `mcp-repo-map-*-token.json` under
+`~/.kira-studio/`. The `KIRA_HOME` environment variable relocates
 that whole directory — the test suite uses it to keep tests off a developer's real data, and the
 git socket follows it, so two `KIRA_HOME`s are two fully independent backends rather than two
 processes fighting over one socket.
@@ -341,37 +383,41 @@ Two facts worth knowing before reading further:
 - **Adapters are capability-driven** (`packages/shared/caps.ts`, mirrored by each Go adapter's own
   `caps.go`): adding an engine is one new package under `apps/kira-studio/internal/adapters/`, not
   a change to the UI.
-- **The git module is headless**, and is the one subsystem whose frontend is not this webview: it
-  runs in the same Go binary as a peer to Studio and Api (`apps/kira-studio/internal/git*`), and a
-  separately-installed VS Code extension process reaches it over a Unix socket
+- **The git backend runs in the same Go binary as a peer to Studio and Api**
+  (`apps/kira-studio/internal/git*`), serving two frontends: the native **Git** module in this
+  window, and a separately-installed VS Code extension process reaching it over a Unix socket
   (`~/.kira-studio/git.sock`) rather than through either plane above.
 
 Top-level layout — `apps/` holds this and any future Wails app; `packages/` holds source shared
 across apps:
 
 ```
-apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops, git
+apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops, git, code intelligence (codeparse/codeindex/codegraph/codeworkspace/repomap), the update checker
+apps/kira-studio/cmd/kira-repo-map  the headless repo-map MCP binary — the repo's only other `main` package
 apps/kira-studio/frontend/src    the Vue 3 app (bindings + the built bundle live alongside it, both gitignored)
 apps/kira-studio/tests/unit      unit suite — no external resource
 apps/kira-studio/tests/ui        Playwright against the built bundle, WebKit, both wire planes mocked
 apps/kira-studio/tests/ipc       per-adapter IPC-boundary suite — real Go backend + mocked-IPC frontend
 apps/kira-studio/tests/e2e-real  Playwright against a real `-tags server` Go binary
-apps/kira-studio-vscode          the Kira Version VS Code extension — the git module's only frontend
+apps/kira-studio-vscode          the Kira Version VS Code extension — the git module's second frontend
 packages/shared      wire protocol + domain types the Go side mirrors as its own source of truth
 packages/api-core    the Api module's DOM-free logic (substitution, curl/raw, dynamic values)
 packages/git-ipc     the git contract, RPC/codec/validation, the socket channel, the FlatBuffers schema
 packages/git-core    client-side git logic: commit store, lane layout, the client half of search, ports
-packages/git-ui      the git webview UI (graph panel, review panel), hosted by the extension
+packages/git-ui      the git graph/review UI, hosted by the extension and by the native Git module
 packages/kira-ui     host-agnostic Vue components shared by the workbench and the git webviews
 packages/db-fixtures shared fixture corpus (fixtures/support code, not a spec suite of its own)
-docs                 architecture, performance, packaging, design system; docs/v1.3 is the live record
+docs                 architecture, performance, packaging, design system; docs/v1.6 is the live record
 scripts/demo-dbs     local fixture databases for manual testing
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown,
-[`docs/v1.3/SPEC.md`](docs/v1.3/SPEC.md) for the git chapter, [`docs/v1.2/SPEC.md`](docs/v1.2/SPEC.md)
-for the completed Api chapter, and [`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) for the completed Studio
-chapter (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown, and
+[`docs/v1.6/SPEC.md`](docs/v1.6/SPEC.md) for the live chapter. Earlier chapters, oldest first:
+[`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) (Studio), [`docs/v1.2/SPEC.md`](docs/v1.2/SPEC.md) (Api),
+[`docs/v1.3/SPEC.md`](docs/v1.3/SPEC.md) (the headless git backend),
+[`docs/v1.4/SPEC.md`](docs/v1.4/SPEC.md) (reliability/tooling polish across existing modules), and
+[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence) — all completed
+(`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
 
 ## Documentation
 
@@ -382,9 +428,18 @@ chapter (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, the Wails bundle layout, verification
   checklist.
-- [`docs/v1.3/`](docs/v1.3/) — the git chapter's phasing record (see `docs/v1.3/README.md`):
-  [`SPEC.md`](docs/v1.3/SPEC.md) and [`plans/`](docs/v1.3/plans/), one implementation plan per
-  phase, G1 through G33.
+- [`docs/v1.6/`](docs/v1.6/) — **the live chapter** (see `docs/v1.6/README.md`): editor
+  consolidation onto Monaco, a dependency/runtime upgrade, native git-blame, and the repo-map MCP
+  server. [`SPEC.md`](docs/v1.6/SPEC.md) and [`plans/`](docs/v1.6/plans/), one implementation plan
+  per phase.
+- [`docs/v1.5/`](docs/v1.5/) — the completed code intelligence chapter's own phasing record (see
+  `docs/v1.5/README.md`): [`SPEC.md`](docs/v1.5/SPEC.md) and [`plans/`](docs/v1.5/plans/), phases
+  C1 through C14.
+- [`docs/v1.4/`](docs/v1.4/) — the completed reliability/tooling/polish chapter's own phasing record
+  (see `docs/v1.4/README.md`): [`SPEC.md`](docs/v1.4/SPEC.md) and [`plans/`](docs/v1.4/plans/).
+- [`docs/v1.3/`](docs/v1.3/) — the completed git-backend chapter's own phasing record (see
+  `docs/v1.3/README.md`): [`SPEC.md`](docs/v1.3/SPEC.md) and [`plans/`](docs/v1.3/plans/), one
+  implementation plan per phase, G1 through G34.
 - [`docs/v1.2/`](docs/v1.2/) — the completed Api chapter's own phasing record (see
   `docs/v1.2/README.md`): [`SPEC.md`](docs/v1.2/SPEC.md) and [`plans/`](docs/v1.2/plans/).
 - [`docs/v1.1/`](docs/v1.1/) — the completed Studio chapter's own phasing record (see
@@ -406,15 +461,14 @@ chapter (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
 Light mode; Windows/Linux; DDL editing; export to
 CSV/JSON; connection folders; split editor groups; SSH tunneling (planned for
 v2); code signing/notarization. **Auto-update is deliberately absent and verified as such** — see
-[`docs/PACKAGING.md`](docs/PACKAGING.md) §7. SQL-table writes (add-row, delete-row, cell-edit) are
-staged as pending changes with a preview; MongoDB/Redis/Kafka/SQS/S3 writes are capability-gated
-per engine (see the table above) and execute immediately, with no staging or preview; S3
-additionally gets upload/download of a whole object via a native OS file dialog, not a value the
-staging model can show inline.
+[`docs/PACKAGING.md`](docs/PACKAGING.md) §7; the app does check GitHub for a newer release and
+shows a status-bar banner linking to the releases page, but downloads and installs nothing. SQL-table
+writes (add-row, delete-row, cell-edit) are staged as pending changes with a preview;
+MongoDB/Redis/Kafka/SQS/S3 writes are capability-gated per engine (see the table above) and execute
+immediately, with no staging or preview; S3 additionally gets upload/download of a whole object via
+a native OS file dialog, not a value the staging model can show inline.
 
-On the git side: **no git mode, tab or panel inside Kira Studio's own window** — the module is
-headless by design, and the transport layer is built so an embedded UI would be additive rather
-than a rework. The extension is **not published to the VS Code Marketplace or OpenVSX**; it ships
+On the git side: the extension is **not published to the VS Code Marketplace or OpenVSX**; it ships
 in the DMG and installs from the *Connected editors* pane.
 
 ## License
