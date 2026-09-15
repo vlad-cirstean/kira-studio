@@ -28,6 +28,10 @@ const MARKDOWN_TEXT = [
   '- two',
   '- three',
   '',
+  '```ts',
+  'const x = 1;',
+  '```',
+  '',
   ...Array.from(
     { length: 80 },
     (_, i) => `Paragraph line ${i + 1} of filler text to force scroll.`,
@@ -103,6 +107,17 @@ test('a repo workspace: a markdown file opens on Source with a Reading toggle, a
   await expect(markdown.locator('ul li')).toHaveCount(3);
   await expect(editor).toBeAttached();
   await expect(editor).toBeHidden();
+
+  // P73 §7/§8: a fenced code block's font-size matches Monaco's own exactly — the root cause this
+  // phase fixed (the block used to inherit :deep(code)'s one-step-smaller --kira-t-sm).
+  const [preFontSize, viewLineFontSize] = await Promise.all([
+    markdown.locator('pre code').evaluate((el) => getComputedStyle(el).fontSize),
+    editor
+      .locator('.view-line')
+      .first()
+      .evaluate((el) => getComputedStyle(el).fontSize),
+  ]);
+  expect(preFontSize).toBe(viewLineFontSize);
 
   // Toggle back — the editor is visible again and its scroll position survived.
   await page.locator('[data-testid="repo-file-view-source"]').click();

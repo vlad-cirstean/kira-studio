@@ -539,6 +539,7 @@ test('a repo workspace: file-tree rows carry per-language icons, directories kee
           truncated: false,
         },
       },
+      readFileSnap('main.go', 'package main\n'),
     ],
   });
 
@@ -562,4 +563,11 @@ test('a repo workspace: file-tree rows carry per-language icons, directories kee
   const dirRow = treeRow(page, 'src');
   await expect(dirRow.locator('.codicon-folder, .codicon-folder-opened')).toHaveCount(1);
   await expect(dirRow.locator('.node-icon[style*="mask-image"]')).toHaveCount(0);
+
+  // P73 §2: opening main.go carries the same seti icon on its tab as on its tree row.
+  await treeRow(page, 'main.go').click();
+  const tabFileIcon = tab(page, 'repo-file').locator('.tab-file-icon');
+  await expect(tabFileIcon).toBeVisible();
+  expect(goStyle).not.toBeNull();
+  await expect(tabFileIcon).toHaveAttribute('style', goStyle as string);
 });
