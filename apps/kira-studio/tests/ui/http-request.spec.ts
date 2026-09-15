@@ -453,3 +453,60 @@ test('Http request — deleting a header row does not scroll (D16 guard)', async
   await expect(rows).toHaveCount(30);
   await expect(table.evaluate((el) => el.scrollTop)).resolves.toBe(0);
 });
+
+// P71 §11: the phase's own actual claim, stated as an assertion — toggling incognito then sending
+// carries `incognito: true` on the httpSend args, and no tabsSave call ever carries this tab, not
+// even the one the toggle itself fires (setIncognito's own on-transition flush, §3.1) to drop the
+// tab's existing row immediately.
+test('Http request — an incognito tab sends with incognito:true and is never in a tabsSave', async ({
+  relaunch,
+}) => {
+  const RESPONSE_BODY = '{"ok":true}';
+  const JSON_RESPONSE = {
+    status: 200,
+    statusText: 'OK',
+    proto: 'HTTP/1.1',
+    headers: [],
+    body: RESPONSE_BODY,
+    bodyEncoding: 'utf8',
+    bodyBytes: RESPONSE_BODY.length,
+    bodyTruncated: false,
+    elapsedMs: 5,
+    finalUrl: 'https://api.example.com/ping',
+    redirects: [],
+  };
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: JSON_RESPONSE }];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewRequest(page);
+  const tabId = await page.locator('[data-testid="tab"]').first().getAttribute('data-tab-id');
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/ping');
+
+  // Everything up to here is ordinary, persisted tab activity — the assertion below is scoped to
+  // what happens *after* the toggle (the phase's own "prospective, not retroactive" rule, §3.1),
+  // not to the tab's whole history in this test.
+  const savesBeforeToggle = control.log().filter((e) => e.channel === IPC.tabsSave).length;
+
+  await page.click('[data-testid="http-incognito-toggle"]');
+  await expect(page.locator('[data-testid="http-incognito-chip"]')).toBeVisible();
+
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
+  expect(sendCalls).toHaveLength(1);
+  expect(sendCalls[0].args).toMatchObject({ incognito: true });
+
+  // Not "no tabsSave at all" — turning incognito on itself fires one immediately (setIncognito's
+  // own on-transition flush) to drop the tab's existing row right away. The claim is that none of
+  // those calls, from the toggle on, ever carries this tab.
+  const savesAfterToggle = control
+    .log()
+    .filter((e) => e.channel === IPC.tabsSave)
+    .slice(savesBeforeToggle);
+  expect(savesAfterToggle.length).toBeGreaterThan(0);
+  for (const save of savesAfterToggle) {
+    const args = save.args as { tabs: { id: string }[] };
+    expect(args.tabs.some((t) => t.id === tabId)).toBe(false);
+  }
+});
