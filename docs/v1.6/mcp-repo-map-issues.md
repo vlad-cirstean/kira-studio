@@ -358,10 +358,23 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   the still-open entry below; planning reproduced it 3 of 4 isolated runs on `28edadc7` and the fix
   is specified in `docs/v1.6/plans/P69c-codeparse-cancel-crash.md`, unimplemented as of this commit.
 
+- **P69d (implementation)**: no server running at session start (`ConnectionRefused`, expected).
+  Built (`bun run mcp:repo-map:build`), deleted the one stale hashed token file under
+  `/root/.kira-studio/`, started fresh (`setsid nohup … & disown`, surviving past the launching
+  call), called it over plain HTTP/JSON-RPC throughout. Note for a future session, alongside P69c's
+  own: **this pass the server bound the documented `8765`**, not a random high port — P69c's own
+  pass saw 46717 (and 38721 before that). The port genuinely varies run to run in either direction,
+  so it must always be read off the startup line, never assumed to be `8765` *or* assumed to be
+  random. Used `find_references`/`find_definition` throughout implementation and for the mandatory
+  post-Commit-4 verification pass (every row of the plan's own §A.5 measured-expected table and §A.6
+  regression-guard table, re-run live against a rebuilt server) — see the two closed non-trivial
+  entries below for what was found and fixed. No new non-trivial finding beyond what this phase's
+  own two gated entries already covered.
+
 ### Non-trivial
 
 - **P69c (planning) — `find_references`'s `file` argument does not scope results to the definition
-  in that file. Open.**
+  in that file. Fixed (`ad22273a`, `dd634743`, `fd4cf1fa`, `33205b96`).**
 
   Found while navigating `internal/codeparse` during P69c's planning pass, against a freshly started
   server on a warm index of this worktree. `file` (with or without `line`) is the documented way to
@@ -398,8 +411,42 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   investigated further — out of P69c's scope, which is the `codeparse` crash, and per the process
   above this pass reports rather than fixes.
 
+  A sixth facet, found during P69d's own implementation pass while verifying the remedy message
+  this entry's `no references found` answers point a caller at (`mode "nameOnly"`, commit 2's own
+  fix): `find_references`'s `mode` schema documents `"name_only"`, but the code only ever compared
+  against `"nameOnly"` — the documented spelling, and every other unrecognized value, silently fell
+  back to `resolved` instead of erroring (`"nameOnly"` → 43, `"name_only"` → 13, `"zzz"` → silently
+  `resolved`). Same defect class as the `languages` case-sensitivity facet above, same tool. Closed
+  by the same commit that closed `languages` (`33205b96`, below).
+
+  **Fix (P69d, `docs/v1.6/plans/P69d-find-references-scoping-and-pointer-leak.md`)**: four commits,
+  root-caused to six facets across three distinct bugs plus three argument-handling defects.
+  `ad22273a` sets the locator's `Query.Name` from `symbol` unconditionally (not only when `line` is
+  absent) and gives `resolveHit` a row-scoped fallback (symbol before reference, pinned to the name
+  when given) for when a defaulted or missing byte column misses every exact name span — closes the
+  under-matching repro and the `find_definition "no definitions found for \"\""` case. `dd634743`
+  stops discarding the `Confidence` `resolveName` already computes: a reference group that resolves
+  repository-wide with more than one candidate now carries no locality evidence and is reported as
+  unattributed rather than guessed, closing the `Parse` over-matching case (38 → 13 attributed + a
+  new closing note naming the other 25) while a singleton repo-wide definition (`Forget`) keeps its
+  full recall unchanged. `fd4cf1fa` replaces the locator's own symbol-alone lookup with a new
+  `codegraph.SymbolsNamed` (an exact-name index read) in place of a ranked, limit-capped prefix
+  search, closing the `languages`-widens-its-own-result case (`Close` 25 → 35, the true count).
+  `33205b96` adds `codeparse.KnownIDs` as the one language vocabulary and validates `languages`
+  (case-insensitive, rejecting an unknown value with the full vocabulary named) and `mode` (both
+  spellings of `nameOnly`, rejecting anything else) instead of silently ignoring either.
+
+  Verified live against a rebuilt server (`bun run mcp:repo-map:build`, `mcp:repo-map` restarted;
+  no query file touched, so no reindex was triggered — the change is read-time resolution logic
+  only) on the identical warm index this entry's own repro used: every row in the plan's own §A.5
+  measured-expected table and §A.6 regression-guard table (P69b's six `read` cases, its three
+  precision guards, P67f's/P67e's read cases, P68b's and P64's own guards) matched the plan's stated
+  numbers exactly, including the `find_definition` header now echoing the resolved target's own
+  name-span column (`session.go:199:19`) rather than the defaulted column the resolver never used.
+
 - **P69c (planning) — `go-tree-sitter` v0.25.0 leaks a `go-pointer` registry entry on every
-  `ParseWithOptions` call. Open.**
+  `ParseWithOptions` call. Investigated, not fixable in this phase; tracked as a known open item
+  (`edfdf530`).**
 
   Read out of the pinned module source while establishing the C cancellation contract for this
   phase's own fix; not found by calling the MCP server, but logged here because it sits in the
@@ -423,6 +470,31 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   upgrade to; closing it means either an upstream fix or not passing `*ParseOptions` at all. P69c's
   own commit 2 (skip a parse whose context is already cancelled) reduces the call rate slightly but
   does not address this. Not investigated further — out of P69c's scope.
+
+  **Correction (P69d) — the magnitude above was high.** Measured directly against a probe build
+  (`docs/v1.6/plans/P69d-find-references-scoping-and-pointer-leak.md` §B.5), the real figure is one
+  entry per file parsed, not "10^4-10^5 permanently retained entries per full repository index": a
+  full index of this repository (1,878 files) leaks 1,878 entries ≈ 0.14 MiB of Go heap / 0.43 MiB
+  RSS — roughly two orders of magnitude smaller per index than originally logged, though still
+  genuinely unbounded across a process's repeated re-indexes and watcher reparses. The "retains the
+  caller's ctx" alarm above also overstated it: `codeindex/sync.go` passes one `context.Context` for
+  a whole sync, not one per parse, so the retained closures share that one context, not thousands.
+
+  **Investigated, not fixable in this phase (P69d, `edfdf530`).** A pooled/shared-`ParseOptions`
+  workaround was built and measured, not just estimated: `mattn/go-pointer`'s `Save` mints a fresh
+  key (`C.malloc(1)` plus a map entry) on every call regardless of the value passed in, so reusing
+  one `*ParseOptions` struct across calls cannot bound the registry — measured 43.7 B/parse of Go
+  heap growth versus 75.6 B/parse today (42% less), still unbounded either way. Making it correct
+  (one options struct per pooled parser, with per-parse cancellation state published to and cleared
+  from an atomic on that parser, since `Session` parses concurrently and a single process-wide
+  shared struct would let one cancelled context abort every in-flight parse) means rewriting the
+  per-parse cancellation handoff P69c had just stabilised (`84fb06f8`/`d2fab09f`/`71ac6d04`), for a
+  leak that would still be unbounded afterward — declined as the wrong trade. Passing `options: nil`
+  removes the leak completely but also removes the only mid-parse cancellation mechanism this
+  codebase has (the deprecated cancellation-flag path is a guaranteed SIGSEGV, per P69's own
+  investigation) — not acceptable. Recorded as a known open item with the corrected magnitude in
+  `docs/ARCHITECTURE.md`'s "Known open items" section rather than forced; that entry is the durable
+  record going forward, not this one.
 
 - **P69b (planning) — `TestParseConcurrentCancellationDoesNotCrash` aborts the whole `codeparse`
   test binary on a tree-sitter C assertion. Fixed (`84fb06f8`).**
