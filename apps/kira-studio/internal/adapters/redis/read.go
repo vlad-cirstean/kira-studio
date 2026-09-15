@@ -121,6 +121,11 @@ func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, red
 	}
 
 	builder := page.NewKeyValuePageBuilder(redisType, meta.ttlMs, meta.memoryBytes, false)
+	if pairSize == 1 {
+		// A set has no natural per-row key (readScanFamily's own doc comment above) — Field here is
+		// a synthetic running display index, never a genuine identifier a mask rule could match.
+		builder.SetFieldsAreColumns(false)
+	}
 	rowCount := 0
 	exhausted := false
 
@@ -204,6 +209,7 @@ func readList(ctx context.Context, conn *goredis.Client, key string, meta keyMet
 	}
 
 	builder := page.NewKeyValuePageBuilder("list", meta.ttlMs, meta.memoryBytes, false)
+	builder.SetFieldsAreColumns(false) // a list index is positional, never a genuine field identifier
 	for i, value := range elements {
 		builder.Push(strconv.Itoa(offset+i), value)
 	}
@@ -323,6 +329,10 @@ func readStream(ctx context.Context, conn *goredis.Client, key string, meta keyM
 	}
 
 	builder := page.NewKeyValuePageBuilder("stream", meta.ttlMs, meta.memoryBytes, false)
+	// Field here is the entry id, not a real field identifier, and Value is a JSON blob of every
+	// field/value pair in the entry together — a single column_name rule can't address one field
+	// inside it, the same reason a genuine DocumentPage refuses outright when rules exist.
+	builder.SetFieldsAreColumns(false)
 	var lastID string
 	for _, rawEntry := range kept {
 		id, fields, err := parseStreamEntry(rawEntry)

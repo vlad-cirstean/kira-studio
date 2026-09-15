@@ -358,6 +358,17 @@ func newMaskRenameRefusedError(column string) error {
 	)}
 }
 
+// newMaskColumnlessKeyValueRefusedError is renderKeyValuePage's own refusal (finding #3, M7): a
+// keyvalue page whose Field values carry no genuine per-entry identifier (page.KeyValuePage's own
+// FieldsAreColumns=false — a Redis list/set's synthetic display index, a stream entry id, a
+// generic console reply with no per-command shape) can never be checked against a mask rule at
+// all: RuleFor/ApplyColumn would just never match, passing the real value straight through while
+// list_connections still reports the connection as protected. Same fail-closed posture as the
+// document/stream page refusal above: refuse outright rather than silently skip masking.
+func newMaskColumnlessKeyValueRefusedError() error {
+	return &maskingRefusedError{msg: "this connection has PII masking rules, which cannot be applied to this result — it carries no real per-entry field name a mask rule's column could match (e.g. a list/set display index, a stream entry id, or a command reply with no per-command field shape); re-read it through a command whose reply names real fields (e.g. HGET/HMGET/HGETALL on a hash), or remove the rules in the connection's Privacy tab"}
+}
+
 // renderPage projects one page.Page into its own JSON-ready envelope, capped at maxRows. plan is
 // run_query's own auto-force-explain result (nil when auto-force-explain is off, the statement
 // was not explainable, or the plan-only EXPLAIN failed) — M5's own seam (M1 §9), now taking a plan
@@ -383,6 +394,9 @@ func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statem
 		r.Plan = plan
 		return r, nil
 	case page.KeyValuePage:
+		if mk != nil && !mk.Empty() && !pg.FieldsAreColumns {
+			return nil, newMaskColumnlessKeyValueRefusedError()
+		}
 		r := renderKeyValuePage(pg, maxRows, mk)
 		r.Plan = plan
 		return r, nil

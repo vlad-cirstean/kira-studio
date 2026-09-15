@@ -222,6 +222,14 @@ type KeyValuePage struct {
 	RowCount    int
 	ByteSize    int
 	FetchedAt   int64
+	// FieldsAreColumns reports whether Fields carries genuine per-value identifiers a mask rule's
+	// column_name could legitimately match (a hash field, a string key's fixed "value" name, an S3
+	// metadata key) — true by default. False for a shape with no real per-entry field concept (a
+	// Redis list/set's synthetic display index, a stream entry id, a generic console reply with no
+	// per-command shape): dbmcp's own renderKeyValuePage (finding #3, M7) refuses to apply mask
+	// rules to such a page rather than silently pass a real value through under a Field no rule
+	// could ever legitimately match by construction.
+	FieldsAreColumns bool
 }
 
 func (KeyValuePage) PageKind() PageKind { return PageKindKeyValue }
@@ -230,13 +238,14 @@ func (p KeyValuePage) Rows() int        { return p.RowCount }
 
 // KeyValuePageBuilder mirrors page.ts's KeyValuePageBuilder.
 type KeyValuePageBuilder struct {
-	redisType     string
-	ttlMs         *int64
-	memoryBytes   *int64
-	valueMaxBytes int
-	fields        *columnScratch
-	values        *columnScratch
-	rowCount      int
+	redisType        string
+	ttlMs            *int64
+	memoryBytes      *int64
+	valueMaxBytes    int
+	fields           *columnScratch
+	values           *columnScratch
+	rowCount         int
+	fieldsAreColumns bool
 }
 
 // NewKeyValuePageBuilder mirrors page.ts's createKeyValuePageBuilder.
@@ -248,7 +257,16 @@ func NewKeyValuePageBuilder(redisType string, ttlMs, memoryBytes *int64, singleR
 	return &KeyValuePageBuilder{
 		redisType: redisType, ttlMs: ttlMs, memoryBytes: memoryBytes, valueMaxBytes: valueMaxBytes,
 		fields: newColumnScratch(), values: newColumnScratch(),
+		fieldsAreColumns: true, // default: Field values are genuine, mask-rule-matchable identifiers
 	}
+}
+
+// SetFieldsAreColumns overrides the default (see KeyValuePage.FieldsAreColumns's own doc comment)
+// — call with false when this page's Field values are synthetic display artifacts rather than a
+// genuine per-value identifier.
+func (b *KeyValuePageBuilder) SetFieldsAreColumns(v bool) *KeyValuePageBuilder {
+	b.fieldsAreColumns = v
+	return b
 }
 
 func (b *KeyValuePageBuilder) Push(field, value string) {
@@ -265,6 +283,7 @@ func (b *KeyValuePageBuilder) Finish(position PagePosition) KeyValuePage {
 		Kind: PageKindKeyValue, Position: position, RedisType: b.redisType, TTLMs: b.ttlMs, MemoryBytes: b.memoryBytes,
 		Fields: fields, Values: values, RowCount: b.rowCount,
 		ByteSize: ChunkByteSize(fields) + ChunkByteSize(values), FetchedAt: nowEpochMs(),
+		FieldsAreColumns: b.fieldsAreColumns,
 	}
 }
 

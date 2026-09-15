@@ -499,3 +499,36 @@ func TestRenderKeyValuePageMasksByFieldName(t *testing.T) {
 		t.Fatalf("Entries[1] = %+v, want both fields unchanged (no matching rule)", rendered.Entries[1])
 	}
 }
+
+// TestRenderPageRefusesColumnlessKeyValuePage is finding #3 (M7): a keyvalue page whose Field
+// values carry no real per-entry identifier (page.KeyValuePage.FieldsAreColumns=false — a Redis
+// list/set's synthetic display index, a generic console reply with no per-command shape) must be
+// refused when the connection has active mask rules, never silently rendered unmasked under a
+// Field no rule could ever legitimately match — the same fail-closed posture as the document/
+// stream page refusal above.
+func TestRenderPageRefusesColumnlessKeyValuePage(t *testing.T) {
+	set := mask.Set{Masker: mask.New(nil), Rules: map[string]mask.Rule{"email": {Kind: mask.KindRedact}}}
+
+	b := page.NewKeyValuePageBuilder("set", nil, nil, false)
+	b.SetFieldsAreColumns(false)
+	b.Push("0", "person@example.com")
+	pg := b.Finish(page.UnpagedPosition(1))
+
+	if _, err := renderPage(pg, 200, nil, &set, "SMEMBERS emails"); err == nil {
+		t.Fatal("renderPage(columnless keyvalue page, rules exist) = nil error, want a refusal")
+	}
+
+	// No rules at all: renders normally, unaffected.
+	if _, err := renderPage(pg, 200, nil, nil, "SMEMBERS emails"); err != nil {
+		t.Fatalf("renderPage(columnless keyvalue page, no rules) = %v, want no error", err)
+	}
+
+	// A page whose fields ARE real columns (the default) is unaffected by this refusal, even with
+	// rules active — columnRules/ApplyColumn's own per-entry match still applies normally.
+	hb := page.NewKeyValuePageBuilder("hash", nil, nil, false)
+	hb.Push("email", "person@example.com")
+	hashPage := hb.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(hashPage, 200, nil, &set, "HGETALL user:1"); err != nil {
+		t.Fatalf("renderPage(hash keyvalue page, real field names) = %v, want no error", err)
+	}
+}
