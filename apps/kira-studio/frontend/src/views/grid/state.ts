@@ -80,10 +80,15 @@ export { runtime, setSearchOpen, toggleSearchOpen };
  *  nothing downstream (the toolbar's disabled toggle, DataView.vue's edit-action gating,
  *  SlickGridHost's own "no insert row while masked" assumption) was written to handle. Centralizing
  *  the guard here means no caller, menu or toolbar or otherwise, can ever turn preview on while a
- *  change is pending — the one place this invariant needs to hold. */
-export function setMaskPreview(tabId: string, on: boolean): void {
-  if (on && hasPending(tabId)) return;
+ *  change is pending — the one place this invariant needs to hold.
+ *
+ *  Returns whether preview actually turned on (or off) — `on && hasPending` is the one case it
+ *  didn't (M7 finding): `markColumnMaskKind` silently swallowed that outcome, so a column marked
+ *  PII while an edit was staged looked like nothing happened at all, with no feedback anywhere. */
+export function setMaskPreview(tabId: string, on: boolean): boolean {
+  if (on && hasPending(tabId)) return false;
   ensureRuntime(tabId).maskPreview = on;
+  return true;
 }
 export function toggleMaskPreview(tabId: string): void {
   const rt = ensureRuntime(tabId);

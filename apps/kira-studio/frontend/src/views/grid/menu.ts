@@ -21,7 +21,7 @@ import {
   stageDelete,
   stageNull,
 } from './pendingChanges';
-import { setFilter, setMaskPreview, setProjection, setSort } from './state';
+import { setActionError, setFilter, setMaskPreview, setProjection, setSort } from './state';
 
 // F1/P21 round 1: the pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
 // the table/view's primary-key columns, which is empty for any relation with no primary key (every
@@ -516,8 +516,13 @@ async function markColumnMaskKind(ctx: HeaderMenuContext, kind: MaskKind): Promi
     correlate: defaultCorrelateFor(kind),
   });
   // §6.7: "the effect is immediately visible" — toggling preview on for this tab is what makes
-  // marking a column PII feel like it did something, right where the user was looking.
-  setMaskPreview(ctx.tabId, true);
+  // marking a column PII feel like it did something, right where the user was looking. Blocked
+  // only while an edit or insert row is staged (setMaskPreview's own pending-changes guard); the
+  // rule itself is still saved either way, so say why the preview did not also turn on rather than
+  // leaving it looking like the menu action had no effect (M7 finding).
+  if (!setMaskPreview(ctx.tabId, true)) {
+    setActionError(ctx.tabId, 'Marked as PII. Commit or discard pending changes to preview it.');
+  }
 }
 
 async function clearColumnMask(ctx: HeaderMenuContext): Promise<void> {
