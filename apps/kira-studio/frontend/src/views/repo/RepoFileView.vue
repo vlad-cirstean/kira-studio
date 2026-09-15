@@ -3,7 +3,7 @@
 // separate stand-in file view ever ships in between).
 import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
@@ -11,12 +11,16 @@ import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
 import { patchRepoFileTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
+import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnotation';
 import { registerEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
+import { renderMarkdownReading } from './markdownReading';
 import { getOrCreateModel, loadMonaco, REPO_THEME_NAME, repoFileUri } from './monaco';
 import { ensureNavigationRegistered } from './navigation';
 import { consumeReveal } from './reveal';
+
+type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
 
@@ -24,6 +28,58 @@ type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'missing' | 'erro
 const state = ref<ViewState>('loading');
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
+const readingPane = ref<HTMLElement | null>(null);
+let editorInstance: StandaloneEditor | null = null;
+
+// D11: only true `markdown` (§2.3's `.md`/`.markdown`/`.mdown`/… — never `.mdx`, which colors as
+// its own Monaco language) grows a toolbar at all; every other file type stays byte-identical to
+// before this phase. D12: opens on Source, like every other file type — a reading view is opt-in,
+// restored per tab from `markdownReading`.
+const isMarkdown = computed(() => monacoLanguageFor(props.tab.path) === 'markdown');
+const view = ref<'source' | 'reading'>(props.tab.state.markdownReading ? 'reading' : 'source');
+const fileText = ref('');
+const renderedHtml = ref<string | null>(null);
+const VIEW_OPTIONS = [
+  { value: 'source' as const, label: 'Source', testid: 'repo-file-view-source' },
+  { value: 'reading' as const, label: 'Reading', testid: 'repo-file-view-reading' },
+];
+
+// D11: rendered lazily on first switch to Reading, then cached — a markdown file opened and never
+// toggled never pays `markdown-it`'s import cost, and a plain read-only view is re-rendered at most
+// once (its source text never changes underneath it).
+async function ensureMarkdownRendered(): Promise<void> {
+  if (renderedHtml.value !== null || !fileText.value) return;
+  renderedHtml.value = await renderMarkdownReading(fileText.value);
+}
+
+function onViewChange(next: 'source' | 'reading'): void {
+  view.value = next;
+  patchRepoFileTabState(props.tab.id, { markdownReading: next === 'reading' });
+  if (next === 'reading') {
+    void ensureMarkdownRendered();
+  } else {
+    // `automaticLayout: true` re-measures off a ResizeObserver, which does fire when `v-show`
+    // brings the container back from `display: none` — this is a deliberate belt-and-braces call,
+    // never observed to be necessary, cheap enough to always make on the one action that toggles it.
+    editorInstance?.layout();
+  }
+}
+
+// D13: every anchor click is neutralised — there is no back button in this webview, so an
+// accidental navigation would strand the user with no way home short of a restart. A same-page
+// `#anchor` link still scrolls (to a heading `renderMarkdownReading`'s own slugger id'd); anything
+// else is left inert, its target already surfaced through the link's own `title` (set at render
+// time), never actually opened — see the plan's own §5.4/§1.7 for why that stays out of this phase.
+function onReadingClick(event: MouseEvent): void {
+  const anchor = (event.target as HTMLElement).closest('a');
+  if (!anchor) return;
+  event.preventDefault();
+  const href = anchor.getAttribute('href');
+  if (!href?.startsWith('#')) return;
+  const id = decodeURIComponent(href.slice(1));
+  if (!id) return;
+  readingPane.value?.querySelector(`#${CSS.escape(id)}`)?.scrollIntoView({ block: 'start' });
+}
 
 let disposeCursorSub: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
@@ -54,6 +110,11 @@ async function mount(): Promise<void> {
   if (content.kind !== 'found') {
     state.value = content.kind;
     return;
+  }
+  // D11: held on a ref (not only handed to the model below) so the reading view can render it too.
+  fileText.value = content.text;
+  if (isMarkdown.value && view.value === 'reading') {
+    void ensureMarkdownRendered();
   }
 
   const mod = await loadMonaco();
@@ -92,6 +153,7 @@ async function mount(): Promise<void> {
     fontSize: settingsState.appearance.fontSize,
   });
   registerEditor(props.tab.id, uri, editor);
+  editorInstance = editor;
 
   // P62 §4.1: attached after the editor exists, guarded on the setting and on whether this
   // window has a git record for the repository at all (`gitRepoIdFor`'s own "never guessed"
@@ -181,6 +243,7 @@ onUnmounted(() => {
   blameHandle?.dispose();
   blameHandle = null;
   unmountEditor(props.tab.id);
+  editorInstance = null;
 });
 
 // Remounting into the same tab (switching back) re-runs mount(), which reuses the cached model —
@@ -188,12 +251,32 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-if="state === 'loading' || state === 'found'"
-    ref="container"
-    class="monaco-host"
-    data-testid="repo-file-editor"
-  />
+  <template v-if="state === 'loading' || state === 'found'">
+    <div v-if="isMarkdown" class="repo-file">
+      <div class="p-toolbar last">
+        <SegmentedControl
+          :model-value="view"
+          :options="VIEW_OPTIONS"
+          data-testid="repo-file-view-toggle"
+          @update:model-value="onViewChange"
+        />
+      </div>
+      <!-- D11: `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
+           toggle, only hidden, so scroll position/selection/find state survive a round trip. -->
+      <div v-show="view === 'source'" ref="container" class="monaco-host" data-testid="repo-file-editor" />
+      <!-- D11: `markdown-it`'s `html: false` (markdownReading.ts) escapes any literal HTML tag in
+           the source, so this is the one `v-html` in this view that's safe. -->
+      <div
+        v-if="view === 'reading'"
+        ref="readingPane"
+        class="md-reading"
+        data-testid="repo-file-markdown"
+        v-html="renderedHtml"
+        @click="onReadingClick"
+      />
+    </div>
+    <div v-else ref="container" class="monaco-host" data-testid="repo-file-editor" />
+  </template>
   <EmptyState
     v-else-if="state === 'binary'"
     icon="file-binary"
@@ -212,5 +295,113 @@ onUnmounted(() => {
 .monaco-host {
   height: 100%;
   width: 100%;
+}
+
+/* D11: column flex only when a markdown file grows the Source/Reading toolbar — every other file
+   type keeps the single unwrapped .monaco-host above, byte-identical to before this phase. */
+.repo-file {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+.repo-file .monaco-host {
+  flex: 1;
+  min-height: 0;
+}
+
+/* D14: every value below is an existing --kira-* token — no new literal. Tailwind's preflight
+   zeroes margin/padding on `*` and list-style on lists, so every block element below restates its
+   own spacing; that is expected here, not a workaround. */
+.md-reading {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--kira-s-6);
+  font-family: var(--kira-font-ui);
+  font-size: var(--kira-t-md);
+  line-height: 1.6;
+  color: var(--kira-fg);
+  background: var(--kira-bg);
+}
+.md-reading :deep(> *) {
+  max-width: 72ch;
+}
+.md-reading :deep(h1),
+.md-reading :deep(h2),
+.md-reading :deep(h3),
+.md-reading :deep(h4),
+.md-reading :deep(h5),
+.md-reading :deep(h6) {
+  margin: var(--kira-s-6) 0 var(--kira-s-3);
+  font-weight: 600;
+  line-height: 1.3;
+}
+.md-reading :deep(h1) {
+  padding-bottom: var(--kira-s-3);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.md-reading :deep(p) {
+  margin: 0 0 var(--kira-s-4);
+}
+.md-reading :deep(ul),
+.md-reading :deep(ol) {
+  margin: 0 0 var(--kira-s-4);
+  padding-left: var(--kira-s-6);
+  list-style: revert;
+}
+.md-reading :deep(li) {
+  margin: var(--kira-s-1) 0;
+}
+.md-reading :deep(a) {
+  color: var(--kira-info);
+  cursor: pointer;
+}
+.md-reading :deep(blockquote) {
+  margin: 0 0 var(--kira-s-4);
+  padding: 0 var(--kira-s-4);
+  border-left: 3px solid var(--kira-border);
+  color: var(--kira-fg-muted);
+}
+.md-reading :deep(hr) {
+  margin: var(--kira-s-6) 0;
+  border: none;
+  border-top: var(--kira-border-width) solid var(--kira-border);
+}
+.md-reading :deep(code) {
+  font-family: var(--kira-font-data);
+  font-size: var(--kira-t-sm);
+  background: var(--kira-bg-input);
+  border-radius: var(--kira-radius-sm);
+  padding: 0.1em 0.35em;
+}
+.md-reading :deep(pre) {
+  margin: 0 0 var(--kira-s-4);
+  padding: var(--kira-s-4);
+  overflow: auto;
+  background: var(--kira-bg-input);
+  border-radius: var(--kira-radius-sm);
+  max-width: none;
+}
+.md-reading :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+.md-reading :deep(table) {
+  margin: 0 0 var(--kira-s-4);
+  border-collapse: collapse;
+  max-width: none;
+}
+.md-reading :deep(th),
+.md-reading :deep(td) {
+  padding: var(--kira-s-2) var(--kira-s-4);
+  border: var(--kira-border-width) solid var(--kira-border);
+  text-align: left;
+}
+.md-reading :deep(thead) {
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+.md-reading :deep(img) {
+  max-width: 100%;
 }
 </style>

@@ -271,8 +271,12 @@ export type RepoGraphTabState = z.infer<typeof repoGraphTabStateSchema>;
 // was showing — restored on mount and re-patched (debounced) as the user scrolls, mirroring
 // DataTabState's own scrollTop. `.default(null)` keeps a tab saved before this field existed
 // restorable, the same discipline every other added tab-state field follows.
+// P67c D12: source is the default for every file type this app opens, markdown included — a
+// reading view is opt-in per tab, not the other way round. `.default(false)` follows revealLine's
+// own discipline: a tab saved before this field existed restores as 'source', same as today.
 export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
   revealLine: z.number().int().min(1).nullable().default(null),
+  markdownReading: z.boolean().default(false),
 });
 export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
 
@@ -497,7 +501,7 @@ export function defaultRepoGraphTabState(): RepoGraphTabState {
 }
 
 export function defaultRepoFileTabState(revealLine: number | null = null): RepoFileTabState {
-  return { revealLine };
+  return { revealLine, markdownReading: false };
 }
 
 /**
