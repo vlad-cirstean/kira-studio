@@ -32,3 +32,62 @@ body {
   width: 100%;
   overflow: hidden;
 }
+
+/*
+ * P67c D8: the 14 raw `<input type="checkbox">` elements across 9 dialogs (RepoSettingsDialog x4,
+ * StashDialog x2, TagDialog x2, BranchDialog, RevertDialog, WorktreeDialog, CherryPickDialog,
+ * ForcePushDialog, ResetDialog) had zero checkbox CSS anywhere in this package — each drew the
+ * platform's own native widget, visibly foreign against this app's own #1f1f1f palette. Scoped to
+ * `.kv-mount-root` (this file's own mount-root class, `main.ts`'s `mount()`) rather than a bare
+ * `input[type="checkbox"]` selector, so this can never reach into the host app's own `.p-check`.
+ *
+ * Visual parity with the host app's `.p-check` (apps/kira-studio/frontend/src/theme/
+ * primitives.css), not a second design: 14px box, 3px radius, 1px border, `appearance: none`.
+ * git-ui has no equivalent of `--kira-control-inline-h` — 14px is a literal here, named after that
+ * source. Vocabulary is `--kv-*`/`--vscode-*` throughout, never `--kira-*`: this package also
+ * renders inside the VS Code extension host, which has no `--kira-*` token at all.
+ */
+.kv-mount-root input[type="checkbox"] {
+  appearance: none;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--kv-input-border);
+  background: var(--kv-input-bg);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.kv-mount-root input[type="checkbox"]:checked {
+  background: var(--kv-button-bg);
+  border-color: var(--kv-button-bg);
+}
+
+/* The codicon font's own check glyph (`@vscode/codicons/dist/codicon.css`'s own
+   `.codicon-check::before { content: "\eab2" }`) as a pseudo-element against the raw input itself
+   — no sibling element, so this is pure CSS against markup none of the 9 dialogs need to change. */
+.kv-mount-root input[type="checkbox"]:checked::after {
+  content: "\eab2";
+  font-family: "codicon", monospace;
+  font-size: 11px;
+  line-height: 1;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kv-button-fg);
+  pointer-events: none;
+}
+
+.kv-mount-root input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--kv-focus-border);
+  outline-offset: 1px;
+}
+
+.kv-mount-root input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
