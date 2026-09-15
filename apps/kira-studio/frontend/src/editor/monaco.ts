@@ -50,6 +50,23 @@ export const REPO_THEME_NAME = KIRA_EDITOR_THEME;
 // back out as `#rrggbb` on read — a general normalizer that subsumes the narrower hex-shorthand-only
 // fix this replaces, rather than special-casing named colours as a second regex.
 let normalizeCanvasCtx: CanvasRenderingContext2D | null | undefined;
+
+// D6 (P67c §3.2) — the alpha trap: a translucent token (`--kira-scrollbar: #79797966`, or a
+// `color-mix(… transparent)` token like `--kira-search-match`) comes back from the canvas
+// normalizer above as `rgba(r, g, b, a)`, never `#rrggbb`. `editor.defineTheme`'s `colors` values
+// go through `Color.fromHex` (`StandaloneTheme.getColors()`, standaloneThemeService.js), which
+// accepts only `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` and returns *red* — not an error — on anything
+// else. Re-encoding as 8-digit hex here, once, is what lets `defineKiraTheme` map a translucent
+// `--kira-*` token at all without silently painting a widget bright red.
+const RGBA_PATTERN = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/;
+function rgbaToHex8(rgba: string): string | undefined {
+  const match = RGBA_PATTERN.exec(rgba);
+  if (!match) return undefined;
+  const [, r, g, b, a] = match;
+  const byte = (n: number): string => Math.round(n).toString(16).padStart(2, '0');
+  return `#${byte(Number(r))}${byte(Number(g))}${byte(Number(b))}${byte(Number(a) * 255)}`;
+}
+
 export function normalizeColor(color: string): string {
   if (normalizeCanvasCtx === undefined) {
     normalizeCanvasCtx = document.createElement('canvas').getContext('2d');
@@ -57,7 +74,8 @@ export function normalizeColor(color: string): string {
   if (!normalizeCanvasCtx) return color; // no canvas 2D support — pass through rather than throw
   normalizeCanvasCtx.fillStyle = '#000000'; // known-good reset, so an invalid `color` leaves this
   normalizeCanvasCtx.fillStyle = color;
-  return normalizeCanvasCtx.fillStyle;
+  const normalized = normalizeCanvasCtx.fillStyle;
+  return rgbaToHex8(normalized) ?? normalized;
 }
 
 export function cssVar(name: string, fallback: string): string {
@@ -81,7 +99,17 @@ let overflowContainer: HTMLElement | undefined;
 export function overflowWidgetsContainer(): HTMLElement {
   if (!overflowContainer) {
     overflowContainer = document.createElement('div');
-    overflowContainer.className = 'kira-editor-overflow-widgets';
+    // D5 (P67c §3.1): every `--vscode-*` custom property Monaco defines is scoped to
+    // `.monaco-editor, .monaco-diff-editor, .monaco-component` (standaloneThemeService.js's own
+    // `_registerRegularEditorContainer`) — a plain `document.body` child carries none of them, so a
+    // widget reparented here (suggest/hover/parameter-hints) lost its whole palette: transparent
+    // background, unstyled text. Upstream's own convention is to put `monaco-editor` on exactly the
+    // node handed to `overflowWidgetsDomNode`
+    // (`multiDiffEditorWidgetImpl.js`'s `h('div.monaco-editor@overflowWidgetsDomNode', {})`), so this
+    // does the same rather than inventing a fourth scope. The app-owned class stays first for
+    // `MonacoHost.vue`'s own `:global(.kira-editor-overflow-widgets …)` rules, which key off it, not
+    // `monaco-editor`.
+    overflowContainer.className = 'kira-editor-overflow-widgets monaco-editor';
     document.body.appendChild(overflowContainer);
   }
   return overflowContainer;

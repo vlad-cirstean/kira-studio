@@ -103,6 +103,71 @@ export function defineKiraTheme(mod: MonacoModule): void {
       'editorSuggestWidget.border': cssVar('--kira-border-strong', '#313131'),
       'editorSuggestWidget.selectedBackground': cssVar('--kira-select', '#04395e'),
       'editorSuggestWidget.highlightForeground': cssVar('--kira-syntax-function', '#dcdcaa'),
+
+      // D6 (P67c §3.2): the ~16 keys above cover the editor surface itself; the context menu, the
+      // rest of the suggest widget, the find/peek widgets and every reparented list read from a
+      // ~40-key set `base: 'vs-dark'` otherwise answers with its own hardcoded literals (e.g. the
+      // menu's `#3C3C3C` against this app's `--kira-bg-elevated` `#202020`) — visibly a different
+      // palette. Every key below was read out of the Monaco stylesheet or default-style object that
+      // actually consumes it (`base/browser/ui/menu/menu.js`'s `getMenuWidgetCSS`,
+      // `editor/contrib/suggest/browser/media/suggest.css`, `platform/theme/common/colors/
+      // listColors.js`), mapped from an existing `--kira-*` token — no new token, no new literal.
+      'menu.background': cssVar('--kira-bg-elevated', '#202020'),
+      'menu.foreground': cssVar('--kira-fg', '#cccccc'),
+      'menu.selectionBackground': cssVar('--kira-hover', '#2a2d2e'),
+      'menu.selectionForeground': cssVar('--kira-fg', '#cccccc'),
+      'menu.separatorBackground': cssVar('--kira-border', '#2b2b2b'),
+      'menu.border': cssVar('--kira-border-strong', '#313131'),
+
+      'editorSuggestWidget.foreground': cssVar('--kira-fg', '#cccccc'),
+      'editorSuggestWidget.selectedForeground': cssVar('--kira-fg', '#cccccc'),
+      'editorSuggestWidget.focusHighlightForeground': cssVar('--kira-syntax-function', '#dcdcaa'),
+      'editorSuggestWidget.selectedIconForeground': cssVar('--kira-fg-muted', '#9d9d9d'),
+      'editorSuggestWidgetStatus.foreground': cssVar('--kira-fg-muted', '#9d9d9d'),
+
+      'list.hoverBackground': cssVar('--kira-hover', '#2a2d2e'),
+      'list.hoverForeground': cssVar('--kira-fg', '#cccccc'),
+      'list.activeSelectionBackground': cssVar('--kira-select', '#04395e'),
+      'list.activeSelectionForeground': cssVar('--kira-accent-fg', '#ffffff'),
+      'list.focusBackground': cssVar('--kira-select', '#04395e'),
+      'list.focusOutline': cssVar('--kira-focus', '#0078d4'),
+      'list.highlightForeground': cssVar('--kira-syntax-function', '#dcdcaa'),
+
+      'dropdown.background': cssVar('--kira-bg-input', '#313131'),
+      'dropdown.foreground': cssVar('--kira-fg', '#cccccc'),
+      'dropdown.border': cssVar('--kira-border', '#2b2b2b'),
+
+      'input.background': cssVar('--kira-bg-input', '#313131'),
+      'input.foreground': cssVar('--kira-fg', '#cccccc'),
+      'input.border': cssVar('--kira-border', '#2b2b2b'),
+
+      'editorWidget.foreground': cssVar('--kira-fg', '#cccccc'),
+      'widget.border': cssVar('--kira-border-strong', '#313131'),
+      // No plain-colour shadow token exists in the palette — `--kira-shadow`/`--kira-shadow-dialog`
+      // are full `box-shadow` shorthands (`0 2px 8px rgb(0 0 0 / 0.32)`), not a `<color>`, so they
+      // cannot feed `Color.fromHex` the way this key needs. `--kira-border-strong` (the existing
+      // elevated-surface boundary colour) stands in rather than inventing a new literal.
+      'widget.shadow': cssVar('--kira-border-strong', '#313131'),
+
+      // `--kira-scrollbar` is `#79797966` — 40% alpha — so `cssVar` normalizes it through the
+      // rgba()-to-#RRGGBBAA branch in `monaco.ts`'s `normalizeColor`; without that branch this would
+      // silently paint the scrollbar thumb bright red (`Color.fromHex`'s own failure mode).
+      'scrollbarSlider.background': cssVar('--kira-scrollbar', '#79797966'),
+      'scrollbarSlider.hoverBackground': cssVar('--kira-scrollbar', '#79797966'),
+      'scrollbarSlider.activeBackground': cssVar('--kira-scrollbar', '#79797966'),
+
+      'peekViewEditor.background': cssVar('--kira-bg', '#1f1f1f'),
+      'peekViewResult.background': cssVar('--kira-bg-elevated', '#202020'),
+      'peekViewTitle.background': cssVar('--kira-bg-chrome', '#181818'),
+
+      // `--kira-search-match` is a translucent `color-mix(… transparent)` token — same alpha branch
+      // as the scrollbar above. `--kira-search-match-current` resolves to an opaque `--kira-warn`
+      // and needs no conversion, but is routed through the same `cssVar` call for consistency.
+      'editor.findMatchBackground': cssVar('--kira-search-match-current', '#cca700'),
+      'editor.findMatchHighlightBackground': cssVar('--kira-search-match', '#cca70040'),
+
+      'textLink.foreground': cssVar('--kira-info', '#3794ff'),
+      'textLink.activeForeground': cssVar('--kira-info', '#3794ff'),
     },
   });
 }
