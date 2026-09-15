@@ -1,0 +1,137 @@
+package dbmcp
+
+import (
+	"context"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mask"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+// fakeConnsMutable is a ConnectionsReader whose one connection's modes can change mid-test —
+// exactly what a real user flipping the connection's MCP tab while a prompt sits open would do.
+type fakeConnsMutable struct {
+	mu      sync.Mutex
+	summary model.ConnectionSummary
+}
+
+func (f *fakeConnsMutable) List() ([]model.ConnectionSummary, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return []model.ConnectionSummary{f.summary}, nil
+}
+
+func (f *fakeConnsMutable) StateOf(string) model.ConnectionState {
+	return model.ConnectionState{Status: "connected"}
+}
+
+func (f *fakeConnsMutable) Connect(string) (model.ConnectionState, error) {
+	return model.ConnectionState{Status: "connected"}, nil
+}
+
+func (f *fakeConnsMutable) setWriteMode(mode string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.summary.McpWriteMode = mode
+}
+
+// fakeQueryRunner always classifies as a fixed class and counts executions — the assertion this
+// test cares about is whether Execute ever runs, not what it returns.
+type fakeQueryRunner struct {
+	class    adapters.OpClass
+	executed atomic.Int32
+}
+
+func (f *fakeQueryRunner) ClassifyStatement(context.Context, string, string) (adapters.OpClass, error) {
+	return f.class, nil
+}
+
+func (f *fakeQueryRunner) Execute(context.Context, adapterhost.ExecuteRequestWire) (adapterhost.ExecuteResponse, error) {
+	f.executed.Add(1)
+	return adapterhost.ExecuteResponse{}, nil
+}
+
+type fakeMaskRulesNone struct{}
+
+func (fakeMaskRulesNone) MaskSetFor(string) (mask.Set, error)   { return mask.Set{}, nil }
+func (fakeMaskRulesNone) List(string) ([]model.MaskRule, error) { return nil, nil }
+
+// TestRunQueryRefusesApprovedWriteAfterPermissionRevokedMidWait is the M7 finding: summary/verdict
+// are resolved before ApprovalBroker.Request's own up-to-2-minute wait, and were never re-checked
+// after Approve landed. A user reacting to an unexpected write prompt by tightening the
+// connection's write mode to deny, then someone (or the same person) approving the now-stale
+// prompt, must not run the statement anyway.
+func TestRunQueryRefusesApprovedWriteAfterPermissionRevokedMidWait(t *testing.T) {
+	conns := &fakeConnsMutable{summary: model.ConnectionSummary{
+		ID: "c1", Name: "conn", McpEnabled: true,
+		McpReadMode: "deny", McpWriteMode: "prompt", McpDdlMode: "deny",
+	}}
+	qr := &fakeQueryRunner{class: adapters.ClassWrite}
+	approvals := NewApprovalBroker(time.Now)
+	s := &Server{cfg: Config{
+		Conns: conns, Query: qr, Approvals: approvals, MaskRules: fakeMaskRulesNone{},
+		ExplainThreshold: func() int { return 1000 },
+	}}
+
+	type outcome struct {
+		errText string
+		isErr   bool
+	}
+	resCh := make(chan outcome, 1)
+	go func() {
+		res, _, _ := s.runQuery(context.Background(), nil, runQueryArgs{ConnectionID: "c1", SQL: "UPDATE t SET x = 1"})
+		if res == nil || !res.IsError || len(res.Content) == 0 {
+			resCh <- outcome{isErr: res != nil && res.IsError}
+			return
+		}
+		text := ""
+		if tc, ok := res.Content[0].(*mcp.TextContent); ok {
+			text = tc.Text
+		}
+		resCh <- outcome{errText: text, isErr: true}
+	}()
+
+	// Wait for the prompt to appear, then react to it exactly like a user would: tighten the mode
+	// before answering.
+	deadline := time.After(2 * time.Second)
+	var requestID string
+	for requestID == "" {
+		select {
+		case <-deadline:
+			t.Fatal("run_query never raised an approval request")
+		default:
+		}
+		if snap := approvals.Pending(); snap.Pending != nil {
+			requestID = snap.Pending.RequestID
+		} else {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	conns.setWriteMode("deny")
+	if got := approvals.Approve(requestID); got != ApprovalActionResolved {
+		t.Fatalf("Approve: got %v", got)
+	}
+
+	select {
+	case out := <-resCh:
+		if !out.isErr {
+			t.Fatal("runQuery succeeded after the write mode was revoked mid-approval, want a refusal")
+		}
+		if !strings.Contains(out.errText, "now deny") {
+			t.Fatalf("error text = %q, want it to mention the permissions now denying the statement", out.errText)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("runQuery never returned after Approve")
+	}
+
+	if n := qr.executed.Load(); n != 0 {
+		t.Fatalf("Execute was called %d times, want 0 — the statement must never run once permissions were revoked", n)
+	}
+}

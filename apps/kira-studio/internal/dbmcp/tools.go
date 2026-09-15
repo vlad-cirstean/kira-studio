@@ -254,7 +254,19 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		})
 		switch outcome {
 		case ApprovalApproved:
-			// fall through to Execute below.
+			// M7 finding: summary/m/verdict above were resolved before this (up to 2-minute) wait.
+			// If the user reacted to the prompt by revoking the connection's MCP exposure or
+			// tightening this class's mode to deny, an Approve landing after that must not run the
+			// statement under permissions that no longer hold — re-resolve both, the same posture
+			// MaskSetFor below already takes for mask rules post-approval.
+			resummary, err := s.resolveEnabled(args.ConnectionID)
+			if err != nil {
+				return errResult(err.Error())
+			}
+			if v := verdictFor(modesOf(resummary), class); v == "deny" {
+				return errResult(fmt.Sprintf("this connection's MCP permissions now deny %s statements; change them in the connection's MCP tab", class))
+			}
+			summary = resummary
 		case ApprovalDenied:
 			return errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
 		case ApprovalTimedOut:
