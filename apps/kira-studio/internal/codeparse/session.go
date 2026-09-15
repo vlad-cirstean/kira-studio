@@ -197,6 +197,10 @@ func (s *Session) checkinParser(grammar ID, p *sitter.Parser) {
 // Parse parses content fresh (no resident tree, no incremental edit) and caches the result's tree
 // for a future Reparse.
 func (s *Session) Parse(ctx context.Context, path string, content []byte, lang ID) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+
 	container := containerOf(lang)
 	parser, err := s.checkoutParser(container)
 	if err != nil {
@@ -226,6 +230,10 @@ func (s *Session) Parse(ctx context.Context, path string, content []byte, lang I
 // fresh either way (§7.3's own scoping — a block is typically small next to its container, so the
 // container-level incremental reparse is where the reuse actually pays for itself).
 func (s *Session) Reparse(ctx context.Context, path string, newContent []byte, lang ID) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+
 	entry, ok := s.cacheTake(path)
 	if !ok {
 		return s.Parse(ctx, path, newContent, lang)
