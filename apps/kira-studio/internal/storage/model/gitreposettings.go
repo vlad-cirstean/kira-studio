@@ -2,11 +2,13 @@ package model
 
 import "fmt"
 
-// GitRepoSettings is G18 D3's seven display settings a user edits from the git graph's own
-// dialog, moved out of VS Code's contributes.configuration entirely (D1). Six are genuinely
-// per-repository facts; LogLevel is not (D14) — GitRepoSettingsRepo.Get/Set collapse it onto a
-// reserved sentinel repo id regardless of which real repo id the caller passed, invisibly to
-// every caller above that storage layer.
+// GitRepoSettings is G18 D3's display settings a user edits from the git graph's own dialog,
+// moved out of VS Code's contributes.configuration entirely (D1). P72 §9.2: LogLevel used to be
+// the one exception (D14) — GitRepoSettingsRepo.Get/Set collapsed it onto a reserved sentinel repo
+// id regardless of which real repo id the caller passed — but that collapse is now deleted; Kira
+// Studio gets its own independent, genuinely app-wide `advanced.gitLogLevel` control instead
+// (packages/shared/domain/settings.ts), and every leaf here, LogLevel included, is an ordinary
+// per-repository fact.
 type GitRepoSettings struct {
 	GraphPageSize         int      `json:"graphPageSize"`
 	GraphScope            string   `json:"graphScope"`
@@ -14,11 +16,11 @@ type GitRepoSettings struct {
 	StashIncludeUntracked bool     `json:"stashIncludeUntracked"`
 	ReviewBaseCandidates  []string `json:"reviewBaseCandidates"`
 	PullStrategy          string   `json:"pullStrategy"`
-	// LogLevel is instance-wide, not per-repo (D14) — see this struct's own doc comment.
+	// LogLevel is an ordinary per-repo leaf (P72 §9.2) — see this struct's own doc comment.
 	LogLevel string `json:"logLevel"`
 	// GithubEnabled is G24 D16's own eighth leaf: off means no gh probe, no spawn, no cache fill, no
 	// badge, no search PR arm, no reaper re-resolve — both commit.resolvePr/branch.resolvePr answer
-	// {kind:'disabled'} outright. Genuinely per-repo (unlike LogLevel), default true.
+	// {kind:'disabled'} outright. Genuinely per-repo, default true.
 	GithubEnabled bool `json:"githubEnabled"`
 	// WorktreePrepareScript is G25 D10's own ninth leaf (kiraVersion.worktree.prepareScript): one
 	// command-line string, never a path, never an argv array. "" means the feature is off — no

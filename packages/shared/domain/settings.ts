@@ -37,6 +37,12 @@ export const appearanceSettingsSchema = /*#__PURE__*/ z.object({
   // `.default(true)` follows the same discipline as wordWrap/rowColoring above — a stored row
   // saved before this field existed hydrates with the annotation on.
   inlineBlame: z.boolean().default(true),
+  // P72 §9.1: relative-vs-absolute commit timestamps in the git graph — moved here from the
+  // per-repo RepoSettingsDialog.vue/PersistedViewState (a reading preference about the person, not
+  // the repository, the same class as fontSize/fontFamily above). `.default('relative')` matches
+  // PersistedViewState's own pre-existing default, so an existing stored settings row hydrates to
+  // today's behavior.
+  dateFormat: z.enum(['relative', 'absolute']).default('relative'),
 });
 export type AppearanceSettings = z.infer<typeof appearanceSettingsSchema>;
 
@@ -72,6 +78,11 @@ export const advancedSettingsSchema = /*#__PURE__*/ z.object({
     .min(EXPENSIVE_QUERY_ROWS_RANGE.min)
     .max(EXPENSIVE_QUERY_ROWS_RANGE.max)
     .default(100_000),
+  // P72 §9.2: the git graph's own diagnostic log verbosity — moved here from the per-repo
+  // RepoSettingsDialog.vue's `kiraVersion.log.level` (`instanceWide: true` there was a label, not
+  // a mechanism; this is where installation-wide settings actually live). `.default('info')`
+  // matches that leaf's own pre-existing default (schema.ts).
+  gitLogLevel: z.enum(['off', 'error', 'warn', 'info', 'debug']).default('info'),
 });
 export type AdvancedSettings = z.infer<typeof advancedSettingsSchema>;
 
@@ -117,7 +128,11 @@ export const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appearanceSettingsSchema,
   data: dataSettingsSchema.default({ defaultPageSize: 100 }),
   cache: cacheSettingsSchema.default({ l2BudgetMb: 64 }),
-  advanced: advancedSettingsSchema.default({ opLogRetentionDays: 30, expensiveQueryRows: 100_000 }),
+  advanced: advancedSettingsSchema.default({
+    opLogRetentionDays: 30,
+    expensiveQueryRows: 100_000,
+    gitLogLevel: 'info',
+  }),
   git: gitSettingsSchema.default({
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
@@ -147,6 +162,7 @@ export const defaultSettings: Settings = {
     wordWrap: true,
     rowColoring: true,
     inlineBlame: true,
+    dateFormat: 'relative',
   },
   data: {
     defaultPageSize: 100,
@@ -157,6 +173,7 @@ export const defaultSettings: Settings = {
   advanced: {
     opLogRetentionDays: 30,
     expensiveQueryRows: 100_000,
+    gitLogLevel: 'info',
   },
   git: {
     protectedBranches: ['main', 'master', 'release/*'],

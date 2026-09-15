@@ -58,13 +58,14 @@ export interface SettingsSnapshot {
   readonly 'workbench.tree.indent': number;
 }
 
-/** G18 D4: the seven per-repo display settings, server-stored, edited from the new in-app dialog
- *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json. Six are genuinely scoped by
- *  repoId; `kiraVersion.log.level` is not (D14) — its value is shared across every repo this
- *  installation opens, stored under a reserved key rather than repoId, a fact the dialog surfaces
- *  to the user (`SettingDef.instanceWide`, `@kira/git-core`) rather than hiding. Every caller
- *  still passes a real repoId for every key, log.level included; only the server's own storage
- *  layer treats that one key's repoId as informational rather than a partition key. */
+/** G18 D4: the per-repo display settings, server-stored, edited from the new in-app dialog
+ *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json — every leaf here is genuinely
+ *  scoped by repoId. P72 §9.2: `kiraVersion.log.level` used to be the one exception (D14, `its
+ *  value shared across every repo this installation opens, stored under a reserved key rather
+ *  than repoId`) — that collapse is deleted; Kira Studio gets its own independent, genuinely
+ *  app-wide `advanced.gitLogLevel` control instead (`packages/shared/domain/settings.ts`), and
+ *  `kiraVersion.log.level` reverts to an ordinary per-repo leaf, still the only surface VS Code
+ *  itself has to set it. */
 export interface RepoSettingsSnapshot {
   readonly 'kiraVersion.graph.pageSize': number;
   readonly 'kiraVersion.graph.scope': 'all' | 'head';
@@ -77,7 +78,7 @@ export interface RepoSettingsSnapshot {
   readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
   readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
   /** G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
-   *  this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
+   *  this repository at all — genuinely per-repo, default true. Off means no
    *  `gh` probe, no spawn, no cache fill: both commit.resolvePr/branch.resolvePr answer
    *  `{kind:'disabled'}` outright. */
   readonly 'kiraVersion.github.enabled': boolean;

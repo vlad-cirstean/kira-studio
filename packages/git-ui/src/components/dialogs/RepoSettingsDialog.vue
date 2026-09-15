@@ -8,11 +8,14 @@
  * itself instead, where the prepare-script approval flow they gate lives. G28 D16 adds
  * `kiraVersion.checkout.autoStash`, its own new "Checkout" section.
  *
- * **`kiraVersion.log.level` is not actually per-repo** (D14) — its own field carries a visible
- * note, driven by `SETTINGS['kiraVersion.log.level'].instanceWide` rather than a hardcoded flag
- * here (the same "one schema, one place" reason this dialog exists as a second consumer of
- * `schema.ts` at all), so a user who edits it from two different repos' dialogs is told why they
- * see the same value in both rather than being surprised by it.
+ * P72 §8.3/§9: `kiraVersion.log.level` **used to not be per-repo** (D14) — a hardcoded sentinel
+ * collapse in `gitreposettings.go`, surfaced here as a visible note. Both that collapse and the
+ * note are deleted: Kira Studio now has its own independent, genuinely app-wide
+ * `advanced.gitLogLevel` (`SettingsDialog.vue`), and this leaf reverts to an ordinary per-repo
+ * fact, same as `dateFormat` below moved to `appearance.dateFormat` there. Both sections
+ * (Display/Diagnostics) are host-conditional (the `host` prop) — shown under `'vscode'`/
+ * `'harness'`, since the extension has no app-wide settings dialog of its own and this remains
+ * its only surface for either value; hidden under `'kira'`, where Studio's own dialog owns both.
  *
  * Mirrors `StashDialog.vue`'s own "one instance, `open` prop + `close` emit" convention — the
  * whole per-repo settings surface fits in one dialog the same way stash's create/branch/popConfirm
@@ -28,11 +31,9 @@
  *
  * G-UX D8: the **Display** section's `dateFormat` field is a SECOND kind of exception to "hand-
  * written from `RepoSettingsSnapshot`" — it does not live in that snapshot at all
- * (`PersistedViewState` owns it, a view preference, not a repository fact, D8's own rejected
- * alternative explains why) — so it arrives as a plain prop/emit pair and applies immediately,
- * never joining `draft`/`save()`'s patch diff. Its own visible scope note is the `log.level`
- * precedent's shape, restated for a value that lives in the opposite direction (client-only,
- * not instance-wide).
+ * (`PersistedViewState` owns it under `'vscode'`/`'harness'`, a view preference, not a repository
+ * fact, D8's own rejected alternative explains why) — so it arrives as a plain prop/emit pair and
+ * applies immediately, never joining `draft`/`save()`'s patch diff.
  */
 import { SETTINGS } from '@kira/git-core';
 import type { HostKind, RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
@@ -46,8 +47,11 @@ const props = defineProps<{
   open: boolean;
   repoSettingsState: RepoSettingsState;
   dateFormat: DateFormat;
-  /** P72 §8.3: which shell mounted this dialog. Not yet read by this file — threaded through so a
-   *  later change can gate a section on it without a second, separate prop-plumbing step. */
+  /** P72 §8.3: which shell mounted this dialog — 'kira' hides the Display/Diagnostics sections
+   *  (Kira Studio owns both app-wide now, appearance.dateFormat/advanced.gitLogLevel,
+   *  packages/shared/domain/settings.ts), 'vscode'/'harness' keep showing them, since the
+   *  extension has no app-wide settings dialog of its own (this dialog is its only surface for
+   *  either value, §8.3's own finding). */
   host: HostKind;
   /** C10 §4.4: `false` under the native read-only graph — hides the Pull section (`strategy`
    *  configures `remote.pull`, a write this host's transport never issues). Graph scope/page size
@@ -133,8 +137,6 @@ function onLogLevelChange(value: string): void {
   draft['kiraVersion.log.level'] = value as RepoSettingsSnapshot['kiraVersion.log.level'];
 }
 
-const logLevelInstanceWide = SETTINGS['kiraVersion.log.level'].instanceWide ?? false;
-
 function close(): void {
   emit('close');
 }
@@ -183,7 +185,10 @@ async function save(): Promise<void> {
 
 <template>
   <KuiDialog :open="open" title="Repository settings" @close="close">
-    <section class="kv-repo-settings-section">
+    <!-- P72 §8.3/§9.1: dateFormat moved to Kira Studio's own app-wide appearance.dateFormat
+         (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
+         remaining surface for it. -->
+    <section v-if="host !== 'kira'" class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Display</h3>
       <label class="kv-dialog-field">
         Commit date
@@ -271,7 +276,11 @@ async function save(): Promise<void> {
       </label>
     </section>
 
-    <section class="kv-repo-settings-section">
+    <!-- P72 §8.3/§9.2: Kira Studio now has its own independent, genuinely app-wide
+         advanced.gitLogLevel (SettingsDialog.vue) — this per-repo leaf is VS Code's only
+         remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
+         genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
+    <section v-if="host !== 'kira'" class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Diagnostics</h3>
       <label class="kv-dialog-field">
         Log level
@@ -281,9 +290,6 @@ async function save(): Promise<void> {
           @update:model-value="onLogLevelChange"
         />
       </label>
-      <p v-if="logLevelInstanceWide" class="kv-dialog-note" data-testid="log-level-instance-wide-note">
-        This applies to Kira Version's own diagnostic log for every repository, not just this one.
-      </p>
     </section>
 
     <template #actions>

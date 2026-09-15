@@ -10,10 +10,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// fakeRepoSettingsStore is a minimal, in-memory stand-in for storage/repos.GitRepoSettingsRepo —
-// it reproduces D14's own sentinel substitution (the one behaviour these tests actually need to
-// exercise) without opening a real database, the same "closures over a plain map" shape
-// registry_test.go's own fakes already use elsewhere in this chapter.
+// fakeRepoSettingsStore is a minimal, in-memory stand-in for storage/repos.GitRepoSettingsRepo,
+// the same "closures over a plain map" shape registry_test.go's own fakes already use elsewhere in
+// this chapter. P72 §9.2: logLevel is an ordinary per-repo leaf now — D14's sentinel substitution
+// this fake used to reproduce is gone from the storage layer, so this fake no longer needs to
+// simulate it either.
 type fakeRepoSettingsStore struct {
 	rows map[string]model.GitRepoSettings
 }
@@ -30,10 +31,6 @@ func (f *fakeRepoSettingsStore) get(repoID string) (model.GitRepoSettings, error
 }
 
 func (f *fakeRepoSettingsStore) set(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
-	// D14: logLevel collapses onto the sentinel "" repo id regardless of the caller's own repoID —
-	// the same substitution GitRepoSettingsRepo itself makes, reproduced here so this test proves
-	// the RPC layer is honest about what the storage layer already guarantees, not merely that a
-	// fake with no such behaviour happens to also pass.
 	current, err := f.get(repoID)
 	if err != nil {
 		return model.GitRepoSettings{}, err
@@ -56,36 +53,17 @@ func (f *fakeRepoSettingsStore) set(repoID string, patch model.GitRepoSettingsPa
 	if patch.PullStrategy != nil {
 		current.PullStrategy = *patch.PullStrategy
 	}
-	f.rows[repoID] = current
-
 	if patch.LogLevel != nil {
-		sentinel, err := f.get("")
-		if err != nil {
-			return model.GitRepoSettings{}, err
-		}
-		sentinel.LogLevel = *patch.LogLevel
-		f.rows[""] = sentinel
+		current.LogLevel = *patch.LogLevel
 	}
-	return f.getResolved(repoID)
-}
-
-func (f *fakeRepoSettingsStore) getResolved(repoID string) (model.GitRepoSettings, error) {
-	s, err := f.get(repoID)
-	if err != nil {
-		return model.GitRepoSettings{}, err
-	}
-	sentinel, err := f.get("")
-	if err != nil {
-		return model.GitRepoSettings{}, err
-	}
-	s.LogLevel = sentinel.LogLevel
-	return s, nil
+	f.rows[repoID] = current
+	return current, nil
 }
 
 func newTestRouter() (*Router, *gitsession.Registry) {
 	store := newFakeRepoSettingsStore()
 	reg := gitsession.NewRegistry(nil)
-	reg.RepoSettingsGet = store.getResolved
+	reg.RepoSettingsGet = store.get
 	reg.RepoSettingsSet = func(repoID string, patch model.GitRepoSettingsPatch) (model.GitRepoSettings, error) {
 		return store.set(repoID, patch)
 	}
@@ -127,11 +105,13 @@ func TestRepoSettings_GetSetRoundTrip(t *testing.T) {
 	}
 }
 
-// TestRepoSettings_LogLevelCollapsesAcrossRepos is G18 §3.18's own cross-connection regression
-// guard for D14, at the RPC layer this time (§3.5 already covers the storage layer directly):
-// repoSettings.set for kiraVersion.log.level on repo A must be visible via repoSettings.get on
+// TestRepoSettings_LogLevelIsScopedAcrossRepos is P72 §9.2's own cross-connection regression
+// guard, at the RPC layer (storage/repos/gitreposettings_test.go's own
+// TestGitRepoSettingsRepo_LogLevelIsScopedPerRepo covers the storage layer directly): replaces
+// G18 §3.18's collapse guard for D14 now that the sentinel substitution is deleted —
+// repoSettings.set for kiraVersion.log.level on repo A must NOT be visible via repoSettings.get on
 // repo B.
-func TestRepoSettings_LogLevelCollapsesAcrossRepos(t *testing.T) {
+func TestRepoSettings_LogLevelIsScopedAcrossRepos(t *testing.T) {
 	router, _ := newTestRouter()
 	conn := gitsession.NewConn("conn-1", "client-1", "label", nil)
 	t.Cleanup(conn.Close)
@@ -148,8 +128,8 @@ func TestRepoSettings_LogLevelCollapsesAcrossRepos(t *testing.T) {
 		t.Fatalf("repoSettings.get(b): %v", err)
 	}
 	snap := got.(RepoSettingsSnapshot)
-	if snap.LogLevel != "debug" {
-		t.Fatalf("Get(b).LogLevel = %q, want %q (sentinel collapse across repos)", snap.LogLevel, "debug")
+	if snap.LogLevel != "info" {
+		t.Fatalf("Get(b).LogLevel = %q, want %q (the default — unscoped by a's write)", snap.LogLevel, "info")
 	}
 }
 
@@ -183,8 +163,10 @@ func (c *changedEventCollector) reset() {
 
 // TestRepoSettings_ChangedEventReachesEveryConnection is G18 §3.18's own event-fan-out guard: two
 // different Conns — even ones that have never opened the repo the write happened on — both
-// receive repoSettings.changed, proving D7's live-propagation mechanism fans a sentinel-backed
-// change out to every open connection, not just the one that made the request.
+// receive repoSettings.changed, proving D7's live-propagation mechanism fans every change out to
+// every open connection, not just the one that made the request, regardless of which key changed
+// (settings.go's own handleRepoSettingsSet doc comment) — log.level is only this test's example
+// patch, not the reason fan-out happens.
 func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	router, _ := newTestRouter()
 
@@ -208,8 +190,8 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	}
 
 	// A sets log.level on repo A; both connections must be told, even though connB never opened
-	// (or even heard of) repo A — log.level is instance-wide (D14), and the RPC layer does not
-	// try to filter recipients by repoId.
+	// (or even heard of) repo A — the RPC layer never filters repoSettings.changed recipients by
+	// repoId, for any key.
 	if _, err := handlersA.Request(context.Background(), "repoSettings.set", []byte(`{
 		"repoId": "/repos/a",
 		"patch": {"kiraVersion.log.level": "warn"}

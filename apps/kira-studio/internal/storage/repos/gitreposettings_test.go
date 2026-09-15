@@ -64,7 +64,7 @@ func TestGitRepoSettingsRepo_SetIsScopedPerRepo(t *testing.T) {
 
 // TestGitRepoSettingsRepo_GithubEnabledRoundTripsPerRepo is G24 D16's own regression guard: set
 // false, read it back, and confirm a DIFFERENT repo is unaffected — GithubEnabled is genuinely
-// per-repo, unlike LogLevel's own sentinel collapse just above.
+// per-repo, same as LogLevel now (P72 §9.2, below).
 func TestGitRepoSettingsRepo_GithubEnabledRoundTripsPerRepo(t *testing.T) {
 	r := newGitRepoSettingsRepo(t)
 	disabled := false
@@ -89,37 +89,32 @@ func TestGitRepoSettingsRepo_GithubEnabledRoundTripsPerRepo(t *testing.T) {
 	}
 }
 
-// TestGitRepoSettingsRepo_LogLevelCollapsesAcrossRepos is G18 §3.5's own regression guard for D14:
-// Set(repoA, {logLevel}) followed by Get(repoB) must show the SAME value — proving the sentinel
-// collapse actually happens across two different real repo ids, not merely that it does not
-// crash. A bug here would silently make log.level behave as if per-repo when it should not, or
-// vice versa.
-func TestGitRepoSettingsRepo_LogLevelCollapsesAcrossRepos(t *testing.T) {
+// TestGitRepoSettingsRepo_LogLevelIsScopedPerRepo is P72 §9.2's own regression guard, the mirror
+// image of the G18 §3.5 test this replaces: Set(repoA, {logLevel}) must NOT be visible from
+// Get(repoB) any more — the sentinel-row collapse D14 gave this one leaf is deleted (Kira Studio's
+// own equivalent is now the independent, genuinely app-wide advanced.gitLogLevel), so LogLevel is
+// an ordinary per-repo leaf like GraphPageSize/GithubEnabled above.
+func TestGitRepoSettingsRepo_LogLevelIsScopedPerRepo(t *testing.T) {
 	r := newGitRepoSettingsRepo(t)
 	level := "debug"
 	if _, err := r.Set("/repos/a", model.GitRepoSettingsPatch{LogLevel: &level}); err != nil {
 		t.Fatalf("Set(a): %v", err)
 	}
 
-	gotB, err := r.Get("/repos/b")
-	if err != nil {
-		t.Fatalf("Get(b): %v", err)
-	}
-	if gotB.LogLevel != "debug" {
-		t.Fatalf("Get(b).LogLevel = %q, want %q (sentinel collapse across repos)", gotB.LogLevel, "debug")
-	}
-
-	// And the reverse direction, for good measure: a write via b is visible via a.
-	level2 := "warn"
-	if _, err := r.Set("/repos/b", model.GitRepoSettingsPatch{LogLevel: &level2}); err != nil {
-		t.Fatalf("Set(b): %v", err)
-	}
 	gotA, err := r.Get("/repos/a")
 	if err != nil {
 		t.Fatalf("Get(a): %v", err)
 	}
-	if gotA.LogLevel != "warn" {
-		t.Fatalf("Get(a).LogLevel = %q, want %q (sentinel collapse across repos, reverse direction)", gotA.LogLevel, "warn")
+	if gotA.LogLevel != "debug" {
+		t.Fatalf("Get(a).LogLevel = %q, want %q", gotA.LogLevel, "debug")
+	}
+
+	gotB, err := r.Get("/repos/b")
+	if err != nil {
+		t.Fatalf("Get(b): %v", err)
+	}
+	if gotB.LogLevel != model.DefaultGitRepoSettings().LogLevel {
+		t.Fatalf("Get(b).LogLevel = %q, want the default (unscoped by a's write)", gotB.LogLevel)
 	}
 }
 

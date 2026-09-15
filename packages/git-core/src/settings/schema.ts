@@ -40,13 +40,18 @@ export interface SettingDef<T> {
    *  below skips both), since contributing either would be a duplicate declaration of a setting
    *  this extension does not itself own the value of. */
   readonly source?: 'extension' | 'host' | 'repo';
-  /** G18 D10/D14: meaningful only when `source === 'repo'`. `true` for exactly one key
-   *  (`kiraVersion.log.level`) — its stored value is shared across every repository this
-   *  installation opens, not scoped by repoId, even though it lives in the same per-repo storage
-   *  and dialog as the other six `'repo'`-sourced keys (a reserved sentinel row, not a schema
-   *  change — storage/repos.GitRepoSettingsRepo's own D14). The dialog surfaces this to the user
-   *  (a visible note, not a hidden implementation detail) rather than presenting it as if its
-   *  value varied per repo. */
+  /** G18 D10/D14: meaningful only when `source === 'repo'` — `true` marks a key whose stored
+   *  value is shared across every repository this installation opens, not scoped by repoId, even
+   *  though it lives in the same per-repo storage and dialog as every other `'repo'`-sourced key
+   *  (a reserved sentinel row, not a schema change — storage/repos.GitRepoSettingsRepo's own
+   *  D14). P72 §9.2: `kiraVersion.log.level` was the only key that ever set this, and the
+   *  cross-repo-collapse mechanism it named (`gitreposettings.go`'s sentinel-row special case,
+   *  `repoSettings.ts`'s merge literal) is now deleted rather than generalised — Kira Studio gets
+   *  its own, genuinely app-wide `advanced.gitLogLevel` control instead (`packages/shared/domain/
+   *  settings.ts`), and `kiraVersion.log.level` itself reverts to an ordinary, honestly-per-repo
+   *  `'repo'` key (still the only surface VS Code has to set it). No key currently sets
+   *  `instanceWide`. Kept as a documented schema capability rather than removed alongside its only
+   *  consumer, so a later instance-wide `'repo'` leaf does not have to re-derive this design. */
   readonly instanceWide?: boolean;
 }
 
@@ -59,11 +64,15 @@ export const SETTINGS = {
   // declaration here after wiring the real one would recreate the exact "a setting that silently
   // does nothing" anti-pattern this fix exists to close out.
   //
-  // G18 D1/D10: the seven keys below all moved from VS Code settings.json into a new per-repo
+  // G18 D1/D10: the keys below all moved from VS Code settings.json into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
   // `source: 'repo'` is what drops each out of `contributes.configuration` (toVsCodeConfiguration
-  // below). kiraVersion.log.level is the one exception among the seven: it is not actually a
-  // per-repo fact (`instanceWide: true`, D14) even though it lives in the same table and dialog.
+  // below). P72 §9.2: `kiraVersion.log.level` used to be the one exception among these — not
+  // actually a per-repo fact (`instanceWide: true`, D14) even though it lived in the same table
+  // and dialog. That special case is now deleted rather than generalised: Kira Studio gets its own
+  // independent, genuinely app-wide `advanced.gitLogLevel` control instead, and this key goes back
+  // to being an ordinary, honestly-per-repo leaf — still the only surface VS Code itself has to
+  // set it (RepoSettingsDialog.vue's Diagnostics section, shown only under that host).
   // G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
   // this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
   // `gh` probe, no spawn, no cache fill, no badge: both commit.resolvePr/branch.resolvePr answer
@@ -101,10 +110,6 @@ export const SETTINGS = {
     description: "Verbosity of kira-version's own diagnostic log.",
     enum: ['off', 'error', 'warn', 'info', 'debug'],
     source: 'repo',
-    // G18 D14: shared across every repository this installation opens, not scoped by repoId —
-    // the dialog renders a visible note driven by this flag rather than presenting the field as
-    // if it varied per repo.
-    instanceWide: true,
   },
   'kiraVersion.review.baseCandidates': {
     key: 'kiraVersion.review.baseCandidates',
