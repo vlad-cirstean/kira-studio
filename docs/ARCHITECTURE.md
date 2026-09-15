@@ -3833,13 +3833,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   Harmless (each connection's own hold is independently refcounted and released) and bounded, but
   real.
 
-- **`internal/repomap/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (P67d §4.2
-  sets `ReadHeaderTimeout`/`IdleTimeout`, narrowing this item rather than closing it). Deliberate:
-  the Streamable HTTP transport holds long-lived server-to-client streams, and a write/read deadline
-  would cut one mid-response; a slow client body on a long POST is not a threat on loopback the way
-  a slow header (`ReadHeaderTimeout`, now bounded) is. Loopback-only binding plus the cross-origin
-  wrapper (§4.1) narrow who can reach it further still, but a client that opens a connection and
-  simply never finishes its response body can still tie one up indefinitely.
+- **Both `internal/repomap/http.go`'s and `internal/dbmcp/http.go`'s HTTP servers leave
+  `WriteTimeout`/`ReadTimeout` unset** (P67d §4.2 gave repomap `ReadHeaderTimeout`/`IdleTimeout`
+  plus the cross-origin wrapper; M7 finding #7 brought dbmcp's server up to the same shape —
+  narrowing this item rather than closing it). Deliberate: the Streamable HTTP transport holds
+  long-lived server-to-client streams, and a write/read deadline would cut one mid-response; a slow
+  client body on a long POST is not a threat on loopback the way a slow header (`ReadHeaderTimeout`,
+  now bounded on both) is. Loopback-only binding plus the cross-origin wrapper narrow who can reach
+  either server further still, but a client that opens a connection and simply never finishes its
+  response body can still tie one up indefinitely.
 - **Native `review.session.save`/`.load` (`repo/git/reviewSession.ts`, backed by the pinned
   repo-graph tab's own persisted state) has no expiry**, unlike the VS Code extension's own
   `ReviewSessionStore`, which discards a saved session past `REVIEW_SESSION_TTL_MS` (14 days,

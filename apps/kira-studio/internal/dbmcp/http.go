@@ -60,11 +60,24 @@ func (s *Server) bindHTTP() error {
 		AllowMissingExpiration: true,
 	})(handler)
 
+	// The go-sdk applies DNS-rebinding protection by default but explicitly does not apply
+	// cross-origin protection unless the caller wraps the handler itself — repomap/http.go's
+	// identical reasoning, applied to this server: a browser tab on an unrelated origin must not be
+	// able to reach it just because it happens to be running on loopback.
 	mux := http.NewServeMux()
-	mux.Handle(mcpPath, protected)
+	mux.Handle(mcpPath, http.NewCrossOriginProtection().Handler(protected))
 
 	s.listener = ln
-	s.http = &http.Server{Handler: mux}
+	s.http = &http.Server{
+		Handler: mux,
+		// ReadHeaderTimeout bounds a slowloris-shaped client; IdleTimeout reclaims a connection
+		// that never issues a second request — repomap/http.go's identical values and reasoning.
+		// WriteTimeout/ReadTimeout stay unset: the Streamable HTTP transport holds long-lived
+		// server-to-client streams, and a slow client body on a long POST is not a threat on
+		// loopback the way a slow header is.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	return nil
 }
 
