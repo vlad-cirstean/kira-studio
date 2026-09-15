@@ -1,14 +1,29 @@
 import { describe, expect, test } from 'bun:test';
-import type { StashEntry } from '@kira/git-ipc';
+import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import {
   buildGlobalStashMenu,
   buildReadOnlyRefMenu,
   buildReadOnlyRowMenu,
   buildReadOnlyStashMenu,
   buildRefMenu,
+  buildRowMenu,
   buildStashMenu,
   type RefMenuContext,
 } from './rowMenuModel.ts';
+
+// P76 §12.2: worktreeAdd is not in GATED_OP_KINDS — an operation in progress must not disable
+// createWorktreeHere, unlike every gatedItem in these same menus.
+const MERGE_IN_PROGRESS: InProgressOperation = {
+  kind: 'merge',
+  otherSha: 'a'.repeat(40),
+  headName: undefined,
+  conflictedPaths: [],
+  canContinue: true,
+  canAbort: true,
+  isSequence: false,
+  unmergedCount: 0,
+  canSkip: false,
+};
 
 function stashFixture(overrides: Partial<StashEntry> = {}): StashEntry {
   return {
@@ -189,6 +204,50 @@ describe('buildRefMenu — tag remote actions are disabled, not silently broken'
   });
 });
 
+// P76 §12.2: createWorktreeHere is un-gated (plainItem, not gatedItem) — present and enabled on
+// branch/remoteBranch rows and the commit row menu even mid-operation, absent for a tag (§10: a
+// tag is a point, its own commit row already offers the detached item), and absent from every
+// read-only builder (it is a write, same as every other row action C10 hides).
+describe('createWorktreeHere — un-gated, offered on branch/remoteBranch/commit rows only', () => {
+  test('present and enabled on a branch row even with an operation in progress', () => {
+    const sections = buildRefMenu(branchCtx({ inProgress: MERGE_IN_PROGRESS }));
+    const item = sections[0]?.items.find((i) => i.id === 'createWorktreeHere');
+    expect(item?.disabled).toBe(false);
+  });
+
+  test('present and enabled on a remoteBranch row even with an operation in progress', () => {
+    const sections = buildRefMenu(
+      branchCtx({ kind: 'remoteBranch', inProgress: MERGE_IN_PROGRESS }),
+    );
+    const item = sections[0]?.items.find((i) => i.id === 'createWorktreeHere');
+    expect(item?.disabled).toBe(false);
+  });
+
+  test('absent for a tag row', () => {
+    const sections = buildRefMenu(branchCtx({ kind: 'tag' }));
+    const ids = sections.flatMap((s) => s.items.map((i) => i.id));
+    expect(ids).not.toContain('createWorktreeHere');
+  });
+
+  test('present in the commit row menu', () => {
+    const sections = buildRowMenu({
+      sha: 'a'.repeat(40),
+      decorations: [],
+      inProgress: MERGE_IN_PROGRESS,
+      clipboardEnabled: false,
+    });
+    const item = sections[0]?.items.find((i) => i.id === 'createWorktreeHere');
+    expect(item?.disabled).toBe(false);
+  });
+
+  test('absent from buildReadOnlyRefMenu and buildReadOnlyRowMenu', () => {
+    const refIds = buildReadOnlyRefMenu().flatMap((s) => s.items.map((i) => i.id));
+    const rowIds = buildReadOnlyRowMenu(true).flatMap((s) => s.items.map((i) => i.id));
+    expect(refIds).not.toContain('createWorktreeHere');
+    expect(rowIds).not.toContain('createWorktreeHere');
+  });
+});
+
 // C10 §4.2/§4.3/§11 (S6): the three read-only builders must never emit an item whose id maps to
 // an OpRequest kind (or, for a ref, anything the picker/graph would otherwise wire to a write) —
 // UI layer 3 of the read-only boundary. The Go allowlist (gitstream_test.go) is what actually
@@ -197,6 +256,7 @@ const WRITE_CAPABLE_ROW_IDS = [
   'checkoutDetached',
   'createBranchHere',
   'createTagHere',
+  'createWorktreeHere',
   'revertThisCommit',
   'resetToThisCommit',
   'cherryPickThisCommit',
