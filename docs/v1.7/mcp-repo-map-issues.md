@@ -52,6 +52,28 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
     `MkdirAll` would edit the same function a second time for no reason. Closed once M1ab lands the
     plan; if M1ab's committed diff does not include the `MkdirAll`, reopen this entry.
 
+  Confirmed present in the landed diff (both A/B arms, verified independently) — `Save` calls
+  `os.MkdirAll(filepath.Dir(path), 0o700)` before `os.WriteFile` in both. **Closed.**
+
+- **M1ab (arm A, MCP-assisted implementation) — `find_references`/`search_symbols` miss a Go
+  struct field reached only via selector expression.**
+
+  - **Found in**: M1ab, arm A (repo-map-assisted implementation pass)
+  - **Status**: Open — needs a dedicated fix pass before it can gate a future phase's dogfooding
+  - **Query/tool call**: `find_references` on `model.ConnectionFields.AutoExplain` and
+    `.ThrottlePerSec`; `search_symbols` for the same field names.
+  - **Expected**: real call sites via `f.AutoExplain`/`c.ThrottlePerSec` selector expressions in
+    `repos/connections.go` and `connections/service.go` (both fields have numerous live call
+    sites).
+  - **Actual**: `find_references` reports no references found; `search_symbols` returns nothing
+    for the field itself (only unrelated same-named local variables elsewhere). A plain `x.Field`
+    selector read isn't captured by either the definition or reference query for struct fields at
+    all — distinct from the already-logged P67f range/index-expression gap (v1.6 log).
+  - **Fix**: none attempted (per this log's own rule — non-trivial, not fixed in the phase that
+    found it). Workaround used: `Grep` for all "does anything else reference this field"
+    checks. Needs its own pass in `internal/repomap`'s Go declaration/reference resolution before
+    a future phase can rely on `find_references` for struct-field navigation.
+
 <!--
 Entry template:
 
