@@ -251,7 +251,7 @@ running it here.
   this repo's established substitute for GUI-driven boot proofs in a sandbox with no display,
   preferred over `xvfb`/`xdotool`/screenshot techniques. `tests/e2e-real/` is built on it.
 
-## repo-map MCP server — running and registering it in this environment (C3, updated C8/P64c/P67d)
+## repo-map MCP server — running and registering it in this environment (C3, updated C8/P64c/P67d/M1)
 
 - **Run `bun run mcp:repo-map:build` once after a fresh clone, before registering with any MCP
   client.** `internal/codeparse`'s cgo build (above) is the same ~34 MB-of-generated-C cost here;
@@ -285,7 +285,11 @@ running it here.
   repository's existing token" and no token — a session that lost the first printout is stuck, and
   a mismatched bearer answers `401 invalid token` with no hint the token itself is the problem. Fix:
   delete that repository's token file and restart, then capture the freshly printed token
-  immediately (`CLAUDE.md`'s mint-a-fresh-one recipe).
+  immediately (`CLAUDE.md`'s mint-a-fresh-one recipe). The stuck window is now **bounded**: since M1
+  every token expires after 7 days (`mcpauth.TTL`), so a stale one eventually remints itself —
+  deleting the file is how you stop waiting, not the only way out. A **lapsed** token is
+  distinguishable from a wrong one: `mcpauth.TokenVerifier` answers with a message naming the server
+  and the expiry instant, where a mismatched token still answers a bare `401 invalid token`.
 - **Responses now carry a source line under each hit (C8)**: `find_definition`, `find_references`,
   `find_implementations` and `search_symbols` each follow a hit's own grep-style line with one
   indented line of the actual code at that position (truncated at 512 bytes, `[stale]`/
@@ -308,3 +312,20 @@ running it here.
   the missing system libraries (`apt-get install libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0
   libflite1 gstreamer1.0-libav` at the time of writing) — install exactly those, not a generic
   `playwright install-deps`, which pulls far more than `webkit` alone needs.
+
+## Database MCP server — reaching it in this environment (M1-M5)
+
+Unlike repo-map, this server exists only inside the app process: `apps/kira-studio/cmd/` holds only
+`g1measure` and `kira-repo-map`, and `package.json` has no `mcp:*` script for it.
+
+- **No headless binary and no `bun run mcp:*` script exists for it.** The only ways to reach it here
+  are `bun run dev` (needs a GUI this container does not have) or a `go build -tags server` boot
+  proof — the same `//go:build server` route documented above for the bound-call surface. M5's own
+  verification did exactly that and drove a real `dbmcp` endpoint with `curl`.
+- Its token is `${KIRA_HOME}/mcp-db-token.json` — no repo slug, one per `KIRA_HOME`
+  (`internal/bridge/dbmcp.go`'s `dbMcpTokenName`, via `mcpauth.PathNamed`) — and it carries the same
+  7-day expiry as repo-map's since M1 (`mcpauth.TTL`).
+- Its port is `DefaultPort` **8766** (`internal/dbmcp/server.go`), with the same ephemeral fallback
+  on conflict, so the read-it-off-the-banner rule above applies here too.
+- The JSON-RPC `curl` shape is identical to `CLAUDE.md`'s repo-map recipe; only the port, the token
+  and the tool names differ. See that recipe rather than duplicating it here.
