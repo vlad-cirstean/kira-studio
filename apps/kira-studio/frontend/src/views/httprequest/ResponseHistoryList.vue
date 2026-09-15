@@ -9,6 +9,7 @@ import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes, formatRelative } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
+import { isIncognito } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -33,6 +34,9 @@ const entries = computed<ResponseHistoryEntry[]>(() => rt.value?.entries ?? []);
 const selected = computed(() => rt.value?.selected ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 const isScratch = computed(() => !props.tab.state.itemId);
+// P71 §3.5: nothing is suppressed here — with nothing recorded, historyList simply returns the
+// empty set, so this only exists to explain the silence rather than leave it looking broken.
+const incognito = computed(() => isIncognito(props.tab.id));
 // P18 D6: the list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list
 // is full" is exactly this predicate — not a stored eviction count (rejected in the plan: List can
 // never say more than "the list is full" without a new column and write path). Not suppressed by
@@ -126,10 +130,13 @@ async function onClear(): Promise<void> {
       data-testid="http-history-empty"
     >
       <span class="p-xs dim scratch-note">
-        Sending this request will record one.
-        <template v-if="isScratch">
-          Scratch requests keep their history until the tab is closed — save this request to keep
-          it.
+        <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
+        <template v-else>
+          Sending this request will record one.
+          <template v-if="isScratch">
+            Scratch requests keep their history until the tab is closed — save this request to
+            keep it.
+          </template>
         </template>
       </span>
     </EmptyState>

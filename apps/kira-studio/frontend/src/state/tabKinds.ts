@@ -78,6 +78,7 @@ import { codeRepoRecord } from './coderepos';
 import { connectionRecord } from './connections';
 import type { MenuItem } from './contextMenu';
 import { settingsState } from './settings';
+import { isIncognito, setIncognito } from './tabIncognito';
 
 // P1 D4/F19: the tab-kind registry, split from workbench/tabViews.ts (C4) by the lint rules —
 // this half is component-free (title/icon/railColor/dropResources/menuExtras/state constructors
@@ -124,6 +125,20 @@ const KIND_ICON: Record<string, string> = {
 
 function railColor(tab: TabRecord): ConnectionColor | undefined {
   return connectionRecord(tab.connectionId)?.color;
+}
+
+// P71 §5.2: both request kinds' own tab context-menu entry — `setIncognito`'s own listener
+// (state/tabs.ts) flushes the tab's existing row immediately on the on-transition.
+function incognitoMenuExtras(tab: TabRecord): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'incognito',
+      label: isIncognito(tab.id) ? 'Turn off incognito' : 'Incognito',
+      icon: 'eye-closed',
+      run: () => setIncognito(tab.id, !isIncognito(tab.id)),
+    },
+  ];
 }
 
 // Every Studio kind (F11): a tab addresses a tree node, so "Reveal in project panel" makes sense
@@ -308,8 +323,9 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // D2: the response lives in the view's own runtime store (views/httprequest/state.ts),
     // freed by cleanupTabRuntime — there is no page store of this kind's own to drop.
     dropResources: noDrop,
-    // D2: there is no project panel to reveal an HTTP request into.
-    menuExtras: () => [],
+    // D2: there is no project panel to reveal an HTTP request into. P71 §5.2: the incognito
+    // toggle is the one thing this kind appends instead.
+    menuExtras: incognitoMenuExtras,
     parseState: parseStateWith(httpRequestTabStateSchema),
     // P15 D8: answers a question about a tab you're not looking at — gRPC is deliberately left
     // out (a call always has a message body, so the mark would be on every tab always, which is
@@ -339,8 +355,9 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // D2: the runtime (and a still-running call) lives in views/grpcrequest/state.ts, freed —
     // and cancelled — by registerTabRuntimeCleanup, not by this hook.
     dropResources: noDrop,
-    // D2: there is no project panel to reveal a gRPC request into.
-    menuExtras: () => [],
+    // D2: there is no project panel to reveal a gRPC request into. P71 §5.2: 'http-request''s own
+    // incognitoMenuExtras.
+    menuExtras: incognitoMenuExtras,
     parseState: parseStateWith(grpcRequestTabStateSchema),
   },
   'variable-set': {

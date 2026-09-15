@@ -41,8 +41,8 @@ import { connectionsState } from './connections';
 import { consoleDefaultFor } from './consoleDefaults';
 import { tabsForWorkspace, workspaceKeyOf } from './mode';
 import { settingsState } from './settings';
-import { TAB_KINDS } from './tabKinds';
 import { isIncognito, registerIncognitoSetListener, setIncognito } from './tabIncognito';
+import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
 import { activateWorkspace, workspaceState } from './workspace';
 
