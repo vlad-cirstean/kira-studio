@@ -68,8 +68,8 @@ type QueryRunner interface {
 	ClassifyStatement(ctx context.Context, connectionID, statement string) (adapters.OpClass, error)
 }
 
-// Config is everything New needs. Zero-value Home takes the documented default; the other four
-// fields are required.
+// Config is everything New needs. Zero-value Home takes the documented default; every other field
+// is required.
 type Config struct {
 	// Home overrides KIRA_HOME (a debugging seam, mirroring repomap.Config's own) — empty means
 	// config.KiraHome().

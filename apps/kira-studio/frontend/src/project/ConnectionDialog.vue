@@ -788,7 +788,10 @@ const preconnectText = computed({
           </label>
 
           <div class="field">
-            <label>Description <span class="dim">— what this database is for</span></label>
+            <label
+              >Description
+              <span class="dim">— what this database is for, read verbatim by an AI client</span></label
+            >
             <textarea
               v-model="draft.mcpDescription"
               class="p-textarea mono"
@@ -799,10 +802,6 @@ const preconnectText = computed({
               @keydown="wrapSelectionOnType"
             />
             <span v-if="fieldErrors.mcpDescription" class="field-error">{{ fieldErrors.mcpDescription }}</span>
-            <span v-else class="helper-text">
-              An AI client reads this verbatim as connection metadata — never interpreted by this
-              app.
-            </span>
           </div>
 
           <label class="field checkbox">
@@ -812,13 +811,8 @@ const preconnectText = computed({
               data-testid="connection-mcp-auto-explain"
             />
             <span>Plan queries before running them</span>
-            <span v-if="mcpExplainSupported" class="helper-text">
-              An EXPLAIN runs before every SELECT this connection's MCP clients send, and a plan
-              estimated to read more than the expensive-query threshold pauses the query until you
-              approve it.
-            </span>
-            <span v-else class="helper-text">
-              This engine has no query plan this app can read, so the setting has no effect.
+            <span v-if="!mcpExplainSupported" class="helper-text">
+              This engine has no query plan this app can read.
             </span>
           </label>
 
