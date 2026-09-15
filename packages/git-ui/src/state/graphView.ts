@@ -377,8 +377,18 @@ export class GraphViewState {
   }
 
   async #applyChunk(chunk: StreamChunkOf<'graph.stream'>): Promise<void> {
+    // P72 §4: a restart-at-row-0 chunk used to clear `layout` here, before its replacement
+    // exists — `laneCount` passed through 0 for a whole worker round trip, which is the
+    // checkout-misalignment symptom. Only `LayoutClient.reset()` (dropping the stale frontier so
+    // the coming `submit()` starts a fresh pass, not a resumed one) belongs on this side of the
+    // await; `LayoutStore.clear()` moves next to `append()` below, so the previous layout stays
+    // on screen until its replacement is ready to swap in synchronously.
+    let wasReset = false;
     const range = await this.#packed.applyChunk(chunk, {
-      onReset: () => this.#resetLayout(),
+      onReset: () => {
+        wasReset = true;
+        this.#layoutClient.reset();
+      },
       onCorrupted: async () => {
         // The re-open supersedes this call's own still-in-flight stream (W2's
         // supersede-on-reopen rule), so nothing else from the corrupted sequence is applied
@@ -406,6 +416,9 @@ export class GraphViewState {
         'kira:layout-submit-end',
       );
     }
+    // `clear()` and `append()` in the same synchronous block: `laneCount` never observably
+    // passes through 0 the way it would if `clear()` ran back on the `onReset` hook above.
+    if (wasReset) this.layout.clear();
     this.layout.append(layoutChunk);
     this.laneCount.value = this.layout.laneCount;
     for (const listener of this.#layoutListeners) listener({ from, to });

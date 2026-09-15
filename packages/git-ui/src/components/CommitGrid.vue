@@ -776,6 +776,11 @@ watch(
 watch(
   () => props.graphView.generation.value,
   () => {
+    // P72 §4: a generation bump (a refresh's restart-at-row-0 chunk) is exactly the moment
+    // laneCount may have moved — a checkout onto a branch with a different lane shape. Same
+    // lastRebuiltLaneCount guard handleChunkLayout already uses, so this only rebuilds when the
+    // shape actually changed rather than on every generation bump.
+    if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
     grid?.invalidateAllRows();
     grid?.updateRowCount();
     grid?.render();
