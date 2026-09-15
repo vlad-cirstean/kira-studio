@@ -280,16 +280,24 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       const leftRev = baseSha ?? EMPTY_TREE_SHA;
       const leftLabel = baseSha ? baseSha.slice(0, 7) : 'empty tree';
       const rightLabel = sha.slice(0, 7);
-      for (const change of detail.files) {
+      // P74 §5.2: every changed file opens as a preview tab, not a permanent one (`pinned:
+      // true`'s own comment before this covered only "N tabs instead of one multi-diff editor",
+      // never "as preview tabs" — this repo's own git blame at 3e9a9a7a shows it was never
+      // revisited once the preview cohort existed to ask for). The first file (no `previewCohort`)
+      // evicts whatever preview cohort/slot preceded it; every file after that joins the cohort
+      // the first one just started, rather than each replacing the last (`openTab`'s own
+      // `previewCohort` doc comment).
+      detail.files.forEach((change, index) => {
         openRepoCommitDiffTab(
           codeRepoId,
           change.path,
           leftRev,
           sha,
           { left: leftLabel, right: rightLabel },
-          true, // "Always pinned/multi-diff in both branches" (contract.ts's own doc comment)
+          false,
+          index > 0,
         );
-      }
+      });
       return { opened: detail.files.length, failed: 0, mode: 'tabs' };
     },
 

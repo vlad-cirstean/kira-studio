@@ -78,8 +78,10 @@ export const tabsState = reactive({
   /** In-memory only: a restored tab has not loaded and shows "Reconnect & load" (§8.4). */
   hydrated: new Set<string>(),
   // C5 §5.1: one entry per workspace, in memory only (like `hydrated` above) — no schema change,
-  // and a restored session comes back with every tab permanent (D3).
-  previewIdByWorkspace: {} as Record<WorkspaceKey, string | null>,
+  // and a restored session comes back with every tab permanent (D3). P74 §5.2: widened from a
+  // single `string | null` slot to a set of ids — "Open all changes" needs a whole cohort of
+  // preview tabs to replace as a unit, not one slot fought over by every file in the commit.
+  previewIdsByWorkspace: {} as Record<WorkspaceKey, readonly string[]>,
 });
 
 export interface RecentTableEntry {
@@ -298,6 +300,16 @@ function setActiveTabId(id: string, key: WorkspaceKey): void {
   activateWorkspace(key);
 }
 
+// P74 §5.2: removes `id` from workspace `key`'s preview cohort if it is there, a no-op otherwise
+// — every "one tab leaves the cohort, the rest stay previewed" site (a permanent reopen, close,
+// drag-start, promoteTab, and repoTabs.ts's own reuse branches) shares this rather than repeating
+// the same guarded filter. Exported for repoTabs.ts alone — every other site lives in this file.
+export function removeFromPreviewCohort(key: WorkspaceKey, id: string): void {
+  const cohort = tabsState.previewIdsByWorkspace[key];
+  if (!cohort?.includes(id)) return;
+  tabsState.previewIdsByWorkspace[key] = cohort.filter((x) => x !== id);
+}
+
 // Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
 // (Task 62) rather than a fresh one created — a fresh tab is about to fetch on mount anyway, so
 // only a caller that cares about the double-click "also reload the data" behavior needs to check
@@ -333,6 +345,12 @@ export function openTab<S>(
     recentKind?: RecentTableEntry['kind'];
     workspaceId?: string | null;
     preview?: boolean;
+    /** P74 §5.2: a bulk open's own files join the workspace's preview cohort instead of each
+     *  replacing the last — never evicts. Ignored when `preview` is falsy. The first file of a
+     *  bulk open still passes `preview: true` without this flag, so it alone evicts whatever
+     *  cohort/slot preceded it; every file after that passes it, joining what the first just
+     *  started. */
+    previewCohort?: boolean;
   },
 ): OpenTabResult {
   const workspaceId = opts.workspaceId ?? null;
@@ -349,10 +367,8 @@ export function openTab<S>(
     if (existing) {
       activateTab(existing.id);
       // §5.2 rule 1: a permanent (`preview` false/undefined) open of the workspace's own current
-      // preview tab promotes it — the slot clears, the tab itself is untouched.
-      if (!opts.preview && tabsState.previewIdByWorkspace[workspaceKey] === existing.id) {
-        tabsState.previewIdByWorkspace[workspaceKey] = null;
-      }
+      // preview tab promotes it — removed from the cohort, the tab itself is untouched.
+      if (!opts.preview) removeFromPreviewCohort(workspaceKey, existing.id);
       // Reopening (double-click, "recent tables", …) against a connection that's live right
       // now reads as "load this" just as much as a brand-new tab does — without this, a tab
       // left unhydrated by an earlier disconnect (or never hydrated after a session restore)
@@ -379,26 +395,35 @@ export function openTab<S>(
     // discriminated union can't express that generically, so this is asserted rather than typed.
   } as unknown as TabRecord;
 
-  if (opts.preview) {
-    const evictedId = tabsState.previewIdByWorkspace[workspaceKey] ?? null;
-    if (evictedId !== null) {
-      // §5.2 rule 3: close-then-insert at the evicted tab's own array position, never mutate its
-      // kind in place — closeTab is the one path that frees page stores/runtime for a
+  if (opts.preview && opts.previewCohort) {
+    // P74 §5.2: a bulk open's own file, after the first — joins the cohort at the end, evicts
+    // nothing. The first file of the same bulk open passes `previewCohort` unset, so it already
+    // did the one eviction this whole batch gets (see that branch below).
+    tabsState.tabs.push(record);
+    tabsState.previewIdsByWorkspace[workspaceKey] = [
+      ...(tabsState.previewIdsByWorkspace[workspaceKey] ?? []),
+      id,
+    ];
+  } else if (opts.preview) {
+    const evictedIds = tabsState.previewIdsByWorkspace[workspaceKey] ?? [];
+    if (evictedIds.length > 0) {
+      // §5.2 rule 3: close-then-insert at the first evicted tab's own array position, never
+      // mutate its kind in place — closeTab is the one path that frees page stores/runtime for a
       // discriminated-union record. No clamp against the workspace's pinned tab here: rendering
       // order comes from tabsForWorkspace's own computed partition (§6.1, state/mode.ts) and no
       // longer depends on where a tab physically sits in this array, so this insert can never land
       // a tab left of the graph tab visually regardless of index.
-      const evictedIdx = tabsState.tabs.findIndex((t) => t.id === evictedId);
+      const evictedIdx = tabsState.tabs.findIndex((t) => t.id === evictedIds[0]);
       const insertAt = evictedIdx < 0 ? tabsState.tabs.length : evictedIdx;
       tabsState.tabs.splice(insertAt, 0, record);
-      closeTab(evictedId);
+      for (const evictedId of evictedIds) closeTab(evictedId);
     } else {
-      // §5.2 rule 4: no preview tab yet — create at the end, set the slot.
+      // §5.2 rule 4: no preview cohort yet — create at the end.
       tabsState.tabs.push(record);
     }
-    tabsState.previewIdByWorkspace[workspaceKey] = id;
+    tabsState.previewIdsByWorkspace[workspaceKey] = [id];
   } else {
-    // §5.2 rule 2: a permanent open never evicts a preview tab — the slot is untouched.
+    // §5.2 rule 2: a permanent open never evicts a preview cohort — it is left untouched.
     tabsState.tabs.push(record);
   }
 
@@ -591,8 +616,8 @@ export function closeTab(id: string): void {
   dropAllPagesForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
   clearSelectedCellFor(id);
   clearPending(id);
-  // §5.2 rule 5: closing the preview tab clears the slot.
-  if (tabsState.previewIdByWorkspace[key] === id) tabsState.previewIdByWorkspace[key] = null;
+  // §5.2 rule 5: closing a preview tab removes it from the cohort.
+  removeFromPreviewCohort(key, id);
 
   if (wasActive) {
     const keyTabs = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
@@ -621,7 +646,7 @@ export function closeWorkspaceTabs(key: WorkspaceKey): void {
   }
   tabsState.tabs = tabsState.tabs.filter((t) => workspaceKeyOf(t) !== key);
   delete tabsState.activeIdByWorkspace[key];
-  delete tabsState.previewIdByWorkspace[key];
+  delete tabsState.previewIdsByWorkspace[key];
   saveNow();
 }
 
@@ -641,7 +666,7 @@ export function closeOthers(id: string): void {
     dropAllPagesForTab(tabId);
     clearSelectedCellFor(tabId);
     clearPending(tabId);
-    if (tabsState.previewIdByWorkspace[key] === tabId) tabsState.previewIdByWorkspace[key] = null;
+    removeFromPreviewCohort(key, tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
   keep.active = true;
@@ -669,7 +694,7 @@ export function closeToTheRight(id: string): void {
     dropAllPagesForTab(tabId);
     clearSelectedCellFor(tabId);
     clearPending(tabId);
-    if (tabsState.previewIdByWorkspace[key] === tabId) tabsState.previewIdByWorkspace[key] = null;
+    removeFromPreviewCohort(key, tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
   const remaining = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
@@ -697,7 +722,7 @@ export function closeAll(): void {
     clearPending(tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
-  tabsState.previewIdByWorkspace[key] = null;
+  tabsState.previewIdsByWorkspace[key] = [];
   const remaining = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key);
   if (remaining.length === 0) {
     // studio/api always land here (no pinned kind exists in either) — byte-identical to the old
@@ -735,7 +760,7 @@ export function moveTab(fromId: string, toId: string): void {
   // §5.2's own promotion trigger list: starting a drag of the preview tab promotes it before it
   // splices — a tab you deliberately positioned must not vanish on the next single click.
   const key = workspaceKeyOf(fromTab);
-  if (tabsState.previewIdByWorkspace[key] === fromId) tabsState.previewIdByWorkspace[key] = null;
+  removeFromPreviewCohort(key, fromId);
 
   const next = [...tabs];
   const [moved] = next.splice(fromIdx, 1);
@@ -764,11 +789,24 @@ export function activatePrevTab(): void {
   stepTab(-1);
 }
 
-// C5 §5.1: what TabStrip.vue renders in italics — a tab is a workspace's own current preview tab.
+// C5 §5.1: what TabStrip.vue renders in italics — a tab is one of its workspace's current
+// preview cohort (P74 §5.2: a set now, not one slot).
 export function isPreview(id: string): boolean {
   const tab = tabsState.tabs.find((t) => t.id === id);
   if (!tab) return false;
-  return tabsState.previewIdByWorkspace[workspaceKeyOf(tab)] === id;
+  return (tabsState.previewIdsByWorkspace[workspaceKeyOf(tab)] ?? []).includes(id);
+}
+
+// P74 §6: a double click on a preview tab makes it permanent — removes it from the cohort,
+// leaving every other previewed tab as replaceable as before. The one place this rule lives, so
+// TabStrip.vue's own `@dblclick` binding cannot drift from §5.2's own filters.
+export function promoteTab(id: string): void {
+  const tab = tabsState.tabs.find((t) => t.id === id);
+  if (!tab) return;
+  const key = workspaceKeyOf(tab);
+  if (!tabsState.previewIdsByWorkspace[key]?.includes(id)) return;
+  removeFromPreviewCohort(key, id);
+  saveNow();
 }
 
 // D17: a patch that sets every field to the value it already had (DataGrid.vue's scroll-persist

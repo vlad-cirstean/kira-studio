@@ -1156,13 +1156,17 @@ the nav-level reason (a repository is an instance inside the Git module, not a s
   existed before this phase, so studio/api behave byte-identically — the only thing that changed
   under them is that the record they are filtered by is now computed by a function with a `??` in
   it, not a plain lookup.
-- **The preview slot is one entry per workspace** (`tabsState.previewIdByWorkspace`, in-memory
-  only, like `tabsState.hydrated`) — VS Code's own convention: a single click opens a file into one
+- **The preview slot is a cohort per workspace** (`tabsState.previewIdsByWorkspace`, in-memory
+  only, like `tabsState.hydrated`) — VS Code's own convention: a single click opens a file into a
   shared, replaceable preview tab (rendered in italics); a double-click, or a second single-click
-  reuse, promotes it to a permanent tab. A permanent open never evicts a preview tab; a new preview
-  open closes the old preview tab and splices the new one into its exact array position, rather
-  than mutating the closed tab's own record in place, so the one existing close path
-  (`closeTab`, which frees page stores/runtime) still runs.
+  reuse, promotes it to a permanent tab (`promoteTab`). A permanent open never evicts the preview
+  cohort; an ordinary (non-cohort) preview open evicts every id currently in it and splices the new
+  tab into the first evicted tab's own array position, rather than mutating a closed tab's record
+  in place, so the one existing close path (`closeTab`, which frees page stores/runtime) still
+  runs. **P74 §5.2** widened this from a single id to a set: `openTab`'s `previewCohort` flag lets a
+  bulk opener ("Open all changes") join several tabs into one replaceable batch instead of each
+  evicting the last — the first file of a batch evicts (no flag), every file after it joins
+  (flag set).
 - **The pin is a property of the tab *kind*, not a per-tab flag.** `repo-graph` is the only pinned
   kind (`TabKindDef.pinned`) — permanently first (`tabsForWorkspace`'s own stable partition, pinned
   tabs first in array order, then the rest), unclosable, un-reorderable, un-duplicable. This phase
@@ -1749,7 +1753,7 @@ other, and (per-window `tabs.window_key` scoping, unaffected) cannot leak tabs a
 **C5 widened this from "per mode" to "per workspace"** (see "Native code workspace (C5)" above) —
 `TAB_KIND_MODE`'s value type is `TabScope = AppMode | 'repo'` now, a repo tab's real workspace
 comes from `TabRecord.workspaceId` instead (`workspaceKeyOf`), and `tabsState.activeIdByWorkspace`/
-`previewIdByWorkspace` replaced the old per-mode-only maps. Nothing above changed in effect for
+`previewIdsByWorkspace` replaced the old per-mode-only maps. Nothing above changed in effect for
 studio/api: `workspaceId` is `null` for both, so `workspaceKeyOf` falls straight back to
 `TAB_KIND_MODE[kind]` and every one of these six functions is byte-identical for them.
 

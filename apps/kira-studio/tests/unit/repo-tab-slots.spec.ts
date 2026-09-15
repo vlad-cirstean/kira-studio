@@ -87,7 +87,7 @@ describe('C5 §5.2: the preview slot', () => {
     const tab = openFile(ws, 'closeme.ts', true);
     expect(isPreview(tab.id)).toBe(true);
     closeTab(tab.id);
-    expect(tabsState.previewIdByWorkspace[ws]).toBeNull();
+    expect(tabsState.previewIdsByWorkspace[ws] ?? []).toEqual([]);
   });
 
   test("two workspaces' preview slots are independent", () => {
