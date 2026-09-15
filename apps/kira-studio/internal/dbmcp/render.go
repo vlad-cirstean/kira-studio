@@ -302,9 +302,15 @@ func statementIdentifierWords(statement string) map[string]bool {
 // that itself renames a masked column (`CREATE VIEW v AS SELECT email AS e ...; SELECT e FROM v`)
 // mentions the masked column's real name nowhere in the statement this function sees — the view
 // definition isn't visible here. Documented as a known open item rather than chased further.
-func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.ColumnDescriptor) (string, bool) {
+// The third return, viaAlias, distinguishes the two refusal shapes for the caller's error message:
+// true when the masked column is present under its own name yet also re-projected under another
+// (an actual rename/transform this scan found evidence of); false when it is simply absent from
+// the result set but mentioned somewhere in the statement — a WHERE/JOIN filter is the common,
+// entirely legitimate case, indistinguishable here from an actual rename this text scan can't see
+// through, so both are refused, but only the alias case may claim a rename or transform.
+func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.ColumnDescriptor) (name string, hidden, viaAlias bool) {
 	if mk == nil || mk.Empty() || statement == "" {
-		return "", false
+		return "", false, false
 	}
 	present := make(map[string]bool, len(columns))
 	presentNames := make([]string, 0, len(columns))
@@ -323,15 +329,15 @@ func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.C
 	for _, name := range names {
 		if !present[name] {
 			if words[name] {
-				return name, true
+				return name, true, false
 			}
 			continue
 		}
 		if maskColumnRenamedViaAlias(statement, name, presentNames) {
-			return name, true
+			return name, true, true
 		}
 	}
-	return "", false
+	return "", false, false
 }
 
 // maskColumnRenamedViaAlias reports whether statement contains explicit alias evidence — the
@@ -364,12 +370,26 @@ func maskColumnRenamedViaAlias(statement, name string, presentNames []string) bo
 	return re.MatchString(statement)
 }
 
-// newMaskRenameRefusedError is §4.4's refusal, reused for the aliasing/expression case (finding
-// #3): the statement mentions a masked column that the result set does not carry under its own
-// name, so refuse rather than silently return it unmasked.
+// newMaskRenameRefusedError is §4.4's refusal for the aliasing/expression case (finding #3): the
+// masked column is present in the result set under its own name AND ALSO re-projected under
+// another, actual evidence of a rename or transform this scan found.
 func newMaskRenameRefusedError(column string) error {
 	return &maskingRefusedError{msg: fmt.Sprintf(
 		"this query renames or transforms a masked column (%q) — select it by its own name to see the masked value; the maskless raw form isn't permitted over this connection",
+		column,
+	)}
+}
+
+// newMaskMentionedButAbsentRefusedError is maskedColumnRenamedOrHidden's other refusal shape: the
+// masked column is not in the result set at all, but its name appears somewhere in the statement
+// — most often a WHERE/JOIN filter with no rename involved. A word-level text scan can't tell that
+// apart from a rename this function's other checks failed to catch, so it refuses either way, but
+// this message never claims to have found a rename or transform it didn't actually see (M7 finding
+// — the previous shared wording read as a false positive to an AI client filtering on, but not
+// selecting, a masked column).
+func newMaskMentionedButAbsentRefusedError(column string) error {
+	return &maskingRefusedError{msg: fmt.Sprintf(
+		"this query references a masked column (%q) that isn't in the result set — refused because a text scan can't tell whether it was filtered, renamed, or transformed; select it by its own name to see the masked value",
 		column,
 	)}
 }
@@ -396,8 +416,11 @@ func newMaskColumnlessKeyValueRefusedError() error {
 func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statement string) (any, error) {
 	switch pg := p.(type) {
 	case page.TabularPage:
-		if name, hidden := maskedColumnRenamedOrHidden(statement, mk, pg.Columns); hidden {
-			return nil, newMaskRenameRefusedError(name)
+		if name, hidden, viaAlias := maskedColumnRenamedOrHidden(statement, mk, pg.Columns); hidden {
+			if viaAlias {
+				return nil, newMaskRenameRefusedError(name)
+			}
+			return nil, newMaskMentionedButAbsentRefusedError(name)
 		}
 		r := renderTabularPage(pg, maxRows, mk)
 		r.Plan = plan

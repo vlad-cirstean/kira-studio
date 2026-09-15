@@ -416,6 +416,25 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 	if _, err := renderPage(pg2, 200, nil, &set, "SELECT email FROM customers WHERE email = 'x'"); err != nil {
 		t.Fatalf("renderPage(masked column selected and filtered by its own name) = %v, want no error", err)
 	}
+
+	// Filtering on a masked column that is NOT selected at all is refused (the scanner can't tell
+	// a WHERE-only mention from an actual rename it failed to catch), but must not claim to have
+	// found a rename or transform it never actually saw — the WHERE-clause case gets its own,
+	// accurate wording (M7 finding).
+	b5 := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "id", DataType: "int4", TypeClass: page.TypeClassNumber},
+	})
+	if err := b5.AppendRow([]*string{&id}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg5 := b5.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(pg5, 200, nil, &set, "SELECT id FROM customers WHERE email = 'x'"); err == nil {
+		t.Fatal("renderPage(masked column filtered but not selected) = nil error, want a refusal")
+	} else if strings.Contains(err.Error(), "renames or transforms") {
+		t.Fatalf("renderPage error = %q, a WHERE-only mention must not claim a rename/transform it never found", err.Error())
+	} else if !strings.Contains(err.Error(), "email") || !strings.Contains(err.Error(), "isn't in the result set") {
+		t.Fatalf("renderPage error = %q, want it to name the column and explain it is absent from the result set", err.Error())
+	}
 }
 
 // TestMaskedToolErrorWithholdsAdapterMessage is finding #4 (M6): a Postgres/MySQL driver error
