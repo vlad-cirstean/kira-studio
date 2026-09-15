@@ -54,13 +54,35 @@ export interface MaskingRule {
 const REDACT_LITERAL = '[redacted]';
 const BULLET = '•'; // U+2022 — not `*`, which reads as SQL/shell syntax.
 
-// graphemes splits s into Unicode grapheme clusters via Intl.Segmenter (UAX #29), the same
-// standard github.com/rivo/uniseg implements on the Go side — length hints count graphemes, not
-// UTF-16 code units, so a masked CJK or emoji-bearing value does not lie about its size.
-function graphemes(s: string): string[] {
-  if (s === '') return [];
-  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
-  return Array.from(segmenter.segment(s), (seg) => seg.segment);
+// graphemeSegmenter is UAX #29 grapheme-cluster segmentation via Intl.Segmenter, the same standard
+// github.com/rivo/uniseg implements on the Go side — length hints count graphemes, not UTF-16 code
+// units, so a masked CJK or emoji-bearing value does not lie about its size. Hoisted to module
+// scope (finding #16, M6): constructing one per call — as every cell in a masked grid column did,
+// once per render — is real, avoidable setup cost Intl.Segmenter's own construction carries; the
+// segmenter itself holds no per-string state, so one shared instance is safe to reuse.
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+// graphemeCount returns s's grapheme-cluster count without materializing every cluster into an
+// array — the shape maskText and maskEmail's domain-hint-off case need (a count alone).
+function graphemeCount(s: string): number {
+  if (s === '') return 0;
+  let n = 0;
+  for (const _ of graphemeSegmenter.segment(s)) n++;
+  return n;
+}
+
+// firstGraphemeAndCount returns s's first grapheme cluster (empty when s is empty) alongside its
+// total count in one segmenter pass — maskWord's own need, without allocating an array of every
+// cluster just to keep two of them.
+function firstGraphemeAndCount(s: string): { first: string; count: number } {
+  if (s === '') return { first: '', count: 0 };
+  let first = '';
+  let count = 0;
+  for (const seg of graphemeSegmenter.segment(s)) {
+    if (count === 0) first = seg.segment;
+    count++;
+  }
+  return { first, count };
 }
 
 // maskWord masks one word: first grapheme + bullet run when keepHint, an all-bullet run of the
@@ -70,11 +92,10 @@ function graphemes(s: string): string[] {
 // back whole. The length hint survives intact either way (a single bullet still says "one
 // grapheme"); only the content does not.
 function maskWord(word: string, keepHint: boolean): string {
-  const g = graphemes(word);
-  const n = g.length;
+  const { first, count: n } = firstGraphemeAndCount(word);
   if (n === 0) return '';
   if (!keepHint || n === 1) return BULLET.repeat(n);
-  return g[0] + BULLET.repeat(n - 1);
+  return first + BULLET.repeat(n - 1);
 }
 
 // NAME_WORD_SPLIT_RE mirrors Go's strings.Fields (unicode.IsSpace) rather than plain `\s`: JS's
@@ -102,7 +123,7 @@ function maskEmail(value: string, keepHint: boolean): string {
   const local = value.slice(0, i);
   const domain = value.slice(i + 1);
   const localMasked = maskWord(local, keepHint);
-  const domainMasked = keepHint ? domain : BULLET.repeat(graphemes(domain).length);
+  const domainMasked = keepHint ? domain : BULLET.repeat(graphemeCount(domain));
   return `${localMasked}@${domainMasked}`;
 }
 
@@ -123,7 +144,7 @@ function lengthBucket(n: number): string {
 
 // maskText keeps nothing but a bucketed length — no first character, no exact length.
 function maskText(value: string): string {
-  const n = graphemes(value).length;
+  const n = graphemeCount(value);
   return `${BULLET}${BULLET}${BULLET} (text, ${lengthBucket(n)} chars)`;
 }
 

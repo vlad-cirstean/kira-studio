@@ -355,7 +355,7 @@ function displayCell(row: number, displayCol: number): DisplayCellView {
   if (view.staged || !maskPreviewOn() || maskRulesByColumn.size === 0) return view;
   const field = currentOrder()[displayCol];
   if (!field) return view;
-  const masked = createMaskPreviewTransform(maskRulesByColumn, maskTagCache)(view, field);
+  const masked = maskTransform(view, field);
   return { ...view, text: masked.text, isNull: masked.isNull, truncated: masked.truncated };
 }
 // M5 §6.6: "copy follows display" — row copy must not paste real values while the preview is
@@ -367,7 +367,6 @@ function displayCell(row: number, displayCol: number): DisplayCellView {
 function rowSnapshot(row: number): RowSnapshot {
   const snap = rvRowSnapshot(props.tabId, getPage(props.tabId), currentOrder(), row);
   if (!maskPreviewOn() || maskRulesByColumn.size === 0) return snap;
-  const transform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
   const values: Record<string, string | null> = {};
   for (const name of snap.columns) {
     const raw = snap.values[name];
@@ -375,7 +374,7 @@ function rowSnapshot(row: number): RowSnapshot {
       values[name] = null;
       continue;
     }
-    const masked = transform(
+    const masked = maskTransform(
       { text: raw, isNull: false, truncated: snap.truncated?.has(name) ?? false },
       name,
     );
@@ -417,11 +416,10 @@ function columnValuesFor(displayCol: number): string[] {
   if (!field) return values;
   const rule = maskRulesByColumn.get(field.toLowerCase());
   if (!rule) return values;
-  const transform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
   // rvColumnValuesFor already collapsed NULL to '' (its own contract, matching every other
   // column-values consumer) — masking that empty string is a no-op regardless (Apply's own
   // "empty stays empty" universal rule), so no NULL-awareness is lost by transforming it anyway.
-  return values.map((text) => transform({ text, isNull: false, truncated: false }, field).text);
+  return values.map((text) => maskTransform({ text, isNull: false, truncated: false }, field).text);
 }
 
 // FIX-8: PK/FK stated as a label, never inferred from colour alone — mirrors DataGrid.vue's own
@@ -591,12 +589,18 @@ function insertRowColumns(order: readonly string[]): NonNullable<ItemMetadata['c
 // `dataSourceState` itself, which must stay synchronous.
 let maskRulesByColumn = new Map<string, MaskingRule>();
 let maskTagCache = new Map<string, string>();
+// Perf (finding #16, M6): one shared transform instance per (maskRulesByColumn, maskTagCache)
+// pair — rebuilt only here and in refreshMaskTagCache below, whenever either actually changes —
+// instead of every displayCell/rowSnapshot/columnValuesFor/dataSourceState call constructing (and
+// memoizing nothing in) its own. displayCell alone runs once per visible cell on every render.
+let maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 
 // Re-resolves maskRulesByColumn from this tab's own connection — cheap (state/maskRules.ts's own
 // in-memory store, no IPC round trip when already loaded).
 function refreshMaskFolding(): void {
   const connectionId = tab()?.connectionId;
   maskRulesByColumn = connectionId ? foldRulesByColumn(maskRulesFor(connectionId)) : new Map();
+  maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 }
 
 // Rebuilds the tag cache for the CURRENT page against the CURRENT folding — §6.3's own "precompute
@@ -608,10 +612,12 @@ async function refreshMaskTagCache(): Promise<void> {
   const p = getPage(props.tabId);
   if (!connectionId || !p || maskRulesByColumn.size === 0) {
     maskTagCache = new Map();
+    maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
     return;
   }
   const key = await correlationKeyFor(connectionId);
   maskTagCache = await buildMaskTagCache(p, maskRulesByColumn, key);
+  maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 }
 
 // C9 — the `GridDataSourceState` builder itself, factored out once this stopped being the single
@@ -624,10 +630,8 @@ function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDa
   const insertColumns = inserts.length > 0 ? insertRowColumns(order) : undefined;
   // M5 §6.2: `undefined` when mask preview is off (or this tab has no masked columns at all) —
   // the extractor is then byte-for-byte what it was before M5.
-  const maskTransform =
-    maskPreviewOn() && maskRulesByColumn.size > 0
-      ? createMaskPreviewTransform(maskRulesByColumn, maskTagCache)
-      : undefined;
+  const activeMaskTransform =
+    maskPreviewOn() && maskRulesByColumn.size > 0 ? maskTransform : undefined;
   return {
     index: { displayRows: currentDisplayRows(), pageRowCount: p?.rowCount ?? 0 },
     inserts,
@@ -636,7 +640,7 @@ function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDa
       ? (handle) => (handle.insertId !== undefined ? insertColumns : undefined)
       : undefined,
     extractValue: p
-      ? createDisplayValueExtractor(props.tabId, p, order, maskTransform)
+      ? createDisplayValueExtractor(props.tabId, p, order, activeMaskTransform)
       : () => ({ text: '', isNull: true, truncated: false }),
   };
 }
