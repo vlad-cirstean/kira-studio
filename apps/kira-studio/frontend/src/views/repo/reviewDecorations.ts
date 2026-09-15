@@ -29,7 +29,7 @@ import type {
   ReviewComment,
   Transport,
 } from '@kira/git-ipc';
-import { type App, createApp } from 'vue';
+import { type App, createApp, nextTick } from 'vue';
 import { onReviewRepaint } from '../../repo/git/transport';
 import type { MonacoModule } from './monaco';
 import ReviewThread from './ReviewThread.vue';
@@ -37,6 +37,14 @@ import ReviewThread from './ReviewThread.vue';
 type DiffEditor = import('monaco-editor').editor.IStandaloneDiffEditor;
 type ModifiedEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 type DeltaDecoration = import('monaco-editor').editor.IModelDeltaDecoration;
+type ViewZone = import('monaco-editor').editor.IViewZone;
+
+// §3.1: pinned monaco-editor@0.56.0's own `view.js` appends `.view-zones` BEFORE `.view-lines` in
+// `.lines-content`, and `viewLines.js` sizes `.view-lines` to the full scroll width/height with no
+// z-index of its own (`position: absolute; z-index: auto`) — a later positioned sibling with
+// `z-index: auto` loses every hit test to it. `10` is VS Code's own value for the view-zone
+// widgets it mounts the same way; without it, a zone paints but nothing in it can ever be clicked.
+const VIEW_ZONE_Z_INDEX = '10';
 
 export interface ReviewDecorationsDeps {
   readonly transport: Transport;
@@ -156,10 +164,25 @@ export function attachReviewDecorations(
   function openZone(afterLine: number, mount: (container: HTMLElement) => App): void {
     closeZone();
     const domNode = document.createElement('div');
+    domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
+    const zone: ViewZone = { afterLineNumber: afterLine, heightInPx: 120, domNode };
     modifiedEditor.changeViewZones((accessor) => {
-      zoneId = accessor.addZone({ afterLineNumber: afterLine, heightInPx: 120, domNode });
+      zoneId = accessor.addZone(zone);
     });
     zoneApp = mount(domNode);
+    // §3.2: 120 predates the compose form's final shape — measure the mounted app's own root
+    // (`.review-thread`, already `overflow: auto`) once it has rendered and re-lay the zone out,
+    // so a long existing comment scrolls inside its own box instead of being clipped by a guess.
+    const id = zoneId;
+    if (id === null) return; // addZone's own callback ran synchronously just above; defensive only.
+    void nextTick(() => {
+      if (zoneId !== id || disposed) return;
+      const measured = domNode.firstElementChild?.scrollHeight;
+      if (measured && measured !== zone.heightInPx) {
+        zone.heightInPx = measured;
+        modifiedEditor.changeViewZones((accessor) => accessor.layoutZone(id));
+      }
+    });
   }
 
   // C12-7: resolveBase's own failure (a transient index.lock conflict, most likely) used to be
@@ -182,6 +205,9 @@ export function attachReviewDecorations(
   function showBannerZone(message: string, retryable: boolean): void {
     closeErrorZone();
     const domNode = document.createElement('div');
+    // §3.1: same paint-order defect as the compose zone above — the Retry button is otherwise
+    // unreachable.
+    domNode.style.zIndex = VIEW_ZONE_Z_INDEX;
     domNode.className = 'kira-review-load-error';
     const span = document.createElement('span');
     span.textContent = message;
