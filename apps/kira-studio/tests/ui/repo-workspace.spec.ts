@@ -436,6 +436,106 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
   await expect(page.locator('.kira-blame-inline')).toHaveCount(0);
 });
 
+// P76 §5/§12.2: the status bar's own blame item, plus §2's revision-pinned guard proven the same
+// way the test above proves its guard — a resolvable trap, not an absent one. Both `repo.open` and
+// `blame.line` answer in each relaunch below; if `blameable` ever again omitted `rev === null`
+// (§2's fix), the revision-pinned half would call them too and the item would wrongly appear.
+test('a repo workspace: the status bar blame item follows the cursor, and never shows on a revision-pinned tab (P76)', async ({
+  relaunch,
+}) => {
+  const BLAME_RESULT = {
+    sha: 'a'.repeat(40),
+    author: 'Ada Lovelace',
+    authorTimeSeconds: 1_700_000_000,
+    summary: 'Fix the frobnicator',
+  };
+
+  {
+    const { window: page } = await relaunch({ control: CONTROL });
+    // See :364's own comment: lazy `gitTransportFor`, so this lands before Stream('git') is ever
+    // called as long as it precedes the dblclick that opens the workspace.
+    await installGitStreamMock(page, REPO.repoId, {
+      'repo.open': undefined,
+      'blame.line': BLAME_RESULT,
+    });
+
+    await openGitModule(page);
+    await repoRow(page).dblclick();
+    await treeRow(page, 'a.ts').click();
+
+    const editor = page.locator('[data-testid="repo-file-editor"]');
+    await expect(editor).toBeVisible();
+    const blameStatus = page.locator('[data-testid="blame-status"]');
+    await expect(blameStatus).toHaveCount(0); // nothing resolved until the cursor actually moves
+
+    await editor.locator('.view-lines').click();
+    await page.keyboard.press('ArrowDown');
+
+    await expect(blameStatus).toBeVisible();
+    await expect(blameStatus).toContainText('Ada Lovelace');
+    await expect(blameStatus).toContainText('Fix the frobnicator');
+  }
+
+  {
+    // A revision-pinned repo-file tab (`rev` set), seeded directly as a restored tab — the real
+    // navigation paths to one (a commit's "Go to file", a diff tab's own go-to-file command) both
+    // need `graph.stream`/`file.goToTarget`, which this mock deliberately never answers (§10).
+    // Marking it `active` here (unlike the restored-tab test above, which leaves its tab inactive
+    // to exercise ensureWorkspaceShell's own fallback) means it renders as soon as the workspace
+    // itself activates, with no tree click needed.
+    const REV = 'b'.repeat(40);
+    const { window: page } = await relaunch({
+      control: [
+        // mockRuntime.ts's own inferredBootMode() maps an active tab's `kind` through
+        // TAB_KIND_MODE, whose repo-file/repo-graph entry is the fixed sentinel 'repo' (state/
+        // mode.ts's own comment) — not a real AppMode, and not what hydrateMode's own
+        // `workspaceState.active = mode` (state/mode.ts:44) expects. An explicit snapshot sidesteps
+        // that inference the same way the restored-tab test above's does, for the same reason.
+        { channel: IPC.windowsEnsure, response: { mode: 'studio' } },
+        { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
+        { channel: IPC.codeWorkspaceListFiles, args: { id: REPO.id }, response: FILE_LISTING },
+        {
+          channel: IPC.tabsList,
+          response: [
+            {
+              id: 'restored-repo-graph',
+              kind: 'repo-graph',
+              connectionId: null,
+              path: '',
+              order: 0,
+              active: false,
+              workspaceId: `repo:${REPO.id}`,
+              state: { viewState: null, reviewSession: null },
+            },
+            {
+              id: 'restored-repo-file-rev',
+              kind: 'repo-file',
+              connectionId: null,
+              path: 'a.ts',
+              order: 1,
+              active: true,
+              workspaceId: `repo:${REPO.id}`,
+              state: { revealLine: null, markdownReading: false, rev: REV },
+            },
+          ],
+        },
+      ],
+    });
+    await installGitStreamMock(page, REPO.repoId, {
+      'repo.open': undefined,
+      'blame.line': BLAME_RESULT,
+      'file.read': { kind: 'found', content: 'export const a = 1;\n' },
+    });
+
+    await openGitModule(page);
+    await repoRow(page).dblclick();
+
+    const editor = page.locator('[data-testid="repo-file-editor"]');
+    await expect(editor).toBeVisible();
+    await expect(page.locator('[data-testid="blame-status"]')).toHaveCount(0);
+  }
+});
+
 // P67b §4.2/§9: "activating a repo tab from anywhere brings the Git module forward" — the
 // concrete boot-time manifestation is main.ts's post-hydrate loop: a window that persisted
 // 'studio' as its own module but restored a repo's pinned graph tab with no active tab of its own

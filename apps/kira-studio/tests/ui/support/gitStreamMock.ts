@@ -21,113 +21,127 @@ import type { Page } from '@playwright/test';
 //    `WailsSocket.send` (§3's root-cause quote) — without this, the pre-fix `post` (a bare
 //    `socket.send(...)`) would silently succeed against this double even though the real socket
 //    throws, which is the same vacuous-pass risk from the opposite direction.
-export async function installGitStreamMock(page: Page, gitRepoId: string): Promise<void> {
-  await page.evaluate((repoId: string) => {
-    const w =
-      (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ??
-      {};
-    (window as unknown as { _wails: typeof w })._wails = w;
-    const existingFactory = w.streamFactory;
+// P76 §12.2: `extraResults` is optional and additive — merged into `resultByMethod` only for a
+// caller that passes it, so `repo-graph-lifecycle.spec.ts`'s own bootstrap() (and every other
+// existing caller) keeps hanging on every method beyond the three above exactly as before. Adding
+// `repo.open`/`blame.line` globally would let bootstrap() proceed past a point it currently hangs
+// at, a behavior change for specs that never asked for it (P74/P75 both recorded this mock's own
+// missing graph.stream/commit.detail as a known gap — this stays additive for the same reason).
+export async function installGitStreamMock(
+  page: Page,
+  gitRepoId: string,
+  extraResults?: Record<string, unknown>,
+): Promise<void> {
+  await page.evaluate(
+    ({ repoId, extraResults }: { repoId: string; extraResults?: Record<string, unknown> }) => {
+      const w =
+        (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ??
+        {};
+      (window as unknown as { _wails: typeof w })._wails = w;
+      const existingFactory = w.streamFactory;
 
-    const CONNECTING = 0;
-    const OPEN = 1;
-    const CLOSED = 3;
+      const CONNECTING = 0;
+      const OPEN = 1;
+      const CLOSED = 3;
 
-    interface MockSocket {
-      binaryType: string;
-      onopen: ((ev: unknown) => void) | null;
-      onmessage: ((ev: { data: ArrayBuffer }) => void) | null;
-      onclose: ((ev: unknown) => void) | null;
-      onerror: ((ev: unknown) => void) | null;
-      readyState: number;
-      send(data: string): void;
-      close(): void;
-    }
+      interface MockSocket {
+        binaryType: string;
+        onopen: ((ev: unknown) => void) | null;
+        onmessage: ((ev: { data: ArrayBuffer }) => void) | null;
+        onclose: ((ev: unknown) => void) | null;
+        onerror: ((ev: unknown) => void) | null;
+        readyState: number;
+        send(data: string): void;
+        close(): void;
+      }
 
-    function deliver(socket: MockSocket, envelope: unknown): void {
-      const bytes = new TextEncoder().encode(JSON.stringify(envelope));
-      setTimeout(() => socket.onmessage?.({ data: bytes.buffer }), 0);
-    }
+      function deliver(socket: MockSocket, envelope: unknown): void {
+        const bytes = new TextEncoder().encode(JSON.stringify(envelope));
+        setTimeout(() => socket.onmessage?.({ data: bytes.buffer }), 0);
+      }
 
-    function createGitMockSocket(): MockSocket {
-      const socket: MockSocket = {
-        binaryType: 'arraybuffer',
-        onopen: null,
-        onmessage: null,
-        onclose: null,
-        onerror: null,
-        readyState: CONNECTING,
-        send(data: string) {
-          // @wailsio/runtime's own WailsSocket.send throws on a CONNECTING socket (P67b §3's root
-          // cause, quoted verbatim in the plan) — reproduced here so a channel that skips the
-          // open-ack gate and sends synchronously actually fails the way the real bug did.
-          if (socket.readyState === CONNECTING) {
-            throw new DOMException('Still in CONNECTING state.', 'InvalidStateError');
-          }
-          // bridge/port.ts's own P57 D3 comment, describing the same WailsSocket: "throws on a
-          // CONNECTING socket and silently drops on a closed one" — a request sent over a
-          // transport whose lease/dispose tore down the underlying socket (bug 1, §2) must hang
-          // exactly as the real bug did, not (wrongly) still answer.
-          if (socket.readyState === CLOSED) return;
-          let envelope: { version: number; body?: { t?: string; id?: number; method?: string } };
-          try {
-            envelope = JSON.parse(data);
-          } catch {
-            return;
-          }
-          const frame = envelope.body;
-          if (frame?.t !== 'req' || frame.id === undefined) return;
-          // @kira/git-ipc's rpc.ts frame union: {t:'res', id, ok:true, result}.
-          const resultByMethod: Record<string, unknown> = {
-            'app.init': {
-              contractVersion: envelope.version,
-              serverVersion: 'ui-test',
-              git: { kind: 'ok', path: '/usr/bin/git', version: '2.40.0' },
-            },
-            'repo.list': { candidates: [], activeRepoId: repoId },
-            'refs.list': {
-              branches: [
-                {
-                  refname: 'refs/heads/main',
-                  kind: 'branch',
-                  shortName: 'main',
-                  objectId: '0'.repeat(40),
-                  peeledObjectId: undefined,
-                  upstream: undefined,
-                  track: undefined,
-                  committerDate: 0,
-                  isHead: true,
-                  checkedOutIn: undefined,
-                  annotation: undefined,
-                },
-              ],
-              remoteBranches: [],
-              tags: [],
-              head: { kind: 'branch', name: 'main' },
-            },
-          };
-          const method = frame.method;
-          if (method === undefined || !(method in resultByMethod)) return; // hang forever
-          deliver(socket, {
-            version: envelope.version,
-            body: { t: 'res', id: frame.id, ok: true, result: resultByMethod[method] },
-          });
-        },
-        close() {
-          socket.readyState = CLOSED;
-        },
-      };
-      // Genuinely asynchronous — a later macrotask, not the same tick `Stream()` returns in. Any
-      // code that sends before this fires is sending on a CONNECTING socket, exactly the window
-      // bug 2 lived in.
-      setTimeout(() => {
-        socket.readyState = OPEN;
-        socket.onopen?.({});
-      }, 0);
-      return socket;
-    }
+      function createGitMockSocket(): MockSocket {
+        const socket: MockSocket = {
+          binaryType: 'arraybuffer',
+          onopen: null,
+          onmessage: null,
+          onclose: null,
+          onerror: null,
+          readyState: CONNECTING,
+          send(data: string) {
+            // @wailsio/runtime's own WailsSocket.send throws on a CONNECTING socket (P67b §3's root
+            // cause, quoted verbatim in the plan) — reproduced here so a channel that skips the
+            // open-ack gate and sends synchronously actually fails the way the real bug did.
+            if (socket.readyState === CONNECTING) {
+              throw new DOMException('Still in CONNECTING state.', 'InvalidStateError');
+            }
+            // bridge/port.ts's own P57 D3 comment, describing the same WailsSocket: "throws on a
+            // CONNECTING socket and silently drops on a closed one" — a request sent over a
+            // transport whose lease/dispose tore down the underlying socket (bug 1, §2) must hang
+            // exactly as the real bug did, not (wrongly) still answer.
+            if (socket.readyState === CLOSED) return;
+            let envelope: { version: number; body?: { t?: string; id?: number; method?: string } };
+            try {
+              envelope = JSON.parse(data);
+            } catch {
+              return;
+            }
+            const frame = envelope.body;
+            if (frame?.t !== 'req' || frame.id === undefined) return;
+            // @kira/git-ipc's rpc.ts frame union: {t:'res', id, ok:true, result}.
+            const resultByMethod: Record<string, unknown> = {
+              'app.init': {
+                contractVersion: envelope.version,
+                serverVersion: 'ui-test',
+                git: { kind: 'ok', path: '/usr/bin/git', version: '2.40.0' },
+              },
+              'repo.list': { candidates: [], activeRepoId: repoId },
+              'refs.list': {
+                branches: [
+                  {
+                    refname: 'refs/heads/main',
+                    kind: 'branch',
+                    shortName: 'main',
+                    objectId: '0'.repeat(40),
+                    peeledObjectId: undefined,
+                    upstream: undefined,
+                    track: undefined,
+                    committerDate: 0,
+                    isHead: true,
+                    checkedOutIn: undefined,
+                    annotation: undefined,
+                  },
+                ],
+                remoteBranches: [],
+                tags: [],
+                head: { kind: 'branch', name: 'main' },
+              },
+              ...extraResults,
+            };
+            const method = frame.method;
+            if (method === undefined || !(method in resultByMethod)) return; // hang forever
+            deliver(socket, {
+              version: envelope.version,
+              body: { t: 'res', id: frame.id, ok: true, result: resultByMethod[method] },
+            });
+          },
+          close() {
+            socket.readyState = CLOSED;
+          },
+        };
+        // Genuinely asynchronous — a later macrotask, not the same tick `Stream()` returns in. Any
+        // code that sends before this fires is sending on a CONNECTING socket, exactly the window
+        // bug 2 lived in.
+        setTimeout(() => {
+          socket.readyState = OPEN;
+          socket.onopen?.({});
+        }, 0);
+        return socket;
+      }
 
-    w.streamFactory = (name: string) =>
-      name === 'git' ? createGitMockSocket() : existingFactory?.(name);
-  }, gitRepoId);
+      w.streamFactory = (name: string) =>
+        name === 'git' ? createGitMockSocket() : existingFactory?.(name);
+    },
+    { repoId: gitRepoId, extraResults },
+  );
 }
