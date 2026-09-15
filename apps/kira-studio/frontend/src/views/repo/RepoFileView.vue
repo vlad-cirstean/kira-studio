@@ -8,6 +8,7 @@ import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
+import { claimBlameStatus, publishBlameStatus, releaseBlameStatus } from '../../state/blameStatus';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { patchRepoFileTabState } from '../../state/tabs';
@@ -120,6 +121,8 @@ let disposeCursorSub: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
 let blameHandle: BlameAnnotationHandle | null = null;
 let blameController: BlameLineController | null = null;
+let blameToken: symbol | undefined;
+let stopBlamePublish: (() => void) | undefined;
 let unwatchInlineBlame: (() => void) | null = null;
 
 // §11: every Monaco instance is readOnly/domReadOnly — neither the keyboard nor a paste can
@@ -239,26 +242,37 @@ async function mount(): Promise<void> {
   // `blame.line` always blames the working tree (contract.ts:1718) — a revision-pinned tab shows
   // different bytes, so its line numbers do not correspond.
   const blameable = gitRepoId !== undefined && rev === null;
+  if (blameable && gitRepoId) {
+    // 7d (moved, P76 §4/§5.3): one lease for this mount, shared by the controller and the reveal
+    // callback below — blameLine.ts's controller has no transport of its own to release, so
+    // whoever creates it disposes it (onUnmounted).
+    const transport = gitTransportFor(workspaceCodeRepoId);
+    blameController = createBlameLineController({
+      transport,
+      gitRepoId,
+      path: props.tab.path,
+      cursor: editor,
+    });
+    // P76 §5.3: resolved even when `inlineBlame` is off, to feed the status bar — the setting
+    // governs the inline annotation only (its own label: "…in the repository file viewer"),
+    // never blame resolution itself.
+    blameToken = claimBlameStatus((sha) => {
+      void transport.request('graph.revealCommit', { repoId: gitRepoId, sha });
+    });
+    const controller = blameController;
+    const token = blameToken;
+    stopBlamePublish = watch(controller.state, (s) => publishBlameStatus(token, s), {
+      immediate: true,
+    });
+  }
+  // §5.3: toggles only the renderer — the controller (and the status-bar publish above) run
+  // regardless of this setting.
   function syncBlameAnnotation(): void {
-    if (settingsState.appearance.inlineBlame && blameable && gitRepoId) {
-      if (!blameHandle) {
-        // 7d (moved, P76 §4): this view leases the transport now, not blameAnnotation.ts —
-        // blameLine.ts's controller is a plain request lifecycle with no transport of its own to
-        // release, so whoever creates it disposes it.
-        blameController = createBlameLineController({
-          transport: gitTransportFor(workspaceCodeRepoId),
-          gitRepoId,
-          path: props.tab.path,
-          cursor: editor,
-        });
-        blameHandle = attachBlameAnnotation(mod, editor, blameController);
-      }
+    if (settingsState.appearance.inlineBlame && blameController) {
+      blameHandle ??= attachBlameAnnotation(mod, editor, blameController);
     } else {
       blameHandle?.dispose();
       blameHandle = null;
-      blameController?.dispose();
-      blameController?.transport.dispose();
-      blameController = null;
     }
   }
   syncBlameAnnotation();
@@ -324,6 +338,10 @@ onUnmounted(() => {
   unwatchInlineBlame = null;
   blameHandle?.dispose();
   blameHandle = null;
+  stopBlamePublish?.();
+  stopBlamePublish = undefined;
+  if (blameToken !== undefined) releaseBlameStatus(blameToken);
+  blameToken = undefined;
   blameController?.dispose();
   blameController?.transport.dispose();
   blameController = null;
