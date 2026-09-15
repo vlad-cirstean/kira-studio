@@ -281,8 +281,11 @@ export class PrState {
    *  documents, for the same reason: `PrState` has no other way to reach one). Called by
    *  `CommitGrid.vue`'s existing `pr.generation` watcher, before its own `invalidateRowHeights` —
    *  never a separate watcher, so a PR resolution and the ancestry it feeds always land in the
-   *  same render pass. */
-  rebuildAncestry(store: CommitStore): void {
+   *  same render pass.
+   *
+   *  `budget` defaults to `PR_ANCESTRY_WALK_BUDGET` — overridable only so `pr.test.ts` can prove
+   *  the cutoff itself without building a 50,000-row fixture; no production caller passes it. */
+  rebuildAncestry(store: CommitStore, budget = PR_ANCESTRY_WALK_BUDGET): void {
     const next = new Map<string, PrRecord>();
     // First-writer-wins queue: every branch tip seeds the walk at once, in `byBranch`'s own
     // iteration order, so a commit reachable from two PR branches keeps whichever branch's own
@@ -297,7 +300,6 @@ export class PrState {
       queue.push(row);
     }
     const visited = new Set<number>(queue);
-    let budget = PR_ANCESTRY_WALK_BUDGET;
     let head = 0;
     while (head < queue.length && budget > 0) {
       const row = queue[head];

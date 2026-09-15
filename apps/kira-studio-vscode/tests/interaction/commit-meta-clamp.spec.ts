@@ -65,6 +65,54 @@ test.describe('CommitMeta message-body clamp', () => {
     expect(clientHeight, 'expanded: no clamp — the full content is visible').toBe(scrollHeight);
   });
 
+  // P74 §1.2/§10: the gap "Show more" itself never closed — the toggle flips and the body
+  // unhides, but `.kv-detail-pane-meta`'s own `max-height: 20%`/`overflow: hidden` (DetailPane.vue)
+  // used to stay fixed regardless, so the newly-unhidden content was clipped with no way to reach
+  // it. `--expanded` widens the cap AND switches to `overflow: auto` (this same file's own
+  // `.kv-detail-pane-meta.kv-detail-pane-meta--expanded` rule) — a real region, not an unbounded
+  // one: this harness's own fixture body (10 paragraphs, deliberately long — see this file's own
+  // comment on why) is taller than even the widened cap, so `scrollHeight > clientHeight` here is
+  // expected and correct. What must be true instead is that the content is scrollable, not gone:
+  // `overflow` is no longer `hidden` once expanded.
+  test('"Show more" grows the meta pane and makes its content reachable by scroll, not clipped', async ({
+    page,
+  }) => {
+    await page.goto(server.url);
+
+    const meta = page.locator('.kv-detail-pane-meta');
+    const collapsedHeight = await meta.evaluate((el) => el.clientHeight);
+
+    await page.locator('.kv-meta-body-toggle').click();
+
+    const { clientHeight, overflowY } = await meta.evaluate((el) => ({
+      clientHeight: el.clientHeight,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+    expect(
+      clientHeight,
+      'expanded: the pane itself grew past the collapsed 20% cap',
+    ).toBeGreaterThan(collapsedHeight);
+    expect(overflowY, 'expanded: content taller than the cap scrolls, it is not clipped away').toBe(
+      'auto',
+    );
+  });
+
+  // P74 §2.1/§10: the harness's own decoration fixture used to be `[]`, so this branch — the Refs
+  // row that only renders when `detail.decoration.length > 0` — was never exercised at all.
+  test('a commit with a ref decoration shows the Refs row after "Show more"', async ({ page }) => {
+    await page.goto(server.url);
+
+    await expect(page.locator('dt', { hasText: 'Refs' })).toHaveCount(0);
+    await expect(page.locator('.kv-meta-refs')).toHaveCount(0);
+
+    await page.locator('.kv-meta-body-toggle').click();
+
+    await expect(page.locator('dt', { hasText: 'Refs' })).toBeVisible();
+    const refs = page.locator('.kv-meta-refs');
+    await expect(refs).toBeVisible();
+    await expect(refs).toContainText('main');
+  });
+
   // G-UX (items 6/7): trailers and the author/committer identity both live inside the same
   // "Show more" region as the body now — hidden entirely while collapsed, revealed together the
   // moment it opens.
