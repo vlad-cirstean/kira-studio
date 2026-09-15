@@ -371,3 +371,50 @@ func TestBroker_UnknownRequestID_ReportsAlreadyResolved(t *testing.T) {
 		t.Fatalf("got %v, want alreadyResolved", got)
 	}
 }
+
+// TestBroker_EmitOrdered_DropsStaleSnapshot mirrors dbmcp.ApprovalBroker's own
+// TestApprovalBroker_EmitOrdered_DropsStaleSnapshot (M7 finding #10 / #23's gitsock side): Request/
+// answer/ExpireOverdue/Shutdown each snapshot state under b.mu, then unlock, then Emit —
+// notify.Emitter's own "never hold your own mutex across Emit" rule — so two of them can Emit in
+// the opposite order from the mu-protected changes that produced their snapshots. emitOrdered's
+// sequence-number guard must drop a stale Emit outright rather than let it land after a newer one
+// already went out — exercised directly and deterministically, since winning that goroutine-
+// scheduling race is not reliable to force from outside.
+func TestBroker_EmitOrdered_DropsStaleSnapshot(t *testing.T) {
+	t.Parallel()
+	b := NewBroker(newFakeClock().Now)
+
+	events := make(chan PairingSnapshot, 4)
+	unsub := b.Subscribe(func(snap PairingSnapshot) { events <- snap })
+	defer unsub()
+
+	older := "older-request-id"
+	staleSnap := PairingSnapshot{Pending: &PairingRequest{RequestID: older}, Queued: 1}
+	newerSnap := PairingSnapshot{} // e.g. the same request resolved and the queue now empty
+
+	b.mu.Lock()
+	seqOlder := b.nextSeqLocked()
+	seqNewer := b.nextSeqLocked()
+	b.mu.Unlock()
+
+	// The later (higher-sequence) resolution's Emit reaches the emitter first — the exact
+	// interleaving the finding describes.
+	b.emitOrdered(seqNewer, newerSnap)
+	b.emitOrdered(seqOlder, staleSnap)
+
+	select {
+	case got := <-events:
+		if got.Pending != nil || got.Queued != 0 {
+			t.Fatalf("first (only) event = %+v, want the newer empty snapshot", got)
+		}
+	default:
+		t.Fatal("newer snapshot was never emitted")
+	}
+
+	select {
+	case got := <-events:
+		t.Fatalf("a second, stale event was emitted: %+v — the older snapshot must be dropped, not published after a newer one", got)
+	default:
+		// correct: the stale emitOrdered call above must be a no-op.
+	}
+}

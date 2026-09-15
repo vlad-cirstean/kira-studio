@@ -2,6 +2,7 @@ package gitsock
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -79,6 +80,16 @@ type Broker struct {
 	byID     map[string]*pendingEntry
 	cooldown map[string]time.Time
 
+	// emitSeq/lastEmitted/emitOrdered guard against publishing a stale snapshot after a newer one
+	// already went out (dbmcp.ApprovalBroker's own emitSeq doc comment — this Broker was that one's
+	// model, and shares its snapshot-under-lock-then-unlock-then-Emit shape at every call site
+	// below, so it shares the same race: two of Request/answer/ExpireOverdue/Shutdown can interleave
+	// their post-unlock Emits in the opposite order from the mu-protected changes that produced
+	// them). emitSeq is read/incremented only under mu; lastEmitted is CAS-guarded so emitOrdered
+	// never reacquires mu, avoiding the reentrancy hazard mu-across-Emit would risk.
+	emitSeq     uint64
+	lastEmitted atomic.Uint64
+
 	emitter notify.Emitter[PairingSnapshot]
 }
 
@@ -103,6 +114,28 @@ func (b *Broker) snapshotLocked() PairingSnapshot {
 	}
 	head := b.queue[0].req
 	return PairingSnapshot{Pending: &head, Queued: len(b.queue)}
+}
+
+// nextSeqLocked assigns and returns the next emit sequence number (Broker.emitSeq's own doc
+// comment). Caller holds b.mu.
+func (b *Broker) nextSeqLocked() uint64 {
+	b.emitSeq++
+	return b.emitSeq
+}
+
+// emitOrdered emits snap unless a later-sequenced snapshot has already gone out. Called with b.mu
+// already released, matching notify.Emitter.Emit's own contract.
+func (b *Broker) emitOrdered(seq uint64, snap PairingSnapshot) {
+	for {
+		last := b.lastEmitted.Load()
+		if seq <= last {
+			return // superseded — a snapshot reflecting this state and more already went out
+		}
+		if b.lastEmitted.CompareAndSwap(last, seq) {
+			break
+		}
+	}
+	b.emitter.Emit(snap)
 }
 
 // InCooldown reports whether clientID is inside its 60s post-denial window (handshake row 6).
@@ -141,6 +174,7 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 	b.queue = append(b.queue, entry)
 	b.byID[entry.req.RequestID] = entry
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	if onEnqueued != nil {
@@ -158,7 +192,7 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 	// RequestID for exactly this case ("a snapshot emitted because the count behind it changed
 	// re-presents the same RequestID and is not [worth re-presenting]"), so this was already the
 	// assumed contract on the consuming side.
-	b.emitter.Emit(snap)
+	b.emitOrdered(seq, snap)
 	return <-entry.result
 }
 
@@ -197,6 +231,7 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny
 		others = b.removeAllForClientLocked(entry.req.ClientID)
 	}
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	if expired {
@@ -207,7 +242,7 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny
 	for _, other := range others {
 		other.result <- PairingDenied
 	}
-	b.emitter.Emit(snap)
+	b.emitOrdered(seq, snap)
 	if expired {
 		return PairingActionExpired
 	}
@@ -231,13 +266,14 @@ func (b *Broker) ExpireOverdue() {
 		b.removeLocked(entry)
 	}
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	for _, entry := range overdue {
 		entry.result <- PairingTimedOut
 	}
 	if len(overdue) > 0 {
-		b.emitter.Emit(snap)
+		b.emitOrdered(seq, snap)
 	}
 }
 
@@ -255,13 +291,14 @@ func (b *Broker) Shutdown() {
 	b.queue = nil
 	b.byID = map[string]*pendingEntry{}
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	for _, entry := range all {
 		entry.result <- PairingDenied
 	}
 	if len(all) > 0 {
-		b.emitter.Emit(snap)
+		b.emitOrdered(seq, snap)
 	}
 }
 
