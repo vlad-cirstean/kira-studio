@@ -30,7 +30,14 @@ type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 // time. Cached by tab id, module-level so it survives the remount; invalidated by
 // registerTabRuntimeCleanup below, the same per-tab-close hook browse/state.ts and keyvalue/state.ts
 // already use for their own runtime maps.
-const markdownHtmlByTabId = new Map<string, string>();
+//
+// Group 4 (P69 review): keyed on tab id ALONE used to go stale whenever the underlying file
+// changed between mounts of the same tab (a `git pull`, a branch checkout, an external edit —
+// routine since P67e made the git surface write-capable) — `mount()` re-reads the file from disk
+// on every remount, so Source would show fresh bytes while Reading kept showing stale rendered
+// HTML. Each entry now also carries the exact `fileText` it was rendered from, so a changed
+// `content` naturally misses the cache instead of matching on tab id alone.
+const markdownHtmlByTabId = new Map<string, { content: string; html: string }>();
 registerTabRuntimeCleanup((tabId) => {
   markdownHtmlByTabId.delete(tabId);
 });
@@ -64,12 +71,12 @@ const VIEW_OPTIONS = [
 async function ensureMarkdownRendered(): Promise<void> {
   if (renderedHtml.value !== null || !fileText.value) return;
   const cached = markdownHtmlByTabId.get(props.tab.id);
-  if (cached !== undefined) {
-    renderedHtml.value = cached;
+  if (cached !== undefined && cached.content === fileText.value) {
+    renderedHtml.value = cached.html;
     return;
   }
   const html = await renderMarkdownReading(fileText.value);
-  markdownHtmlByTabId.set(props.tab.id, html);
+  markdownHtmlByTabId.set(props.tab.id, { content: fileText.value, html });
   renderedHtml.value = html;
 }
 

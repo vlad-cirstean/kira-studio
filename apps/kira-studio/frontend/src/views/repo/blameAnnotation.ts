@@ -18,6 +18,7 @@ import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
 import { codeRepoIdFor, stashPendingBlameReveal } from '../../repo/git/hostHandlers';
 import { pinnedGraphTabId } from '../../repo/git/reviewSession';
 import { emitUiAction } from '../../repo/git/transport';
+import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { activateTab } from '../../state/tabs';
 import type { MonacoModule } from './monaco';
 
@@ -47,29 +48,10 @@ export interface BlameAnnotationHandle {
   dispose(): void;
 }
 
-// §4.2: `blame.line` needs this connection to already hold the repo. `repo.open` is idempotent
-// per (connection, repoId) and git-ui never calls `repo.close`, so the hold lives as long as the
-// transport — one memoised promise per gitRepoId, module-level so two open file tabs on the same
-// repository share it. Mirrors `reviewDecorations.ts`'s own `baseMemo` (C12-7/C13-14): only a
-// SUCCESSFUL resolution stays cached, so a transient failure can retry on the next attach rather
-// than replay the same rejection forever.
-const repoOpenMemo = new Map<string, Promise<void>>();
-
-function ensureRepoOpen(transport: Transport, gitRepoId: string): Promise<void> {
-  let cached = repoOpenMemo.get(gitRepoId);
-  if (!cached) {
-    cached = transport
-      .request('repo.open', { path: gitRepoId }, undefined)
-      .then(() => undefined)
-      .catch((err: unknown) => {
-        repoOpenMemo.delete(gitRepoId);
-        console.error('blameAnnotation: repo.open failed', err);
-        throw err;
-      });
-    repoOpenMemo.set(gitRepoId, cached);
-  }
-  return cached;
-}
+// §4.2: `blame.line` needs this connection to already hold the repo — `ensureRepoOpen` (moved to
+// state/repoOpenHold.ts, Group 3 P69 review, so `repo/git/transport.ts`'s own dispose path can
+// clear its memo entry without a views/ -> repo/ layering violation) memoises the `repo.open`
+// call per gitRepoId, one hold per transport for as long as it lives.
 
 /** Injected text must be a single line (Monaco's own `InjectedTextOptions.content` doc comment) —
  *  a commit subject can't itself contain a newline after `--line-porcelain`, but this normalises

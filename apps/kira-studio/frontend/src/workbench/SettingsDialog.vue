@@ -10,7 +10,7 @@ import {
   type Settings,
   type SettingsPatch,
 } from '@shared/domain/settings';
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes, formatRelative } from '../format';
@@ -18,6 +18,7 @@ import { cacheStatsState } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
 import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
 import {
+  hydrateRepoMap,
   installRepoMapClaudeCode,
   regenerateRepoMapToken,
   repoMapState,
@@ -198,6 +199,46 @@ async function onRegenerateRepoMapToken(): Promise<void> {
     repoMapRegenerating.value = false;
   }
 }
+
+// P69 review, Group 2: repoMapState.status was otherwise only written at boot and by this
+// dialog's own mutation calls above — nothing re-fetched it when the Code intelligence section
+// became active, so a repository imported elsewhere while Settings sat open stayed invisible,
+// and a row stuck on "indexing" never advanced to "ready" without an unrelated refetch. Refresh
+// on entering the section, then poll a short interval while any listed row is still indexing.
+const REPOMAP_POLL_INTERVAL_MS = 3000;
+let repoMapPollTimer: ReturnType<typeof setInterval> | null = null;
+
+function repoMapStillIndexing(): boolean {
+  return repoMapState.status.repos.some((r) => r.serving && !r.ready);
+}
+
+function stopRepoMapPoll(): void {
+  if (repoMapPollTimer === null) return;
+  clearInterval(repoMapPollTimer);
+  repoMapPollTimer = null;
+}
+
+function startRepoMapPollIfNeeded(): void {
+  if (repoMapPollTimer !== null || !repoMapStillIndexing()) return;
+  repoMapPollTimer = setInterval(() => {
+    void hydrateRepoMap().then(() => {
+      if (!repoMapStillIndexing()) stopRepoMapPoll();
+    });
+  }, REPOMAP_POLL_INTERVAL_MS);
+}
+
+watch(
+  activeSection,
+  (section) => {
+    if (section !== 'Code intelligence') {
+      stopRepoMapPoll();
+      return;
+    }
+    void hydrateRepoMap().then(startRepoMapPollIfNeeded);
+  },
+  { immediate: true },
+);
+onBeforeUnmount(stopRepoMapPoll);
 
 const repoMapInstalling = ref(false);
 async function onInstallRepoMapClaudeCode(): Promise<void> {

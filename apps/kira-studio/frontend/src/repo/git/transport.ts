@@ -44,7 +44,8 @@ import { createRpcClient, createStreamChannel } from '@kira/git-ipc';
 // @ts-ignore
 import { Stream } from '/wails/runtime.js';
 import { dropCredentialRequests, enqueueCredentialRequest } from '../../state/gitCredential';
-import { createHostHandlers } from './hostHandlers';
+import { forgetRepoOpen } from '../../state/repoOpenHold';
+import { createHostHandlers, gitRepoIdFor } from './hostHandlers';
 
 /** The two `EventKey`s this host answers itself rather than forwarding to `remote.on` — never
  *  emitted by Go (§8.1). */
@@ -315,6 +316,11 @@ export function disposeGitTransport(codeRepoId: string): void {
   sharedClientsByCodeRepoId.delete(codeRepoId);
   localEmittersByCodeRepoId.delete(codeRepoId);
   dropCredentialRequests(codeRepoId);
+  // blameAnnotation.ts's `repoOpenMemo` records a `repo.open` hold scoped to this shared
+  // client's own Conn — a reopened workspace gets a new Conn, so the memo must not outlive this
+  // one (Group 3, P69 review).
+  const gitRepoId = gitRepoIdFor(codeRepoId);
+  if (gitRepoId !== undefined) forgetRepoOpen(gitRepoId);
   for (const lease of [...shared.leases]) lease.dispose();
   shared.transport.dispose();
 }
