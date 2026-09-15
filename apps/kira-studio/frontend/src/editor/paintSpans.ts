@@ -58,11 +58,21 @@ export function mergeHighlightRanges(
   const points = [...cuts].sort((a, b) => a - b);
 
   const out: ClassRun[] = [];
+  // `base` tiles `[0, textLength)` left to right with no gaps (this function's own doc comment;
+  // `parseColorizedLine`'s only caller builds it that way), and `points` is sorted ascending, so a
+  // single forward-only pointer finds each point's covering base run in amortized O(1) instead of
+  // rescanning all of `base` per point (O(P*B) total before this — a real cost on a long,
+  // heavily-tokenized line under `ranges` highlighting on every keystroke).
+  let baseIdx = 0;
   for (let i = 0; i < points.length - 1; i++) {
     const from = points[i];
     const to = points[i + 1];
     if (from >= to) continue;
-    const baseRun = base.find((b) => b.from <= from && from < b.to);
+    while (baseIdx < base.length && base[baseIdx].to <= from) baseIdx++;
+    const baseRun =
+      baseIdx < base.length && base[baseIdx].from <= from && from < base[baseIdx].to
+        ? base[baseIdx]
+        : undefined;
     const classes = [...(baseRun?.classes ?? [])];
     for (const r of validRanges) {
       if (r.from <= from && from < r.to) classes.push(r.class);
