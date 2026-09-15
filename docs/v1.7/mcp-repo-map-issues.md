@@ -91,6 +91,29 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   issued in that window returned an `isError` "still building" result. Trivial — retried after sync
   finished, no fix needed (index-build time is P64c's own concern, not a new defect).
 
+- **M3 (planning) — M1c closure confirmed on a field it wasn't fixed against**: `find_references`
+  on `McpDdlMode` (an M2-introduced field, didn't exist when M1c landed) returns 13 exact
+  references — the same query shape that returned nothing pre-M1c. Not a new finding, additional
+  closure evidence for the M1c entry above.
+
+- **M3 (planning)**: `outline_file` takes `file`, not `path` (`path` fails with "unexpected
+  additional properties"); `find_implementations` still rejects a `limit` argument three sibling
+  tools accept (first logged during M2's planning, unchanged). Both trivial, both recurring —
+  the eight tools' argument names/support aren't consistent with each other. No fix attempted; worth
+  its own small pass eventually (naming/arg-surface consistency, not a correctness bug), not urgent
+  enough to gate a phase.
+
+- **M3 (planning) — not a repo-map defect, a real per-session cost**: restarting the server inside
+  the 7-day token window prints "Using this repository's existing token" with no registration
+  command — a fresh session holds no plaintext and cannot call the server at all without deleting
+  and re-minting (which invalidates the previously registered client). Happened again this pass.
+  Noted so a future session budgets for this rather than debugging what looks like a 401.
+
+- **M3 (planning) — extends the existing `pkill` note**: killing by PID from `pgrep -af` output is
+  correct, but that output includes the invoking shell's own command line (the search pattern
+  matches it) — read the output and extract the right PID, never pipe `pgrep -af`'s output straight
+  into `kill`.
+
 <!--
 Entry template:
 
