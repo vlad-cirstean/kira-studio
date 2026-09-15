@@ -13,10 +13,12 @@ on Wails (Go) and Vue 3, one app you switch between with a mode button.
   (**Api**) through v1.2, and the git backend through v1.3 — headless at first, with its only
   frontend **Kira Version**, a VS Code extension bundled in the DMG. v1.5 added a native code
   intelligence workspace inside Kira Studio's own window — import a repository, browse and diff its
-  files, navigate its code — and v1.6 (the current chapter) made **git** a full peer of
-  **Studio**/**Api** (its own mode, its own native graph and code-review layer) and enabled real
-  git-write operations from that native surface. The VS Code extension remains a fully supported
-  second frontend over the same backend. Expect bugs and breaking changes between builds. See
+  files, navigate its code — and v1.6 made **git** a full peer of **Studio**/**Api** (its own mode,
+  its own native graph and code-review layer) and enabled real git-write operations from that
+  native surface. v1.7 (the current chapter) added a second local MCP server that exposes a chosen
+  connection's data to an AI client, under per-connection read/write/DDL permissions, with
+  per-column PII masking. The VS Code extension remains a fully supported second frontend over the
+  same backend. Expect bugs and breaking changes between builds. See
   [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
 - **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
@@ -96,6 +98,11 @@ A couple of things worth knowing up front:
   against the server, with no staging or preview — that model is specific to the SQL grid below.
 - **Mutations (SQL grid)** — add/delete row and cell edits staged as a per-tab pending-change set
   with an exact command preview; commit or rollback; nothing reaches the database until commit.
+- **Column masking (PII)** — mark a column as PII from its own grid header menu (**Mark column as
+  PII**) with one of six masks — name, email, text, number, date or full redact — and a toolbar
+  toggle previews the masked view live over the real rows. Display-layer only: the underlying rows
+  are never mutated, and the grid goes read-only while the preview is on. Rules are managed per
+  connection in the connection dialog's **Privacy** tab.
 - **PK/FK navigation** — click an outbound-FK cell's nav button for a read-only preview popover
   first, with two actions: *Open in new tab* (jump straight to the referencing/referenced rows in a
   pre-filtered new tab) or *Edit this record* (opens the same pre-filtered tab with the caret
@@ -173,6 +180,31 @@ A couple of things worth knowing up front:
   Code and similar), off by default and enabled per repository from Settings → Code intelligence.
   The exact registration command is shown before the Install button, deliberately — enabling it is
   never a silent action.
+
+## Database MCP features
+
+- **A second local MCP server** — separate from the repo-map one: its own process-lifetime
+  instance, its own loopback port (8766 by default, falling back to an OS-assigned one if that's
+  taken), its own bearer token. Off by default; enabled from Settings → Database MCP, which shows
+  the registration command before its Install button, the same as Code intelligence.
+- **Six tools** — `list_connections`, `list_children`, `describe_table`, `describe_schema`,
+  `run_query`, `explain_query`. `run_query` executes through the same adapter path the app's own SQL
+  console uses.
+- **Deny by default, per connection** — a connection is invisible to an AI client until its owner
+  exposes it.
+- **Per-operation permissions** — read, write and DDL each independently *allow*, *deny* or
+  *prompt*, per connection, edited in the connection dialog's **MCP** tab. Defaults: read allow,
+  write prompt, DDL deny. Every statement is classified before it runs, and one the classifier can't
+  read falls to the strictest of the three modes rather than through the gate. **DDL is denied by
+  default and only executes at all if a person allows it, per connection.**
+- **Human approval for `prompt`** — the query doesn't run until a person approves the actual
+  statement text in a modal dialog.
+- **EXPLAIN** — `explain_query` returns the same normalized plan the console renders (SELECT/WITH
+  only). A per-connection auto-explain setting plans every eligible `run_query` first, and a plan
+  estimated over the expensive-query row threshold pauses for the same human approval.
+- **Masking over MCP** — the per-column PII rules above are applied to results before an AI client
+  sees them, with a keyed correlation tag so two rows holding the same real value are recognizably
+  the same without the value being exposed or recoverable.
 
 ## Git features
 
@@ -320,11 +352,11 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 
 **App data:** the app keeps `kira.db`, `logs/`, the git module's own `review.db`, `codeindex.db`
 (plus its `-wal`/`-shm`), its `git.sock`/`git.sock.lock`, the per-repository sync flocks
-`codeindex-sync-<12 hex>.lock`, and the repo-map MCP tokens `mcp-repo-map-*-token.json` under
-`~/.kira-studio/`. The `KIRA_HOME` environment variable relocates
-that whole directory — the test suite uses it to keep tests off a developer's real data, and the
-git socket follows it, so two `KIRA_HOME`s are two fully independent backends rather than two
-processes fighting over one socket.
+`codeindex-sync-<12 hex>.lock`, the repo-map MCP tokens `mcp-repo-map-*-token.json`, and the
+database MCP server's own token `mcp-db-token.json`, all under `~/.kira-studio/`. The `KIRA_HOME`
+environment variable relocates that whole directory — the test suite uses it to keep tests off a
+developer's real data, and the git socket follows it, so two `KIRA_HOME`s are two fully independent
+backends rather than two processes fighting over one socket.
 
 **Git hooks:** `bun install` points `core.hooksPath` at `.githooks/` (via the `prepare` lifecycle
 script), which installs a `pre-commit` hook running `bun run lint` and `bun run typecheck` — about
@@ -392,7 +424,7 @@ Top-level layout — `apps/` holds this and any future Wails app; `packages/` ho
 across apps:
 
 ```
-apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops, git, code intelligence (codeparse/codeindex/codegraph/codeworkspace/repomap), the update checker
+apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops, git, code intelligence (codeparse/codeindex/codegraph/codeworkspace/repomap), database MCP (dbmcp/mask/maskrules/queryplan/mcpauth), the update checker
 apps/kira-studio/cmd/kira-repo-map  the headless repo-map MCP binary — the repo's only other `main` package
 apps/kira-studio/frontend/src    the Vue 3 app (bindings + the built bundle live alongside it, both gitignored)
 apps/kira-studio/tests/unit      unit suite — no external resource
@@ -407,17 +439,18 @@ packages/git-core    client-side git logic: commit store, lane layout, the clien
 packages/git-ui      the git graph/review UI, hosted by the extension and by the native Git module
 packages/kira-ui     host-agnostic Vue components shared by the workbench and the git webviews
 packages/db-fixtures shared fixture corpus (fixtures/support code, not a spec suite of its own)
-docs                 architecture, performance, packaging, design system; docs/v1.6 is the live record
+docs                 architecture, performance, packaging, design system; docs/v1.7 is the live record
 scripts/demo-dbs     local fixture databases for manual testing
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown, and
-[`docs/v1.6/SPEC.md`](docs/v1.6/SPEC.md) for the live chapter. Earlier chapters, oldest first:
+[`docs/v1.7/SPEC.md`](docs/v1.7/SPEC.md) for the live chapter. Earlier chapters, oldest first:
 [`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) (Studio), [`docs/v1.2/SPEC.md`](docs/v1.2/SPEC.md) (Api),
 [`docs/v1.3/SPEC.md`](docs/v1.3/SPEC.md) (the headless git backend),
-[`docs/v1.4/SPEC.md`](docs/v1.4/SPEC.md) (reliability/tooling polish across existing modules), and
-[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence) — all completed
-(`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
+[`docs/v1.4/SPEC.md`](docs/v1.4/SPEC.md) (reliability/tooling polish across existing modules),
+[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence), and
+[`docs/v1.6/SPEC.md`](docs/v1.6/SPEC.md) (editor consolidation and tooling upgrades) — all
+completed (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
 
 ## Documentation
 
@@ -428,10 +461,14 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state br
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, the Wails bundle layout, verification
   checklist.
-- [`docs/v1.6/`](docs/v1.6/) — **the live chapter** (see `docs/v1.6/README.md`): editor
-  consolidation onto Monaco, a dependency/runtime upgrade, native git-blame, and the repo-map MCP
-  server. [`SPEC.md`](docs/v1.6/SPEC.md) and [`plans/`](docs/v1.6/plans/), one implementation plan
+- [`docs/v1.7/`](docs/v1.7/) — **the live chapter** (see `docs/v1.7/README.md`): a local database
+  MCP server with per-connection read/write/DDL permissions, an EXPLAIN path, and per-column PII
+  masking. [`SPEC.md`](docs/v1.7/SPEC.md) and [`plans/`](docs/v1.7/plans/), one implementation plan
   per phase.
+- [`docs/v1.6/`](docs/v1.6/) — the completed editor-consolidation/tooling chapter's own phasing
+  record (see `docs/v1.6/README.md`): [`SPEC.md`](docs/v1.6/SPEC.md) and
+  [`plans/`](docs/v1.6/plans/) — editor consolidation onto Monaco, a dependency/runtime upgrade,
+  native git-blame, and the repo-map MCP server.
 - [`docs/v1.5/`](docs/v1.5/) — the completed code intelligence chapter's own phasing record (see
   `docs/v1.5/README.md`): [`SPEC.md`](docs/v1.5/SPEC.md) and [`plans/`](docs/v1.5/plans/), phases
   C1 through C14.
