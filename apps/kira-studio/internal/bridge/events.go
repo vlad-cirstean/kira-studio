@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -55,6 +56,9 @@ const (
 	// established: flush on 60ms/256 matches/the terminal event, one producer (StartSearch's own
 	// goroutine), no Sources entry.
 	ChannelCodeSearch = "kira:code:search"
+	// ChannelDbMcpApproval is M2 §7.1's own push channel — the prompt-mode approval queue's live
+	// snapshot, ChannelGitPairing's own shape applied to run_query's approval broker.
+	ChannelDbMcpApproval = "kira:dbmcp:approval"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in
@@ -80,6 +84,9 @@ type Sources struct {
 	Git interface {
 		OnPairingChanged(func(gitsock.PairingSnapshot)) func()
 		OnClientsChanged(func([]model.GitClient)) func()
+	}
+	DbMcp interface {
+		OnApprovalChange(func(dbmcp.ApprovalSnapshot)) func()
 	}
 }
 
@@ -118,6 +125,9 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 	unsubGitClients := s.Git.OnClientsChanged(func(clients []model.GitClient) {
 		ev.emit.Emit(ChannelGitClientsChanged, clients)
 	})
+	unsubDbMcpApproval := s.DbMcp.OnApprovalChange(func(snap dbmcp.ApprovalSnapshot) {
+		ev.emit.Emit(ChannelDbMcpApproval, toWireApprovalSnapshot(snap))
+	})
 
 	return func() {
 		unsubState()
@@ -127,6 +137,7 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 		unsubMetrics()
 		unsubGitPairing()
 		unsubGitClients()
+		unsubDbMcpApproval()
 	}
 }
 

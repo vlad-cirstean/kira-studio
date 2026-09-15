@@ -191,6 +191,7 @@ func fieldsInput(name string) connections.Input {
 		ConnectionFields: model.ConnectionFields{
 			Name: name, Kind: "kafka", Color: "blue", Mode: "fields",
 			Host: strPtr("localhost"), Port: intPtr(5432), Options: map[string]any{},
+			McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
 		},
 	}
 }
@@ -331,7 +332,7 @@ func TestUriPasswordStripAndInject(t *testing.T) {
 	in := connections.Input{
 		ConnectionFields: model.ConnectionFields{
 			Name: "uri-conn", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
+			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
 		},
 	}
 	created := mustCreate(t, h.svc, in)
@@ -366,7 +367,7 @@ func TestUriModeUpdateHonorsExplicitPasswordClear(t *testing.T) {
 	created := mustCreate(t, h.svc, connections.Input{
 		ConnectionFields: model.ConnectionFields{
 			Name: "uri-clear", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
+			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
 		},
 	})
 
@@ -374,7 +375,7 @@ func TestUriModeUpdateHonorsExplicitPasswordClear(t *testing.T) {
 	if _, err := h.svc.Update(created.ID, connections.Input{
 		ConnectionFields: model.ConnectionFields{
 			Name: "uri-clear", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{},
+			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
 		},
 		Password: cleared,
 	}); err != nil {
@@ -399,14 +400,14 @@ func TestUriModeUpdateWithNoPasswordSignalLeavesSecretUnchanged(t *testing.T) {
 	created := mustCreate(t, h.svc, connections.Input{
 		ConnectionFields: model.ConnectionFields{
 			Name: "uri-untouched", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{},
+			URI: strPtr("postgresql://u:p@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
 		},
 	})
 
 	if _, err := h.svc.Update(created.ID, connections.Input{
 		ConnectionFields: model.ConnectionFields{
 			Name: "uri-untouched-renamed", Kind: "kafka", Color: "blue", Mode: "uri",
-			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{},
+			URI: strPtr("postgresql://u@h:5432/db"), Options: map[string]any{}, McpReadMode: "allow", McpWriteMode: "prompt", McpDdlMode: "deny",
 		},
 	}); err != nil {
 		t.Fatalf("Update: %v", err)

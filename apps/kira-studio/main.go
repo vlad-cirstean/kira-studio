@@ -30,6 +30,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
@@ -269,7 +270,11 @@ func main() {
 
 	// M1 §3.3: the DB MCP server's embedded instance — same posture as repoMapSvc just above, but
 	// no repository to resolve: it reads this app's own connections/tree/router straight from deps.
-	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{})}
+	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
+	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
+	// restart of the embedded server within one app run.
+	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
+	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
 	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
@@ -289,7 +294,7 @@ func main() {
 	}
 
 	events := bridge.NewEvents(emitter)
-	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock})
+	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
 
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked

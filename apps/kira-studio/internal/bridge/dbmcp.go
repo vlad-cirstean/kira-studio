@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
@@ -32,6 +33,10 @@ const dbMcpTokenName = "mcp-db"
 type DbMcpService struct {
 	Deps      appcore.Deps
 	Installer RepoMapInstaller
+	// Approvals is M2's prompt-mode broker — constructed once in main.go and outliving this
+	// service's own server start/stop, so the event subscription wired at boot (Events.Attach)
+	// stays valid across a restart of the embedded server.
+	Approvals *dbmcp.ApprovalBroker
 
 	mu     sync.Mutex
 	server *dbmcp.Server
@@ -106,12 +111,13 @@ func (s *DbMcpService) startLocked(mint bool) error {
 	}
 	home := config.KiraHome()
 	srv, err := dbmcp.New(dbmcp.Config{
-		Home:   home,
-		Token:  dbMcpTokenProviderFor(home, mint),
-		Conns:  s.Deps.Connections,
-		Tree:   s.Deps.Tree,
-		Query:  s.Deps.Router,
-		Logger: slog.Default(),
+		Home:      home,
+		Token:     dbMcpTokenProviderFor(home, mint),
+		Conns:     s.Deps.Connections,
+		Tree:      s.Deps.Tree,
+		Query:     s.Deps.Router,
+		Approvals: s.Approvals,
+		Logger:    slog.Default(),
 	})
 	if err != nil {
 		return err
@@ -132,6 +138,9 @@ func (s *DbMcpService) stopLocked() {
 	}
 	_ = s.server.Close()
 	s.server = nil
+	// M2 §5.3: nothing left blocked on a broker nobody will answer again. The broker itself stays
+	// usable — a later re-enable within the same app run constructs a fresh server against it.
+	s.Approvals.AbandonAll()
 }
 
 // startIfEnabled is main.go's own boot-time call, mirroring StartRepoMapIfEnabled's own posture
@@ -253,4 +262,84 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 		return DbMcpInstallResult{Outcome: mcpinstall.OutcomeNotFound}
 	}
 	return toWireDbMcpInstallResult(s.Installer.Install(ctx, dbMcpServerName, s.server.URL(), plain))
+}
+
+// dbMcpApprovalStatementCap bounds DbMcpApprovalRequest.Statement on the wire — a generated
+// statement can be large, and the approval dialog renders it; Truncated says whether it was cut.
+const dbMcpApprovalStatementCap = 4000
+
+// capApprovalStatement cuts s at a rune boundary so a multi-byte character straddling the cap
+// never produces invalid UTF-8 on the wire.
+func capApprovalStatement(s string) (text string, truncated bool) {
+	if len(s) <= dbMcpApprovalStatementCap {
+		return s, false
+	}
+	cut := dbMcpApprovalStatementCap
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut], true
+}
+
+// DbMcpApprovalRequest is dbmcp.ApprovalRequest's wire projection — an absolute deadline (epoch
+// ms) instead of a time.Time, GitPairingRequest's own precedent.
+type DbMcpApprovalRequest struct {
+	RequestID      string `json:"requestId"`
+	ConnectionID   string `json:"connectionId"`
+	ConnectionName string `json:"connectionName"`
+	Kind           string `json:"kind"`
+	Class          string `json:"class"`
+	Statement      string `json:"statement"`
+	Truncated      bool   `json:"truncated"`
+	ExpiresAtMs    int64  `json:"expiresAtMs"`
+}
+
+// DbMcpApprovalSnapshot is dbmcp.ApprovalSnapshot's wire projection.
+type DbMcpApprovalSnapshot struct {
+	Pending *DbMcpApprovalRequest `json:"pending"`
+	Queued  int                   `json:"queued"`
+}
+
+func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
+	out := DbMcpApprovalSnapshot{Queued: snap.Queued}
+	if snap.Pending != nil {
+		statement, truncated := capApprovalStatement(snap.Pending.Statement)
+		out.Pending = &DbMcpApprovalRequest{
+			RequestID: snap.Pending.RequestID, ConnectionID: snap.Pending.ConnectionID,
+			ConnectionName: snap.Pending.ConnectionName, Kind: snap.Pending.Kind,
+			Class: string(snap.Pending.Class), Statement: statement, Truncated: truncated,
+			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
+		}
+	}
+	return out
+}
+
+// PendingApprovals is the snapshot a newly opened window fetches on mount — state/gitClients.ts's
+// own boot-time hydration, applied to the approval queue.
+func (s *DbMcpService) PendingApprovals() DbMcpApprovalSnapshot {
+	return toWireApprovalSnapshot(s.Approvals.Pending())
+}
+
+// DbMcpApprovalArgs is shared by ApproveQuery/DenyQuery — nothing but the request id.
+type DbMcpApprovalArgs struct {
+	RequestID string `json:"requestId"`
+}
+
+// ApproveQuery and DenyQuery never return a Go error — a decision is a value (GitClientsService's
+// own precedent) — and return the current snapshot rather than an action-result enum, so the
+// clicking window updates immediately instead of waiting for its own broadcast to arrive.
+func (s *DbMcpService) ApproveQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot, error) {
+	if args.RequestID == "" {
+		return DbMcpApprovalSnapshot{}, ipcerr.BadRequest("requestId is required")
+	}
+	s.Approvals.Approve(args.RequestID)
+	return toWireApprovalSnapshot(s.Approvals.Pending()), nil
+}
+
+func (s *DbMcpService) DenyQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot, error) {
+	if args.RequestID == "" {
+		return DbMcpApprovalSnapshot{}, ipcerr.BadRequest("requestId is required")
+	}
+	s.Approvals.Deny(args.RequestID)
+	return toWireApprovalSnapshot(s.Approvals.Pending()), nil
 }
