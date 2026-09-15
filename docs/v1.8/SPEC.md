@@ -199,6 +199,84 @@ re-verified: `go build/vet` clean (no Go touched), `bun typecheck/lint` clean, b
 assertion) are pre-existing wall-clock-contention flakes in files this phase's diff never touches,
 neither reproducing when re-run outside the full-parallel tier. No known gaps against the plan.
 
+## P74 result
+
+Landed per plan (`docs/v1.8/plans/P74-commit-detail-pr-diff-viewing.md`), 9 commits (`679f508f`..
+`89ee3cc5`) — the plan's own 7, plus 2 follow-up fixes for regressions this phase's full-suite pass
+caught, per `CLAUDE.md`'s "implement whole plan first, then test once" rule.
+
+§1.4's runtime check (harness, `.kv-detail-pane-meta` after "Show more"): `maxHeight` resolves to
+`px` at both a 300px and an 800px app height (`50%`, not `none`), and `scroll` (891) exceeds
+`client` (150/400) at both — confirming §1.3b's clipping defect, not §1.4's unproven "cap never
+resolves" candidate. Fix: the Refs row now gates on `detail.decoration.length` (a reactive prop
+read) instead of a non-reactive `decorationEl.childNodes.length`; the expanded region moved from a
+hard `max-height: 50%` clip to `flex: 0 1 auto; min-height: min(220px, 60%); max-height: 70%;
+overflow: auto` — bounded and scrollable, not unbounded (the plan's own "clipping" framing read as
+unbounded growth; it isn't, and `commit-meta-clamp.spec.ts` now asserts the real shape:
+`clientHeight` grows past the collapsed cap and `overflowY` is `auto`, not `scrollHeight <=
+clientHeight`, which is false by design against the harness's own deliberately-tall fixture).
+
+§3's external PR link: fixed all four anchor sites, two beyond the plan's own grep
+(`BranchPicker.vue`/`StackList.vue`'s stack badges, `refBadges.ts`'s SlickGrid-formatter badge) —
+each now a `<button>` calling `pr.browserUrl`/`GitHubService.OpenPullRequestURL`, never a raw
+`<a href>`. Contract version 35 → 36.
+
+§5.1's host-check ("does desktop already open N tabs"): substituted source-reading
+(`hostHandlers.ts:265`-`291`) for a literal GUI click-and-count — no GUI in this sandbox — per the
+plan's own §0 allowance. Confirmed: desktop already opened one tab per changed file; the defect was
+`pinned: true` making every one of them permanent. Fixed by widening `previewIdByWorkspace` to
+`previewIdsByWorkspace` (a cohort) and passing `pinned: false` with `previewCohort` set on every
+file but the first.
+
+§7 (Go to file): implemented per plan, reusing `mapLineAcrossDiff` verbatim (never re-derived) for
+the live-file drift remap; `repo-file` tabs carry an optional `rev`, titled with the short rev when
+set; two callers wired (`FileTree.vue`'s row menu, gated on `sha` being available; `RepoDiffView.vue`'s
+new `repo.goToFileFromDiff` command). One named gap: `RepoDiffView.vue` has no toast/announce
+channel of its own (unlike `packages/git-ui`'s shared `App.vue`) — its `unavailable`/failure case
+falls back to `console.warn`, a real gap, not a silently invented notification system.
+
+**§10 tests — one deviation from the plan's own file names, stated plainly.** The plan names
+`tests/ui/tabs.spec.ts` for the §5.2/§6 cohort/promotion assertions and `tests/ui/repo-workspace.spec.ts`
+for §7.2/§7.3's go-to-file assertions. Neither can carry them as written: `tabs.spec.ts` is
+exclusively the Postgres/DB tab system (no git fixture at all, and `preview: true` is never passed
+for any non-repo tab, so there is nothing to assert there regardless of what's added);
+`repo-workspace.spec.ts`'s own `gitStreamMock` answers only `app.init`/`repo.list`/`refs.list` and
+has no streaming support for `graph.stream` or a `commit.detail` response, so no commit can be
+selected to trigger "Open all changes" or "Go to file" through it as built — extending that mock
+with real streaming support was not part of this phase's scope. Extended
+`tests/unit/repo-tab-slots.spec.ts` instead — `state/tabs.ts`'s own preview-cohort/promotion
+mechanism already carries a `§15.1`-style doc comment naming that file as its intended direct unit
+test, the same precedent the file's pre-existing C5-era tests already follow — plus two new files in
+that same one-topic-per-file directory: `repo-file-tab-revision.spec.ts` (`openRepoFileTab`'s
+rev-aware identity and title) and `repo-go-to-file-handler.spec.ts` (`editor.goToFile`'s three
+outcomes, live/historical/unavailable, including the line remap). `pr.test.ts`'s ancestry-walk
+tests and `commit-meta-clamp.spec.ts`'s two new assertions landed exactly where the plan named them.
+`rebuildAncestry` gained an optional `budget` parameter (default unchanged, every production caller
+unaffected) purely so the budget-cutoff test needs a 5-row fixture instead of a 50,000-row one — an
+initial version without it built the real-sized fixture and, combined with a `sha` helper that
+padded on the wrong side and collided every row into one `ShaTable` hash bucket, hung a test run
+long enough to need killing; both are fixed, and the lesson (pad a synthetic sha on the
+most-significant side, or use a testability seam instead of a large fixture) is recorded here rather
+than as a standing rule, since it's a one-off test-authoring fact, not a working-agreement change.
+`wireConformance.test.ts` (named in the plan's §11.3 for keeping a contract version bump in step)
+does not exist anywhere in this repo — confirmed by search, not fixed here (out of this phase's
+scope). Its absence had a concrete, not hypothetical, cost: `165b376b`'s own contract version bump
+left three things stale that only this phase's own full-suite verification pass (not any per-commit
+fast check) caught: `packages/git-ipc/testdata/graphChunkFrame.{bin,json}`'s own captured
+envelope version (regenerated via `gitsock`'s `TestFixtures_CaptureGraphChunkFrame`,
+`KIRA_GIT_FIXTURES=write`), `internal/gitrpc/stash_test.go`'s `TestContractVersion_Is35` (moved
+forward to `Is36`, its own established per-bump convention), and `internal/bridge/gitstream.go`'s
+allowlist missing the new `pr.browserUrl` method entirely (caught by
+`TestGitrpcDispatch_EveryMethodIsClassified`, a security-relevant classification gap, not cosmetic).
+All three fixed as the two follow-up commits above.
+
+Independently re-verified: `go build/vet` clean, `go test ./...` clean (`internal/grpcclient`'s
+reflection test is the same pre-existing full-parallel-run flake P71 already noted — reproduces only
+under the full suite's resource contention, passes standalone and does not recur on a second full
+run), `bun typecheck/lint` clean, both `bun run build` (desktop) and `bun run build:vscode` succeed,
+1456/1456 unit tests (`bun run test:unit`), 275/275 `ui`+`ui-timing` Playwright tests (`bun run
+test:ui`, 7.9m). No other known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
