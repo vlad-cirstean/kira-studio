@@ -167,3 +167,33 @@ func TestReferencesToReadClampsToOwnDirectory(t *testing.T) {
 		t.Fatalf("want Total=1, Truncated=false, got %+v", refs)
 	}
 }
+
+// TestReferencesToFieldCrossDirectoryResolves is M1c §4.4's own regression case
+// (docs/v1.7/plans/M1c-repomap-struct-field-fix.md): a "field" reference, unlike a "read"
+// reference, must resolve across directories — the whole point of giving it its own kind rather
+// than reusing "read" (§1.5). No golden fixture reaches this: it needs the "read" tier clamp *not*
+// applying to "field", Go's own unexported-name privacy clamp (exercised here by using an exported
+// name so it does not fire), and the attribution gate's singleton branch (a repo-wide, single
+// candidate is still attributed) all at once.
+func TestReferencesToFieldCrossDirectoryResolves(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	defFile := seedFile(t, store, "pkg/model/connection.go", "go", nil, []codeparse.Symbol{
+		sym("field", "M1cAutoExplain", 0, 0, 20, 6, 0),
+	}, nil)
+	refFile := seedFile(t, store, "pkg/repos/connections.go", "go", nil, nil, []codeparse.Reference{
+		ref("field", "M1cAutoExplain", 0, 5, 23, 7),
+	})
+
+	refs, err := g.ReferencesTo(ctx, Query{Path: defFile.Path, Byte: 6}, RefOpts{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs.Sites) != 1 || refs.Sites[0].Path != refFile.Path {
+		t.Fatalf("want the cross-directory field reference resolved, got %+v", refs.Sites)
+	}
+	if refs.Total != 1 || refs.Unattributed != 0 || refs.Truncated {
+		t.Fatalf("want Total=1, Unattributed=0, Truncated=false, got %+v", refs)
+	}
+}
