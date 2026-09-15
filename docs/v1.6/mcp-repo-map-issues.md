@@ -371,6 +371,18 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   entries below for what was found and fixed. No new non-trivial finding beyond what this phase's
   own two gated entries already covered.
 
+- **P70 (planning)**: two trivial operational frictions, both already covered by `CLAUDE.md`/
+  `docs/DEV_ENVIRONMENT.md` edits this phase made rather than needing their own fix. First, the
+  ephemeral-port fallback: `internal/repomap/http.go` binds `DefaultPort` 8765 first but falls back
+  to an OS-assigned ephemeral port when it's taken — one instance bound `8765`, a second bound
+  `http://127.0.0.1:46717/mcp`, minutes apart in the same container; read the port off the startup
+  banner, never assume `8765`. Second, the unrecoverable hashed token: `mcpauth` stores only a
+  salted hash, so a restart that didn't capture the first printout prints "Using this repository's
+  existing token" with no way to recover it, and a mismatched bearer answers `401 invalid token`
+  with no hint the token is the problem — delete that repository's `mcp-repo-map-*-token.json` and
+  restart to mint a fresh one. No fix needed beyond the doc updates; logged so a future session
+  doesn't rediscover either.
+
 ### Non-trivial
 
 - **P69c (planning) — `find_references`'s `file` argument does not scope results to the definition

@@ -143,7 +143,7 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   accidentally can never weaken it. `apps/kira-studio/tests/ui/secrets.spec.ts`'s "keychain
   available" scenario guards this.
 
-## The git module — running and testing it here (G1-G29)
+## The git module — running and testing it here (G1-G34)
 
 See `docs/ARCHITECTURE.md`'s Git module section for what it is and why. This section is only about
 running it here.
@@ -251,7 +251,7 @@ running it here.
   this repo's established substitute for GUI-driven boot proofs in a sandbox with no display,
   preferred over `xvfb`/`xdotool`/screenshot techniques. `tests/e2e-real/` is built on it.
 
-## repo-map MCP server — running and registering it in this environment (C3)
+## repo-map MCP server — running and registering it in this environment (C3, updated C8/P64c/P67d)
 
 - **Run `bun run mcp:repo-map:build` once after a fresh clone, before registering with any MCP
   client.** `internal/codeparse`'s cgo build (above) is the same ~34 MB-of-generated-C cost here;
@@ -274,7 +274,18 @@ running it here.
   "Authorization: Bearer <token>"` — verified in this environment against a real `claude` (2.1.270):
   `claude mcp list` reports the server "✓ Connected" once running. `claude mcp remove kira-repo-map -s user`
   cleans up the global `~/.claude.json` entry afterward — leaving a stale registration behind
-  confuses a later, unrelated session in the same container.
+  confuses a later, unrelated session in the same container. **Read the host and port off the
+  startup banner every time, not off this example** — `internal/repomap/http.go` binds
+  `DefaultPort` 8765 first but falls back to an OS-assigned ephemeral port when it's taken
+  (reproduced here: one instance bound `8765`, a second bound `http://127.0.0.1:46717/mcp`, minutes
+  apart in the same container); this container routinely has an instance already running, so the
+  fallback is the normal case here, not an edge case.
+- **A restart cannot recover a token it didn't capture the first time.** `mcpauth` stores only a
+  salted hash (`${KIRA_HOME}/mcp-repo-map-<slug>-token.json`), so a restart prints "Using this
+  repository's existing token" and no token — a session that lost the first printout is stuck, and
+  a mismatched bearer answers `401 invalid token` with no hint the token itself is the problem. Fix:
+  delete that repository's token file and restart, then capture the freshly printed token
+  immediately (`CLAUDE.md`'s mint-a-fresh-one recipe).
 - **Responses now carry a source line under each hit (C8)**: `find_definition`, `find_references`,
   `find_implementations` and `search_symbols` each follow a hit's own grep-style line with one
   indented line of the actual code at that position (truncated at 512 bytes, `[stale]`/
@@ -285,12 +296,12 @@ running it here.
   for both the headless and embedded instance — a stdio server's stderr used to be the client's
   literal log file; now merely conventional, since Streamable HTTP means stdout is free too (the
   process's own startup banner and registration command use it deliberately, §3.1 of the plan).
-- **The embedded instance needs a real git repository at the app process's own working directory**
-  (C3 §3.2) — `wails3 task dev` run from this repository's own root resolves correctly; a `go build
-  -tags server` boot proof (above) run from anywhere else won't have one to find, and the Code
-  intelligence tab will show the "no repository found" error rather than a command. Use the
-  headless path (`bun run mcp:repo-map --repo <path>`) to exercise the server against an arbitrary
-  checkout in this environment instead.
+- **The embedded instance no longer needs a repository at the app process's own working directory**
+  (P67d) — one embedded `repomap.Server` serves however many imported repositories the user grants
+  access to from the Code intelligence tab, each granted or revoked individually; enabling the
+  toggle there starts the server directly, with no working-directory resolution involved. Use the
+  headless path (`bun run mcp:repo-map --repo <path>`) to point the server at an arbitrary checkout
+  from this environment instead.
 - **The Playwright UI tier needs `webkit` explicitly fetched** (unrelated to this phase, but hit
   while verifying its own spec): this container ships only Chromium preinstalled.
   `bunx playwright install webkit` downloads the browser itself; its own post-install warning names
