@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "email",
+    "keepHint": true,
+    "correlate": false
+  },
+  "key": null,
+  "value": "   "
+}

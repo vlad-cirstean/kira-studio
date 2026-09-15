@@ -306,6 +306,13 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 // read into Go and never touching the cipher (mirrors SecretsRepo.Copy's own "no decrypt, no
 // re-encrypt" contract, P25 D11), so a crash between "insert the row" and "copy the secret" can no
 // longer leave a passwordless duplicate behind the way two separate statements could.
+//
+// M5: this INSERT does not name mask_correlation_key, so the duplicate gets the column's own
+// DEFAULT '' — deliberately NOT copied from fromConnectionID (unlike password, just above). A
+// copied key would make the duplicate's masked correlation tags linkable back to the original's,
+// silently breaking the "key is scoped to one connection" invariant plan §2.5 states. The
+// duplicate mints its own key lazily, the same as any other connection with no key yet
+// (repos/maskkeys.go's EnsureKey).
 func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnectionID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
 	optionsJSON, err := json.Marshal(f.Options)
 	if err != nil {

@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "bogus",
+    "keepHint": false,
+    "correlate": false
+  },
+  "key": null,
+  "value": "secret value"
+}

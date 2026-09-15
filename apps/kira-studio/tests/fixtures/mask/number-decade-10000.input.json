@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "number",
+    "keepHint": false,
+    "correlate": false
+  },
+  "key": null,
+  "value": "10000"
+}

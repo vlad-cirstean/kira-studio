@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "name",
+    "keepHint": true,
+    "correlate": false
+  },
+  "key": null,
+  "value": "🏳️‍🌈 Bob"
+}

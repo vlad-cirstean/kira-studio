@@ -21,6 +21,7 @@ require (
 	github.com/moby/moby/api v1.56.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/redis/go-redis/v9 v9.22.0
+	github.com/rivo/uniseg v0.4.7
 	github.com/shirou/gopsutil/v4 v4.26.8
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/clickhouse v0.44.0

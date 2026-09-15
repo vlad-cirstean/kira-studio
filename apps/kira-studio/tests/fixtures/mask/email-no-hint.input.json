@@ -1,0 +1,9 @@
+{
+  "rule": {
+    "kind": "email",
+    "keepHint": false,
+    "correlate": false
+  },
+  "key": null,
+  "value": "maria.gonzalez@acme.example"
+}

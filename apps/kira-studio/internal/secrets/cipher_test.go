@@ -255,4 +255,7 @@ func TestScopeStringsAndEnvelopePrefixAreFrozen(t *testing.T) {
 	if ScopeVariableHistory != "variable-history" {
 		t.Errorf("ScopeVariableHistory = %q, want %q", ScopeVariableHistory, "variable-history")
 	}
+	if ScopeMaskKey != "mask-key" {
+		t.Errorf("ScopeMaskKey = %q, want %q", ScopeMaskKey, "mask-key")
+	}
 }

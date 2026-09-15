@@ -50,6 +50,7 @@ var names = []struct {
 	{20, "m1_connection_mcp", "0020_m1_connection_mcp.sql"},
 	{21, "m2_connection_permissions", "0021_m2_connection_permissions.sql"},
 	{22, "m3_connection_mcp_explain", "0022_m3_connection_mcp_explain.sql"},
+	{23, "m5_column_mask_rules", "0023_m5_column_mask_rules.sql"},
 }
 
 // All returns every migration in ascending version order.
