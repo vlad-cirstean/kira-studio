@@ -62,6 +62,13 @@ export const paletteCommands: PaletteCommand[] = [
   // not the registerCommand/runCommand shape repo.search above uses — quick open needs no mounted
   // panel to be meaningful, unlike repo.search's segmented-control switch.
   { id: 'repo.quickOpen', label: 'Quick Open…', run: openQuickOpen },
+  // P74 §7.4 item 1: registered by RepoDiffView.vue only for a revision-backed diff tab — a
+  // no-op elsewhere, the same view-scoped shape every other runCommand entry above has.
+  {
+    id: 'repo.goToFileFromDiff',
+    label: 'Go to file',
+    run: () => runCommand('repo.goToFileFromDiff'),
+  },
   { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
   { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
   { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },

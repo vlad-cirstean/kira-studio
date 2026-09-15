@@ -28,6 +28,23 @@ export function repoFileUri(mod: MonacoModule, repoId: string, path: string): st
   return repoFileUriObject(mod, repoId, path).toString();
 }
 
+// P74 §7.3: a repo-file tab pinned to a revision (`repoFileTabStateSchema.rev`) — keyed by `rev`
+// exactly as repoRevisionDiffUris keys its own two sides below, so a historical read of `path`
+// never collides with the live worktree model already cached at repoFileUri's own URI.
+export function repoRevisionFileUri(
+  mod: MonacoModule,
+  repoId: string,
+  path: string,
+  rev: string,
+): string {
+  return mod.Uri.from({
+    scheme: 'kira-repo',
+    authority: repoId,
+    path: `/${path}`,
+    query: `rev=${rev}`,
+  }).toString();
+}
+
 // C6 §8.3: the diff editor's own two sides share one scheme with the file viewer (so navigation's
 // one selector covers both) but need distinct model identities — `query` tells them apart without
 // a second scheme.

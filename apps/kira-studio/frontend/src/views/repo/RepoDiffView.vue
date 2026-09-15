@@ -55,6 +55,7 @@ const state = ref<ViewState>('loading');
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let unregisterFind: (() => void) | null = null;
+let unregisterGoToFile: (() => void) | null = null;
 let reviewDecorations: ReviewDecorationsHandle | null = null;
 
 // §11: read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
@@ -194,6 +195,42 @@ async function mount(): Promise<void> {
     void modifiedEditor.getAction('actions.find')?.run();
   });
 
+  // P74 §7.4 item 1: the diff editor's own "go to file" — the extension contributes this to its
+  // diff editor's title bar (diffToolbar.ts); this app has no toolbar there, so a command
+  // instead, the same mechanism view.find above already uses. Revision-backed diffs only (right
+  // !== null) — C6's plain worktree-vs-HEAD comparison already shows the live file on disk, with
+  // nothing else to jump to.
+  if (gitRepoId !== undefined && right !== null) {
+    const targetGitRepoId = gitRepoId;
+    const targetRev = right;
+    unregisterGoToFile = registerCommand('repo.goToFileFromDiff', () => {
+      const line = modifiedEditor.getPosition()?.lineNumber ?? 1;
+      const transport = gitTransportFor(repoId);
+      transport
+        .request('editor.goToFile', {
+          repoId: targetGitRepoId,
+          rev: targetRev,
+          path: props.tab.path,
+          line,
+        })
+        .then((outcome) => {
+          // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
+          // composition) — the tab switch is the visible confirmation. `unavailable` is the one
+          // branch with no other signal; this raw editor view has no toast/live-region channel
+          // to surface it through, so it goes to the console rather than dropping silently.
+          if (outcome.kind === 'unavailable') {
+            console.warn(
+              `repo.goToFileFromDiff: ${props.tab.path} unavailable — ${outcome.reason}`,
+            );
+          }
+        })
+        .catch((err: unknown) => {
+          console.warn('repo.goToFileFromDiff failed:', err);
+        })
+        .finally(() => transport.dispose());
+    });
+  }
+
   // C11 §7.4/S11: the comment-thread/mark-reviewed layer, only for a review diff tab. `left` is
   // never null here — openRepoReviewDiffTab (S8) always supplies both revisions alongside `review`.
   if (review !== null && gitRepoId !== undefined && left !== null) {
@@ -216,6 +253,8 @@ onMounted(() => void mount());
 onUnmounted(() => {
   unregisterFind?.();
   unregisterFind = null;
+  unregisterGoToFile?.();
+  unregisterGoToFile = null;
   reviewDecorations?.dispose();
   reviewDecorations = null;
   unmountEditor(props.tab.id);

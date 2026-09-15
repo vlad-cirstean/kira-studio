@@ -13,6 +13,7 @@
  * miss rather than guessing, exact rather than heuristic because `RepoSummary.repoId` is already
  * stored from the same `gitclient.Identify` call `repo.open` itself runs (C5's import).
  */
+import { mapLineAcrossDiff } from '@kira/git-core';
 import type {
   EventKey,
   EventPayload,
@@ -30,6 +31,7 @@ import { layoutState, toggleProjectPanel } from '../../state/layout';
 import {
   openRepoCommitDiffTab,
   openRepoDiffTab,
+  openRepoFileTab,
   openRepoReviewDiffTab,
 } from '../../state/repoTabs';
 import { setRepoSearchView } from '../state/search';
@@ -180,10 +182,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
         git: server.git,
         capabilities: {
           openInEditor: true,
-          // detailActions.ts D12/G21 D12: goToFile has no native caller left; a throwing entry
-          // below is honest about that, so this stays false rather than advertising a capability
-          // this host cannot actually serve.
-          goToFile: false,
+          goToFile: true,
           clipboard: true,
           // This app has no merge editor — the user's own stated carve-out
           // (docs/v1.6/plans/P67e-git-relax-read-only.md): conflicts surface through the
@@ -391,9 +390,40 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return {};
     },
 
-    // detailActions.ts D12/G21 D12: no caller remains for editor.goToFile at all — a throw is
-    // honest and costs nothing (§5's own table).
-    'editor.goToFile': refuseLocally('editor.goToFile', 'has no native caller'),
+    // P74 §7.2: file.goToTarget (Go-served) already resolves the live-vs-historical decision;
+    // this handler only composes its three outcomes onto the tab helpers this file already
+    // imports. `mapLineAcrossDiff` is `goToFile.ts`'s own algorithm (G4 D11) — reused verbatim,
+    // never re-derived.
+    'editor.goToFile': async (params, signal) => {
+      const { repoId: gitRepoId, rev, path, line } = params;
+      const codeRepoId = codeRepoIdFor(gitRepoId);
+      if (codeRepoId === undefined) {
+        throw new Error(`hostHandlers: editor.goToFile: unknown git repoId ${gitRepoId}`);
+      }
+      const target = await deps.remoteRequest(
+        'file.goToTarget',
+        { repoId: gitRepoId, rev, path },
+        signal,
+      );
+      switch (target.kind) {
+        case 'live': {
+          const finalLine =
+            target.hunks !== null ? mapLineAcrossDiff(target.hunks, line, 'old') : line;
+          openRepoFileTab(codeRepoId, path, { preview: true, reveal: { line: finalLine } });
+          return { kind: 'liveFile', path, line: finalLine };
+        }
+        case 'historical': {
+          openRepoFileTab(codeRepoId, target.path, {
+            preview: true,
+            rev: target.rev,
+            reveal: { line },
+          });
+          return { kind: 'virtualBlob', path: target.path, rev: target.rev, line };
+        }
+        case 'unavailable':
+          return target;
+      }
+    },
 
     'editor.resolveConflict': refuseLocally(
       'editor.resolveConflict',

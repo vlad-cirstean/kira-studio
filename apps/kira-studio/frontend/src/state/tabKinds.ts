@@ -12,6 +12,7 @@ import {
   httpRequestTabStateSchema,
 } from '@shared/domain/http';
 import {
+  asRepoFileTab,
   type BrowseTabRecord,
   type BrowseTabState,
   browseTabStateSchema,
@@ -167,9 +168,15 @@ function noDrop(): void {
 // C5 §7: a repo-file tab's `path` is a plain repository-relative path ('src/main.go'), not an
 // encoded NodePath — tabTitle's own pathTail() expects a "kind:name" segment and would return the
 // whole path unparsed, so this kind gets its own basename-only title instead.
+//
+// P74 §7.3: also called for a repo-diff tab's own title (repoDiffTitle below), which has no `rev`
+// field — asRepoFileTab returns null there, so the suffix is added only for an actual repo-file
+// tab at a revision, matching repoDiffTitle's own `(abc1234 ↔ def5678)` suffix shape.
 function repoFileTitle(tab: TabRecord): string {
   const idx = tab.path.lastIndexOf('/');
-  return idx < 0 ? tab.path : tab.path.slice(idx + 1);
+  const base = idx < 0 ? tab.path : tab.path.slice(idx + 1);
+  const rev = asRepoFileTab(tab)?.state.rev;
+  return rev == null ? base : `${base} (${rev.slice(0, 7)})`;
 }
 
 // C6 §8.1: same basename-only reasoning as repoFileTitle, plus a suffix distinguishing a diff tab

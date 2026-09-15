@@ -51,6 +51,11 @@ const props = defineProps<{
   parentIndex: number;
   store: CommitStore;
   actions: DetailActions;
+  /** P74 §7.4: the commit these files belong to — enables the row menu's "Go to file"
+   *  (`actions.goToFile({ rev: sha, path, line: 1 })`). Absent (every caller before this phase)
+   *  renders byte-identically: the item simply does not appear, the same "absent, not disabled"
+   *  convention `reviewStates` above already uses. */
+  sha?: string;
   /** G11 D16: the review sidebar's Files pane only — a per-path reviewed status, keyed by
    *  `FileChange.path`. Absent (the default, every other caller of this component) renders
    *  byte-identically to before this prop existed: no checkbox, no badge, nothing — `DetailPane.vue`
@@ -380,12 +385,43 @@ function onRowContextMenu(event: MouseEvent, row: FileTreeRow): void {
   fileMenuState.value = { x: event.clientX, y: event.clientY, path: row.node.change.path };
 }
 
-const fileMenuSections = computed(() => buildFileRowMenu(props.actions.capabilities.clipboard));
+const fileMenuSections = computed(() =>
+  buildFileRowMenu(
+    props.actions.capabilities.clipboard,
+    props.actions.capabilities.goToFile && props.sha !== undefined,
+  ),
+);
+
+// P74 §7.4: line 1 — a tree row has no cursor, so "go to file" is the row's own job; "go to
+// line" is the editor's (RepoDiffView.vue's own `repo.goToFileFromDiff` command). Announces
+// either way, matching openAllChanges's own no-silent-failure posture.
+async function goToFile(path: string): Promise<void> {
+  const sha = props.sha;
+  if (sha === undefined) return;
+  try {
+    const outcome = await props.actions.goToFile({ rev: sha, path, line: 1 });
+    switch (outcome.kind) {
+      case 'liveFile':
+      case 'virtualBlob':
+        props.actions.announce(`Opened ${outcome.path}`);
+        break;
+      case 'unavailable':
+        props.actions.announce(`Couldn't open ${path} — ${outcome.reason}`);
+        break;
+    }
+  } catch (err) {
+    props.actions.announce(
+      `Couldn't open ${path} — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 function onFileMenuSelect(id: string): void {
   const path = fileMenuState.value?.path;
   fileMenuState.value = undefined;
-  if (id === 'copyPath' && path !== undefined) copyPath(path);
+  if (path === undefined) return;
+  if (id === 'copyPath') copyPath(path);
+  else if (id === 'goToFile') void goToFile(path);
 }
 
 /** G14 D8: the directory portion of a flat-mode row's path, for the review sidebar's dimmed-

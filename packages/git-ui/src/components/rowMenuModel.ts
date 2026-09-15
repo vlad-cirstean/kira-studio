@@ -134,10 +134,19 @@ export function buildReviewRowMenu(clipboardEnabled: boolean): MenuSection[] {
  * decision) — built directly against `@kira/kira-ui`'s own `MenuItem` type from the start,
  * matching every other menu-building function in this file. G21 D11: this is now the one copy-
  * path affordance in every tree, not only the review-styled ones it started out scoped to.
+ *
+ * P74 §7.4: `goToFileEnabled` adds "Go to file" — absent (not disabled), the same convention
+ * `clipboardEnabled` already uses, for a caller with no commit sha to resolve (`FileTree.vue`'s
+ * own `sha` prop is optional) or a host with `capabilities.goToFile` false.
  */
-export function buildFileRowMenu(clipboardEnabled: boolean): MenuSection[] {
-  if (!clipboardEnabled) return [];
-  return [{ items: [plainItem('copyPath', 'Copy path', 'codicon-copy')] }];
+export function buildFileRowMenu(
+  clipboardEnabled: boolean,
+  goToFileEnabled: boolean,
+): MenuSection[] {
+  const items: MenuItem[] = [];
+  if (goToFileEnabled) items.push(plainItem('goToFile', 'Go to file', 'codicon-go-to-file'));
+  if (clipboardEnabled) items.push(plainItem('copyPath', 'Copy path', 'codicon-copy'));
+  return items.length === 0 ? [] : [{ items }];
 }
 
 export interface RefMenuContext {
