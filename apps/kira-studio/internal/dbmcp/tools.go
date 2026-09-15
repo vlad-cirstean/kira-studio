@@ -20,6 +20,13 @@ type listConnectionsArgs struct{}
 // listConnections returns every connection with mcp_enabled true — deny by default (§6.1): a
 // connection the user has not exposed is absent entirely, not listed-and-denied, since its
 // existence is not the AI client's business.
+//
+// M7 finding #8: deliberately not gated on read mode the way listChildren/describeTable/
+// describeSchema now are. This tool's whole job is enumerating exposed connections *and their own
+// configured permissions* (the Permissions field below) so a caller can see, up front, that a
+// connection denies read/write/DDL before trying any of them — gating it on read mode would hide
+// exactly the information it exists to surface, for a connection that denies reads but still
+// allows writes or DDL.
 func (s *Server) listConnections(_ context.Context, _ *mcp.CallToolRequest, _ listConnectionsArgs) (*mcp.CallToolResult, any, error) {
 	conns, err := s.cfg.Conns.List()
 	if err != nil {
@@ -65,8 +72,16 @@ type listChildrenArgs struct {
 }
 
 func (s *Server) listChildren(_ context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
-	if _, err := s.resolveEnabled(args.ConnectionID); err != nil {
+	summary, err := s.resolveEnabled(args.ConnectionID)
+	if err != nil {
 		return errResult(err.Error())
+	}
+	// M7 finding #8: a schema-browsing tool, gated at read-mode's own minimum bar — deny refuses,
+	// same as every other read here. Not extended to prompt's own approval dialog: unlike run_query/
+	// explain_query, this never runs caller-supplied SQL against the connection, so there is no
+	// statement to show the human in an approval request.
+	if m := modesOf(summary); m.read == "deny" {
+		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
 	}
 	result, err := s.cfg.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
@@ -87,8 +102,14 @@ type describeTableArgs struct {
 // it already answers E_UNSUPPORTED in its own words (kafka/s3/sqs/redis) — surfaced verbatim by
 // toolError rather than an invented message here (§4.3).
 func (s *Server) describeTable(_ context.Context, _ *mcp.CallToolRequest, args describeTableArgs) (*mcp.CallToolResult, any, error) {
-	if _, err := s.resolveEnabled(args.ConnectionID); err != nil {
+	summary, err := s.resolveEnabled(args.ConnectionID)
+	if err != nil {
 		return errResult(err.Error())
+	}
+	// M7 finding #8: same read-mode-deny gate as listChildren — see its own comment for why prompt
+	// stops short of an approval dialog here.
+	if m := modesOf(summary); m.read == "deny" {
+		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
 	}
 	result, err := s.cfg.Tree.Describe(args.ConnectionID, args.Path, args.Refresh, nil)
 	if err != nil {
@@ -106,8 +127,14 @@ type describeSchemaArgs struct {
 }
 
 func (s *Server) describeSchema(_ context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
-	if _, err := s.resolveEnabled(args.ConnectionID); err != nil {
+	summary, err := s.resolveEnabled(args.ConnectionID)
+	if err != nil {
 		return errResult(err.Error())
+	}
+	// M7 finding #8: same read-mode-deny gate as listChildren — see its own comment for why prompt
+	// stops short of an approval dialog here.
+	if m := modesOf(summary); m.read == "deny" {
+		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
 	}
 	result, err := s.cfg.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
