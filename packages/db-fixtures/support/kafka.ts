@@ -75,6 +75,10 @@ async function start(): Promise<KafkaFixture> {
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
+    mcpDescription: '',
+    mcpReadMode: 'allow',
+    mcpWriteMode: 'prompt',
+    mcpDdlMode: 'deny',
     password: null,
   };
 

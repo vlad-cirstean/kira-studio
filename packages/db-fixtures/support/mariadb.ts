@@ -137,6 +137,10 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<MariaFixture> {
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
+    mcpDescription: '',
+    mcpReadMode: 'allow',
+    mcpWriteMode: 'prompt',
+    mcpDdlMode: 'deny',
     password: PASSWORD,
   };
 

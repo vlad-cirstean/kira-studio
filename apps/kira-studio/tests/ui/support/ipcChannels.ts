@@ -142,6 +142,9 @@ export const IPC = {
   dbMcpSetEnabled: 'kira:dbmcp:setEnabled',
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
   dbMcpInstallClaudeCode: 'kira:dbmcp:installClaudeCode',
+  dbMcpPendingApprovals: 'kira:dbmcp:approval:pending',
+  dbMcpApproveQuery: 'kira:dbmcp:approval:approve',
+  dbMcpDenyQuery: 'kira:dbmcp:approval:deny',
 
   updateStatus: 'kira:update:status',
   updateOpenReleasePage: 'kira:update:openReleasePage',
@@ -171,4 +174,5 @@ export const IPC = {
   appMetrics: 'kira:app:metrics',
   gitPairing: 'kira:git:pairing',
   gitClientsChanged: 'kira:git:clients',
+  dbMcpApproval: 'kira:dbmcp:approval',
 } as const;

@@ -82,6 +82,10 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
+    mcpDescription: '',
+    mcpReadMode: 'allow',
+    mcpWriteMode: 'prompt',
+    mcpDdlMode: 'deny',
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -104,6 +108,10 @@ test('the unavailable path fails loudly and safely', async ({ relaunch, consoleE
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
+    mcpDescription: '',
+    mcpReadMode: 'allow',
+    mcpWriteMode: 'prompt',
+    mcpDdlMode: 'deny',
   });
 
   const { window: page } = await relaunch({

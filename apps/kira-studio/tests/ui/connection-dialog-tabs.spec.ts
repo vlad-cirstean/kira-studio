@@ -27,7 +27,7 @@ async function fillGeneralFields(
   await page.fill('[data-testid="connection-username"]', 'testuser');
 }
 
-test('all three tabs switch, and General is where a freshly-opened details step lands', async ({
+test('all four tabs switch, and General is where a freshly-opened details step lands', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({
@@ -38,22 +38,44 @@ test('all three tabs switch, and General is where a freshly-opened details step 
   const generalTab = page.locator('[data-testid="connection-tab-general"]');
   const advancedTab = page.locator('[data-testid="connection-tab-advanced"]');
   const preconnectTab = page.locator('[data-testid="connection-tab-preconnect"]');
+  const mcpTab = page.locator('[data-testid="connection-tab-mcp"]');
 
   await expect(generalTab).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="connection-name"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-readonly"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="connection-preconnect"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toHaveCount(0);
 
   await advancedTab.click();
   await expect(advancedTab).toHaveClass(/is-active/);
   await expect(generalTab).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="connection-readonly"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-name"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toHaveCount(0);
 
   await preconnectTab.click();
   await expect(preconnectTab).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="connection-preconnect"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-readonly"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toHaveCount(0);
+
+  // M2 §7.2: the fourth tab — expose checkbox, description, and one SegmentedControl per
+  // permission class, each disabled while mcpEnabled is false.
+  await mcpTab.click();
+  await expect(mcpTab).toHaveClass(/is-active/);
+  await expect(page.locator('[data-testid="connection-preconnect"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toBeVisible();
+  await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeVisible();
+  await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="connection-mcp-read-allow"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="connection-mcp-write-prompt"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeDisabled();
+
+  await page.click('[data-testid="connection-mcp-enabled"]');
+  await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="connection-mcp-read-allow"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="connection-mcp-write-prompt"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeEnabled();
 
   await generalTab.click();
   await expect(generalTab).toHaveClass(/is-active/);
@@ -89,6 +111,10 @@ test('the pre-connect textarea round-trips a multi-line value, and a valid throt
     autoExplain: false,
     throttlePerSec: 5,
     mcpEnabled: false,
+    mcpDescription: '',
+    mcpReadMode: 'allow',
+    mcpWriteMode: 'prompt',
+    mcpDdlMode: 'deny',
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
@@ -242,6 +268,12 @@ test("the dialog's box never moves, across every step, tab, sub-tab and engine f
   await page.click('[data-testid="connection-tab-advanced"]');
   await assertUnchanged();
   await page.click('[data-testid="connection-tab-preconnect"]');
+  await assertUnchanged();
+  await page.click('[data-testid="connection-tab-mcp"]');
+  await assertUnchanged();
+  // §7.2: toggling mcpEnabled disables/enables the other controls in place — nothing appears or
+  // disappears, so the box must stay unchanged either way.
+  await page.click('[data-testid="connection-mcp-enabled"]');
   await assertUnchanged();
   await page.click('[data-testid="connection-tab-general"]');
   await assertUnchanged();

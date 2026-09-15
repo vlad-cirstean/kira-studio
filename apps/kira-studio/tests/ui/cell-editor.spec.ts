@@ -165,6 +165,10 @@ function connectionCreateArgs(name: string, color: string, readOnly = false) {
     autoExplain: false,
     throttlePerSec: 0,
     mcpEnabled: false,
+    mcpDescription: '',
+    mcpReadMode: 'allow',
+    mcpWriteMode: 'prompt',
+    mcpDdlMode: 'deny',
   };
 }
 

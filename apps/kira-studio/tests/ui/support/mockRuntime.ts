@@ -147,6 +147,9 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   dbMcpSetEnabled: 'DbMcpService.SetEnabled',
   dbMcpRegenerate: 'DbMcpService.Regenerate',
   dbMcpInstallClaudeCode: 'DbMcpService.InstallClaudeCode',
+  dbMcpPendingApprovals: 'DbMcpService.PendingApprovals',
+  dbMcpApproveQuery: 'DbMcpService.ApproveQuery',
+  dbMcpDenyQuery: 'DbMcpService.DenyQuery',
 
   updateStatus: 'UpdateService.Status',
   updateOpenReleasePage: 'UpdateService.OpenReleasePage',
@@ -296,6 +299,10 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // above already gets, not a fixture miss.
   [IPC.gitClientsList]: '[]',
   [IPC.gitPairingPending]: JSON.stringify({ pending: null, queued: 0 }),
+  // M2: hydrateDbMcpApprovals() joins the same unconditional-every-boot list as gitPairingPending
+  // just above, same reasoning — nothing in tests/ui/ exercises a prompt-mode approval queue, so
+  // "nothing pending" is the correct empty answer for a spec with no fixture of its own.
+  [IPC.dbMcpPendingApprovals]: JSON.stringify({ pending: null, queued: 0 }),
   // G10: hydrateGitClients() now also fetches VsixStatus on every boot — the same
   // no-committed-fixture-will-ever-snapshot-this reasoning as the two entries above. "not
   // bundled, code not found" is the honest default for a dev-server run under Playwright, which
