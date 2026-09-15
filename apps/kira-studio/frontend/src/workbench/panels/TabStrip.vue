@@ -16,6 +16,7 @@ import {
   duplicateTab,
   isPreview,
   moveTab,
+  promoteTab,
   tabsState,
 } from '../../state/tabs';
 import { workspaceState } from '../../state/workspace';
@@ -251,6 +252,7 @@ function onDragEnd(): void {
         :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
         draggable="true"
         @click="onClick(tab)"
+        @dblclick="promoteTab(tab.id)"
         @auxclick.middle="onMiddleClick(tab)"
         @contextmenu.prevent="onContextMenu($event, tab)"
         @dragstart="onDragStart(tab.id)"
