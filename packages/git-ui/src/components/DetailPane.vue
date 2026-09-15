@@ -114,8 +114,12 @@ function onOpenFile(index: number, pinned: boolean): void {
   overflow: hidden;
 }
 
+/* Expanded: a real region of the pane, never a percentage the tree can squeeze to nothing.
+   min-height is what makes the expansion visible even in a short panel; the tree keeps the rest. */
 .kv-detail-pane-meta.kv-detail-pane-meta--expanded {
-  max-height: 50%;
+  flex: 0 1 auto;
+  min-height: min(220px, 60%);
+  max-height: 70%;
   overflow: auto;
 }
 
