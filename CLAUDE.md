@@ -150,7 +150,10 @@ duplicated here; this file only points at them.
 Code navigation over this repository's own tree-sitter graph (C3, `internal/repomap`), served as MCP
 tools: `find_definition`, `find_references`, `find_implementations`, `search_symbols`,
 `search_files`, `outline_file`, `read_symbol`, `list_repos`. Ask it instead of opening whole files to
-find a symbol or read one declaration — the tokens that saves are the point.
+find a symbol or read one declaration — the tokens that saves are the point. Multi-repo attach is
+now the normal case (P67d), so every navigation tool other than `list_repos` itself takes an
+optional `repo` argument naming which attached repository to query — omit it when only one is
+attached; call `list_repos` first to see the names when unsure.
 
 **Use it when working in this repository.** Standing expectation, not a demo: start it and navigate
 with it.

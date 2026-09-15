@@ -229,19 +229,42 @@ func (s *RepoMapService) rowsAndGrantedLocked() (rows, granted []model.CodeRepo,
 // list — 1a) and Rekeys any already-attached instance whose live key has drifted from it — a rename,
 // or a new grant landing on a name that collides with an already-attached one, can shift another
 // row's own dedupe suffix, not just the row that changed.
+//
+// Repeats the rekey pass until an iteration makes no further progress (P69 review, finding 5a): a
+// single pass strands a repository on its stale key when desired keys form a dependency chain (A
+// wants the key B currently holds, and B simultaneously wants to move elsewhere) and A is
+// processed before B frees it — Rekey's own collision check simply fails for A that round, and
+// nothing revisited it before this fix. Each pass is cheap (repomap.Server.Rekey is an in-memory
+// map move), so bounding by len(granted) passes is a correctness measure, not a performance one —
+// it is exactly enough passes to resolve any acyclic chain of that length; a true cycle (A wants
+// B's key, B wants A's) can never resolve through pairwise Rekey alone no matter how many passes
+// run, so this converges on everything resolvable and logs whatever is still stuck afterward
+// rather than looping forever on a cycle.
 func (s *RepoMapService) syncAttachedKeysLocked(rows, granted []model.CodeRepo) {
 	desired := repoKeys(rows)
+	for pass := 0; pass < len(granted); pass++ {
+		progressed := false
+		for _, r := range granted {
+			want := desired[r.ID]
+			have, attached := s.keys[r.ID]
+			if !attached || have == want {
+				continue
+			}
+			if err := s.server.Rekey(have, want); err != nil {
+				continue // may free up once whatever currently holds `want` moves off it
+			}
+			s.keys[r.ID] = want
+			progressed = true
+		}
+		if !progressed {
+			break
+		}
+	}
 	for _, r := range granted {
 		want := desired[r.ID]
-		have, attached := s.keys[r.ID]
-		if !attached || have == want {
-			continue
+		if have, attached := s.keys[r.ID]; attached && have != want {
+			slog.Warn("repo-map: rekey did not converge", "scope", "repomap", "repo", r.Name, "have", have, "want", want)
 		}
-		if err := s.server.Rekey(have, want); err != nil {
-			slog.Warn("repo-map: rekey", "scope", "repomap", "repo", r.Name, "err", err)
-			continue
-		}
-		s.keys[r.ID] = want
 	}
 }
 

@@ -191,13 +191,7 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if in.Mode == string(codegraph.NameOnly) {
 		mode = codegraph.NameOnly
 	}
-	limit := in.Limit
-	if limit <= 0 {
-		limit = findReferencesDefaultLimit
-	}
-	if limit > findReferencesMaxLimit {
-		limit = findReferencesMaxLimit
-	}
+	limit := clamp(in.Limit, findReferencesDefaultLimit, findReferencesMaxLimit)
 
 	refs, err := inst.graph.ReferencesTo(ctx, q, codegraph.RefOpts{
 		Mode: mode, Kinds: in.Kinds, IncludeDefinition: in.IncludeDefinition, Limit: limit,

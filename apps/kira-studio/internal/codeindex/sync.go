@@ -47,9 +47,14 @@ type SyncStats struct {
 // "no rows for that name" from "the index is mid-rebuild" or "the last rebuild failed" — which
 // nothing outside codeindex could do before.
 type SyncState struct {
-	InFlight   bool
-	Generation uint64 // completed full Syncs; 0 means none has finished yet
-	LastErr    error  // the last completed full Sync's own error, nil on success
+	InFlight bool
+	// Generation counts completed full Sync attempts, successful or not (endSync increments it
+	// unconditionally, deliberately: sync_concurrency_test.go's own TestSyncState asserts
+	// Generation advances after a failed Sync too, so a caller can tell "no Sync has run yet"
+	// apart from "the last Sync failed" purely from Generation == 0 vs > 0, without having to
+	// also check LastErr). 0 means none has finished yet.
+	Generation uint64
+	LastErr    error // the last completed full Sync's own error, nil on success
 	LastDoneAt time.Time
 }
 
