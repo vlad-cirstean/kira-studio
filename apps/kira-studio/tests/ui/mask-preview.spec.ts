@@ -305,3 +305,125 @@ test('grid mask preview — mark a column PII, preview masks and locks editing, 
   await expect(gridCell(page, 0, 'email')).toHaveClass(/cell-masked/);
   await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-only');
 });
+
+// M7 finding #11: correlationKeyFor's own IPC call can reject (an unwrapped business-rule failure,
+// tests/ipc's own `error` snapshot shape) — before the fix this "failed open": the preview stayed
+// on (toggle active, badge "read-only") while the grid's own dataSource was never updated to apply
+// any transform at all, since the render tail after the failed await never ran. The fix turns the
+// preview back off and surfaces the failure instead.
+test('grid mask preview — turns itself back off when the correlation key fetch fails', async ({
+  relaunch,
+}) => {
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [CONNECTION_SUMMARY] },
+    {
+      channel: IPC.connectionsConnect,
+      args: { id: CONNECTION_ID },
+      response: {
+        connectionId: CONNECTION_ID,
+        status: 'connected',
+        serverVersion: SERVER_VERSION,
+        error: null,
+        since: 1735689600000,
+        caps: POSTGRES_CAPS,
+      },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: '', refresh: false },
+      response: { nodes: ROOT_CHILDREN, source: 'server', truncated: false },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: DB_PATH, refresh: false },
+      response: { nodes: DB_CHILDREN, source: 'server', truncated: false },
+    },
+    {
+      channel: IPC.treeChildren,
+      args: { connectionId: CONNECTION_ID, path: APP_PATH, refresh: false },
+      response: { nodes: APP_CHILDREN, source: 'server', truncated: false },
+    },
+    {
+      channel: IPC.treeDescribe,
+      args: { connectionId: CONNECTION_ID, path: CUSTOMERS_PATH, refresh: false, tabId: null },
+      response: { meta: CUSTOMERS_META, source: 'server' },
+    },
+    { channel: IPC.maskRulesList, args: { connectionId: CONNECTION_ID }, response: [] },
+    {
+      channel: IPC.maskRulesList,
+      args: { connectionId: CONNECTION_ID },
+      response: [EMAIL_RULE],
+    },
+    {
+      channel: IPC.maskRulesUpsert,
+      args: {
+        connectionId: CONNECTION_ID,
+        fields: {
+          tableName: 'app.customers',
+          columnName: 'email',
+          kind: 'email',
+          keepHint: true,
+          correlate: true,
+        },
+      },
+      response: EMAIL_RULE,
+    },
+    // The one difference from the scenario above: this fetch fails instead of degrading to "".
+    {
+      channel: IPC.maskRulesCorrelationKey,
+      args: { connectionId: CONNECTION_ID },
+      error: { code: 'E_INTERNAL', message: 'key store unavailable' },
+    },
+  ];
+  const PORT: PortSnapshot[] = [
+    {
+      op: DATA_OP.read,
+      payload: {
+        connectionId: CONNECTION_ID,
+        path: CUSTOMERS_PATH,
+        projection: null,
+        filter: null,
+        sort: null,
+        pageSize: 100,
+        cursor: { mode: 'offset', offset: 0 },
+      },
+      response: { kind: 'read', page: CUSTOMERS_PAGE, source: 'server' },
+    },
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL, stream: PORT });
+
+  const connRow = connectionRow(page, 'Mask Preview DB');
+  await expect(connRow).toBeVisible();
+  await openRowMenu(page, '');
+  await page.click('[data-testid="menu-item-connect"]');
+  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
+    timeout: 10_000,
+  });
+  await expandRow(page, '');
+  await expandRow(page, DB_PATH);
+  await expandRow(page, APP_PATH);
+
+  const tableRow = await findRow(page, CUSTOMERS_PATH);
+  await tableRow.dblclick();
+  const grid = page.locator('[data-testid="data-grid"]');
+  await expect(grid).toBeVisible();
+  await expect(gridCell(page, 0, 'email')).toHaveText('maria.gonzalez@acme.example');
+
+  await page.click('[data-testid="grid-header-cell"][data-column="email"]', { button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-mark-pii"]').hover();
+  await expect(page.locator('[data-testid="context-submenu"]')).toBeVisible();
+  await page.click('[data-testid="menu-item-mask-email"]');
+  await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
+
+  // The toggle exists (this connection has a masked column now) but must not read "on" — the
+  // fetch behind it failed — and the grid must show the real value, never a half-applied mask.
+  const toggle = page.locator('[data-testid="toolbar-mask-preview"]');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).not.toHaveClass(/is-active/);
+  await expect(gridCell(page, 0, 'email')).toHaveText('maria.gonzalez@acme.example');
+  await expect(gridCell(page, 0, 'email')).not.toHaveClass(/cell-masked/);
+  await expect(page.locator('[data-testid="grid-writable-badge"]')).toHaveText('read-write');
+  await expect(page.locator('[data-testid="data-action-error"]')).toBeVisible();
+});

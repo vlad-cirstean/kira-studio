@@ -117,7 +117,7 @@ import {
 } from '../shared/slick/selection';
 import { getPage, pageVersion, setVisibleWindow } from './page';
 import { parseTextSortTerms } from './sortTerms';
-import { runtime, type Selection, setSort } from './state';
+import { runtime, type Selection, setActionError, setMaskPreview, setSort } from './state';
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -618,6 +618,34 @@ async function refreshMaskTagCache(): Promise<void> {
   const key = await correlationKeyFor(connectionId);
   maskTagCache = await buildMaskTagCache(p, maskRulesByColumn, key);
   maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
+}
+
+// M7 finding #11: refreshMaskTagCache's own correlationKeyFor call can reject (an IPC failure) —
+// every call site below used to leave that unhandled, which "fails open": the preview stays on
+// (toggle active, grid-writable-badge still "read-only") but the grid's own dataSource is never
+// updated to apply the mask transform, since the render tail after the await never runs. Turn the
+// preview back off on failure (setMaskPreview, not a direct write to rt.maskPreview — its own
+// pending-changes guard is irrelevant here since this only ever turns preview OFF) and surface the
+// failure the same way every other async grid action in this file does (setActionError), then still
+// re-render so the toggle-off state actually reaches the grid rather than leaving the last, already-
+// stale render in place.
+function refreshMaskTagsAndRerender(): void {
+  void refreshMaskTagCache().then(
+    () => {
+      if (!grid || !dataSource) return;
+      dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
+      grid.invalidateAllRows();
+      grid.render();
+    },
+    (err: unknown) => {
+      setMaskPreview(props.tabId, false);
+      setActionError(props.tabId, err instanceof Error ? err.message : String(err));
+      if (!grid || !dataSource) return;
+      dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
+      grid.invalidateAllRows();
+      grid.render();
+    },
+  );
 }
 
 // C9 — the `GridDataSourceState` builder itself, factored out once this stopped being the single
@@ -2268,14 +2296,8 @@ onMounted(() => {
   // current page — maskTagCache was reset to empty by the remount too. Mirrors the pageVersion
   // watch's own async tail (below) exactly: render synchronously (already done, correct but
   // tag-less, by the `grid.render()` above), then fill tags in once the async pass resolves.
-  if (maskPreviewOn()) {
-    void refreshMaskTagCache().then(() => {
-      if (!grid || !dataSource) return;
-      dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
-      grid.invalidateAllRows();
-      grid.render();
-    });
-  }
+  // refreshMaskTagsAndRerender (finding #11) turns preview back off on a correlation-key failure.
+  if (maskPreviewOn()) refreshMaskTagsAndRerender();
 });
 
 onUnmounted(() => {
@@ -2348,15 +2370,9 @@ watch(
     // M5 §6.3: "on every pageVersion bump while it is on" — a freshly loaded page has an entirely
     // different set of distinct values, so the previous tag cache no longer applies. The redaction
     // above already rendered synchronously (correct, tag-less) the instant this watch fired; this
-    // fills the tags in a moment later, once the async HMAC pass resolves.
-    if (maskPreviewOn()) {
-      void refreshMaskTagCache().then(() => {
-        if (!grid || !dataSource) return;
-        dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
-        grid.invalidateAllRows();
-        grid.render();
-      });
-    }
+    // fills the tags in a moment later, once the async HMAC pass resolves. refreshMaskTagsAndRerender
+    // (finding #11) turns preview back off on a correlation-key failure.
+    if (maskPreviewOn()) refreshMaskTagsAndRerender();
   },
 );
 
@@ -2468,7 +2484,18 @@ watch(
   [() => rt()?.maskPreview, () => maskRulesState.byConnection[tab()?.connectionId ?? '']],
   async () => {
     refreshMaskFolding();
-    await refreshMaskTagCache();
+    try {
+      await refreshMaskTagCache();
+    } catch (err) {
+      // M7 finding #11: a correlation-key fetch failure must not leave the preview claiming "on"
+      // while the grid quietly never applied it (a fail-open) — turn it back off and surface why,
+      // then still fall through to the render below so that toggle-off state actually reaches the
+      // grid. setMaskPreview(false) is a no-op guard-wise (its pending-changes guard only blocks
+      // turning preview ON), and reassigning this watch's own `rt().maskPreview` dependency to the
+      // same false-vs-already-false value it may already hold means this fires at most once more.
+      setMaskPreview(props.tabId, false);
+      setActionError(props.tabId, err instanceof Error ? err.message : String(err));
+    }
     if (!grid || !dataSource) return;
     const p = getPage(props.tabId);
     dataSource.setState(dataSourceState(p, currentOrder()));
