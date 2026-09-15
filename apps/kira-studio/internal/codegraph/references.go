@@ -126,13 +126,20 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 
 	files := fileCache{}
 	symbolsByFile := symbolCache{}
+	// groupResult is groupTargets' own memoized entry: which symbols (by id) a reference from this
+	// group would resolve to, plus whether that group carries any locality evidence at all
+	// (discriminant, below).
+	type groupResult struct {
+		ids          map[int64]bool
+		discriminant bool
+	}
 	// groupTargets memoizes, per (directory, kind, language), the set of symbol ids a reference to
 	// name from some file in that group would resolve to (§5.5). P69b: a "read" reference's own tier
 	// membership is clamped by its kind (resolve.go), and the Go package-privacy rule depends on
 	// language, so both join directory in the memo key — a name/kind/language combination used many
 	// times across few directories still costs one resolution per (directory, kind, language) group,
 	// not one per occurrence.
-	groupTargets := map[string]map[int64]bool{}
+	groupTargets := map[string]groupResult{}
 
 	targetIDs := make(map[int64]bool, len(targets))
 	for _, t := range targets {
@@ -141,6 +148,7 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 
 	var sites []Site
 	total := 0
+	unattributed := 0
 	for _, r := range refRows {
 		if len(kindSet) > 0 && !kindSet[r.Kind] {
 			continue
@@ -157,16 +165,27 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		if !included {
 			dir := dirOf(rf.Path)
 			key := dir + "\x00" + r.Kind + "\x00" + rf.Language
-			ids, ok := groupTargets[key]
+			group, ok := groupTargets[key]
 			if !ok {
-				ids, err = g.groupResolutionTargets(ctx, dir, rf.Language, r.Kind, name)
+				ids, conf, err := g.groupResolutionTargets(ctx, dir, rf.Language, r.Kind, name)
 				if err != nil {
 					return Refs{}, err
 				}
-				groupTargets[key] = ids
+				// A group that resolved RepoWide with more than one candidate carries no locality
+				// evidence at all — every same-named definition in the repository is equally
+				// "in the set," so membership in it proves nothing about which one this occurrence
+				// means. A singleton candidate is kept regardless of tier: a name with exactly one
+				// definition repository-wide is unambiguous even at RepoWide, which is what
+				// preserves recall for the ordinary cross-directory case (P69d §A.4 commit 2).
+				group = groupResult{ids: ids, discriminant: conf != RepoWide || len(ids) == 1}
+				groupTargets[key] = group
+			}
+			if !group.discriminant {
+				unattributed++
+				continue
 			}
 			for id := range targetIDs {
-				if ids[id] {
+				if group.ids[id] {
 					included = true
 					break
 				}
@@ -216,28 +235,30 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		}
 	}
 
-	return Refs{Sites: sites, Total: total, Truncated: total > len(sites)}, nil
+	return Refs{Sites: sites, Total: total, Truncated: total > len(sites), Unattributed: unattributed}, nil
 }
 
 // groupResolutionTargets is ReferencesTo's own memoized computation: which symbols (by id) would a
 // kind-shaped reference to name, sitting somewhere in directory dir of a file in language, resolve
-// to? Implemented as one resolveName call against a synthetic file path inside dir that matches no
-// real file — so no candidate can ever land in tier 0 relative to it, modeling "some file in this
-// directory, exact file unspecified" directly: a same-directory candidate lands in tier 1, everything
-// else in tier 2, exactly the two tiers the memo key itself is defined over. language is set on the
-// sentinel so the Go package-privacy rule in resolveName (which keys off site.File.Language) is
-// reachable from ReferencesTo at all — before P69b it never was, for any kind (§4.3). kind is set on
-// the sentinel so a "read" reference gets resolveName's own tier<=1 clamp (§4.2).
-func (g *Graph) groupResolutionTargets(ctx context.Context, dir, language, kind, name string) (map[int64]bool, error) {
+// to, and with what confidence? Implemented as one resolveName call against a synthetic file path
+// inside dir that matches no real file — so no candidate can ever land in tier 0 relative to it,
+// modeling "some file in this directory, exact file unspecified" directly: a same-directory
+// candidate lands in tier 1, everything else in tier 2, exactly the two tiers the memo key itself is
+// defined over. language is set on the sentinel so the Go package-privacy rule in resolveName (which
+// keys off site.File.Language) is reachable from ReferencesTo at all — before P69b it never was, for
+// any kind (§4.3). kind is set on the sentinel so a "read" reference gets resolveName's own tier<=1
+// clamp (§4.2). The returned Confidence is what ReferencesTo's own attribution gate reads (P69d §A.4
+// commit 2) — resolveName already computes it; this used to discard it.
+func (g *Graph) groupResolutionTargets(ctx context.Context, dir, language, kind, name string) (map[int64]bool, Confidence, error) {
 	sentinel := codeindex.FileRow{Path: dir + "/\x00", Language: language}
 	site := resolveSite{File: sentinel, Kind: kind, StartByte: -1, EndByte: -1, NameStartByte: -1, NameEnd: -1}
-	cands, _, err := g.resolveName(ctx, name, nil, site)
+	cands, conf, err := g.resolveName(ctx, name, nil, site)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	ids := make(map[int64]bool, len(cands))
 	for _, c := range cands {
 		ids[c.sym.ID] = true
 	}
-	return ids, nil
+	return ids, conf, nil
 }

@@ -101,11 +101,16 @@ type RefOpts struct {
 	Limit             int // default 500, max 2000
 }
 
-// Refs is ReferencesTo's own result.
+// Refs is ReferencesTo's own result. Unattributed counts occurrences of the query's own name whose
+// referring group (directory, kind, language) resolved RepoWide with more than one candidate —
+// name-based resolution genuinely cannot tell which of several repository-wide definitions such an
+// occurrence means, so it is reported, not silently folded into Sites under one of them (P69d §A.4
+// commit 2).
 type Refs struct {
-	Sites     []Site
-	Total     int
-	Truncated bool
+	Sites        []Site
+	Total        int
+	Truncated    bool
+	Unattributed int
 }
 
 // SymbolSearch configures SearchSymbols.

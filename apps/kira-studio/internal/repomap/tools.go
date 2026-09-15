@@ -214,7 +214,7 @@ func (s *Server) findReferences(ctx context.Context, _ *mcp.CallToolRequest, in 
 		name = refs.Sites[0].Name
 	}
 	src := inst.sourceForSites(ctx, in.OmitSource, refs.Sites)
-	return inst.text(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, src))
+	return inst.text(renderReferences(name, refs.Sites, refs.Total, refs.Truncated, refs.Unattributed, src))
 }
 
 // --- find_implementations ---

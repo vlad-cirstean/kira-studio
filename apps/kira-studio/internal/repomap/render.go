@@ -77,10 +77,30 @@ func renderDefinitions(name, resolvedFrom string, targets []codegraph.Target, sr
 	return b.String()
 }
 
+// unattributedNote is the closing line renderReferences prints when Refs.Unattributed is non-zero
+// (P69d §A.4 commit 2) — a repository-wide-ambiguous group's occurrences are counted but never
+// listed as a Site, since attributing one to this definition specifically would be a guess; this is
+// what tells the caller they exist and how to see them anyway.
+func unattributedNote(name string, unattributed int) string {
+	plural := ""
+	if unattributed != 1 {
+		plural = "s"
+	}
+	return fmt.Sprintf(
+		"%d further occurrence%s of %q could not be attributed to this definition — the name is "+
+			"defined in several places and those sites carry no locality evidence; re-call with mode "+
+			"\"nameOnly\" to see them all.", unattributed, plural, name)
+}
+
 // renderReferences is find_references' own shape — Truncated always reported with the real total
-// (§6.3).
-func renderReferences(name string, sites []codegraph.Site, total int, truncated bool, src sourceLines) string {
+// (§6.3). unattributed is P69d §A.4 commit 2's own count, rendered as a closing line rather than
+// folded into total/sites — including on the total==0 path, so an all-unattributed answer never
+// reads as a bare "no references found".
+func renderReferences(name string, sites []codegraph.Site, total int, truncated bool, unattributed int, src sourceLines) string {
 	if total == 0 {
+		if unattributed > 0 {
+			return unattributedNote(name, unattributed)
+		}
 		return fmt.Sprintf("no references found for %q", name)
 	}
 	var b strings.Builder
@@ -102,6 +122,10 @@ func renderReferences(name string, sites []codegraph.Site, total int, truncated 
 			b.WriteString(fmt.Sprintf("%s   %s", loc, s.Kind))
 		}
 		writeSource(&b, src, s.Path, s.NameSpan.Start.Row)
+	}
+	if unattributed > 0 {
+		b.WriteString("\n\n")
+		b.WriteString(unattributedNote(name, unattributed))
 	}
 	return b.String()
 }
