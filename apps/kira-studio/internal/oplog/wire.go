@@ -57,6 +57,10 @@ type inFlightOp struct {
 	tabID        *string
 	kind         string
 	startedAt    string
+	// incognito is P71 §4.3: true for an op started with OpSpec.Incognito — handleOpStart skips
+	// Append for it, handleOpEnd skips Finish, and finishInFlight skips it on shutdown. The live
+	// Operations-panel update (updates.Emit) still fires in all three cases.
+	incognito bool
 }
 
 // Wiring is the Go analogue of oplog.ts's wireOplog, split into New/Start/Stop (P54 D14): New
@@ -163,19 +167,28 @@ func (w *Wiring) handleOpStart(payload json.RawMessage, inFlight map[string]inFl
 		TabID        *string `json:"tabId"`
 		Kind         string  `json:"kind"`
 		StartedAt    string  `json:"startedAt"`
+		Incognito    bool    `json:"incognito"`
 	}
 	if err := json.Unmarshal(payload, &evt); err != nil || !model.ValidOpKind(evt.Kind) {
 		return
 	}
 
-	rec := inFlightOp{connectionID: evt.ConnectionID, tabID: evt.TabID, kind: evt.Kind, startedAt: evt.StartedAt}
+	rec := inFlightOp{
+		connectionID: evt.ConnectionID, tabID: evt.TabID, kind: evt.Kind, startedAt: evt.StartedAt,
+		incognito: evt.Incognito,
+	}
 	inFlight[evt.OpID] = rec
 
-	if err := w.ops.Append(model.OpAppend{
-		ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, Kind: rec.kind, StartedAt: rec.startedAt,
-	}); err != nil {
-		slog.Warn("append failed", "scope", "oplog", "opId", evt.OpID, "err", err)
-		return
+	// P71 §4.3: an incognito op is never Appended — nothing about it reaches op_log — but the
+	// live Operations-panel update below still fires, so a running incognito op is visible while
+	// it runs and simply gone (never having existed on disk) once it completes.
+	if !evt.Incognito {
+		if err := w.ops.Append(model.OpAppend{
+			ID: evt.OpID, ConnectionID: rec.connectionID, TabID: rec.tabID, Kind: rec.kind, StartedAt: rec.startedAt,
+		}); err != nil {
+			slog.Warn("append failed", "scope", "oplog", "opId", evt.OpID, "err", err)
+			return
+		}
 	}
 
 	w.updates.Emit(model.OpRecord{
@@ -200,19 +213,32 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	patch := model.OpFinish{
 		Status: evt.Status, DurationMs: evt.DurationMs, Rows: evt.Rows, Command: evt.Command, Error: evt.Error,
 	}
-	// P23 D1(c): Finish truncates patch.Command/patch.Error in place, so the record built below
-	// (and pushed live to the renderer) reflects exactly what was stored, never the
-	// pre-truncation event payload — a live update must not disagree with a subsequent Recent()
-	// reload about whether Re-run should be disabled.
-	commandTruncated, err := w.ops.Finish(evt.OpID, &patch)
-	if err != nil {
-		slog.Warn("finish failed", "scope", "oplog", "opId", evt.OpID, "err", err)
-		return completedSincePrune
-	}
 
-	// oplog.ts:80-84's exact fallbacks for an op:end with no matching op:start.
+	// P71 §4.3: the inFlight lookup moves above Finish (oplog.ts:80-84's exact fallbacks for an
+	// op:end with no matching op:start still apply below) so an incognito op's own skip decision
+	// is known before deciding whether to write anything at all — nothing was ever Appended for
+	// it (handleOpStart's own skip), so Finish would either no-op or fail against a missing row.
 	started, ok := inFlight[evt.OpID]
 	delete(inFlight, evt.OpID)
+
+	var commandTruncated bool
+	if ok && started.incognito {
+		// patch.Command/patch.Error stay exactly as the event carried them — Finish is the only
+		// thing that truncates them in place, and this op's live record is in-memory only, never
+		// written to op_log, so there is nothing to truncate for.
+	} else {
+		// P23 D1(c): Finish truncates patch.Command/patch.Error in place, so the record built
+		// below (and pushed live to the renderer) reflects exactly what was stored, never the
+		// pre-truncation event payload — a live update must not disagree with a subsequent
+		// Recent() reload about whether Re-run should be disabled.
+		var err error
+		commandTruncated, err = w.ops.Finish(evt.OpID, &patch)
+		if err != nil {
+			slog.Warn("finish failed", "scope", "oplog", "opId", evt.OpID, "err", err)
+			return completedSincePrune
+		}
+	}
+
 	record := model.OpRecord{
 		ID: evt.OpID, DurationMs: &evt.DurationMs, Status: evt.Status, Rows: evt.Rows,
 		Command: patch.Command, Error: patch.Error, CommandTruncated: commandTruncated,
@@ -242,6 +268,12 @@ func (w *Wiring) finishInFlight(inFlight map[string]inFlightOp, message string) 
 	now := time.Now()
 	for opID, rec := range inFlight {
 		delete(inFlight, opID)
+		// P71 §4.3: an incognito op still running at shutdown was never Appended, so there is no
+		// row to Finish — skip it rather than writing a fresh "app exited" row for an op that
+		// never reached op_log at all.
+		if rec.incognito {
+			continue
+		}
 
 		durationMs := 0 // a startedAt that will not parse yields 0 — JS gives NaN there, which
 		// is not a number SQLite should store, and 0 is the honest value for "we cannot tell".

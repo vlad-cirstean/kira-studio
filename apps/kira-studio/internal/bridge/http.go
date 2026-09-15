@@ -46,6 +46,10 @@ type HttpSendArgs struct {
 	// knows it, http.ts:208), and used for exactly one thing, recording a response-history
 	// entry under the right scope.
 	ItemID string `json:"itemId"`
+	// Incognito is P71 §4: mirrors ItemID's optional-on-the-TS-side shape (default false on the
+	// zero value). Suppresses the response-history Record call below and rides along on the op
+	// spec so the op log skips persisting this op too (adapterhost/host.go, oplog/wire.go).
+	Incognito bool `json:"incognito"`
 }
 
 // Send runs one HTTP request through Host.RunOp with ConnectionID: nil (D3, proven safe by F10 —
@@ -68,7 +72,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 	}
 
 	tabID := args.TabID
-	spec := adapterhost.OpSpec{ConnectionID: nil, Kind: "http", OpID: args.OpID, TabID: &tabID}
+	spec := adapterhost.OpSpec{ConnectionID: nil, Kind: "http", OpID: args.OpID, TabID: &tabID, Incognito: args.Incognito}
 
 	_, value, err := s.Deps.Router.Host().RunOp(ctx, spec,
 		func(runCtx context.Context, op *adapters.OpCtx) (any, error) {
@@ -119,17 +123,21 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 			// P8 D2: recorded from args (stage 1 — F3), never from resolved. Best-effort: a
 			// failed insert logs and the send still returns its response — a history feature
 			// must never be the reason a user loses the answer they were waiting for.
-			if err := s.Deps.Repos.ResponseHistory.Record(model.ResponseHistoryRecord{
-				ItemID:        args.ItemID,
-				TabID:         args.TabID,
-				EnvironmentID: args.EnvironmentID,
-				Method:        args.Method,
-				URL:           args.URL,
-				Headers:       args.Headers,
-				Body:          args.Body,
-				Response:      resp,
-			}); err != nil {
-				slog.Warn("recording response history failed", "scope", "bridge/http", "opId", args.OpID, "err", err)
+			// P71 §4.1: skipped entirely for an incognito tab — nothing about this send reaches
+			// SQLite.
+			if !args.Incognito {
+				if err := s.Deps.Repos.ResponseHistory.Record(model.ResponseHistoryRecord{
+					ItemID:        args.ItemID,
+					TabID:         args.TabID,
+					EnvironmentID: args.EnvironmentID,
+					Method:        args.Method,
+					URL:           args.URL,
+					Headers:       args.Headers,
+					Body:          args.Body,
+					Response:      resp,
+				}); err != nil {
+					slog.Warn("recording response history failed", "scope", "bridge/http", "opId", args.OpID, "err", err)
+				}
 			}
 
 			return resp, nil
