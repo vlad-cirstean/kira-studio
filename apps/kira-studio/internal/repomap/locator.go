@@ -79,18 +79,6 @@ func absentFileReason(root, rel string) string {
 	return fmt.Sprintf("%s exists but is not indexed — its language is not one this index covers, or it is excluded — call search_files to see what is indexed", rel)
 }
 
-// exactSymbolMatches narrows hits (a prefix search's own results, §4.3 in C2) down to the ones
-// whose Name is exactly name — rule 4's own "exactly one hit whose name matches exactly."
-func exactSymbolMatches(hits []codegraph.Target, name string) []codegraph.Target {
-	var out []codegraph.Target
-	for _, h := range hits {
-		if h.Name == name {
-			out = append(out, h)
-		}
-	}
-	return out
-}
-
 // locate resolves args into a codegraph.Query per §6.1's five rules. A returned error is a genuine
 // internal fault (a database error from the rule-4 symbol search); everything caller-correctable is
 // carried in locateResult.msg/ambiguous/empty instead.
@@ -119,22 +107,21 @@ func locate(ctx context.Context, graph *codegraph.Graph, root string, args locat
 		return locateResult{query: q}, nil
 
 	case args.Symbol != "":
-		hits, err := graph.SearchSymbols(ctx, codegraph.SymbolSearch{Text: args.Symbol, Languages: args.Languages, Limit: defaultSymbolLocateLimit})
+		hits, err := graph.SymbolsNamed(ctx, args.Symbol, args.Languages, defaultSymbolLocateLimit)
 		if err != nil {
 			return locateResult{}, err
 		}
-		exact := exactSymbolMatches(hits, args.Symbol)
-		switch len(exact) {
+		switch len(hits) {
 		case 0:
 			return locateResult{empty: true}, nil
 		case 1:
-			t := exact[0]
+			t := hits[0]
 			return locateResult{query: codegraph.Query{
 				Path: t.Path, Byte: -1,
 				Point: &codegraph.Point{Row: t.NameSpan.Start.Row, Column: t.NameSpan.Start.Column},
 			}}, nil
 		default:
-			return locateResult{ambiguous: exact}, nil
+			return locateResult{ambiguous: hits}, nil
 		}
 
 	default:
@@ -143,6 +130,5 @@ func locate(ctx context.Context, graph *codegraph.Graph, root string, args locat
 }
 
 // defaultSymbolLocateLimit bounds rule 4's own disambiguation search — enough to show a caller
-// every real candidate in practice without an unbounded scan; codegraph's own SearchSymbols clamps
-// again regardless (§6.2).
+// every real candidate in practice without an unbounded scan.
 const defaultSymbolLocateLimit = 50

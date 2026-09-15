@@ -104,6 +104,97 @@ func less(a, b codeindex.SymbolHit, needle string) bool {
 	return a.Path < b.Path
 }
 
+// symbolFileHit pairs a symbol row with its own file row — SymbolsNamed's own working shape before
+// it builds a Target, the same pairing SymbolHit gives SearchSymbols for free from SQL, but read
+// here as two separate Go-side round trips (FindSymbolsByName has no join of its own).
+type symbolFileHit struct {
+	sym  codeindex.SymbolRow
+	file codeindex.FileRow
+}
+
+// SymbolsNamed returns every symbol named exactly name in the repository — codeindex.Store.
+// FindSymbolsByName's own exact-name index, already used by resolveName — optionally narrowed to
+// languages (an exact, case-sensitive match against each file's own stored language, same
+// convention SearchSymbols' SQL filter uses), ordered by path then start byte for determinism, and
+// capped at limit (0 means unlimited).
+//
+// repomap's locator uses this instead of SearchSymbols for a symbol-alone lookup (P69d §A.4 commit
+// 3): SearchSymbols is a ranked, limit-capped prefix search over SQL's own case-insensitive LIKE, so
+// capping ahead of an exact-name filter can silently drop real candidates whenever enough
+// case-insensitive-prefix competitors crowd them out of the cap first (§A.2-c: 35 symbols named
+// exactly "Close" competing with 49 more named "close" for the same 50 slots). Reading the exact-name
+// index directly has no such competitor set to lose to.
+func (g *Graph) SymbolsNamed(ctx context.Context, name string, languages []string, limit int) ([]Target, error) {
+	rows, err := g.store.FindSymbolsByName(ctx, g.repoID, name)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	fileIDs := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		fileIDs = append(fileIDs, r.FileID)
+	}
+	files, err := g.store.FilesByIDs(ctx, fileIDs)
+	if err != nil {
+		return nil, err
+	}
+	filesByID := make(map[int64]codeindex.FileRow, len(files))
+	for _, f := range files {
+		filesByID[f.ID] = f
+	}
+
+	languageSet := make(map[string]bool, len(languages))
+	for _, l := range languages {
+		languageSet[l] = true
+	}
+
+	var hits []symbolFileHit
+	for _, row := range rows {
+		f, ok := filesByID[row.FileID]
+		if !ok {
+			continue // a symbol whose file vanished between the two reads — skip rather than fail.
+		}
+		if len(languageSet) > 0 && !languageSet[f.Language] {
+			continue
+		}
+		hits = append(hits, symbolFileHit{sym: row, file: f})
+	}
+
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].file.Path != hits[j].file.Path {
+			return hits[i].file.Path < hits[j].file.Path
+		}
+		return hits[i].sym.StartByte < hits[j].sym.StartByte
+	})
+	if limit > 0 && len(hits) > limit {
+		hits = hits[:limit]
+	}
+
+	out := make([]Target, len(hits))
+	for i, h := range hits {
+		container, err := g.containerChain(ctx, h.sym)
+		if err != nil {
+			return nil, err
+		}
+		out[i] = Target{
+			SymbolID:   h.sym.ID,
+			Path:       h.file.Path,
+			Language:   h.file.Language,
+			Kind:       h.sym.Kind,
+			Name:       h.sym.Name,
+			Container:  container,
+			Span:       symbolSpan(h.sym),
+			NameSpan:   symbolNameSpan(h.sym),
+			Rule:       "search",
+			Confidence: Exact,
+		}
+	}
+	return out, nil
+}
+
 // SearchFiles runs s.Text as a substring match over the repository's own file paths, ranked by
 // earliest match offset, then shorter path, then path itself.
 func (g *Graph) SearchFiles(ctx context.Context, s FileSearch) ([]FileHit, error) {
