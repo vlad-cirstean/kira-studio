@@ -516,7 +516,7 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   preference where no anchor exists (P64b plan §0.1).
 
 - **P68 (code review, dimension 1) — `outline_file` cannot distinguish "this file has no indexed
-  definitions" from "this path does not exist". Open.**
+  definitions" from "this path does not exist". Fixed (`402a8fdf`).**
 
   P67f closed this exact class for the not-yet-indexed case (`render.go`'s empty string vs.
   `notReadyResult`), but the absent-*file* case survives in `renderOutline` (`render.go:181`):
@@ -541,6 +541,21 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   `search_files` already answers the underlying question (it returns the `file` rows), and
   `sourceForOneFile` already distinguishes `file not found` from `unreadable` for its own source
   lines, so both halves of the distinction exist in-package. Per the process above, not fixed here.
+
+  **Fix (P68b, `402a8fdf`)**: `codegraph.Graph.Outline` already looked the file up via `GetFile` to
+  decide whether to query for symbols — it just discarded the answer. It now returns that as a
+  second value (`indexed bool`), zero extra DB work. `outline_file` routes the absent case to a new
+  `IsError` message (`absentFileReason`, `repomap/locator.go`) distinct per cause: out-of-repo,
+  missing on disk (names `search_files`), unreadable, a directory (names `search_files` with
+  `pathPrefix`), non-regular, and exists-but-unindexed (names `search_files`). `renderOutline`'s own
+  `"has no indexed definitions"` sentence is unchanged and now only ever reached for a genuinely
+  indexed file. Two more inputs hit the identical bug beyond this entry's own repro, found while
+  planning the fix and covered by the same change: a file that exists on disk but whose language
+  isn't indexed (`README.md`), and a directory path. The control case — a real, indexed,
+  genuinely definition-free file (`packages/git-ui/src/icons/codicon.css`) — still answers
+  `"has no indexed definitions"` normally, not as an error. Verified live against a rebuilt server:
+  all four absent-shape cases above now return their own distinct `IsError` message, and the
+  definition-free and out-of-repo (`/etc/hosts`) controls are unchanged.
 
 <!--
 Entry template:
