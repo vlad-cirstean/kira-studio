@@ -865,6 +865,8 @@ and `review_comment`, the flat file/line AI-comment list, anchored by both a com
 path's blob oid at that commit. Sessions are purged after 14 days idle — returning after that
 window starts clean, by design rather than as an error case.
 
+### Code parsing and the code graph (C1/C2)
+
 **A third SQLite file, `codeindex.db`, the same reason as the second (C1).** The tree-sitter parse
 cache — per-file declarations, references and injected-block ranges over every repository this
 process has indexed — lives in its own file for the same lifecycle reason `review.db` does:
@@ -963,6 +965,8 @@ word-under-cursor name, resolved against the same file's symbols — SPEC's own 
 case, at the cost of one optional field and no new parsing. Nothing cross-component resolves: no
 prop flow, no Angular DI, no JSX element-to-component edge — each would need a type system or a
 hand-written identifier query this phase never adds.
+
+### The repo-map MCP server (C3, P64-P69d)
 
 **`internal/repomap` (C3) is an MCP protocol server in front of `codegraph.Graph` — no new parsing,
 no new resolution logic, just a wire format.** `github.com/modelcontextprotocol/go-sdk` (Apache-2.0,
@@ -1080,6 +1084,8 @@ any local process's for the asking regardless of who is meant to be the only cal
 the Settings dialog's Code intelligence tab shows the command before its Install button, never the
 reverse, and the button re-resolves `claude`'s own location fresh on every click rather than trusting
 a cached probe. No VS Code MCP registration of any kind is attempted.
+
+### The native code workspace (C5-C9)
 
 **Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
 throughout.** Import a git repository and click it to open it as its own independent workspace: its
