@@ -177,9 +177,15 @@ watch(
 // excludes the enabled-checkbox column (a real `<input type="checkbox">`, Checkbox.vue) from the
 // count, so form-data's own extra content-type field in the trailing slot does not shift the
 // mapping for rows that lack it (it simply has no target there, and navigation into it does
-// nothing rather than landing on the wrong field).
-function textInputsIn(row: Element): HTMLInputElement[] {
-  return Array.from(row.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"])'));
+// nothing rather than landing on the wrong field). P71 §8.3: `, textarea` covers a `grow` cell's
+// own `<textarea>` — no cell value can contain a newline (§8), so a cell is still one logical
+// line, and this table's own row-stepping contract (P15b D6) is unaffected.
+function textInputsIn(row: Element): (HTMLInputElement | HTMLTextAreaElement)[] {
+  return Array.from(
+    row.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      'input:not([type="checkbox"]), textarea',
+    ),
+  );
 }
 
 function onContainerKeydown(e: KeyboardEvent): void {
@@ -197,8 +203,14 @@ function onContainerKeydown(e: KeyboardEvent): void {
   }
   const el = e.target;
   // Only real text inputs participate — a <select> (form-data's kind picker) or a <button> (Choose
-  // file, Remove) stays Tab-reachable and keeps its own native arrow behaviour untouched.
-  if (!(el instanceof HTMLInputElement) || el.type === 'checkbox') return;
+  // file, Remove) stays Tab-reachable and keeps its own native arrow behaviour untouched. `.type`
+  // exists on both element types (a textarea's own is always the constant 'textarea'), so this one
+  // check still excludes only the enabled-checkbox column.
+  if (
+    !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) ||
+    el.type === 'checkbox'
+  )
+    return;
 
   const row = el.closest<HTMLElement>('.field-row');
   const container = row?.parentElement;
@@ -277,6 +289,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
              which is independent of what `range-highlights`/`hover-at` paint. -->
         <AutocompleteField
           v-if="nameCandidates || valueVariableSupport"
+          grow
           :model-value="entry.row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"
@@ -288,6 +301,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
         />
         <TextField
           v-else
+          grow
           :model-value="entry.row.name"
           :placeholder="namePlaceholder"
           :data-testid="`${testidPrefix}-name`"
@@ -304,6 +318,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
         <div class="field-cell">
           <AutocompleteField
             v-if="valueVariableSupport"
+            grow
             :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
@@ -315,6 +330,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
           />
           <TextField
             v-else
+            grow
             :model-value="entry.row.value"
             :placeholder="valuePlaceholder"
             :data-testid="`${testidPrefix}-value`"
@@ -327,6 +343,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
            pay a fourth AutocompleteField-width column for nothing. -->
       <div v-if="showDescriptions" class="field-cell">
         <TextField
+          grow
           :model-value="entry.row.description ?? ''"
           placeholder="description"
           :data-testid="`${testidPrefix}-description`"

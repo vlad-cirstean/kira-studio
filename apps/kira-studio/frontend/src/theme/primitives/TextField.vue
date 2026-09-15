@@ -36,6 +36,11 @@ const props = withDefaults(
     // step to that Next/Prev don't already do better, and the stepper's width only cramps its
     // already-narrow 46px box.
     hideStepper?: boolean;
+    /** P71 §8.1: opt-in 4-row auto-grow — the control becomes a `<textarea>`, sized purely by CSS
+     *  (`.p-input.is-grow`, primitives.css), Enter prevented so no newline ever enters the value.
+     *  Off by default: every other call site renders byte-identically. Mutually exclusive with
+     *  `type` by construction — a caller opting into grow never also asks for password/number. */
+    grow?: boolean;
   }>(),
   { size: 'sm', type: 'text' },
 );
@@ -47,7 +52,7 @@ const emit = defineEmits<{
 }>();
 
 const attrs = useAttrs();
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
 // The native spinner is hidden (see .p-input input[type='number'] below) and replaced with
 // stepBtn below — stepUp()/stepDown() already honour the element's own min/max/step attrs,
@@ -58,31 +63,61 @@ const showStepper = computed(() => props.type === 'number' && !props.hideStepper
 
 function stepBy(dir: 1 | -1): void {
   const el = inputRef.value;
-  if (!el || !showStepper.value || 'disabled' in attrs) return;
+  // `grow` and the stepper are mutually exclusive by construction (grow never sets type="number"),
+  // but the ref itself is now widened to cover both branches, so this narrows before calling the
+  // input-only stepUp/stepDown.
+  if (!el || !(el instanceof HTMLInputElement) || !showStepper.value || 'disabled' in attrs) return;
   if (dir > 0) el.stepUp();
   else el.stepDown();
   el.dispatchEvent(new Event('input', { bubbles: true }));
   el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function onInput(e: Event): void {
+  emit('update:modelValue', (e.target as HTMLInputElement | HTMLTextAreaElement).value);
+}
+
+// P71 §8: Enter is prevented under `grow` so no newline is ever inserted — growth comes from soft
+// wrapping alone, and every existing @enter contract (send-on-Enter, accept/submit) stays intact.
+function onEnter(e: KeyboardEvent): void {
+  if (props.grow) e.preventDefault();
+  emit('enter');
 }
 </script>
 
 <template>
   <span
     class="p-input"
-    :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': showStepper }"
+    :class="{ md: size === 'md', ui, 'is-invalid': invalid, 'has-stepper': showStepper, 'is-grow': grow }"
   >
     <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
     <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
+    <span v-if="grow" class="input-wrap" :data-value="modelValue">
+      <textarea
+        rows="1"
+        wrap="soft"
+        autocomplete="off"
+        v-bind="$attrs"
+        ref="inputRef"
+        :value="modelValue"
+        :placeholder="placeholder"
+        @input="onInput"
+        @keydown="onKeydown"
+        @keydown.enter="onEnter"
+        @blur="emit('blur', $event)"
+      />
+    </span>
     <input
+      v-else
       autocomplete="off"
       v-bind="$attrs"
       ref="inputRef"
       :type="type"
       :value="modelValue"
       :placeholder="placeholder"
-      @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+      @input="onInput"
       @keydown="onKeydown"
-      @keydown.enter="emit('enter')"
+      @keydown.enter="onEnter"
       @blur="emit('blur', $event)"
     />
     <span v-if="showStepper" class="stepper">
@@ -109,3 +144,13 @@ function stepBy(dir: 1 | -1): void {
     </span>
   </span>
 </template>
+
+<style scoped>
+/* P71 §8.1: only rendered under `grow` — sizes as a flex item of `.p-input`; primitives.css's own
+   `.p-input.is-grow .input-wrap` rule switches its *internal* display to grid for the auto-grow
+   trick (grid-area overlap between the textarea and the sizing replica). */
+.input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+</style>

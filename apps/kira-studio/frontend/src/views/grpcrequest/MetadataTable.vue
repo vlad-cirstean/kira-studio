@@ -134,8 +134,14 @@ watch(
 // import `views/httprequest/**`, biome.json, and this handler is small enough that duplicating it
 // costs less than the coupling a shared module would create). See that file's own comment for the
 // full rule set.
-function textInputsIn(row: Element): HTMLInputElement[] {
-  return Array.from(row.querySelectorAll<HTMLInputElement>('input:not([type="checkbox"])'));
+// P71 §8.3: `, textarea` covers a `grow` cell's own `<textarea>` — FieldRowsTable.vue's own
+// identical comment applies verbatim.
+function textInputsIn(row: Element): (HTMLInputElement | HTMLTextAreaElement)[] {
+  return Array.from(
+    row.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+      'input:not([type="checkbox"]), textarea',
+    ),
+  );
 }
 
 function onContainerKeydown(e: KeyboardEvent): void {
@@ -149,7 +155,11 @@ function onContainerKeydown(e: KeyboardEvent): void {
     return;
   }
   const el = e.target;
-  if (!(el instanceof HTMLInputElement) || el.type === 'checkbox') return;
+  if (
+    !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) ||
+    el.type === 'checkbox'
+  )
+    return;
 
   const row = el.closest<HTMLElement>('.metadata-row');
   const container = row?.parentElement;
@@ -215,6 +225,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       />
       <div class="metadata-cell">
         <AutocompleteField
+          grow
           :model-value="entry.row.name"
           placeholder="key (lowercase, - _ . only)"
           data-testid="grpc-metadata-name"
@@ -226,6 +237,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       <div class="metadata-cell">
         <AutocompleteField
           v-if="variables"
+          grow
           :model-value="entry.row.value"
           placeholder="value"
           data-testid="grpc-metadata-value"
@@ -237,6 +249,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
         />
         <TextField
           v-else
+          grow
           :model-value="entry.row.value"
           placeholder="value"
           data-testid="grpc-metadata-value"
@@ -246,6 +259,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       <!-- P22b D6: FieldRowsTable.vue's own description cell, mirrored here (F18). -->
       <div v-if="showDescriptions" class="metadata-cell">
         <TextField
+          grow
           :model-value="entry.row.description ?? ''"
           placeholder="description"
           data-testid="grpc-metadata-description"
