@@ -281,7 +281,14 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		}
 		return nil, nil, err
 	}
-	return jsonResult(rendered)
+	// Finding #12, M6: a `;`-separated args.SQL can make the adapter execute more than one
+	// statement, each with its own page — surface that rather than silently rendering only
+	// resp.Pages[0] with no sign anything else ran.
+	var result any = rendered
+	if len(resp.Pages) > 1 {
+		result = withAdditionalStatementResultsNote(rendered, len(resp.Pages)-1)
+	}
+	return jsonResult(result)
 }
 
 // --- explain_query (§4) ---

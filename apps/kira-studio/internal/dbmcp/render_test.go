@@ -402,6 +402,37 @@ func TestMaskedToolErrorWithholdsAdapterMessage(t *testing.T) {
 	}
 }
 
+// TestWithAdditionalStatementResultsNoteAddsCountWithoutLosingFields is finding #12, M6: a
+// run_query call whose args.SQL ran more than one statement must say so rather than silently
+// rendering only the first statement's page.
+func TestWithAdditionalStatementResultsNoteAddsCountWithoutLosingFields(t *testing.T) {
+	b := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "id", DataType: "int4", TypeClass: page.TypeClassNumber},
+	})
+	one := "1"
+	if err := b.AppendRow([]*string{&one}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg := b.Finish(page.UnpagedPosition(1))
+
+	rendered := renderTabularPage(pg, 10, nil)
+
+	got := withAdditionalStatementResultsNote(rendered, 2)
+	m, ok := got.(map[string]any)
+	if !ok {
+		t.Fatalf("withAdditionalStatementResultsNote returned %T, want map[string]any", got)
+	}
+	if m["kind"] != "tabular" {
+		t.Fatalf("lost the original result's own fields: %v", m)
+	}
+	if n, ok := m["additionalStatementResults"].(int); !ok || n != 2 {
+		t.Fatalf("additionalStatementResults = %v, want 2", m["additionalStatementResults"])
+	}
+	if note, ok := m["note"].(string); !ok || !strings.Contains(note, "2 additional statement") {
+		t.Fatalf("note = %v, want it to mention 2 additional statements", m["note"])
+	}
+}
+
 // TestRenderKeyValuePageMasksByFieldName is §4.3's own extension: a Redis hash field (or an S3
 // metadata key) is column-shaped, so a rule whose column_name matches keyValueEntry.Field masks
 // that entry's Value — matched case-insensitively, the same as a tabular column.

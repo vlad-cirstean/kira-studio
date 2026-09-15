@@ -353,6 +353,30 @@ func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statem
 	}
 }
 
+// withAdditionalStatementResultsNote marks rendered (a run_query result, always one of the
+// concrete *Result structs above) with the count of further statement results the adapter
+// produced but this call did not render (finding #12, M6) — e.g. `args.SQL` held more than one
+// `;`-separated statement, and only the first one's page is ever projected. Without this, extra
+// statements ran (a write among them, possibly) with no sign in the response that anything but
+// the shown result happened. Round-trips through JSON rather than adding the field to every
+// concrete result type, so run_query's ordinary (single-page) shape is untouched.
+func withAdditionalStatementResultsNote(rendered any, extraPages int) any {
+	encoded, err := json.Marshal(rendered)
+	if err != nil {
+		return rendered
+	}
+	var m map[string]any
+	if err := json.Unmarshal(encoded, &m); err != nil {
+		return rendered
+	}
+	m["additionalStatementResults"] = extraPages
+	m["note"] = fmt.Sprintf(
+		"this call ran %d additional statement(s) beyond the one shown here; only the first statement's result is returned",
+		extraPages,
+	)
+	return m
+}
+
 func cappedReturned(rowCount, maxRows int) int {
 	if rowCount > maxRows {
 		return maxRows
