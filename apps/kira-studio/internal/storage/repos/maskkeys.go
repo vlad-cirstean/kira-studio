@@ -50,6 +50,13 @@ func (r *MaskKeysRepo) Get(connectionID string) ([]byte, error) {
 // EnsureKey returns the connection's own key, minting and persisting a fresh 32-byte one on first
 // call (plan §2.5's own "lazy creation... the first time a connection renders a mask whose rule has
 // correlate: true"). A connection with no correlating rule never calls this and so never gets one.
+//
+// Two callers can race here on first use (M7 finding: the MCP render path's own MaskSetFor and the
+// grid preview's own CorrelationKeyHex, both resolving the same connection's key at once). The
+// write below is guarded by `WHERE mask_correlation_key = ''` rather than an unconditional UPDATE,
+// so only the first writer's key is ever persisted; a losing caller's RowsAffected is 0 and it
+// re-reads the winner's key instead of returning the one it generated but never actually stored —
+// both callers then build their own mask.Set from the same bytes, with nothing left to invalidate.
 func (r *MaskKeysRepo) EnsureKey(connectionID string) ([]byte, error) {
 	existing, err := r.Get(connectionID)
 	if err != nil {
@@ -62,8 +69,27 @@ func (r *MaskKeysRepo) EnsureKey(connectionID string) ([]byte, error) {
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("repos/maskkeys: generate key: %w", err)
 	}
-	if err := r.setKey(connectionID, key); err != nil {
-		return nil, err
+	encrypted, err := r.cipher.Encrypt(secrets.ScopeMaskKey, string(key))
+	if err != nil {
+		return nil, fmt.Errorf("repos/maskkeys: encrypt %s: %w", connectionID, err)
+	}
+	res, err := r.db.Exec(
+		`UPDATE connections SET mask_correlation_key = ? WHERE id = ? AND mask_correlation_key = ''`,
+		encrypted, connectionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("repos/maskkeys: set %s: %w", connectionID, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("repos/maskkeys: set %s: %w", connectionID, err)
+	}
+	if n == 0 {
+		// Lost the race (another EnsureKey minted first), or connectionID has no row — either way
+		// the key this call generated was never persisted, so it must never be handed out as if it
+		// were. Re-read rather than trust it: nil, nil for a genuinely missing connection, the
+		// winner's key otherwise.
+		return r.Get(connectionID)
 	}
 	return key, nil
 }
@@ -84,8 +110,19 @@ func (r *MaskKeysRepo) setKey(connectionID string, key []byte) error {
 	if err != nil {
 		return fmt.Errorf("repos/maskkeys: encrypt %s: %w", connectionID, err)
 	}
-	if _, err := r.db.Exec(`UPDATE connections SET mask_correlation_key = ? WHERE id = ?`, encrypted, connectionID); err != nil {
+	res, err := r.db.Exec(`UPDATE connections SET mask_correlation_key = ? WHERE id = ?`, encrypted, connectionID)
+	if err != nil {
 		return fmt.Errorf("repos/maskkeys: set %s: %w", connectionID, err)
+	}
+	// Regenerate is the only caller — without this check, regenerating against an id with no
+	// matching row (e.g. a connection deleted the moment before) reported success while writing
+	// nothing, silently leaving the request looking honored (M7 finding).
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos/maskkeys: set %s: %w", connectionID, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("repos/maskkeys: set %s: no such connection", connectionID)
 	}
 	return nil
 }
