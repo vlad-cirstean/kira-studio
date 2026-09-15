@@ -59,7 +59,10 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   struct field reached only via selector expression.**
 
   - **Found in**: M1ab, arm A (repo-map-assisted implementation pass)
-  - **Status**: Open — needs a dedicated fix pass before it can gate a future phase's dogfooding
+  - **Status**: Fixed (`f453ee37`, M1c). Independently re-verified live: `search_symbols
+    {"query":"AutoExplain"}` → `ConnectionFields.AutoExplain` at `connection.go:24:2`;
+    `find_references` on it → exactly 7 sites, exact lines, matching the plan's required-results
+    table. **Closed.**
   - **Query/tool call**: `find_references` on `model.ConnectionFields.AutoExplain` and
     `.ThrottlePerSec`; `search_symbols` for the same field names.
   - **Expected**: real call sites via `f.AutoExplain`/`c.ThrottlePerSec` selector expressions in
