@@ -72,6 +72,18 @@ func resolveHit(q Query, symbols []codeindex.SymbolRow, references []codeindex.R
 		if ref := referenceByNamePoint(references, *q.Point); ref != nil {
 			return queryHit{Name: ref.Name, Ref: ref, Ok: true}
 		}
+		// Neither point lookup hit — the common case for a caller-supplied line with no real byte
+		// column (repomap/locator.go defaults one to 1, which rarely lands inside an identifier's
+		// own name span). Fall back to the row itself: the leftmost symbol/reference whose name
+		// starts on q.Point.Row, pinned to q.Name when the caller gave one. Symbols before
+		// references, same precedence as the point path above and for the same reason
+		// (symbolByNamePoint's own doc comment).
+		if sym := symbolOnRow(symbols, q.Point.Row, q.Name); sym != nil {
+			return queryHit{Name: sym.Name, Sym: sym, Ok: true}
+		}
+		if ref := referenceOnRow(references, q.Point.Row, q.Name); ref != nil {
+			return queryHit{Name: ref.Name, Ref: ref, Ok: true}
+		}
 	case q.Byte >= 0:
 		if sym := symbolByNameByte(symbols, q.Byte); sym != nil {
 			return queryHit{Name: sym.Name, Sym: sym, Ok: true}
@@ -152,6 +164,46 @@ func innermostReferenceNode(refs []codeindex.ReferenceRow, b int) *codeindex.Ref
 			if best == nil || r.StartByte > best.StartByte {
 				best = r
 			}
+		}
+	}
+	return best
+}
+
+// symbolOnRow/referenceOnRow are resolveHit's own row-scoped fallback (repomap/locator.go's
+// file+line locator has no real byte column to pin a point lookup to): every symbol/reference
+// whose name starts on row, filtered to name when the caller gave one, leftmost (smallest
+// NameStartByte) among the rest — the same "several matches, pick one" shape symbolByNamePoint
+// already resolves via innermost, applied here to "same row" instead of "same point."
+
+func symbolOnRow(syms []codeindex.SymbolRow, row int, name string) *codeindex.SymbolRow {
+	var best *codeindex.SymbolRow
+	for i := range syms {
+		s := &syms[i]
+		if s.NameStartRow != row {
+			continue
+		}
+		if name != "" && s.Name != name {
+			continue
+		}
+		if best == nil || s.NameStartByte < best.NameStartByte {
+			best = s
+		}
+	}
+	return best
+}
+
+func referenceOnRow(refs []codeindex.ReferenceRow, row int, name string) *codeindex.ReferenceRow {
+	var best *codeindex.ReferenceRow
+	for i := range refs {
+		r := &refs[i]
+		if r.NameStartRow != row {
+			continue
+		}
+		if name != "" && r.Name != name {
+			continue
+		}
+		if best == nil || r.NameStartByte < best.NameStartByte {
+			best = r
 		}
 	}
 	return best

@@ -101,7 +101,11 @@ func locate(ctx context.Context, graph *codegraph.Graph, root string, args locat
 		if err != nil {
 			return locateResult{msg: err.Error()}, nil
 		}
-		q := codegraph.Query{Path: rel, Byte: -1}
+		// q.Name is set unconditionally (not only in a symbol-alone branch) so a file+line locator
+		// carries the symbol hint through to resolveHit's row-scoped fallback (position.go) even
+		// when the caller also supplies line — the common case of a path:line copied out of an
+		// ambiguity list, with no byte column to pin a name-span/node-span lookup to.
+		q := codegraph.Query{Path: rel, Byte: -1, Name: args.Symbol}
 		switch {
 		case args.Line > 0:
 			column := args.Column
@@ -109,9 +113,7 @@ func locate(ctx context.Context, graph *codegraph.Graph, root string, args locat
 				column = 1
 			}
 			q.Point = &codegraph.Point{Row: args.Line - 1, Column: column - 1}
-		case args.Symbol != "":
-			q.Name = args.Symbol
-		default:
+		case args.Symbol == "":
 			return locateResult{msg: "file given with neither line nor symbol — pass line (and optional column), or symbol, alongside file"}, nil
 		}
 		return locateResult{query: q}, nil

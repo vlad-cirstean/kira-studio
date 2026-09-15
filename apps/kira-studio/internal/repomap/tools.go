@@ -148,7 +148,14 @@ func (s *Server) findDefinition(ctx context.Context, _ *mcp.CallToolRequest, in 
 	}
 	resolvedFrom := ""
 	if q.Point != nil {
-		resolvedFrom = position(q.Path, codegraph.Point{Row: q.Point.Row, Column: q.Point.Column})
+		p := codegraph.Point{Row: q.Point.Row, Column: q.Point.Column}
+		if len(targets) > 0 && !pointInNameSpan(p, targets[0].NameSpan) {
+			// The requested column missed every name span at this position (resolveHit's own
+			// row-scoped fallback, codegraph/position.go, is what resolved this) — echo the
+			// definition's own name span instead of a column the resolver never actually used.
+			p = targets[0].NameSpan.Start
+		}
+		resolvedFrom = position(q.Path, p)
 	}
 	src := inst.sourceForTargets(ctx, in.OmitSource, targets)
 	return inst.text(renderDefinitions(name, resolvedFrom, targets, src))
@@ -451,6 +458,12 @@ func (s *Server) listRepos(_ context.Context, _ *mcp.CallToolRequest, _ listRepo
 		fmt.Fprintf(&b, "%s\t%s\t%s\n", r.Key, r.Root, state)
 	}
 	return textResult(strings.TrimRight(b.String(), "\n"))
+}
+
+// pointInNameSpan reports whether p falls inside span — a name span's own Start/End (both derived
+// same-row, codegraph.spanFromBytes) is exact, so this is a plain half-open range check.
+func pointInNameSpan(p codegraph.Point, span codegraph.Span) bool {
+	return p.Row == span.Start.Row && p.Column >= span.Start.Column && p.Column < span.End.Column
 }
 
 func clamp(v, def, max int) int {
