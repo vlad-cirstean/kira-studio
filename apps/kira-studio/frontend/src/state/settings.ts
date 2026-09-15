@@ -36,6 +36,7 @@ function applySettings(settings: Settings): void {
   Object.assign(settingsState.advanced, settings.advanced);
   Object.assign(settingsState.git, settings.git);
   Object.assign(settingsState.codeIntel, settings.codeIntel);
+  Object.assign(settingsState.dbMcp, settings.dbMcp);
   applyAppearance();
 }
 

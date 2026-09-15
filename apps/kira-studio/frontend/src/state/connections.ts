@@ -225,3 +225,10 @@ export async function setConnectionReadOnly(id: string, readOnly: boolean): Prom
     await connectConnection(id);
   }
 }
+
+// M1 §6.2: the Database MCP section's own allow-list checkbox, setConnectionColor's own shape —
+// no reconnect needed, unlike setConnectionReadOnly: this gates whether the DB MCP server exposes
+// the connection to an AI client, never what the live adapter connection itself does.
+export async function setConnectionMcpEnabled(id: string, mcpEnabled: boolean): Promise<void> {
+  await patchConnectionFields(id, { mcpEnabled });
+}

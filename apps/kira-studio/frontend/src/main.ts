@@ -10,6 +10,7 @@ import { initAppUpdate } from './state/appUpdate';
 import { initCacheStats } from './state/cacheStats';
 import { codeReposState, hydrateCodeRepos } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
+import { hydrateDbMcp } from './state/dbmcp';
 import { hydrateGitClients } from './state/gitClients';
 import { hydrateOps } from './state/ops';
 import { hydrateRepoMap } from './state/repomap';
@@ -296,6 +297,7 @@ async function bootstrap(): Promise<void> {
     hydrateCodeRepos(),
     hydrateGitClients(),
     hydrateRepoMap(),
+    hydrateDbMcp(),
     hydrateOps(),
     hydrateTabs(),
   ]);

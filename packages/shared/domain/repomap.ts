@@ -28,6 +28,10 @@ export const repoMapStatusSchema = /*#__PURE__*/ z.object({
   command: z.string(),
   claudeAvailable: z.boolean(),
   probed: z.array(z.string()),
+  // M1 §6.2: the current token's own expiry, RFC 3339, "" when nothing is running or the record
+  // has not yet been stamped by the 7-day-rotation retrofit. Without this the retrofit is a silent
+  // trap — a registered client just starts getting 401s a week after upgrade with no visible cause.
+  expiresAt: z.string(),
   error: z.string(),
   repos: z.array(repoMapRepoStatusSchema),
 });

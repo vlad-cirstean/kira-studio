@@ -103,6 +103,13 @@ export const codeIntelSettingsSchema = /*#__PURE__*/ z.object({
 });
 export type CodeIntelSettings = z.infer<typeof codeIntelSettingsSchema>;
 
+// M1 §6.2: mirrors codeIntelSettingsSchema exactly — the embedded DB MCP server instance's own
+// on/off switch (internal/bridge/dbmcp.go owns the actual start/stop side effect).
+export const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
+  serverEnabled: z.boolean().default(false),
+});
+export type DbMcpSettings = z.infer<typeof dbMcpSettingsSchema>;
+
 // `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
 // row with no `data`/`cache`/`advanced`/`git`/`codeIntel` keys, and that row must still parse on
 // next launch.
@@ -117,6 +124,7 @@ export const settingsSchema = /*#__PURE__*/ z.object({
     gitPath: '',
   }),
   codeIntel: codeIntelSettingsSchema.default({ mcpServerEnabled: false }),
+  dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -127,6 +135,7 @@ export const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
   codeIntel: codeIntelSettingsSchema.partial().optional(),
+  dbMcp: dbMcpSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -156,5 +165,8 @@ export const defaultSettings: Settings = {
   },
   codeIntel: {
     mcpServerEnabled: false,
+  },
+  dbMcp: {
+    serverEnabled: false,
   },
 };

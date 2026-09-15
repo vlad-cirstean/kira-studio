@@ -16,6 +16,13 @@ import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts'
 import { formatBytes, formatRelative } from '../format';
 import { cacheStatsState } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
+import { connectionsState, setConnectionMcpEnabled } from '../state/connections';
+import {
+  dbMcpState,
+  installDbMcpClaudeCode,
+  regenerateDbMcpToken,
+  setDbMcpEnabled,
+} from '../state/dbmcp';
 import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
 import {
   hydrateRepoMap,
@@ -114,6 +121,7 @@ const sections = [
   'Connected editors',
   'Git',
   'Code intelligence',
+  'Database MCP',
   'Advanced',
 ] as const;
 type Section = (typeof sections)[number];
@@ -266,6 +274,69 @@ const repoMapInstallMessage = computed(() => {
       return null;
   }
 });
+
+// M1 §6.2: repo-map's own token-expiry line, on both servers now that both rotate — "expired,
+// regenerate" rather than a stale-looking date once the instant has passed.
+function tokenExpired(expiresAt: string): boolean {
+  return !!expiresAt && new Date(expiresAt).getTime() <= Date.now();
+}
+const repoMapTokenExpired = computed(() => tokenExpired(repoMapState.status.expiresAt));
+
+// M1 §6.2: same instant-action posture as onToggleRepoMapEnabled — dbMcp.serverEnabled both
+// persists and starts/stops the embedded DB MCP server in one call.
+const dbMcpToggling = ref(false);
+async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
+  dbMcpToggling.value = true;
+  try {
+    await setDbMcpEnabled(enabled);
+  } finally {
+    dbMcpToggling.value = false;
+  }
+}
+
+const dbMcpRegenerating = ref(false);
+async function onRegenerateDbMcpToken(): Promise<void> {
+  dbMcpRegenerating.value = true;
+  try {
+    await regenerateDbMcpToken();
+  } finally {
+    dbMcpRegenerating.value = false;
+  }
+}
+
+const dbMcpInstalling = ref(false);
+async function onInstallDbMcpClaudeCode(): Promise<void> {
+  dbMcpInstalling.value = true;
+  try {
+    await installDbMcpClaudeCode();
+  } finally {
+    dbMcpInstalling.value = false;
+  }
+}
+
+const dbMcpInstallMessage = computed(() => {
+  const result = dbMcpState.installResult;
+  if (!result) return null;
+  switch (result.outcome) {
+    case 'installed':
+      return 'Registered with Claude Code.';
+    case 'notFound':
+      return "Claude Code's CLI isn't available. Copy the command above and run it yourself once it is installed.";
+    case 'installFailed':
+      return `Claude Code refused the registration: ${result.detail}. Copy the command above and run it yourself.`;
+    default:
+      return null;
+  }
+});
+
+const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpState.status.expiresAt));
+
+// §6.1: deny by default, edited here rather than in ConnectionDialog.vue — P67d's own shape for
+// the same problem on the repo-map side, and it keeps this phase's entire allow-list inside one
+// template block in this one file.
+async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promise<void> {
+  await setConnectionMcpEnabled(id, enabled);
+}
 
 const fontFamilyUnavailable = computed(() => !fontStackAvailable(draft.appearance.fontFamily));
 const fontFamilyFallback = computed(() => resolveFontFallback(draft.appearance.fontFamily));
@@ -978,6 +1049,20 @@ async function onSave(): Promise<void> {
                 </AppButton>
               </template>
 
+              <!-- M1 §6.2: the 7-day rotation retrofit is otherwise a silent trap — a registered
+                   client just starts getting 401s a week after upgrade with no visible cause. -->
+              <p
+                v-if="repoMapState.status.running && repoMapState.status.expiresAt"
+                class="helper-text"
+                data-testid="repomap-token-expiry"
+              >
+                {{
+                  repoMapTokenExpired
+                    ? 'Token expired — regenerate it above.'
+                    : `Token valid until ${new Date(repoMapState.status.expiresAt).toLocaleString()}.`
+                }}
+              </p>
+
               <h3 class="section-subhead">Repository access</h3>
               <p class="muted-note">
                 An assistant can navigate only the repositories granted here. Nothing is shared by
@@ -1020,6 +1105,98 @@ async function onSave(): Promise<void> {
                 </li>
               </ul>
             </template>
+          </template>
+
+          <template v-else-if="activeSection === 'Database MCP'">
+            <!-- M1 §6.2: same instant-action posture as Code intelligence just above — this leaf
+                 (dbMcp.serverEnabled) both persists and starts/stops the embedded DB MCP server in
+                 one call, so it belongs on the action side of the draft/Save line, never mixed with
+                 it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
+                 "enabling is never a silent action"). -->
+            <label class="field checkbox">
+              <Checkbox
+                :model-value="settingsState.dbMcp.serverEnabled"
+                :disabled="dbMcpToggling"
+                data-testid="settings-db-mcp-enabled"
+                @update:model-value="onToggleDbMcpEnabled"
+              />
+              <span>Enable the database MCP server</span>
+              <span class="helper-text"
+                >Lets an AI client list, browse and query the connections exposed below, through
+                the same path this app's own SQL console uses. Starts and stops with this
+                toggle.</span
+              >
+            </label>
+
+            <template v-if="settingsState.dbMcp.serverEnabled">
+              <p v-if="dbMcpState.status.error" class="muted-note" data-testid="db-mcp-error">
+                {{ dbMcpState.status.error }}
+              </p>
+              <template v-else-if="dbMcpState.status.running && dbMcpState.status.command">
+                <p class="mono command-text" data-testid="db-mcp-command">
+                  {{ dbMcpState.status.command }}
+                </p>
+                <AppButton
+                  kind="dialog"
+                  class="action-button"
+                  :disabled="dbMcpInstalling"
+                  data-testid="db-mcp-install-button"
+                  @click="onInstallDbMcpClaudeCode"
+                >
+                  {{ dbMcpState.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
+                </AppButton>
+                <p v-if="dbMcpInstallMessage" class="helper-text" data-testid="db-mcp-install-outcome">
+                  {{ dbMcpInstallMessage }}
+                </p>
+              </template>
+              <template v-else-if="dbMcpState.status.running">
+                <p class="muted-note" data-testid="db-mcp-no-token">
+                  This server restarted since it was last enabled; its registration command needs a
+                  fresh token to show again.
+                </p>
+                <AppButton
+                  kind="dialog"
+                  class="action-button"
+                  :disabled="dbMcpRegenerating"
+                  data-testid="db-mcp-regenerate-button"
+                  @click="onRegenerateDbMcpToken"
+                >
+                  Regenerate token
+                </AppButton>
+              </template>
+              <p
+                v-if="dbMcpState.status.running && dbMcpState.status.expiresAt"
+                class="helper-text"
+                data-testid="db-mcp-token-expiry"
+              >
+                {{
+                  dbMcpTokenExpired
+                    ? 'Token expired — regenerate it above.'
+                    : `Token valid until ${new Date(dbMcpState.status.expiresAt).toLocaleString()}.`
+                }}
+              </p>
+            </template>
+
+            <div class="sec-label">Exposed connections</div>
+            <p class="helper-text">
+              Deny by default — only connections checked here are visible to an AI client through
+              this server.
+            </p>
+            <label
+              v-for="conn in connectionsState.records"
+              :key="conn.id"
+              class="field checkbox"
+            >
+              <Checkbox
+                :model-value="conn.mcpEnabled"
+                :data-testid="`db-mcp-connection-${conn.id}`"
+                @update:model-value="(v: boolean) => onToggleConnectionMcpEnabled(conn.id, v)"
+              />
+              <span>{{ conn.name }}</span>
+            </label>
+            <p v-if="connectionsState.records.length === 0" class="muted-note">
+              No connections yet — add one first.
+            </p>
           </template>
 
           <template v-else-if="activeSection === 'Advanced'">
