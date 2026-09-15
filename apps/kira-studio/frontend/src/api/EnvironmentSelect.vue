@@ -4,10 +4,10 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import {
-  activeEnvironmentId,
+  environmentIdForTab,
   initVariables,
   openEnvironments,
-  setActiveEnvironment,
+  selectEnvironmentForTab,
   variablesState,
 } from './state/variables';
 
@@ -37,20 +37,29 @@ import {
 // border/padding do not change at all (P16 D6's rule, api-ui-consistency.spec.ts's own guard).
 onMounted(initVariables);
 
+// P71 §3.3: an optional tabId — present from both request views, so their own selection can be an
+// incognito tab's own in-memory override instead of the app-wide active environment.
+// environmentIdForTab/selectEnvironmentForTab already fall back to the app-wide behaviour for a
+// tab that isn't incognito, and `isIncognito('')` is false for the empty-string default below (no
+// tab is ever named ''), so a caller with no tab context at all needs no separate branch here — it
+// gets exactly today's global behaviour for free.
+const props = withDefaults(defineProps<{ tabId?: string }>(), { tabId: '' });
+
 const open = ref(false);
 
+const activeEnvironmentId = computed(() => environmentIdForTab(props.tabId));
 const activeEnvironment = computed(
   () => variablesState.environments.find((e) => e.id === activeEnvironmentId.value) ?? null,
 );
 
 function selectNone(): void {
   open.value = false;
-  void setActiveEnvironment('');
+  void selectEnvironmentForTab(props.tabId, '');
 }
 
 function selectEnvironment(id: string): void {
   open.value = false;
-  void setActiveEnvironment(id);
+  void selectEnvironmentForTab(props.tabId, id);
 }
 
 function manage(): void {
