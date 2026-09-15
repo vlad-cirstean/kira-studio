@@ -404,3 +404,21 @@ func TestMaskWordSingleGraphemeNeverEchoes(t *testing.T) {
 		}
 	}
 }
+
+// TestMaskEmailEmptyLocalPartNeverEchoes is a second gap TestApplyNeverEchoesOriginalText's
+// generator (uniform over an alphabet including "@") does not reliably hit: a value with an empty
+// local part — "@corp.example.com", "@x", or bare "@" — reassembles as "" + "@" + domain, the
+// input itself, whenever keepHint is true. maskEmail must fall through to the universal redaction
+// instead (M7 finding).
+func TestMaskEmailEmptyLocalPartNeverEchoes(t *testing.T) {
+	cases := []string{"@corp.example.com", "@x", "@"}
+	for _, value := range cases {
+		got := maskEmail(value, true)
+		if got == value {
+			t.Fatalf("maskEmail(%q, keepHint=true) = %q, echoed the original text", value, got)
+		}
+		if got != redactLiteral {
+			t.Fatalf("maskEmail(%q, keepHint=true) = %q, want %q", value, got, redactLiteral)
+		}
+	}
+}

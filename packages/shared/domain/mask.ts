@@ -122,6 +122,12 @@ function maskEmail(value: string, keepHint: boolean): string {
   if (i < 0) return maskName(value, keepHint);
   const local = value.slice(0, i);
   const domain = value.slice(i + 1);
+  if (local === '') {
+    // M7 finding: an empty local part reassembles as `${''}@${domain}` — the input itself,
+    // verbatim, whenever keepHint is true. No path may echo the original text; fall through to the
+    // universal redaction instead.
+    return REDACT_LITERAL;
+  }
   const localMasked = maskWord(local, keepHint);
   const domainMasked = keepHint ? domain : BULLET.repeat(graphemeCount(domain));
   return `${localMasked}@${domainMasked}`;

@@ -198,6 +198,13 @@ func maskEmail(value string, keepHint bool) string {
 		return maskName(value, keepHint)
 	}
 	local, domain := value[:i], value[i+1:]
+	if local == "" {
+		// M7 finding: an empty local part (value has no character before its last "@") reassembles
+		// as "" + "@" + domain — the input itself, verbatim, whenever keepHint is true. Apply's own
+		// contract is that no path echoes the original text; fall through to the universal
+		// redaction rather than a masked shape that happens to equal the input.
+		return redactLiteral
+	}
 	localMasked := maskWord(local, keepHint)
 	domainMasked := domain
 	if !keepHint {
