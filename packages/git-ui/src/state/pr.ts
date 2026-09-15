@@ -1,3 +1,4 @@
+import type { CommitStore } from '@kira/git-core';
 import type { GhStatus, PrLookupResult, PrRecord } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
@@ -13,6 +14,13 @@ const SELECTION_DEBOUNCE_MS = 300;
  *  normal-sized branch list still finishes in one or two batches rather than trickling one at a
  *  time. */
 const PR_ENSURE_SNAPSHOT_CONCURRENCY = 6;
+
+/** §4.2's own budget on `rebuildAncestry`'s breadth-first walk — bounds the cost to the loaded
+ *  window rather than the repository: a long-lived `main` whose own tip has a PR would otherwise
+ *  walk the entire loaded history on every rebuild. 50,000 rows is well past any window a session
+ *  actually loads (`graph.loadMore`'s own default page size is 5,000), so this only ever fires
+ *  against a pathological case, never an ordinary one. */
+const PR_ANCESTRY_WALK_BUDGET = 50_000;
 
 /**
  * G24 D10: the one client-side owner of every GitHub PR fact this app renders — the graph
@@ -48,6 +56,10 @@ export class PrState {
    *  (via `state/search.ts`) both read this by branch short name. Absent means "no known PR (yet,
    *  or at all)" — same "render nothing" rule as `bySha`. */
   readonly byBranch: ShallowRef<ReadonlyMap<string, PrRecord>> = shallowRef(new Map());
+  /** P74 §4.2: commits reachable from a PR branch's tip within the loaded graph window, keyed by
+   *  sha. Derived from `byBranch`, never fetched: the value is the branch's own `PrRecord`. Rebuilt
+   *  by `rebuildAncestry`, never written any other way. */
+  readonly prByAncestry: ShallowRef<ReadonlyMap<string, PrRecord>> = shallowRef(new Map());
   /** Bumped on every change to `bySha`/`byBranch` — `CommitGrid.vue`'s own `pr.generation`
    *  watcher (a third instance of the `graphView.generation`/`search.searchGeneration` pattern)
    *  re-renders the message column on this alone. */
@@ -122,6 +134,7 @@ export class PrState {
     this.#disabledForRepo = false;
     this.bySha.value = new Map();
     this.byBranch.value = new Map();
+    this.prByAncestry.value = new Map();
     this.selected.value = undefined;
     this.status.value = undefined;
     this.generation.value++;
@@ -259,6 +272,61 @@ export class PrState {
     } finally {
       this.#branchRequests.delete(branch);
     }
+  }
+
+  /** P74 §4.2: rebuilds `prByAncestry` from the PR records currently in `byBranch` — a bounded
+   *  breadth-first walk over `store`'s own packed parent array, run once per rebuild rather than
+   *  once per rendered row. `store` is an explicit argument (this class holds no `CommitStore` of
+   *  its own, only `bridge` — the same deviation `ensureSnapshot`'s own doc comment already
+   *  documents, for the same reason: `PrState` has no other way to reach one). Called by
+   *  `CommitGrid.vue`'s existing `pr.generation` watcher, before its own `invalidateRowHeights` —
+   *  never a separate watcher, so a PR resolution and the ancestry it feeds always land in the
+   *  same render pass. */
+  rebuildAncestry(store: CommitStore): void {
+    const next = new Map<string, PrRecord>();
+    // First-writer-wins queue: every branch tip seeds the walk at once, in `byBranch`'s own
+    // iteration order, so a commit reachable from two PR branches keeps whichever branch's own
+    // entry happened to iterate first — deterministic per rebuild, never re-decided mid-walk.
+    const queue: number[] = [];
+    const recordOfRow = new Map<number, PrRecord>();
+    for (const record of this.byBranch.value.values()) {
+      const row = store.rowOfSha(record.headSha);
+      if (row === -1) continue; // The tip is outside the loaded window — contributes nothing.
+      if (recordOfRow.has(row)) continue;
+      recordOfRow.set(row, record);
+      queue.push(row);
+    }
+    const visited = new Set<number>(queue);
+    let budget = PR_ANCESTRY_WALK_BUDGET;
+    let head = 0;
+    while (head < queue.length && budget > 0) {
+      const row = queue[head];
+      head += 1;
+      budget -= 1;
+      if (row === undefined) continue;
+      const record = recordOfRow.get(row);
+      if (record === undefined) continue;
+      next.set(store.shaAt(row), record);
+      for (const parentRow of store.parentsOf(row)) {
+        if (parentRow === -1 || visited.has(parentRow)) continue;
+        visited.add(parentRow);
+        recordOfRow.set(parentRow, record);
+        queue.push(parentRow);
+      }
+    }
+    this.prByAncestry.value = next;
+  }
+
+  /** P74 §4.2's own lookup order: `bySha` first (an authoritative per-commit answer from GitHub),
+   *  `prByAncestry` second (a derivation, which must never override a real answer), `undefined`
+   *  otherwise — every consumer already renders that as nothing. Returns the same
+   *  `readonly PrRecord[] | undefined` shape `bySha` itself does, so `CommitGrid.vue`'s `prsFor`
+   *  accessor can call this directly with no reshaping. */
+  prForCommit(sha: string): readonly PrRecord[] | undefined {
+    const direct = this.bySha.value.get(sha);
+    if (direct !== undefined) return direct;
+    const derived = this.prByAncestry.value.get(sha);
+    return derived === undefined ? undefined : [derived];
   }
 
   dispose(): void {
