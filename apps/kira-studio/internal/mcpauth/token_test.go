@@ -1,6 +1,7 @@
 package mcpauth
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -59,6 +60,51 @@ func TestLoadOrMintTTLMintsOnceThenLoads(t *testing.T) {
 	}
 	if !Verify(plain1, rec2) {
 		t.Fatal("the originally-minted plaintext no longer verifies against the loaded record")
+	}
+}
+
+// TestSaveIsAtomicAndLeavesNoTempFile pins Save's temp-file-plus-rename shape (M7 finding): the
+// existing record at path must never be observable as a truncated/partial file, and a successful
+// Save must not leave its own scratch file behind for a later Load to trip over.
+func TestSaveIsAtomicAndLeavesNoTempFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "token.json")
+
+	_, rec1, err := MintTTL(TTL)
+	if err != nil {
+		t.Fatalf("MintTTL: %v", err)
+	}
+	if err := Save(path, rec1); err != nil {
+		t.Fatalf("Save (first): %v", err)
+	}
+
+	_, rec2, err := MintTTL(TTL)
+	if err != nil {
+		t.Fatalf("MintTTL: %v", err)
+	}
+	if err := Save(path, rec2); err != nil {
+		t.Fatalf("Save (second, overwrite): %v", err)
+	}
+
+	loaded, ok, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load after Save: %v", err)
+	}
+	if !ok {
+		t.Fatal("Load after Save: ok = false")
+	}
+	if string(loaded.Hash) != string(rec2.Hash) {
+		t.Fatal("Load after the second Save returned the first record, not the overwrite")
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	for _, e := range entries {
+		if e.Name() != filepath.Base(path) {
+			t.Fatalf("Save left a stray file behind: %s", e.Name())
+		}
 	}
 }
 

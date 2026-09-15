@@ -164,16 +164,41 @@ func Load(path string) (Record, bool, error) {
 // Save writes rec to path, mode 0600 — hash+salt only, never the plaintext (D8). Creates path's
 // parent directory first (mode 0700) — a machine where KIRA_HOME does not exist yet otherwise
 // fails outright on the very first mint (M1 §2.6).
+//
+// Writes via a temp file + rename rather than truncating path in place (M7 finding): a crash or a
+// full disk mid-write used to leave a truncated token file that Load then fails to parse, taking
+// the whole server down at next start with no path forward but deleting a file the user has no
+// reason to know about. Rename is atomic on both target platforms (POSIX same-filesystem rename;
+// this repo's own KIRA_HOME layout keeps the temp file alongside the real one, so it is), so a
+// reader only ever sees the old complete file or the new complete file, never a partial one.
 func Save(path string, rec Record) error {
 	data, err := json.Marshal(rec)
 	if err != nil {
 		return fmt.Errorf("mcpauth: encode %s: %w", path, err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return fmt.Errorf("mcpauth: mkdir %s: %w", filepath.Dir(path), err)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("mcpauth: mkdir %s: %w", dir, err)
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		return fmt.Errorf("mcpauth: write %s: %w", path, err)
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("mcpauth: create temp for %s: %w", path, err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // no-op once the rename below succeeds
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return fmt.Errorf("mcpauth: chmod %s: %w", tmpName, err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("mcpauth: write %s: %w", tmpName, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("mcpauth: close %s: %w", tmpName, err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("mcpauth: rename %s to %s: %w", tmpName, path, err)
 	}
 	return nil
 }
