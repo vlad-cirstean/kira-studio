@@ -1735,6 +1735,7 @@ onBeforeUnmount(() => {
           :open="repoSettingsDialogOpen"
           :repo-settings-state="repoSettingsState"
           :date-format="dateFormat"
+          :host="props.host"
           :write-capability="actions?.capabilities.write ?? false"
           @close="repoSettingsDialogOpen = false"
           @update:date-format="dateFormat = $event"

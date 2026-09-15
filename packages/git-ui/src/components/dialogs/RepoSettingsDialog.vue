@@ -35,7 +35,7 @@
  * not instance-wide).
  */
 import { SETTINGS } from '@kira/git-core';
-import type { RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
+import type { HostKind, RepoSettingsPatch, RepoSettingsSnapshot } from '@kira/git-ipc';
 import type { KuiSelectOption } from '@kira/kira-ui';
 import { KuiButton, KuiDialog, KuiSelect } from '@kira/kira-ui';
 import { computed, reactive, watch } from 'vue';
@@ -46,6 +46,9 @@ const props = defineProps<{
   open: boolean;
   repoSettingsState: RepoSettingsState;
   dateFormat: DateFormat;
+  /** P72 §8.3: which shell mounted this dialog. Not yet read by this file — threaded through so a
+   *  later change can gate a section on it without a second, separate prop-plumbing step. */
+  host: HostKind;
   /** C10 §4.4: `false` under the native read-only graph — hides the Pull section (`strategy`
    *  configures `remote.pull`, a write this host's transport never issues). Graph scope/page size
    *  stay: genuine read-side controls, and `repoSettings.set` itself stays allowed at layer 1
