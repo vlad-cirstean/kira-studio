@@ -121,6 +121,12 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // stored row has no such key. A first-class column, not an options_json key — the migration's
   // own comment carries the full argument (an access grant must not be settable by pasting a URI).
   mcpEnabled: z.boolean().default(false),
+  // M3: runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
+  // and pauses the query for a human decision when the plan crosses the expensive-query row
+  // threshold. `.default(true)` is load-bearing the same way mcpEnabled's is — an older stored row
+  // has no such key. Separate from autoExplain (above), which governs this app's own console — see
+  // the migration's own comment for why one switch cannot mean both.
+  mcpAutoExplain: z.boolean().default(true),
   // M2: free-text "what this DB is for", passed to an AI client as connection metadata
   // (list_connections). Never interpreted by this app.
   mcpDescription: z.string().max(1000).default(''),
@@ -131,12 +137,6 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   mcpReadMode: mcpPermissionModeSchema.default('allow'),
   mcpWriteMode: mcpPermissionModeSchema.default('prompt'),
   mcpDdlMode: mcpPermissionModeSchema.default('deny'),
-  // M3: runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
-  // and pauses the query for a human decision when the plan crosses the expensive-query row
-  // threshold. `.default(true)` is load-bearing the same way mcpEnabled's is — an older stored row
-  // has no such key. Separate from autoExplain (above), which governs this app's own console — see
-  // the migration's own comment for why one switch cannot mean both.
-  mcpAutoExplain: z.boolean().default(true),
 });
 
 // SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes
