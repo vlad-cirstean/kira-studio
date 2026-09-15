@@ -1075,3 +1075,91 @@ func TestDuplicateCopiesMaskRules(t *testing.T) {
 		t.Fatalf("no-rules duplicate has %d mask rules, want 0", len(noRules))
 	}
 }
+
+// TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds is finding #4 (M7): a source with MCP
+// exposure and mask rules must still end up MCP-enabled on the happy path — InsertDuplicateWithSecret
+// now always inserts the duplicate with mcp_enabled off, so this confirms Duplicate's own follow-up
+// SetMcpEnabled call actually restores the source's real state once the mask rule copy succeeds,
+// both in the returned summary and in storage.
+func TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("masked-and-exposed")
+	in.McpEnabled = true
+	created := mustCreate(t, h.svc, in)
+
+	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
+		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail,
+	}, model.NowISO()); err != nil {
+		t.Fatalf("MaskRules.Upsert: %v", err)
+	}
+
+	dup, err := h.svc.Duplicate(created.ID)
+	if err != nil {
+		t.Fatalf("Duplicate: %v", err)
+	}
+	if !dup.McpEnabled {
+		t.Fatal("Duplicate result McpEnabled = false, want true (matching the source, once mask rules copied)")
+	}
+
+	stored, err := h.repos.Connections.Get(dup.ID)
+	if err != nil {
+		t.Fatalf("Conns.Get(duplicate): %v", err)
+	}
+	if stored == nil || !stored.McpEnabled {
+		t.Fatalf("stored duplicate McpEnabled = %v, want true", stored)
+	}
+
+	dupRules, err := h.repos.MaskRules.ListForConnection(dup.ID)
+	if err != nil {
+		t.Fatalf("MaskRules.ListForConnection(duplicate): %v", err)
+	}
+	if len(dupRules) != 1 {
+		t.Fatalf("duplicate has %d mask rules, want 1 (copied before MCP was enabled)", len(dupRules))
+	}
+}
+
+// TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails is finding #4 (M7)'s own named defect: before
+// this fix, InsertDuplicateWithSecret copied McpEnabled verbatim in the same INSERT that committed
+// the duplicate row, so an error from the mask-rule copy that ran afterward still surfaced to the
+// caller — but the already-committed duplicate was left live and MCP-exposed with zero mask rules.
+// This forces that copy to fail (the mask rules table is dropped after the source's own rule is
+// written, so ListForConnection errors) and confirms the duplicate row that HAS been committed by
+// then is not MCP-exposed, closing exactly that gap.
+func TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails(t *testing.T) {
+	h := newHarness(t)
+	in := fieldsInput("masked-and-exposed")
+	in.McpEnabled = true
+	created := mustCreate(t, h.svc, in)
+
+	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
+		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail,
+	}, model.NowISO()); err != nil {
+		t.Fatalf("MaskRules.Upsert: %v", err)
+	}
+
+	// Break the mask rule copy deterministically: ListForConnection (copyMaskRules' own first
+	// step) now errors on the missing table.
+	if _, err := h.repos.MaskRules.DB.Exec(`DROP TABLE connection_mask_rules`); err != nil {
+		t.Fatalf("drop connection_mask_rules: %v", err)
+	}
+
+	dup, err := h.svc.Duplicate(created.ID)
+	if err == nil {
+		t.Fatalf("Duplicate = %+v, nil error, want an error once the mask rule copy fails", dup)
+	}
+
+	// The duplicate connection row was already committed by InsertDuplicateWithSecret before the
+	// failing copy step ran — it must not be MCP-exposed regardless.
+	all, err := h.repos.Connections.List()
+	if err != nil {
+		t.Fatalf("Conns.List: %v", err)
+	}
+	for _, c := range all {
+		if c.ID == created.ID {
+			continue
+		}
+		if c.McpEnabled {
+			t.Fatalf("duplicate connection %s committed with McpEnabled = true despite the failed mask rule copy, want false", c.ID)
+		}
+	}
+}

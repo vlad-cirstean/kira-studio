@@ -391,19 +391,34 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// atomicity fix: the new row and its copied password column are now written by the very same
 	// INSERT statement (InsertDuplicateWithSecret, P21 round 3 finding 4's precedent), never as two
 	// separate writes — a crash between them can no longer leave a passwordless duplicate behind.
+	// mcp_enabled is always inserted off (that method's own doc comment) — flipped on below, once
+	// mask rules are copied.
 	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, model.NowISO())
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
-	// Finding #6, M6: ConnectionFields (copied above via InsertDuplicateWithSecret) carries the
-	// source's MCP exposure (McpEnabled/read/write/DDL modes), but mask rules live in a separate
-	// table keyed by connection_id and are never copied by that INSERT. Without this, a duplicated
-	// connection that was masked-and-MCP-exposed becomes immediately MCP-exposed with zero mask
-	// rules, silently exposing whatever PII the original was protecting.
+	// Finding #6, M6: ConnectionFields carries the source's MCP exposure (McpEnabled/read/write/DDL
+	// modes), but mask rules live in a separate table keyed by connection_id and are never copied by
+	// InsertDuplicateWithSecret's own INSERT. Without this, a duplicated connection that was
+	// masked-and-MCP-exposed would become MCP-exposed with zero mask rules, silently exposing
+	// whatever PII the original was protecting.
 	if s.deps.MaskRules != nil {
 		if err := s.copyMaskRules(id, newID); err != nil {
 			return model.ConnectionSummary{}, wrapErr(err)
 		}
+	}
+	// Finding #4, M7: only now — after the mask rule copy above has actually succeeded — is MCP
+	// exposure switched on to match the source. Before this, InsertDuplicateWithSecret copied
+	// McpEnabled verbatim in the same INSERT that committed the row, so an error from copyMaskRules
+	// above still returned to the caller, but the already-committed duplicate was left live and
+	// MCP-exposed with zero mask rules — M6 finding #6's own gap, reopened via this error path. A
+	// crash between this write and the one above leaves the duplicate merely not-yet-MCP-enabled
+	// (safe), never exposed-without-rules (unsafe).
+	if fields.McpEnabled {
+		if err := s.deps.Conns.SetMcpEnabled(newID, true, model.NowISO()); err != nil {
+			return model.ConnectionSummary{}, wrapErr(err)
+		}
+		created.McpEnabled = true
 	}
 	s.emitListChanged()
 	return created, nil

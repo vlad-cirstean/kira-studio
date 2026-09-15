@@ -313,6 +313,14 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 // silently breaking the "key is scoped to one connection" invariant plan §2.5 states. The
 // duplicate mints its own key lazily, the same as any other connection with no key yet
 // (repos/maskkeys.go's EnsureKey).
+//
+// mcp_enabled is always inserted as 0, regardless of f.McpEnabled (finding #4, M7) — mirroring
+// CodeReposRepo's own "a fresh import is never granted MCP access by default" precedent. Mask
+// rules live in a separate table this single INSERT cannot also write, so Service.Duplicate copies
+// them in a second statement afterward; inserting the duplicate already-MCP-live here would let a
+// crash or error in that second write commit an MCP-exposed, zero-mask-rule duplicate (M6 finding
+// #6's own gap, reopened via this exact error path). SetMcpEnabled below is what flips it on, once
+// the mask rule copy that must precede any live MCP exposure has actually succeeded.
 func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnectionID string, f model.ConnectionFields, createdAt string) (model.ConnectionSummary, error) {
 	optionsJSON, err := json.Marshal(f.Options)
 	if err != nil {
@@ -335,12 +343,12 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
 			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
 			created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			(SELECT password FROM connections WHERE id = ?))
 	`,
 		toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		boolToInt(f.AutoExplain), f.ThrottlePerSec,
 		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
 		createdAt, createdAt, sortOrder, fromConnectionID,
 	); err != nil {
@@ -358,6 +366,29 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: row %s not readable after insert", toConnectionID)
 	}
 	return *created, nil
+}
+
+// SetMcpEnabled flips mcp_enabled alone — Duplicate's own fix (finding #4, M7): the new row is
+// always inserted with MCP forced off (InsertDuplicateWithSecret's own doc comment on this), and
+// this is what flips it on afterward, once the mask rule copy that must precede any live MCP
+// exposure has actually succeeded. A narrow single-column UPDATE rather than a full Update() call
+// with a stale field snapshot, so it can't stomp a concurrent edit made in the brief window between
+// the two writes. Mirrors CodeReposRepo's own SetMcpEnabled (P67d) — same RowsAffected check, same
+// sql.ErrNoRows sentinel for "not found" rather than silently no-op-succeeding.
+func (r *ConnectionsRepo) SetMcpEnabled(connID string, enabled bool, updatedAt string) error {
+	res, err := r.DB.Exec(`UPDATE connections SET mcp_enabled = ?, updated_at = ? WHERE id = ?`,
+		boolToInt(enabled), updatedAt, connID)
+	if err != nil {
+		return fmt.Errorf("repos/connections: set mcp_enabled %s: %w", connID, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos/connections: set mcp_enabled %s: rows affected: %w", connID, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("repos/connections: set mcp_enabled %s: %w", connID, sql.ErrNoRows)
+	}
+	return nil
 }
 
 // UpdateWithSecret is Update plus, in the same UPDATE statement, the row's password column —

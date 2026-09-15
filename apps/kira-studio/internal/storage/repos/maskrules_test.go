@@ -2,6 +2,7 @@ package repos_test
 
 import (
 	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -132,5 +133,79 @@ func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 	}
 	if string(duplicateMinted) == string(originalKey) {
 		t.Fatal("the duplicate's freshly-minted key equals the original's — keys are linkable across connections")
+	}
+}
+
+// TestInsertDuplicateWithSecretAlwaysStartsMcpDisabled is finding #4 (M7): the duplicate's row must
+// never be committed already MCP-live, whatever the source's own McpEnabled was — mask rules live
+// in a separate table this single INSERT cannot also write, so connections.Service.Duplicate flips
+// mcp_enabled on (via SetMcpEnabled) only after copying them succeeds. A duplicate inserted
+// already-enabled here would be exposed with zero mask rules for the entire window before that
+// second write, and would stay that way forever if it errored.
+func TestInsertDuplicateWithSecretAlwaysStartsMcpDisabled(t *testing.T) {
+	db := newRepos(t).DB
+	conns := &repos.ConnectionsRepo{DB: db}
+
+	fromID := uuid.NewString()
+	fields := model.ConnectionFields{
+		Name: "src", Kind: "postgres", Color: "blue", Mode: "fields",
+		McpEnabled: true, McpReadMode: "allow", McpWriteMode: "deny", McpDdlMode: "deny",
+	}
+	if _, err := conns.InsertWithSecret(fromID, fields, model.NowISO(), nil); err != nil {
+		t.Fatalf("InsertWithSecret: %v", err)
+	}
+
+	toID := uuid.NewString()
+	created, err := conns.InsertDuplicateWithSecret(fromID, toID, fields, model.NowISO())
+	if err != nil {
+		t.Fatalf("InsertDuplicateWithSecret: %v", err)
+	}
+	if created.McpEnabled {
+		t.Fatal("InsertDuplicateWithSecret result has McpEnabled = true, want it always inserted off")
+	}
+
+	got, err := conns.Get(toID)
+	if err != nil {
+		t.Fatalf("Get(duplicate): %v", err)
+	}
+	if got == nil || got.McpEnabled {
+		t.Fatalf("duplicate row McpEnabled = %v, want false regardless of the source's own McpEnabled", got)
+	}
+	// The permission modes themselves are still copied verbatim — only the live/off switch is held
+	// back, not the connection's configured MCP shape.
+	if got.McpReadMode != "allow" || got.McpWriteMode != "deny" || got.McpDdlMode != "deny" {
+		t.Fatalf("duplicate permission modes = %+v, want copied verbatim from the source", got.ConnectionFields)
+	}
+}
+
+// TestSetMcpEnabledFlipsFlagAndRejectsMissingID pins connections.SetMcpEnabled's own two
+// behaviours (finding #4, M7): it flips mcp_enabled alone (leaving every other column untouched)
+// and reports sql.ErrNoRows for an id that matches no row, rather than a silent no-op success.
+func TestSetMcpEnabledFlipsFlagAndRejectsMissingID(t *testing.T) {
+	db := newRepos(t).DB
+	conns := &repos.ConnectionsRepo{DB: db}
+
+	connID := uuid.NewString()
+	fields := model.ConnectionFields{Name: "conn", Kind: "postgres", Color: "blue", Mode: "fields"}
+	if _, err := conns.InsertWithSecret(connID, fields, model.NowISO(), nil); err != nil {
+		t.Fatalf("InsertWithSecret: %v", err)
+	}
+
+	if err := conns.SetMcpEnabled(connID, true, model.NowISO()); err != nil {
+		t.Fatalf("SetMcpEnabled(true): %v", err)
+	}
+	got, err := conns.Get(connID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got == nil || !got.McpEnabled {
+		t.Fatalf("McpEnabled after SetMcpEnabled(true) = %v, want true", got)
+	}
+	if got.Name != "conn" {
+		t.Fatalf("Name = %q, want unchanged %q — SetMcpEnabled must touch mcp_enabled alone", got.Name, "conn")
+	}
+
+	if err := conns.SetMcpEnabled(uuid.NewString(), true, model.NowISO()); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("SetMcpEnabled(missing id) = %v, want a wrapped sql.ErrNoRows", err)
 	}
 }
