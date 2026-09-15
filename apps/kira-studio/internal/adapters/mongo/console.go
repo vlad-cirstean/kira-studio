@@ -81,6 +81,21 @@ func isWriteStatement(stmt parsedStatement) bool {
 	return writeConsoleMethods[stmt.method]
 }
 
+// ClassifyStatement satisfies adapters.StatementClassifier (M2) over this package's own
+// parseStatement/isWriteStatement — Mongo's grammar admits no schema statement (M2's model.
+// MongoConsoleMethods is ten find/write/aggregate methods, no DDL), so DDL is unreachable here. A
+// parse error returns ClassUnknown with the error rather than failing the classification silently.
+func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
+	stmt, err := parseStatement(statement)
+	if err != nil {
+		return adapters.ClassUnknown, err
+	}
+	if isWriteStatement(stmt) {
+		return adapters.ClassWrite, nil
+	}
+	return adapters.ClassRead, nil
+}
+
 func parseStatement(text string) (parsedStatement, error) {
 	parser, err := NewLiteralParser(strings.TrimSpace(text))
 	if err != nil {

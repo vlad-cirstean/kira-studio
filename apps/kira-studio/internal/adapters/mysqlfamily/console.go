@@ -14,6 +14,12 @@ import (
 // skipping it would leave this connection's next op running inside a stale open transaction.
 const endTransactionTimeout = 5 * time.Second
 
+// ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier —
+// serves both mysql and mariadb, since mysqlfamily.Adapter is registered under both kinds.
+func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
+	return adapters.ClassifySQL(statement), nil
+}
+
 // numberDBTypes/temporalDBTypes are console.ts's own NUMBER_TYPES/TEMPORAL_TYPES, spelled in
 // go-sql-driver's own DatabaseTypeName() vocabulary (fields.go's typeDatabaseName) rather than the
 // mariadb npm package's FieldInfo.type enum — the two name the same wire types differently, but

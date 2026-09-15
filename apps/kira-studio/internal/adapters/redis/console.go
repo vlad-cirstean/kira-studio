@@ -95,6 +95,32 @@ func resultToPage(command string, reply any) page.KeyValuePage {
 	return builder.Finish(page.UnpagedPosition(pageSize))
 }
 
+// ClassifyStatement satisfies adapters.StatementClassifier (M2) over this package's own
+// tokenize/isReadOnlyCommand — Redis has no DDL, and one run_query call is one command (tokenize
+// treats a newline as ordinary whitespace, so extra lines become arguments, never a second
+// command). The COMMAND table is server-wide, so the db index does not matter for classification.
+func (a *Adapter) ClassifyStatement(ctx context.Context, statement string) (adapters.OpClass, error) {
+	set, err := a.requireSet()
+	if err != nil {
+		return adapters.ClassUnknown, err
+	}
+	tokens, err := tokenize(statement)
+	if err != nil {
+		return adapters.ClassUnknown, err
+	}
+	if len(tokens) == 0 {
+		return adapters.ClassUnknown, nil
+	}
+	conn, err := set.get(ctx, a.defaultDbIndex)
+	if err != nil {
+		return adapters.ClassUnknown, err
+	}
+	if set.isReadOnlyCommand(ctx, conn, tokens[0]) {
+		return adapters.ClassRead, nil
+	}
+	return adapters.ClassWrite, nil
+}
+
 // execute is console.ts's execute — one op-log row for the whole batch (P5.5 D9's precedent).
 // A read-only connection is gated per-command via Redis's own COMMAND table (isReadOnlyCommand),
 // not a blanket refusal — SPEC.md's read-only contract disables "anything but a read", and a flat

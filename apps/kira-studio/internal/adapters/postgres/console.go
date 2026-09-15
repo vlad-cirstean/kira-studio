@@ -15,6 +15,11 @@ import (
 // would leave this connection's next op running inside a stale, likely-aborted transaction.
 const endTransactionTimeout = 5 * time.Second
 
+// ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier.
+func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
+	return adapters.ClassifySQL(statement), nil
+}
+
 // rawField is console.ts's RawField.
 type rawField struct {
 	name        string

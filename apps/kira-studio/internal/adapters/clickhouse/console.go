@@ -8,6 +8,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
 
+// ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier.
+func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
+	return adapters.ClassifySQL(statement), nil
+}
+
 // leadingCommentRE/rowReturningRE are console.ts's own — D19: the HTTP interface gives no cheap
 // "will this return rows" check before executing (unlike SQLite's own zero-column QueryContext
 // signal or MariaDB's OkPacket-vs-rows shape) — a leading-keyword heuristic decides a streamed

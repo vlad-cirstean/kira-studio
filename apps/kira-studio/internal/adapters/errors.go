@@ -120,7 +120,7 @@ func endsTransaction(stmt string) bool {
 	}
 }
 
-// stripSQLComments replaces every SQL comment — a line comment (`--` to end of line) or a block
+// StripSQLComments replaces every SQL comment — a line comment (`--` to end of line) or a block
 // comment (`/* ... */`) — with a single space, preserving token boundaries the same way real SQL
 // treats a comment as lexical whitespace (confirmed against a real server: `READ/*x*/WRITE` parses
 // identically to `READ WRITE`, so a comment must become a space, never be deleted outright, or the
@@ -130,7 +130,7 @@ func endsTransaction(stmt string) bool {
 // its own matching, correctly-nested */, swallowing the inner comment and the "x" between them —
 // which a single non-nesting regexp pass cannot express, so this scans by rune and tracks depth
 // instead.
-func stripSQLComments(s string) string {
+func StripSQLComments(s string) string {
 	r := []rune(s)
 	var out strings.Builder
 	depth := 0
@@ -165,7 +165,7 @@ func stripSQLComments(s string) string {
 // *session default* (default_transaction_read_only / SESSION TRANSACTION READ ONLY) at connect
 // time and wrapping each Execute() batch in an explicit read-only transaction, neither of which a
 // statement inside that same transaction can be trusted not to try to escape. Three angles are
-// rejected outright rather than run, each confirmed against a real server (see stripSQLComments,
+// rejected outright rather than run, each confirmed against a real server (see StripSQLComments,
 // sqlReadOnlyVarOff and endsTransaction's own doc comments for what was actually tried and what a
 // real server actually did): the SQL-standard `READ WRITE` phrase, naming a read-only GUC/session
 // variable and assigning it a falsy value, and a bare COMMIT/END/ROLLBACK that would end the
@@ -174,7 +174,7 @@ func stripSQLComments(s string) string {
 // session default plus the wrapping transaction), not a substitute for it.
 func AssertNoTransactionEscalation(statements []string) error {
 	for _, stmt := range statements {
-		stripped := stripSQLComments(stmt)
+		stripped := StripSQLComments(stmt)
 		if sqlReadWrite.MatchString(stripped) || sqlReadOnlyVarOff.MatchString(stripped) || endsTransaction(stripped) {
 			return New(CodeUnsupported, "connection is read-only", nil)
 		}
