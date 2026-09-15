@@ -6,13 +6,18 @@ existing modules — the API client and the git module — so it continues `P` n
 rather than taking a fresh letter, the same reason v1.6's own opening paragraph gives for reusing
 `P` instead of picking a new one.
 
-**Thirteen feature rows plus the two standing code-review rounds and the closing docs row.** Every
-row below comes directly from the request that opened this chapter; nothing is invented scope.
-Several requests share a root component and are grouped into one row so a phase's own planning pass
-can fix a shared cause once rather than patch symptoms three times (the git-graph rendering/perf/
-layout row is the clearest case: reload-on-return, checkout misalignment, scroll flicker and the
-sticky-header/tab-bar overlap are all plausibly the same worker/layout-recompute cost surfacing in
-different ways — the phase's own planning pass confirms or splits this before implementing).
+**Eight feature rows plus one code-review round and the closing docs row.** Every row below comes
+directly from the request that opened this chapter; nothing is invented scope. This table was
+originally nineteen rows (sixteen feature rows plus two review rounds plus docs); by explicit
+instruction it's consolidated to roughly half that and down to a single code-review round instead
+of `CLAUDE.md`'s standard two, given the smaller total surface a shorter table leaves to review.
+Small, self-contained items that used to get their own row are now bundled into whichever row they
+sit closest to — by shared component when one exists (settings relocation folded into the graph-
+panel row that motivates it, blame widget and worktree creation folded together as two small,
+unrelated, self-contained git-module additions, the same precedent P71 itself already set by
+bundling incognito mode with input sizing), or by shared subsystem when there's no shared root cause
+but the same code area (P75's three code-navigation items are one Monaco/codegraph subsystem, not
+one bug). P71 already landed as its own row before this consolidation and is unchanged.
 
 **Confirmed today, checked directly, not assumed** (an `Explore` pass over the current tree before
 this table was written):
@@ -32,10 +37,10 @@ this table was written):
   per-arbitrary-commit PR lookup and no icon on the time/sha line yet. Diff opening for a single
   file already goes through VS Code's native diff editor
   (`DetailPane.vue`'s `actions.openInEditor`, with a preview- vs. pinned-tab distinction on click
-  vs. double-click) — P75's "open commit changes" multi-file request and P76's go-to-file/virtual-
-  file request extend this path, not replace it. The desktop app's own tab strip
+  vs. double-click) — P73's "open commit changes" multi-file request and go-to-file/virtual-file
+  request extend this path, not replace it. The desktop app's own tab strip
   (`apps/kira-studio/frontend/src/workbench/panels/TabStrip.vue`) independently implements the same
-  preview-tab convention (`.is-preview` italic styling) — P75's "temporary tab" ask is about this
+  preview-tab convention (`.is-preview` italic styling) — P73's "temporary tab" ask is about this
   tab strip specifically, separate from the VS Code-extension surface.
 - Review UI: `packages/git-ui/src/components/review/` (`ReviewView.vue`, `ReviewCommitRow.vue`,
   `ReviewFilesPane.vue`, `ReviewCommentsPane.vue`, `BaseSelector.vue`), state in
@@ -44,23 +49,23 @@ this table was written):
   `apps/kira-studio/frontend/src/repo/RepoReviewView.vue`.
 - Settings: per-repo git-graph settings already distinguish a per-repo flag from a global one —
   `packages/git-ui/src/state/repoSettings.ts`'s `instanceWide` schema flag (documented L25-40),
-  merged across repos regardless of which repo's write triggered the change event. P74 reuses this
-  exact mechanism (or promotes further into the app-wide `SettingsDialog.vue`/`settings.ts` where a
-  setting is genuinely app-wide, not just instance-wide-but-still-per-repo-shaped) rather than
-  inventing a second one.
+  merged across repos regardless of which repo's write triggered the change event. P72's settings-
+  relocation piece reuses this exact mechanism (or promotes further into the app-wide
+  `SettingsDialog.vue`/`settings.ts` where a setting is genuinely app-wide, not just instance-wide-
+  but-still-per-repo-shaped) rather than inventing a second one.
 - Seti file icons already exist and are used in the file tree —
   `packages/git-ui/src/icons/setiFileIcon.ts` (+ test), consumed by `FileTree.vue` and mirrored
-  app-side at `apps/kira-studio/frontend/src/repo/fileIcon.ts`. P77 is wiring this into
+  app-side at `apps/kira-studio/frontend/src/repo/fileIcon.ts`. P73 is wiring this into
   `TabStrip.vue`, not building a new icon set.
 - Branches/stashes: `packages/git-ui/src/components/BranchPicker.vue` (also handles worktree
   switch/open-in-new-window, bubbled from `WorktreeList.vue`), `StashList.vue`/
   `GlobalStashList.vue`/`StashDetailPane.vue`.
 - Row-level right-click already has a working framework — `packages/git-ui/src/components/
   RowContextMenu.vue`, a thin wrapper over `@kira/kira-ui`'s `KuiContextMenu`, driven by
-  `rowMenuModel.ts`'s `MenuSection[]`, used by 8 row components today. P83's worktree action plugs
+  `rowMenuModel.ts`'s `MenuSection[]`, used by 8 row components today. P76's worktree action plugs
   into this, reusing `WorktreeList.vue`'s existing create/switch machinery rather than a new dialog.
 - Status bar is `apps/kira-studio/frontend/src/workbench/StatusBar.vue` (currently CPU/memory/cache/
-  update-state only — no blame widget yet). P81 adds one.
+  update-state only — no blame widget yet). P76 adds one.
 - The API module's request/response UI is `apps/kira-studio/frontend/src/views/httprequest/`
   (`HttpRequestView.vue`, `RequestBodyPane.vue`, `RequestHeadersTable.vue`, `QueryParamsTable.vue`,
   `ResponsePane.vue`, etc.), backed by `apps/kira-studio/frontend/src/api/state/`
@@ -69,54 +74,64 @@ this table was written):
   are all backend-owned records synced over the bridge to Go/SQLite
   (`apps/kira-studio/frontend/src/state/tabs.ts`, `internal/storage`, `internal/apivars/`), unlike a
   typical browser "incognito" implementation. No incognito/private-session concept exists anywhere
-  in the app yet — P71 is new ground, not extending a partial mechanism, and its own planning pass
-  has to decide how a per-tab flag suppresses these backend writes without a parallel in-memory
-  storage layer duplicating every write path.
+  in the app yet — P71 is new ground, not extending a partial mechanism.
+- Code navigation: `apps/kira-studio/frontend/src/views/repo/navigation.ts` registers Monaco
+  `DefinitionProvider`/`HoverProvider` (F12/hover both work) backed by `internal/codegraph`, but
+  never `registerReferenceProvider`/`registerImplementationProvider`, and Cmd/Ctrl+click doesn't
+  navigate despite the same provider backing F12. `internal/codegraph/resolve.go` ranks candidates
+  by scope-proximity only (never receiver-type/method-set) — the hover UI's own markdown already
+  labels every result "_Name-resolved, not type-resolved._" Go's `ImplementationsOf` returns nothing
+  today because `internal/codeparse/queries/go/tags.scm`'s `method_declaration` capture stores a
+  method's name only, never its receiver type — TS/Java already resolve further via
+  `extends_clause`/`implements_clause`/`superclass` captures. Monaco's own stock peek-references/
+  peek-implementation UI is already fully bundled in this app (`register.all.js` pulls in
+  `ReferencesController`, `GoToImplementationAction` — confirmed present, not stripped), so wiring
+  the missing providers isn't blocked on UI; it's blocked on `Refs.Sites`/`Target` carrying no per-
+  occurrence confidence signal a bare `Location[]` can express. All three findings came from the
+  same code-intelligence discussion, not from any phase's own planning pass — P75 covers them.
 
-**Sequencing.** P71 (API module) is fully independent of the git-module rows and floats to the
-front only because it is unrelated, self-contained work — no ordering constraint ties it to
-anything else. Within the git module: P72 (remove the dead repo-switch dropdown) is a pure deletion,
-goes first, and shrinks `AppToolbar.vue`/`RepoPicker.vue` surface before P73 touches the same
-toolbar area. P73 (graph rendering/perf/layout: reload-on-return, checkout misalignment, scroll
-flicker, label sizing, sticky graph-header-vs-tab-bar) comes next since P75/P79 both depend on graph
-navigation actually being stable to build "jump to this commit in the graph" links against. P74
-(settings relocation) follows immediately — it's cutting over what P73 may have just touched
-(look/appearance knobs), so doing it right after avoids relocating a setting whose behavior is about
-to change again. P75 (commit detail: show-more, PR icon relocation off the webview, PR icon on
-every commit's time/sha line for a PR-associated branch) and P76 (diff viewing: multi-file open,
-temporary tabs, go-to-file including virtual files) both extend `DetailPane.vue`'s file-opening path
-directly, P75 before P76 since P76's temporary-tab work touches the same file rows P75's multi-file
-open produces. P77 (tab-strip seti icons) and P78 (markdown reading-view font) are small, unrelated,
-self-contained polish items placed after the tab-strip/diff work they sit beside so they're not
-touching a tab strip mid-change. P79 (review tab: fix broken commit-diff/graph navigation) needs
-P73's graph stability and P76's diff-opening path already landed — it's explicitly described as
-"can't open commit diff nor see the commit in the graph", i.e. broken calls into exactly those two
-paths. P80 (review UX polish: checkbox shape/state, placement, comment interactivity, highlight)
-comes right after — no point redesigning a checkbox in a view whose navigation P79 just fixed, before
-P79 lands. P81 (blame widget), P82 (branches/stashes redesign) and P83 (worktree creation) are each
-self-contained and placed last among the feature rows, in roughly ascending UI scope (a status-bar
-widget, then a full dropdown redesign, then a new context-menu action). P84/P85 (the two code-review
-rounds) and P86 (main-docs update) close the chapter exactly as `CLAUDE.md`'s standing process and
-v1.6/v1.7's own closing rows require.
+**Sequencing.** P71 (API module, already landed) is fully independent of the git-module rows.
+Within the git module: P72 (remove the dead repo-switch dropdown, fix graph rendering/perf/layout —
+reload-on-return, checkout misalignment, scroll flicker, label sizing, sticky graph-header-vs-tab-
+bar — then relocate the settings that touching those fixes may have moved) goes first among the
+git-module rows since P74/P75's own dependents need stable graph navigation to build on; the
+settings-relocation piece sits last within P72 itself so it isn't relocating a setting whose
+behavior is about to change again mid-phase. P73 (tab-strip seti icons, markdown reading-view font)
+is small, unrelated, self-contained polish bundled into one row per this chapter's own precedent
+(P71's own two-item bundle) and placed right after P72 since one of its two items touches the same
+tab strip P72's sticky-header fix does. P74 (commit detail: show-more, PR icon relocation, PR icon
+per commit; diff viewing: multi-file open, temporary tabs, go-to-file including virtual files) is
+one row since both extend `DetailPane.vue`'s file-opening path directly — the PR/detail-panel work
+naturally precedes the diff-viewing work internally, same reasoning as before, just no longer split
+across two rows. P75 (review tab: fix broken commit-diff/graph navigation, then the checkbox/
+placement/comment-interactivity/highlight polish) is one row — fixing broken navigation and then
+polishing the view it just fixed always had to happen in that order, so folding them into a single
+row changes nothing about execution, only the row count; it needs P72's graph stability and P74's
+diff-opening path already landed, exactly as before. P76 (blame widget, worktree creation) bundles
+two small, self-contained, unrelated git-module additions — same "small items don't need separate
+rows" reasoning as P73, placed after the review-tab work since neither depends on it. P77 (branches/
+stashes redesign) stays its own row — the largest single UI-scope item remaining, not a candidate for
+bundling. P78 (Cmd/Ctrl+click fix, Go inheritance matching, reference/implementation wiring) merges
+what were three separately-discovered rows in the same Monaco/codegraph subsystem: internally, the
+click fix has no dependency on the other two and can land first or in parallel within the phase; Go
+inheritance matching must land before reference/implementation wiring within the same phase, for the
+same reason as before — `ImplementationsOf` returns nothing for Go until the receiver-type/method-set
+gap closes, so wiring a Go-to-implementation command ahead of that would ship dead functionality for
+the app's own primary backend language. P79 (the single code-review round, by explicit instruction
+rather than `CLAUDE.md`'s standard two) and P80 (main-docs update) close the chapter.
 
 | Phase | Deliverable | Why here |
 |---|---|---|
-| **P71 API module: incognito mode per tab, 4-row auto-growing inputs** | A per-tab incognito toggle: when on, nothing from that tab's session persists once its tab closes — no history entry, no env/variable writes, no collection changes, no saved request. Since the API module has no browser-local storage at all (`apps/kira-studio/frontend/src/state/tabs.ts` and `api/state/*` all write through the bridge to Go/SQLite), this phase's own planning pass designs how an incognito tab's runtime state stays purely in-memory on the frontend and never reaches those bridge calls, while everything else about the tab (rendering, running requests, viewing responses) keeps working normally — plus a clear visual indicator the tab is incognito. Second, unrelated item in the same row since both are small, module-local, UI-only changes: the raw-text inputs (headers/body/params, wherever a textarea currently clips) grow up to 4 rows before switching to internal scroll, instead of a fixed single-row height | Self-contained, no dependency on any other row |
-| **P72 Git graph: remove the repo-switch dropdown** | Delete `RepoPicker.vue` and its mount point in `AppToolbar.vue`. Kira Studio's own left sidebar already switches repos; the VS Code extension already has one repo per window. The dropdown duplicates both, in neither surface it needs to | Pure deletion — goes first so P73 isn't touching toolbar code the dropdown still occupies |
-| **P73 Git graph rendering/perf/layout fixes** | Four related symptoms in the same rendering path (`CommitGrid.vue`, `graph/layoutStore.ts`, `graph/layout.worker.ts`, `graph/rowSvg.ts`): (1) the graph fully reloads every time the git-graph tab regains focus, instead of keeping its already-computed layout; (2) checking out a branch/commit visibly disaligns the graph for a moment before it snaps back into place; (3) scrolling the graph flickers; (4) branch/tag labels render in a smaller font than the commit-message text next to them and should match. This phase's own planning pass determines whether (1)-(3) share one root cause (a stale-cache/recompute-on-mount bug in `layoutStore.ts`, or worker round-trip timing) or are separate bugs, and fixes accordingly — reporting which, not assuming | After P72, before anything else that depends on stable graph navigation (P75, P79) |
-| **P74 Move per-repo git-graph settings that are actually global into general settings** | Audit `RepoSettingsDialog.vue`'s full settings list against `repoSettings.ts`'s existing `instanceWide` flag; anything about look/appearance (and any other setting that has no real reason to differ per repo) moves into the app-wide `SettingsDialog.vue`/`settings.ts`, either by flipping `instanceWide` where that's already sufficient or by relocating the control entirely when the setting has no legitimate per-repo axis at all. This phase's own planning pass states, setting by setting, which move and why — not a blanket relocation | Right after P73, before its possible appearance-setting changes get relocated a second time |
-| **P75 Commit detail panel: show-more fix, PR icon relocated off the webview, PR icon on every commit's time/sha line** | Three fixes to `DetailPane.vue`/`CommitMeta.vue`: (1) "show more" (truncated commit message/body expansion) currently does nothing — fix it; (2) clicking a GitHub PR icon currently opens the PR in an embedded webview — this phase's own planning pass locates that webview path (not found in `git-ui`'s current commit-detail code in this chapter's own scoping pass, so it may live in the desktop app's own git integration or the VS Code extension host — confirm before changing) and replaces it with inline PR status (open/closed/merged) shown directly in the commit-detail panel plus a link that opens the PR in the external browser, never embedded; (3) extend `pr.ts`'s `PrState` beyond branch-tip-only lookup so any commit on a branch associated with a PR shows a small GitHub icon on its time/sha line, linking to that PR — reachable from any commit on the branch, not only the tip | After P73 (needs stable graph/detail-panel navigation to build on) and before P76 (both touch the same file-opening/detail-panel surface) |
-| **P76 Diff viewing: multi-file "open commit changes", temporary tabs, go-to-file for virtual files** | "Open commit changes" currently opens only one changed file's diff instead of all of them — fix to open every changed file. Those diff tabs currently pin as persistent tabs in the desktop app's own `TabStrip.vue`; they should open as temporary/preview tabs (the same `.is-preview` convention `TabStrip.vue` already implements elsewhere), promoted to pinned only on the same interaction (double-click/explicit edit) the file-tree preview convention already uses. Add a "go to file" action from a diff view matching the VS Code extension's own `actions.openInEditor` behavior — jump to the real file and the corresponding line, and this phase's own planning pass makes it work for virtual/synthetic content too (a diff side that has no on-disk file, e.g. a deleted/renamed/staged-only version), not just real files | Right after P75, same file-opening surface |
-| **P77 Tab-strip icons: reuse the seti file-icon set** | `TabStrip.vue`'s tab icons currently don't use the seti icon set already used in `FileTree.vue` (`packages/git-ui/src/icons/setiFileIcon.ts`, mirrored at `apps/kira-studio/frontend/src/repo/fileIcon.ts`). Wire the same icon resolution into the tab strip so a file's tab icon matches its tree-view icon | Small, self-contained; placed after the tab-strip changes P76 makes so it isn't racing them |
-| **P78 Markdown default view: reading mode, editor-matching font size** | Confirm/set the default open mode for `.md` files to reading (preview) view — already the case per the request ("it works well") — and fix the preview font size, which currently renders noticeably smaller than the code editor's own font size; it should match | Small, self-contained |
-| **P79 Fix review tab: broken commit-diff opening and graph navigation** | From the review tab (`ReviewView.vue`/`RepoReviewView.vue`), opening a commit's diff and revealing a commit in the graph both currently do nothing. Trace both broken call paths (likely stale references into the pre-P73 graph-navigation API, or a session-scoped commit list `reviewSession.ts` builds that the graph/detail-panel opening actions don't recognize) and fix | After P73 (graph stability) and P76 (diff-opening path) both land — this row's own bugs are broken calls into exactly those two mechanisms |
-| **P80 Review UX polish: checkbox shape/state, placement, comment interactivity, highlight** | In the review UI: (1) the mark-reviewed control is currently round — make it square; (2) find a better position for it now that a go-to-file button already sits in the same row area (added earlier in this phase's own history, per the request) — this phase's own planning pass picks the layout; (3) "add review comment" opens something but isn't interactive in any way — fix it end to end; (4) a partial-review state needs its own indeterminate checkbox visual, not just a third color reusing the same two-state control; (5) once a file is marked fully reviewed, its green "reviewed" row highlight should disappear (currently persists after marking) | Right after P79 — polishing a view whose navigation was just fixed |
-| **P81 Git-blame status-bar widget** | Show git blame for the line under the cursor in `StatusBar.vue` (author, relative date, commit summary — matching what a blame gutter/widget in VS Code itself shows), updating as the cursor moves | Self-contained, placed after the review-tab work since it touches an unrelated status-bar surface |
-| **P82 Redesign the branches/stashes dropdown** | `BranchPicker.vue` (branches + worktree switch/open) and the stash components (`StashList.vue`/`GlobalStashList.vue`/`StashDetailPane.vue`) are hard to navigate today per the request. This phase's own planning pass proposes a concrete redesign (grouping, search/filter, disclosure structure) before implementing it, not a cosmetic pass over the existing structure | Self-contained; placed near the end since it's the largest single UI-scope item among the remaining rows |
-| **P83 Right-click: create worktree** | Add a "Create worktree" action to the existing row context-menu framework (`RowContextMenu.vue`/`rowMenuModel.ts`), reusing `WorktreeList.vue`'s existing create machinery (already used from `BranchPicker.vue`) rather than building a second worktree-creation path | After P82, since P82 may restructure the branch row this context menu attaches to |
-| **P84 Code review, round 1** | Three parallel Opus subagents, one per dimension — architecture/security, functional correctness, performance/resource efficiency — findings-only, per `CLAUDE.md`'s own process, scoped to this chapter's own diff (P71-P83). One sequential Sonnet subagent fixes every finding judged real | After P71-P83 land: a review needs a finished tree |
-| **P85 Code review, round 2** | The same three-dimension cycle, run again in full — against the tree P84's fixes leave, re-read fresh rather than trusting P84's summary — per `CLAUDE.md`'s "repeat the whole loop" rule. A round finding nothing real says so rather than manufacturing a finding | After P84's fixes land |
-| **P86 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's changes — API incognito mode, and the git module's rendering/PR/diff/review/settings/blame/worktree changes — the same "read the current tree, don't trust prose" bar v1.6's P70 and v1.7's M8 used | Last of all: needs both review rounds' fixes landed first |
+| **P71 API module: incognito mode per tab, 4-row auto-growing inputs** | A per-tab incognito toggle: when on, nothing from that tab's session persists once its tab closes — no history entry, no env/variable writes, no collection changes, no saved request. Since the API module has no browser-local storage at all (`apps/kira-studio/frontend/src/state/tabs.ts` and `api/state/*` all write through the bridge to Go/SQLite), this phase's own planning pass designs how an incognito tab's runtime state stays purely in-memory on the frontend and never reaches those bridge calls, while everything else about the tab (rendering, running requests, viewing responses) keeps working normally — plus a clear visual indicator the tab is incognito. Second, unrelated item in the same row since both are small, module-local, UI-only changes: the raw-text inputs (headers/body/params, wherever a textarea currently clips) grow up to 4 rows before switching to internal scroll, instead of a fixed single-row height | Self-contained, no dependency on any other row. **Landed** — see plan/implementation commits |
+| **P72 Git graph panel: remove repo-switch dropdown, rendering/perf/layout fixes, settings relocation** | Delete `RepoPicker.vue` and its `AppToolbar.vue` mount point — Kira Studio's own left sidebar and the VS Code extension's one-repo-per-window model both already make it redundant. Fix four related rendering/perf symptoms in `CommitGrid.vue`/`graph/layoutStore.ts`/`graph/layout.worker.ts`/`graph/rowSvg.ts`: the graph fully reloads every time its tab regains focus instead of keeping its computed layout; checking out a branch/commit visibly disaligns the graph before it snaps back; scrolling flickers; branch/tag labels render smaller than the adjacent commit-message text and should match. This phase's own planning pass determines whether the first three share one root cause (stale-cache/recompute-on-mount, or worker round-trip timing) or are separate bugs, and states which. Then audit `RepoSettingsDialog.vue`'s full settings list against `repoSettings.ts`'s existing `instanceWide` flag and relocate look/appearance settings (and anything else with no legitimate per-repo axis) into the app-wide `SettingsDialog.vue`/`settings.ts`, setting by setting, stated with reasons — not a blanket move | First among the git-module rows: P74/P75 both depend on stable graph navigation; settings relocation sits last within this row so it isn't relocating a setting whose look/appearance behavior this same row may have just changed |
+| **P73 Tab-strip icons and markdown reading-view font** | `TabStrip.vue`'s tab icons don't reuse the seti icon set already used in `FileTree.vue` (`packages/git-ui/src/icons/setiFileIcon.ts`, mirrored at `apps/kira-studio/frontend/src/repo/fileIcon.ts`) — wire it in so a file's tab icon matches its tree-view icon. Separately: the markdown preview's default reading-mode view is already correct, but its font size renders noticeably smaller than the code editor's own font size — fix it to match | Small, self-contained, unrelated pair bundled per this chapter's own P71 precedent; placed right after P72 since the tab-strip icon change sits beside P72's sticky-header fix |
+| **P74 Commit detail, PR integration and diff viewing** | `DetailPane.vue`/`CommitMeta.vue`: fix "show more" (truncated commit message/body expansion currently does nothing); replace the GitHub PR icon's current click behavior (opens the PR in an embedded webview — this phase's own planning pass locates that webview path, not found in `git-ui`'s current commit-detail code during this chapter's own scoping, so it may live in the desktop app's own git integration or the VS Code extension host; confirm before changing) with inline PR status (open/closed/merged) in the panel plus an external-browser link, never embedded; extend `pr.ts`'s `PrState` beyond branch-tip-only lookup so any commit on a PR-associated branch shows a small GitHub icon on its time/sha line, reachable from anywhere on the branch. Then diff viewing: "open commit changes" currently opens only one changed file instead of all of them — open every changed file; those diff tabs currently pin as persistent tabs in `TabStrip.vue` and should open as temporary/preview tabs instead (the same `.is-preview` convention used elsewhere), promoted to pinned only on the same double-click/explicit-edit interaction the file-tree preview convention already uses; add a "go to file" action matching the VS Code extension's own `actions.openInEditor` behavior — jump to the real file and line, working for virtual/synthetic diff content (deleted/renamed/staged-only) too, not just real files | Right after P72/P73: both halves extend `DetailPane.vue`'s file-opening path directly, and the PR/detail-panel fixes naturally precede the diff-viewing fixes that touch the same file rows |
+| **P75 Review tab: fix navigation, then UX polish** | From the review tab (`ReviewView.vue`/`RepoReviewView.vue`), opening a commit's diff and revealing a commit in the graph both currently do nothing — trace both broken call paths (likely stale references into the pre-P72 graph-navigation API, or a session-scoped commit list `reviewSession.ts` builds that the graph/detail-panel actions don't recognize) and fix. Once navigation works, polish the same view: the mark-reviewed control is round, make it square; reposition it given the go-to-file button already in the same row area, this phase's own planning pass picks the layout; "add review comment" opens something but isn't interactive in any way — fix it end to end; a partial-review state needs its own indeterminate checkbox visual, not a third color on the same two-state control; once a file is marked fully reviewed, its green "reviewed" row highlight should disappear instead of persisting | After P72 (graph stability) and P74 (diff-opening path); the navigation half is literally broken calls into those two mechanisms, and the polish half only makes sense once navigation is fixed |
+| **P76 Git-blame status-bar widget and right-click worktree creation** | Show git blame for the line under the cursor in `StatusBar.vue` (author, relative date, commit summary), updating as the cursor moves. Separately: add a "Create worktree" action to the existing row context-menu framework (`RowContextMenu.vue`/`rowMenuModel.ts`), reusing `WorktreeList.vue`'s existing create machinery already used from `BranchPicker.vue` rather than a second worktree-creation path | Two small, self-contained, unrelated git-module additions bundled per this chapter's own small-item precedent; placed after the review-tab work since neither depends on it |
+| **P77 Redesign the branches/stashes dropdown** | `BranchPicker.vue` (branches + worktree switch/open) and the stash components (`StashList.vue`/`GlobalStashList.vue`/`StashDetailPane.vue`) are hard to navigate today per the request. This phase's own planning pass proposes a concrete redesign (grouping, search/filter, disclosure structure) before implementing it, not a cosmetic pass over the existing structure | Kept as its own row — the largest single UI-scope item in the chapter, not a fit for bundling |
+| **P78 Code navigation: Cmd/Ctrl+click fix, Go inheritance matching, reference/implementation wiring** | Three findings from this chapter's own code-intelligence discussion, same Monaco/codegraph subsystem: (1) Cmd/Ctrl+click doesn't navigate even though the same `DefinitionProvider` (`navigation.ts`) already backs F12/hover — root-cause before fixing (modifier-click never reaching the provider, a platform Cmd-vs-Ctrl mismatch, an editor option shadowing the binding, or the provider silently failing on click-triggered requests specifically) and fix only the confirmed cause; (2) close `internal/codegraph`'s Go-specific data gap — `method_declaration` captures a method's name only, never its receiver type (`internal/codeparse/queries/go/tags.scm`), so add that capture, extend `go/m1c_fields.scm`'s struct-field capture to the embedded-field case it already documents skipping, build the resulting type→method-set index, and have the Go resolver path check it before falling back to name-proximity; (3) wire `registerReferenceProvider`/`registerImplementationProvider` into `navigation.ts` — Monaco's stock peek UI is already bundled, the backend (`ReferencesTo`/`ImplementationsOf`) already returns lists, but `Refs.Sites`/`Target` carry no per-occurrence confidence signal a bare `Location[]` can express, so design and implement that surfacing (extended return data, a peek-list label/decoration, or another mechanism the plan justifies) before wiring the providers | Found live, not by any phase's own plan; the click fix is independent and can land anywhere within this row, but item (2) must land before item (3) internally — wiring Go-to-implementation ahead of the receiver-type fix would ship a command that silently does nothing for Go |
+| **P79 Code review** | Three parallel Opus subagents, one per dimension — architecture/security, functional correctness, performance/resource efficiency — findings-only, per `CLAUDE.md`'s own process, scoped to this chapter's own diff (P71-P78). One sequential Sonnet subagent fixes every finding judged real. A single round, not `CLAUDE.md`'s standard two, by explicit instruction | After P71-P78 land: a review needs a finished tree |
+| **P80 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's changes — API incognito mode, the git module's rendering/PR/diff/review/settings/blame/worktree changes, and the code-navigation fixes (click, Go inheritance matching, reference/implementation wiring) — the same "read the current tree, don't trust prose" bar v1.6's P70 and v1.7's M8 used | Last of all: needs the review round's fixes landed first |
 
 ## Layout
 
