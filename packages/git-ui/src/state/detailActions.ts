@@ -48,9 +48,12 @@ export interface DetailActions {
    *  `openInEditor`) so the caller can announce it — item 8's own remaining problem (i), a run
    *  where some files silently fail to open, is what makes an awaited, inspectable result matter
    *  here specifically. */
+  /** P75 §1.2: `parentIndex` is optional — a collapsed row has none to give (nothing has been
+   *  picked yet), matching the contract's own `parentIndex?: number`; the host default (parent 0)
+   *  answers exactly as an unexpanded row would have shown. */
   openAllChanges(params: {
     sha: string;
-    parentIndex: number;
+    parentIndex?: number;
   }): Promise<{ opened: number; failed: number; mode: 'multiDiff' | 'tabs' }>;
   /** "Go to file" (D14a) — `rev`/`path`/`line` are exactly the algorithm at the top of the plan
    *  already resolved; this method only makes the request and returns the outcome, it does not

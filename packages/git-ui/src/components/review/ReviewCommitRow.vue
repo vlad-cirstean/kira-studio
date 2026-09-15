@@ -18,6 +18,7 @@ import type { CommitStore } from '@kira/git-core';
 import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
+import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
 import { formatRelativeDate } from '../dateFormat.ts';
 import FileTree from '../FileTree.vue';
@@ -29,6 +30,10 @@ const props = defineProps<{
   store: CommitStore;
   expanded: boolean;
   expansion: ReviewExpansion | undefined;
+  /** P75 §1.2: the session-level row-action bundle (`ReviewSessionState.rowActions`) — reachable
+   *  on a collapsed row exactly like an expanded one, unlike `expansion?.actions` (`undefined`
+   *  until this row has been expanded at least once). */
+  actions: DetailActions;
   /** Roving-tabindex cursor (§6.8's tree/treeitem pattern, `FileTree.vue`'s own precedent) —
    *  `ReviewView.vue` owns which row is the cursor across the whole list. */
   focused: boolean;
@@ -117,24 +122,22 @@ function onMenuSelect(id: string): void {
 // every request in the same tick with a bare `void` and no `.catch`, so a run where 1 of 14 opens
 // succeeded and 13 rejected looked, to the user, exactly like "it only shows one file's diff" —
 // no announcement, no error surface, no partial-success reporting. This awaits the single host
-// round trip and announces the real outcome either way. Needs the commit already expanded (its
-// file list fetched); an unexpanded row announces why instead of silently doing nothing.
+// round trip and announces the real outcome either way.
+//
+// P75 §1.2: no expansion precondition — `props.actions` is reachable on a collapsed row (the
+// old `exp?.actions.announce(...)` optional-chained through the very binding that was undefined
+// on a never-expanded row, so its "expand the commit first" announcement never actually ran).
+// `parentIndex` is `undefined` until the row has been expanded (nothing picked yet); the host
+// default (parent 0) is exactly what an unexpanded row would have shown anyway.
 async function openAllChanges(): Promise<void> {
   // G-UX D5: stopPropagation() here is now redundant with (and removed in favour of) onRowClick's
   // own .kv-review-row-actions guard above -- one rule for the whole action cluster.
-  const exp = props.expansion;
-  const files = exp?.detail.detail.value?.files;
-  if (!exp || !files) {
-    exp?.actions.announce('Expand the commit first.');
-    return;
-  }
-  const parentIndex = exp.detail.parentIndex.value;
   try {
-    const { opened, failed, mode } = await exp.actions.openAllChanges({
+    const { opened, failed, mode } = await props.actions.openAllChanges({
       sha: props.sha,
-      parentIndex,
+      parentIndex: props.expansion?.detail.parentIndex.value,
     });
-    exp.actions.announce(
+    props.actions.announce(
       failed === 0
         ? mode === 'multiDiff'
           ? `Opened all ${opened} changed files`
@@ -142,7 +145,7 @@ async function openAllChanges(): Promise<void> {
         : `Opened ${opened} of ${opened + failed} files — ${failed} couldn't be opened`,
     );
   } catch (err) {
-    exp.actions.announce(
+    props.actions.announce(
       `Couldn't open the changes — ${err instanceof Error ? err.message : String(err)}`,
     );
   }
