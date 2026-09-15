@@ -1,0 +1,33 @@
+{
+  "kind": "sqlite",
+  "root": {
+    "label": "Query plan",
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "SEARCH t USING COVERING INDEX idx_t_a (a=?)",
+        "relation": "t",
+        "detail": "SEARCH t USING COVERING INDEX idx_t_a (a=?)",
+        "metrics": [],
+        "issues": [
+          {
+            "severity": "info",
+            "code": "covering-index",
+            "message": "SEARCH t USING COVERING INDEX idx_t_a (a=?)"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "issues": [
+    {
+      "severity": "info",
+      "code": "covering-index",
+      "message": "SEARCH t USING COVERING INDEX idx_t_a (a=?)"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "3\t0\tSEARCH t USING COVERING INDEX idx_t_a (a=?)"
+}

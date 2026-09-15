@@ -1,0 +1,74 @@
+{
+  "kind": "clickhouse",
+  "root": {
+    "label": "Expression: (Project names + Projection)",
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "ReadFromMergeTree: default.t",
+        "relation": "default.t",
+        "metrics": [
+          {
+            "label": "PrimaryKey condition",
+            "value": "and((id in (-Inf, 20]), (id in [10, +Inf)))"
+          },
+          {
+            "label": "PrimaryKey granules",
+            "value": "62 / 62 selected"
+          },
+          {
+            "label": "PrimaryKey keys",
+            "value": "id"
+          },
+          {
+            "label": "PrimaryKey parts",
+            "value": "3 / 3 selected"
+          },
+          {
+            "label": "PrimaryKey search",
+            "value": "binary search"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "warn",
+            "code": "pk-not-narrowed",
+            "message": "the primary key on \"default.t\" did not narrow the read — every granule was selected"
+          },
+          {
+            "severity": "warn",
+            "code": "all-parts-read",
+            "message": "every part of \"default.t\" was read (3 parts)"
+          },
+          {
+            "severity": "warn",
+            "code": "wide-scan",
+            "message": "ReadFromMergeTree: default.t is estimated to read 500,000 rows"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "estimatedRowsRead": 500000,
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "pk-not-narrowed",
+      "message": "the primary key on \"default.t\" did not narrow the read — every granule was selected"
+    },
+    {
+      "severity": "warn",
+      "code": "all-parts-read",
+      "message": "every part of \"default.t\" was read (3 parts)"
+    },
+    {
+      "severity": "warn",
+      "code": "wide-scan",
+      "message": "ReadFromMergeTree: default.t is estimated to read 500,000 rows"
+    }
+  ],
+  "overThreshold": true,
+  "raw": "[{\"Plan\":{\"Node Type\":\"Expression\",\"Description\":\"(Project names + Projection)\",\"Plans\":[{\"Node Type\":\"ReadFromMergeTree\",\"Node Id\":\"ReadFromMergeTree_0\",\"Description\":\"default.t\",\"Indexes\":[{\"Type\":\"PrimaryKey\",\"Keys\":[\"id\"],\"Condition\":\"and((id in (-Inf, 20]), (id in [10, +Inf)))\",\"Search Algorithm\":\"binary search\",\"Initial Parts\":3,\"Selected Parts\":3,\"Initial Granules\":62,\"Selected Granules\":62}]}]}}]\n\n-- EXPLAIN ESTIMATE --\n[{\"rows\":500000}]"
+}

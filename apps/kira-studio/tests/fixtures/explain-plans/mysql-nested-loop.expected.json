@@ -1,0 +1,77 @@
+{
+  "kind": "mysql",
+  "root": {
+    "label": "Query",
+    "cost": {
+      "total": 120.44
+    },
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "Nested loop join",
+        "metrics": [],
+        "issues": [],
+        "children": [
+          {
+            "label": "Full scan on orders",
+            "relation": "orders",
+            "estimatedRows": 5000,
+            "cost": {
+              "total": 80
+            },
+            "metrics": [
+              {
+                "label": "cost_info.prefix_cost",
+                "value": "80.00"
+              },
+              {
+                "label": "rows_produced_per_join",
+                "value": "5000"
+              }
+            ],
+            "issues": [
+              {
+                "severity": "warn",
+                "code": "full-scan",
+                "message": "full table scan on \"orders\" — no index was used"
+              }
+            ],
+            "children": []
+          },
+          {
+            "label": "eq_ref access on customers",
+            "relation": "customers",
+            "detail": "(orders.customer_id = customers.id)",
+            "estimatedRows": 1,
+            "cost": {
+              "total": 40.44
+            },
+            "metrics": [
+              {
+                "label": "cost_info.prefix_cost",
+                "value": "40.44"
+              }
+            ],
+            "issues": [],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "estimatedRowsRead": 5000,
+  "nativeCost": {
+    "value": 120.44,
+    "unit": "mysql-cost"
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "full-scan",
+      "message": "full table scan on \"orders\" — no index was used"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "{\"query_block\":{\"select_id\":1,\"cost_info\":{\"query_cost\":\"120.44\"},\"nested_loop\":[{\"table\":{\"table_name\":\"orders\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":5000,\"rows_produced_per_join\":5000,\"cost_info\":{\"prefix_cost\":\"80.00\"}}},{\"table\":{\"table_name\":\"customers\",\"access_type\":\"eq_ref\",\"possible_keys\":[\"PRIMARY\"],\"key\":\"PRIMARY\",\"rows_examined_per_scan\":1,\"cost_info\":{\"prefix_cost\":\"40.44\"},\"attached_condition\":\"(orders.customer_id = customers.id)\"}}]}}"
+}

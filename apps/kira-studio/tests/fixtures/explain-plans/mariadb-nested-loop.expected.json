@@ -1,0 +1,68 @@
+{
+  "kind": "mariadb",
+  "root": {
+    "label": "Query",
+    "cost": {
+      "total": 16.5855622
+    },
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "Full scan on t",
+        "relation": "t",
+        "detail": "t.`name` = 'n5'",
+        "estimatedRows": 100175,
+        "cost": {
+          "total": 16.5855622
+        },
+        "metrics": [
+          {
+            "label": "cost",
+            "value": "16.5855622"
+          },
+          {
+            "label": "filtered",
+            "value": "100"
+          },
+          {
+            "label": "loops",
+            "value": "1"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "warn",
+            "code": "full-scan",
+            "message": "full table scan on \"t\" — no index was used"
+          },
+          {
+            "severity": "warn",
+            "code": "wide-scan",
+            "message": "Full scan on t is estimated to read 100,175 rows"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "estimatedRowsRead": 100175,
+  "nativeCost": {
+    "value": 16.5855622,
+    "unit": "mariadb-cost"
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "full-scan",
+      "message": "full table scan on \"t\" — no index was used"
+    },
+    {
+      "severity": "warn",
+      "code": "wide-scan",
+      "message": "Full scan on t is estimated to read 100,175 rows"
+    }
+  ],
+  "overThreshold": true,
+  "raw": "{\"query_block\":{\"select_id\":1,\"cost\":16.5855622,\"nested_loop\":[{\"table\":{\"table_name\":\"t\",\"access_type\":\"ALL\",\"loops\":1,\"rows\":100175,\"cost\":16.5855622,\"filtered\":100,\"attached_condition\":\"t.`name` = 'n5'\"}}]}}"
+}

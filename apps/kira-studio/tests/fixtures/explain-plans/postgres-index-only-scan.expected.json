@@ -1,0 +1,27 @@
+{
+  "kind": "postgres",
+  "root": {
+    "label": "Index Only Scan on u",
+    "relation": "u",
+    "estimatedRows": 5,
+    "metrics": [],
+    "issues": [
+      {
+        "severity": "info",
+        "code": "index-only-scan",
+        "message": "\"u\" is read entirely from its index — no heap access needed"
+      }
+    ],
+    "children": []
+  },
+  "estimatedRowsRead": 5,
+  "issues": [
+    {
+      "severity": "info",
+      "code": "index-only-scan",
+      "message": "\"u\" is read entirely from its index — no heap access needed"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "[{\"Plan\":{\"Node Type\":\"Index Only Scan\",\"Relation Name\":\"u\",\"Plan Rows\":5}}]"
+}

@@ -1,0 +1,41 @@
+{
+  "kind": "clickhouse",
+  "root": {
+    "label": "Expression: (Project names + Projection)",
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "ReadFromMergeTree: default.t",
+        "relation": "default.t",
+        "metrics": [
+          {
+            "label": "PrimaryKey condition",
+            "value": "and((id in (-Inf, 20]), (id in [10, +Inf)))"
+          },
+          {
+            "label": "PrimaryKey granules",
+            "value": "1 / 62 selected"
+          },
+          {
+            "label": "PrimaryKey keys",
+            "value": "id"
+          },
+          {
+            "label": "PrimaryKey parts",
+            "value": "1 / 1 selected"
+          },
+          {
+            "label": "PrimaryKey search",
+            "value": "binary search"
+          }
+        ],
+        "issues": [],
+        "children": []
+      }
+    ]
+  },
+  "issues": [],
+  "overThreshold": false,
+  "raw": "[{\"Plan\":{\"Node Type\":\"Expression\",\"Description\":\"(Project names + Projection)\",\"Plans\":[{\"Node Type\":\"ReadFromMergeTree\",\"Node Id\":\"ReadFromMergeTree_0\",\"Description\":\"default.t\",\"Indexes\":[{\"Type\":\"PrimaryKey\",\"Keys\":[\"id\"],\"Condition\":\"and((id in (-Inf, 20]), (id in [10, +Inf)))\",\"Search Algorithm\":\"binary search\",\"Initial Parts\":1,\"Selected Parts\":1,\"Initial Granules\":62,\"Selected Granules\":1}]}]}}]\n\n-- EXPLAIN ESTIMATE --\n[]"
+}

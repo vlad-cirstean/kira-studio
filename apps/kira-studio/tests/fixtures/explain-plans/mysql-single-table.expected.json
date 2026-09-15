@@ -1,0 +1,74 @@
+{
+  "kind": "mysql",
+  "root": {
+    "label": "Query",
+    "cost": {
+      "total": 6304.55
+    },
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "Full scan on t",
+        "relation": "t",
+        "detail": "(`app`.`t`.`name` = 'n5')",
+        "estimatedRows": 62643,
+        "cost": {
+          "total": 6304.55
+        },
+        "metrics": [
+          {
+            "label": "cost_info.data_read_per_join",
+            "value": "1M"
+          },
+          {
+            "label": "cost_info.eval_cost",
+            "value": "626.43"
+          },
+          {
+            "label": "cost_info.prefix_cost",
+            "value": "6304.55"
+          },
+          {
+            "label": "cost_info.read_cost",
+            "value": "5678.12"
+          },
+          {
+            "label": "filtered",
+            "value": "10.00"
+          },
+          {
+            "label": "rows_produced_per_join",
+            "value": "6264"
+          },
+          {
+            "label": "used_columns",
+            "value": "id, cat, name"
+          }
+        ],
+        "issues": [
+          {
+            "severity": "warn",
+            "code": "full-scan",
+            "message": "full table scan on \"t\" — no index was used"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "estimatedRowsRead": 62643,
+  "nativeCost": {
+    "value": 6304.55,
+    "unit": "mysql-cost"
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "full-scan",
+      "message": "full table scan on \"t\" — no index was used"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "{\"query_block\":{\"select_id\":1,\"cost_info\":{\"query_cost\":\"6304.55\"},\"table\":{\"table_name\":\"t\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":62643,\"rows_produced_per_join\":6264,\"filtered\":\"10.00\",\"cost_info\":{\"read_cost\":\"5678.12\",\"eval_cost\":\"626.43\",\"prefix_cost\":\"6304.55\",\"data_read_per_join\":\"1M\"},\"used_columns\":[\"id\",\"cat\",\"name\"],\"attached_condition\":\"(`app`.`t`.`name` = 'n5')\"}}}"
+}

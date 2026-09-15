@@ -5,68 +5,48 @@
 // capture is already in the plan doc).
 
 import { describe, expect, test } from 'bun:test';
+import { ExplainTruncatedError, parseExplainPages } from '../../frontend/src/views/console/plan';
+import type { QueryPlan } from '../../frontend/src/views/console/planModel';
 import { parseClickhousePlan } from '../../frontend/src/views/console/planParsers/clickhouse';
 import { parseMariadbPlan } from '../../frontend/src/views/console/planParsers/mariadb';
 import { parseMysqlPlan } from '../../frontend/src/views/console/planParsers/mysql';
 import { parsePostgresPlan } from '../../frontend/src/views/console/planParsers/postgres';
-import { parseSqlitePlan } from '../../frontend/src/views/console/planParsers/sqlite';
+import {
+  parseSqlitePlan,
+  type SqliteExplainRow,
+} from '../../frontend/src/views/console/planParsers/sqlite';
+import {
+  buildPages,
+  buildTruncatedPage,
+  fixtureCases,
+  loadExpected,
+  loadInput,
+  normalize,
+} from '../fixtures/explain-plans/loader';
+
+// M3 §2.4: the JSON literals moved out into tests/fixtures/explain-plans/*.input.json — the
+// parity fixtures the new describe('parity fixtures') block below and internal/queryplan's own
+// parse_test.go both read — and read back in here rather than duplicated, wherever a case below
+// corresponds to one fixture exactly. Existing per-rule assertions are unchanged.
+function rawTextOf(caseName: string): string {
+  const input = loadInput(caseName);
+  const cell = input.pages?.[0]?.rows[0]?.[0];
+  if (cell === undefined) throw new Error(`fixture ${caseName} has no first-page first-cell text`);
+  return cell;
+}
+
+function sqliteRowsOf(caseName: string): SqliteExplainRow[] {
+  const input = loadInput(caseName);
+  const rows = input.pages?.[0]?.rows ?? [];
+  return rows.map(([id, parent, detail]) => ({
+    id: Number(id),
+    parent: Number(parent),
+    detail: detail ?? '',
+  }));
+}
 
 describe('parsePostgresPlan — F11', () => {
-  const JOIN_PLAN = JSON.stringify([
-    {
-      Plan: {
-        'Node Type': 'Limit',
-        'Startup Cost': 7814.39,
-        'Total Cost': 7814.41,
-        'Plan Rows': 10,
-        'Plan Width': 15,
-        Plans: [
-          {
-            'Node Type': 'Sort',
-            'Sort Key': ['(count(*)) DESC'],
-            'Plan Rows': 46038,
-            Plans: [
-              {
-                'Node Type': 'Aggregate',
-                Strategy: 'Hashed',
-                'Group Key': ['t.name'],
-                Plans: [
-                  {
-                    'Node Type': 'Hash Join',
-                    'Join Type': 'Inner',
-                    'Hash Cond': '(t.id = c.t_id)',
-                    'Total Cost': 6128.95,
-                    'Plan Rows': 46038,
-                    Plans: [
-                      {
-                        'Node Type': 'Seq Scan',
-                        'Relation Name': 't',
-                        Alias: 't',
-                        'Total Cost': 3582.0,
-                        'Plan Rows': 184153,
-                        Filter: '(cat > 3)',
-                      },
-                      {
-                        'Node Type': 'Hash',
-                        Plans: [
-                          {
-                            'Node Type': 'Seq Scan',
-                            'Relation Name': 'c',
-                            'Total Cost': 771.0,
-                            'Plan Rows': 50000,
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ]);
+  const JOIN_PLAN = rawTextOf('postgres-join');
 
   test('finds the widest scan, not the root estimate (D14)', () => {
     const plan = parsePostgresPlan(JOIN_PLAN, 100_000);
@@ -91,12 +71,7 @@ describe('parsePostgresPlan — F11', () => {
   });
 
   test('an index-only scan is an info issue, not a warning', () => {
-    const plan = parsePostgresPlan(
-      JSON.stringify([
-        { Plan: { 'Node Type': 'Index Only Scan', 'Relation Name': 'u', 'Plan Rows': 5 } },
-      ]),
-      100_000,
-    );
+    const plan = parsePostgresPlan(rawTextOf('postgres-index-only-scan'), 100_000);
     expect(plan.issues).toEqual([
       {
         severity: 'info',
@@ -108,27 +83,7 @@ describe('parsePostgresPlan — F11', () => {
 });
 
 describe('parseMysqlPlan — F12', () => {
-  const FULL_SCAN = JSON.stringify({
-    query_block: {
-      select_id: 1,
-      cost_info: { query_cost: '6304.55' },
-      table: {
-        table_name: 't',
-        access_type: 'ALL',
-        rows_examined_per_scan: 62643,
-        rows_produced_per_join: 6264,
-        filtered: '10.00',
-        cost_info: {
-          read_cost: '5678.12',
-          eval_cost: '626.43',
-          prefix_cost: '6304.55',
-          data_read_per_join: '1M',
-        },
-        used_columns: ['id', 'cat', 'name'],
-        attached_condition: "(`app`.`t`.`name` = 'n5')",
-      },
-    },
-  });
+  const FULL_SCAN = rawTextOf('mysql-single-table');
 
   test('flags a full scan and reports the query-level cost verbatim', () => {
     const plan = parseMysqlPlan(FULL_SCAN, 100_000);
@@ -139,25 +94,7 @@ describe('parseMysqlPlan — F12', () => {
   });
 
   test('a materialized derived table is flagged as a temp table', () => {
-    const plan = parseMysqlPlan(
-      JSON.stringify({
-        query_block: {
-          cost_info: { query_cost: '10.00' },
-          table: {
-            table_name: '<derived2>',
-            access_type: 'ALL',
-            rows_examined_per_scan: 100,
-            materialized_from_subquery: {
-              using_temporary_table: true,
-              query_block: {
-                table: { table_name: 't', access_type: 'ALL', rows_examined_per_scan: 500 },
-              },
-            },
-          },
-        },
-      }),
-      100_000,
-    );
+    const plan = parseMysqlPlan(rawTextOf('mysql-materialized-subquery'), 100_000);
     expect(plan.issues.map((i) => i.code)).toEqual(
       expect.arrayContaining(['full-scan', 'temp-table']),
     );
@@ -166,28 +103,7 @@ describe('parseMysqlPlan — F12', () => {
 
 describe('parseMariadbPlan — F13', () => {
   test('a same-named cost field is not comparable to MySQL’s', () => {
-    const plan = parseMariadbPlan(
-      JSON.stringify({
-        query_block: {
-          select_id: 1,
-          cost: 16.5855622,
-          nested_loop: [
-            {
-              table: {
-                table_name: 't',
-                access_type: 'ALL',
-                loops: 1,
-                rows: 100175,
-                cost: 16.5855622,
-                filtered: 100,
-                attached_condition: "t.`name` = 'n5'",
-              },
-            },
-          ],
-        },
-      }),
-      100_000,
-    );
+    const plan = parseMariadbPlan(rawTextOf('mariadb-nested-loop'), 100_000);
     // F17's own empirical proof: this genuine full scan reads more rows than F12's MySQL example
     // (100,175 vs 62,643) yet its identically-named `cost` field (16.59) is three orders of
     // magnitude smaller than MySQL's 6,304.55 for that comparable scan — the reason D14 thresholds
@@ -201,38 +117,7 @@ describe('parseMariadbPlan — F13', () => {
   });
 
   test('a read_sorted_file/filesort wrapper is unwrapped to its own table', () => {
-    const plan = parseMariadbPlan(
-      JSON.stringify({
-        query_block: {
-          select_id: 1,
-          cost: 2.22612952,
-          nested_loop: [
-            {
-              read_sorted_file: {
-                filesort: {
-                  sort_key: 't.`name`',
-                  table: {
-                    table_name: 't',
-                    access_type: 'ref',
-                    possible_keys: ['cat'],
-                    key: 'cat',
-                    key_length: '5',
-                    used_key_parts: ['cat'],
-                    ref: ['const'],
-                    loops: 1,
-                    rows: 2000,
-                    cost: 2.22612952,
-                    filtered: 100,
-                    attached_condition: 't.cat <=> 3',
-                  },
-                },
-              },
-            },
-          ],
-        },
-      }),
-      100_000,
-    );
+    const plan = parseMariadbPlan(rawTextOf('mariadb-filesort'), 100_000);
     expect(plan.root.children[0]?.label).toBe('Sort (filesort)');
     expect(plan.issues.map((i) => i.code)).toEqual(['filesort']);
     // The wrapped table itself is not a full scan (access_type 'ref', a key chosen) — no
@@ -259,10 +144,7 @@ describe('parseSqlitePlan — F14', () => {
   });
 
   test('a SEARCH row is not flagged as a full scan; a temp b-tree still fires', () => {
-    const plan = parseSqlitePlan([
-      { id: 4, parent: 0, detail: 'SEARCH t USING INDEX t_cat (cat=?)' },
-      { id: 15, parent: 0, detail: 'USE TEMP B-TREE FOR ORDER BY' },
-    ]);
+    const plan = parseSqlitePlan(sqliteRowsOf('sqlite-scan-search-mix'));
     expect(plan.issues.map((i) => i.code)).toEqual(['temp-btree']);
     expect(plan.root.children).toHaveLength(2);
   });
@@ -345,4 +227,28 @@ describe('parseClickhousePlan — F15', () => {
     const plan = parseClickhousePlan(planJson(1, 62), [{ rows: 111 }, { rows: 222 }], 100_000);
     expect(plan.estimatedRowsRead).toBe(333);
   });
+});
+
+// M3 §2.4/§10: the second implementation of these same rules lives in Go
+// (internal/queryplan/parse_test.go), reading these exact files. A drift in either language fails
+// a test in that language, on the same bytes — this block is the TypeScript side of that check.
+describe('parity fixtures', () => {
+  for (const caseName of fixtureCases()) {
+    test(caseName, () => {
+      const input = loadInput(caseName);
+      const expected = loadExpected(caseName);
+
+      if (input.truncatedFirstCell) {
+        expect(() =>
+          parseExplainPages(input.kind, buildTruncatedPage(), input.thresholdRows),
+        ).toThrow(ExplainTruncatedError);
+        expect(expected).toEqual({ truncated: true });
+        return;
+      }
+
+      const pages = buildPages(input.pages ?? []);
+      const plan = normalize(parseExplainPages(input.kind, pages, input.thresholdRows));
+      expect(plan).toEqual(expected as QueryPlan);
+    });
+  }
 });

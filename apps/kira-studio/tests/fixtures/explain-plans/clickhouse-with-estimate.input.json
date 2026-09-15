@@ -1,0 +1,18 @@
+{
+  "kind": "clickhouse",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["QUERY PLAN"],
+      "rows": [
+        [
+          "[{\"Plan\":{\"Node Type\":\"Expression\",\"Description\":\"(Project names + Projection)\",\"Plans\":[{\"Node Type\":\"ReadFromMergeTree\",\"Node Id\":\"ReadFromMergeTree_0\",\"Description\":\"default.t\",\"Indexes\":[{\"Type\":\"PrimaryKey\",\"Keys\":[\"id\"],\"Condition\":\"and((id in (-Inf, 20]), (id in [10, +Inf)))\",\"Search Algorithm\":\"binary search\",\"Initial Parts\":3,\"Selected Parts\":3,\"Initial Granules\":62,\"Selected Granules\":62}]}]}}]"
+        ]
+      ]
+    },
+    {
+      "columns": ["rows"],
+      "rows": [["500000"]]
+    }
+  ]
+}

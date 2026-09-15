@@ -1,0 +1,40 @@
+{
+  "kind": "sqlite",
+  "root": {
+    "label": "Query plan",
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "SEARCH t USING INDEX t_cat (cat=?)",
+        "relation": "t",
+        "detail": "SEARCH t USING INDEX t_cat (cat=?)",
+        "metrics": [],
+        "issues": [],
+        "children": []
+      },
+      {
+        "label": "USE TEMP B-TREE FOR ORDER BY",
+        "detail": "USE TEMP B-TREE FOR ORDER BY",
+        "metrics": [],
+        "issues": [
+          {
+            "severity": "warn",
+            "code": "temp-btree",
+            "message": "USE TEMP B-TREE FOR ORDER BY"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "temp-btree",
+      "message": "USE TEMP B-TREE FOR ORDER BY"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "4\t0\tSEARCH t USING INDEX t_cat (cat=?)\n15\t0\tUSE TEMP B-TREE FOR ORDER BY"
+}

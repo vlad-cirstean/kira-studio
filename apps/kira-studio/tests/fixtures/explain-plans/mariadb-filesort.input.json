@@ -1,0 +1,14 @@
+{
+  "kind": "mariadb",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["QUERY PLAN"],
+      "rows": [
+        [
+          "{\"query_block\":{\"select_id\":1,\"cost\":2.22612952,\"nested_loop\":[{\"read_sorted_file\":{\"filesort\":{\"sort_key\":\"t.`name`\",\"table\":{\"table_name\":\"t\",\"access_type\":\"ref\",\"possible_keys\":[\"cat\"],\"key\":\"cat\",\"key_length\":\"5\",\"used_key_parts\":[\"cat\"],\"ref\":[\"const\"],\"loops\":1,\"rows\":2000,\"cost\":2.22612952,\"filtered\":100,\"attached_condition\":\"t.cat <=> 3\"}}}}]}}"
+        ]
+      ]
+    }
+  ]
+}

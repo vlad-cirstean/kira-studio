@@ -7,6 +7,8 @@
 // TypeScript can hand back a zero-copy Uint32Array view (P11 D4).
 package page
 
+import "sort"
+
 // Constants, from page.ts:175-197.
 const (
 	MaxCellBytes                = 64 << 10
@@ -55,6 +57,14 @@ func IsNull(chunk Chunk, row int) bool {
 // CellText decodes row's text out of chunk.
 func CellText(chunk Chunk, row int) string {
 	return string(chunk.Data[chunk.Offsets[row]:chunk.Offsets[row+1]])
+}
+
+// IsTruncated reports whether row's cell was clipped at MaxCellBytes. Truncated is the sorted row
+// index list the builder writes, not a bitset — protocol/page.ts's isTruncated binary-searches the
+// same list.
+func IsTruncated(chunk Chunk, row int) bool {
+	i := sort.Search(len(chunk.Truncated), func(i int) bool { return chunk.Truncated[i] >= uint32(row) })
+	return i < len(chunk.Truncated) && chunk.Truncated[i] == uint32(row)
 }
 
 // ChunkByteSize is the real, measured byte cost of chunk — what L2 budgets against. Unchanged by

@@ -1,0 +1,71 @@
+{
+  "kind": "mysql",
+  "root": {
+    "label": "Query",
+    "cost": {
+      "total": 10
+    },
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "Full scan on <derived2>",
+        "relation": "<derived2>",
+        "estimatedRows": 100,
+        "metrics": [],
+        "issues": [
+          {
+            "severity": "warn",
+            "code": "full-scan",
+            "message": "full table scan on \"<derived2>\" — no index was used"
+          },
+          {
+            "severity": "warn",
+            "code": "temp-table",
+            "message": "\"<derived2>\" was materialized into a temporary table"
+          }
+        ],
+        "children": [
+          {
+            "label": "Full scan on t",
+            "relation": "t",
+            "estimatedRows": 500,
+            "metrics": [],
+            "issues": [
+              {
+                "severity": "warn",
+                "code": "full-scan",
+                "message": "full table scan on \"t\" — no index was used"
+              }
+            ],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "estimatedRowsRead": 500,
+  "nativeCost": {
+    "value": 10,
+    "unit": "mysql-cost"
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "full-scan",
+      "message": "full table scan on \"<derived2>\" — no index was used"
+    },
+    {
+      "severity": "warn",
+      "code": "temp-table",
+      "message": "\"<derived2>\" was materialized into a temporary table"
+    },
+    {
+      "severity": "warn",
+      "code": "full-scan",
+      "message": "full table scan on \"t\" — no index was used"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "{\"query_block\":{\"cost_info\":{\"query_cost\":\"10.00\"},\"table\":{\"table_name\":\"<derived2>\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":100,\"materialized_from_subquery\":{\"using_temporary_table\":true,\"query_block\":{\"table\":{\"table_name\":\"t\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":500}}}}}}"
+}

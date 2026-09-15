@@ -1,0 +1,131 @@
+{
+  "kind": "postgres",
+  "root": {
+    "label": "Limit",
+    "estimatedRows": 10,
+    "cost": {
+      "total": 7814.41,
+      "startup": 7814.39
+    },
+    "metrics": [
+      {
+        "label": "Plan Width",
+        "value": "15"
+      }
+    ],
+    "issues": [],
+    "children": [
+      {
+        "label": "Sort",
+        "estimatedRows": 46038,
+        "metrics": [
+          {
+            "label": "Sort Key",
+            "value": "(count(*)) DESC"
+          }
+        ],
+        "issues": [],
+        "children": [
+          {
+            "label": "Aggregate",
+            "metrics": [
+              {
+                "label": "Group Key",
+                "value": "t.name"
+              },
+              {
+                "label": "Strategy",
+                "value": "Hashed"
+              }
+            ],
+            "issues": [],
+            "children": [
+              {
+                "label": "Hash Join",
+                "detail": "(t.id = c.t_id)",
+                "estimatedRows": 46038,
+                "cost": {
+                  "total": 6128.95
+                },
+                "metrics": [
+                  {
+                    "label": "Join Type",
+                    "value": "Inner"
+                  }
+                ],
+                "issues": [],
+                "children": [
+                  {
+                    "label": "Seq Scan on t",
+                    "relation": "t",
+                    "detail": "(cat > 3)",
+                    "estimatedRows": 184153,
+                    "cost": {
+                      "total": 3582
+                    },
+                    "metrics": [
+                      {
+                        "label": "Alias",
+                        "value": "t"
+                      }
+                    ],
+                    "issues": [
+                      {
+                        "severity": "warn",
+                        "code": "full-scan",
+                        "message": "full table scan on \"t\" with a filter — no index was used"
+                      },
+                      {
+                        "severity": "warn",
+                        "code": "wide-scan",
+                        "message": "Seq Scan on t is estimated to read 184,153 rows"
+                      }
+                    ],
+                    "children": []
+                  },
+                  {
+                    "label": "Hash",
+                    "metrics": [],
+                    "issues": [],
+                    "children": [
+                      {
+                        "label": "Seq Scan on c",
+                        "relation": "c",
+                        "estimatedRows": 50000,
+                        "cost": {
+                          "total": 771
+                        },
+                        "metrics": [],
+                        "issues": [],
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "estimatedRowsRead": 184153,
+  "nativeCost": {
+    "value": 7814.41,
+    "unit": "postgres-planner"
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "full-scan",
+      "message": "full table scan on \"t\" with a filter — no index was used"
+    },
+    {
+      "severity": "warn",
+      "code": "wide-scan",
+      "message": "Seq Scan on t is estimated to read 184,153 rows"
+    }
+  ],
+  "overThreshold": true,
+  "raw": "[{\"Plan\":{\"Node Type\":\"Limit\",\"Startup Cost\":7814.39,\"Total Cost\":7814.41,\"Plan Rows\":10,\"Plan Width\":15,\"Plans\":[{\"Node Type\":\"Sort\",\"Sort Key\":[\"(count(*)) DESC\"],\"Plan Rows\":46038,\"Plans\":[{\"Node Type\":\"Aggregate\",\"Strategy\":\"Hashed\",\"Group Key\":[\"t.name\"],\"Plans\":[{\"Node Type\":\"Hash Join\",\"Join Type\":\"Inner\",\"Hash Cond\":\"(t.id = c.t_id)\",\"Total Cost\":6128.95,\"Plan Rows\":46038,\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Relation Name\":\"t\",\"Alias\":\"t\",\"Total Cost\":3582,\"Plan Rows\":184153,\"Filter\":\"(cat > 3)\"},{\"Node Type\":\"Hash\",\"Plans\":[{\"Node Type\":\"Seq Scan\",\"Relation Name\":\"c\",\"Total Cost\":771,\"Plan Rows\":50000}]}]}]}]}]}}]"
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "mysql",
+  "thresholdRows": 100000,
+  "pages": [
+    {
+      "columns": ["QUERY PLAN"],
+      "rows": [
+        [
+          "{\"query_block\":{\"cost_info\":{\"query_cost\":\"10.00\"},\"table\":{\"table_name\":\"<derived2>\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":100,\"materialized_from_subquery\":{\"using_temporary_table\":true,\"query_block\":{\"table\":{\"table_name\":\"t\",\"access_type\":\"ALL\",\"rows_examined_per_scan\":500}}}}}}"
+        ]
+      ]
+    }
+  ]
+}

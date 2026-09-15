@@ -1,0 +1,77 @@
+{
+  "kind": "mariadb",
+  "root": {
+    "label": "Query",
+    "cost": {
+      "total": 2.22612952
+    },
+    "metrics": [],
+    "issues": [],
+    "children": [
+      {
+        "label": "Sort (filesort)",
+        "metrics": [],
+        "issues": [
+          {
+            "severity": "warn",
+            "code": "filesort",
+            "message": "a temporary sort file (filesort) was used — sort key t.`name`"
+          }
+        ],
+        "children": [
+          {
+            "label": "ref access on t",
+            "relation": "t",
+            "detail": "t.cat <=> 3",
+            "estimatedRows": 2000,
+            "cost": {
+              "total": 2.22612952
+            },
+            "metrics": [
+              {
+                "label": "cost",
+                "value": "2.22612952"
+              },
+              {
+                "label": "filtered",
+                "value": "100"
+              },
+              {
+                "label": "key_length",
+                "value": "5"
+              },
+              {
+                "label": "loops",
+                "value": "1"
+              },
+              {
+                "label": "ref",
+                "value": "const"
+              },
+              {
+                "label": "used_key_parts",
+                "value": "cat"
+              }
+            ],
+            "issues": [],
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  "estimatedRowsRead": 2000,
+  "nativeCost": {
+    "value": 2.22612952,
+    "unit": "mariadb-cost"
+  },
+  "issues": [
+    {
+      "severity": "warn",
+      "code": "filesort",
+      "message": "a temporary sort file (filesort) was used — sort key t.`name`"
+    }
+  ],
+  "overThreshold": false,
+  "raw": "{\"query_block\":{\"select_id\":1,\"cost\":2.22612952,\"nested_loop\":[{\"read_sorted_file\":{\"filesort\":{\"sort_key\":\"t.`name`\",\"table\":{\"table_name\":\"t\",\"access_type\":\"ref\",\"possible_keys\":[\"cat\"],\"key\":\"cat\",\"key_length\":\"5\",\"used_key_parts\":[\"cat\"],\"ref\":[\"const\"],\"loops\":1,\"rows\":2000,\"cost\":2.22612952,\"filtered\":100,\"attached_condition\":\"t.cat <=> 3\"}}}}]}}"
+}
