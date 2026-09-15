@@ -3453,6 +3453,120 @@ every `Set`, reappearing at its zod default on the very next read. `inlineBlame`
 alongside `wordWrap`/`rowColoring`, the only Go change this phase makes and the only reason it makes
 one.
 
+## Database MCP server (v1.7)
+
+### The server (M1)
+
+`internal/dbmcp` is a second, separate instance of the same pattern `internal/repomap` uses
+(`go-sdk/mcp`, loopback-only Streamable HTTP, `mcpauth` bearer token) — never a mode of the existing
+server. `DefaultPort` **8766**, adjacent to repo-map's 8765, with the same OS-assigned-ephemeral
+fallback on conflict (`http.go:37-43`). Two servers, not one, because they serve unrelated graphs
+with very different trust postures: repo-map is read-only by construction, this one can write and
+run DDL by design. One token file, `mcp-db-token.json`, no slug, because one instance exists per app
+process per `KIRA_HOME` (`internal/bridge/dbmcp.go:22-25`). Lifecycle is `bridge.DbMcpService` — the
+server is constructed and started when the Settings toggle turns on (or already is, at boot) and
+stopped when it turns off or the app quits; the `ApprovalBroker` is constructed once in `main.go`
+and **outlives** the server's own start/stop, so the boot-time event subscription stays valid across
+a restart.
+
+### The six tools
+
+`list_connections`, `list_children`, `describe_table`, `describe_schema`, `run_query`,
+`explain_query` (`server.go:202-225`). Metadata routes through the existing `internal/adapters`
+layer, and `run_query` through the same adapter query path the console uses
+(`adapterhost.Router.Execute`, exported for this at `ee98b26d`) — no second metadata or query path
+exists. `list_children` replaces the fixed-name `list_databases`/`list_schemas` pair
+`docs/v1.7/SPEC.md`'s M1 row names: the adapter layer's metadata primitive is one lazy level
+(`Adapter.Children`), and the levels differ per kind, so one tool returning the node's own `kind`
+carries strictly more information than a fixed pair of names could. M7's fix (`21e5d77d`) gates
+`list_children`, `describe_table` and `describe_schema` on read-mode deny, not only `run_query`;
+`list_connections` stays deliberately ungated, since its whole job is showing a caller a
+connection's configured permissions before it tries any of them.
+
+### Permissions and statement classification (M2)
+
+Three independent modes per connection — read, write, DDL — each *allow*, *deny* or *prompt*,
+defaulting to allow/prompt/deny (migration `0021`). `internal/adapters/classify.go`: `OpClass` is
+`read|write|ddl|unknown`, exposed through an **optional** `StatementClassifier` interface, not a
+required `Adapter` method — only the kinds with a console can answer it at all. `ClassifySQL` is
+shared by the five SQL kinds (postgres, mysql, mariadb, sqlite, clickhouse); Mongo and Redis reuse
+their own existing statement/command inspection; Kafka, S3 and SQS implement no classifier at all,
+so a call against them falls straight to `unknown` with no error. `run_query`'s gate order
+(`tools.go`): resolve → refuse before connecting if all three modes deny → clamp `maxRows` → connect
+→ classify → verdict (a deny refuses here, before any EXPLAIN work) → forced EXPLAIN when
+`mcp_auto_explain` is on → heavy check → at most one approval → execute → render. Two properties
+make it safe: a classifier error degrades to `unknown` and never bypasses the gate, and `unknown`
+resolves to the **strictest** of the three modes rather than through it. Two bypasses M6 and M7
+closed here are the kind of thing a future change re-opens: comment stripping had to become quote-
+and dollar-quote-aware (`accaadf8`), and MySQL/MariaDB's `/*! … */` executable-comment syntax had to
+stop being stripped as a real comment (`16ea4f89`).
+
+### The approval flow
+
+`internal/dbmcp/approval.go`'s `ApprovalBroker`, modeled on `internal/gitsock`'s own FIFO broker
+(`Broker`, `pairing.go`) — `ApprovalTimeout`/`maxPendingApprovals` reuse that broker's own bounds
+(`pairingTimeout`, its own queue cap): a client disconnect stops the wait via `ctx`, with no
+external expiry ticker. The UI is `workbench/DbMcpApprovalDialog.vue`, an always-mounted modal at
+`App.vue`'s root beside `GitPairingDialog.vue`. `Reason` is `"permission"` or `"heavy"`, and at most
+one prompt is raised per call when both apply — the stricter reason (permission) wins the label,
+with the plan evidence riding along.
+
+### EXPLAIN (M3)
+
+`internal/queryplan` is a **Go port** of the frontend EXPLAIN parser
+(`frontend/src/views/console/plan.ts`, `planModel.ts`, `planIssues.ts`, `planParsers/*.ts`), not a
+language bridge — every function is pure data transformation over the page each dialect's EXPLAIN
+returns, importing `internal/page` and stdlib only. The two implementations are pinned against the
+same fixture set, `tests/fixtures/explain-plans/*.{input,expected}.json`, read by both
+`internal/queryplan/parse_test.go` and `tests/unit/explain-plan.spec.ts`, so drift in either port
+fails on the same bytes. `explain_query` refuses anything but a leading SELECT/WITH
+(`queryplan.Explainable`) and refuses unsupported adapter kinds before connecting — postgres, mysql,
+mariadb, sqlite and clickhouse are the only kinds `queryplan.Supported` accepts. The SELECT/WITH
+restriction matters more than it looks: on ClickHouse, `EXPLAIN` can execute its own target on some
+forms, so letting a DDL/DML statement through this path would make it a write oracle.
+Auto-force-explain is its own `mcp_auto_explain` column (migration `0022`), deliberately **not** the
+existing human-facing `AutoExplain` console flag — one switch cannot honestly mean both "show a
+warning strip after the fact" and "block an AI client on a modal a human must answer." The heaviness
+threshold is the existing `advanced.expensiveQueryRows` setting (default 100,000), read fresh per
+call via `bridge/dbmcp.go`'s `explainThreshold`.
+
+### Masking (M5)
+
+`internal/mask`: six kinds, `name|email|text|number|date|redact`, and **no `id` kind** — the plan's
+own draft defined one (identifier columns, tag-only) but dropped it before implementation, since
+masking is opt-in per column and an internal id nobody marks sensitive is already untouched.
+Grapheme-aware via `github.com/rivo/uniseg`. `Stricter()` folds two rules conflicting on one column,
+each of the kind ranking and the `KeepHint`/`Correlate` flags resolving independently toward its own
+stricter value. The correlation tag is a keyed HMAC-SHA256 over the real value's raw UTF-8 bytes
+alone — no column or table identity mixed in, which is what lets two different columns holding the
+same real value (`customers.id` and `orders.customer_id`) tag identically for a join to survive —
+enough for cross-row and cross-join correlation, never enough to recover the value; `number` never
+correlates, since a bucket is many-to-one. The two-surface split is stated plainly in the code: the
+**MCP render path** (`internal/dbmcp/render.go`) is the security boundary, and the grid preview
+(`views/grid/maskPreview.ts`) is a *preview*, not a control — the user there already holds the real
+values. Both are pinned to each other by 66 shared Go-generated fixture pairs under
+`tests/fixtures/mask/` that `internal/mask/parity_test.go` and `tests/unit/mask-parity.spec.ts` both
+read. The refusals matter more than the transforms, since they are the non-obvious half: a
+document/stream page **refuses** rather than silently skips when rules exist; a masked column that
+is aliased or transformed is refused rather than returned unmasked (`0176243e`, re-opened and
+properly closed by `5ff00d57` for the duplicate-name case); a Redis key-value result is masked by
+real field name and refused otherwise, since some reply shapes carry no per-entry field name a rule
+could match (`640e5580`); and raw adapter error text is withheld on a masked connection, because a
+type-cast error routinely embeds the literal it failed on (`1ad96285`).
+
+### The UI surfaces
+
+`workbench/SettingsDialog.vue`'s `sections` array has **eight** entries, and **`'Database MCP'` is
+its own section**, listed after `'Code intelligence'` — it is *not* part of the Code intelligence
+tab. That section holds the enable toggle, the registration command and Install button, the
+token-expiry line, and a read-only **Exposed connections** glance (per-row read/write/DDL modes,
+auto-explain, and M5's masked-column count) with **no second editor**.
+`project/ConnectionDialog.vue`'s `DetailTab` is now **five** values — `'General' | 'Advanced' |
+'Pre-connect' | 'MCP' | 'Privacy'` — with all permission and description editing in **MCP** and all
+mask-rule editing in **Privacy**. The grid's own two surfaces are the header menu's `Mark column as
+PII` submenu (`views/grid/menu.ts:619`) and the toolbar preview toggle
+(`views/grid/DataToolbar.vue`'s `toolbar-mask-preview`).
+
 ## Renderer security surface
 
 **This section is much shorter than it was, and that is the finding, not an omission.** Most of what
