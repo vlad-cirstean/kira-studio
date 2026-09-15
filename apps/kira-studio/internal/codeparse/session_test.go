@@ -69,13 +69,22 @@ func TestReparseCancelledContextReturnsError(t *testing.T) {
 
 // TestParseConcurrentCancellationDoesNotCrash is Group 0's own repro shape: many goroutines
 // racing Parse/Reparse against contexts cancelled mid-flight, on a Session whose parser pool
-// recycles parsers across callers exactly as codeindex's sync workers do. Before the
-// ParseWithOptions fix, go-tree-sitter's deprecated ParseCtx spawned a goroutine that wrote to a
-// NULL CancellationFlag on cancellation — a guaranteed, uncatchable SIGSEGV that killed the whole
-// process (reproduced by the review round roughly 30-40% of the time under -count=15). There is
-// nothing to assert beyond "the test binary survives": a crash here means the process is gone,
-// not a failed assertion. Run with -race and a high -count (per CLAUDE.md's own instructions for
-// this package) for real confidence.
+// recycles parsers across callers exactly as codeindex's sync workers do. It guards two distinct
+// process-killing failure modes found in two consecutive phases:
+//
+//   - Before the ParseWithOptions fix (P69, b412286b), go-tree-sitter's deprecated ParseCtx
+//     spawned a goroutine that wrote to a NULL CancellationFlag on cancellation — a guaranteed,
+//     uncatchable SIGSEGV (reproduced by the review round roughly 30-40% of the time under
+//     -count=15).
+//   - After that fix but before P69c, a parse cancelled during tree-sitter's internal balancing
+//     phase left canceled_balancing set with no public API to clear it; checkinParser's own
+//     Reset() did not touch that flag, so the poisoned parser went back into the pool and the
+//     next parse on it hit ts_assert(self->finished_tree.ptr) and SIGABRT'd — deterministic given
+//     the cancellation phase, not a race (docs/v1.6/plans/P69c-codeparse-cancel-crash.md §2).
+//
+// There is nothing to assert beyond "the test binary survives": a crash here means the process is
+// gone, not a failed assertion. Run with -race and a high -count (per CLAUDE.md's own instructions
+// for this package) for real confidence.
 func TestParseConcurrentCancellationDoesNotCrash(t *testing.T) {
 	s := NewSession()
 	defer s.Close()
@@ -103,4 +112,82 @@ func TestParseConcurrentCancellationDoesNotCrash(t *testing.T) {
 		}(w)
 	}
 	wg.Wait()
+}
+
+// TestParseAfterCancelledParseIsCorrect catches what
+// TestParseConcurrentCancellationDoesNotCrash cannot: a resumed parse silently returning the
+// wrong tree instead of crashing (docs/v1.6/plans/P69c-codeparse-cancel-crash.md §2.5 — measured
+// 416/456 wrong-tree outcomes for the "drop Reset(), reuse anyway" fix that was rejected because
+// it trades a loud crash for silent corruption). It parses a small baseline file once to fix an
+// expected answer, sweeps a cancellation deadline across the full duration of a large parse so
+// cancellation lands everywhere from the first checkpoint through the balancing phase, and after
+// every single sweep step — cancelled or not — re-parses the baseline file on the same Session
+// and asserts it still gets the right answer.
+func TestParseAfterCancelledParseIsCorrect(t *testing.T) {
+	s := NewSession()
+	defer s.Close()
+
+	const smallPath = "small.go"
+	small := []byte("package small\n\nfunc Small() int {\n\treturn 1\n}\n\nfunc Other() int {\n\treturn 2\n}\n")
+
+	baseline, err := s.Parse(context.Background(), smallPath, small, Go)
+	if err != nil {
+		t.Fatalf("baseline Parse of the small file failed: %v", err)
+	}
+	if baseline.HasError {
+		t.Fatal("baseline parse of the small file has ERROR nodes — fixture is broken")
+	}
+	expectedSymbols := len(baseline.Symbols)
+	expectedLines := baseline.LineCount
+	if expectedSymbols == 0 {
+		t.Fatal("baseline parse found zero symbols — fixture is broken")
+	}
+
+	const largePath = "large.go"
+	large := largeGoSource(300)
+
+	start := time.Now()
+	if _, err := s.Parse(context.Background(), largePath, large, Go); err != nil {
+		t.Fatalf("timing Parse of the large file failed: %v", err)
+	}
+	fullDuration := time.Since(start)
+	if fullDuration <= 0 {
+		t.Fatal("timing Parse of the large file took no measurable time — cannot sweep a deadline across it")
+	}
+
+	const steps = 200
+	cancelled := 0
+	for i := 0; i < steps; i++ {
+		// Sweep the deadline from near-zero to the full uncancelled duration, so cancellation
+		// lands everywhere from the very first progress checkpoint (parse loop) through the
+		// balancing phase — not just "immediately", which would only exercise one phase.
+		timeout := time.Duration(i+1) * fullDuration / steps
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		_, parseErr := s.Parse(ctx, largePath, large, Go)
+		cancel()
+		if parseErr != nil {
+			cancelled++
+		}
+
+		// Regardless of whether this step actually cancelled, the pool must still hand back a
+		// clean parser: a clean Parse of the small baseline file on the SAME Session must match
+		// the fixed expected answer exactly. A mismatch here means a resumed parse silently
+		// returned the wrong (large file's, or a prior parse's) tree.
+		result, err := s.Parse(context.Background(), smallPath, small, Go)
+		if err != nil {
+			t.Fatalf("step %d/%d (timeout=%v): clean Parse of baseline file failed: %v", i, steps, timeout, err)
+		}
+		if result.HasError {
+			t.Fatalf("step %d/%d (timeout=%v): baseline parse has ERROR nodes — possible resumed-parse corruption", i, steps, timeout)
+		}
+		if len(result.Symbols) != expectedSymbols || result.LineCount != expectedLines {
+			t.Fatalf("step %d/%d (timeout=%v): baseline parse mismatch — got %d symbols/%d lines, want %d/%d — possible resumed-parse corruption",
+				i, steps, timeout, len(result.Symbols), result.LineCount, expectedSymbols, expectedLines)
+		}
+	}
+
+	if cancelled == 0 {
+		t.Fatal("zero of the sweep steps actually triggered a cancellation — test is not exercising the cancel-mid-parse path")
+	}
+	t.Logf("%d/%d sweep steps actually cancelled", cancelled, steps)
 }
