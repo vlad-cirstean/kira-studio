@@ -43,9 +43,10 @@ const props = defineProps<{
   /** This repository's own stored `kiraVersion.worktree.prepareScript` — "" means the feature is
    *  off, and the prepare phase is skipped entirely after a successful create. */
   prepareScript: string;
-  /** `capabilities.runPrepareScript` (D14) — VS Code's own workspace-trust gate, defence in depth.
+  /** `capabilities.runPrepareScript` (D14) — false for VS Code's own workspace-trust gate, or
+   *  because a host (Kira Studio's native window) refuses running arbitrary scripts outright.
    *  When false, the prepare phase still shows the script (transparency costs nothing) but offers
-   *  no way to run it. */
+   *  no way to run it — the message below stays host-neutral rather than naming either reason. */
   runPrepareScriptCapability: boolean;
 }>();
 
@@ -339,7 +340,7 @@ function onClose(): void {
         <p>This repository has a prepare script:</p>
         <pre class="kv-worktree-script">{{ prepareScript }}</pre>
         <p v-if="!runPrepareScriptCapability" class="kv-dialog-error">
-          Running scripts is disabled in this workspace (untrusted).
+          Running scripts is disabled here.
         </p>
         <label v-else class="kv-dialog-field--inline">
           <input type="checkbox" v-model="runChecked" />

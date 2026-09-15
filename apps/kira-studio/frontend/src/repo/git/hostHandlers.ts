@@ -151,7 +151,11 @@ type HostHandler<K extends RequestKey> = (
  *  default for a method this file has simply never heard of, never a silently dropped one. */
 export type HostHandlers = Partial<{ [K in RequestKey]: HostHandler<K> }>;
 
-function readOnlyRefusal<K extends RequestKey>(method: K, reason: string): HostHandler<K> {
+// 8b (P68 review): named readOnlyRefusal until this rename — a boundary (a3753dd5 deliberately
+// purged "read-only" wording from gitstream.go's own comments) that no longer applies to any of
+// this function's 4 call sites below, each of which refuses for an unrelated reason (no native
+// caller, needs a merge editor, no native meaning).
+function refuseLocally<K extends RequestKey>(method: K, reason: string): HostHandler<K> {
   return async () => {
     throw new Error(`hostHandlers: ${method} ${reason}`);
   };
@@ -368,20 +372,20 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
 
     // detailActions.ts D12/G21 D12: no caller remains for editor.goToFile at all — a throw is
     // honest and costs nothing (§5's own table).
-    'editor.goToFile': readOnlyRefusal('editor.goToFile', 'has no native caller'),
+    'editor.goToFile': refuseLocally('editor.goToFile', 'has no native caller'),
 
     // P67e: this stream's own remote op now needs to answer git's own askpass prompts for
     // real (state/gitCredential.ts + workbench/GitCredentialDialog.vue) — the refusal here is
     // gone, and layer 1 (gitstream.go's allowedMethods) now forwards this to Go.
-    'editor.resolveConflict': readOnlyRefusal(
+    'editor.resolveConflict': refuseLocally(
       'editor.resolveConflict',
       'needs a merge editor this window does not have; resolve the files in your own editor, then Continue',
     ),
-    'settings.setGitPath': readOnlyRefusal(
+    'settings.setGitPath': refuseLocally(
       'settings.setGitPath',
       "writes the global git path, which this app's own Settings dialog already owns",
     ),
-    'worktree.openWindow': readOnlyRefusal(
+    'worktree.openWindow': refuseLocally(
       'worktree.openWindow',
       'has no native meaning: there is no second window to open a worktree into',
     ),

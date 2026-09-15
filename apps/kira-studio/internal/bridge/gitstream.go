@@ -53,8 +53,9 @@ func newStreamConnID() gitsession.ConnID {
 //
 //   - worktree.prepare/worktree.cancelPrepare — RunPrepare executes a user-stored shell command
 //     with no human-approval gate anywhere in this codebase (its only check is "does this match
-//     what's currently stored"); a security boundary, not a file-editing one. Hidden client-side by
-//     capabilities.runPrepareScript: false (hostHandlers.ts).
+//     what's currently stored"); a security boundary, not a file-editing one. Gated client-side by
+//     capabilities.runPrepareScript: false (hostHandlers.ts) — the flow stays reachable, WorktreeDialog
+//     just refuses to run the script while the flag is false, rather than hiding the affordance.
 //   - settings.setGitPath — writes the global git path, which this app's own Settings dialog
 //     already owns; no git-ui affordance calls it at all (it is the VS Code extension's own
 //     one-time migration routine).
