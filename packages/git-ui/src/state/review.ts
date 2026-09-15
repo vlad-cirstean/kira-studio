@@ -80,6 +80,13 @@ export class ReviewSessionState {
    *  every expanded row's `DetailActions` writes here rather than each owning its own region. */
   readonly announcement: ShallowRef<string> = shallowRef('');
   readonly expandedShas: ShallowRef<ReadonlySet<string>> = shallowRef(new Set());
+  /** P75 §1.2: the row-level action bundle, one per targeted session rather than one per expanded
+   *  row — every bundle `#createRowActions` ever built closed over `repoId` and nothing else, so
+   *  N bundles for N expanded rows were N identical closures. `undefined` until `setTarget`, which
+   *  is what let a collapsed row's own "Open all changes" reach nothing at all (it read its whole
+   *  bundle off `expansionFor(sha)`, `undefined` before the row was ever expanded). Set by
+   *  `setTarget`, cleared by `clearTarget`. */
+  readonly rowActions: ShallowRef<DetailActions | undefined> = shallowRef(undefined);
 
   readonly #packed: PackedStreamState;
   readonly #bridge: BridgeClient;
@@ -138,6 +145,7 @@ export class ReviewSessionState {
     this.#clearExpansions();
     this.#packed.reset();
     this.repoId.value = repoId;
+    this.rowActions.value = this.#createRowActions(repoId);
     this.branch.value = branch;
     this.#base = undefined;
     this.resolution.value = undefined;
@@ -181,6 +189,7 @@ export class ReviewSessionState {
     this.pane.value = 'commits';
     this.phase.value = 'idle';
     this.branch.value = undefined;
+    this.rowActions.value = undefined;
   }
 
   /** The header picker's override (§6.8): re-resolves **with** an explicit base, exactly the
@@ -259,13 +268,14 @@ export class ReviewSessionState {
    *  session"). No-op with no active repo. */
   expand(sha: string): void {
     const repoId = this.repoId.value;
-    if (!repoId) return;
+    const actions = this.rowActions.value;
+    if (!repoId || !actions) return;
     if (this.expandedShas.value.has(sha)) return;
     this.expandedShas.value = new Set(this.expandedShas.value).add(sha);
     if (!this.#expansions.has(sha)) {
       const detail = new DetailState(this.#bridge);
       detail.setRepoId(repoId);
-      this.#expansions.set(sha, { detail, actions: this.#createRowActions(repoId) });
+      this.#expansions.set(sha, { detail, actions });
       detail.select(sha);
     }
   }

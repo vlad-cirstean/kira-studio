@@ -303,6 +303,11 @@ function onSelectComment(path: string): void {
   reviewFiles.value?.selectFile(path);
 }
 
+// P75 §1.2: the Commits pane's own row-action bundle — a plain computed (not the raw
+// `review.rowActions` ref) so the template can narrow it once, the same seam `filesActions`
+// below already uses for its own `DetailActions | undefined`.
+const rowActions = computed<DetailActions | undefined>(() => review.value?.rowActions.value);
+
 // The Files pane's own actions bundle — "Open in editor"/"Go to file" are wired for real (the
 // same bridge calls createDetailActions makes) but ReviewFilesPane.vue always disables both
 // capabilities for its own DiffView, since neither has an honest meaning against a branch-review
@@ -869,7 +874,9 @@ watch(
           “{{ review.branch.value }}” adds no commits to “{{ review.resolution.value?.base }}”.
         </p>
 
-        <template v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits'">
+        <template
+          v-else-if="review.phase.value === 'listing' && review.pane.value === 'commits' && rowActions"
+        >
           <div
             v-if="review.staleReview.value"
             class="kv-review-stale-banner"
@@ -900,6 +907,7 @@ watch(
               :store="review.store"
               :expanded="review.expandedShas.value.has(sha)"
               :expansion="review.expansionFor(sha)"
+              :actions="rowActions"
               :focused="index === focusedRow"
               :list-mode="listMode"
               :filter="filter"
