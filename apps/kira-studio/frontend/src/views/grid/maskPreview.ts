@@ -3,8 +3,10 @@
 // Framing, stated once (§6.1): the grid toggle is a preview, not a control. The security boundary
 // is the MCP path (internal/dbmcp/render.go), where the user is not the adversary. This module
 // exists so a human can see what an AI client sees, over their own data, on their own machine —
-// where they already hold the real values. That is why search and clipboard (elsewhere) stay over
-// raw values, and why a cache miss here degrades to *less* information, never a leaked one.
+// where they already hold the real values. Find/search (grid/search.ts) stays over raw values;
+// copy-column-values follows display instead (SlickGridHost.vue's own columnValuesFor, §6.6) and
+// masks when preview is on. Either way, a cache miss here degrades to *less* information, never a
+// leaked one.
 
 import type { MaskingRule } from '@shared/domain/mask';
 import { applyVisible, tag } from '@shared/domain/mask';
