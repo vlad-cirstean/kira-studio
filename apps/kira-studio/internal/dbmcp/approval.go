@@ -3,6 +3,7 @@ package dbmcp
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -111,6 +112,20 @@ type ApprovalBroker struct {
 	queue []*approvalEntry
 	byID  map[string]*approvalEntry
 
+	// emitSeq assigns each snapshot taken under mu a strictly increasing sequence number, read and
+	// incremented only under mu — emitOrdered's own guard (M7 finding) against publishing a stale
+	// snapshot after a newer one already went out. Request/resolve/AbandonAll each snapshot, then
+	// unlock, then Emit — notify.Emitter's own "never hold your own mutex across Emit" rule — so
+	// two of them can interleave their post-unlock Emits in the opposite order from the
+	// mu-protected state changes that produced them (two run_query calls resolving concurrently,
+	// say), leaving a subscriber holding an already-superseded snapshot.
+	emitSeq uint64
+	// lastEmitted is the highest sequence number actually handed to emitter.Emit — CAS-guarded
+	// rather than mu-guarded, so emitOrdered never reacquires mu and never risks the reentrancy
+	// hazard mu avoids by design in the first place (a subscriber callback that calls back into the
+	// broker while Emit is running).
+	lastEmitted atomic.Uint64
+
 	emitter notify.Emitter[ApprovalSnapshot]
 }
 
@@ -137,6 +152,28 @@ func (b *ApprovalBroker) snapshotLocked() ApprovalSnapshot {
 	return ApprovalSnapshot{Pending: &head, Queued: len(b.queue)}
 }
 
+// nextSeqLocked assigns and returns the next emit sequence number (ApprovalBroker.emitSeq's own
+// doc comment). Caller holds b.mu.
+func (b *ApprovalBroker) nextSeqLocked() uint64 {
+	b.emitSeq++
+	return b.emitSeq
+}
+
+// emitOrdered emits snap unless a later-sequenced snapshot has already gone out. Called with b.mu
+// already released, matching notify.Emitter.Emit's own contract.
+func (b *ApprovalBroker) emitOrdered(seq uint64, snap ApprovalSnapshot) {
+	for {
+		last := b.lastEmitted.Load()
+		if seq <= last {
+			return // superseded — a snapshot reflecting this state and more already went out
+		}
+		if b.lastEmitted.CompareAndSwap(last, seq) {
+			break
+		}
+	}
+	b.emitter.Emit(snap)
+}
+
 // Request enqueues req (minting its RequestID, EnqueuedAt and ExpiresAt) and blocks the calling
 // goroutine until it is approved, denied, its deadline elapses, or ctx is done — whichever comes
 // first. Past maxPendingApprovals it returns ApprovalDenied immediately rather than queueing.
@@ -154,12 +191,13 @@ func (b *ApprovalBroker) Request(ctx context.Context, req ApprovalRequest) Appro
 	b.queue = append(b.queue, entry)
 	b.byID[entry.req.RequestID] = entry
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	// Every enqueue emits (gitsock's G31 round-2 finding #6): a second/third request queueing
 	// behind an already-presented head still changes Queued, and any subscriber's "N waiting" line
 	// must track that even though the presented head is unchanged.
-	b.emitter.Emit(snap)
+	b.emitOrdered(seq, snap)
 
 	timer := time.NewTimer(time.Until(entry.req.ExpiresAt))
 	defer timer.Stop()
@@ -205,10 +243,11 @@ func (b *ApprovalBroker) resolve(requestID string, outcome ApprovalOutcome) Appr
 	}
 	b.removeLocked(entry)
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	entry.result <- outcome
-	b.emitter.Emit(snap)
+	b.emitOrdered(seq, snap)
 	return ApprovalActionResolved
 }
 
@@ -222,13 +261,14 @@ func (b *ApprovalBroker) AbandonAll() {
 	b.queue = nil
 	b.byID = map[string]*approvalEntry{}
 	snap := b.snapshotLocked()
+	seq := b.nextSeqLocked()
 	b.mu.Unlock()
 
 	for _, entry := range entries {
 		entry.result <- ApprovalAbandoned
 	}
 	if len(entries) > 0 {
-		b.emitter.Emit(snap)
+		b.emitOrdered(seq, snap)
 	}
 }
 
