@@ -96,6 +96,7 @@ function onClearFile(index: number): void {
       <div v-if="row.kind === 'text'" class="field-cell">
         <AutocompleteField
           v-if="variables"
+          grow
           :model-value="row.value"
           placeholder="value"
           data-testid="http-formdata-value"
@@ -107,6 +108,7 @@ function onClearFile(index: number): void {
         />
         <TextField
           v-else
+          grow
           :model-value="row.value"
           placeholder="value"
           data-testid="http-formdata-value"

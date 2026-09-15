@@ -73,6 +73,9 @@ const props = withDefaults(
      *  is every call site but the URL/header-value fields (item 10's hover). No hover machinery
      *  (listener, timer, panel) exists at all when this is absent. */
     hoverAt?: (text: string, offset: number) => string[] | null;
+    /** P71 §8.2: TextField.vue's own opt-in 4-row auto-grow — the control becomes a `<textarea>`.
+     *  Off by default: every existing call site renders byte-identically. */
+    grow?: boolean;
   }>(),
   { candidates: () => [] },
 );
@@ -147,7 +150,7 @@ function onPaste(e: ClipboardEvent): void {
 
 const listId = `ac-${Math.random().toString(36).slice(2)}`;
 
-const inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 const open = ref(false);
 const activeIndex = ref(0);
 const wordStart = ref(0);
@@ -183,7 +186,7 @@ const filtered = computed(() =>
     : rankCandidates(resolvedCandidates.value, currentWord.value),
 );
 
-function recompute(el: HTMLInputElement): void {
+function recompute(el: HTMLInputElement | HTMLTextAreaElement): void {
   const cursor = el.selectionStart ?? el.value.length;
   const tokenizer = props.tokenAt ?? tokenAt;
   const token = tokenizer(el.value, cursor);
@@ -208,7 +211,7 @@ function positionList(): void {
 }
 
 function onInput(e: Event): void {
-  const el = e.target as HTMLInputElement;
+  const el = e.target as HTMLInputElement | HTMLTextAreaElement;
   emit('update:modelValue', el.value);
   forceAll.value = false;
   recompute(el);
@@ -224,12 +227,12 @@ function onInput(e: Event): void {
 // state onKeydown just set.
 function onClick(e: Event): void {
   if (!open.value) return;
-  recompute(e.target as HTMLInputElement);
+  recompute(e.target as HTMLInputElement | HTMLTextAreaElement);
   positionList();
 }
 function onKeyup(e: KeyboardEvent): void {
   if (!open.value || NAV_KEYS.has(e.key)) return;
-  recompute(e.target as HTMLInputElement);
+  recompute(e.target as HTMLInputElement | HTMLTextAreaElement);
 }
 
 function accept(completion: Completion): void {
@@ -256,16 +259,16 @@ function onKeydown(e: KeyboardEvent): void {
   // auto-closes it (theme/wrapSelection.ts, the two can never both fire for one keystroke) —
   // rather than running through the completion machinery below; onInput's own listener picks up
   // the synthetic 'input' event either one dispatches, same as any other edit.
-  const before = (e.target as HTMLInputElement).value;
+  const before = (e.target as HTMLInputElement | HTMLTextAreaElement).value;
   wrapSelectionOnType(e);
   autoClosePairsOnType(e);
-  if ((e.target as HTMLInputElement).value !== before) return;
+  if ((e.target as HTMLInputElement | HTMLTextAreaElement).value !== before) return;
   // Ctrl+Space / Cmd+Space: explicit "show me everything", matching completionKeymap's own
   // binding (docs/v1/plans/P18-autocomplete.md realities #8) so the console and these plain fields
   // share one muscle memory.
   if (e.key === ' ' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
-    recompute(e.target as HTMLInputElement);
+    recompute(e.target as HTMLInputElement | HTMLTextAreaElement);
     forceAll.value = true;
     open.value = filtered.value.length > 0;
     if (open.value) positionList();
@@ -297,6 +300,8 @@ function onKeydown(e: KeyboardEvent): void {
     }
   }
   if (e.key === 'Enter') {
+    // P71 §8: no newline is ever inserted under `grow` — growth comes from soft wrapping alone.
+    if (props.grow) e.preventDefault();
     open.value = false;
     emit('enter');
   } else if (e.key === 'Escape') emit('escape');
@@ -310,8 +315,13 @@ function onKeydown(e: KeyboardEvent): void {
 // the exact same offset as the invisible real text sitting on top of it.
 const overlayRootRef = ref<HTMLElement | null>(null);
 function onInputScroll(e: Event): void {
-  if (overlayRootRef.value)
-    overlayRootRef.value.scrollLeft = (e.target as HTMLInputElement).scrollLeft;
+  // P71 §8.2: scrollTop mirrored too, alongside scrollLeft — a no-op for a plain single-line
+  // input (scrollTop is always 0 there) and what keeps the overlay panned to the same offset as a
+  // `grow` textarea's own internal vertical scroll past 4 rows.
+  const el = e.target as HTMLInputElement | HTMLTextAreaElement;
+  if (!overlayRootRef.value) return;
+  overlayRootRef.value.scrollLeft = el.scrollLeft;
+  overlayRootRef.value.scrollTop = el.scrollTop;
 }
 
 // P15b D3(c): a field-local floating tooltip for the token under the pointer, built on
@@ -430,10 +440,10 @@ onBeforeUnmount(() => {
 <template>
   <span
     class="p-input autocomplete-field"
-    :class="{ 'is-invalid': invalid }"
+    :class="{ 'is-invalid': invalid, 'is-grow': grow }"
   >
     <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
-    <span class="input-wrap">
+    <span class="input-wrap" :data-value="modelValue">
       <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
            behind the real input rather than the input itself (P60a §5: span-painted text, not a
            mounted editor). `overlayHtml` is built entirely by `paintOverlayHtml` — every character
@@ -447,7 +457,34 @@ onBeforeUnmount(() => {
         aria-hidden="true"
         v-html="overlayHtml"
       ></div>
+      <textarea
+        v-if="grow"
+        ref="inputRef"
+        v-bind="$attrs"
+        rows="1"
+        wrap="soft"
+        :value="modelValue"
+        :placeholder="placeholder"
+        :class="{ 'has-overlay': showOverlay }"
+        autocomplete="off"
+        spellcheck="false"
+        role="combobox"
+        aria-autocomplete="list"
+        :aria-expanded="open"
+        :aria-controls="listId"
+        :aria-activedescendant="open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined"
+        @input="onInput"
+        @paste="onPaste"
+        @click="onClick"
+        @keyup="onKeyup"
+        @keydown="onKeydown"
+        @blur="onBlur"
+        @scroll="onInputScroll"
+        @mousemove="onInputMouseMove"
+        @mouseleave="closeHover"
+      />
       <input
+        v-else
         ref="inputRef"
         v-bind="$attrs"
         :value="modelValue"
@@ -562,6 +599,15 @@ onBeforeUnmount(() => {
 .highlight-overlay :deep(.kira-ed-var-unknown) {
   color: var(--kira-warn);
   text-decoration: underline wavy var(--kira-warn);
+}
+
+/* P71 §8.2: the overlay must wrap on exactly the same boundaries as a `grow` textarea — same font,
+   same width, same white-space/overflow-wrap — and top-align rather than vertically centre a
+   single line. */
+.autocomplete-field.is-grow .highlight-overlay {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* The real input stays the only interactive/focusable/selectable element — its own text is

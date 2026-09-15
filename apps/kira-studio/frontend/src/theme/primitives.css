@@ -172,7 +172,8 @@
 .p-input.is-invalid {
   border-color: var(--kira-error);
 }
-.p-input input {
+.p-input input,
+.p-input textarea {
   background: none;
   border: none;
   outline: none;
@@ -181,8 +182,52 @@
   min-width: 0;
   flex: 1;
 }
+/* P71 §8: opt-in 4-row auto-grow (TextField.vue/AutocompleteField.vue's own `grow` prop) — a CSS
+   grid replica sized by the same text, clamped to 4 lines, with no JS height write per keystroke.
+   `field-sizing: content` is Chromium-only (this app ships on WebKitGTK/WKWebView too) and a JS
+   autosize library writes an inline height per input event across a table that can hold dozens of
+   rows — this is ~15 lines of CSS with no JS, no observer, no per-keystroke layout write. Placed
+   after the plain `.p-input input/textarea` rule above so its higher-specificity selectors sort in
+   ascending order, not because it depends on that rule's own properties. */
+.p-input.is-grow {
+  --grow-lh: 1.45;
+  --grow-rows: 4;
+  height: auto;
+  align-items: flex-start;
+  line-height: var(--grow-lh);
+  /* One row renders at exactly --kira-control-h and vertically centred, so a filled row sits at
+     the same height as every control beside it; each further row adds exactly one line box.
+     max(0px, …) because both the font size and the control height are user-settable tokens. */
+  padding-block: max(
+    0px,
+    calc((var(--kira-control-h) - 2 * var(--kira-border-width) - var(--grow-lh) * 1em) / 2)
+  );
+}
+.p-input.is-grow .input-wrap {
+  display: grid;
+}
+/* The sizing replica: same text, same font, same wrapping, invisible. Its own max-height is the
+   4-row clamp — clamping the replica (not the box) is what keeps the grid track itself at most
+   four lines, so the stretched textarea inside it scrolls rather than overflowing. The trailing
+   space keeps a value ending in a space from collapsing the last line. */
+.p-input.is-grow .input-wrap::after {
+  content: attr(data-value) " ";
+  grid-area: 1 / 1;
+  visibility: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(var(--grow-rows) * var(--grow-lh) * 1em);
+  overflow: hidden;
+  font: inherit;
+}
+.p-input.is-grow .input-wrap > textarea {
+  grid-area: 1 / 1;
+  resize: none;
+  overflow-y: auto;
+}
 .p-input .ph,
-.p-input input::placeholder {
+.p-input input::placeholder,
+.p-input textarea::placeholder {
   /* P16 D8: was --kira-fg-disabled (2.55:1 on --kira-bg-input — the worst-contrast text in the
      app, and this is neither a disabled control nor the reserved-word set D9 renames — a
      placeholder/prefix is the most-read low-contrast text in both modes). --kira-fg-muted clears
