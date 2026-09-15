@@ -4,8 +4,10 @@ import { control } from '../bridge/control';
 import { formatBytes } from '../format';
 import { appMetricsState } from '../state/appMetrics';
 import { appUpdateState } from '../state/appUpdate';
+import { blameStatusState } from '../state/blameStatus';
 import { cacheStatsState } from '../state/cacheStats';
 import CodiconIcon from '../theme/CodiconIcon.vue';
+import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 import { engineState } from './state/engine';
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
@@ -65,6 +67,19 @@ const updateTooltip = computed(
 function onOpenReleasePage(): void {
   void control.updateOpenReleasePage().catch(() => {});
 }
+
+// P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
+// is the extension's own choice; this bar hides items with nothing to say instead (app-metrics,
+// cache-size both do the same), so absent is the consistent answer here.
+const blame = computed(() =>
+  blameStatusState.status.kind === 'resolved' ? blameStatusState.status : null,
+);
+const blameText = computed(() => (blame.value ? blameLineText(blame.value) : ''));
+const blameTooltip = computed(() => (blame.value ? blameLineTooltip(blame.value).join(' — ') : ''));
+
+function onRevealBlameCommit(): void {
+  if (blame.value) blameStatusState.reveal?.(blame.value.sha);
+}
 </script>
 
 <template>
@@ -76,6 +91,18 @@ function onOpenReleasePage(): void {
       <span class="p-status" data-testid="caret-status">
         <span class="mono xs muted">no selection</span>
       </span>
+      <!-- P76 §5.2: a sibling fact, not the caret-status slot above — that readout stays unwired. -->
+      <button
+        v-if="blame"
+        class="p-status blame"
+        data-testid="blame-status"
+        :disabled="!blameStatusState.reveal"
+        v-tooltip="blameTooltip"
+        @click="onRevealBlameCommit"
+      >
+        <CodiconIcon name="git-commit" :size="13" />
+        <span class="blame-text">{{ blameText }}</span>
+      </button>
     </div>
 
     <div class="side">
@@ -152,5 +179,23 @@ function onOpenReleasePage(): void {
 }
 .update:hover {
   color: var(--kira-fg);
+}
+
+/* .blame is a <button> for the same reason .update is (activated -> keyboard focus/Enter/Space
+   come free); its UA chrome reset is that rule's, reused. Unlike .update, no accent color — a
+   blame readout is informational, not something needing attention. */
+.blame {
+  background: none;
+  font: inherit;
+  color: var(--kira-fg);
+}
+.blame:disabled {
+  cursor: default;
+}
+.blame-text {
+  max-width: 48ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
