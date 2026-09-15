@@ -49,6 +49,13 @@ var sqlReadKeywords = map[string]bool{
 	"SHOW": true, "DESCRIBE": true, "DESC": true, "VALUES": true, "TABLE": true,
 }
 
+// sqlAnalyzeKeyword and sqlIntoKeyword are single-word sqlWordBoundaryContainsAny vocabularies,
+// package-level for the same reason as sqlWriteKeywords/sqlDDLKeywords above: a literal
+// map[string]bool{...} at each call site allocated fresh on every ExplainAnalyzeTarget/
+// ClassifySQL call.
+var sqlAnalyzeKeyword = map[string]bool{"ANALYZE": true}
+var sqlIntoKeyword = map[string]bool{"INTO": true}
+
 // sqlWordBoundaryContainsAny reports whether any upper-cased word in s (split on non-word runes)
 // is a key of words — used where a keyword can appear anywhere in the statement (WITH bodies,
 // SELECT ... INTO), not just leading.
@@ -105,7 +112,7 @@ func ExplainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool)
 		}
 		options := string(r[1:end])
 		target = strings.TrimSpace(string(r[end+1:]))
-		return sqlWordBoundaryContainsAny(options, map[string]bool{"ANALYZE": true}), target, true
+		return sqlWordBoundaryContainsAny(options, sqlAnalyzeKeyword), target, true
 	}
 	fields := strings.Fields(rest)
 	if len(fields) > 0 && strings.EqualFold(fields[0], "ANALYZE") {
@@ -142,7 +149,7 @@ func ClassifySQL(statement string) OpClass {
 	switch {
 	case keyword == "SELECT":
 		// SELECT ... INTO creates a table on Postgres and writes a file on MySQL.
-		if sqlWordBoundaryContainsAny(stripped, map[string]bool{"INTO": true}) {
+		if sqlWordBoundaryContainsAny(stripped, sqlIntoKeyword) {
 			return ClassWrite
 		}
 		return ClassRead
