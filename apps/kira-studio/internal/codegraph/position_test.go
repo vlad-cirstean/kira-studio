@@ -155,6 +155,82 @@ func TestDefinitionOfGoTypeSelfCapture(t *testing.T) {
 	}
 }
 
+// TestResolveHitPointRowNameFallbackPrecedence is P69d §A.4 commit 1's own boundary rule:
+// resolveHit tries an exact Point match first (unchanged), then falls back to a row-scoped
+// match (symbol before reference, both filtered to Query.Name when the caller gave one), then
+// falls through to a bare Name hint — the shape repomap/locator.go's file+line locator produces,
+// which almost never has a real byte column to pin an exact Point match to (§A.2-a).
+func TestResolveHitPointRowNameFallbackPrecedence(t *testing.T) {
+	// Row 0: two symbols share a row — "Alpha" at columns [5,10), "Beta" at columns [20,24).
+	alpha := codeindex.SymbolRow{
+		Kind: "function", Name: "Alpha",
+		StartByte: 0, EndByte: 30, StartRow: 0, StartColumn: 0, EndRow: 0, EndColumn: 30,
+		NameStartByte: 5, NameEndByte: 10, NameStartRow: 0, NameStartColumn: 5,
+	}
+	beta := codeindex.SymbolRow{
+		Kind: "function", Name: "Beta",
+		StartByte: 31, EndByte: 60, StartRow: 0, StartColumn: 31, EndRow: 0, EndColumn: 60,
+		NameStartByte: 20, NameEndByte: 24, NameStartRow: 0, NameStartColumn: 20,
+	}
+	symbols := []codeindex.SymbolRow{alpha, beta}
+
+	// Row 1: one reference, "Gamma" at columns [10,15) — no symbol shares this row, so the row
+	// fallback's own symbol-before-reference precedence can only be exercised on row 0 above; this
+	// is the reference arm on its own.
+	gammaRef := codeindex.ReferenceRow{
+		Kind: "call", Name: "Gamma",
+		StartByte: 200, EndByte: 220, StartRow: 1, StartColumn: 0,
+		NameStartByte: 200, NameEndByte: 205, NameStartRow: 1, NameStartColumn: 10,
+	}
+	references := []codeindex.ReferenceRow{gammaRef}
+
+	t.Run("exact point match wins outright — no row fallback needed", func(t *testing.T) {
+		hit := resolveHit(Query{Point: &Point{Row: 0, Column: 7}}, symbols, references)
+		if !hit.Ok || hit.Sym == nil || hit.Sym.Name != "Alpha" {
+			t.Fatalf("want Alpha (exact point hit), got %+v", hit)
+		}
+	})
+
+	t.Run("off-by-one past the name span: point misses, row fallback resolves by name", func(t *testing.T) {
+		// Column 10 is Alpha's own NameEndByte — excluded by symbolByNamePoint's half-open range
+		// (the identical boundary position_test.go's own boundaries subtest covers for a
+		// reference), so the exact point path misses entirely and the row fallback takes over,
+		// pinned to Beta by the caller's own Name hint.
+		hit := resolveHit(Query{Point: &Point{Row: 0, Column: 10}, Name: "Beta"}, symbols, references)
+		if !hit.Ok || hit.Sym == nil || hit.Sym.Name != "Beta" {
+			t.Fatalf("want Beta (row fallback, name-pinned), got %+v", hit)
+		}
+	})
+
+	t.Run("row fallback with no Name hint picks the leftmost match on the row", func(t *testing.T) {
+		hit := resolveHit(Query{Point: &Point{Row: 0, Column: 10}}, symbols, references)
+		if !hit.Ok || hit.Sym == nil || hit.Sym.Name != "Alpha" {
+			t.Fatalf("want Alpha (leftmost on row 0, no Name pin), got %+v", hit)
+		}
+	})
+
+	t.Run("row fallback reaches a reference when no symbol shares the row", func(t *testing.T) {
+		hit := resolveHit(Query{Point: &Point{Row: 1, Column: 3}}, symbols, references)
+		if !hit.Ok || hit.Ref == nil || hit.Ref.Name != "Gamma" {
+			t.Fatalf("want Gamma (row fallback, reference arm), got %+v", hit)
+		}
+	})
+
+	t.Run("point and row both miss: falls through to the bare Name hint", func(t *testing.T) {
+		hit := resolveHit(Query{Point: &Point{Row: 5, Column: 0}, Name: "Delta"}, symbols, references)
+		if !hit.Ok || hit.Name != "Delta" || hit.Sym != nil || hit.Ref != nil {
+			t.Fatalf("want a bare name-hint fallback, got %+v", hit)
+		}
+	})
+
+	t.Run("point and row both miss, no Name given: resolves to nothing", func(t *testing.T) {
+		hit := resolveHit(Query{Point: &Point{Row: 5, Column: 0}}, symbols, references)
+		if hit.Ok {
+			t.Fatalf("want no hit, got %+v", hit)
+		}
+	})
+}
+
 // TestLocateThroughStore exercises the same resolveHit path end to end through a real
 // codeindex.Store (§11's own seeding convention): one file carrying a script-setup block's own
 // symbol (Point lookup into a block-scoped definition) and a template region with no rows at all
