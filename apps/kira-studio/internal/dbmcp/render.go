@@ -180,6 +180,22 @@ type tabularColumn struct {
 // client might read as "planned, found nothing" (M3 §5.3).
 type planEnvelope struct {
 	Plan *planSummary `json:"plan,omitempty"`
+	// AdditionalStatementResults/Note are withAdditionalStatementResultsNote's own fields (M7
+	// finding #17), set directly here rather than through a marshal/unmarshal/remarshal round trip
+	// — omitempty keeps run_query's ordinary (single-statement) response shape byte-for-byte
+	// unchanged from before this field existed.
+	AdditionalStatementResults int    `json:"additionalStatementResults,omitempty"`
+	Note                       string `json:"note,omitempty"`
+}
+
+// setAdditionalStatementResultsNote is withAdditionalStatementResultsNote's own per-result setter,
+// promoted to every concrete *Result type below through planEnvelope's embedding.
+func (e *planEnvelope) setAdditionalStatementResultsNote(extraPages int) {
+	e.AdditionalStatementResults = extraPages
+	e.Note = fmt.Sprintf(
+		"this call ran %d additional statement(s) beyond the one shown here; only the first statement's result is returned",
+		extraPages,
+	)
 }
 
 type tabularResult struct {
@@ -420,23 +436,34 @@ func renderPage(p page.Page, maxRows int, plan *planSummary, mk *maskset, statem
 // produced but this call did not render (finding #12, M6) — e.g. `args.SQL` held more than one
 // `;`-separated statement, and only the first one's page is ever projected. Without this, extra
 // statements ran (a write among them, possibly) with no sign in the response that anything but
-// the shown result happened. Round-trips through JSON rather than adding the field to every
-// concrete result type, so run_query's ordinary (single-page) shape is untouched.
+// the shown result happened.
+//
+// Sets planEnvelope's own fields directly on rendered's concrete type (M7 finding #17) instead of
+// a marshal/unmarshal/remarshal round trip through a generic map: the previous shape serialized
+// the whole result three times over — once here to get JSON bytes, once back into a map to add two
+// fields, and a third time in jsonResult's own final Marshal — real, avoidable cost proportional to
+// the result's own size (a run_query response can carry up to 2000 rows). A type switch over the
+// four concrete result types renderPage can produce replaces that with one direct field write.
 func withAdditionalStatementResultsNote(rendered any, extraPages int) any {
-	encoded, err := json.Marshal(rendered)
-	if err != nil {
+	switch r := rendered.(type) {
+	case tabularResult:
+		r.setAdditionalStatementResultsNote(extraPages)
+		return r
+	case documentResult:
+		r.setAdditionalStatementResultsNote(extraPages)
+		return r
+	case keyValueResult:
+		r.setAdditionalStatementResultsNote(extraPages)
+		return r
+	case streamResult:
+		r.setAdditionalStatementResultsNote(extraPages)
+		return r
+	default:
+		// Unreached in practice — renderPage's own return type is always one of the four above —
+		// kept so a future fifth result type fails safe (the note simply doesn't attach) rather
+		// than panicking.
 		return rendered
 	}
-	var m map[string]any
-	if err := json.Unmarshal(encoded, &m); err != nil {
-		return rendered
-	}
-	m["additionalStatementResults"] = extraPages
-	m["note"] = fmt.Sprintf(
-		"this call ran %d additional statement(s) beyond the one shown here; only the first statement's result is returned",
-		extraPages,
-	)
-	return m
 }
 
 func cappedReturned(rowCount, maxRows int) int {

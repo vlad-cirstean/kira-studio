@@ -1,6 +1,7 @@
 package dbmcp
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -462,19 +463,40 @@ func TestWithAdditionalStatementResultsNoteAddsCountWithoutLosingFields(t *testi
 
 	rendered := renderTabularPage(pg, 10, nil)
 
+	// M7 finding #17: fields are set directly on the concrete type now, no marshal round trip —
+	// the result comes back as the same tabularResult, not a generic map.
 	got := withAdditionalStatementResultsNote(rendered, 2)
-	m, ok := got.(map[string]any)
+	tr, ok := got.(tabularResult)
 	if !ok {
-		t.Fatalf("withAdditionalStatementResultsNote returned %T, want map[string]any", got)
+		t.Fatalf("withAdditionalStatementResultsNote returned %T, want tabularResult", got)
 	}
-	if m["kind"] != "tabular" {
-		t.Fatalf("lost the original result's own fields: %v", m)
+	if tr.Kind != "tabular" {
+		t.Fatalf("lost the original result's own fields: %+v", tr)
 	}
-	if n, ok := m["additionalStatementResults"].(int); !ok || n != 2 {
-		t.Fatalf("additionalStatementResults = %v, want 2", m["additionalStatementResults"])
+	if tr.RowCount != 1 || tr.Returned != 1 {
+		t.Fatalf("lost the original result's own row fields: %+v", tr)
 	}
-	if note, ok := m["note"].(string); !ok || !strings.Contains(note, "2 additional statement") {
-		t.Fatalf("note = %v, want it to mention 2 additional statements", m["note"])
+	if tr.AdditionalStatementResults != 2 {
+		t.Fatalf("AdditionalStatementResults = %d, want 2", tr.AdditionalStatementResults)
+	}
+	if !strings.Contains(tr.Note, "2 additional statement") {
+		t.Fatalf("Note = %q, want it to mention 2 additional statements", tr.Note)
+	}
+
+	// The JSON wire shape carries both new fields too, not just the Go struct.
+	encoded, err := json.Marshal(tr)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(encoded, &wire); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if n, ok := wire["additionalStatementResults"].(float64); !ok || n != 2 {
+		t.Fatalf("wire additionalStatementResults = %v, want 2", wire["additionalStatementResults"])
+	}
+	if note, ok := wire["note"].(string); !ok || !strings.Contains(note, "2 additional statement") {
+		t.Fatalf("wire note = %v, want it to mention 2 additional statements", wire["note"])
 	}
 }
 
