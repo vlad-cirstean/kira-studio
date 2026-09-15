@@ -278,6 +278,28 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   one) rather than a silent top-hit guess, and `outline_file` on `internal/gitclient/runner.go`
   returned its normal node list — both a clean no-regression check. No new non-trivial finding.
 
+- **P67c (implementation)**: same `ConnectionRefused`/stale-token pattern as every entry above — no
+  server running at session start; built, started, found a stale hashed token file (killed by PID,
+  per P67f's own note — `pkill -f`/`pgrep -f … | xargs kill` both kill the calling shell), deleted
+  it, restarted to mint a fresh bearer token, called it over plain HTTP/JSON-RPC throughout.
+  Confirmed P67f's own two reference-query fixes (`ddd15b00`/`0bfef238`) actually help, on real code
+  this phase wrote rather than the fix's own regression fixtures: `find_references
+  {"file":"apps/kira-studio/frontend/src/views/repo/language.ts","symbol":"EXTENSION_LANGUAGE"}`
+  correctly finds the one `EXTENSION_LANGUAGE[ext]` index-expression read
+  (`language.ts:246`, the TS/JS half of the fix), and `find_references
+  {"file":"apps/kira-studio/internal/page/wire/RedisType.go","symbol":"EnumNamesRedisType"}`
+  correctly finds `EnumNamesRedisType[v]` (`RedisType.go:40`, the Go half) — both would have
+  returned "no references found" before P67f. `find_references {"symbol":"monacoLanguageFor"}` also
+  picked up this phase's own new call site inside `RepoFileView.vue`'s `isMarkdown` computed, not
+  just the pre-existing ones. One trivial, not-a-defect note: `find_definition`/`find_references`
+  for a bare Go struct field name (e.g. `Unstaged`, a `porcelain.StatusEntry` field read as
+  `e.Unstaged`) returns "no symbol named" / "no references found" rather than resolving — the
+  indexer's own symbol table holds top-level declarations (functions, types, methods, constants),
+  not individual struct fields, the same class of "expected, not a defect" already logged for a Vue
+  SFC's own component name (P60a, above); `search_symbols`/`outline_file` on the struct's own type
+  is the right tool for a field, not `find_definition` on the field name alone. No new non-trivial
+  finding.
+
 ### Non-trivial
 
 - **P67e (implementation) — `find_references` returns nothing for a package-level variable that is
