@@ -72,6 +72,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :detail="detail"
         :actions="actions"
         :pr-result="pr?.selected.value"
+        :pr-for-commit="pr?.prForCommit(detailState.sha.value ?? '')"
       />
       <FileTree
         class="kv-detail-pane-tree"

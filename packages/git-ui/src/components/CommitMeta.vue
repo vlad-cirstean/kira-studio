@@ -19,7 +19,7 @@
  * icon button is gone too — SHA/message copy already exist via the row context menu, and the new
  * facts row's SHA button covers the one copy path this pane itself offers.
  */
-import type { PrLookupResult } from '@kira/git-ipc';
+import type { PrLookupResult, PrRecord } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { CommitDetail } from '../state/detail.ts';
@@ -35,6 +35,10 @@ const props = defineProps<{
    *  `DetailPane.vue`. `undefined` covers both "nothing selected yet" and the in-flight/debounce
    *  window, same as `detail` itself before it resolves. */
   prResult?: PrLookupResult;
+  /** P74 §4.3: any PR this commit is on (`PrState.prForCommit`, threaded by `DetailPane.vue`) —
+   *  drives the facts-row icon, distinct from `prResult` (this exact commit's own "Pull request"
+   *  row, only ever populated for the selected commit). `undefined` renders no icon. */
+  prForCommit?: readonly PrRecord[];
 }>();
 
 const bodyEl = ref<HTMLParagraphElement | null>(null);
@@ -256,8 +260,8 @@ async function openAllChanges(): Promise<void> {
   }
 }
 
-/** P74 §3.3: the "Pull request" row's own external-open action — composes/opens the URL host-side
- *  (`DetailActions.openPullRequest`'s own doc comment), this pane only ever names the PR number. */
+/** P74 §3.3: the "Pull request" row's own external-open action, and (§4.3) the facts-row icon's
+ *  — one open path for both, never two. */
 async function openPullRequest(number: number): Promise<void> {
   try {
     await props.actions.openPullRequest({ number });
@@ -267,6 +271,22 @@ async function openPullRequest(number: number): Promise<void> {
     );
   }
 }
+
+/** P74 §4.3: the facts row's own icon — the first PR `prForCommit` names (ancestry's own
+ *  first-writer-wins already resolved which branch wins when more than one claims a commit;
+ *  `bySha`'s own array is realistically always length 1 in practice, never fanned out further
+ *  here). `undefined` renders nothing, the same "render nothing" rule every other G24 surface
+ *  follows. */
+const prIcon = computed(() => {
+  const first = props.prForCommit?.[0];
+  if (!first) return undefined;
+  return {
+    number: first.number,
+    title: first.title,
+    state: first.state,
+    stateLabel: PR_STATE_LABEL[first.state] ?? first.state,
+  };
+});
 </script>
 
 <template>
@@ -305,6 +325,16 @@ async function openPullRequest(number: number): Promise<void> {
         {{ shortSha }}
       </button>
       <code v-else class="kv-meta-sha-static" data-testid="commit-meta-sha">{{ shortSha }}</code>
+      <button
+        v-if="prIcon"
+        type="button"
+        class="kv-meta-pr-icon codicon codicon-github"
+        :class="`kv-meta-pr-icon--${prIcon.state}`"
+        v-kui-tooltip="`#${prIcon.number} ${prIcon.title} — ${prIcon.stateLabel}`"
+        :aria-label="`Open pull request #${prIcon.number} on GitHub`"
+        data-testid="commit-meta-pr-icon"
+        @click="openPullRequest(prIcon.number)"
+      />
     </p>
 
     <p
@@ -546,5 +576,33 @@ button.kv-meta-pr-link:hover {
 
 .kv-meta-pr-unavailable {
   color: var(--kv-description-fg);
+}
+
+/* P74 §4.3: the facts row's own PR icon — sized/coloured off the row's own 0.85em text, never a
+   bare px literal, and coloured by the same --kv-badge-pr-*-fg token the grid/StackList/detail
+   pane's own PR badges already use, so no surface can disagree about what a state looks like. */
+.kv-meta-pr-icon {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.kv-meta-pr-icon--open {
+  color: var(--kv-badge-pr-open-fg);
+}
+
+.kv-meta-pr-icon--draft {
+  color: var(--kv-badge-pr-draft-fg);
+}
+
+.kv-meta-pr-icon--merged {
+  color: var(--kv-badge-pr-merged-fg);
+}
+
+.kv-meta-pr-icon--closed {
+  color: var(--kv-badge-pr-closed-fg);
 }
 </style>
