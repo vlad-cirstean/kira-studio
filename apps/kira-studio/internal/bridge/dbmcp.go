@@ -2,6 +2,7 @@ package bridge
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -283,17 +284,36 @@ func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult
 // statement can be large, and the approval dialog renders it; Truncated says whether it was cut.
 const dbMcpApprovalStatementCap = 4000
 
-// capApprovalStatement cuts s at a rune boundary so a multi-byte character straddling the cap
-// never produces invalid UTF-8 on the wire.
+// dbMcpApprovalStatementHalf is how much of the head and of the tail capApprovalStatement shows
+// when a statement exceeds the cap — half each, so the visible text still totals dbMcpApprovalStatementCap.
+const dbMcpApprovalStatementHalf = dbMcpApprovalStatementCap / 2
+
+// capApprovalStatement shows the first and last dbMcpApprovalStatementHalf bytes of s, with a
+// clear "... N bytes omitted ..." marker between them, when s exceeds the cap. Head-only display
+// (finding #5, M6) let a statement's real effect hide entirely past the visible window — e.g.
+// `UPDATE customers SET tier='basic' WHERE id=1 /* <4KB filler> */ OR 1=1` showed a human a narrow
+// single-row update while the unseen tail turned it into a full-table write, with the dialog's own
+// note claiming "the full text still runs" despite giving no way to see what that meant. Showing
+// the tail too means a hidden clause tacked onto the end is never past the visible window; cuts
+// land at rune boundaries on both ends so a multi-byte character straddling one never produces
+// invalid UTF-8 on the wire.
 func capApprovalStatement(s string) (text string, truncated bool) {
 	if len(s) <= dbMcpApprovalStatementCap {
 		return s, false
 	}
-	cut := dbMcpApprovalStatementCap
-	for cut > 0 && !utf8.RuneStart(s[cut]) {
-		cut--
+	headEnd := dbMcpApprovalStatementHalf
+	for headEnd > 0 && !utf8.RuneStart(s[headEnd]) {
+		headEnd--
 	}
-	return s[:cut], true
+	tailStart := len(s) - dbMcpApprovalStatementHalf
+	for tailStart < len(s) && !utf8.RuneStart(s[tailStart]) {
+		tailStart++
+	}
+	if tailStart < headEnd {
+		tailStart = headEnd
+	}
+	marker := fmt.Sprintf("\n\n... %d bytes omitted ...\n\n", tailStart-headEnd)
+	return s[:headEnd] + marker + s[tailStart:], true
 }
 
 // dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own

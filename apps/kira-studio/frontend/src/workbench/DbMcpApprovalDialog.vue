@@ -88,7 +88,8 @@ async function onApprove(): Promise<void> {
       dbMcpState.approval.pending.statement
     }}</pre>
     <p v-if="dbMcpState.approval.pending.truncated" class="detail">
-      Statement truncated for display — the full text still runs.
+      Statement too long to show in full — the middle section named above was cut; the full text
+      still runs.
     </p>
 
     <div v-if="dbMcpState.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
