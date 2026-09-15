@@ -8,13 +8,14 @@
  * was a compromise, just a rename with a few genuinely row-density-only tokens left behind.
  */
 :root {
-  /* G-UX (item 2b): raised from 22px so a row's ref-badge strip has its own 16px line above the
-     18px message line (`CommitGrid.vue`'s `.kv-cell-message` grid, `columns.ts`'s own
-     `.kv-message-badges-row` wrapper) — confirmed safe to change uniformly: every consumer
-     (`rowSvg.ts`'s node/edge geometry, `graphColumn.ts`) already reads this token rather than a
-     literal, so nothing needed touching beyond this one value. */
-  --kv-row-height: 36px;
-  --kv-row-height-compact: 20px;
+  /* P72 §6.3: derived from `--kv-h-xs` (kira-structure.css) — the same token the message line's
+     own track height and the badge's own type/box now use (CommitGrid.vue), so the badge row and
+     the message row become the same height *by construction* rather than by two coincidentally-
+     equal literals. `+2px` is the cell's own vertical padding, matching the arithmetic
+     `CommitGrid.vue`'s `.kv-cell-message` comment already documented for the old literals. At the
+     13px VS Code default this still resolves to the same 36px/20px the old literals held. */
+  --kv-row-height: calc(2 * var(--kv-h-xs) + 2px);
+  --kv-row-height-compact: calc(var(--kv-h-xs) + 2px);
   --kv-row-height-comfortable: 26px;
 
   /* G14 D6: the fallback for a host that reports nothing — VS Code's own default for

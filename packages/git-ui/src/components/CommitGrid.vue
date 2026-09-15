@@ -1120,26 +1120,28 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 
 /* G-UX (item 2b): the literal ask — badges above the message, on their own line, rather than
    fighting it for horizontal space (item 2a's `.kv-ref-badges` `max-width` cap was the quick,
-   low-risk stopgap; this supersedes it). A 2-row CSS Grid, not a flex column. `18px` matches
-   `--kv-row-height-compact`'s own `20px` (`density.css`) minus this cell's vertical padding; the
-   subject stays `grid-row: 2` either way (`.kv-message-subject`, below) so it never has to move.
-   `16px`/`18px` together match `--kv-row-height`'s own `36px` minus the same padding.
+   low-risk stopgap; this supersedes it). A 2-row CSS Grid, not a flex column. The subject stays
+   `grid-row: 2` either way (`.kv-message-subject`, below) so it never has to move.
    P7 (item 1): the badges track is collapsed to `0` by default — a commit with no badges (most
    rows) is now genuinely single-line, not merely visually empty on a still-full-height row. Only
    `.kv-cell-message--has-badges` (`columns.ts`'s own `messageFormatter`, set in the same branch
-   that decides whether `.kv-message-badges-row` is even built) reserves the 16px track; the row's
-   own real height comes from `getItemMetadata`'s `height` (`columns.ts`'s `rowMetadata`), which
-   uses the identical condition — the two can never disagree about whether a row is tall. */
+   that decides whether `.kv-message-badges-row` is even built) reserves the badge track; the
+   row's own real height comes from `getItemMetadata`'s `height` (`columns.ts`'s `rowMetadata`),
+   which uses the identical condition — the two can never disagree about whether a row is tall.
+   P72 §6.3: both tracks are now `--kv-h-xs` (kira-structure.css) — the same token `.kv-badge`'s
+   own height derives from below — instead of the `16px`/`18px` literals the badge used to be
+   three points smaller than. `density.css`'s own `--kv-row-height`/`-compact` derive from the
+   identical token, so a row's real height and this grid's track heights can never drift apart. */
 .kv-cell-message {
   display: grid;
-  grid-template-rows: 0 18px;
+  grid-template-rows: 0 var(--kv-h-xs);
   align-items: center;
   min-width: 0;
   overflow: hidden;
 }
 
 .kv-cell-message.kv-cell-message--has-badges {
-  grid-template-rows: 16px 18px;
+  grid-template-rows: var(--kv-h-xs) var(--kv-h-xs);
 }
 
 /* The row-1 strip — ref badges then the PR badge, sharing one flex row and one `overflow: hidden`
@@ -1198,17 +1200,25 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
    dark and light theme variants (`vscode-tokens.css`'s own light-theme block already redefines
    these same `-fg` tokens per theme — darkening them here for a fill adapts automatically,
    no new tokens needed). */
+/* P72 §6.3: type and box now derive from the same scale `.kv-cell-message`'s own subject text
+   uses (`--kv-t-md`/`--kv-h-xs`, kira-structure.css) — the badge label used to sit three points
+   smaller than the message text beside it, by literal. `box-sizing: border-box` (§6.2 i): without
+   it `.kv-badge` occupies `16 + 2 + 2 = 20px` inside its own `16px` track — invisible while the
+   track was a bigger literal, real the moment it derives from the same token as the badge's own
+   height. Scoped to `.kv-badge` alone, not a package-wide reset — see this file's own doc comment
+   at the top of this block for why that would be out of scope. */
 .kv-badge {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   padding: 0 5px;
-  height: 16px;
-  line-height: 16px;
-  font-size: 10px;
+  height: var(--kv-h-xs);
+  line-height: var(--kv-h-xs);
+  font-size: var(--kv-t-md);
   white-space: nowrap;
   color: var(--kv-badge-fg);
   border: 2px solid transparent;
+  box-sizing: border-box;
 }
 
 .kv-badge-pill,
@@ -1230,8 +1240,10 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   border-style: dashed;
 }
 
+/* P72 §6.3: a step below `.kv-badge`'s own label size — an icon reads as decoration, not text —
+   but now moves *with* the type scale instead of staying pinned at a literal. */
 .kv-badge-icon {
-  font-size: 11px;
+  font-size: var(--kv-t-sm);
 }
 
 /* §6.2's "badge text truncates at ~190px, full name in title" — the icon stays fixed size, only
@@ -1304,8 +1316,10 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
    at a glance, where a plain dot next to the badge's own icon was easy to miss. Fixed in
    `--kv-focus-border`, independent of the badge's own kind colour or any lane tint, so "this is
    the current branch" stays a single, consistent, always-recognisable signal. */
+/* P72 §6.3: `--kv-t-xs`, a step below `.kv-badge-icon`'s own `--kv-t-sm` — same reasoning as that
+   rule's own comment, one step further since a checkmark reads as even more purely decorative. */
 .kv-badge-current-glyph {
-  font-size: 9px;
+  font-size: var(--kv-t-xs);
   color: var(--kv-focus-border);
 }
 
