@@ -68,6 +68,14 @@ func (in Input) Validate() error {
 		(in.ThrottlePerSec < throttlePerSecMin || in.ThrottlePerSec > throttlePerSecMax) {
 		return ipcerr.BadRequest("throttlePerSec must be 0, or between 0.01 and 1000")
 	}
+	if !model.ValidMcpPermissionMode(in.McpReadMode) ||
+		!model.ValidMcpPermissionMode(in.McpWriteMode) ||
+		!model.ValidMcpPermissionMode(in.McpDdlMode) {
+		return ipcerr.BadRequest("invalid MCP permission mode")
+	}
+	if len(in.McpDescription) > 1000 {
+		return ipcerr.BadRequest("mcpDescription must be at most 1000 characters")
+	}
 
 	if in.Mode == "fields" {
 		if fileKinds[in.Kind] {

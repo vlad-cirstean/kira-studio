@@ -28,6 +28,14 @@ type ConnectionFields struct {
 	// M1 §6.1: whether this connection is exposed to the local DB MCP server. Deny by default. A
 	// first-class column, not an options_json key — see the migration's own comment for why.
 	McpEnabled bool `json:"mcpEnabled"`
+	// M2: free-text "what this DB is for", passed to an AI client as connection metadata
+	// (list_connections). Never interpreted by this app.
+	McpDescription string `json:"mcpDescription"`
+	// M2: per-operation MCP permission, one of deny/allow/prompt. Enforced only on the DB MCP
+	// server's run_query path — the human console is governed by ReadOnly, unchanged.
+	McpReadMode  string `json:"mcpReadMode"`
+	McpWriteMode string `json:"mcpWriteMode"`
+	McpDdlMode   string `json:"mcpDdlMode"`
 }
 
 // ConnectionSummary mirrors packages/shared/domain/connection.ts's connectionSummarySchema.
@@ -84,3 +92,9 @@ func ValidConnectionColor(v string) bool { return ValidPaletteColor(v) }
 
 // ValidConnectionMode mirrors connection.ts's connectionModeSchema.
 func ValidConnectionMode(v string) bool { return v == "fields" || v == "uri" }
+
+// mcpPermissionModes mirrors connection.ts's mcpPermissionModeSchema.
+var mcpPermissionModes = map[string]bool{"deny": true, "allow": true, "prompt": true}
+
+// ValidMcpPermissionMode mirrors connection.ts's mcpPermissionModeSchema (M2).
+func ValidMcpPermissionMode(v string) bool { return mcpPermissionModes[v] }

@@ -12,6 +12,7 @@ import (
 const connectionSelectColumns = `
 	id, name, kind, color, mode, read_only, host, port, database, username, uri,
 	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode,
 	sort_order, created_at, updated_at
 `
 
@@ -40,7 +41,8 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	if err := row.Scan(
 		&c.ID, &c.Name, &c.Kind, &c.Color, &c.Mode, &readOnly, &host, &port, &database,
 		&username, &uri, &options, &preconnect, &sidecar, &autoExplain, &c.ThrottlePerSec,
-		&mcpEnabled, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
+		&mcpEnabled, &c.McpDescription, &c.McpReadMode, &c.McpWriteMode, &c.McpDdlMode,
+		&c.SortOrder, &c.CreatedAt, &c.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -56,6 +58,21 @@ func scanConnectionRow(row rowScanner) (*model.ConnectionSummary, error) {
 	if !model.ValidConnectionMode(c.Mode) {
 		slog.Warn("dropping connection row: unrecognised mode", "scope", "storage/connections", "id", c.ID, "mode", c.Mode)
 		return nil, nil
+	}
+	// M2: an unreadable permission word coerces to the strictest value (deny) rather than dropping
+	// the row — dropping would hide the connection from the app entirely; coercing keeps it visible
+	// and keeps it safe.
+	if !model.ValidMcpPermissionMode(c.McpReadMode) {
+		slog.Warn("coercing connection row: unrecognised MCP read mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpReadMode)
+		c.McpReadMode = "deny"
+	}
+	if !model.ValidMcpPermissionMode(c.McpWriteMode) {
+		slog.Warn("coercing connection row: unrecognised MCP write mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpWriteMode)
+		c.McpWriteMode = "deny"
+	}
+	if !model.ValidMcpPermissionMode(c.McpDdlMode) {
+		slog.Warn("coercing connection row: unrecognised MCP DDL mode", "scope", "storage/connections", "id", c.ID, "mode", c.McpDdlMode)
+		c.McpDdlMode = "deny"
 	}
 
 	c.ReadOnly = readOnly != 0
@@ -167,12 +184,14 @@ func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, create
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
 			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode,
 			created_at, updated_at, sort_order
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), createdAt, createdAt, sortOrder,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, createdAt, createdAt, sortOrder,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -200,12 +219,14 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 		   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 		       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
 		       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+		       mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
 		       updated_at = ?
 		 WHERE id = ?
 	`,
 		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), updatedAt, connID,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, updatedAt, connID,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
 	}
@@ -249,12 +270,14 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
 			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode,
 			created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), createdAt, createdAt, sortOrder, secretEnc,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, createdAt, createdAt, sortOrder, secretEnc,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -299,13 +322,15 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 		INSERT INTO connections (
 			id, name, kind, color, mode, read_only, host, port, database, username, uri,
 			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode,
 			created_at, updated_at, sort_order, password
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			(SELECT password FROM connections WHERE id = ?))
 	`,
 		toConnectionID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), createdAt, createdAt, sortOrder, fromConnectionID,
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, createdAt, createdAt, sortOrder, fromConnectionID,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert duplicate %s: %w", toConnectionID, err)
 	}
@@ -345,12 +370,14 @@ func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFiel
 			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
 			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+			       mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
 			       updated_at = ?, password = ?
 			 WHERE id = ?
 		`,
 			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), updatedAt, secretEnc, connID,
+			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, updatedAt, secretEnc, connID,
 		)
 	} else {
 		_, execErr = r.DB.Exec(`
@@ -358,12 +385,14 @@ func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFiel
 			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
 			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
 			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+			       mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
 			       updated_at = ?
 			 WHERE id = ?
 		`,
 			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
 			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled), updatedAt, connID,
+			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, updatedAt, connID,
 		)
 	}
 	if execErr != nil {
