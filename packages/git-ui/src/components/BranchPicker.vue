@@ -26,12 +26,13 @@ import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
-import type { WorktreeState } from '../state/worktrees.ts';
+import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 import GlobalStashList from './GlobalStashList.vue';
 import RowContextMenu from './RowContextMenu.vue';
 import {
   buildRefListSections,
   formatTrack,
+  localNameForRemoteBranch,
   remoteCheckoutLabel,
   remoteCheckoutTarget,
 } from './refListModel.ts';
@@ -102,7 +103,9 @@ const emit = defineEmits<{
   (e: 'saveEntryToGlobalStash', entry: StashEntry): void;
   (e: 'switchWorktree', path: string): void;
   (e: 'openWorktreeWindow', path: string): void;
-  (e: 'createWorktree'): void;
+  /** P76 §9.3: widened to carry an optional seed — `undefined` from `WorktreeList.vue`'s own
+   *  create button, a seed from this picker's own "Create worktree here…" row action. */
+  (e: 'createWorktree', seed?: WorktreeCreateSeed): void;
   (e: 'openRestackDialog', branch: string): void;
   (e: 'openSetStackParentDialog', branch: string): void;
 }>();
@@ -267,6 +270,22 @@ async function onRefMenuSelect(id: string): Promise<void> {
   }
   if (id.startsWith('deleteRemoteRef:')) {
     await props.ops.tagDeleteRemote(id.slice('deleteRemoteRef:'.length), row.shortName);
+    return;
+  }
+  if (id === 'createWorktreeHere') {
+    // P76 §9.1: same derivation as `checkoutRemote`'s own DWIM — a remote-tracking branch's local
+    // name may not exist yet, so that arm creates it as a new branch rather than passing it as an
+    // already-existing one.
+    emit(
+      'createWorktree',
+      row.kind === 'remoteBranch'
+        ? {
+            mode: 'newBranch',
+            branch: localNameForRemoteBranch(row.shortName),
+            startPoint: row.shortName,
+          }
+        : { mode: 'existingBranch', branch: row.shortName },
+    );
     return;
   }
   // G26 D-4.14: the stack section's own five items — 'stackSetParent'/'stackRestack' emit intents

@@ -2,6 +2,15 @@ import type { WorktreeAddPreflight, WorktreeEntry, WorktreeRemovePreflight } fro
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 
+/** P76 §9.1: what a "Create worktree here…" row action pre-fills `WorktreeDialog.vue`'s create
+ *  phase with. Every field optional: the toolbar/palette entry point opens with `{}` and keeps
+ *  today's defaults. */
+export interface WorktreeCreateSeed {
+  readonly mode?: 'existingBranch' | 'newBranch' | 'detach';
+  readonly branch?: string;
+  readonly startPoint?: string;
+}
+
 /**
  * G25 D1: the worktree list as reactive state, mirroring `StashState`'s/`RefsState`'s own shape —
  * reloaded on the same `repo.changed` signal `RefsState` already listens to (`kind ===

@@ -28,15 +28,17 @@ import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref, watch } from 'vue';
 import type { OpsState } from '../../state/ops.ts';
 import type { RefsState } from '../../state/refs.ts';
-import type { WorktreeState } from '../../state/worktrees.ts';
+import type { WorktreeCreateSeed, WorktreeState } from '../../state/worktrees.ts';
 
 const props = defineProps<{
   worktrees: WorktreeState;
   ops: OpsState;
   refs: RefsState;
-  /** Toggled by `AppToolbar.vue`'s "Create Worktree…" button and the `createWorktree` palette
-   *  action, via `App.vue`. */
-  createOpen: boolean;
+  /** Set by `AppToolbar.vue`'s "Create Worktree…" button, the `createWorktree` palette action, or
+   *  a "Create worktree here…" row action (P76 §8/§9), via `App.vue`. A fresh object (even `{}`)
+   *  opens the create phase and re-seeds it; `undefined` closes it. Watched by reference rather
+   *  than a boolean so a second row action re-seeds even while the dialog is already open. */
+  createRequest: WorktreeCreateSeed | undefined;
   /** `kiraVersion.worktree.basePath`'s current value — pre-fills the path field's own directory
    *  (D10); pure UX, never validated as an existing directory. */
   basePathDefault: string;
@@ -57,7 +59,7 @@ type Phase = 'create' | 'prepare' | undefined;
 const worktreeCreated = ref<string | undefined>(undefined);
 const phase = computed<Phase>(() => {
   if (worktreeCreated.value !== undefined) return 'prepare';
-  if (props.createOpen) return 'create';
+  if (props.createRequest !== undefined) return 'create';
   return undefined;
 });
 const active = computed(() => phase.value !== undefined);
@@ -76,13 +78,15 @@ const preflight = ref<WorktreeAddPreflight | undefined>(undefined);
 let previewToken = 0;
 
 watch(
-  () => props.createOpen,
-  (isOpen) => {
-    if (!isOpen) return;
+  () => props.createRequest,
+  (seed) => {
+    if (!seed) return;
     path.value = '';
-    mode.value = 'newBranch';
-    branch.value = '';
-    startPoint.value = props.refs.head.value?.kind === 'branch' ? props.refs.head.value.name : '';
+    mode.value = seed.mode ?? 'newBranch';
+    branch.value = seed.branch ?? '';
+    startPoint.value =
+      seed.startPoint ??
+      (props.refs.head.value?.kind === 'branch' ? props.refs.head.value.name : '');
     preflight.value = undefined;
     worktreeCreated.value = undefined;
   },

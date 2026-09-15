@@ -45,7 +45,7 @@ import type { RefsState } from '../state/refs.ts';
 import type { RepoState } from '../state/repo.ts';
 import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
-import type { WorktreeState } from '../state/worktrees.ts';
+import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // Plain (not `import type`) imports, for two different reasons. BranchPicker: vue-tsc needs the
 // real import to infer the template's inline @branch-from-stash handler's parameter type from
 // BranchPicker's own emits declaration — a type-only import here breaks that inference (TS7006).
@@ -96,7 +96,7 @@ const emit = defineEmits<{
    *  `WorktreeList.vue`'s own doc comment on why this toolbar does not act on them itself. */
   (event: 'switch-worktree', path: string): void;
   (event: 'open-worktree-window', path: string): void;
-  (event: 'create-worktree'): void;
+  (event: 'create-worktree', seed?: WorktreeCreateSeed): void;
   /** G26: forwarded straight from `BranchPicker.vue` -> `StackList.vue`'s own emits — `App.vue`
    *  owns `StackDialog.vue`'s actual open state, the same "toolbar owns no dialog state itself"
    *  shape every other dialog-opening emit above already follows. */
@@ -301,7 +301,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       @save-entry-to-global-stash="(entry) => emit('save-entry-to-global-stash', entry)"
       @switch-worktree="(path) => emit('switch-worktree', path)"
       @open-worktree-window="(path) => emit('open-worktree-window', path)"
-      @create-worktree="emit('create-worktree')"
+      @create-worktree="(seed) => emit('create-worktree', seed)"
       @open-restack-dialog="(branch) => emit('open-restack-dialog', branch)"
       @open-set-stack-parent-dialog="(branch) => emit('open-set-stack-parent-dialog', branch)"
     />
