@@ -33,7 +33,11 @@ func TestInjectGoldenFixtures(t *testing.T) {
 				{BlockStyle, CSS},
 			},
 			syms: []symRow{{"function", "greet", -1}},
-			refs: []refRow{{"call", "helper"}},
+			// P69b's new "arguments" read pattern (docs/v1.6/plans/
+			// P69b-repo-map-bare-identifier-reads.md §4.1) applies inside an injected JS block
+			// too: helper(name)'s own argument now earns a "read" row alongside the pre-existing
+			// "call" one.
+			refs: []refRow{{"call", "helper"}, {"read", "name"}},
 		},
 		{
 			id: Svelte, file: "testdata/inject/sample.svelte",
@@ -42,7 +46,7 @@ func TestInjectGoldenFixtures(t *testing.T) {
 				{BlockStyle, CSS},
 			},
 			syms: []symRow{{"function", "greet", -1}},
-			refs: []refRow{{"call", "helper"}},
+			refs: []refRow{{"call", "helper"}, {"read", "name"}},
 		},
 		{
 			// The unsupported-lang case: <style lang="scss"> is recorded, honestly, as
@@ -53,7 +57,10 @@ func TestInjectGoldenFixtures(t *testing.T) {
 				{BlockStyle, Unsupported},
 			},
 			syms: []symRow{{"function", "helper", -1}},
-			refs: nil,
+			// P69b: this fixture's own `helper` is declared but never called, so its only new
+			// capture is the binary_expression right-operand pattern on `"hi " + name` inside the
+			// function body (docs/v1.6/plans/P69b-repo-map-bare-identifier-reads.md §4.1).
+			refs: []refRow{{"read", "name"}},
 		},
 	}
 

@@ -74,3 +74,20 @@ func p67fHelperReads() {
 	_ = p67fSampleContainerVal.m["x"]
 	_ = p67fSampleNestedMap["a"]["b"]
 }
+
+// P69b: a bare-identifier read as a call argument and as both operands of a comparison, a
+// non-identifier call argument (no row), and a slice bound — the commonest read shapes P67f's
+// range/index patterns above didn't reach (docs/v1.6/plans/
+// P69b-repo-map-bare-identifier-reads.md §6.2).
+var p69bArg = 1
+var p69bLeft = 2
+var p69bRight = 3
+
+func p69bConsume(n int) {}
+
+func p69bHelperReads(buf []byte) {
+	p69bConsume(p69bArg)
+	_ = p69bLeft < p69bRight
+	p69bConsume(p67fSampleContainerVal.items)
+	_ = buf[:p69bArg]
+}

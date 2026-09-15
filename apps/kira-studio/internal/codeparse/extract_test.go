@@ -95,18 +95,40 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"constant", "p67fSampleItems", -1},
 				{"function", "p67fMakeItems", -1},
 				{"function", "p67fHelperReads", -1},
+				{"constant", "p69bArg", -1},
+				{"constant", "p69bLeft", -1},
+				{"constant", "p69bRight", -1},
+				{"constant", "p69bObj", -1},
+				{"function", "p69bConsume", -1},
+				{"function", "p69bHelperReads", -1},
 			},
+			// P69b adds the new "arguments"/"binary_expression" read patterns (docs/v1.6/plans/
+			// P69b-repo-map-bare-identifier-reads.md §4.1/§6.2): the two pre-existing fixture
+			// sites above now each earn an extra "read" row — "name" from `helper(name)`'s own
+			// call argument and from `"hi " + name`'s own binary operand, "v" from each
+			// `console.log(v)` call (twice) — plus a dedicated p69b block covering an identifier
+			// call argument (p69bArg, one row), both comparison operands (p69bLeft/p69bRight, two
+			// rows), and a non-identifier (selector) call argument producing no row.
 			refs: []refRow{
 				{"call", "helper"},
+				{"read", "name"},
+				{"read", "name"},
 				{"implementation", "Greeter"},
 				{"class", "Greeter"},
 				{"call", "makeRobot"},
 				{"class", "Robot"},
 				{"read", "p67fSampleItems"},
 				{"call", "log"},
+				{"read", "v"},
 				{"read", "p67fSampleItems"},
 				{"call", "p67fMakeItems"},
 				{"call", "log"},
+				{"read", "v"},
+				{"call", "p69bConsume"},
+				{"read", "p69bArg"},
+				{"read", "p69bLeft"},
+				{"read", "p69bRight"},
+				{"call", "p69bConsume"},
 			},
 		},
 		{
@@ -153,20 +175,41 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"constant", "p67fSampleItems", -1},
 				{"function", "p67fMakeItems", -1},
 				{"function", "p67fHelperReads", -1},
+				// P69b: same dedicated block as sample.js above (docs/v1.6/plans/
+				// P69b-repo-map-bare-identifier-reads.md §6.2).
+				{"constant", "p69bArg", -1},
+				{"constant", "p69bLeft", -1},
+				{"constant", "p69bRight", -1},
+				{"constant", "p69bObj", -1},
+				{"function", "p69bConsume", -1},
+				{"function", "p69bHelperReads", -1},
 			},
+			// P69b: same incidental-row growth as sample.js above ("name" from helper2(name)'s
+			// call argument and from "hi " + name's binary operand), plus the same dedicated
+			// p69b block appended at the end (docs/v1.6/plans/
+			// P69b-repo-map-bare-identifier-reads.md §4.1/§6.2).
 			refs: []refRow{
 				{"implementation", "Greeter"},
 				{"type", "Greeter"},
 				{"type", "Greeter"},
 				{"implementation", "Greeter"},
 				{"call", "helper2"},
+				{"read", "name"},
+				{"read", "name"},
 				{"call", "makeConfig"},
 				{"class", "Robot"},
 				{"read", "p67fSampleItems"},
 				{"call", "log"},
+				{"read", "v"},
 				{"read", "p67fSampleItems"},
 				{"call", "p67fMakeItems"},
 				{"call", "log"},
+				{"read", "v"},
+				{"call", "p69bConsume"},
+				{"read", "p69bArg"},
+				{"read", "p69bLeft"},
+				{"read", "p69bRight"},
+				{"call", "p69bConsume"},
 			},
 		},
 		{
@@ -210,6 +253,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "p67fSampleContainer", -1},
 				{"variable", "p67fSampleContainerVal", -1},
 				{"function", "p67fHelperReads", -1},
+				{"variable", "p69bArg", -1},
+				{"variable", "p69bLeft", -1},
+				{"variable", "p69bRight", -1},
+				{"function", "p69bConsume", -1},
+				{"function", "p69bHelperReads", -1},
 			},
 			refs: []refRow{
 				{"type", "Greeter"},
@@ -231,6 +279,23 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"read", "p67fSampleReadMap"},
 				{"read", "p67fSampleReadMap"},
 				{"read", "p67fSampleNestedMap"},
+				// P69b: p69bConsume's own parameter types ("int", "byte" for buf []byte) are
+				// ordinary pre-existing "type" reference captures, incidental to adding parameters
+				// at all — not new in this phase. p69bConsume(p69bArg) earns "call"+"read"; the
+				// comparison earns both operands; p69bConsume(p67fSampleContainerVal.items) earns
+				// only "call" (selector argument, no row); buf[:p69bArg] earns two rows — "buf"
+				// (the slice's own operand field, also newly captured for the slice form) and
+				// "p69bArg" (the slice's end bound, the case this phase's repro finding names
+				// explicitly).
+				{"type", "int"},
+				{"type", "byte"},
+				{"call", "p69bConsume"},
+				{"read", "p69bArg"},
+				{"read", "p69bLeft"},
+				{"read", "p69bRight"},
+				{"call", "p69bConsume"},
+				{"read", "buf"},
+				{"read", "p69bArg"},
 			},
 		},
 		{

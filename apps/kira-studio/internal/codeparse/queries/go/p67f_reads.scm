@@ -14,3 +14,22 @@
 ; the name that would be recorded is not the operand's own.
 (index_expression
   operand: (identifier) @name @reference.read)
+
+; P69b (docs/v1.6/plans/P69b-repo-map-bare-identifier-reads.md §4.1) — the commonest read shape of
+; all, a bare identifier passed as a call argument or used as a comparison/arithmetic operand.
+
+; `f(x)` — x is read. argument_list has no field name; a non-identifier argument (a call, a
+; selector, a composite literal) is not captured, same rule as the two patterns above.
+(argument_list (identifier) @name @reference.read)
+
+; `a < b`, `a + b` — both operands are read. Comparison and arithmetic share one node kind, so the
+; operator is deliberately not constrained.
+(binary_expression left: (identifier) @name @reference.read)
+(binary_expression right: (identifier) @name @reference.read)
+
+; `raw[:n]` — n is read. start/end/capacity only; `operand` is already covered by index_expression
+; above for the non-slice form and is captured here for the slice form too.
+(slice_expression start: (identifier) @name @reference.read)
+(slice_expression end: (identifier) @name @reference.read)
+(slice_expression capacity: (identifier) @name @reference.read)
+(slice_expression operand: (identifier) @name @reference.read)

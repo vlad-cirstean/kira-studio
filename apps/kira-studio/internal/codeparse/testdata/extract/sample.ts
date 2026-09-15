@@ -66,3 +66,20 @@ function p67fHelperReads(): void {
     console.log(v);
   }
 }
+
+// P69b: a bare-identifier read as a call argument, as both operands of a comparison, and a
+// non-identifier call argument, a selector (no row) — the commonest read shapes P67f's
+// for...of/index patterns above didn't reach (docs/v1.6/plans/
+// P69b-repo-map-bare-identifier-reads.md §6.2).
+const p69bArg: number = 1;
+const p69bLeft: number = 2;
+const p69bRight: number = 3;
+const p69bObj = { val: 4 };
+
+function p69bConsume(n: number): void {}
+
+function p69bHelperReads(): void {
+  p69bConsume(p69bArg);
+  const cmp = p69bLeft < p69bRight;
+  p69bConsume(p69bObj.val);
+}
