@@ -305,28 +305,38 @@ export async function maskNullable(
 }
 
 // KIND_STRICTNESS ranks the six kinds from most to least redacting (§4.2's conflict-folding
-// order): redact > text > date > email > name > number. Lower rank wins a conflict.
+// order): redact > text > date > number > name > email. Lower rank wins a conflict.
+//
+// M6 finding #9: email and number previously sat the other way around (redact > text > date >
+// email > name > number), backwards for two pairs relative to actual redaction strength. email vs
+// name: `email` leaves the domain fully visible while `name` bullets far more of the value, so
+// `email` must not outrank `name`. name vs number: `number` fully brackets a value (no digits at
+// all) while `name` keeps a leading character and reveals the exact length, so `number` must
+// outrank `name`. Swapping only email's and number's own rank values (name's is unchanged)
+// satisfies both — kept identical to mask.go's own kindStrictness, including this reasoning.
 const KIND_STRICTNESS: Record<MaskKind, number> = {
   redact: 0,
   text: 1,
   date: 2,
-  email: 3,
+  number: 3,
   name: 4,
-  number: 5,
+  email: 5,
 };
 
-// stricter returns whichever of a, b is the stricter rule: the lower-ranked kind first, and within
-// one kind, keepHint=false beats keepHint=true and correlate=false beats correlate=true — an
-// ambiguity between two rules matching the same column name (under different table names) must
-// never resolve to the more permissive option. Used by the grid preview to fold its own copy of a
-// connection's rules by column name, the same way maskrules.Service.MaskSetFor folds them
-// server-side for the MCP render path.
+// stricter returns whichever of a, b is the stricter rule: the lower-ranked kind wins, and the two
+// flags fold independently toward their own stricter (more redacting) value — keepHint and
+// correlate each false-wins — across any kind pair, not only when a and b share a kind (M6 finding
+// #9's second half: a stricter flag on the losing kind's own rule must not be silently discarded
+// just because its kind lost). An ambiguity between two rules matching the same column name (under
+// different table names) must never resolve to the more permissive option on any axis. Used by the
+// grid preview to fold its own copy of a connection's rules by column name, the same way
+// maskrules.Service.MaskSetFor folds them server-side for the MCP render path.
 export function stricter(a: MaskingRule, b: MaskingRule): MaskingRule {
   const ra = KIND_STRICTNESS[a.kind] ?? KIND_STRICTNESS.redact;
   const rb = KIND_STRICTNESS[b.kind] ?? KIND_STRICTNESS.redact;
-  if (ra !== rb) return ra < rb ? a : b;
+  const kind = rb < ra ? b.kind : a.kind;
   return {
-    kind: a.kind,
+    kind,
     keepHint: a.keepHint && b.keepHint,
     correlate: a.correlate && b.correlate,
   };

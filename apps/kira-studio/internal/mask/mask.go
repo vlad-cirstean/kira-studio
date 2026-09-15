@@ -344,21 +344,34 @@ func (m *Masker) tag(value string) string {
 }
 
 // kindStrictness ranks the six kinds from most to least redacting (§4.2's conflict-folding order):
-// redact > text > date > email > name > number. Lower rank wins a conflict, the same "lowest rank
+// redact > text > date > number > name > email. Lower rank wins a conflict, the same "lowest rank
 // is strictest" convention dbmcp/permissions.go's strictnessRank already uses.
+//
+// M6 finding #9: email and number previously sat the other way around (redact > text > date >
+// email > name > number), which put two pairs backwards relative to their actual redaction
+// strength. email vs name: `email` leaves the domain fully visible (`b••@corp.example.com`) while
+// `name` bullets far more of the value, so `email` must not outrank `name`. name vs number:
+// `number` fully brackets a value (`[1000000000-10000000000)`, no digits at all) while `name` keeps
+// a leading character and reveals the exact length, so `number` is at least as strict as `name` for
+// every input and must outrank it. Swapping only email's and number's own rank values (leaving
+// name's unchanged) satisfies both: number now outranks name, and name now outranks email.
 var kindStrictness = map[Kind]int{
 	KindRedact: 0,
 	KindText:   1,
 	KindDate:   2,
-	KindEmail:  3,
+	KindNumber: 3,
 	KindName:   4,
-	KindNumber: 5,
+	KindEmail:  5,
 }
 
-// Stricter returns whichever of a, b is the stricter rule (§4.2): the lower-ranked kind first, and
-// within one kind, KeepHint=false beats KeepHint=true and Correlate=false beats Correlate=true — an
-// ambiguity between two rules matching the same column name (under different table_name values)
-// must never resolve to the more permissive option.
+// Stricter returns whichever of a, b is the stricter rule (§4.2): the lower-ranked kind wins, and
+// the two flags fold independently toward their own stricter (more redacting) value — KeepHint and
+// Correlate each false-wins — across any kind pair, not only when a and b share a kind (M6 finding
+// #9's second half: a stricter flag on the losing kind's own rule must not be silently discarded
+// just because its kind lost — e.g. a.Kind=text,KeepHint=true and b.Kind=name,KeepHint=false must
+// fold to Kind=text (text outranks name), KeepHint=false (b's own stricter flag), not KeepHint=true
+// merely because a's kind won). An ambiguity between two rules matching the same column name (under
+// different table_name values) must never resolve to the more permissive option on any axis.
 func Stricter(a, b Rule) Rule {
 	ra, ok := kindStrictness[a.Kind]
 	if !ok {
@@ -368,17 +381,12 @@ func Stricter(a, b Rule) Rule {
 	if !ok {
 		rb = kindStrictness[KindRedact]
 	}
-	if ra != rb {
-		if ra < rb {
-			return a
-		}
-		return b
+	kind := a.Kind
+	if rb < ra {
+		kind = b.Kind
 	}
-	// Same kind: fold the two flags independently, each toward its own stricter (more redacting)
-	// value — not "prefer a wholesale" — so e.g. a.KeepHint=false, b.Correlate=false folds to both
-	// false even though neither single rule had both.
 	return Rule{
-		Kind:      a.Kind,
+		Kind:      kind,
 		KeepHint:  a.KeepHint && b.KeepHint,
 		Correlate: a.Correlate && b.Correlate,
 	}

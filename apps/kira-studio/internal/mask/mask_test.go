@@ -252,8 +252,13 @@ func TestApplyNilKeyDegradesToNoTag(t *testing.T) {
 
 // --- conflict folding (§4.2, "the same shape as M2's own strictestOf") ---
 
+// TestStricterKindOrder pins the corrected M6 finding #9 ordering — redact > text > date > number
+// > name > email — rather than the original plan's redact > text > date > email > name > number,
+// which had two pairs backwards relative to actual redaction strength (email left the domain fully
+// visible while name bulleted far more of the value; number fully bracketed a value with no digits
+// at all while name kept a leading character and revealed the exact length).
 func TestStricterKindOrder(t *testing.T) {
-	order := []Kind{KindRedact, KindText, KindDate, KindEmail, KindName, KindNumber}
+	order := []Kind{KindRedact, KindText, KindDate, KindNumber, KindName, KindEmail}
 	for i := 0; i < len(order); i++ {
 		for j := 0; j < len(order); j++ {
 			a := Rule{Kind: order[i], KeepHint: true, Correlate: true}
@@ -276,6 +281,25 @@ func TestStricterFlagsWithinOneKind(t *testing.T) {
 	got := Stricter(a, b)
 	if got.KeepHint != false || got.Correlate != false {
 		t.Fatalf("Stricter same-kind flags = %+v, want both flags folded to their stricter (false) value", got)
+	}
+}
+
+// TestStricterFlagsFoldAcrossDifferentKinds is finding #9's second half (M6): before this fix, a
+// mismatched-kind pair returned one whole rule verbatim, discarding a stricter flag on the losing
+// kind's own rule just because its kind lost. text outranks name, but b's own KeepHint=false must
+// still survive into the folded result.
+func TestStricterFlagsFoldAcrossDifferentKinds(t *testing.T) {
+	a := Rule{Kind: KindText, KeepHint: true, Correlate: true}
+	b := Rule{Kind: KindName, KeepHint: false, Correlate: true}
+	got := Stricter(a, b)
+	if got.Kind != KindText {
+		t.Fatalf("Stricter(text, name).Kind = %s, want text (the stricter kind)", got.Kind)
+	}
+	if got.KeepHint != false {
+		t.Fatalf("Stricter(text, name).KeepHint = %v, want false (folded from the losing kind's own stricter flag)", got.KeepHint)
+	}
+	if got.Correlate != true {
+		t.Fatalf("Stricter(text, name).Correlate = %v, want true (both rules had it true)", got.Correlate)
 	}
 }
 
