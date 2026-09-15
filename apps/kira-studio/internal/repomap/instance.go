@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codegraph"
@@ -49,6 +50,11 @@ type repoInstance struct {
 	// syncSem is the owning Server's own initialSyncSem — borrowed, never closed here. nil in a
 	// repoInstance a test builds directly (attach_test.go), which skips the gate entirely.
 	syncSem chan struct{}
+	// syncQueued is true while this instance is waiting on syncSem's own slot, after its flock
+	// wait has already finished — Group 5b: lets waitReady's timeout message and listRepos tell
+	// "queued behind another repository's initial index" apart from "actively syncing," instead
+	// of both reading as the same generic "still building" line.
+	syncQueued atomic.Bool
 
 	// syncDone is closed when runInitialSync's own background goroutine actually returns — distinct
 	// from ready, which opens as soon as the FIRST idx.Sync call finishes but says nothing about
@@ -63,35 +69,49 @@ type repoInstance struct {
 	closeOnce sync.Once
 }
 
-// runInitialSync runs behind the per-repository flock, then closes the readiness gate exactly once
-// regardless of outcome — a Sync error still opens the gate (a tool call then gets whatever
-// codegraph can answer from an empty or partial index, which is honest; it does not hang forever).
+// runInitialSync acquires the cross-process flock, then the process-wide sync-worker slot, then
+// runs the actual Sync — closing the readiness gate exactly once regardless of outcome (a Sync
+// error still opens the gate: a tool call then gets whatever codegraph can answer from an empty
+// or partial index, which is honest; it does not hang forever).
+//
+// Group 1a/1b: the semaphore acquire used to be the very first thing this function did, wrapping
+// AcquireSyncLock's own up-to-5-minute flock wait — so a repository doing zero CPU work (just
+// waiting on another process's lock) held the one process-wide slot for the whole wait, blocking
+// every other attached repository's Sync from ever starting. AcquireSyncLock is now called first
+// and is itself ctx-aware, so cancel() (close(), below) can cut that wait short; the semaphore is
+// now acquired only once the lock wait is over, wrapping just the real work (idx.Sync).
 func (inst *repoInstance) runInitialSync(ctx context.Context, home string) {
 	defer close(inst.syncDone)
 
-	// 3a: wait for a free slot before doing any real work — bounds how many repositories' initial
-	// Sync run at once, process-wide, to codeindex/sync.go's own single-Sync worker cap rather than
-	// N times it. A revoke/detach while still queued (ctx cancelled before a slot frees up) returns
-	// with ready never opened — correct, since nothing was ever synced; waitReady's own `done`/ctx
-	// cases (not this instance's ready gate) are what unblock a caller in that case.
-	if inst.syncSem != nil {
-		select {
-		case inst.syncSem <- struct{}{}:
-			defer func() { <-inst.syncSem }()
-		case <-ctx.Done():
-			return
-		}
-	}
-
-	lock, acquired, err := codeindex.AcquireSyncLock(home, inst.repoID, codeindex.DefaultSyncLockTimeout)
-	if err != nil {
+	lock, acquired, err := codeindex.AcquireSyncLock(ctx, home, inst.repoID, codeindex.DefaultSyncLockTimeout)
+	if err != nil && ctx.Err() == nil {
 		inst.log.Warn("repo-map sync lock", "scope", "repomap", "repo", inst.repoID, "err", err)
 	}
 	inst.lockMu.Lock()
 	inst.lock = lock
 	inst.lockMu.Unlock()
 	if !acquired {
-		inst.log.Debug("repo-map sync lock: proceeding without it (timeout or unsupported platform)", "scope", "repomap", "repo", inst.repoID)
+		inst.log.Debug("repo-map sync lock: proceeding without it (timeout, cancellation, or unsupported platform)", "scope", "repomap", "repo", inst.repoID)
+	}
+	if ctx.Err() != nil {
+		// Cancelled while waiting on the lock (revoke/app quit) — nothing was synced, ready is
+		// deliberately left closed; waitReady's own `done`/ctx cases unblock any waiting caller.
+		return
+	}
+
+	// 3a: wait for a free slot before doing the actual parse work — bounds how many repositories'
+	// initial Sync run at once, process-wide, to codeindex/sync.go's own single-Sync worker cap
+	// rather than N times it. A revoke/detach while still queued (ctx cancelled before a slot
+	// frees up) returns with ready never opened — correct, since nothing was ever synced.
+	if inst.syncSem != nil {
+		inst.syncQueued.Store(true)
+		select {
+		case inst.syncSem <- struct{}{}:
+			inst.syncQueued.Store(false)
+			defer func() { <-inst.syncSem }()
+		case <-ctx.Done():
+			return
+		}
 	}
 
 	stats, err := inst.idx.Sync(ctx)
@@ -122,6 +142,13 @@ func (inst *repoInstance) waitReady(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-deadline:
+		// Group 5b: a repository still queued behind initialSyncSem's own slot (Group 1's fix
+		// makes this the common case for every repository after the first during a multi-repo
+		// cold boot) hasn't started syncing at all — "still building" wrongly implies active work
+		// in flight, so word the two cases distinctly.
+		if inst.syncQueued.Load() {
+			return fmt.Errorf("repo-map index for %s is queued behind another repository's initial index (waiting past %s) — retry shortly", inst.root, readyTimeout)
+		}
 		return fmt.Errorf("repo-map index for %s is still building (initial sync running past %s) — retry shortly", inst.root, readyTimeout)
 	}
 	// The gate above is one-shot, so a later full Sync (a watcher rescan) runs behind an
@@ -153,7 +180,10 @@ func (inst *repoInstance) info() RepoInfo {
 	if st := inst.idx.SyncState(); st.LastErr != nil {
 		degraded = st.LastErr.Error()
 	}
-	return RepoInfo{Key: inst.key, RepoID: inst.repoID, Root: inst.root, Ready: ready, Degraded: degraded}
+	return RepoInfo{
+		Key: inst.key, RepoID: inst.repoID, Root: inst.root, Ready: ready, Degraded: degraded,
+		Queued: inst.syncQueued.Load(),
+	}
 }
 
 // discardUnregistered closes an instance Attach built speculatively outside reposMu (3b, attach.go)

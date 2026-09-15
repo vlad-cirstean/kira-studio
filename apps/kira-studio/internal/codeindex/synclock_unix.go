@@ -7,6 +7,7 @@
 package codeindex
 
 import (
+	"context"
 	"errors"
 	"os"
 	"sync"
@@ -42,7 +43,16 @@ const syncLockPollInterval = 50 * time.Millisecond
 // polls for an exclusive, non-blocking flock up to timeout. A timeout is not an error the caller
 // must fail on — the caller proceeds without the lock rather than hang forever on a stuck one
 // (a stuck lock must degrade, never hang).
-func AcquireSyncLock(home, repoID string, timeout time.Duration) (*SyncLock, bool, error) {
+//
+// ctx interrupts the poll loop early (Group 1b/1a's own fix): a revoke or app quit calling
+// cancel() on the instance's own context must be able to cut this wait short instead of always
+// running out its own up-to-5-minute timeout while holding nothing but an idle wait — this used
+// to have no ctx parameter at all, so a caller's cancel() could not reach it, and the flock wait
+// could hold a process-wide resource (repomap's initialSyncSem, once moved to wrap only the real
+// work) far longer than the work it was meant to bound. Returns ctx.Err() (not the timeout's own
+// nil-error degrade) so a caller can tell "cancelled, give up" apart from "timed out, proceed
+// without the lock".
+func AcquireSyncLock(ctx context.Context, home, repoID string, timeout time.Duration) (*SyncLock, bool, error) {
 	path := SyncLockPath(home, repoID)
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
@@ -62,7 +72,12 @@ func AcquireSyncLock(home, repoID string, timeout time.Duration) (*SyncLock, boo
 			_ = f.Close()
 			return nil, false, nil
 		}
-		time.Sleep(syncLockPollInterval)
+		select {
+		case <-ctx.Done():
+			_ = f.Close()
+			return nil, false, ctx.Err()
+		case <-time.After(syncLockPollInterval):
+		}
 	}
 }
 

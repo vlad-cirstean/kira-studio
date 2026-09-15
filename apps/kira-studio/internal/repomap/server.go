@@ -14,6 +14,7 @@ package repomap
 
 import (
 	"log/slog"
+	"runtime"
 	"sync"
 	"time"
 
@@ -22,6 +23,19 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+// initialSyncSemCapacity sizes initialSyncSem proportionate to the machine (P69 review, finding
+// 1c) rather than a hardcoded 1: each Sync's own worker pool already caps parse concurrency at
+// min(NumCPU, 4) (codeindex/sync.go's syncWorkers), so allowing roughly NumCPU/4 concurrent Syncs
+// bounds total concurrent parse workers to roughly NumCPU overall instead of either serializing
+// every repository's index one after another (capacity 1) or letting N repositories multiply the
+// per-Sync cap by N with no bound at all.
+func initialSyncSemCapacity() int {
+	if n := runtime.NumCPU() / 4; n > 1 {
+		return n
+	}
+	return 1
+}
 
 // readyTimeout bounds every tool call's own wait on an instance's readiness gate (instance.go) —
 // never an empty result while the index is still building, and never a hang past this bound either.
@@ -74,13 +88,19 @@ type Server struct {
 	repos   map[string]*repoInstance
 	order   []string // attach order, for a stable list_repos/Repos()
 
-	// initialSyncSem bounds how many repositories' own initial full Sync (attach.go's Attach,
-	// runInitialSync) run at once — capacity 1, so N attached repositories never multiply
-	// codeindex/sync.go's own syncWorkers() bound by N (P68 review, performance finding 3a):
-	// codeindex's own worker cap already bounds ONE Sync's own CPU/SQLite-write impact; nothing
-	// above this Server bounded how many Syncs could be doing that at once. A watcher-driven
-	// rescan is not gated by this — it is incremental and per-file, not the multi-second full pass
-	// this exists to bound.
+	// initialSyncSem bounds how many repositories' own full Sync — an initial Sync
+	// (attach.go's Attach, runInitialSync) or a watcher-triggered rescan Sync (codeindex/watch.go's
+	// own fire) — run at once, process-wide (P68 review, performance finding 3a; P69 review,
+	// finding 1d: a rescan Sync is the identical multi-second full pass an initial Sync is, so it
+	// is gated by this same semaphore too, not exempt from it). codeindex/sync.go's own
+	// syncWorkers() already caps ONE Sync's own parse concurrency at min(NumCPU, 4); this bounds
+	// how many Syncs can be doing that at once. Capacity is proportionate to the machine
+	// (max(1, NumCPU/4)) rather than a hardcoded 1 (P69 review, finding 1c) — a hardcoded 1 pinned
+	// multi-repo cold boot to 25% of a 16-core machine while fully serializing every repository's
+	// index one after another. The semaphore wraps only the actual Sync call, never the
+	// cross-process flock wait ahead of it (instance.go's runInitialSync) — P69 review finding 1a:
+	// a repository doing zero CPU work while just waiting on another process's lock must never
+	// hold this slot idle for however long that wait takes.
 	initialSyncSem chan struct{}
 
 	mcp *mcp.Server
@@ -115,7 +135,7 @@ func New(cfg Config) (*Server, error) {
 		tokenPlain:     cfg.TokenPlain,
 		tokenMinted:    cfg.TokenPlain != "",
 		repos:          make(map[string]*repoInstance),
-		initialSyncSem: make(chan struct{}, 1),
+		initialSyncSem: make(chan struct{}, initialSyncSemCapacity()),
 	}
 
 	s.mcp = s.buildMCPServer()

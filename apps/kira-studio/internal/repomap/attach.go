@@ -32,6 +32,10 @@ type RepoInfo struct {
 	Key, RepoID, Root string
 	Ready             bool   // the initial sync has finished
 	Degraded          string // idx.SyncState().LastErr, "" when healthy
+	// Queued is true while this repository is waiting on initialSyncSem's own slot, after its
+	// flock wait has already finished but before any real Sync work has started (Group 5b) — a
+	// !Ready repository with Queued false is actively syncing, not merely waiting its turn.
+	Queued bool
 }
 
 // attachFastPathLocked answers Attach's two "nothing to build" outcomes — this exact repository
@@ -86,7 +90,7 @@ func (s *Server) Attach(spec RepoSpec) (RepoInfo, error) {
 		store: s.store, idx: idx, graph: graph, log: s.log, syncSem: s.initialSyncSem,
 		ready: make(chan struct{}), done: make(chan struct{}), syncDone: make(chan struct{}), cancel: cancel,
 	}
-	watcher, err := idx.Watch()
+	watcher, err := idx.Watch(runCtx, s.initialSyncSem)
 	if err != nil {
 		// A watcher failure is not fatal to serving what has already synced — logged, not
 		// returned, the same posture a bind failure gets.

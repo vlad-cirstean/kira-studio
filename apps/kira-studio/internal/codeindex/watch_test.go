@@ -1,6 +1,7 @@
 package codeindex
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -63,7 +64,7 @@ func awaitCalls(t *testing.T, spy *firingSpy, n int) []firingCall {
 func TestWatcher_CoalescesWithinOneWindow(t *testing.T) {
 	fake := &fakeBackend{events: make(chan rawEvent, 4)}
 	spy := &firingSpy{}
-	w := newWatcherWith(nil, fake, spy.record)
+	w := newWatcherWith(nil, fake, spy.record, context.Background(), nil)
 	t.Cleanup(func() { _ = w.Close() })
 
 	fake.events <- rawEvent{Path: "/repo/a.js"}
@@ -91,7 +92,7 @@ func TestWatcher_CoalescesWithinOneWindow(t *testing.T) {
 func TestWatcher_LeadingWindowFiring(t *testing.T) {
 	fake := &fakeBackend{events: make(chan rawEvent, 16)}
 	spy := &firingSpy{}
-	w := newWatcherWith(nil, fake, spy.record)
+	w := newWatcherWith(nil, fake, spy.record, context.Background(), nil)
 	t.Cleanup(func() { _ = w.Close() })
 
 	start := time.Now()
@@ -115,7 +116,7 @@ func TestWatcher_LeadingWindowFiring(t *testing.T) {
 func TestWatcher_RescanSupersedesPathSet(t *testing.T) {
 	fake := &fakeBackend{events: make(chan rawEvent, 4)}
 	spy := &firingSpy{}
-	w := newWatcherWith(nil, fake, spy.record)
+	w := newWatcherWith(nil, fake, spy.record, context.Background(), nil)
 	t.Cleanup(func() { _ = w.Close() })
 
 	fake.events <- rawEvent{Path: "/repo/a.js"}
@@ -135,7 +136,7 @@ func TestWatcher_RescanSupersedesPathSet(t *testing.T) {
 func TestWatcher_CloseDuringPendingTimer(t *testing.T) {
 	fake := &fakeBackend{events: make(chan rawEvent, 1)}
 	spy := &firingSpy{}
-	w := newWatcherWith(nil, fake, spy.record)
+	w := newWatcherWith(nil, fake, spy.record, context.Background(), nil)
 
 	fake.events <- rawEvent{Path: "/repo/a.js"} // arms the timer; window has not elapsed yet.
 

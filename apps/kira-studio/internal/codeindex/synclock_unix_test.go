@@ -3,6 +3,7 @@
 package codeindex
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -19,7 +20,7 @@ func TestAcquireSyncLockSecondWaits(t *testing.T) {
 	home := t.TempDir()
 	repoID := "test-repo"
 
-	lock, acquired, err := AcquireSyncLock(home, repoID, time.Second)
+	lock, acquired, err := AcquireSyncLock(context.Background(), home, repoID, time.Second)
 	if err != nil {
 		t.Fatalf("AcquireSyncLock: %v", err)
 	}
@@ -31,7 +32,7 @@ func TestAcquireSyncLockSecondWaits(t *testing.T) {
 	// per-open-file-description, so this genuinely exercises cross-descriptor contention, the
 	// same shape two separate processes would see.
 	start := time.Now()
-	_, acquired2, err := AcquireSyncLock(home, repoID, 100*time.Millisecond)
+	_, acquired2, err := AcquireSyncLock(context.Background(), home, repoID, 100*time.Millisecond)
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatalf("second AcquireSyncLock: %v", err)
@@ -46,7 +47,7 @@ func TestAcquireSyncLockSecondWaits(t *testing.T) {
 	lock.Release()
 
 	// Once released, a fresh acquisition succeeds promptly.
-	lock2, acquired3, err := AcquireSyncLock(home, repoID, time.Second)
+	lock2, acquired3, err := AcquireSyncLock(context.Background(), home, repoID, time.Second)
 	if err != nil {
 		t.Fatalf("third AcquireSyncLock: %v", err)
 	}
@@ -54,4 +55,40 @@ func TestAcquireSyncLockSecondWaits(t *testing.T) {
 		t.Fatal("third AcquireSyncLock did not acquire the lock after release")
 	}
 	lock2.Release()
+}
+
+// TestAcquireSyncLockCtxCancelInterruptsWait is Group 1b's own claim: cancelling ctx must cut the
+// poll loop short well before the lock's own timeout, not just before the caller gets back
+// control after the full wait — the whole point of threading ctx through here at all.
+func TestAcquireSyncLockCtxCancelInterruptsWait(t *testing.T) {
+	home := t.TempDir()
+	repoID := "test-repo"
+
+	lock, acquired, err := AcquireSyncLock(context.Background(), home, repoID, time.Second)
+	if err != nil {
+		t.Fatalf("AcquireSyncLock: %v", err)
+	}
+	if !acquired {
+		t.Fatal("first AcquireSyncLock did not acquire the lock")
+	}
+	defer lock.Release()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+
+	start := time.Now()
+	_, acquired2, err := AcquireSyncLock(ctx, home, repoID, time.Minute)
+	elapsed := time.Since(start)
+	if acquired2 {
+		t.Fatal("second AcquireSyncLock succeeded while the first still holds the lock")
+	}
+	if err == nil {
+		t.Fatal("AcquireSyncLock with a cancelled ctx returned a nil error")
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("AcquireSyncLock took %s to notice ctx cancellation, want well under its own 1-minute timeout", elapsed)
+	}
 }

@@ -52,6 +52,18 @@ type Watcher struct {
 	// or store at all, the same role a fake backend plays for gitclient/watcher_test.go.
 	onFire func(paths map[string]bool, rescan bool)
 
+	// ctx bounds a rescan-triggered full Sync and a per-file reparse (fire, below) — the caller's
+	// own long-lived cancellable context (repomap's runCtx/inst.cancel, or codeworkspace's own
+	// EnsureIndex ctx), never context.Background() (Group 1d: that left Close() blocking
+	// synchronously on an in-flight rescan Sync with no way to notice cancellation — cancel()
+	// called ahead of Close() by both owners now actually reaches it).
+	ctx context.Context
+	// sem, when non-nil, gates a rescan Sync behind the same slot budget an initial Sync already
+	// respects (repomap.Server's own initialSyncSem) — a dropped/overflowed watch event triggers
+	// the identical multi-second full-repository Sync the initial-sync semaphore exists to bound,
+	// so it must be gated by the same semaphore rather than running unbounded alongside it.
+	sem chan struct{}
+
 	stop chan struct{}
 	done chan struct{}
 
@@ -59,16 +71,21 @@ type Watcher struct {
 }
 
 // Watch starts idx's own worktree watcher. Close stops it; it does not stop idx itself.
-func (idx *Index) Watch() (*Watcher, error) {
+//
+// ctx must be a long-lived context the caller cancels itself (never a per-request context) —
+// cancelling it ahead of Close() is what lets Close() return promptly instead of blocking on an
+// in-flight rescan Sync (Group 1d). sem, when non-nil, gates a rescan Sync's own CPU cost behind
+// the same budget as an initial Sync; pass nil where no such budget exists.
+func (idx *Index) Watch(ctx context.Context, sem chan struct{}) (*Watcher, error) {
 	src, err := newBackend(idx)
 	if err != nil {
 		return nil, err
 	}
-	return newWatcherWith(idx, src, nil), nil
+	return newWatcherWith(idx, src, nil, ctx, sem), nil
 }
 
-func newWatcherWith(idx *Index, src backend, onFire func(paths map[string]bool, rescan bool)) *Watcher {
-	w := &Watcher{idx: idx, src: src, onFire: onFire, stop: make(chan struct{}), done: make(chan struct{})}
+func newWatcherWith(idx *Index, src backend, onFire func(paths map[string]bool, rescan bool), ctx context.Context, sem chan struct{}) *Watcher {
+	w := &Watcher{idx: idx, src: src, onFire: onFire, ctx: ctx, sem: sem, stop: make(chan struct{}), done: make(chan struct{})}
 	go w.run()
 	return w
 }
@@ -141,8 +158,19 @@ func (w *Watcher) fire(pending map[string]bool, rescan bool) {
 		w.onFire(pending, rescan)
 		return
 	}
-	ctx := context.Background() // watcher-driven work outlives any one caller's request context; Close() is its own cancellation.
+	ctx := w.ctx
+	if ctx == nil {
+		ctx = context.Background() // defensive fallback only — every real caller passes one (Watch's own doc).
+	}
 	if rescan {
+		if w.sem != nil {
+			select {
+			case w.sem <- struct{}{}:
+				defer func() { <-w.sem }()
+			case <-ctx.Done():
+				return
+			}
+		}
 		if _, err := w.idx.Sync(ctx); err != nil {
 			slog.Warn("codeindex: rescan sync", "scope", "watch", "repoId", w.idx.repoID, "err", err)
 		}
@@ -165,13 +193,13 @@ func (idx *Index) handleFiring(ctx context.Context, paths map[string]bool) {
 			continue
 		}
 
-		_, hadRow, err := idx.store.GetFile(ctx, idx.repoID, relPath)
+		row, hadRow, err := idx.store.GetFile(ctx, idx.repoID, relPath)
 		if err != nil {
 			slog.Warn("codeindex: get file for watch event", "scope", "watch", "path", relPath, "err", err)
 			continue
 		}
 		if hadRow {
-			if err := idx.reparseChangedPath(ctx, absPath, relPath); err != nil {
+			if err := idx.reparseChangedPath(ctx, absPath, relPath, row); err != nil {
 				slog.Warn("codeindex: reparse on change", "scope", "watch", "path", relPath, "err", err)
 			}
 			continue
@@ -201,15 +229,10 @@ func (idx *Index) relPath(absPath string) (string, bool) {
 }
 
 // reparseChangedPath handles an event path that is already a file row: reparse it, or delete its
-// row (and forget its resident tree) if it no longer exists on disk.
-func (idx *Index) reparseChangedPath(ctx context.Context, absPath, relPath string) error {
-	row, hadRow, err := idx.store.GetFile(ctx, idx.repoID, relPath)
-	if err != nil {
-		return err
-	}
-	if !hadRow {
-		return nil
-	}
+// row (and forget its resident tree) if it no longer exists on disk. row is the caller's own
+// already-fetched GetFile result (handleFiring's own row, Group 5h) — reparseChangedPath never
+// re-queries it itself.
+func (idx *Index) reparseChangedPath(ctx context.Context, absPath, relPath string, row FileRow) error {
 	if _, statErr := os.Stat(absPath); statErr != nil {
 		if err := idx.store.DeleteFile(ctx, idx.repoID, relPath); err != nil {
 			return err

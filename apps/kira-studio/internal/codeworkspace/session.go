@@ -147,7 +147,7 @@ func (s *Session) EnsureIndex(store *codeindex.Store, home string, log *slog.Log
 	// D11) so the desktop app's own native workspace and an embedded/headless repo-map server
 	// never parse one repository's initial sync twice at once.
 	go func() {
-		lock, acquired, err := codeindex.AcquireSyncLock(home, s.IndexRepoID, codeindex.DefaultSyncLockTimeout)
+		lock, acquired, err := codeindex.AcquireSyncLock(ctx, home, s.IndexRepoID, codeindex.DefaultSyncLockTimeout)
 		if err != nil {
 			log.Warn("codeworkspace sync lock", "scope", "codeworkspace", "repo", s.IndexRepoID, "err", err)
 		}
@@ -170,7 +170,7 @@ func (s *Session) EnsureIndex(store *codeindex.Store, home string, log *slog.Log
 		close(ready)
 	}()
 
-	w, err := idx.Watch()
+	w, err := idx.Watch(ctx, nil)
 	if err != nil {
 		// A watcher failure is not fatal to serving what has already synced — logged, not
 		// returned, same posture as repomap.Server's own construction.

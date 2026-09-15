@@ -449,6 +449,8 @@ func (s *Server) listRepos(_ context.Context, _ *mcp.CallToolRequest, _ listRepo
 		switch {
 		case r.Degraded != "":
 			state = "degraded: " + r.Degraded
+		case !r.Ready && r.Queued:
+			state = "queued behind another repository's initial index"
 		case !r.Ready:
 			state = "indexing"
 		}
