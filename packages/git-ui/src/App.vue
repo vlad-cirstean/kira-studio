@@ -54,7 +54,7 @@ import GitBlockedPanel from './components/GitBlockedPanel.vue';
 import LoadMoreButton from './components/LoadMoreButton.vue';
 import NoRepositoryPanel from './components/NoRepositoryPanel.vue';
 import RowContextMenu from './components/RowContextMenu.vue';
-import { remoteCheckoutTarget } from './components/refListModel.ts';
+import { localNameForRemoteBranch, remoteCheckoutTarget } from './components/refListModel.ts';
 import {
   buildReadOnlyRefMenu,
   buildReadOnlyRowMenu,
@@ -99,7 +99,7 @@ import {
   type ViewStateStore,
 } from './state/viewState.ts';
 import { WorkingDetailState } from './state/working.ts';
-import { WorktreeState } from './state/worktrees.ts';
+import { type WorktreeCreateSeed, WorktreeState } from './state/worktrees.ts';
 
 const props = defineProps<{
   transport: Transport;
@@ -526,6 +526,10 @@ async function onCommitMenuSelect(id: string): Promise<void> {
     case 'createTagHere':
       tagDialogState.value = { open: true, target: commit.sha };
       return;
+    case 'createWorktreeHere':
+      // P76 §9.1: a commit is a point, not a line of development — the dialog's own detach mode.
+      worktreeCreateRequest.value = { mode: 'detach', startPoint: commit.sha };
+      return;
     case 'revertThisCommit':
       await opsState.runRevert([commit.sha]);
       return;
@@ -635,10 +639,11 @@ function handleSaveEntryToGlobalStash(entry: StashEntry): void {
 // nothing of its own" shape stashCreateOpen/tagDialogState above already follow.
 const repoSettingsDialogOpen = ref(false);
 
-// G25: WorktreeDialog.vue's own create-mode toggle — same "App.vue owns the boolean" shape
-// stashCreateOpen already follows, opened by both the toolbar/branch-picker button and the
-// `createWorktree` palette action.
-const worktreeCreateOpen = ref(false);
+// G25/P76 §9.3: WorktreeDialog.vue's own create-phase seed — same "App.vue owns the state, the
+// dialog owns nothing of its own" shape stackDialogTarget below already follows. Opened (and
+// re-seeded) by the toolbar/branch-picker button, the `createWorktree` palette action, and a
+// "Create worktree here…" row action; `undefined` closes it.
+const worktreeCreateRequest = ref<WorktreeCreateSeed | undefined>(undefined);
 
 // G26 D13/4.8: StackDialog.vue's own two-mode target — same "App.vue owns the state, the dialog
 // component owns nothing of its own" shape every other dialog above follows. `undefined` ⇒
@@ -675,6 +680,12 @@ async function handleOpenWorktreeWindow(path: string): Promise<void> {
   const repoId = repoState.value?.activeRepo.value?.repoId;
   if (repoId === undefined) return;
   await bridge.request('worktree.openWindow', { repoId, path });
+}
+
+/** `WorktreeList.vue`'s own create button emits no seed (`undefined`); a ref/commit row action
+ *  (§9.3) emits one. `{}` keeps `WorktreeDialog.vue`'s existing defaults either way (P76 §9.1). */
+function onCreateWorktree(seed?: WorktreeCreateSeed): void {
+  worktreeCreateRequest.value = seed ?? {};
 }
 
 // ---------------------------------------------------------------------------------------
@@ -768,6 +779,19 @@ async function onRefMenuSelect(id: string): Promise<void> {
       forceDeleteRefCandidate.value = { name: state.name, x: state.x, y: state.y };
     }
     return;
+  }
+  if (id === 'createWorktreeHere') {
+    // P76 §9.1: `existingBranch` needs a branch that exists locally already; a remote-tracking
+    // ref's local name may not (`localNameForRemoteBranch`, the same derivation `checkoutRef`
+    // above uses for the DWIM checkout), so that arm creates it as a new branch instead.
+    worktreeCreateRequest.value =
+      state.kind === 'remoteBranch'
+        ? {
+            mode: 'newBranch',
+            branch: localNameForRemoteBranch(state.name),
+            startPoint: state.name,
+          }
+        : { mode: 'existingBranch', branch: state.name };
   }
 }
 
@@ -900,7 +924,7 @@ function runUiAction(
       globalStashSaveOpen.value = true;
       break;
     case 'createWorktree':
-      worktreeCreateOpen.value = true;
+      worktreeCreateRequest.value = {};
       break;
     case 'resetSelected': {
       const sha = selection.sha.value;
@@ -1475,7 +1499,7 @@ onBeforeUnmount(() => {
           @save-entry-to-global-stash="handleSaveEntryToGlobalStash"
           @switch-worktree="handleSwitchWorktree"
           @open-worktree-window="handleOpenWorktreeWindow"
-          @create-worktree="worktreeCreateOpen = true"
+          @create-worktree="onCreateWorktree"
           @open-restack-dialog="handleOpenRestackDialog"
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @open-repo-settings="repoSettingsDialogOpen = true"
@@ -1513,7 +1537,7 @@ onBeforeUnmount(() => {
           @save-entry-to-global-stash="handleSaveEntryToGlobalStash"
           @switch-worktree="handleSwitchWorktree"
           @open-worktree-window="handleOpenWorktreeWindow"
-          @create-worktree="worktreeCreateOpen = true"
+          @create-worktree="onCreateWorktree"
           @open-restack-dialog="handleOpenRestackDialog"
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @open-repo-settings="repoSettingsDialogOpen = true"
@@ -1738,11 +1762,11 @@ onBeforeUnmount(() => {
             :worktrees="worktreeState"
             :ops="opsState"
             :refs="refsState"
-            :create-open="worktreeCreateOpen"
+            :create-request="worktreeCreateRequest"
             :base-path-default="worktreeBasePathDefault"
             :prepare-script="worktreePrepareScript"
             :run-prepare-script-capability="actions?.capabilities.runPrepareScript ?? false"
-            @close-create="worktreeCreateOpen = false"
+            @close-create="worktreeCreateRequest = undefined"
           />
           <StackDialog
             :stack="stackState"

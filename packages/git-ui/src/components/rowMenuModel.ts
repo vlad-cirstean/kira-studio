@@ -71,6 +71,11 @@ export function buildRowMenu(ctx: CommitMenuContext): MenuSection[] {
     ),
     plainItem('createBranchHere', 'Create branch here…', 'codicon-git-branch'),
     plainItem('createTagHere', 'Create tag here…', 'codicon-tag'),
+    // P76 §8: worktreeAdd is not in GATED_OP_KINDS (git-core/src/model/operation.ts) — canRunOp
+    // returns true for it unconditionally, so plainItem (not gatedItem, which would gate nothing)
+    // is the honest call. Creating a worktree during a merge/rebase touches neither the sequencer
+    // state nor the current worktree.
+    plainItem('createWorktreeHere', 'Create worktree here…', 'codicon-multiple-windows'),
     gatedItem(
       'revertThisCommit',
       'Revert this commit…',
@@ -226,6 +231,7 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
         items: [
           gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
           plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple'),
+          plainItem('createWorktreeHere', 'Create worktree here…', 'codicon-multiple-windows'),
         ],
       },
     ];
@@ -234,6 +240,7 @@ export function buildRefMenu(ctx: RefMenuContext): MenuSection[] {
     gatedItem('checkoutRef', 'Checkout', 'checkout', ctx.inProgress, 'codicon-check'),
     plainItem('renameRef', 'Rename branch…', 'codicon-edit'),
     plainItem('reviewBranch', 'Review branch changes', 'codicon-diff-multiple'),
+    plainItem('createWorktreeHere', 'Create worktree here…', 'codicon-multiple-windows'),
   ];
   // git refuses to delete the branch you are currently on — not one of §7.11's gated op kinds
   // (the gate is scoped to what an in-progress *operation* blocks), so this is its own, simpler
