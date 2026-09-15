@@ -527,6 +527,10 @@ async function clearColumnMask(ctx: HeaderMenuContext): Promise<void> {
 
 // D7: Sort asc/desc/Clear sort, Hide column/Show all columns, Copy column name/values.
 export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
+  // Computed once: the mark-pii submenu below reads it once per mask kind plus once for "Not
+  // PII" (7 reads total) — existingMaskRule does a fresh maskRulesFor()/filter()/find() scan
+  // each time, and ctx (and the rules it reads) cannot change between them within one menu build.
+  const currentMaskRule = existingMaskRule(ctx);
   return [
     {
       type: 'item',
@@ -615,7 +619,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
             type: 'item',
             id: `mask-${kind}`,
             label,
-            checked: existingMaskRule(ctx)?.kind === kind,
+            checked: currentMaskRule?.kind === kind,
             run: () => markColumnMaskKind(ctx, kind),
           }),
         ),
@@ -624,7 +628,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
           type: 'item',
           id: 'mask-none',
           label: 'Not PII',
-          checked: !existingMaskRule(ctx),
+          checked: !currentMaskRule,
           run: () => clearColumnMask(ctx),
         },
       ],
