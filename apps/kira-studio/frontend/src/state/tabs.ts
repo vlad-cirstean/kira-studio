@@ -42,6 +42,7 @@ import { consoleDefaultFor } from './consoleDefaults';
 import { tabsForWorkspace, workspaceKeyOf } from './mode';
 import { settingsState } from './settings';
 import { TAB_KINDS } from './tabKinds';
+import { isIncognito, registerIncognitoSetListener, setIncognito } from './tabIncognito';
 import { cleanupTabRuntime } from './tabRuntime';
 import { activateWorkspace, workspaceState } from './workspace';
 
@@ -123,8 +124,15 @@ let pendingSnapshot: string | null = null;
 // good. Assigning only after tabsSave actually resolves means a failed write leaves
 // lastSavedSnapshot at its last real success, so the next state change (even one that lands on the
 // same snapshot the failed save had) is not short-circuited away.
+// P71 §3.1: an incognito tab is never written — left out of the snapshot entirely, and
+// TabsService.Save replaces the window's whole tab set, so a tab switched to incognito mid-session
+// also drops whatever row it already had, with no separate delete call needed.
+function persistableTabs(): TabRecord[] {
+  return tabsState.tabs.filter((t) => !isIncognito(t.id));
+}
+
 function saveIfChanged(): void {
-  const snapshot = JSON.stringify(tabsState.tabs);
+  const snapshot = JSON.stringify(persistableTabs());
   if (snapshot === lastSavedSnapshot || snapshot === pendingSnapshot) return;
   pendingSnapshot = snapshot;
   // P21 round 3 performance finding 9: this used to hand `tabsState.tabs` itself — the live,
@@ -181,11 +189,18 @@ function flushPendingTabState(ack: () => void): void {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  void control.tabsSave(tabsState.tabs).finally(ack);
+  void control.tabsSave(persistableTabs()).finally(ack);
 }
 
 control.onFlushBeforeClose(() => flushPendingTabState(control.appFlushed));
 control.onWindowFlushBeforeClose(() => flushPendingTabState(control.windowFlushed));
+
+// P71 §3.1: turning incognito on flushes the tab's existing row immediately, rather than at
+// whatever unrelated state change saves next — tabIncognito.ts cannot call saveNow directly (it
+// would recreate the cycle its own module comment avoids), so it publishes the toggle here instead.
+registerIncognitoSetListener((_tabId, on) => {
+  if (on) saveNow();
+});
 
 // D7: main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
 // are already gone server-side — a tab this store still holds for it is a row that can never be
@@ -548,6 +563,9 @@ export function duplicateTab(id: string): string {
     workspaceId: source.workspaceId ?? null,
   } as unknown as TabRecord;
   tabsState.tabs.push(record);
+  // P71 §3.1: duplicating an incognito tab to try a variant must not silently start persisting
+  // it — the copy carries the flag too.
+  if (isIncognito(source.id)) setIncognito(newId, true);
   setActiveTabId(newId, workspaceKeyOf(source));
   tabsState.hydrated.add(newId);
   saveNow();
