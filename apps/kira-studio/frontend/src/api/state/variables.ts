@@ -9,6 +9,7 @@ import type {
 } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
+import { isIncognito } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { runReveal } from '../reveal';
 import { closeVariableSetTabsForOwner, openEnvironmentsTab, renameVariableSetTabs } from '../tabs';
@@ -73,6 +74,41 @@ export async function setActiveEnvironment(id: string): Promise<void> {
   await control.variablesSetActiveEnvironment(id);
   await loadEnvironments();
 }
+
+// ---- P71 §3.3: the per-tab environment override ----
+//
+// An incognito tab's own environment pick lives here, in memory, never touching
+// api_environments.is_active — switching environment is the main reason to open an incognito tab
+// at all, so the selector itself stays enabled and useful rather than disabled (§3.3's own
+// "declined" note). Absent (no entry) until the user actually picks one: an incognito tab inherits
+// the app-wide selection at open time, so the common case is byte-identical to today.
+const incognitoEnvByTab = new Map<string, string>(); // tabId → environment id ('' = none)
+
+export function environmentIdForTab(tabId: string): string {
+  if (isIncognito(tabId) && incognitoEnvByTab.has(tabId)) {
+    return incognitoEnvByTab.get(tabId) as string;
+  }
+  return activeEnvironmentId.value;
+}
+
+export function environmentColorForTab(tabId: string): PaletteColor {
+  if (!isIncognito(tabId) || !incognitoEnvByTab.has(tabId)) return activeEnvironmentColor.value;
+  const id = incognitoEnvByTab.get(tabId);
+  return variablesState.environments.find((e) => e.id === id)?.color ?? 'none';
+}
+
+/** In-memory when the tab is incognito, else the ordinary app-wide write (setActiveEnvironment). */
+export async function selectEnvironmentForTab(tabId: string, id: string): Promise<void> {
+  if (isIncognito(tabId)) {
+    incognitoEnvByTab.set(tabId, id);
+    return;
+  }
+  await setActiveEnvironment(id);
+}
+
+registerTabRuntimeCleanup((tabId) => {
+  incognitoEnvByTab.delete(tabId);
+});
 
 export async function createEnvironment(
   name: string,
