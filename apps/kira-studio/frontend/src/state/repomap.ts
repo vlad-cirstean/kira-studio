@@ -3,15 +3,16 @@ import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { settingsState } from './settings';
 
-// C3 §7.4: the Code intelligence tab's own store — the shape gitClientsState already established
-// for a status-plus-last-action pair, hydrated at boot alongside it (main.ts).
+// C3 §7.4/P67d §7.3: the Code intelligence tab's own store — the shape gitClientsState already
+// established for a status-plus-last-action pair, hydrated at boot alongside it (main.ts).
 const DEFAULT_STATUS: RepoMapStatus = {
   running: false,
-  repo: '',
+  url: '',
   command: '',
   claudeAvailable: false,
   probed: [],
   error: '',
+  repos: [],
 };
 
 export const repoMapState = reactive({
@@ -41,6 +42,13 @@ export async function setRepoMapEnabled(enabled: boolean): Promise<void> {
 // action in place of the command whenever status.running is true but status.command is empty.
 export async function regenerateRepoMapToken(): Promise<void> {
   repoMapState.status = await control.repoMapRegenerate();
+}
+
+// P67d §7.3/§7.4: the "Repository access" list's own per-row grant/revoke — no settingsState write,
+// since the grant lives in code_repos, not in settings; installResult is left alone, since a grant
+// change never invalidates an existing registration (the same token, the same URL).
+export async function setRepoMapRepoEnabled(id: string, enabled: boolean): Promise<void> {
+  repoMapState.status = await control.repoMapSetRepoEnabled(id, enabled);
 }
 
 export async function installRepoMapClaudeCode(): Promise<void> {

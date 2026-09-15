@@ -22,6 +22,7 @@ import {
   regenerateRepoMapToken,
   repoMapState,
   setRepoMapEnabled,
+  setRepoMapRepoEnabled,
 } from '../state/repomap';
 import { patchSettings, settingsState } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -173,6 +174,18 @@ async function onToggleRepoMapEnabled(enabled: boolean): Promise<void> {
     await setRepoMapEnabled(enabled);
   } finally {
     repoMapToggling.value = false;
+  }
+}
+
+// P67d §7.4: the "Repository access" list's own per-row toggle — keyed by code_repos.id so two
+// rows can never step on each other's disabled state while both are mid-flight.
+const repoMapRepoToggling = ref<string | null>(null);
+async function onToggleRepoMapRepo(id: string, enabled: boolean): Promise<void> {
+  repoMapRepoToggling.value = id;
+  try {
+    await setRepoMapRepoEnabled(id, enabled);
+  } finally {
+    repoMapRepoToggling.value = null;
   }
 }
 
@@ -877,9 +890,9 @@ async function onSave(): Promise<void> {
               />
               <span>Enable the repository-map MCP server</span>
               <span class="helper-text"
-                >Lets an AI coding assistant navigate this checkout's code (definitions,
-                references, file outlines) from a pre-built index, without reading every file
-                itself. Starts and stops with this toggle.</span
+                >Starts a local MCP server so an AI coding assistant can navigate your code
+                (definitions, references, file outlines) from a pre-built index instead of reading
+                every file. Grant it access to individual repositories below.</span
               >
             </label>
 
@@ -905,11 +918,13 @@ async function onSave(): Promise<void> {
                 </p>
               </template>
               <template v-else-if="repoMapState.status.running">
-                <!-- §0 D8: an app restart loaded the existing token's hash+salt but the plaintext
-                     itself is unknown to this process — a hash cannot be reversed. -->
+                <!-- P67d §6.3 (D2): one app-scoped token now covers every granted repository, so an
+                     enable no longer mints unconditionally — this is also what an app restart looks
+                     like (the existing token's hash+salt loaded, but the plaintext itself unknown to
+                     this process; a hash cannot be reversed). -->
                 <p class="muted-note" data-testid="repomap-no-token">
-                  This server restarted since it was last enabled; its registration command needs a
-                  fresh token to show again.
+                  Using the registration from last time — it's still valid. Regenerate only if it
+                  was never registered with Claude Code, or you want to invalidate it.
                 </p>
                 <AppButton
                   kind="dialog"
@@ -921,6 +936,48 @@ async function onSave(): Promise<void> {
                   Regenerate token
                 </AppButton>
               </template>
+
+              <h3 class="section-subhead">Repository access</h3>
+              <p class="muted-note">
+                An assistant can navigate only the repositories granted here. Nothing is shared by
+                default.
+              </p>
+              <p
+                v-if="repoMapState.status.repos.length === 0"
+                class="muted-note"
+                data-testid="repomap-repos-empty"
+              >
+                No repositories imported yet. Import one from the Git module's panel.
+              </p>
+              <ul v-else class="repomap-repos-list" data-testid="repomap-repos-list">
+                <li
+                  v-for="repo in repoMapState.status.repos"
+                  :key="repo.id"
+                  class="repomap-repo-row"
+                  :data-testid="`repomap-repo-row-${repo.id}`"
+                >
+                  <div class="repomap-repo-info">
+                    <span class="repomap-repo-name">{{ repo.name }}</span>
+                    <span class="helper-text mono">{{ repo.root }}</span>
+                    <span
+                      v-if="repo.error"
+                      class="field-error"
+                      :data-testid="`repomap-repo-error-${repo.id}`"
+                    >
+                      {{ repo.error }}
+                    </span>
+                    <span v-else-if="repo.serving" class="helper-text">
+                      {{ repo.ready ? `Shared as "${repo.key}"` : 'Indexing…' }}
+                    </span>
+                  </div>
+                  <Checkbox
+                    :model-value="repo.enabled"
+                    :disabled="repoMapRepoToggling === repo.id"
+                    :data-testid="`repomap-repo-toggle-${repo.id}`"
+                    @update:model-value="(v) => onToggleRepoMapRepo(repo.id, v)"
+                  />
+                </li>
+              </ul>
             </template>
           </template>
 
@@ -1243,6 +1300,40 @@ async function onSave(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* P67d §7.4: the "Repository access" list — .git-clients-list/.git-client-row's own pattern, with
+   the info column allowed to wrap the root path instead of eliding it. */
+.repomap-repos-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repomap-repo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border: var(--kira-border-width) solid var(--kira-border);
+  border-radius: var(--kira-radius-sm);
+}
+
+.repomap-repo-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-1);
+  min-width: 0;
+}
+
+.repomap-repo-name {
+  color: var(--kira-fg);
+  font-size: var(--kira-t-sm);
+  overflow-wrap: break-word;
 }
 
 /* SettingsDialog.html's row-density preview strip */
