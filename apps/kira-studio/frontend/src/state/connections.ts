@@ -91,6 +91,7 @@ function defaultDraft(): ConnectionInput {
     mcpReadMode: 'allow',
     mcpWriteMode: 'prompt',
     mcpDdlMode: 'deny',
+    mcpAutoExplain: true,
   };
 }
 

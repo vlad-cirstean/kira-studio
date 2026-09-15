@@ -102,6 +102,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<SqliteFixture> 
     mcpReadMode: 'allow',
     mcpWriteMode: 'prompt',
     mcpDdlMode: 'deny',
+    mcpAutoExplain: true,
     password: null,
   };
 

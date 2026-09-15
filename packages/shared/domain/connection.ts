@@ -131,6 +131,12 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   mcpReadMode: mcpPermissionModeSchema.default('allow'),
   mcpWriteMode: mcpPermissionModeSchema.default('prompt'),
   mcpDdlMode: mcpPermissionModeSchema.default('deny'),
+  // M3: runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
+  // and pauses the query for a human decision when the plan crosses the expensive-query row
+  // threshold. `.default(true)` is load-bearing the same way mcpEnabled's is — an older stored row
+  // has no such key. Separate from autoExplain (above), which governs this app's own console — see
+  // the migration's own comment for why one switch cannot mean both.
+  mcpAutoExplain: z.boolean().default(true),
 });
 
 // SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes
@@ -141,6 +147,18 @@ export const AWS_STYLE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqs', 's3'
 // Kinds whose "connection" is a local file path, not a network endpoint (P35 D10/D11). Fields
 // mode repurposes `database` for the absolute path; host/port/username/password are unused.
 export const FILE_KINDS: ReadonlySet<ConnectionKind> = new Set(['sqlite']);
+
+// M3 §7/§9.1: the five kinds that have an EXPLAIN this app can parse — frontend/src/views/console/
+// explain.ts's explainStatementsFor switch is the real authority (its own comment cross-references
+// this constant); this copy exists so project/ConnectionDialog.vue's own auto-explain checkbox can
+// read it without project/ importing views/ directly (SPEC §11).
+export const EXPLAIN_SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
+  'postgres',
+  'mysql',
+  'mariadb',
+  'sqlite',
+  'clickhouse',
+]);
 
 export const connectionInputSchema = connectionFieldsSchema.superRefine((input, ctx) => {
   if (input.mode === 'fields') {

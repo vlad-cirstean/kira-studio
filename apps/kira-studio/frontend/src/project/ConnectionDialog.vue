@@ -6,6 +6,7 @@ import {
   connectionInputSchema,
   connectionKindSchema,
   DEFAULT_PORT,
+  EXPLAIN_SUPPORTED_KINDS,
   FILE_KINDS,
   MIN_SERVER_VERSION,
 } from '@shared/domain/connection';
@@ -86,6 +87,12 @@ function mcpModeOptions(
 
 const draft = computed(() => connectionsState.dialog.draft);
 const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
+// M3 §9.1: whether this kind has an EXPLAIN this app can parse at all — the auto-explain checkbox
+// is disabled (never hidden) for the rest, since the setting is visible where it's set rather than
+// discovered missing.
+const mcpExplainSupported = computed(
+  () => !!draft.value && EXPLAIN_SUPPORTED_KINDS.has(draft.value.kind),
+);
 // P25 D8: reported once at startup (state/connections.ts's hydrateConnections()), never changes
 // for the life of the process.
 const secretStatus = computed(() => connectionsState.secretStorage);
@@ -797,6 +804,23 @@ const preconnectText = computed({
               app.
             </span>
           </div>
+
+          <label class="field checkbox">
+            <Checkbox
+              v-model="draft.mcpAutoExplain"
+              :disabled="!draft.mcpEnabled || !mcpExplainSupported"
+              data-testid="connection-mcp-auto-explain"
+            />
+            <span>Plan queries before running them</span>
+            <span v-if="mcpExplainSupported" class="helper-text">
+              An EXPLAIN runs before every SELECT this connection's MCP clients send, and a plan
+              estimated to read more than the expensive-query threshold pauses the query until you
+              approve it.
+            </span>
+            <span v-else class="helper-text">
+              This engine has no query plan this app can read, so the setting has no effect.
+            </span>
+          </label>
 
           <div class="field">
             <label>Read <span class="dim">— SELECT and its engine equivalents</span></label>

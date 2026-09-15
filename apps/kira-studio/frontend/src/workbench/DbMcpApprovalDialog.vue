@@ -42,6 +42,21 @@ const classWord = computed(() => {
   return cls ? (CLASS_WORDS[cls] ?? 'a statement') : 'a statement';
 });
 
+// M3 §6.2/§6.3: the same dialog, one more reason to raise it — title and lede vary by reason,
+// everything else (Deny focused on mount, Escape denies, the countdown, the queue count, the
+// statement <pre>) stays exactly as M2 shipped it. A heavy query and a write are the same keyboard
+// interaction.
+const dialogTitle = computed(() =>
+  dbMcpState.approval.pending?.reason === 'heavy' ? 'Run this heavy query?' : 'Approve this query?',
+);
+
+const heavyLede = computed(() => {
+  const plan = dbMcpState.approval.pending?.plan;
+  const pending = dbMcpState.approval.pending;
+  if (!pending || !plan || plan.estimatedRowsRead === null) return '';
+  return `${pending.connectionName} (${pending.kind}) wants to run a query estimated to read ${plan.estimatedRowsRead.toLocaleString()} rows — over your threshold of ${plan.thresholdRows.toLocaleString()}.`;
+});
+
 async function onDeny(): Promise<void> {
   const id = dbMcpState.approval.pending?.requestId;
   if (id) await denyQuery(id);
@@ -56,12 +71,15 @@ async function onApprove(): Promise<void> {
 <template>
   <DialogFrame
     v-if="dbMcpState.approval.pending"
-    title="Approve this query?"
+    :title="dialogTitle"
     :width="520"
     test-id="db-mcp-approval-dialog"
     @close="onDeny"
   >
-    <p class="message">
+    <p v-if="dbMcpState.approval.pending.reason === 'heavy'" class="message">
+      {{ heavyLede }}
+    </p>
+    <p v-else class="message">
       <strong>{{ dbMcpState.approval.pending.connectionName }}</strong>
       ({{ dbMcpState.approval.pending.kind }}) wants to run {{ classWord }} through the database
       MCP server.
@@ -72,6 +90,28 @@ async function onApprove(): Promise<void> {
     <p v-if="dbMcpState.approval.pending.truncated" class="detail">
       Statement truncated for display — the full text still runs.
     </p>
+
+    <div v-if="dbMcpState.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
+      <p class="detail" data-testid="db-mcp-approval-plan-rows">
+        <template v-if="dbMcpState.approval.pending.plan.estimatedRowsRead !== null">
+          Estimated {{ dbMcpState.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
+          read — threshold {{ dbMcpState.approval.pending.plan.thresholdRows.toLocaleString() }}.
+        </template>
+        <template v-else> No row estimate available for this plan. </template>
+      </p>
+      <p
+        v-for="(issue, i) in dbMcpState.approval.pending.plan.issues"
+        :key="i"
+        class="detail plan-issue"
+        data-testid="db-mcp-approval-plan-issue"
+      >
+        <strong>{{ issue.severity }}</strong> {{ issue.message }}
+      </p>
+      <p v-if="dbMcpState.approval.pending.plan.issuesOmitted > 0" class="detail">
+        +{{ dbMcpState.approval.pending.plan.issuesOmitted }} more
+      </p>
+    </div>
+
     <p class="detail" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
     <p v-if="dbMcpState.approval.queued > 1" class="detail" data-testid="db-mcp-approval-queue-count">
       1 of {{ dbMcpState.approval.queued }} waiting
@@ -118,6 +158,14 @@ async function onApprove(): Promise<void> {
   margin: 0;
   padding: 0 var(--kira-s-5) var(--kira-s-4);
   color: var(--kira-fg-subtle);
+}
+
+.plan-block {
+  margin: 0 0 var(--kira-s-2);
+}
+
+.plan-issue {
+  padding-top: 0;
 }
 
 .footer-actions {

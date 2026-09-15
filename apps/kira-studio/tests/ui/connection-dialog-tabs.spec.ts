@@ -67,12 +67,18 @@ test('all four tabs switch, and General is where a freshly-opened details step l
   await expect(page.locator('[data-testid="connection-mcp-enabled"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeVisible();
   await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeDisabled();
+  // M3 §9.1: the auto-explain checkbox — disabled while mcpEnabled is false, same as the three
+  // permission rows; postgres is one of the five EXPLAIN-supported kinds, so enabling mcpEnabled
+  // alone is enough to enable it here.
+  await expect(page.locator('[data-testid="connection-mcp-auto-explain"]')).toBeVisible();
+  await expect(page.locator('[data-testid="connection-mcp-auto-explain"]')).toBeDisabled();
   await expect(page.locator('[data-testid="connection-mcp-read-allow"]')).toBeDisabled();
   await expect(page.locator('[data-testid="connection-mcp-write-prompt"]')).toBeDisabled();
   await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeDisabled();
 
   await page.click('[data-testid="connection-mcp-enabled"]');
   await expect(page.locator('[data-testid="connection-mcp-description"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="connection-mcp-auto-explain"]')).toBeEnabled();
   await expect(page.locator('[data-testid="connection-mcp-read-allow"]')).toBeEnabled();
   await expect(page.locator('[data-testid="connection-mcp-write-prompt"]')).toBeEnabled();
   await expect(page.locator('[data-testid="connection-mcp-ddl-deny"]')).toBeEnabled();
@@ -115,6 +121,7 @@ test('the pre-connect textarea round-trips a multi-line value, and a valid throt
     mcpReadMode: 'allow',
     mcpWriteMode: 'prompt',
     mcpDdlMode: 'deny',
+    mcpAutoExplain: true,
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

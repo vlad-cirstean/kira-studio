@@ -169,6 +169,7 @@ function connectionCreateArgs(name: string, color: string, readOnly = false) {
     mcpReadMode: 'allow',
     mcpWriteMode: 'prompt',
     mcpDdlMode: 'deny',
+    mcpAutoExplain: true,
   };
 }
 

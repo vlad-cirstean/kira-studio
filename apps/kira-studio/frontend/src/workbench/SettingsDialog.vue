@@ -1192,7 +1192,9 @@ async function onSave(): Promise<void> {
             <p class="muted-note">
               A newly exposed connection defaults to read allow, write prompt, DDL deny — this
               migration tightened what an already-exposed connection allowed too. Edit a
-              connection's own three modes and description in its MCP tab.
+              connection's own three modes and description in its MCP tab. Newly exposed
+              connections plan their queries before running them, and a plan over the
+              expensive-query threshold pauses for approval.
             </p>
             <ul
               v-if="connectionsState.records.length"
@@ -1209,7 +1211,9 @@ async function onSave(): Promise<void> {
                   <span class="db-mcp-connection-name">{{ conn.name }}</span>
                   <span class="helper-text"
                     >read {{ conn.mcpReadMode }} · write {{ conn.mcpWriteMode }} · DDL
-                    {{ conn.mcpDdlMode }}</span
+                    {{ conn.mcpDdlMode }}<template v-if="conn.mcpAutoExplain">
+                      · plans queries</template
+                    ></span
                   >
                   <span v-if="mcpDescriptionFirstLine(conn)" class="helper-text">{{
                     mcpDescriptionFirstLine(conn)
