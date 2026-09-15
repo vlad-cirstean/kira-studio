@@ -47,6 +47,17 @@ describe('splitSqlStatements — lexical regimes (P44 F43)', () => {
     expect(stmts[0]?.text).toBe(`SELECT '\\'; still one'`);
   });
 
+  // Finding #15, M6: a trailing backslash-escape as the very last character of source (with
+  // backslashEscapes: true and no closing quote) steps scanSqlSpan's cursor two past that
+  // backslash — one past source.length — before the loop notices it ran out of source. The
+  // returned span's own end must still never exceed source.length.
+  test('3d. an unterminated quote ending in a trailing backslash-escape never reports end past source.length', () => {
+    const src = "'\\";
+    const stmts = splitSqlStatements(src, { backslashEscapes: true });
+    expect(stmts).toHaveLength(1);
+    expect(stmts[0]?.end).toBeLessThanOrEqual(src.length);
+  });
+
   test('4. -- runs to end of line', () => {
     const stmts = splitSqlStatements('SELECT 1; -- comment; not a boundary\nSELECT 2;');
     expect(stmts.map((s) => s.text)).toEqual(['SELECT 1', '-- comment; not a boundary\nSELECT 2']);

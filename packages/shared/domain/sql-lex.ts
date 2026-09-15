@@ -71,7 +71,10 @@ export function scanSqlSpan(source: string, i: number, options: SqlLexOptions): 
       }
       j++;
     }
-    return { kind: 'quote', start: i, end: j, closed, quoteChar: quote };
+    // A trailing backslash-escape at the very end of source (j at n-1) steps j to n+1 above —
+    // clamp back to n (finding #15, M6): end must never exceed source.length, the same "the
+    // source length when unterminated" contract every other arm here already honours.
+    return { kind: 'quote', start: i, end: Math.min(j, n), closed, quoteChar: quote };
   }
   // Postgres dollar-quoting: $$ ... $$ or $tag$ ... $tag$.
   if (c === '$' && options.dollarQuoting) {
