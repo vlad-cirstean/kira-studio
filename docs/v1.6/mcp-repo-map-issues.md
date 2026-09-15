@@ -309,6 +309,18 @@ Entries are closed in place (status flips to Fixed, commit noted) rather than de
   (P67f's own note), so start the server as a genuine background task instead. No new finding,
   trivial or otherwise.
 
+- **P67d (implementation)**: a prior planning agent's server was still live on 8765 but its token
+  had already gone stale by the time this session started — killed it, deleted every
+  `mcp-repo-map-*-token.json` under `KIRA_HOME`, rebuilt (`bun run mcp:repo-map:build`, this phase's
+  own `internal/repomap` split), and started fresh. `nohup … & disown` this time, not a plain `&`, so
+  it survived past the launching call. Dogfooded the phase's own new surface directly: `list_repos`
+  (a brand-new tool, this phase's own addition) returned exactly the one attached repository
+  (`kira-studio	/home/user/kira-studio	ready`); `search_symbols {"query":"repoInstance"}` found the
+  new type in `instance.go`; `find_references {"symbol":"pick","file":".../attach.go"}` returned all
+  11 real call sites across `tools.go` and `attach_test.go` (the 7 handlers plus 4 test call sites),
+  checked against a grep — no misses, no false positives. No new finding, trivial or otherwise; the
+  split package resolves and navigates correctly.
+
 ### Non-trivial
 
 - **P67e (implementation) — `find_references` returns nothing for a package-level variable that is

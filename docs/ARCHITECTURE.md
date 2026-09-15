@@ -643,19 +643,23 @@ git_repo_settings(repo_id, key, value)                  -- G18; per-(repository,
                                                        -- sentinel (a real RepoID can never be
                                                        -- empty), so the one non-per-repo key
                                                        -- needs no schema change
-code_repos(id, name, root, repo_id, sort_order, created_at)  -- C5, migration 0018; a repo entry
-                                                       -- imported into the native code workspace
-                                                       -- -- a parallel list to `connections`, never
-                                                       -- an extension of it (a repository needs
-                                                       -- none of that table's other fields).
-                                                       -- repo_id (gitclient's own identity, UNIQUE)
-                                                       -- is what tabs.workspace_id's 'repo:<id>'
-                                                       -- values key off this table's own `id`, not
-                                                       -- repo_id itself
+code_repos(id, name, root, repo_id, sort_order, created_at, mcp_enabled)  -- C5, migration 0018;
+                                                       -- a repo entry imported into the native code
+                                                       -- workspace -- a parallel list to
+                                                       -- `connections`, never an extension of it (a
+                                                       -- repository needs none of that table's other
+                                                       -- fields). repo_id (gitclient's own identity,
+                                                       -- UNIQUE) is what tabs.workspace_id's
+                                                       -- 'repo:<id>' values key off this table's own
+                                                       -- `id`, not repo_id itself. mcp_enabled (P67d,
+                                                       -- migration 0019): 0/1, this repository's own
+                                                       -- MCP access grant -- default 0, so nothing is
+                                                       -- shared with an MCP client until a user grants
+                                                       -- it explicitly
 ```
 
-`kira.db` is at migration **0018** as of C5 (`0018_c5_code_repos.sql`) — `code_repos` plus
-`tabs.workspace_id` (above).
+`kira.db` is at migration **0019** as of P67d (`0019_p67d_repo_map_access.sql`) — `code_repos.
+mcp_enabled` on top of C5's `code_repos` plus `tabs.workspace_id` (above).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
 startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
@@ -1021,20 +1025,37 @@ whole file."
 and stopped by this app's own process, in step with the `codeIntel.mcpServerEnabled` setting — on
 while the app is running and the toggle is on, off the moment either isn't (`internal/bridge/
 repomap.go`'s `RepoMapService`, `main.go`'s own `StartRepoMapIfEnabled`/`StopRepoMap` calls beside
-`gitSock.Start`/`Close`). Its repository is resolved from this process's own working directory via
-`gitclient.Identify` — correct for `wails3 task dev` run from this repository's own root (this
-chapter's own dogfooding loop), honestly limited for a packaged app launched from `/Applications`
-(Known open items, below). *Headless*: `bun run mcp:repo-map`, a wholly separate OS process, not
-managed by any setting, resolving its own repository from `--repo` or its own cwd — the path C4-C6
-use for developing on this repo, or any repository, without the GUI open. Each instance binds its
-own port (a fixed default first, an OS-assigned ephemeral one on conflict — never `0.0.0.0`, always
-`127.0.0.1`) and mints its own static bearer token (`internal/mcpauth`: `crypto/rand`, base64url on
-the wire, `sha256(salt‖token)` at rest — `git_clients`' own trust-store shape, one JSON file per
-repository under `KIRA_HOME` rather than a database table, since `kira.db` is never opened by this
-server package and a `codeindex.db` table would mean a second connection pool for a two-column read).
-Every request is checked — the SDK's own `auth.RequireBearerToken` middleware wraps the tool
-handler — because a loopback TCP port, unlike `git.sock`'s Unix domain socket, is any local process's
-for the asking regardless of who is meant to be the only caller.
+`gitSock.Start`/`Close`). **P67d: one embedded `repomap.Server` now serves however many imported
+repositories (`code_repos`) a user grants MCP access to, not the one repository that happened to
+match this process's own working directory** — the toggle is general, matching the reported bug
+(`internal/repomap` split into `Server`, the transport/token/tool-registration/instance-registry
+owner, and a `repoInstance` per attached repository — index, graph, watcher, sync lock, readiness
+gate — `internal/repomap/instance.go`/`attach.go`). `RepoMapService.attachGrantedLocked` attaches
+every granted repository on enable (and on each new grant while running); `SetRepoEnabled`
+grants/revokes one repository, attaching or detaching its live instance immediately if the server is
+running; removing or renaming an imported repository revokes/re-keys its live grant immediately too
+(`CodeWorkspaceService.OnRepoRemoved`/`OnRepoRenamed`, wired in `main.go`). Every navigation tool
+takes an optional `repo` argument (the repository's own derived key, from its `code_repos.name`) —
+resolved by `Server.pick` when omitted: the sole attached repository if there is exactly one, else
+an error naming every attached key; a new eighth tool, `list_repos`, lists them. *Headless*: `bun run
+mcp:repo-map`, a wholly separate OS process, not managed by any setting, resolving its own repository
+from `--repo` or its own cwd via `AttachDir` (unchanged) — the path C4-C6 use for developing on this
+repo, or any repository, without the GUI open; still exactly one repository attached at startup.
+Each instance binds its own port (a fixed default first, an OS-assigned ephemeral one on conflict —
+never `0.0.0.0`, always `127.0.0.1`). Token files diverge by design since P67d: the embedded
+instance now mints/loads **one app-scoped token** covering every granted repository
+(`mcp-repo-map-app-token.json`, `mcpauth.Path(home, "app")` — an explicit enable uses
+`mcpauth.LoadOrMint`, not an unconditional fresh `Mint`, since one registration now covers every
+grant and a toggle-off-and-on must not silently invalidate it; the explicit Regenerate action is the
+one way to force a fresh one), while the headless binary keeps its original one-token-per-repository
+files (`internal/mcpauth`: `crypto/rand`, base64url on the wire, `sha256(salt‖token)` at rest —
+`git_clients`' own trust-store shape, one JSON file per instance under `KIRA_HOME` rather than a
+database table, since `kira.db` is never opened by this server package and a `codeindex.db` table
+would mean a second connection pool for a two-column read). Every request is checked — the SDK's own
+`auth.RequireBearerToken` middleware wraps the tool handler, itself wrapped in `http.
+NewCrossOriginProtection()` (P67d §4: the SDK applies DNS-rebinding protection by default but not
+cross-origin protection) — because a loopback TCP port, unlike `git.sock`'s Unix domain socket, is
+any local process's for the asking regardless of who is meant to be the only caller.
 
 **Registration is Claude Code CLI only** (`internal/mcpinstall`, `claude mcp add --transport http
 --scope user <name> <url> --header "Authorization: Bearer <token>"`, verified against the real CLI):
@@ -3638,13 +3659,6 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   assembled from stored rows at all, let alone compared against an interface's. A data limit, not
   an effort estimate: closing it needs a receiver-capturing query and a schema column, not more
   resolver logic.
-- **The repo-map MCP server's embedded instance resolves its repository from this app process's own
-  working directory only** (C3 §3.2). Correct for `wails3 task dev` run from this repository's own
-  root; a packaged `Kira Studio.app` launched from `/Applications` has a cwd that is very unlikely
-  to be a git worktree at all, so the embedded instance simply does not start for a real end user
-  today, and the Code intelligence tab says why. Real "current repository" selection for a packaged
-  app is native git mode's job (C8) or C5's own dogfooding wiring, not invented ahead of either; the
-  headless `bun run mcp:repo-map` path works for any repository regardless.
 - **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
   open and on an explicit Refresh action only — a file created, deleted or modified outside the app
   is not reflected until one of those happens. `codeindex`'s own worktree watcher covers only
@@ -3667,11 +3681,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **A repository open in the native workspace while the embedded repo-map MCP server serves the
   same repository parses every saved file twice** (C6 §3.1). Two independent `codeindex.Index`
   instances in one process, each with its own watcher, each reacting to the identical file-save
-  event. Harmless — `codeindex.Store.ReplaceFile` is transactional, and the shared `codeindex.db`
-  is WAL-mode with a busy timeout precisely for two pools in one process — and bounded (one extra
-  parse per save, not per keystroke), but real; threading one `*codeindex.Index` through both
-  features would couple two independent lifecycles for a savings that has never mattered in
-  practice. The per-repository sync *flock* (`internal/codeindex.AcquireSyncLock`) only covers each
+  event. **P67d: this is now reachable for any repository a user has granted MCP access to, not only
+  the one that happened to match the app process's own cwd** — previously near-unreachable in
+  practice (the embedded instance rarely started for a packaged app at all), now a normal
+  configuration whenever a repository is both open in the Git module and granted. Still harmless —
+  `codeindex.Store.ReplaceFile` is transactional, and the shared `codeindex.db` is WAL-mode with a
+  busy timeout precisely for two pools in one process — and still bounded (one extra parse per save,
+  not per keystroke), but real; threading one `*codeindex.Index` through both features would couple
+  two independent lifecycles for a savings that has never mattered in practice (P67d §13, explicitly
+  declined). The per-repository sync *flock* (`internal/codeindex.AcquireSyncLock`) only covers each
   side's own *initial* sync, by design — it is not a general single-parser guarantee.
 - **The repo-map MCP server's watcher is armed before its own initial `Sync` completes**
   (`repomap/server.go:168`-`170`, P64c §1.5/§6.7): `runInitialSync` runs in a goroutine and
@@ -3717,10 +3735,13 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   Harmless (each connection's own hold is independently refcounted and released) and bounded, but
   real.
 
-- **`internal/repomap/http.go`'s HTTP server sets no `ReadTimeout`/`WriteTimeout`/`IdleTimeout`**
-  (`bindHTTP`'s `&http.Server{Handler: mux}`). Loopback-only binding narrows who can reach it, but a
-  slow or hung client on that port can still tie up a connection indefinitely — Go's own zero-value
-  defaults for all three.
+- **`internal/repomap/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (P67d §4.2
+  sets `ReadHeaderTimeout`/`IdleTimeout`, narrowing this item rather than closing it). Deliberate:
+  the Streamable HTTP transport holds long-lived server-to-client streams, and a write/read deadline
+  would cut one mid-response; a slow client body on a long POST is not a threat on loopback the way
+  a slow header (`ReadHeaderTimeout`, now bounded) is. Loopback-only binding plus the cross-origin
+  wrapper (§4.1) narrow who can reach it further still, but a client that opens a connection and
+  simply never finishes its response body can still tie one up indefinitely.
 - **Native `review.session.save`/`.load` (`repo/git/reviewSession.ts`, backed by the pinned
   repo-graph tab's own persisted state) has no expiry**, unlike the VS Code extension's own
   `ReviewSessionStore`, which discards a saved session past `REVIEW_SESSION_TTL_MS` (14 days,
