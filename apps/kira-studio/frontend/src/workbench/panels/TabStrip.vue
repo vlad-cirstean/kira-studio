@@ -2,6 +2,7 @@
 import type { TabRecord } from '@shared/domain/tabs';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
+import { fileIconStyle } from '../../repo/fileIcon';
 import { openContextMenu } from '../../state/contextMenu';
 import { tabsForWorkspace } from '../../state/mode';
 import { isIncognito } from '../../state/tabIncognito';
@@ -30,10 +31,6 @@ function isPinned(tab: TabRecord): boolean {
 // what a 'data' tab's icon is, or that a tab's colour comes from its connection.
 function colorFor(tab: TabRecord): string | undefined {
   return TAB_KINDS[tab.kind].railColor(tab);
-}
-
-function iconFor(tab: TabRecord): string {
-  return TAB_KINDS[tab.kind].icon(tab);
 }
 
 function titleFor(tab: TabRecord): string {
@@ -133,8 +130,18 @@ const tabs = computed(() => tabsForWorkspace(workspaceState.active));
 // else. `tabsForWorkspace`'s own pinned-first partition is unchanged; this only stops flattening
 // it back into one list. In practice at most one tab is ever pinned (the repo-graph tab,
 // `tabKinds.ts`), but this reads off `isPinned` generically rather than assuming that.
-const pinnedTabs = computed(() => tabs.value.filter((tab) => isPinned(tab)));
-const scrollingTabs = computed(() => tabs.value.filter((tab) => !isPinned(tab)));
+// P73 §2.2: each entry carries its own resolved icon so the template narrows the TabIcon union
+// once per render instead of calling TAB_KINDS[tab.kind].icon(tab) twice per branch.
+const pinnedTabs = computed(() =>
+  tabs.value
+    .filter((tab) => isPinned(tab))
+    .map((tab) => ({ tab, icon: TAB_KINDS[tab.kind].icon(tab) })),
+);
+const scrollingTabs = computed(() =>
+  tabs.value
+    .filter((tab) => !isPinned(tab))
+    .map((tab) => ({ tab, icon: TAB_KINDS[tab.kind].icon(tab) })),
+);
 
 // Selecting a tab from anywhere other than this strip itself (a tree double-click, Cmd/Ctrl+click
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
@@ -195,7 +202,7 @@ function onDragEnd(): void {
          neither is wired here at all rather than guarded per-tab. -->
     <div v-if="pinnedTabs.length > 0" class="tab-strip-pinned" data-testid="tab-strip-pinned">
       <button
-        v-for="tab in pinnedTabs"
+        v-for="{ tab, icon } in pinnedTabs"
         :key="tab.id"
         type="button"
         class="p-tab is-pinned"
@@ -211,13 +218,19 @@ function onDragEnd(): void {
         @click="onClick(tab)"
         @contextmenu.prevent="onContextMenu($event, tab)"
       >
-        <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
+        <span
+          v-if="typeof icon !== 'string'"
+          class="tab-icon tab-file-icon"
+          :style="fileIconStyle(icon.filePath)"
+          aria-hidden="true"
+        />
+        <CodiconIcon v-else :name="icon" :size="13" class="tab-icon" />
       </button>
       <span class="tab-strip-separator" aria-hidden="true"></span>
     </div>
     <div ref="stripRef" class="tab-strip" data-testid="tab-strip-row" @wheel="onWheel">
       <button
-        v-for="tab in scrollingTabs"
+        v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
         type="button"
         class="p-tab"
@@ -245,7 +258,13 @@ function onDragEnd(): void {
         @dragend="onDragEnd"
       >
         <span class="p-tab-rail" />
-        <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
+        <span
+          v-if="typeof icon !== 'string'"
+          class="tab-icon tab-file-icon"
+          :style="fileIconStyle(icon.filePath)"
+          aria-hidden="true"
+        />
+        <CodiconIcon v-else :name="icon" :size="13" class="tab-icon" />
         <CodiconIcon
           v-if="isIncognito(tab.id)"
           name="eye-closed"
@@ -348,6 +367,20 @@ function onDragEnd(): void {
 
 .tab-icon {
   flex-shrink: 0;
+}
+
+/* P73 §2.3: a seti mask icon (repo-file tabs) rather than a codicon glyph — coloured per language,
+   14px (--kira-control-inline-h) rather than the tree's 16px so it doesn't outweigh the 13px
+   codicon beside it on other tabs. */
+.tab-file-icon {
+  width: var(--kira-control-inline-h);
+  height: var(--kira-control-inline-h);
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 .tab-title {
