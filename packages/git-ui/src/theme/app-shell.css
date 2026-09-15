@@ -60,16 +60,19 @@ body {
   flex-shrink: 0;
 }
 
-.kv-mount-root input[type="checkbox"]:checked {
+.kv-mount-root input[type="checkbox"]:checked,
+.kv-mount-root input[type="checkbox"]:indeterminate {
   background: var(--kv-button-bg);
   border-color: var(--kv-button-bg);
 }
 
-/* The codicon font's own check glyph (`@vscode/codicons/dist/codicon.css`'s own
-   `.codicon-check::before { content: "\eab2" }`) as a pseudo-element against the raw input itself
-   — no sibling element, so this is pure CSS against markup none of the 9 dialogs need to change. */
-.kv-mount-root input[type="checkbox"]:checked::after {
-  content: "\eab2";
+/* The codicon font's own check/dash glyphs (`@vscode/codicons/dist/codicon.css`'s own
+   `.codicon-check::before { content: "\eab2" }`, `.codicon-dash::before { content: "\eacc" }`) as
+   a pseudo-element against the raw input itself — no sibling element, so this is pure CSS against
+   markup none of the 9 dialogs need to change. P75 §4.2: indeterminate (a file partially reviewed)
+   shares every declaration with checked but the glyph, so one rule lists both selectors. */
+.kv-mount-root input[type="checkbox"]:checked::after,
+.kv-mount-root input[type="checkbox"]:indeterminate::after {
   font-family: "codicon", monospace;
   font-size: 11px;
   line-height: 1;
@@ -80,6 +83,12 @@ body {
   justify-content: center;
   color: var(--kv-button-fg);
   pointer-events: none;
+}
+.kv-mount-root input[type="checkbox"]:checked::after {
+  content: "\eab2";
+}
+.kv-mount-root input[type="checkbox"]:indeterminate::after {
+  content: "\eacc";
 }
 
 .kv-mount-root input[type="checkbox"]:focus-visible {
