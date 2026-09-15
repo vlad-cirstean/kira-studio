@@ -253,20 +253,27 @@ export function attachReviewDecorations(
   function paint(): void {
     if (disposed) return;
 
+    // P75 §5: a fully-reviewed file needs no per-line tint — the per-hunk glyph below and the file
+    // tree's own checked box already say it, on every line at once. The tint earns its keep only
+    // for a partial review, where it is the sole thing showing which lines are covered.
+    const fullyReviewed =
+      lineCount > 0 && coverage({ start: 1, end: lineCount }, reviewedRanges) === 'full';
     reviewedLineCollection.set(
-      normalizeRanges(reviewedRanges).map(
-        (r): DeltaDecoration => ({
-          range: new mod.Range(r.start, 1, r.end, 1),
-          options: {
-            isWholeLine: true,
-            className: 'kira-review-line-reviewed',
-            overviewRuler: {
-              color: 'var(--kira-ok)',
-              position: mod.editor.OverviewRulerLane.Left,
-            },
-          },
-        }),
-      ),
+      fullyReviewed
+        ? []
+        : normalizeRanges(reviewedRanges).map(
+            (r): DeltaDecoration => ({
+              range: new mod.Range(r.start, 1, r.end, 1),
+              options: {
+                isWholeLine: true,
+                className: 'kira-review-line-reviewed',
+                overviewRuler: {
+                  color: 'var(--kira-ok)',
+                  position: mod.editor.OverviewRulerLane.Left,
+                },
+              },
+            }),
+          ),
     );
 
     const nextHunkByLine = new Map<number, { block: LineRange; reviewed: boolean }>();
