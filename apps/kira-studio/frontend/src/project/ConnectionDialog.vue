@@ -785,7 +785,7 @@ const preconnectText = computed({
             <textarea
               v-model="draft.mcpDescription"
               class="p-textarea mono"
-              rows="3"
+              rows="2"
               maxlength="1000"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-description"
@@ -825,11 +825,9 @@ const preconnectText = computed({
               data-testid="connection-mcp-ddl"
             />
           </div>
-          <span class="helper-text">
-            A statement this app cannot classify is treated as whichever of the three is strictest.
-          </span>
           <p class="helper-text">
-            These govern the MCP server only. The Read-only flag on the Advanced tab is what
+            A statement this app cannot classify is treated as whichever of the three is strictest.
+            These govern the MCP server only — the Read-only flag on the Advanced tab is what
             governs this app's own console.
           </p>
           </div>
