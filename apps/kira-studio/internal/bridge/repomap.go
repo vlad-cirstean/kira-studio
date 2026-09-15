@@ -2,6 +2,8 @@ package bridge
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -184,7 +186,11 @@ func normalizeRepoKey(name string) string {
 // repoKeys derives every row's own client-facing key from its code_repos.name (normalizeRepoKey),
 // deterministic for a given row order: a collision within rows appends -2, -3, … in list order, so
 // a key is stable across restarts unless the user renames a repository (the rename hook re-derives
-// and Rekeys, syncAttachedKeysLocked below).
+// and Rekeys, syncAttachedKeysLocked below). Every caller must pass the FULL imported-repo list
+// (CodeRepos.List's own order), never a filtered subset — a key must depend only on that repo's own
+// name and its position in the stable full list, never on which OTHER repos happen to be granted
+// right now (1a fix, P68 review: deriving over the granted subset alone meant revoking one repo
+// could silently rename another's key the next time some other repo was granted).
 func repoKeys(rows []model.CodeRepo) map[string]string {
 	counts := make(map[string]int, len(rows))
 	keys := make(map[string]string, len(rows))
@@ -201,28 +207,30 @@ func repoKeys(rows []model.CodeRepo) map[string]string {
 	return keys
 }
 
-// grantedRowsLocked returns every imported repository currently granted MCP access, in
-// CodeRepos.List's own order.
-func (s *RepoMapService) grantedRowsLocked() ([]model.CodeRepo, error) {
-	rows, err := s.Deps.Repos.CodeRepos.List()
+// rowsAndGrantedLocked fetches every imported repository (CodeRepos.List's own order) plus the
+// granted subset of it, in one call — every caller that needs the granted set for attach/detach also
+// needs the full set to derive stable keys against (repoKeys' own doc comment: a key depends on the
+// full imported-repo list's order, never on which other repos happen to be granted).
+func (s *RepoMapService) rowsAndGrantedLocked() (rows, granted []model.CodeRepo, err error) {
+	rows, err = s.Deps.Repos.CodeRepos.List()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	granted := make([]model.CodeRepo, 0, len(rows))
+	granted = make([]model.CodeRepo, 0, len(rows))
 	for _, r := range rows {
 		if r.McpEnabled {
 			granted = append(granted, r)
 		}
 	}
-	return granted, nil
+	return rows, granted, nil
 }
 
-// syncAttachedKeysLocked recomputes every granted row's own desired key (repoKeys) and Rekeys any
-// already-attached instance whose live key has drifted from it — a rename, or a new grant landing
-// on a name that collides with an already-attached one, can shift another row's own dedupe suffix,
-// not just the row that changed.
-func (s *RepoMapService) syncAttachedKeysLocked(granted []model.CodeRepo) {
-	desired := repoKeys(granted)
+// syncAttachedKeysLocked recomputes every row's own desired key (repoKeys, over the FULL imported
+// list — 1a) and Rekeys any already-attached instance whose live key has drifted from it — a rename,
+// or a new grant landing on a name that collides with an already-attached one, can shift another
+// row's own dedupe suffix, not just the row that changed.
+func (s *RepoMapService) syncAttachedKeysLocked(rows, granted []model.CodeRepo) {
+	desired := repoKeys(rows)
 	for _, r := range granted {
 		want := desired[r.ID]
 		have, attached := s.keys[r.ID]
@@ -239,14 +247,14 @@ func (s *RepoMapService) syncAttachedKeysLocked(granted []model.CodeRepo) {
 
 // attachGrantedLocked attaches every currently-granted repository that is not already attached
 // (repomap.Server.Attach is itself idempotent, so re-running this after a grant or at boot only
-// ever adds what's missing), then syncs every attached key. A per-row Attach failure is logged and
-// recorded in that row's own attachErrs entry; it never fails the others and never fails the
-// server. mu must be held by the caller.
+// ever adds what's missing). A per-row Attach failure is logged and recorded in that row's own
+// attachErrs entry; it never fails the others and never fails the server. mu must be held by the
+// caller.
 func (s *RepoMapService) attachGrantedLocked(ctx context.Context) {
 	if s.server == nil {
 		return
 	}
-	granted, err := s.grantedRowsLocked()
+	rows, granted, err := s.rowsAndGrantedLocked()
 	if err != nil {
 		slog.Warn("repo-map: list repos", "scope", "repomap", "err", err)
 		return
@@ -278,7 +286,13 @@ func (s *RepoMapService) attachGrantedLocked(ctx context.Context) {
 	if s.keys == nil {
 		s.keys = make(map[string]string)
 	}
-	desired := repoKeys(granted)
+	// 1b: rekey every already-attached instance onto its correct desired key FIRST, before
+	// attempting any new Attach — otherwise a new repo whose desired key collides with an
+	// incumbent's stale one fails to attach (the incumbent hasn't freed it yet) and, since nothing
+	// here retries a failed attach, is never attached until the app restarts.
+	s.syncAttachedKeysLocked(rows, granted)
+
+	desired := repoKeys(rows)
 	for _, r := range granted {
 		if _, already := s.keys[r.ID]; already {
 			continue
@@ -297,7 +311,6 @@ func (s *RepoMapService) attachGrantedLocked(ctx context.Context) {
 		s.keys[r.ID] = key
 		delete(s.attachErrs, r.ID)
 	}
-	s.syncAttachedKeysLocked(granted)
 }
 
 // startLocked constructs and starts a new embedded instance if one is not already running, loading
@@ -400,12 +413,12 @@ func (s *RepoMapService) onRepoRenamed(id, _ string) {
 	if _, attached := s.keys[id]; !attached {
 		return
 	}
-	granted, err := s.grantedRowsLocked()
+	rows, granted, err := s.rowsAndGrantedLocked()
 	if err != nil {
 		slog.Warn("repo-map: list repos for rename", "scope", "repomap", "err", err)
 		return
 	}
-	s.syncAttachedKeysLocked(granted)
+	s.syncAttachedKeysLocked(rows, granted)
 }
 
 // StartRepoMapIfEnabled and StopRepoMap are main.go's own boot/shutdown hooks for the embedded
@@ -469,6 +482,9 @@ func (s *RepoMapService) SetRepoEnabled(args RepoMapSetRepoEnabledArgs) (RepoMap
 		return RepoMapStatus{}, ipcerr.BadRequest("id is required")
 	}
 	if err := s.Deps.Repos.CodeRepos.SetMcpEnabled(args.ID, args.Enabled); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return RepoMapStatus{}, ipcerr.BadRequest("repository not found")
+		}
 		return RepoMapStatus{}, ipcerr.Internal(err.Error())
 	}
 
@@ -477,10 +493,17 @@ func (s *RepoMapService) SetRepoEnabled(args RepoMapSetRepoEnabledArgs) (RepoMap
 	if s.server != nil {
 		if args.Enabled {
 			s.attachGrantedLocked(context.Background())
-		} else if key, ok := s.keys[args.ID]; ok {
-			s.server.Detach(key)
-			delete(s.keys, args.ID)
+		} else {
+			// 1c: cleared unconditionally, not only when a live key exists — a repository that
+			// never successfully attached (git was unavailable when it was granted, or 1b's own
+			// since-fixed key collision) has no entry in s.keys, so gating this on the s.keys
+			// lookup left its attachErrs entry displayed forever, surviving the revoke that was
+			// supposed to clear it (statusLocked renders it next to an unchecked checkbox).
 			delete(s.attachErrs, args.ID)
+			if key, ok := s.keys[args.ID]; ok {
+				s.server.Detach(key)
+				delete(s.keys, args.ID)
+			}
 		}
 	}
 	return s.statusLocked(), nil

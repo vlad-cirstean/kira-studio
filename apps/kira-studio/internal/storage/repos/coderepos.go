@@ -86,10 +86,21 @@ func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 }
 
 // SetMcpEnabled persists P67d's own per-repository MCP grant/revoke — bridge.RepoMapService's
-// SetRepoEnabled, the storage half.
+// SetRepoEnabled, the storage half. Returns sql.ErrNoRows (wrapped) when id matches no row, the same
+// sentinel this package's own read paths already use for "not found" (gitclients.go's ByID) —
+// unlike every sibling write method here, this used to never check RowsAffected at all, silently
+// "succeeding" for a nonexistent id.
 func (r *CodeReposRepo) SetMcpEnabled(id string, enabled bool) error {
-	if _, err := r.DB.Exec(`UPDATE code_repos SET mcp_enabled = ? WHERE id = ?`, enabled, id); err != nil {
+	res, err := r.DB.Exec(`UPDATE code_repos SET mcp_enabled = ? WHERE id = ?`, enabled, id)
+	if err != nil {
 		return fmt.Errorf("repos/coderepos: set mcp_enabled %s: %w", id, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repos/coderepos: set mcp_enabled %s: rows affected: %w", id, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("repos/coderepos: set mcp_enabled %s: %w", id, sql.ErrNoRows)
 	}
 	return nil
 }
