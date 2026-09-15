@@ -14,9 +14,10 @@ import type {
   HttpTimeline,
 } from '@shared/domain/http';
 import { collectionIdFor } from '../../api/state/collections';
-import { activeEnvironmentId, mergedValuesAndSecrets } from '../../api/state/variables';
+import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
+import { isIncognito } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteSendRecorded } from './history';
@@ -154,7 +155,7 @@ export async function send(tabId: string): Promise<void> {
   rt.error = null;
 
   const collectionId = collectionIdFor(tab.state);
-  const environmentId = activeEnvironmentId.value;
+  const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
   // no await, no dynamic-generators chunk fetched or parsed. Only a request that actually
@@ -179,6 +180,7 @@ export async function send(tabId: string): Promise<void> {
       // P8 D2: the tab already knows it (http.ts:208) — '' for a scratch tab, exactly like
       // collectionId's own "possibly empty" shape above.
       itemId: tab.state.itemId ?? '',
+      incognito: isIncognito(tabId),
     });
     if (rt.opId !== opId) return; // superseded by a newer send
     rt.status = 'idle';
@@ -235,7 +237,7 @@ export async function resolveForExport(tabId: string): Promise<ExportResolution 
   if (!tab) return null;
 
   const collectionId = collectionIdFor(tab.state);
-  const environmentId = activeEnvironmentId.value;
+  const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   const first = resolveTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
