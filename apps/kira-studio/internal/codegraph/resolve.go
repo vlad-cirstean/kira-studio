@@ -346,6 +346,19 @@ func (g *Graph) resolveName(ctx context.Context, name string, refSymbols []codei
 		return nil, "", nil
 	}
 
+	// P69b: a bare-identifier "read" reference (an argument, a binary operand, a slice bound) carries
+	// no import or qualification evidence, so a name-based resolver genuinely can't tell a local from
+	// a distant module-level constant sharing its name. Clamp to same-file-or-same-directory before
+	// the Go rule below — every read site this phase indexes is already tier <= 1 by construction (a
+	// package-level constant is read inside its own package), so this loses no real capability and
+	// closes the cross-directory false positives a raw capture would otherwise return.
+	if site.Kind == "read" {
+		candidates = filterTierAtMost(candidates, 1)
+		if len(candidates) == 0 {
+			return nil, "", nil
+		}
+	}
+
 	if site.File.Language == "go" && isUnexportedGoName(name) {
 		candidates = filterTierAtMost(candidates, 1)
 		if len(candidates) == 0 {

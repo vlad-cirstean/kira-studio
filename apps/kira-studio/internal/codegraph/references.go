@@ -84,11 +84,13 @@ func isSelfSite(ref codeindex.ReferenceRow, refFile codeindex.FileRow, targets [
 
 // ReferencesTo finds occurrences of q's own name (§5.5). Resolved (the default) runs the resolver
 // for every candidate reference sharing the name and keeps the ones whose own winning target set
-// intersects q's target, memoized per directory of the referring file (within one call, name is
-// already fixed and tier membership never depends on the reference's own kind — only ranking
-// does) — so a name used many times across few directories costs one resolution per directory, not
-// one per occurrence. NameOnly skips resolution entirely, trading precision for recall (a
-// grep-shaped caller). IncludeDefinition adds the target's own NameSpan as a Site.
+// intersects q's target, memoized per (directory, kind, language) of the referring file — P69b
+// makes tier membership depend on the reference's own kind (a "read" reference clamps to tier <=1,
+// resolve.go), and language gates the Go package-privacy rule, so both join the memo key alongside
+// directory — so a name used many times across few (directory, kind, language) groups costs one
+// resolution per group, not one per occurrence. NameOnly skips resolution entirely, trading
+// precision for recall (a grep-shaped caller). IncludeDefinition adds the target's own NameSpan as
+// a Site.
 func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, error) {
 	file, symbols, _, hit, err := g.locate(ctx, q)
 	if err != nil {
@@ -124,12 +126,12 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 
 	files := fileCache{}
 	symbolsByFile := symbolCache{}
-	// groupTargets memoizes, per directory, the set of symbol ids a reference to name from some
-	// file in that directory would resolve to (§5.5). Tier membership never depends on the
-	// reference's own kind (only ranking does, and ranking doesn't matter for "does this
-	// reference's own winning set intersect the target" — a boolean question), so the memo needs
-	// no kind dimension at all despite name/kind together bounding what counts as a "candidate
-	// reference" in the first place (the kindSet filter above, and r.Kind on each returned Site).
+	// groupTargets memoizes, per (directory, kind, language), the set of symbol ids a reference to
+	// name from some file in that group would resolve to (§5.5). P69b: a "read" reference's own tier
+	// membership is clamped by its kind (resolve.go), and the Go package-privacy rule depends on
+	// language, so both join directory in the memo key — a name/kind/language combination used many
+	// times across few directories still costs one resolution per (directory, kind, language) group,
+	// not one per occurrence.
 	groupTargets := map[string]map[int64]bool{}
 
 	targetIDs := make(map[int64]bool, len(targets))
@@ -154,13 +156,14 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		included := mode == NameOnly
 		if !included {
 			dir := dirOf(rf.Path)
-			ids, ok := groupTargets[dir]
+			key := dir + "\x00" + r.Kind + "\x00" + rf.Language
+			ids, ok := groupTargets[key]
 			if !ok {
-				ids, err = g.groupResolutionTargets(ctx, dir, name)
+				ids, err = g.groupResolutionTargets(ctx, dir, rf.Language, r.Kind, name)
 				if err != nil {
 					return Refs{}, err
 				}
-				groupTargets[dir] = ids
+				groupTargets[key] = ids
 			}
 			for id := range targetIDs {
 				if ids[id] {
@@ -217,14 +220,17 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 }
 
 // groupResolutionTargets is ReferencesTo's own memoized computation: which symbols (by id) would a
-// reference to name, sitting somewhere in directory dir, resolve to? Implemented as one resolveName
-// call against a synthetic file path inside dir that matches no real file — so no candidate can
-// ever land in tier 0 relative to it, modeling "some file in this directory, exact file
-// unspecified" directly: a same-directory candidate lands in tier 1, everything else in tier 2,
-// exactly the two tiers the memo key itself is defined over.
-func (g *Graph) groupResolutionTargets(ctx context.Context, dir, name string) (map[int64]bool, error) {
-	sentinel := codeindex.FileRow{Path: dir + "/\x00"}
-	site := resolveSite{File: sentinel, StartByte: -1, EndByte: -1, NameStartByte: -1, NameEnd: -1}
+// kind-shaped reference to name, sitting somewhere in directory dir of a file in language, resolve
+// to? Implemented as one resolveName call against a synthetic file path inside dir that matches no
+// real file — so no candidate can ever land in tier 0 relative to it, modeling "some file in this
+// directory, exact file unspecified" directly: a same-directory candidate lands in tier 1, everything
+// else in tier 2, exactly the two tiers the memo key itself is defined over. language is set on the
+// sentinel so the Go package-privacy rule in resolveName (which keys off site.File.Language) is
+// reachable from ReferencesTo at all — before P69b it never was, for any kind (§4.3). kind is set on
+// the sentinel so a "read" reference gets resolveName's own tier<=1 clamp (§4.2).
+func (g *Graph) groupResolutionTargets(ctx context.Context, dir, language, kind, name string) (map[int64]bool, error) {
+	sentinel := codeindex.FileRow{Path: dir + "/\x00", Language: language}
+	site := resolveSite{File: sentinel, Kind: kind, StartByte: -1, EndByte: -1, NameStartByte: -1, NameEnd: -1}
 	cands, _, err := g.resolveName(ctx, name, nil, site)
 	if err != nil {
 		return nil, err
