@@ -289,18 +289,35 @@ function crockfordBase32(bytes: Uint8Array): string {
   return out;
 }
 
+// importedHmacKeys caches each key's imported CryptoKey, keyed by the Uint8Array object itself
+// (finding #18, M6): buildMaskTagCache (maskPreview.ts) calls tag() once per distinct value on a
+// page — all sharing the same key — and importKey is as async and non-trivial as sign() itself, so
+// without this every one of those calls re-imported an identical key from scratch. A WeakMap, not
+// a plain Map: the cache entry disappears on its own once the key bytes it was built from do,
+// nothing here needs to evict it by hand.
+const importedHmacKeys = new WeakMap<Uint8Array, Promise<CryptoKey>>();
+
+function importHmacKey(key: Uint8Array): Promise<CryptoKey> {
+  let imported = importedHmacKeys.get(key);
+  if (!imported) {
+    imported = crypto.subtle.importKey(
+      'raw',
+      key.buffer as ArrayBuffer,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    importedHmacKeys.set(key, imported);
+  }
+  return imported;
+}
+
 // tag computes "#" + crockfordBase32(HMAC-SHA256(key, value))[0:6] — exactly internal/mask's own
 // formula. The HMAC message is value's raw UTF-8 bytes alone, nothing else. Async: Web Crypto's
 // HMAC has no synchronous API, which is why the grid preview (maskPreview.ts) precomputes tags
 // into a cache ahead of SlickGrid's synchronous cellFormatter rather than calling this per cell.
 export async function tag(key: Uint8Array, value: string): Promise<string> {
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    key.buffer as ArrayBuffer,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
+  const cryptoKey = await importHmacKey(key);
   const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(value));
   const encoded = crockfordBase32(new Uint8Array(signature));
   return `#${encoded.slice(0, 6)}`;
