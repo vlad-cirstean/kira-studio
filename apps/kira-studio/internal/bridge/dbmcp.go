@@ -111,13 +111,14 @@ func (s *DbMcpService) startLocked(mint bool) error {
 	}
 	home := config.KiraHome()
 	srv, err := dbmcp.New(dbmcp.Config{
-		Home:      home,
-		Token:     dbMcpTokenProviderFor(home, mint),
-		Conns:     s.Deps.Connections,
-		Tree:      s.Deps.Tree,
-		Query:     s.Deps.Router,
-		Approvals: s.Approvals,
-		Logger:    slog.Default(),
+		Home:             home,
+		Token:            dbMcpTokenProviderFor(home, mint),
+		Conns:            s.Deps.Connections,
+		Tree:             s.Deps.Tree,
+		Query:            s.Deps.Router,
+		Approvals:        s.Approvals,
+		ExplainThreshold: s.explainThreshold,
+		Logger:           slog.Default(),
 	})
 	if err != nil {
 		return err
@@ -129,6 +130,19 @@ func (s *DbMcpService) startLocked(mint bool) error {
 		}
 	}()
 	return nil
+}
+
+// explainThreshold is dbmcp.Config.ExplainThreshold's real backend: settingsState.advanced.
+// expensiveQueryRows's own Go leaf, read fresh on every call — never cached, since a stale
+// threshold would silently mis-flag every query after the user changes it (M3 §3.3). A settings
+// read failure must not break a query; it falls back to the documented default and logs once.
+func (s *DbMcpService) explainThreshold() int {
+	settings, err := s.Deps.Repos.Settings.GetAll()
+	if err != nil {
+		slog.Warn("db mcp: read expensive-query threshold, using default", "scope", "dbmcp", "err", err)
+		return model.DefaultSettings().Advanced.ExpensiveQueryRows
+	}
+	return settings.Advanced.ExpensiveQueryRows
 }
 
 // stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
@@ -281,6 +295,49 @@ func capApprovalStatement(s string) (text string, truncated bool) {
 	return s[:cut], true
 }
 
+// dbMcpApprovalPlanIssuesCap bounds DbMcpApprovalPlan.Issues on the wire — the dbmcp package's own
+// approvalPlanFrom already caps at this same figure (M3 §6.2), so this is a defense-in-depth
+// re-application at the wire boundary, the same posture capApprovalStatement already takes for
+// the statement text.
+const dbMcpApprovalPlanIssuesCap = 10
+
+// DbMcpApprovalPlanIssue is dbmcp.ApprovalPlanIssue's wire projection.
+type DbMcpApprovalPlanIssue struct {
+	Severity string `json:"severity"`
+	Code     string `json:"code"`
+	Message  string `json:"message"`
+}
+
+// DbMcpApprovalPlan is dbmcp.ApprovalPlan's wire projection — M3's own plan evidence the approval
+// dialog renders, present only on a request that carries one.
+type DbMcpApprovalPlan struct {
+	EstimatedRowsRead *float64                 `json:"estimatedRowsRead"`
+	ThresholdRows     int                      `json:"thresholdRows"`
+	OverThreshold     bool                     `json:"overThreshold"`
+	Issues            []DbMcpApprovalPlanIssue `json:"issues"`
+	IssuesOmitted     int                      `json:"issuesOmitted"`
+}
+
+func toWireApprovalPlan(p *dbmcp.ApprovalPlan) *DbMcpApprovalPlan {
+	if p == nil {
+		return nil
+	}
+	issues := p.Issues
+	omitted := p.IssuesOmitted
+	if len(issues) > dbMcpApprovalPlanIssuesCap {
+		omitted += len(issues) - dbMcpApprovalPlanIssuesCap
+		issues = issues[:dbMcpApprovalPlanIssuesCap]
+	}
+	wireIssues := make([]DbMcpApprovalPlanIssue, len(issues))
+	for i, iss := range issues {
+		wireIssues[i] = DbMcpApprovalPlanIssue{Severity: iss.Severity, Code: iss.Code, Message: iss.Message}
+	}
+	return &DbMcpApprovalPlan{
+		EstimatedRowsRead: p.EstimatedRowsRead, ThresholdRows: p.ThresholdRows,
+		OverThreshold: p.OverThreshold, Issues: wireIssues, IssuesOmitted: omitted,
+	}
+}
+
 // DbMcpApprovalRequest is dbmcp.ApprovalRequest's wire projection — an absolute deadline (epoch
 // ms) instead of a time.Time, GitPairingRequest's own precedent.
 type DbMcpApprovalRequest struct {
@@ -292,6 +349,9 @@ type DbMcpApprovalRequest struct {
 	Statement      string `json:"statement"`
 	Truncated      bool   `json:"truncated"`
 	ExpiresAtMs    int64  `json:"expiresAtMs"`
+	// Reason is M3's own "permission" | "heavy" — every M2-era request is "permission" (M3 §6.2).
+	Reason string             `json:"reason"`
+	Plan   *DbMcpApprovalPlan `json:"plan"`
 }
 
 // DbMcpApprovalSnapshot is dbmcp.ApprovalSnapshot's wire projection.
@@ -309,6 +369,8 @@ func toWireApprovalSnapshot(snap dbmcp.ApprovalSnapshot) DbMcpApprovalSnapshot {
 			ConnectionName: snap.Pending.ConnectionName, Kind: snap.Pending.Kind,
 			Class: string(snap.Pending.Class), Statement: statement, Truncated: truncated,
 			ExpiresAtMs: snap.Pending.ExpiresAt.UnixMilli(),
+			Reason:      string(snap.Pending.Reason),
+			Plan:        toWireApprovalPlan(snap.Pending.Plan),
 		}
 	}
 	return out

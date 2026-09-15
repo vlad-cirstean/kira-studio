@@ -165,29 +165,29 @@ func TestRenderStreamPage(t *testing.T) {
 func TestRenderPageDispatchesByKind(t *testing.T) {
 	tb := page.NewTabularPageBuilder(nil)
 	tabular := tb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(tabular, 200); err != nil {
+	if _, err := renderPage(tabular, 200, nil); err != nil {
 		t.Fatalf("renderPage(TabularPage): %v", err)
 	}
 
 	db := page.NewDocumentPageBuilder(false)
 	doc := db.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(doc, 200); err != nil {
+	if _, err := renderPage(doc, 200, nil); err != nil {
 		t.Fatalf("renderPage(DocumentPage): %v", err)
 	}
 
 	kvb := page.NewKeyValuePageBuilder("string", nil, nil, false)
 	kv := kvb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(kv, 200); err != nil {
+	if _, err := renderPage(kv, 200, nil); err != nil {
 		t.Fatalf("renderPage(KeyValuePage): %v", err)
 	}
 
 	sb := page.NewStreamPageBuilder(nil)
 	stream := sb.Finish(page.UnpagedPosition(0))
-	if _, err := renderPage(stream, 200); err != nil {
+	if _, err := renderPage(stream, 200, nil); err != nil {
 		t.Fatalf("renderPage(StreamPage): %v", err)
 	}
 
-	if _, err := renderPage(unknownPage{}, 200); err == nil {
+	if _, err := renderPage(unknownPage{}, 200, nil); err == nil {
 		t.Fatal("renderPage(unrecognised kind) = nil error, want an error naming the unhandled type")
 	}
 }

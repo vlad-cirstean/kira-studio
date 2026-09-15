@@ -474,6 +474,10 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 //
 // M1 §6.1: McpEnabled joins the same exception list for the same reason — it gates whether this
 // connection is exposed to the DB MCP server, never what it connects to.
+//
+// M3: McpAutoExplain joins the same exception list for the same reason as McpEnabled — it gates
+// what this connection does on the MCP path (whether run_query plans a SELECT first), never what
+// it connects to.
 func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
 	return in.Kind == stored.Kind &&
 		in.Mode == stored.Mode &&

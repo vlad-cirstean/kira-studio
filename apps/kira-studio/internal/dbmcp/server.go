@@ -22,8 +22,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -85,6 +85,13 @@ type Config struct {
 	// outliving Server start/stop so the event subscription wired at boot stays valid across a
 	// server restart.
 	Approvals *ApprovalBroker
+	// ExplainThreshold is the expensive-query row threshold (advanced.expensiveQueryRows) — read
+	// fresh on every call, never cached: a stale threshold silently mis-flags every query after the
+	// user changes it. A plain func rather than an interface, gitsession.Registry.Settings's own
+	// seam, so this package keeps its existing backends and adds no new service dependency.
+	// Required — a silently-defaulted threshold would make every heavy-query verdict wrong in a
+	// way nothing surfaces.
+	ExplainThreshold func() int
 	// Logger receives every operational log line. A nil Logger falls back to slog.Default().
 	Logger *slog.Logger
 }
@@ -117,7 +124,7 @@ type Server struct {
 const serverVersion = "0.0.0"
 
 // instructions is §4's own one paragraph: the steer that decides whether any of this pays off.
-const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`."
+const instructions = "These tools read and query the databases configured in this Kira Studio app. Only connections the user has explicitly exposed are visible; start with `list_connections`. Walk structure with `list_children`, passing back a `path` it returned — levels differ per engine, so do not assume a database or schema level exists. `describe_schema` gets every relation's columns in one call and is cheaper than one `describe_table` per table. `run_query` runs one statement through the same path the app's own SQL console uses, against the connection's own permissions; results are capped and say so when truncated. Every query appears in the user's Operations panel. Each `list_connections` entry's `permissions` object names its read/write/DDL mode (deny, allow or prompt) and its `description`, when set, says what the connection is for — read both before calling `run_query`. Plan an expensive-looking query with `explain_query` before running it, and expect `run_query` to plan it anyway on connections whose owner turned auto-explain on."
 
 // New resolves cfg, mints or loads this instance's own token, builds the five-tool mcp.Server, and
 // binds the HTTP listener (§3.2's default-then-fallback port selection) — but does not yet accept
@@ -138,6 +145,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.Approvals == nil {
 		return nil, fmt.Errorf("dbmcp: Config.Approvals is required")
+	}
+	if cfg.ExplainThreshold == nil {
+		return nil, fmt.Errorf("dbmcp: Config.ExplainThreshold is required")
 	}
 
 	tokenRec, tokenPlain, tokenMinted, err := cfg.Token()
@@ -187,8 +197,12 @@ func (s *Server) buildMCPServer() *mcp.Server {
 	}, s.describeSchema)
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_query",
-		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Results are capped by maxRows; the query itself still runs in full. Each connection's read/write/DDL permission is checked first: a denied class is refused, and a class set to prompt waits for the user to approve it, which can take up to two minutes.",
+		Description: "Run one statement (not a script — one statement per call) against a connection, through the same path the app's own SQL console uses. Connects the connection if it is not already connected. Results are capped by maxRows; the query itself still runs in full. Each connection's read/write/DDL permission is checked first: a denied class is refused, and a class set to prompt waits for the user to approve it, which can take up to two minutes. On a connection whose owner turned auto-explain on, an explainable SELECT/WITH is planned first — a plan estimated over the connection owner's expensive-query threshold pauses the query for approval the same way a prompt-mode permission does.",
 	}, s.runQuery)
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "explain_query",
+		Description: "Plan one SELECT or WITH statement without running it, and return the normalized plan: the node tree, each node's estimated rows and native cost, and the structural issues this app detects (full scans, unused indexes, filesorts). Not available on mongodb, redis, kafka, s3 or sqs. Metric order within a node is not contractual; pass includeRaw for the server's own text.",
+	}, s.explainQuery)
 
 	return srv
 }

@@ -2,11 +2,14 @@ package dbmcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/queryplan"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -128,9 +131,14 @@ type runQueryArgs struct {
 // the same deduplicated path the UI uses, so the connection visibly comes up in the app rather than
 // opening invisibly.
 //
-// M2 §4.2's gate order: resolve (unchanged) → refuse before connecting if every mode denies →
-// clamp maxRows (unchanged) → connect (unchanged: classification needs the live adapter, and so
-// does execution) → classify → verdict → prompt if needed → execute (unchanged).
+// M3 §5.2's gate order — a deliberate reorder from M2's own predicted seam, for two reasons: a
+// statement the permission gate will deny must buy no EXPLAIN work, and one call must raise at
+// most one approval prompt. resolve (unchanged) → refuse before connecting if every mode denies
+// (unchanged) → clamp maxRows (unchanged) → connect (unchanged) → classify (unchanged) → verdict,
+// with deny refusing here, before any EXPLAIN (reordered) → forced EXPLAIN when McpAutoExplain is
+// on (new — a nil plan or any error degrades to "no plan", never blocks) → heavy check (new,
+// §6.1: overThreshold only) → at most one approval, for verdict=="prompt" or heavy (extended) →
+// execute (unchanged) → render, now carrying a plan summary when one exists (extended).
 func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQueryArgs) (*mcp.CallToolResult, any, error) {
 	summary, err := s.resolveEnabled(args.ConnectionID)
 	if err != nil {
@@ -166,15 +174,50 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		class = adapters.ClassUnknown
 	}
 
-	switch verdict := verdictFor(m, class); verdict {
-	case "allow":
-		// fall through to Execute below.
+	verdict := verdictFor(m, class)
+	switch verdict {
+	case "allow", "prompt":
+		// continue below — a statement the gate will deny must buy no EXPLAIN work (§5.2), so deny
+		// is refused before auto-force-explain ever runs.
 	case "deny":
 		return errResult(fmt.Sprintf("this connection's MCP permissions deny %s statements; change them in the connection's MCP tab", class))
-	case "prompt":
+	default:
+		// An unrecognised mode word cannot reach here — repos/connections.go's scan coerces any
+		// unreadable mode to "deny" before this method is ever called.
+		return errResult(fmt.Sprintf("this connection's MCP permissions are misconfigured for %s statements; change them in the connection's MCP tab", class))
+	}
+
+	// Auto-force-explain (§5.2 step 7): a plan-only EXPLAIN, never ANALYZE, run before the human
+	// is asked about the query when verdict is "prompt" — the minimum information needed to tell
+	// them what they are approving. Any failure degrades to "no plan" (D19 rule 6's own posture);
+	// a run_query call must not start failing because a plan could not be parsed.
+	var plan *queryplan.Plan
+	if summary.McpAutoExplain {
+		p, planErr := s.planFor(ctx, summary, args.SQL, args.Path)
+		if planErr != nil {
+			s.log.Warn("dbmcp: run_query: auto-force-explain failed, running without a plan", "connectionId", args.ConnectionID, "error", planErr)
+		} else {
+			plan = p
+		}
+	}
+
+	// §6.1: heavy is overThreshold only, never "any warn issue" — SQLite reports no row estimate
+	// at all, so borrowing the console's isFlaggedPlan rule would raise a modal on nearly every
+	// SQLite query.
+	heavy := plan != nil && plan.OverThreshold
+
+	// At most one approval prompt per call (§5.2/§6.2): when both a permission-prompt and a heavy
+	// plan apply, one request carries Reason: ApprovalReasonPermission (the stricter reason — the
+	// user said "ask me about every write") with the plan evidence riding along.
+	if verdict == "prompt" || heavy {
+		reason := ApprovalReasonHeavy
+		if verdict == "prompt" {
+			reason = ApprovalReasonPermission
+		}
 		outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
 			ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
-			Class: class, Statement: args.SQL,
+			Class: class, Statement: args.SQL, Reason: reason,
+			Plan: approvalPlanFrom(plan, s.cfg.ExplainThreshold()),
 		})
 		switch outcome {
 		case ApprovalApproved:
@@ -188,10 +231,6 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		default:
 			return errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
 		}
-	default:
-		// An unrecognised mode word cannot reach here — repos/connections.go's scan coerces any
-		// unreadable mode to "deny" before this method is ever called.
-		return errResult(fmt.Sprintf("this connection's MCP permissions are misconfigured for %s statements; change them in the connection's MCP tab", class))
 	}
 
 	resp, err := s.cfg.Query.Execute(ctx, adapterhost.ExecuteRequestWire{
@@ -206,9 +245,122 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	if len(resp.Pages) == 0 {
 		return jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
 	}
-	rendered, err := renderPage(resp.Pages[0], maxRows)
+	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, s.cfg.ExplainThreshold()))
 	if err != nil {
 		return nil, nil, err
 	}
 	return jsonResult(rendered)
+}
+
+// --- explain_query (§4) ---
+
+type explainQueryArgs struct {
+	ConnectionID string `json:"connectionId" jsonschema:"Connection id from list_connections."`
+	SQL          string `json:"sql" jsonschema:"One SELECT or WITH statement to plan. It is not executed — EXPLAIN is always issued without ANALYZE."`
+	Path         string `json:"path,omitempty" jsonschema:"Encoded path selecting the database to plan against, from list_children. Required for engines with more than one database; ignored by engines with one."`
+	IncludeRaw   bool   `json:"includeRaw,omitempty" jsonschema:"Also return the server's own raw EXPLAIN text. Default false — it can be tens of kilobytes, and the parsed plan above is the point."`
+}
+
+// explainQueryResult embeds queryplan.Plan so its own fields inline directly into the result
+// object — the same shape planModel.ts's QueryPlan is, plus ThresholdRows (§4.2): an MCP client
+// cannot otherwise interpret OverThreshold, since the threshold itself lives in this app's own
+// settings, never sent to the client any other way.
+type explainQueryResult struct {
+	queryplan.Plan
+	ThresholdRows int `json:"thresholdRows"`
+}
+
+// explainQuery plans one SELECT/WITH statement without running it (§4.3's own gate order):
+// resolve → kind support → explainability → read-mode deny (before connecting) → connect →
+// classify-assert every composed statement as a read (§8.3) → verdict on the read mode (prompt
+// raises M2's approval, carrying the composed statement) → execute → parse → project, dropping Raw
+// unless IncludeRaw.
+func (s *Server) explainQuery(ctx context.Context, _ *mcp.CallToolRequest, args explainQueryArgs) (*mcp.CallToolResult, any, error) {
+	summary, err := s.resolveEnabled(args.ConnectionID)
+	if err != nil {
+		return errResult(err.Error())
+	}
+
+	// §7: unsupported kinds are refused before connecting — nothing this call can do will succeed.
+	if !queryplan.Supported(summary.Kind) {
+		return errResult(fmt.Sprintf("connection %q (%s) has no EXPLAIN this app can parse", summary.Name, summary.Kind))
+	}
+	// §8.1: explain_query accepts only what queryplan.Explainable accepts — a DELETE/UPDATE never
+	// gets its own EXPLAIN path (ClickHouse's EXPLAIN can execute its target on some forms).
+	if !queryplan.Explainable(args.SQL) {
+		return errResult("explain_query only accepts a SELECT or WITH statement")
+	}
+
+	m := modesOf(summary)
+	if m.read == "deny" {
+		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
+	}
+
+	state, err := s.connectForQuery(args.ConnectionID)
+	if err != nil {
+		return toolError(err)
+	}
+	if state.Status != "connected" {
+		return errResult(connectStateError(state))
+	}
+
+	statements := queryplan.StatementsFor(summary.Kind, args.SQL)
+	// §8.2/§8.3: the composed EXPLAIN is gated as a read through M2's existing classifier, not a
+	// new permission vocabulary — a non-read verdict here is an internal refusal, this app's own
+	// composer producing something it does not trust, never something the caller did wrong.
+	if err := s.assertComposedStatementsAreReads(ctx, args.ConnectionID, statements); err != nil {
+		return nil, nil, err
+	}
+
+	switch verdict := verdictFor(m, adapters.ClassRead); verdict {
+	case "allow":
+		// fall through to Execute below.
+	case "prompt":
+		outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
+			ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
+			Class: adapters.ClassRead, Statement: strings.Join(statements, "\n"),
+			Reason: ApprovalReasonPermission,
+		})
+		switch outcome {
+		case ApprovalApproved:
+			// fall through to Execute below.
+		case ApprovalDenied:
+			return errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
+		case ApprovalTimedOut:
+			return errResult(fmt.Sprintf("query against %q got no answer within 2 minutes", summary.Name))
+		case ApprovalAbandoned:
+			return errResult(fmt.Sprintf("the database MCP server stopped before the query against %q was answered", summary.Name))
+		default:
+			return errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
+		}
+	case "deny":
+		// Already handled above (m.read == "deny", before connecting) — unreachable in practice,
+		// kept so a future change to verdictFor cannot silently skip the read-mode gate here.
+		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
+	default:
+		return errResult("this connection's MCP permissions are misconfigured for read statements; change them in the connection's MCP tab")
+	}
+
+	resp, err := s.cfg.Query.Execute(ctx, adapterhost.ExecuteRequestWire{
+		OpID:         uuid.NewString(),
+		ConnectionID: args.ConnectionID,
+		Path:         args.Path,
+		Statements:   statements,
+	})
+	if err != nil {
+		return toolError(err)
+	}
+
+	threshold := s.cfg.ExplainThreshold()
+	plan, err := queryplan.FromPages(summary.Kind, resp.Pages, threshold)
+	if err != nil {
+		if errors.Is(err, queryplan.ErrTruncated) {
+			return errResult("the query plan was too large to parse — try a narrower statement")
+		}
+		return errResult(fmt.Sprintf("could not parse the EXPLAIN result: %s", err.Error()))
+	}
+	if !args.IncludeRaw {
+		plan.Raw = ""
+	}
+	return jsonResult(explainQueryResult{Plan: plan, ThresholdRows: threshold})
 }

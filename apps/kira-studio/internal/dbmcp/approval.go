@@ -40,6 +40,34 @@ const (
 	ApprovalActionAlreadyResolved
 )
 
+// ApprovalReason is why this request was raised — M2's permission gate, or M3's heavy-plan flag.
+// Both are the same question ("should this run?") asked for different reasons, so they share one
+// queue and one dialog rather than competing for the user's attention (M3 §6.2).
+type ApprovalReason string
+
+const (
+	ApprovalReasonPermission ApprovalReason = "permission"
+	ApprovalReasonHeavy      ApprovalReason = "heavy"
+)
+
+// ApprovalPlanIssue is one Issue as the dialog renders it — plan evidence, never the whole tree.
+type ApprovalPlanIssue struct {
+	Severity string
+	Code     string
+	Message  string
+}
+
+// ApprovalPlan is the plan evidence the dialog shows for a heavy-query (or plan-carrying
+// permission) request — never the whole tree (M3 §6.2). Issues is capped by the caller
+// (bridge/dbmcp.go's own wire projection), with IssuesOmitted carrying the remainder.
+type ApprovalPlan struct {
+	EstimatedRowsRead *float64
+	ThresholdRows     int
+	OverThreshold     bool
+	Issues            []ApprovalPlanIssue
+	IssuesOmitted     int
+}
+
 // ApprovalRequest is one queued query — what the dialog renders. RequestID, EnqueuedAt and
 // ExpiresAt are minted by Request, never by the caller.
 type ApprovalRequest struct {
@@ -51,6 +79,12 @@ type ApprovalRequest struct {
 	Statement      string
 	EnqueuedAt     time.Time
 	ExpiresAt      time.Time
+	// Reason is M2's own "permission" for every M2-era call site — M3's runQuery/explainQuery are
+	// the first callers to pass ApprovalReasonHeavy or a non-nil Plan.
+	Reason ApprovalReason
+	// Plan is the heavy-query evidence (M3 §6.1/§6.2), nil for an ordinary permission prompt with
+	// no plan attached (auto-force-explain off, or the statement was not explainable).
+	Plan *ApprovalPlan
 }
 
 // ApprovalSnapshot is emitted on every queue change: the head request (nil when empty) plus how

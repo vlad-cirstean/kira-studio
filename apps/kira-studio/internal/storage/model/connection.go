@@ -36,6 +36,11 @@ type ConnectionFields struct {
 	McpReadMode  string `json:"mcpReadMode"`
 	McpWriteMode string `json:"mcpWriteMode"`
 	McpDdlMode   string `json:"mcpDdlMode"`
+	// M3: runs this connection's own EXPLAIN before every explainable run_query on the DB MCP path,
+	// and pauses the query for a human decision when the plan crosses the expensive-query row
+	// threshold. Separate from AutoExplain, which governs this app's own console — see the
+	// migration's own comment for why one switch cannot mean both.
+	McpAutoExplain bool `json:"mcpAutoExplain"`
 }
 
 // ConnectionSummary mirrors packages/shared/domain/connection.ts's connectionSummarySchema.

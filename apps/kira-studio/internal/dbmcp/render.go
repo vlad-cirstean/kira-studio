@@ -99,6 +99,14 @@ type tabularColumn struct {
 	TypeClass string `json:"typeClass"`
 }
 
+// planEnvelope is embedded in each result struct so `plan` inlines into the same JSON object the
+// client already reads — run_query's response shape is otherwise unchanged from M1/M2. Omitted
+// entirely when no plan was produced (omitempty on a nil pointer), never a `"plan": null` a
+// client might read as "planned, found nothing" (M3 §5.3).
+type planEnvelope struct {
+	Plan *planSummary `json:"plan,omitempty"`
+}
+
 type tabularResult struct {
 	Kind           string          `json:"kind"`
 	Columns        []tabularColumn `json:"columns"`
@@ -107,6 +115,7 @@ type tabularResult struct {
 	Returned       int             `json:"returned"`
 	TruncatedCells int             `json:"truncatedCells"`
 	Truncated      bool            `json:"truncated,omitempty"`
+	planEnvelope
 }
 
 type documentEntry struct {
@@ -120,6 +129,7 @@ type documentResult struct {
 	RowCount  int             `json:"rowCount"`
 	Returned  int             `json:"returned"`
 	Truncated bool            `json:"truncated,omitempty"`
+	planEnvelope
 }
 
 type keyValueEntry struct {
@@ -136,6 +146,7 @@ type keyValueResult struct {
 	RowCount    int             `json:"rowCount"`
 	Returned    int             `json:"returned"`
 	Truncated   bool            `json:"truncated,omitempty"`
+	planEnvelope
 }
 
 type streamMessage struct {
@@ -152,6 +163,7 @@ type streamResult struct {
 	RowCount  int             `json:"rowCount"`
 	Returned  int             `json:"returned"`
 	Truncated bool            `json:"truncated,omitempty"`
+	planEnvelope
 }
 
 // cellAt returns row's own text from chunk, or nil for SQL NULL — §5.2's own flagged hazard: a
@@ -166,17 +178,28 @@ func cellAt(chunk page.Chunk, row int) *string {
 	return &text
 }
 
-// renderPage projects one page.Page into its own JSON-ready envelope, capped at maxRows.
-func renderPage(p page.Page, maxRows int) (any, error) {
+// renderPage projects one page.Page into its own JSON-ready envelope, capped at maxRows. plan is
+// run_query's own auto-force-explain result (nil when auto-force-explain is off, the statement
+// was not explainable, or the plan-only EXPLAIN failed) — M5's own seam (M1 §9), now taking a plan
+// summary alongside the page (M3 §5.3).
+func renderPage(p page.Page, maxRows int, plan *planSummary) (any, error) {
 	switch pg := p.(type) {
 	case page.TabularPage:
-		return renderTabularPage(pg, maxRows), nil
+		r := renderTabularPage(pg, maxRows)
+		r.Plan = plan
+		return r, nil
 	case page.DocumentPage:
-		return renderDocumentPage(pg, maxRows), nil
+		r := renderDocumentPage(pg, maxRows)
+		r.Plan = plan
+		return r, nil
 	case page.KeyValuePage:
-		return renderKeyValuePage(pg, maxRows), nil
+		r := renderKeyValuePage(pg, maxRows)
+		r.Plan = plan
+		return r, nil
 	case page.StreamPage:
-		return renderStreamPage(pg, maxRows), nil
+		r := renderStreamPage(pg, maxRows)
+		r.Plan = plan
+		return r, nil
 	default:
 		// §5.2: "implement it rather than panicking on the fourth arm of a type switch" — reachable
 		// only if a future adapter kind gains Caps().SQL with a page kind this projection has not
