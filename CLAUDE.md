@@ -193,14 +193,17 @@ Headless setup, for a session with no GUI:
    this server exists for come from the response being a targeted answer instead of a whole file,
    which curl doesn't change — only the transport is manual, not the value.
 
-Each repository's token is stored hashed under `KIRA_HOME`, so a later run reuses it and prints a
-note instead of a command; an already-registered client keeps working. To mint a fresh one, delete
-that repository's `mcp-repo-map-*-token.json` and restart the server.
+Each repository's token is stored hashed under `KIRA_HOME` and expires after 7 days (M1): a later
+run within that window reuses it and prints a note instead of a command; an already-registered
+client keeps working. Once it lapses, restart mints a fresh one automatically — no manual deletion
+needed — but the printed `claude mcp add` command must be re-run, since the old registration no
+longer authenticates. To force a fresh token before it lapses, delete that repository's
+`mcp-repo-map-*-token.json` and restart.
 
-**Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.6/`
-today). Trivial (config, registration, wiring): fix inline, log one line. Non-trivial (wrong
-result, missing tool, crash): log a full entry and fix nothing in that phase — the next phase
-waits for a dedicated fix pass to close it.
+**Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.7/`
+today). Trivial (config, registration,
+wiring): fix inline, log one line. Non-trivial (wrong result, missing tool, crash): log a full entry
+and fix nothing in that phase — the next phase waits for a dedicated fix pass to close it.
 
 Development use only. The shipped end-user surface — the Settings dialog's Code intelligence tab —
 is product, not process; `docs/ARCHITECTURE.md` describes it and how the server works,
