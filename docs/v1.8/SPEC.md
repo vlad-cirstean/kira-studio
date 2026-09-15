@@ -150,6 +150,29 @@ unit tests, 118/118 relevant Playwright UI specs. One pre-existing, unrelated fl
 confirmed untouched by this phase's diff (`internal/grpcclient`'s reflection test, a port race in
 that package's own suite). No known gaps against the plan.
 
+## P72 result
+
+Landed per plan (`docs/v1.8/plans/P72-git-graph-panel.md`), 8 commits (`ed550d39`..`8b346fc3`).
+Root cause confirmed and fixed in three independent pieces: reload-on-tab-focus fixed by keeping
+`RepoGraphView.vue` mounted across tab switches (`KeepAlive`) rather than tearing down and
+rebuilding the whole layout; checkout misalignment fixed by keeping the graph layout on screen
+across a refresh instead of resetting it to zero lanes mid-stream; scroll flicker fixed by
+rebuilding row heights when PR badges resolve (`invalidateRowHeights()` alongside
+`invalidateAllRows()`) — the plan's own fallback `minRowBuffer` widening (§5.2) was confirmed
+unnecessary once this landed, and the `ResizeObserver`-on-`KeepAlive` open question was confirmed
+answered (fires reliably on both Chromium and WebKit via a standalone repro) so the plan's fallback
+`MountHandle.refresh()` method was correctly never added. Label sizing now reads off the shared
+`--kv-*` type scale. Settings: `dateFormat` and `kiraVersion.log.level` moved app-wide
+(`appearance.dateFormat`, `advanced.gitLogLevel`); `log.level`'s key stays a genuine `source:
+'repo'` schema entry since VS Code's `RepoSettingsDialog.vue` remains its only editing surface
+there (host-conditional via the `MountOptions.host` seam) — only its `instanceWide` cross-repo-
+collapse special case was deleted, per the plan's own detailed prose over its summary table's
+shorthand. Independently re-verified: `go build/vet/test` clean, `bun typecheck/lint` clean, both
+`bun run build` (desktop) and `bun run build:vscode` (extension) succeed, 1370/1370 unit tests,
+26/26 relevant desktop Playwright specs (`repo-graph-lifecycle`, `repo-workspace`, `tabs`,
+`settings-apply-on-save`, `settings-code-intelligence`) plus 16/16 VS Code extension
+`graph-columns.spec.ts`. No known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
