@@ -132,7 +132,13 @@ package gitrpc
 // from blame.line's own bump. No new event, no new capability, no new UiActionKind member, no SQL
 // migration. editor.openWorkingDiff (the same item's diff-open action) is extension-only, answered
 // entirely inside the extension exactly like editor.openRangeDiff -- it needs no bump of its own.
-const ContractVersion = 35
+// P74 §3.3 (2026-09-15): 35 -> 36, for one new Go-served request, pr.browserUrl (composes a PR's
+// github.com URL server-side; params: repoId/number, result: {url: string|null}) and one new
+// extension-answered request, pr.openExternal (params: repoId/number, result: {}), which requests
+// pr.browserUrl over the socket and hands the URL to the host's own browser-open path -- never
+// answered by this Go server itself, the same "editor.*-shaped" precedent editor.openDiff already
+// set. One new app.init capability, openExternal (both hosts report true). No SQL migration.
+const ContractVersion = 36
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

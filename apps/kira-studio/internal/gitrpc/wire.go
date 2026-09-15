@@ -689,6 +689,21 @@ type BranchResolvePrParams struct {
 	Branch string `json:"branch"`
 }
 
+// PrBrowserUrlParams is pr.browserUrl's own request (P74 §3.3) — hostHandlers.ts/proxyHandlers.ts
+// answer pr.openExternal by requesting this over the git socket, then handing the URL to the
+// host's own browser-open path (never the reverse: the renderer never supplies a URL).
+type PrBrowserUrlParams struct {
+	RepoID string `json:"repoId"`
+	Number int    `json:"number"`
+}
+
+// PrBrowserUrlResult mirrors @kira/git-ipc's own `{url: string} | {url: null}` — `URL` is a
+// pointer so `null` (github disabled, or no GitHub remote) round-trips as JSON `null` rather than
+// an empty string an href-shaped caller might mistake for a real, if empty, value.
+type PrBrowserUrlResult struct {
+	URL *string `json:"url"`
+}
+
 // ---------------------------------------------------------------------------------------
 // G25 — worktree support (D1-D14). worktree.list/preflight.worktreeAdd/preflight.worktreeRemove's
 // own results are gitsession's/gitpreflight's own wire-shaped types ([]gitsession.WorktreeEntry

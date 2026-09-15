@@ -1499,6 +1499,11 @@ export type Contract = {
            *  transport's Go side refuses every write with `E_READ_ONLY` regardless of this flag —
            *  this is UI-layer 3 (hide, don't disable), never the boundary itself. */
           readonly write: boolean;
+          /** P74 §3.3: whether this host can open a URL in the OS/system browser at all — gates
+           *  the PR row's/badge's external-open button, so a future host with no browser renders
+           *  the PR number as plain text rather than a dead control. Not `EditorCapabilities`
+           *  (`DetailActions`'s own `capabilities`) — this is not an editor action. */
+          readonly openExternal: boolean;
         };
       };
     };
@@ -2097,6 +2102,22 @@ export type Contract = {
     'branch.resolvePr': {
       params: { repoId: string; branch: string };
       result: PrLookupResult;
+    };
+    // ---- P74 §3.3: opening a PR in the external browser, never in place -------------------
+    /** Server-composed: the renderer names a PR by number, never a URL (the boundary
+     *  `checker.go`'s own `safeReleaseURL` already defends). `null` when GitHub is disabled or
+     *  there is no GitHub remote — the same "disabled collapses to nothing" posture
+     *  `PrLookupResult` already takes. Go-served, never proxied to the extension. */
+    'pr.browserUrl': {
+      params: { repoId: string; number: number };
+      result: { readonly url: string } | { readonly url: null };
+    };
+    /** Host-answered (extension-answered like every `editor.*` request before it, D3.3):
+     *  requests `pr.browserUrl` over the socket and hands the URL to the host's own
+     *  browser-open path — never answered by the Go server itself. */
+    'pr.openExternal': {
+      params: { repoId: string; number: number };
+      result: Record<string, never>;
     };
     // ---- G25: worktree support (D1/D4/D8/D9-D14) -------------------------------------------
     /** D1: one spawn (`git worktree list --porcelain -z`), never cached — see `WorktreeEntry`'s

@@ -26,6 +26,10 @@ const props = defineProps<{
    *  precedent (`buildReadOnlyRefMenu`) gives the identical actions reached from a ref's own
    *  context menu. The list itself (base/branch/PR/track/stale) stays visible — a read. */
   writeCapability: boolean;
+  /** P74 §3.3 — see `BranchPicker.vue`'s own doc comment on these two props, threaded straight
+   *  through from `AppToolbar.vue`. */
+  openExternalCapability: boolean;
+  openPullRequest: (number: number) => void;
 }>();
 
 const emit = defineEmits<{
@@ -99,15 +103,24 @@ async function removeFromStack(branch: string): Promise<void> {
           >
             stale
           </span>
-          <a
-            v-if="row.pr"
+          <button
+            v-if="row.pr && openExternalCapability"
+            type="button"
             class="kv-badge kv-badge-pill kv-badge-pr"
             :class="`kv-badge-pr--${row.pr.state}`"
-            :href="row.pr.url"
+            v-kui-tooltip="row.pr.title"
+            @click="openPullRequest(row.pr.number)"
+          >
+            {{ prBadgeLabel(row.pr) }}
+          </button>
+          <span
+            v-else-if="row.pr"
+            class="kv-badge kv-badge-pill kv-badge-pr"
+            :class="`kv-badge-pr--${row.pr.state}`"
             v-kui-tooltip="row.pr.title"
           >
             {{ prBadgeLabel(row.pr) }}
-          </a>
+          </span>
           <span v-if="row.trackText" class="kv-stack-track">{{ row.trackText }}</span>
           <span v-if="row.checkedOutIn" class="kv-stack-badge" v-kui-tooltip="row.checkedOutIn">
             <span class="codicon codicon-repo" aria-hidden="true"></span>

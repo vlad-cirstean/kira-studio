@@ -116,6 +116,14 @@ function copy(text: string, whatCopied: string): void {
   props.actions?.copy(text, whatCopied);
 }
 
+// P74 §3.3: BranchPicker.vue's own branch-row badge and StackList.vue's own row badge each open
+// a PR the same way CommitMeta.vue's facts-row icon/"Pull request" row do — one action, threaded
+// down rather than reimplemented at either call site.
+function openPullRequest(number: number): void {
+  void props.actions?.openPullRequest({ number });
+}
+const openExternalCapability = computed(() => props.actions?.capabilities.openExternal ?? false);
+
 const refreshButtonRef = ref<InstanceType<typeof RefreshButton> | null>(null);
 const branchPickerRef = ref<InstanceType<typeof BranchPicker> | null>(null);
 const pullStrategyPickerRef = ref<InstanceType<typeof PullStrategyPicker> | null>(null);
@@ -286,6 +294,8 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
       :open-worktree-window-capability="openWorktreeWindowCapability"
       :write-capability="write"
       :pr="prState"
+      :open-external-capability="openExternalCapability"
+      :open-pull-request="openPullRequest"
       @branch-from-stash="(entry) => emit('branch-from-stash', entry)"
       @save-global-stash="emit('save-global-stash')"
       @save-entry-to-global-stash="(entry) => emit('save-entry-to-global-stash', entry)"

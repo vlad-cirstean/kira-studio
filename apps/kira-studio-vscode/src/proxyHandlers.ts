@@ -24,6 +24,7 @@
  */
 import { basename, isAbsolute, join, relative, sep } from 'node:path';
 import type {
+  Browser,
   Clipboard,
   DocumentRef,
   EditorIntegration,
@@ -94,6 +95,9 @@ export interface CreateProxyHandlersDeps {
   // clicking "Trust" in the banner).
   readonly windows: Windows;
   readonly isWorkspaceTrusted: () => boolean;
+  // P74 §3.3: `pr.openExternal`'s own port — wraps `vscode.env.openExternal` (`ports/browser.ts`),
+  // the same "narrow port, this file stays vscode-free" shape `windows` above already follows.
+  readonly browser: Browser;
   // G6/D15: reveals the review sidebar, optionally targeting repoId/branch — `review.open`'s own
   // implementation. Supplied as a plain function rather than a provider instance so this file
   // never imports vscode.WebviewViewProvider; extension.ts breaks the construction cycle (the
@@ -186,6 +190,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     editor,
     logger,
     windows,
+    browser,
     isWorkspaceTrusted,
     revealReview,
     renderReviewComments,
@@ -237,6 +242,8 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
           // C10 D6: this host's transport forwards every request straight to the socket, which
           // accepts writes — unchanged from before C10 added the flag.
           write: true,
+          // P74 §3.3: vscode.env.openExternal always exists.
+          openExternal: true,
         },
       };
     },
@@ -537,6 +544,17 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // entirely by the Go server.
     'commit.resolvePr': forward('commit.resolvePr'),
     'branch.resolvePr': forward('branch.resolvePr'),
+    // P74 §3.3: Go-served, a plain forward — same shape as commit.resolvePr/branch.resolvePr.
+    'pr.browserUrl': forward('pr.browserUrl'),
+    // P74 §3.3: host-answered, the same "editor.*-shaped" precedent editor.openDiff already set —
+    // requests pr.browserUrl over the socket, then hands the URL (when non-null) to the OS
+    // browser. A null url (github disabled, or no GitHub remote) is a silent no-op: the caller
+    // already gated the button on this very lookup resolving in the first place.
+    'pr.openExternal': async ({ repoId, number }, ctx) => {
+      const result = await connection.request('pr.browserUrl', { repoId, number }, ctx.signal);
+      if (result.url !== null) await browser.openExternal(result.url);
+      return {};
+    },
     // G25: five plain forwards, answered entirely by the Go server, same as every other
     // repoId-addressed request.
     'worktree.list': forward('worktree.list'),

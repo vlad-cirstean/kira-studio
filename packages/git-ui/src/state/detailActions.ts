@@ -59,6 +59,11 @@ export interface DetailActions {
    *  torn out along with a contract method (`editor.goToFile`) this phase's own plan never asked
    *  to remove. */
   goToFile(params: { rev: string; path: string; line: number }): Promise<GoToFileOutcome>;
+  /** P74 §3.3: opens a pull request in the external browser, never in place — the renderer never
+   *  supplies a URL (`pr.openExternal`'s own doc comment); it names the PR by number and the host
+   *  composes/opens the URL itself. A no-op (never called) when `capabilities.openExternal` is
+   *  false; callers gate the button on that themselves, same convention `openInEditor` uses. */
+  openPullRequest(params: { number: number }): Promise<void>;
 }
 
 export function createDetailActions(
@@ -99,6 +104,11 @@ export function createDetailActions(
       const repo = repoId();
       if (!repo) throw new Error('createDetailActions: goToFile called with no active repo');
       return bridge.request('editor.goToFile', { repoId: repo, rev, path, line });
+    },
+    async openPullRequest({ number }) {
+      const repo = repoId();
+      if (!repo) throw new Error('createDetailActions: openPullRequest called with no active repo');
+      await bridge.request('pr.openExternal', { repoId: repo, number });
     },
   };
 }

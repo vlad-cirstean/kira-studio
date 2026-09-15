@@ -430,6 +430,9 @@ export class ReviewSessionState {
         this.#bridge.request('editor.openAllChanges', { repoId, sha, parentIndex }),
       goToFile: async ({ rev, path, line }) =>
         this.#bridge.request('editor.goToFile', { repoId, rev, path, line }),
+      openPullRequest: async ({ number }) => {
+        await this.#bridge.request('pr.openExternal', { repoId, number });
+      },
     };
   }
 

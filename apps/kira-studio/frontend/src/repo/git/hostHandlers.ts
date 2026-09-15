@@ -24,6 +24,7 @@ import type {
   ReviewSessionSnapshot,
   Transport,
 } from '@kira/git-ipc';
+import { control } from '../../bridge/control';
 import { codeRepoRecord, codeReposState } from '../../state/coderepos';
 import { layoutState, toggleProjectPanel } from '../../state/layout';
 import {
@@ -202,6 +203,8 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
           // stash, worktree add/remove) — this is the one flag the UI actually branches on to
           // show every such write affordance uniformly.
           write: true,
+          // P74 §3.3: GitHubService.OpenPullRequestURL/BrowserManager.OpenURL always exists.
+          openExternal: true,
         },
       };
     },
@@ -368,6 +371,16 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       const codeRepoId = codeRepoIdFor(gitRepoId);
       const session = codeRepoId === undefined ? null : loadReviewSession(codeRepoId);
       return { session: session as ReviewSessionSnapshot | null };
+    },
+
+    // P74 §3.3: requests pr.browserUrl over the git socket, then hands the URL (when non-null) to
+    // GitHubService.OpenPullRequestURL — the one Go-side path that ever opens the OS browser. A
+    // null url (github disabled, or no GitHub remote) is a silent no-op: the caller already gated
+    // the button on this very lookup resolving in the first place.
+    'pr.openExternal': async ({ repoId, number }, signal) => {
+      const result = await deps.remoteRequest('pr.browserUrl', { repoId, number }, signal);
+      if (result.url !== null) await control.githubOpenPullRequestUrl(result.url);
+      return {};
     },
 
     // detailActions.ts D12/G21 D12: no caller remains for editor.goToFile at all — a throw is

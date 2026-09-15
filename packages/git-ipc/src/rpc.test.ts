@@ -177,6 +177,8 @@ function stubHandlers(
       'review.session.load': notImplemented,
       'commit.resolvePr': notImplemented,
       'branch.resolvePr': notImplemented,
+      'pr.browserUrl': notImplemented,
+      'pr.openExternal': notImplemented,
       'worktree.list': notImplemented,
       'preflight.worktreeAdd': notImplemented,
       'preflight.worktreeRemove': notImplemented,
