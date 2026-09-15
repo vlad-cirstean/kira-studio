@@ -173,6 +173,32 @@ shorthand. Independently re-verified: `go build/vet/test` clean, `bun typecheck/
 `settings-apply-on-save`, `settings-code-intelligence`) plus 16/16 VS Code extension
 `graph-columns.spec.ts`. No known gaps against the plan.
 
+## P73 result
+
+Landed per plan (`docs/v1.8/plans/P73-tab-icons-markdown-font.md`), 3 commits (`4c1a741e`..
+`ea539a39`). Tab icons: `TabKindDef.icon` widened to `string | { filePath }`; `repo-file` is the
+one kind that returns `{ filePath: tab.path }`, resolved by `TabStrip.vue` through the same
+`fileIconStyle()` the repo file tree already uses — `repo-diff` stays on `git-compare` per the
+plan's stated reason (the only glance-level diff signal given tab-title truncation). Deleted the
+now-orphaned `repoFileIcon()` and its `monacoLanguageFor` import, verified by grep rather than the
+repo-map MCP server per the plan's own dogfooding note (its confirmed non-call-read false negative,
+`docs/v1.8/mcp-repo-map-issues.md`). Markdown font: root cause was never the base size (already
+tied to `--kira-font-size`, matching Monaco) but two real defects either side of it — fenced code
+inherited `:deep(code)`'s `--kira-t-sm` step-down, fixed by a more-specific `:deep(pre code)` rule
+at `--kira-t-md`; and Tailwind preflight zeroes heading `font-size` with `.md-reading` never
+restoring it, fixed with an `em`-based `h1`-`h6` scale (1.6/1.4/1.2/1.05/1) that tracks the
+Appearance font-size setting rather than a literal or `--kira-t-xl`. Two assertions added to the
+two existing specs the plan named (`repo-workspace.spec.ts`'s per-language-icon test, a tab's
+`.tab-file-icon` mask-image now compared to its tree row's; `markdown-reading.spec.ts`'s
+Source/Reading test, a fenced block's computed `pre code` font-size compared to a Monaco
+`.view-line`'s) — no new spec file, no new unit test, per the plan's own bar. Independently
+re-verified: `go build/vet` clean (no Go touched), `bun typecheck/lint` clean, both `bun run build`
+(desktop) and `bun run build:vscode` succeed (`packages/git-ui/` untouched, confirmed by diff),
+1370/1370 unit tests, 268/270 full `ui` Playwright tier passing — the two failures
+(`cell-editor.spec.ts`'s <250ms grid-response bound, `grpc-request.spec.ts`'s debounce-timing
+assertion) are pre-existing wall-clock-contention flakes in files this phase's diff never touches,
+neither reproducing when re-run outside the full-parallel tier. No known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
