@@ -133,6 +133,23 @@ rather than `CLAUDE.md`'s standard two) and P80 (main-docs update) close the cha
 | **P79 Code review** | Three parallel Opus subagents, one per dimension — architecture/security, functional correctness, performance/resource efficiency — findings-only, per `CLAUDE.md`'s own process, scoped to this chapter's own diff (P71-P78). One sequential Sonnet subagent fixes every finding judged real. A single round, not `CLAUDE.md`'s standard two, by explicit instruction | After P71-P78 land: a review needs a finished tree |
 | **P80 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's changes — API incognito mode, the git module's rendering/PR/diff/review/settings/blame/worktree changes, and the code-navigation fixes (click, Go inheritance matching, reference/implementation wiring) — the same "read the current tree, don't trust prose" bar v1.6's P70 and v1.7's M8 used | Last of all: needs the review round's fixes landed first |
 
+## P71 result
+
+Landed per plan (`docs/v1.8/plans/P71-api-incognito-input-sizing.md`), 8 commits (`64463e0d`..
+`edc83cfd`). Incognito: a frontend-only per-tab flag (`state/tabIncognito.ts`) filters every tab
+snapshot before `tabsSave`, plus new `Incognito bool` fields on the Go RPCs (`HttpSendArgs`/
+`GrpcCallArgs`) guarding response-history recording and `internal/oplog`'s persistence (a running
+incognito op still shows live in the Operations panel, just never written); an incognito tab's
+active environment is a per-tab in-memory override rather than touching the shared active-env row.
+4-row auto-grow: a CSS grid-replica trick (`primitives.css`'s `.p-input.is-grow`) behind an opt-in
+`grow` prop on `TextField.vue`/`AutocompleteField.vue`, wired into every raw-text cell the plan
+scoped in (params/headers/form-data/gRPC metadata), correctly leaving out the URL/target fields,
+Monaco body editors, form-data's content-type cell and `VariableRow`'s password-type value cell.
+Independently re-verified: `go build/vet/test` clean, `bun typecheck/lint/build` clean, 1370/1370
+unit tests, 118/118 relevant Playwright UI specs. One pre-existing, unrelated flake noted and
+confirmed untouched by this phase's diff (`internal/grpcclient`'s reflection test, a port race in
+that package's own suite). No known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
