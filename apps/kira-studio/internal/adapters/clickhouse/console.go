@@ -3,14 +3,39 @@ package clickhouse
 import (
 	"context"
 	"regexp"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
 
-// ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier.
+// ClassifyStatement satisfies adapters.StatementClassifier (M2) over the shared SQL classifier,
+// with one ClickHouse-specific correction — see classifyClickHouseSQL.
 func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapters.OpClass, error) {
-	return adapters.ClassifySQL(statement), nil
+	return classifyClickHouseSQL(statement), nil
+}
+
+// classifyClickHouseSQL corrects ClassifySQL's own default for a bare (non-ANALYZE) EXPLAIN (M7
+// finding #10): on Postgres/MySQL/MariaDB/SQLite an EXPLAIN without ANALYZE never executes its
+// target, so ClassifySQL classifies it ClassRead unconditionally — docs/v1.7/plans/M3's own §8.1
+// records that ClickHouse is "the one it does not clear", the reason queryplan.Explainable already
+// refuses to ever compose a ClickHouse EXPLAIN over anything but SELECT/WITH. That restriction only
+// covers explain_query's own composed statements, not run_query, which accepts raw SQL text a
+// caller could type `EXPLAIN <DELETE ...>` into directly — classified ClassRead by the shared
+// scanner, letting a connection with write:deny run a write through it. Reclassify by the
+// EXPLAIN's own target instead, the same worst-case reasoning ClassifySQL already applies when
+// ANALYZE is present, applied here unconditionally since this dialect's plain form is not cleared
+// either.
+func classifyClickHouseSQL(statement string) adapters.OpClass {
+	stripped := strings.TrimSpace(adapters.StripOneTrailingSemicolon(adapters.StripSQLComments(statement)))
+	fields := strings.Fields(stripped)
+	if len(fields) > 0 && strings.EqualFold(fields[0], "EXPLAIN") {
+		rest := strings.TrimSpace(stripped[len(fields[0]):])
+		if hasAnalyze, target, ok := adapters.ExplainAnalyzeTarget(rest); ok && !hasAnalyze {
+			return adapters.ClassifySQL(target)
+		}
+	}
+	return adapters.ClassifySQL(statement)
 }
 
 // leadingCommentRE/rowReturningRE are console.ts's own — D19: the HTTP interface gives no cheap

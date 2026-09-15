@@ -68,7 +68,7 @@ func isSQLWordBoundary(r rune) bool {
 	return !(r == '_' || (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'))
 }
 
-// explainAnalyzeTarget inspects the (already comment/semicolon-stripped) text following the
+// ExplainAnalyzeTarget inspects the (already comment/semicolon-stripped) text following the
 // EXPLAIN keyword and reports whether ANALYZE was requested — either the bare `EXPLAIN ANALYZE
 // ...` form or Postgres's parenthesised option-list form, `EXPLAIN (ANALYZE) ...` / `EXPLAIN
 // (ANALYZE, BUFFERS) ...` — since either genuinely executes the target statement, unlike a plain
@@ -77,7 +77,11 @@ func isSQLWordBoundary(r rune) bool {
 // remains to classify when hasAnalyze is true. ok is false only when rest opens with `(` but the
 // option list never balances — the caller must not default to ClassRead over text it can't parse,
 // since an unparseable option list might be hiding ANALYZE inside it.
-func explainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool) {
+//
+// Exported (M7 finding #10) so a per-dialect ClassifyStatement — clickhouse/console.go's own — can
+// reuse this same parsing rather than re-implementing it, for a dialect where ClassifySQL's default
+// EXPLAIN-without-ANALYZE-is-a-read assumption does not hold.
+func ExplainAnalyzeTarget(rest string) (hasAnalyze bool, target string, ok bool) {
 	if strings.HasPrefix(rest, "(") {
 		r := []rune(rest)
 		depth := 0
@@ -156,7 +160,7 @@ func ClassifySQL(statement string) OpClass {
 		return ClassRead
 	case keyword == "EXPLAIN":
 		rest := strings.TrimSpace(stripped[len(fields[0]):])
-		hasAnalyze, target, ok := explainAnalyzeTarget(rest)
+		hasAnalyze, target, ok := ExplainAnalyzeTarget(rest)
 		if !ok {
 			// A leading parenthesised option list this scanner can't balance might be hiding
 			// ANALYZE inside it — never assume ClassRead over an option list it can't parse.
