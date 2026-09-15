@@ -28,6 +28,10 @@ type OpSpec struct {
 	Kind         string // a model.OpKind value
 	OpID         string
 	TabID        *string
+	// Incognito is P71 §4.3's own addition: forwarded onto op:start so oplog.Wiring can skip
+	// persisting this op at all (Append/Finish) while still emitting the live Operations-panel
+	// update — false for every caller but HttpService.Send/GrpcService.Call.
+	Incognito bool
 }
 
 type runningOp struct {
@@ -121,6 +125,7 @@ type opStartPayload struct {
 	TabID        *string `json:"tabId"`
 	Kind         string  `json:"kind"`
 	StartedAt    string  `json:"startedAt"`
+	Incognito    bool    `json:"incognito"`
 }
 
 type opEndPayload struct {
@@ -183,6 +188,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 	startedAt := model.NowISO()
 	h.emitJSON(oplog.EventOpStart, opStartPayload{
 		OpID: opID, ConnectionID: spec.ConnectionID, TabID: spec.TabID, Kind: spec.Kind, StartedAt: startedAt,
+		Incognito: spec.Incognito,
 	})
 
 	op := adapters.NewOpCtx(opID)

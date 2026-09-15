@@ -60,6 +60,15 @@ func opStartPayload(opID string, connectionID, tabID *string, kind, startedAt st
 	return b
 }
 
+// opStartPayloadIncognito is opStartPayload's own P71 sibling — the one field distinguishing an
+// incognito op's op:start event.
+func opStartPayloadIncognito(opID, startedAt string) json.RawMessage {
+	b, _ := json.Marshal(map[string]any{
+		"opId": opID, "connectionId": nil, "tabId": nil, "kind": "http", "startedAt": startedAt, "incognito": true,
+	})
+	return b
+}
+
 func opEndPayload(opID, status string) json.RawMessage {
 	b, _ := json.Marshal(map[string]any{
 		"opId": opID, "status": status, "durationMs": 1, "rows": nil, "command": nil, "error": nil,
@@ -209,9 +218,19 @@ func TestShutdownReconcilesInFlight(t *testing.T) {
 	h.src.ch <- oplog.Event{Topic: oplog.EventOpEnd, Payload: opEndPayload("op4", "ok")}
 	waitUntil(t, time.Second, func() bool { return rowExists(t, h.ops, "op4") && fetchOp(t, h.ops, "op4").Status == "ok" })
 
+	// P71 §4.3: an incognito op still running at shutdown was never Appended (handleOpStart's own
+	// skip) — finishInFlight must skip it too, rather than writing a fresh "app exited" row for an
+	// op that never reached op_log at all.
+	h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayloadIncognito("op-incog-shutdown", startedAt)}
+	waitUntil(t, time.Second, func() bool { return updates.count() >= 6 })
+
 	// Stop's unsubscribe closes the channel; consume's range loop returns and finishInFlight runs.
 	// Must not panic or hang.
 	h.wiring.Stop()
+
+	if rowExists(t, h.ops, "op-incog-shutdown") {
+		t.Errorf("an incognito op left running at shutdown was persisted")
+	}
 
 	for _, id := range []string{"op1", "op2", "op3"} {
 		waitUntil(t, time.Second, func() bool { return fetchOp(t, h.ops, id).Status == "error" })
@@ -225,6 +244,31 @@ func TestShutdownReconcilesInFlight(t *testing.T) {
 	}
 	if row := fetchOp(t, h.ops, "op4"); row.Status != "ok" {
 		t.Errorf("op4 (already finished before shutdown) status = %q, want untouched ok", row.Status)
+	}
+}
+
+// TestIncognitoOpSkipsPersistence is P71 §4.3's own guard on handleOpEnd's reordering: an op
+// started with incognito must reach neither Append (handleOpStart) nor Finish (handleOpEnd) — the
+// live Operations-panel view (updates.Emit) still fires for both, so a running incognito op stays
+// visible while it runs and simply never existed in op_log once it completes.
+func TestIncognitoOpSkipsPersistence(t *testing.T) {
+	h := newHarness(t, 30)
+	var updates updateCollector
+	h.wiring.OnUpdate(updates.handle)
+	h.wiring.Start()
+	t.Cleanup(h.wiring.Stop)
+
+	startedAt := model.NowISO()
+	h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayloadIncognito("op-incog", startedAt)}
+	waitUntil(t, time.Second, func() bool { return updates.count() == 1 })
+	if rowExists(t, h.ops, "op-incog") {
+		t.Fatalf("op:start with incognito=true wrote a row")
+	}
+
+	h.src.ch <- oplog.Event{Topic: oplog.EventOpEnd, Payload: opEndPayload("op-incog", "ok")}
+	waitUntil(t, time.Second, func() bool { return updates.count() == 2 })
+	if rowExists(t, h.ops, "op-incog") {
+		t.Fatalf("op:end for an incognito op wrote a row")
 	}
 }
 

@@ -188,6 +188,10 @@ type GrpcCallArgs struct {
 	CollectionID   string                `json:"collectionId"`
 	EnvironmentID  string                `json:"environmentId"`
 	ItemID         string                `json:"itemId"`
+	// Incognito is P71 §4: HttpSendArgs' own addition, mirrored here — suppresses
+	// recordGrpcHistory below and rides along on the op spec so the op log skips persisting this
+	// op too (adapterhost/host.go, oplog/wire.go).
+	Incognito bool `json:"incognito"`
 }
 
 // Call is bridge/http.go's Send with a different payload, deliberately down to the ordering (D7):
@@ -208,7 +212,7 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 	}
 
 	tabID := args.TabID
-	spec := adapterhost.OpSpec{ConnectionID: nil, Kind: "grpc", OpID: args.OpID, TabID: &tabID}
+	spec := adapterhost.OpSpec{ConnectionID: nil, Kind: "grpc", OpID: args.OpID, TabID: &tabID, Incognito: args.Incognito}
 	unresolvedMethod := args.Service + "/" + args.Method
 
 	_, value, err := s.Deps.Router.Host().RunOp(ctx, spec,
@@ -302,6 +306,11 @@ func (s *GrpcService) Call(ctx context.Context, args GrpcCallArgs) (grpcclient.C
 // close. Call itself skips recording for a streaming call (`if !args.Streaming`) precisely because
 // runServerStream already did it.
 func (s *GrpcService) recordGrpcHistory(args GrpcCallArgs, result grpcclient.CallResult) {
+	// P71 §4.2: one guard covers all four call sites (unary and streaming) — nothing about an
+	// incognito call reaches SQLite.
+	if args.Incognito {
+		return
+	}
 	streaming := model.GrpcStreamingUnary
 	if args.Streaming {
 		streaming = model.GrpcStreamingServer
