@@ -1024,6 +1024,17 @@ read can answer rather than removing the ambiguity a selector base or an assignm
 `find_references` now answers for every read shape this section names except a selector base and an
 assignment RHS.
 
+**M1c (`docs/v1.7/plans/M1c-repomap-struct-field-fix.md`) indexes Go struct fields, TS/TSX
+interface/type-literal/class members and JS class fields as definitions, and a plain `x.Field`
+selector or `obj.prop` member read — not just one in call position — as a `"field"` reference.**
+Before this, neither half existed: a struct/class field was never a symbol at all, and only a
+selector/member sitting in a call's own function position (`c.Greet()`) earned a reference row. A
+`"field"` reference is its own kind, deliberately outside the `"read"` kind's tier ≤ 1 clamp above —
+a selector names its member explicitly, unlike a bare identifier, so it carries the qualification
+evidence a cross-directory read needs and is not subject to the same over-match risk. The previously
+declined **selector base** measurement (the `x` in `x.Field`, priced in the paragraph above) stays
+declined; M1c captures the field half only, a different position.
+
 **C8 adds one source line under each hit — the one place this server reads a file's own bytes,
 never a whole file.** `find_definition`, `find_references`, `find_implementations` and
 `search_symbols` (plus the ambiguous-candidates list, since disambiguating between same-named
