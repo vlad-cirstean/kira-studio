@@ -374,9 +374,6 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     // honest and costs nothing (§5's own table).
     'editor.goToFile': refuseLocally('editor.goToFile', 'has no native caller'),
 
-    // P67e: this stream's own remote op now needs to answer git's own askpass prompts for
-    // real (state/gitCredential.ts + workbench/GitCredentialDialog.vue) — the refusal here is
-    // gone, and layer 1 (gitstream.go's allowedMethods) now forwards this to Go.
     'editor.resolveConflict': refuseLocally(
       'editor.resolveConflict',
       'needs a merge editor this window does not have; resolve the files in your own editor, then Continue',
