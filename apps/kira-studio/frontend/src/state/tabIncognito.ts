@@ -4,7 +4,7 @@ import { registerTabRuntimeCleanup } from './tabRuntime';
 // P71 §2.1: a per-tab in-memory flag suppressing every persistence write path a request tab can
 // reach (§1.1 of the plan) — one flag, checked at each write site, rather than a parallel
 // non-persisted store mirroring reads too (§2's own "suppress, don't mirror" decision). In-memory
-// only, exactly like tabsState.hydrated/previewIdByWorkspace (state/tabs.ts) — no schema change,
+// only, exactly like tabsState.hydrated/previewIdsByWorkspace (state/tabs.ts) — no schema change,
 // and a restored session has nothing to restore (an incognito tab was never saved).
 //
 // Its own module rather than a field on tabsState: state/tabKinds.ts needs to read it for the tab

@@ -12,6 +12,7 @@ import {
   type OpenTabResult,
   openTab,
   patchRepoFileTabState,
+  removeFromPreviewCohort,
   tabsState,
 } from './tabs';
 
@@ -77,6 +78,9 @@ export function openRepoCommitDiffTab(
   right: string,
   labels: { left: string; right: string },
   pinned: boolean,
+  // P74 §5.2: set only by a bulk caller ("Open all changes") — every file after the first in that
+  // same loop, so the cohort it started is joined rather than each file evicting the last.
+  previewCohort?: boolean,
 ): OpenTabResult {
   const workspaceId = repoWorkspaceKey(repoId);
   const existing = tabsState.tabs.find((t) => {
@@ -94,9 +98,7 @@ export function openRepoCommitDiffTab(
     // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
     // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
     // rule since it never reaches openTab's.
-    if (pinned && tabsState.previewIdByWorkspace[workspaceId] === existing.id) {
-      tabsState.previewIdByWorkspace[workspaceId] = null;
-    }
+    if (pinned) removeFromPreviewCohort(workspaceId, existing.id);
     return { id: existing.id, reused: true };
   }
   return openTab(
@@ -110,7 +112,7 @@ export function openRepoCommitDiffTab(
         leftLabel: labels.left,
         rightLabel: labels.right,
       }),
-    { reuse: false, workspaceId, preview: !pinned },
+    { reuse: false, workspaceId, preview: !pinned, previewCohort },
   );
 }
 
@@ -127,6 +129,8 @@ export function openRepoReviewDiffTab(
   labels: { left: string; right: string },
   review: { branch: string; branchTip: string; leftLabel: string },
   pinned: boolean,
+  // P74 §5.2: mirrors openRepoCommitDiffTab's own trailing param — see its doc comment.
+  previewCohort?: boolean,
 ): OpenTabResult {
   const workspaceId = repoWorkspaceKey(repoId);
   const existing = tabsState.tabs.find((t) => {
@@ -142,9 +146,7 @@ export function openRepoReviewDiffTab(
   });
   if (existing) {
     activateTab(existing.id);
-    if (pinned && tabsState.previewIdByWorkspace[workspaceId] === existing.id) {
-      tabsState.previewIdByWorkspace[workspaceId] = null;
-    }
+    if (pinned) removeFromPreviewCohort(workspaceId, existing.id);
     return { id: existing.id, reused: true };
   }
   return openTab(
@@ -156,7 +158,7 @@ export function openRepoReviewDiffTab(
         { left, right, leftLabel: labels.left, rightLabel: labels.right },
         review,
       ),
-    { reuse: false, workspaceId, preview: !pinned },
+    { reuse: false, workspaceId, preview: !pinned, previewCohort },
   );
 }
 

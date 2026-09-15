@@ -1848,8 +1848,11 @@ export type Contract = {
      * no entry in `@types/vscode`) and falls back to a sequenced, error-aware loop over the same
      * per-file open `editor.openDiff` uses when that command is absent or rejects — see
      * `ports/editorIntegration.ts`'s own `openAllChanges` doc comment for the full fallback
-     * shape. Always pinned/multi-diff in both branches — this is the bulk call site item 8's
-     * original bug was about, and it is never regressed by D13's own per-file preview/pin split.
+     * shape — VS Code's own two branches stay pinned/multi-diff, untouched since G19 D8. The
+     * desktop's own `editor.openAllChanges` handler (`hostHandlers.ts`) opens every file as a
+     * preview-cohort tab instead (P74 §5.2) — a bulk open item 8's original bug was about, and
+     * that bug is never regressed by D13's own per-file preview/pin split, but a whole commit's
+     * files permanently pinning the strip was never the ask either.
      */
     'editor.openAllChanges': {
       params: { repoId: string; sha: string; parentIndex?: number };
