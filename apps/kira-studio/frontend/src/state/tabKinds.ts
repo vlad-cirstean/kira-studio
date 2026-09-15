@@ -71,7 +71,6 @@ import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/res
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { dropRepoDiffTab, dropRepoFileTab } from '../views/repo/editors';
-import { monacoLanguageFor } from '../views/repo/language';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { codeRepoRecord } from './coderepos';
@@ -86,10 +85,14 @@ import { isIncognito, setIncognito } from './tabIncognito';
 // (F19). Every entry below carries Studio's existing per-kind behaviour verbatim: TabStrip.vue's
 // old iconFor body, tabTitle (F10), connectionRecord(tab.connectionId)?.color, and the "Reveal in
 // project panel" menu item (F11) — nothing here changes what Studio does, only where it lives.
+/** A codicon name, or a file path whose icon comes from the shared seti set
+ *  (`repo/fileIcon.ts`) — the same rule the repo file tree and the diff tree already use. */
+export type TabIcon = string | { readonly filePath: string };
+
 export interface TabKindDef<K extends TabKind = TabKind> {
   mode: (typeof TAB_KIND_MODE)[K];
   title(tab: TabRecord): string;
-  icon(tab: TabRecord): string;
+  icon(tab: TabRecord): TabIcon;
   railColor(tab: TabRecord): ConnectionColor | undefined;
   /** A brand-new tab of this kind, opened with nothing to inherit. */
   defaultState(): Extract<TabRecord, { kind: K }>['state'];
@@ -182,18 +185,6 @@ function repoDiffTitle(tab: TabRecord): string {
     return `${repoFileTitle(tab)} (${left} ↔ ${right})`;
   }
   return `${repoFileTitle(tab)} (Working Tree)`;
-}
-
-// §9.4's own language id, mapped down to one of three tab-strip icons — the same coarse-bucket
-// idea RepoTreeRow.vue's own extension map uses, deliberately not the identical five buckets
-// (a tab strip icon and a tree-row icon are different glance surfaces, D9's own "different
-// purposes" reasoning applied one level further).
-function repoFileIcon(tab: TabRecord): string {
-  const lang = monacoLanguageFor(tab.path);
-  if (lang === 'json') return 'json';
-  if (lang === 'markdown') return 'markdown';
-  if (lang === 'plaintext') return 'file';
-  return 'file-code';
 }
 
 // P3 D3: every parseState below is a one-liner over the schema its own kind already imports —
@@ -425,10 +416,12 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     pinned: true,
   },
   // C5 §8/§9: one opened repository file, rendered by Monaco (read-only, §11).
+  // P73 §3.1: the same seti icon the file tree already shows for this path — RepoTreeRow.vue's own
+  // fileIconStyle (repo/fileIcon.ts), resolved by TabStrip.vue rather than here (P1 D4).
   'repo-file': {
     mode: TAB_KIND_MODE['repo-file'],
     title: repoFileTitle,
-    icon: repoFileIcon,
+    icon: (tab) => ({ filePath: tab.path }),
     railColor: () => undefined,
     defaultState: (): RepoFileTabState => defaultRepoFileTabState(),
     duplicateState: (tab: RepoFileTabRecord): RepoFileTabState => ({ ...tab.state }),
