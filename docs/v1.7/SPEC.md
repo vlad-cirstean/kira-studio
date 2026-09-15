@@ -239,6 +239,37 @@ three full-parallel runs (100%-worker CPU contention, not files this pass touche
 confirmed passing cleanly in isolation, consistent with this suite's already-documented pacing-test
 flakiness class.
 | **M8 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's new subsystem — a second MCP server, its permissions/anonymization/Faker model, and its Settings-dialog toggle — the same "read the current tree, don't trust prose" bar v1.6's own P70 used | Last of all: needs both review rounds' fixes landed first |
+**M8 result**: plan (`docs/v1.7/plans/M8-main-docs-update.md`) verified every M1-M7 SPEC row against
+`git log` on `cfb87a8b..HEAD` rather than SPEC prose, confirmed M4 (Faker-MCP bridge) never shipped
+in any of the four files, and confirmed the two M6-round Known-open-items (correlation-tag
+chosen-plaintext oracle, dbmcp bearer-token argv exposure) still accurate and out of this phase's
+scope. One sequential Sonnet subagent implemented it as 5 commits (`0c14ed63`..`e83335cb`), smallest
+and most mechanical first: `CLAUDE.md` (pointer fixes, one clause distinguishing the two MCP
+servers), `docs/DEV_ENVIRONMENT.md` (new section — the DB MCP server has no headless binary or
+`bun run mcp:*` script, unlike repo-map), `docs/ARCHITECTURE.md`'s small corrections (schema block
+gains seven v1.7 columns and `connection_mask_rules` across migrations `0020`-`0023`, migration
+high-water mark `0019`→`0023`, `mcpauth.LoadOrMint`→`LoadOrMintTTL` plus the 7-day TTL retrofit,
+Testing section names the two new Go/TS parity-fixture pairs), a new top-level `## Database MCP
+server (v1.7)` section (7 subsections: server/tools/permissions/approval/EXPLAIN/masking/UI, placed
+as a peer of `## Git module (v1.3)`, not nested under `## Storage`), and `README.md` (a new "Column
+masking (PII)" bullet and a new "Database MCP features" section, plus the chapter pointers moved
+from v1.6 to v1.7). While implementing, the subagent caught two of its own plan's estimates against
+the tree and corrected them: the mask parity fixture count is 66 pairs, not 60 as the plan
+estimated, and M7's `21e5d77d` gates three tools (`list_children`/`describe_table`/`describe_schema`)
+on read-mode deny, not four. Independently re-verified, not taken on the subagent's own report: every
+fact spot-checked directly against source (six tool names and `DefaultPort` 8766 in `server.go`, no
+`goja`/faker in `go.mod` or the tree, migration file names `0020`-`0023`, `mcpauth.LoadOrMintTTL` in
+`bridge/repomap.go`, `SettingsDialog.vue`'s `sections` array confirming `'Database MCP'` as its own
+top-level entry after `'Code intelligence'`, `ConnectionDialog.vue`'s five-value `DetailTab`,
+`gitsock.pairingTimeout`/queue-cap reuse in `dbmcp/approval.go`, the HMAC-SHA256 correlation-tag
+construction, both cited fix commits `1ad96285`/`0176243e`); all of the plan's own §6 grep sweeps
+re-run clean (no stray faker/goja/`generate_fake_data`/`list_databases`/`list_schemas`/`id`-kind
+hits, no remaining "docs/v1.6 is the live chapter" claims, every `8765`/`8766` mention contextual, no
+bare `LoadOrMint` without the `TTL` suffix); `bun run lint` clean. One leftover inaccuracy found on
+independent review — the new `## Database MCP server` section correctly said 66 shared mask fixture
+pairs, but the Testing-section edit from an earlier commit in the same pass still said 60,
+self-contradicting within the file — fixed in a follow-up commit (`57f58caf`) rather than editing the
+landed commits. Chapter complete: nothing in this file remains unimplemented once M8's commits land.
 
 ## M1ab result
 
