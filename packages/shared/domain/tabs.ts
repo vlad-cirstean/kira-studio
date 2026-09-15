@@ -277,6 +277,10 @@ export type RepoGraphTabState = z.infer<typeof repoGraphTabStateSchema>;
 export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
   revealLine: z.number().int().min(1).nullable().default(null),
   markdownReading: z.boolean().default(false),
+  // P74 §7.3: non-null means this tab shows `path` at that revision, read-only, via `file.read`
+  // — not the worktree file. `.default(null)` keeps every tab saved before this phase
+  // restorable, the same discipline `revealLine`/`markdownReading` above already follow.
+  rev: z.string().nullable().default(null),
 });
 export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
 
@@ -500,8 +504,11 @@ export function defaultRepoGraphTabState(): RepoGraphTabState {
   return { viewState: null, reviewSession: null };
 }
 
-export function defaultRepoFileTabState(revealLine: number | null = null): RepoFileTabState {
-  return { revealLine, markdownReading: false };
+export function defaultRepoFileTabState(
+  revealLine: number | null = null,
+  rev: string | null = null,
+): RepoFileTabState {
+  return { revealLine, markdownReading: false, rev };
 }
 
 /**

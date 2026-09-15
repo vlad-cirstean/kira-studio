@@ -84,6 +84,7 @@ function onOpenFile(index: number, pinned: boolean): void {
         :parent-index="detailState.parentIndex.value"
         :store="store"
         :actions="actions"
+        :sha="detailState.sha.value ?? undefined"
         @select-file="detailState.selectFile($event)"
         @open-file="onOpenFile"
         @update:list-mode="detailState.setListMode($event)"

@@ -17,7 +17,13 @@ import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnota
 import { registerEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import { renderMarkdownReading } from './markdownReading';
-import { getOrCreateModel, loadMonaco, REPO_THEME_NAME, repoFileUri } from './monaco';
+import {
+  getOrCreateModel,
+  loadMonaco,
+  REPO_THEME_NAME,
+  repoFileUri,
+  repoRevisionFileUri,
+} from './monaco';
 import { ensureNavigationRegistered } from './navigation';
 import { consumeReveal } from './reveal';
 
@@ -127,13 +133,40 @@ async function mount(): Promise<void> {
     return;
   }
 
-  let content: Awaited<ReturnType<typeof control.codeWorkspaceReadFile>>;
-  try {
-    content = await control.codeWorkspaceReadFile(repoId, props.tab.path);
-  } catch (err) {
-    state.value = 'error';
-    errorMessage.value = err instanceof Error ? err.message : String(err);
-    return;
+  const rev = props.tab.state.rev;
+  let content: { kind: 'found' | 'missing' | 'binary' | 'tooLarge'; text: string };
+  if (rev === null) {
+    try {
+      content = await control.codeWorkspaceReadFile(repoId, props.tab.path);
+    } catch (err) {
+      state.value = 'error';
+      errorMessage.value = err instanceof Error ? err.message : String(err);
+      return;
+    }
+  } else {
+    // P74 §7.3: a revision-pinned tab reads via the git transport, the same request
+    // RepoDiffView.vue already uses for a commit diff's two sides — never the worktree file.
+    const gitRepoId = gitRepoIdFor(repoId);
+    if (!gitRepoId) {
+      state.value = 'error';
+      errorMessage.value = 'This repository is not open.';
+      return;
+    }
+    const transport = gitTransportFor(repoId);
+    try {
+      const result = await transport.request('file.read', {
+        repoId: gitRepoId,
+        rev,
+        path: props.tab.path,
+      });
+      content = { kind: result.kind, text: result.kind === 'found' ? result.content : '' };
+    } catch (err) {
+      state.value = 'error';
+      errorMessage.value = err instanceof Error ? err.message : String(err);
+      return;
+    } finally {
+      transport.dispose();
+    }
   }
   if (content.kind !== 'found') {
     state.value = content.kind;
@@ -150,12 +183,20 @@ async function mount(): Promise<void> {
   // Unmounted (tab closed/switched away) while the read/import above was in flight.
   if (!container.value) return;
 
-  const uri = repoFileUri(mod, repoId, props.tab.path);
+  const uri =
+    rev === null
+      ? repoFileUri(mod, repoId, props.tab.path)
+      : repoRevisionFileUri(mod, repoId, props.tab.path, rev);
   const language = monacoLanguageFor(props.tab.path);
-  const model = getOrCreateModel(mod, uri, content.text, language, {
-    repoId,
-    path: props.tab.path,
-  });
+  // C6 D7's own rule, carried over from RepoDiffView.vue's HEAD side: a revision-pinned read is
+  // never byte-identical to what the index describes, so it is never registered as navigable.
+  const model = getOrCreateModel(
+    mod,
+    uri,
+    content.text,
+    language,
+    rev === null ? { repoId, path: props.tab.path } : undefined,
+  );
 
   const editor = mod.editor.create(container.value, {
     model,

@@ -1,5 +1,6 @@
 import {
   asRepoDiffTab,
+  asRepoFileTab,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
 } from '@shared/domain/tabs';
@@ -22,22 +23,49 @@ export interface OpenRepoFileOpts {
   // `revealLine` — a search result (or a go-to-definition match) carries a column worth restoring
   // a cursor to within this session, not across a restart.
   reveal?: { line: number; column?: number; endColumn?: number };
+  /** P74 §7.3: non-null opens `path` read-only at that revision instead of the worktree file —
+   *  part of this tab's own identity (below), so two different revisions of the same path are two
+   *  different tabs, never one silently replacing the other. `undefined`/`null` both mean the
+   *  worktree file, every caller from before this phase included. */
+  rev?: string | null;
 }
 
 // C5 §5.2: the repo workspace's own file-open entry point — every tree row click and every
 // search/quick-open match (§12) routes through this, never openTab directly, so the preview/pin
 // rules stay in exactly one place (openTab itself, §15.1's own unit-tested mechanism).
+//
+// P74 §7.3: does its own existing-tab lookup rather than opening through `openTab`'s `reuse: true`
+// branch — `openTab`'s own dedupe key is (workspaceId, kind, connectionId, path), which has no
+// room for `rev`; without this, opening the same path at two different revisions would collide
+// into one tab (the identical gap `openRepoCommitDiffTab`'s own doc comment names, one kind over).
 export function openRepoFileTab(
   repoId: string,
   path: string,
   opts: OpenRepoFileOpts,
 ): OpenTabResult {
   const revealLine = opts.reveal?.line ?? null;
-  const result = openTab('repo-file', null, path, () => defaultRepoFileTabState(revealLine), {
-    reuse: true,
-    workspaceId: repoWorkspaceKey(repoId),
-    preview: opts.preview,
+  const rev = opts.rev ?? null;
+  const workspaceId = repoWorkspaceKey(repoId);
+  const existing = tabsState.tabs.find((t) => {
+    if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
+    const file = asRepoFileTab(t);
+    return file !== null && file.state.rev === rev;
   });
+  let result: OpenTabResult;
+  if (existing) {
+    activateTab(existing.id);
+    // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
+    // `openTab`'s own reuse branch does this; this wrapper's own reuse path needs the identical
+    // rule since it never reaches openTab's (same reasoning as openRepoCommitDiffTab's own).
+    if (!opts.preview) removeFromPreviewCohort(workspaceId, existing.id);
+    result = { id: existing.id, reused: true };
+  } else {
+    result = openTab('repo-file', null, path, () => defaultRepoFileTabState(revealLine, rev), {
+      reuse: false,
+      workspaceId,
+      preview: opts.preview,
+    });
+  }
   // §5.2 rule 1: "Apply reveal either way" — a fresh tab's makeState() already carries it, so this
   // only does real work for a reused tab (and is a same-value no-op, via skipUnchanged, otherwise).
   if (revealLine !== null) patchRepoFileTabState(result.id, { revealLine });
