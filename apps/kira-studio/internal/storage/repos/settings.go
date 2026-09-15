@@ -65,6 +65,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
 	leaf(stored, "git.path", &result.Git.GitPath)
 	leaf(stored, "codeIntel.mcpServerEnabled", &result.CodeIntel.McpServerEnabled)
+	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
 	return result, nil
 }
 
@@ -154,6 +155,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	}
 	if ci := patch.CodeIntel; ci != nil && ci.McpServerEnabled != nil {
 		if err := upsertSettingsLeaf(tx, "codeIntel.mcpServerEnabled", *ci.McpServerEnabled); err != nil {
+			return model.Settings{}, err
+		}
+	}
+	if dm := patch.DbMcp; dm != nil && dm.ServerEnabled != nil {
+		if err := upsertSettingsLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled); err != nil {
 			return model.Settings{}, err
 		}
 	}
