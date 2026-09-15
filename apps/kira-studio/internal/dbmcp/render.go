@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -274,13 +275,27 @@ func statementIdentifierWords(statement string) map[string]bool {
 // columnRules's exact-name-only match sees nothing to mask on that result column and the real
 // value returns unmasked (finding #3, M6) — under-masking, the opposite of this design's stated
 // over-mask-on-ambiguity intent (mask.Set.RuleFor's own doc comment).
+//
+// An exact-name column being present is not by itself proof every mention of that column was
+// rendered under a name columnRules can match (finding #1, M7): `SELECT email, email AS leak FROM
+// customers` carries "email" under its own name *and* a second, differently-named projection of
+// the same column — the first occurrence must not excuse the second. maskColumnRenamedViaAlias
+// catches that second case once the masked name is confirmed present.
+//
+// Residual, undetectable by a text scanner over the outer statement alone: a pre-existing view
+// that itself renames a masked column (`CREATE VIEW v AS SELECT email AS e ...; SELECT e FROM v`)
+// mentions the masked column's real name nowhere in the statement this function sees — the view
+// definition isn't visible here. Documented as a known open item rather than chased further.
 func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.ColumnDescriptor) (string, bool) {
 	if mk == nil || mk.Empty() || statement == "" {
 		return "", false
 	}
 	present := make(map[string]bool, len(columns))
+	presentNames := make([]string, 0, len(columns))
 	for _, c := range columns {
-		present[strings.ToLower(c.Name)] = true
+		lower := strings.ToLower(c.Name)
+		present[lower] = true
+		presentNames = append(presentNames, lower)
 	}
 	words := statementIdentifierWords(statement)
 	// Deterministic across calls despite map iteration order, for a stable error message.
@@ -290,14 +305,47 @@ func maskedColumnRenamedOrHidden(statement string, mk *maskset, columns []page.C
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if present[name] {
+		if !present[name] {
+			if words[name] {
+				return name, true
+			}
 			continue
 		}
-		if words[name] {
+		if maskColumnRenamedViaAlias(statement, name, presentNames) {
 			return name, true
 		}
 	}
 	return "", false
+}
+
+// maskColumnRenamedViaAlias reports whether statement contains explicit alias evidence — the
+// masked column name, followed (with no intervening top-level comma, i.e. still the same
+// projection item) by an "AS <alias>" — where alias is itself one of the columns actually present
+// in the result set under a name other than the masked column's own. This is what
+// maskedColumnRenamedOrHidden's exact-name presence check alone cannot see: `SELECT email, email
+// AS leak FROM customers` satisfies "email present under its own name" while also carrying a
+// second, unmasked projection of the same value under "leak".
+//
+// Restricted to columns actually present in the output (never "any word after AS anywhere") so
+// this doesn't false-positive on an unrelated alias that merely happens to share a statement with
+// a masked column, e.g. `SELECT id, other_col AS leak, email FROM t` — "leak" there derives from
+// other_col, not email, and the required "email ... AS leak" adjacency (no comma crossed) is absent.
+func maskColumnRenamedViaAlias(statement, name string, presentNames []string) bool {
+	var aliases []string
+	for _, n := range presentNames {
+		if n != name {
+			aliases = append(aliases, regexp.QuoteMeta(n))
+		}
+	}
+	if len(aliases) == 0 {
+		return false
+	}
+	pattern := `(?i)\b` + regexp.QuoteMeta(name) + `\b[^,]*\bas\b\s*\b(?:` + strings.Join(aliases, "|") + `)\b`
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return false
+	}
+	return re.MatchString(statement)
 }
 
 // newMaskRenameRefusedError is §4.4's refusal, reused for the aliasing/expression case (finding

@@ -370,6 +370,51 @@ func TestRenderPageRefusesRenamedOrTransformedMaskedColumn(t *testing.T) {
 	if _, err := renderPage(pg2, 200, nil, &set, "SELECT email FROM customers"); err != nil {
 		t.Fatalf("renderPage(masked column by its own name) = %v, want no error", err)
 	}
+
+	// A masked column selected once under its own name and again under a different alias must
+	// still be refused (finding #1, M7): the exact-name occurrence alone must not excuse the
+	// second, differently-named projection of the same value — the previous implementation's
+	// "present under its own name" short-circuit skipped the check entirely here, returning
+	// "leak" completely unmasked.
+	b3 := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "email", DataType: "text", TypeClass: page.TypeClassText},
+		{Name: "leak", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	if err := b3.AppendRow([]*string{&v, &v}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg3 := b3.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(pg3, 200, nil, &set, "SELECT email, email AS leak FROM customers"); err == nil {
+		t.Fatal("renderPage(masked column duplicated under a second alias) = nil error, want a refusal")
+	} else if !strings.Contains(err.Error(), "email") {
+		t.Fatalf("renderPage error = %q, want it to name the masked column", err.Error())
+	}
+
+	// Same bypass shape via `SELECT *` — the star silently contributes the exact-name "email"
+	// column with no textual mention of its own, so a naive word-occurrence-count comparison
+	// would wrongly treat the explicit "email AS leak" mention as already accounted for.
+	b4 := page.NewTabularPageBuilder([]page.ColumnDescriptor{
+		{Name: "id", DataType: "int4", TypeClass: page.TypeClassNumber},
+		{Name: "email", DataType: "text", TypeClass: page.TypeClassText},
+		{Name: "leak", DataType: "text", TypeClass: page.TypeClassText},
+	})
+	id := "1"
+	if err := b4.AppendRow([]*string{&id, &v, &v}); err != nil {
+		t.Fatalf("AppendRow: %v", err)
+	}
+	pg4 := b4.Finish(page.UnpagedPosition(1))
+	if _, err := renderPage(pg4, 200, nil, &set, "SELECT *, email AS leak FROM customers"); err == nil {
+		t.Fatal("renderPage(SELECT *, email AS leak) = nil error, want a refusal")
+	} else if !strings.Contains(err.Error(), "email") {
+		t.Fatalf("renderPage error = %q, want it to name the masked column", err.Error())
+	}
+
+	// Filtering on the masked column's own name while also selecting it under that same name
+	// (no second alias anywhere) must still render normally — a WHERE-clause self-reference is
+	// not a second, differently-named projection.
+	if _, err := renderPage(pg2, 200, nil, &set, "SELECT email FROM customers WHERE email = 'x'"); err != nil {
+		t.Fatalf("renderPage(masked column selected and filtered by its own name) = %v, want no error", err)
+	}
 }
 
 // TestMaskedToolErrorWithholdsAdapterMessage is finding #4 (M6): a Postgres/MySQL driver error

@@ -3703,6 +3703,15 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   Closing it needs running the suite's own regeneration path (extend, per `CLAUDE.md`'s own P25/P26
   guidance) against a current schema.
 
+- **`maskedColumnRenamedOrHidden`'s outer-statement scan can't see into a pre-existing view
+  definition** (M7 round 2, finding #1). A view that itself renames a masked column
+  (`CREATE VIEW v AS SELECT email AS e FROM customers; SELECT e FROM v`) mentions the masked
+  column's real name nowhere in the statement `run_query`/`explain_query` actually see, so the
+  refusal that catches an inline alias (`SELECT email AS e FROM customers`) can't fire here — `e`
+  renders unmasked. Closing this needs the view's own definition visible to the scanner (a
+  per-adapter catalog lookup resolving a view name back to its defining query), out of proportion
+  to a text-scanning heuristic that deliberately does no real SQL parsing elsewhere either.
+
 - **M5's correlation tag doesn't verify a masked value's provenance** (M6 round 1, architecture/
   functional-correctness findings). The tag lets an AI client tell two masked cells apart or match
   them (same real value → same tag) without seeing the real value — but it's computed from whatever
