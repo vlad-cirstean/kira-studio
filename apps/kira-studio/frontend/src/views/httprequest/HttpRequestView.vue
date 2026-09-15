@@ -28,9 +28,9 @@ import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
 import { openEditRawDialog } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
-  activeEnvironmentColor,
-  activeEnvironmentId,
   ensureVariablesLoaded,
+  environmentColorForTab,
+  environmentIdForTab,
   mergedValuesAndSecrets,
 } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -38,6 +38,7 @@ import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/ranges';
 import { registerCommand } from '../../shortcuts/commands';
+import { isIncognito, setIncognito } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
@@ -63,6 +64,15 @@ const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
 const title = computed(() => httpRequestTitle(props.tab.state));
+
+// P71 §5/§3.1: the tab's own incognito state, and the per-tab environment id it reads through
+// while incognito (api/state/variables.ts's own override) — every other caller of
+// collectionId/environmentId in this file goes through envId, never activeEnvironmentId directly.
+const incognito = computed(() => isIncognito(props.tab.id));
+function toggleIncognito(): void {
+  setIncognito(props.tab.id, !incognito.value);
+}
+const envId = computed(() => environmentIdForTab(props.tab.id));
 
 // D12/P17 D19: a method chip coloured per-method (not per-family any more — httpMethodToken
 // replaces httpMethodClass outright, F13/D19), over .p-method's new tinted-background rule. P4
@@ -149,7 +159,11 @@ const saved = computed(() => savedRequestFor(props.tab.state.itemId));
 const dirty = computed(() => isDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
+// P71 §3.2: an incognito tab has no route into a persisting editor — Save/Save as… no-op, and the
+// #head-trailing button (below) is disabled with a tooltip naming why. This early return also
+// covers registerCommand('api.save', onSave) and the command palette entry it registers.
 function onSave(): void {
+  if (incognito.value) return;
   const itemId = props.tab.state.itemId;
   if (!itemId || !saved.value) {
     onSaveAs();
@@ -159,6 +173,7 @@ function onSave(): void {
 }
 
 function onSaveAs(): void {
+  if (incognito.value) return;
   openSaveDialog(
     props.tab.id,
     props.tab.state.name || title.value,
@@ -183,7 +198,7 @@ async function onCopyAsCurl(): Promise<void> {
     resolution.deferredNames,
     defaultContentTypeFor(props.tab.state.bodyMode, props.tab.state.codeLanguage),
     collectionId.value,
-    activeEnvironmentId.value,
+    envId.value,
   );
 }
 
@@ -223,23 +238,20 @@ function onEditRaw(): void {
 // the preview stays a pure function of the tab's text: no await, no chunk load, nothing generated.
 const collectionId = computed(() => collectionIdFor(props.tab.state));
 watch(
-  [collectionId, activeEnvironmentId],
+  [collectionId, envId],
   ([cid, eid]) => {
     void ensureVariablesLoaded('collection', cid);
     void ensureVariablesLoaded('environment', eid);
   },
   { immediate: true },
 );
-// P15b D4: one computed, over the same collectionId/activeEnvironmentId this file already watches
-// (immediately above) — rangeHighlights/hoverAt/candidates for the URL field, the request body
-// editor, and (via FieldRowsTable's own props) the header/param/form-data value cells.
-const variables = computed(() => variableSupport(collectionId.value, activeEnvironmentId.value));
+// P15b D4: one computed, over the same collectionId/envId this file already watches (immediately
+// above) — rangeHighlights/hoverAt/candidates for the URL field, the request body editor, and (via
+// FieldRowsTable's own props) the header/param/form-data value cells.
+const variables = computed(() => variableSupport(collectionId.value, envId.value));
 
 const unresolvedRefs = computed(() => {
-  const { values, secretNames } = mergedValuesAndSecrets(
-    collectionId.value,
-    activeEnvironmentId.value,
-  );
+  const { values, secretNames } = mergedValuesAndSecrets(collectionId.value, envId.value);
   const refs = resolveTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
     refs
@@ -369,7 +381,7 @@ onUnmounted(() => {
       refresh-testid="http-request-refresh"
       stop-testid="http-request-stop"
       :can-stop="running"
-      :env-color="activeEnvironmentColor"
+      :env-color="environmentColorForTab(tab.id)"
       @refresh="onSend"
       @stop="onStop"
     >
@@ -387,6 +399,15 @@ onUnmounted(() => {
         >
           {{ unresolvedRefs.length }} unresolved
         </span>
+        <!-- P71 §5.1: the view head's own incognito chip, beside the tab strip's icon. -->
+        <span
+          v-if="incognito"
+          class="p-chip"
+          data-testid="http-incognito-chip"
+          v-tooltip="'Nothing from this tab is saved'"
+        >
+          Incognito
+        </span>
       </template>
 
       <!-- P22b D3: Save moves to the slot ViewHeader already reserves for exactly this — #badges
@@ -398,8 +419,8 @@ onUnmounted(() => {
         <AppButton
           icon="save"
           data-testid="http-save"
-          :disabled="canSave && !dirty"
-          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
+          :disabled="incognito || (canSave && !dirty)"
+          v-tooltip="incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection')"
           @click="onSave"
         >
           Save
@@ -454,6 +475,18 @@ onUnmounted(() => {
           data-testid="http-edit-raw"
           @click="onEditRaw"
         />
+        <!-- P71 §5.2: rows before Copy as curl/Edit as raw are exports of the tab's *current*
+             text, unaffected by incognito — this toggle sits after them. Tooltip states the
+             prospective rule (§3.1): switching this on stops future writes, it never deletes rows
+             already saved before it was flipped. -->
+        <IconButton
+          icon="eye-closed"
+          :active="incognito"
+          aria-label="Incognito"
+          v-tooltip="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
+          data-testid="http-incognito-toggle"
+          @click="toggleIncognito"
+        />
       </template>
 
       <template #toolbar-2>
@@ -499,11 +532,12 @@ onUnmounted(() => {
           <VariablesOverviewPanel
             v-if="overviewOpen"
             :collection-id="collectionId"
-            :environment-id="activeEnvironmentId"
+            :environment-id="envId"
+            :can-edit="!incognito"
             @close="overviewOpen = false"
           />
         </div>
-        <EnvironmentSelect />
+        <EnvironmentSelect :tab-id="tab.id" />
       </template>
 
       <!-- P28 D11: above the request panel it searches, not floating over it — LAW 03, the same

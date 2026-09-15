@@ -16,9 +16,9 @@ import {
   variableSupport,
 } from '../../api/state/variableCompletion';
 import {
-  activeEnvironmentColor,
-  activeEnvironmentId,
   ensureVariablesLoaded,
+  environmentColorForTab,
+  environmentIdForTab,
   mergedValuesAndSecrets,
 } from '../../api/state/variables';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -26,6 +26,7 @@ import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
+import { isIncognito, setIncognito } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
@@ -53,6 +54,14 @@ const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
+
+// P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
+// environment id it reads through while incognito.
+const incognito = computed(() => isIncognito(props.tab.id));
+function toggleIncognito(): void {
+  setIncognito(props.tab.id, !incognito.value);
+}
+const envId = computed(() => environmentIdForTab(props.tab.id));
 
 const TLS_OPTIONS = [
   { value: 'tls' as const, label: 'TLS', testid: 'grpc-tls-tls' },
@@ -123,7 +132,9 @@ const saved = computed(() => savedGrpcRequestFor(props.tab.state.itemId));
 const dirty = computed(() => isGrpcDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
+// P71 §3.2: HttpRequestView.vue's own pair — see its comment.
 function onSave(): void {
+  if (incognito.value) return;
   const itemId = props.tab.state.itemId;
   if (!itemId || !saved.value) {
     onSaveAs();
@@ -137,6 +148,7 @@ function onSave(): void {
 }
 
 function onSaveAs(): void {
+  if (incognito.value) return;
   openSaveGrpcDialog(
     props.tab.id,
     props.tab.state.name || title.value,
@@ -154,23 +166,20 @@ function onStop(): void {
 
 const collectionId = computed(() => collectionIdFor(props.tab.state));
 watch(
-  [collectionId, activeEnvironmentId],
+  [collectionId, envId],
   ([cid, eid]) => {
     void ensureVariablesLoaded('collection', cid);
     void ensureVariablesLoaded('environment', eid);
   },
   { immediate: true },
 );
-// P18 D10: HttpRequestView.vue's own one-line computed, over the collection/environment watch
-// this view already runs (immediately above) — rangeHighlights/hoverAt/candidates for the target
-// field, the metadata value cells, and (rangeHighlights only) the message editor.
-const variables = computed(() => variableSupport(collectionId.value, activeEnvironmentId.value));
+// P18 D10: HttpRequestView.vue's own one-line computed, over the collection/envId watch this view
+// already runs (immediately above) — rangeHighlights/hoverAt/candidates for the target field, the
+// metadata value cells, and (rangeHighlights only) the message editor.
+const variables = computed(() => variableSupport(collectionId.value, envId.value));
 
 const unresolvedRefs = computed(() => {
-  const { values, secretNames } = mergedValuesAndSecrets(
-    collectionId.value,
-    activeEnvironmentId.value,
-  );
+  const { values, secretNames } = mergedValuesAndSecrets(collectionId.value, envId.value);
   const refs = resolveGrpcTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
     refs
@@ -267,7 +276,7 @@ onUnmounted(() => {
       refresh-testid="grpc-request-refresh"
       stop-testid="grpc-request-stop"
       :can-stop="running"
-      :env-color="activeEnvironmentColor"
+      :env-color="environmentColorForTab(tab.id)"
       @refresh="onCall"
       @stop="onStop"
     >
@@ -284,6 +293,15 @@ onUnmounted(() => {
         >
           {{ unresolvedRefs.length }} unresolved
         </span>
+        <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
+        <span
+          v-if="incognito"
+          class="p-chip"
+          data-testid="grpc-incognito-chip"
+          v-tooltip="'Nothing from this tab is saved'"
+        >
+          Incognito
+        </span>
       </template>
 
       <!-- P22b D3 (HttpRequestView.vue's own sibling): Save moves to the slot ViewHeader already
@@ -294,8 +312,8 @@ onUnmounted(() => {
         <AppButton
           icon="save"
           data-testid="grpc-save"
-          :disabled="canSave && !dirty"
-          v-tooltip="canSave ? 'Save request' : 'Save request to a collection'"
+          :disabled="incognito || (canSave && !dirty)"
+          v-tooltip="incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection')"
           @click="onSave"
         >
           Save
@@ -356,6 +374,19 @@ onUnmounted(() => {
         </AppButton>
       </template>
 
+      <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
+           icon-only action group, so this is its own #toolbar-end. -->
+      <template #toolbar-end>
+        <IconButton
+          icon="eye-closed"
+          :active="incognito"
+          aria-label="Incognito"
+          v-tooltip="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
+          data-testid="grpc-incognito-toggle"
+          @click="toggleIncognito"
+        />
+      </template>
+
       <template #toolbar-2>
         <SegmentedControl
           :model-value="tab.state.requestPane"
@@ -398,11 +429,12 @@ onUnmounted(() => {
           <VariablesOverviewPanel
             v-if="overviewOpen"
             :collection-id="collectionId"
-            :environment-id="activeEnvironmentId"
+            :environment-id="envId"
+            :can-edit="!incognito"
             @close="overviewOpen = false"
           />
         </div>
-        <EnvironmentSelect />
+        <EnvironmentSelect :tab-id="tab.id" />
       </template>
 
       <div class="request-response-split">

@@ -18,7 +18,14 @@ import { openVariableSetTab } from './tabs';
 // with (F3), and adding a third reveal surface after the row table and Copy as curl is exactly the
 // surface-count growth P14's two rounds of findings were about. A secret row shows a `secret` chip
 // and nothing else.
-const props = defineProps<{ collectionId: string; environmentId: string }>();
+// P71 §3.4: `canEdit` defaults true (every existing caller renders byte-identically) — an
+// incognito tab passes false, hiding the two Edit buttons below (the only route out of the tab
+// into a persisting editor) while leaving the panel itself fully readable, as it already is by
+// design.
+const props = withDefaults(
+  defineProps<{ collectionId: string; environmentId: string; canEdit?: boolean }>(),
+  { canEdit: true },
+);
 const emit = defineEmits<{ close: [] }>();
 
 const rows = computed<VariableOverviewRow[]>(() =>
@@ -123,6 +130,7 @@ function editEnvironmentVariables(): void {
 
       <div class="overview-footer">
         <button
+          v-if="canEdit"
           type="button"
           class="overview-link"
           :disabled="!collectionId"
@@ -132,6 +140,7 @@ function editEnvironmentVariables(): void {
           Edit collection variables…
         </button>
         <button
+          v-if="canEdit"
           type="button"
           class="overview-link"
           :disabled="!environmentId"

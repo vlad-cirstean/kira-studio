@@ -4,6 +4,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { openContextMenu } from '../../state/contextMenu';
 import { tabsForWorkspace } from '../../state/mode';
+import { isIncognito } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
   activateTab,
@@ -195,6 +196,7 @@ function onDragEnd(): void {
         'is-dragging': dragId === tab.id,
         'is-preview': isPreview(tab.id),
         'is-pinned': isPinned(tab),
+        'is-incognito': isIncognito(tab.id),
       }"
       data-testid="tab"
       :data-tab-id="tab.id"
@@ -202,6 +204,7 @@ function onDragEnd(): void {
       :data-active="tab.active"
       :data-preview="isPreview(tab.id)"
       :data-pinned="isPinned(tab)"
+      :data-incognito="isIncognito(tab.id)"
       :data-color="colorFor(tab)"
       :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
       :draggable="!isPinned(tab)"
@@ -214,6 +217,13 @@ function onDragEnd(): void {
     >
       <span class="p-tab-rail" />
       <CodiconIcon :name="iconFor(tab)" :size="13" class="tab-icon" />
+      <CodiconIcon
+        v-if="isIncognito(tab.id)"
+        name="eye-closed"
+        :size="12"
+        class="tab-incognito"
+        v-tooltip="'Incognito — nothing from this tab is saved'"
+      />
       <span class="tab-title">{{ titleFor(tab) }}</span>
       <CodiconIcon
         v-if="badgeFor(tab)"
@@ -287,6 +297,12 @@ function onDragEnd(): void {
 }
 
 .tab-badge {
+  flex-shrink: 0;
+  color: var(--kira-fg-muted);
+}
+
+/* P71 §5.1: mirrors .tab-badge's own colour — a small, unobtrusive mark, not a warning. */
+.tab-incognito {
   flex-shrink: 0;
   color: var(--kira-fg-muted);
 }

@@ -8,6 +8,7 @@ import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref } from 'vue';
 import { formatRelative } from '../../format';
 import { confirmDialog } from '../../state/confirmDialog';
+import { isIncognito } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -36,6 +37,8 @@ const entries = computed<GrpcCallHistoryEntry[]>(() => rt.value?.entries ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 // P18 D6: HTTP's own "the list is full" predicate, restated for gRPC's cap.
 const atCap = computed(() => entries.value.length >= GRPC_HISTORY_PER_SCOPE_LIMIT);
+// P71 §3.5: ResponseHistoryList.vue's own explanation for the silence, restated for gRPC.
+const incognito = computed(() => isIncognito(props.tab.id));
 
 onMounted(() => {
   ensureGrpcHistoryFresh(props.tab.id);
@@ -89,7 +92,11 @@ async function onClear(): Promise<void> {
     </div>
 
     <MessageStrip v-if="rt?.error" tone="err">{{ rt.error }}</MessageStrip>
-    <EmptyState v-else-if="entries.length === 0" icon="history" label="No past calls yet" />
+    <EmptyState
+      v-else-if="entries.length === 0"
+      icon="history"
+      :label="incognito ? 'Calls are not recorded in an incognito tab.' : 'No past calls yet'"
+    />
 
     <template v-else>
       <PanelSearchBox
