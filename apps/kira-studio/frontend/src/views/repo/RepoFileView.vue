@@ -14,6 +14,7 @@ import { patchRepoFileTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnotation';
+import { type BlameLineController, createBlameLineController } from './blameLine';
 import { registerEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import { renderMarkdownReading } from './markdownReading';
@@ -118,6 +119,7 @@ function onReadingClick(event: MouseEvent): void {
 let disposeCursorSub: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
 let blameHandle: BlameAnnotationHandle | null = null;
+let blameController: BlameLineController | null = null;
 let unwatchInlineBlame: (() => void) | null = null;
 
 // §11: every Monaco instance is readOnly/domReadOnly — neither the keyboard nor a paste can
@@ -240,15 +242,23 @@ async function mount(): Promise<void> {
   function syncBlameAnnotation(): void {
     if (settingsState.appearance.inlineBlame && blameable && gitRepoId) {
       if (!blameHandle) {
-        blameHandle = attachBlameAnnotation(mod, editor, {
+        // 7d (moved, P76 §4): this view leases the transport now, not blameAnnotation.ts —
+        // blameLine.ts's controller is a plain request lifecycle with no transport of its own to
+        // release, so whoever creates it disposes it.
+        blameController = createBlameLineController({
           transport: gitTransportFor(workspaceCodeRepoId),
           gitRepoId,
           path: props.tab.path,
+          cursor: editor,
         });
+        blameHandle = attachBlameAnnotation(mod, editor, blameController);
       }
     } else {
       blameHandle?.dispose();
       blameHandle = null;
+      blameController?.dispose();
+      blameController?.transport.dispose();
+      blameController = null;
     }
   }
   syncBlameAnnotation();
@@ -314,6 +324,9 @@ onUnmounted(() => {
   unwatchInlineBlame = null;
   blameHandle?.dispose();
   blameHandle = null;
+  blameController?.dispose();
+  blameController?.transport.dispose();
+  blameController = null;
   unmountEditor(props.tab.id);
   editorInstance = null;
 });
