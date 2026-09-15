@@ -36,9 +36,9 @@ func newConformanceServer(t *testing.T) *Server {
 		t.Fatalf("seed: %v", err)
 	}
 
-	plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(testRepoID)))
+	plain, rec, _, err := mcpauth.LoadOrMintTTL(mcpauth.Path(home, mcpauth.Slug(testRepoID)), mcpauth.TTL)
 	if err != nil {
-		t.Fatalf("LoadOrMint: %v", err)
+		t.Fatalf("LoadOrMintTTL: %v", err)
 	}
 	srv, err := New(Config{Home: home, Token: rec, TokenPlain: plain})
 	if err != nil {

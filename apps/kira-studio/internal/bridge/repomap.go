@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
@@ -76,6 +77,10 @@ type RepoMapStatus struct {
 	Command         string   `json:"command"`
 	ClaudeAvailable bool     `json:"claudeAvailable"`
 	Probed          []string `json:"probed"`
+	// ExpiresAt is the current token's own expiry, RFC 3339, "" when nothing is running or the
+	// record has not yet been stamped (M1 §6.2 — without this, the 7-day retrofit is a silent
+	// trap).
+	ExpiresAt string `json:"expiresAt"`
 	// Error is a server-wide failure (a bind failure starting the listener) — "" whenever Running
 	// is true, or the setting is simply off. A per-repository failure lives on that repository's
 	// own RepoMapRepoStatus.Error instead.
@@ -127,6 +132,9 @@ func (s *RepoMapService) statusLocked() RepoMapStatus {
 		// already on) — the Code intelligence tab shows a Regenerate action instead.
 		if plain, minted := s.server.Token(); minted {
 			st.Command = mcpinstall.Command(repoMapServerName, s.server.URL(), plain)
+		}
+		if exp := s.server.TokenExpiry(); !exp.IsZero() {
+			st.ExpiresAt = exp.Format(time.RFC3339)
 		}
 		for _, ri := range s.server.Repos() {
 			live[ri.RepoID] = ri
@@ -346,7 +354,7 @@ func (s *RepoMapService) startLocked() error {
 		return nil
 	}
 	home := s.home()
-	plain, rec, _, err := mcpauth.LoadOrMint(mcpauth.Path(home, repoMapTokenSlug))
+	plain, rec, _, err := mcpauth.LoadOrMintTTL(mcpauth.Path(home, repoMapTokenSlug), mcpauth.TTL)
 	if err != nil {
 		return err
 	}
@@ -544,7 +552,7 @@ func (s *RepoMapService) Regenerate() RepoMapStatus {
 		return s.statusLocked()
 	}
 	path := mcpauth.Path(s.home(), repoMapTokenSlug)
-	plain, rec, err := mcpauth.Mint()
+	plain, rec, err := mcpauth.MintTTL(mcpauth.TTL)
 	if err != nil {
 		slog.Warn("repo-map: regenerate token", "scope", "repomap", "err", err)
 		return s.statusLocked()

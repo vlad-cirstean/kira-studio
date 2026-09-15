@@ -43,8 +43,10 @@ func (s *Server) bindHTTP() error {
 
 	verifier := s.tokenVerifier()
 	protected := auth.RequireBearerToken(verifier, &auth.RequireBearerTokenOptions{
-		// D8's own token carries no exp claim — it is not OAuth-shaped, so the middleware's default
-		// "every TokenInfo must carry an Expiration" reject is opted out of here.
+		// mcpauth.Check does its own expiry test and reports OutcomeExpired with an actionable
+		// message (M1 §2.5); the SDK's own Expiration-based check would only ever see a zero
+		// TokenInfo.Expiration (deliberately left empty, see tokenVerifier below) and produce its
+		// flat "token missing expiration" body instead, so that check stays opted out here.
 		AllowMissingExpiration: true,
 	})(handler)
 
@@ -69,20 +71,17 @@ func (s *Server) bindHTTP() error {
 	return nil
 }
 
-// tokenVerifier is this instance's own auth.TokenVerifier (D8): constant-time compare against the
-// token Config.Token resolved at construction. A Server constructed with a zero-value Token (should
-// never happen outside a test — every real caller resolves one via mcpauth first) rejects every
-// request, fail-closed.
+// tokenVerifier is this instance's own auth.TokenVerifier (D8, M1 §2.5): mcpauth.TokenVerifier
+// reads the current record under s.tokenMu on every request, so a Regenerate mid-flight is picked
+// up by the very next one. A Server constructed with a zero-value Token (should never happen
+// outside a test — every real caller resolves one via mcpauth first) rejects every request,
+// fail-closed.
 func (s *Server) tokenVerifier() auth.TokenVerifier {
-	return func(_ context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
+	return mcpauth.TokenVerifier("kira-repo-map", func() mcpauth.Record {
 		s.tokenMu.RLock()
-		rec := s.token
-		s.tokenMu.RUnlock()
-		if len(rec.Hash) == 0 || !mcpauth.Verify(token, rec) {
-			return nil, auth.ErrInvalidToken
-		}
-		return &auth.TokenInfo{}, nil
-	}
+		defer s.tokenMu.RUnlock()
+		return s.token
+	})
 }
 
 // Port returns the actually-bound port — the default, or the ephemeral fallback (§5).

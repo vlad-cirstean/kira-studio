@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpauth"
@@ -63,7 +64,15 @@ func run() int {
 		return 1
 	}
 
-	plain, rec, minted, err := mcpauth.LoadOrMint(mcpauth.Path(home, mcpauth.Slug(info.RepoID)))
+	// prevExpired is read before the mint/load below overwrites the on-disk record — purely to
+	// phrase the startup print correctly: state the expiry date when reusing, and that the old one
+	// lapsed when re-minting (§7).
+	tokenPath := mcpauth.Path(home, mcpauth.Slug(info.RepoID))
+	var prevExpired bool
+	if prevRec, ok, _ := mcpauth.Load(tokenPath); ok {
+		prevExpired = mcpauth.Expired(prevRec, time.Now())
+	}
+	plain, rec, minted, err := mcpauth.LoadOrMintTTL(tokenPath, mcpauth.TTL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "kira-repo-map:", err)
 		return 1
@@ -72,10 +81,13 @@ func run() int {
 
 	fmt.Printf("Repo map MCP server listening on %s\n", srv.URL())
 	if minted {
+		if prevExpired {
+			fmt.Println("The previous token had expired — minted a fresh one.")
+		}
 		fmt.Println("Register with:")
 		fmt.Printf("  claude mcp add --transport http --scope user kira-repo-map %s --header \"Authorization: Bearer %s\"\n", srv.URL(), plain)
 	} else {
-		fmt.Println("Using this repository's existing token (unchanged since it was last minted).")
+		fmt.Printf("Using this repository's existing token, valid until %s.\n", srv.TokenExpiry().Format(time.RFC3339))
 		fmt.Println("If it is not already registered with Claude Code, delete this repository's mcp-repo-map-*-token.json under KIRA_HOME and restart to mint a fresh one.")
 	}
 

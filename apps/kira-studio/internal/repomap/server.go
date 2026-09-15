@@ -211,9 +211,17 @@ func (s *Server) Token() (plain string, minted bool) {
 	return s.tokenPlain, s.tokenMinted
 }
 
-// SetToken replaces this Server's own live auth record — bridge.RepoMapService's Regenerate action,
-// safe to call while requests are in flight: the very next request to arrive is checked against the
-// new record, never a stale in-memory copy.
+// TokenExpiry returns the currently-held record's own expiry instant (zero for a pre-M1 record
+// that has not yet been stamped by a load — see mcpauth.LoadOrMintTTL).
+func (s *Server) TokenExpiry() time.Time {
+	s.tokenMu.RLock()
+	defer s.tokenMu.RUnlock()
+	return s.token.ExpiresAt
+}
+
+// SetToken replaces this Server's own live auth record — bridge.RepoMapService's Regenerate
+// action (§0 D8's restart-recovery path), safe to call while requests are in flight: the very next
+// request to arrive is checked against the new record, never a stale in-memory copy.
 func (s *Server) SetToken(rec mcpauth.Record, plain string) {
 	s.tokenMu.Lock()
 	defer s.tokenMu.Unlock()
