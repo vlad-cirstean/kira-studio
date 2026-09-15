@@ -83,6 +83,7 @@ async function start(opts?: { seedBigTable?: boolean }): Promise<PgFixture> {
     options: {},
     autoExplain: false,
     throttlePerSec: 0,
+    mcpEnabled: false,
     password: PASSWORD,
   };
 

@@ -88,6 +88,7 @@ test('the pre-connect textarea round-trips a multi-line value, and a valid throt
     preconnectSidecar: false,
     autoExplain: false,
     throttlePerSec: 5,
+    mcpEnabled: false,
     sortOrder: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

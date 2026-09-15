@@ -111,6 +111,11 @@ const connectionFieldsSchema = /*#__PURE__*/ z.object({
   // dialog's own field error, matching every other numeric field's split between "this schema
   // parses a stored row" and "Save enforces the real bound".
   throttlePerSec: z.number().min(0).max(CONNECTION_THROTTLE_RANGE.max).default(0),
+  // M1 §6.1: whether this connection is exposed to the local DB MCP server. Deny by default.
+  // `.default(false)` is load-bearing the same way autoExplain's/throttlePerSec's are — an older
+  // stored row has no such key. A first-class column, not an options_json key — the migration's
+  // own comment carries the full argument (an access grant must not be settable by pasting a URI).
+  mcpEnabled: z.boolean().default(false),
 });
 
 // SQS and S3 have no host/port at all (P10's D8, P17's own D8/D9 mirror) — fields mode repurposes

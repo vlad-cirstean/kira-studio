@@ -86,6 +86,7 @@ function defaultDraft(): ConnectionInput {
     preconnectSidecar: false,
     autoExplain: false,
     throttlePerSec: 0,
+    mcpEnabled: false,
   };
 }
 
