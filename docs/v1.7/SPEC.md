@@ -205,6 +205,39 @@ on faith: `internal/ipcfixture`'s failure reproduces identically at the pre-fix 
 only under full-suite `-race` resource contention and passed cleanly in isolation, in a package none
 of the 19 fixes touch.
 | **M7 Code review, round 2** | The same three-dimension cycle, run again in full — against the tree M6's fixes leave, plus the same wider v1.6-focused scope, re-read fresh rather than trusting M6's summary — per `CLAUDE.md`'s "repeat the whole loop" rule. A round finding nothing real says so rather than manufacturing a finding | After M6's fixes land |
+**M7 result**: diff-range scoping fixed before dispatch this round (M6's `b7960c57..HEAD` was
+accidentally the whole repo's history, not v1.7's own diff — `cfb87a8b..HEAD`, v1.7's real
+78-commit chapter diff since branching off v1.6's tip, and `73c35953^..cfb87a8b`, v1.6's own
+complete diff, replaced it). Three fresh Opus reviewers found round 1's fixes were mostly clean but
+**re-opened round 1's own critical masking fix**: `SELECT email, email AS leak FROM customers`
+still leaked `email`'s real value under `leak`, since the aliasing guard gave up entirely once any
+result column carried the masked name under its own, correctly-matched form. 28 further real
+findings across the three dimensions, none overlapping M6's list: MySQL/MariaDB's `/*! ... */`
+executable-comment syntax defeated both the read-only-escalation guard and the MCP write gate the
+same way M6's stripped-comment bypass did, on a construct that fix didn't consider; Redis/key-value
+results were never actually masked over MCP despite `list_connections` claiming otherwise (the
+adapter's field-naming scheme never matched a rule); `Duplicate()` could commit an MCP-exposed,
+mask-ruleless connection with no rollback on a copy failure; the grid's mask preview didn't survive
+a tab-switch remount, rendering real values under a still-lit "masked" toggle; and `maskText`
+walked a value's full grapheme count even though its own length bucket saturates at 512 (up to
+133x wasted CPU, ~2s per large `run_query`). Plus HTTP-hardening parity with the repo-map server,
+four MCP tools bypassing permission modes entirely for schema browsing, a stray NUL byte from a
+round-1 fix that made a file binary to git, a `run_query`-vs-`explain_query` EXPLAIN-classification
+gap on ClickHouse, a mask-correlation-key mint race, an approval-dialog truncation that moved (not
+closed) M6's own blind spot, and a batch of lower-severity correctness/performance/wording items.
+One sequential Sonnet subagent fixed all 28 (33 commits, `5ff00d57`..`7a69a8c5`); nothing was judged
+a product trade-off requiring a decision, and three items were explicitly left as accepted
+engineering trade-offs with reasoning recorded in the fix-pass report (an already-documented N+1 on
+a human-frequency path, a per-cell HMAC alloc where pooling would need a lock, and a whole-page
+synchronous mask pass whose worst case the grapheme-cap fix already bounds). Independently
+re-verified: `go build/vet` clean; targeted `-race` runs (incl. `internal/gitsock`, whose broker got
+the same stale-emit-ordering fix mirrored onto it) green; the critical re-opened finding's exact
+repro (`SELECT email, email AS leak FROM customers`) and the MySQL executable-comment repros both
+confirmed fixed directly against source; `bun typecheck`/`lint` clean; `bun run test:unit` 1438/0;
+full `tests/ui/` suite — four different, unrelated timing-sensitive tests flaked once each across
+three full-parallel runs (100%-worker CPU contention, not files this pass touched), every one
+confirmed passing cleanly in isolation, consistent with this suite's already-documented pacing-test
+flakiness class.
 | **M8 Update main docs** | Brings `README.md`, `docs/ARCHITECTURE.md`, `docs/DEV_ENVIRONMENT.md`, `CLAUDE.md` current for this chapter's new subsystem — a second MCP server, its permissions/anonymization/Faker model, and its Settings-dialog toggle — the same "read the current tree, don't trust prose" bar v1.6's own P70 used | Last of all: needs both review rounds' fixes landed first |
 
 ## M1ab result
