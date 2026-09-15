@@ -322,8 +322,10 @@ async function openAllChanges(): Promise<void> {
         </template>
       </dl>
       <dl v-if="hasDetails" class="kv-meta-details-list">
-        <dt v-if="decorationEl?.childNodes.length">Refs</dt>
-        <dd v-show="decorationEl?.childNodes.length" ref="decorationEl" class="kv-meta-refs"></dd>
+        <template v-if="detail.decoration.length > 0">
+          <dt>Refs</dt>
+          <dd ref="decorationEl" class="kv-meta-refs"></dd>
+        </template>
         <template v-if="signatureText">
           <dt>Signature</dt>
           <dd>{{ signatureText }}</dd>
