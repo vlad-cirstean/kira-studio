@@ -3691,6 +3691,18 @@ own secrets.
 Kept only while genuinely open — delete an item the moment it's resolved, never mark it done in
 place. `CLAUDE.md` states the process rule; this is the list itself.
 
+- **`internal/ipcfixture`'s golden fixtures (P25's complete real-container suite) are stale**,
+  discovered running `go test ./...` with Docker available (v1.7 M3). `testdata/*.fixture.json`
+  were last regenerated at `6a7b8118`, a v1.6-era commit — before Redis's `keyTypes` capability
+  (`2e856b7d`) and before v1.7's `mcp_read_mode`/`mcp_write_mode`/`mcp_ddl_mode` columns (M1/M2)
+  existed. `TestFixture_ClickHouse`/`Kafka`/`MariaDB`/`MySQL`/`Redis`/`SQS` all diff against the
+  committed JSON: a new `caps.keyTypes` field, and every fixture connection row logs "unrecognised
+  MCP {read,write,DDL} mode ... mode=\"\"" since the stored rows predate those columns and read back
+  empty. Predates this chapter entirely — not caused by M1/M2/M3 — and this suite is explicitly
+  on-demand/CI-only (`CLAUDE.md`'s P25 section), so it doesn't gate a phase's own fast checks.
+  Closing it needs running the suite's own regeneration path (extend, per `CLAUDE.md`'s own P25/P26
+  guidance) against a current schema.
+
 - **First-launch window-size clamp (P22 D6(a)) still can't apply to the very first window a fresh
   install opens** (round-2 review finding 4). `main.go`'s `openWindow` now resolves
   `app.Screen.GetPrimary()` fresh per call rather than once before `app.Run()`, which lets
