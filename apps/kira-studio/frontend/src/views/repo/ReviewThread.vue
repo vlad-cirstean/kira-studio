@@ -97,6 +97,8 @@ function submit(): void {
   flex-direction: column;
   gap: 6px;
   overflow: auto;
+  /* §3.1: Monaco's view-lines layer otherwise wins text selection inside this zone too. */
+  user-select: text;
 }
 
 .review-thread-anchor {
