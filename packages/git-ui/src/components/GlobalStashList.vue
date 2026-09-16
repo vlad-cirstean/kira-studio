@@ -42,10 +42,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'branchFromStash', entry: StashEntry): void;
   (e: 'saveGlobalStash'): void;
+  /** P77 §14 (N9) — see `StashList.vue`'s own doc comment on this event. This also makes a
+   *  global-stash entry reachable at all: it can never be a graph row, so before this fix "Show
+   *  changes" needed an unrelated commit selected first for `hasSelection` to be true. */
+  (e: 'selected'): void;
 }>();
 
 function select(entry: StashEntry): void {
   props.stash.select(entry.sha);
+  emit('selected');
 }
 
 const stashMenu = ref<{ entry: StashEntry; x: number; y: number } | undefined>(undefined);

@@ -1221,6 +1221,15 @@ watch(
   },
 );
 
+// P77 §14 (N9): the same rule, for a stash row selected from the picker — `stashState.selected`
+// has no row index to gate on (it is never a graph row), so this watches the entry itself instead.
+watch(
+  () => stashState.selected.value,
+  (entry) => {
+    if (entry !== undefined && breakpoint.value !== 'wide') detailOpen.value = true;
+  },
+);
+
 function toggleDetail(): void {
   detailOpen.value = !detailOpen.value;
 }
@@ -1392,7 +1401,13 @@ const initialScrollRowProp = computed(() =>
 
 // P7 (item 2): the strip's own selection has no row at all, so it must widen this check directly
 // rather than through `selection.row` — mirrors `selectionIsWorking`'s own reasoning.
-const hasSelection = computed(() => selection.row.value >= 0 || workingState.selected.value);
+// P77 §14 (N9): a stash row can never be a graph row either (`selectionIsStash` above widens the
+// same way) — before this, selecting a stash from the picker left this `false`, so the detail
+// pane rendered "Select a commit to see its details." instead of the stash's own pane the
+// `v-else-if` chain below already knows how to show.
+const hasSelection = computed(
+  () => selection.row.value >= 0 || workingState.selected.value || selectionIsStash.value,
+);
 
 // G20 D2: this root's own KuiTooltip instance and listener set — independent of ReviewView.vue's
 // (two separate webview documents cannot share one singleton, G19 F3).

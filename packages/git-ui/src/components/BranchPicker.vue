@@ -747,6 +747,7 @@ onBeforeUnmount(() => {
           :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
+          @selected="closeForCheckout"
         />
 
         <GlobalStashList
@@ -760,6 +761,7 @@ onBeforeUnmount(() => {
           :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-global-stash="emit('saveGlobalStash')"
+          @selected="closeForCheckout"
         />
         </template>
 

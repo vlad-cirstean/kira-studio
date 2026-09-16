@@ -53,10 +53,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'branchFromStash', entry: StashEntry): void;
   (e: 'saveEntryToGlobalStash', entry: StashEntry): void;
+  /** P77 §14 (N9): `BranchPicker.vue` closes the panel through `closeForCheckout()` on this — the
+   *  same focus-to-trigger-before-close fix a checkout already gets, so the pane the click fills
+   *  is not left behind the popover. */
+  (e: 'selected'): void;
 }>();
 
 function select(entry: StashEntry): void {
   props.stash.select(entry.sha);
+  emit('selected');
 }
 
 const stashMenu = ref<{ entry: StashEntry; x: number; y: number } | undefined>(undefined);
