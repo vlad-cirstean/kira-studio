@@ -174,6 +174,7 @@ export const IPC = {
   codeSearch: 'kira:code:search',
   // P83 §12.2: every imported repository's checked-out branch in one batched call.
   codeWorkspaceRepoHeads: 'kira:codeWorkspace:repoHeads',
+  codeWorkspaceRepoWorktreeLinks: 'kira:codeWorkspace:repoWorktreeLinks',
 
   // P83 §3.2: the embedded terminal's own bound surface.
   terminalOpen: 'kira:terminal:open',

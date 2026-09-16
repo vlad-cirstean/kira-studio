@@ -175,6 +175,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceStartSearch: 'CodeWorkspaceService.StartSearch',
   codeWorkspaceCancelSearch: 'CodeWorkspaceService.CancelSearch',
   codeWorkspaceRepoHeads: 'CodeWorkspaceService.RepoHeads',
+  codeWorkspaceRepoWorktreeLinks: 'CodeWorkspaceService.RepoWorktreeLinks',
 
   terminalOpen: 'TerminalService.Open',
   terminalWrite: 'TerminalService.Write',
@@ -379,6 +380,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // spec that DOES care (repo-workspace.spec.ts's own branch-label test) still wins with its own
   // snapshot, same as every other wildcard here.
   [IPC.codeWorkspaceRepoHeads]: '[]',
+  // P84 §13.4: GitPanel.vue's onMounted calls this unconditionally too, same reasoning as
+  // codeWorkspaceRepoHeads just above — most specs never care which repository nests under which.
+  [IPC.codeWorkspaceRepoWorktreeLinks]: '[]',
   // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
   // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
   // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard

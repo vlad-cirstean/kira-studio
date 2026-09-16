@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -191,6 +192,106 @@ func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeads
 		})
 	}
 	g.Wait()
+	return results, nil
+}
+
+// CodeRepoWorktreeLink is one repository row's place in the panel's own list: ParentID names the
+// row it nests under (P84 plan §3's anchor), empty when it is a top-level repository. Error names
+// why a row could not be read — a row whose worktree is gone from disk keeps ParentID empty and
+// stays top-level, the safe default.
+type CodeRepoWorktreeLink struct {
+	ID       string `json:"id"`
+	ParentID string `json:"parentId"`
+	Error    string `json:"error,omitempty"`
+}
+
+// RepoWorktreeLinks groups every imported repository by its `--git-common-dir` and answers each
+// row's anchor (P84 plan §3/§4.2) — GitPanel.vue's dedup filter: a row with a non-empty ParentID
+// never renders at the top level, only nested under its anchor's twisty. No args: both callers
+// (the panel's onMounted and its records watcher) refresh the whole list, the same shape ListRepos
+// already uses.
+func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRepoWorktreeLink, error) {
+	repos, err := s.Deps.Repos.CodeRepos.List()
+	if err != nil {
+		return nil, ipcerr.Internal(err.Error())
+	}
+
+	status := s.Discovery.Status(ctx, s.gitPathSetting())
+	if status.Kind != "ok" {
+		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
+	}
+
+	// CodeRepos.List() orders by (sort_order, name), which is not the total order §3's rule-2
+	// tiebreak needs (two rows can share both). Sort explicitly by (SortOrder, CreatedAt, ID) so
+	// anchor selection is deterministic regardless of the storage layer's own order (P84 plan §16
+	// OQ-3).
+	sort.Slice(repos, func(i, j int) bool {
+		if repos[i].SortOrder != repos[j].SortOrder {
+			return repos[i].SortOrder < repos[j].SortOrder
+		}
+		if repos[i].CreatedAt != repos[j].CreatedAt {
+			return repos[i].CreatedAt < repos[j].CreatedAt
+		}
+		return repos[i].ID < repos[j].ID
+	})
+
+	type identity struct {
+		gitDir    string
+		commonDir string
+		err       string
+	}
+	identities := make([]identity, len(repos))
+	var g errgroup.Group
+	g.SetLimit(repoHeadsConcurrency)
+	for i, repo := range repos {
+		i, repo := i, repo
+		if repo.Root == "" {
+			continue // a bare repository (RepoHeads' own guard, :180) has no worktree; belt-and-braces
+		}
+		g.Go(func() error {
+			gitDir, commonDir, err := gitclient.WorktreeIdentity(ctx, s.Runner, status.Path, repo.Root)
+			if err != nil {
+				identities[i].err = err.Error()
+				return nil
+			}
+			identities[i].gitDir = gitDir
+			identities[i].commonDir = commonDir
+			return nil
+		})
+	}
+	g.Wait()
+
+	results := make([]CodeRepoWorktreeLink, len(repos))
+	for i, repo := range repos {
+		results[i] = CodeRepoWorktreeLink{ID: repo.ID, Error: identities[i].err}
+	}
+
+	// Group by commonDir, skipping errored or bare (commonDir == "") rows, then pick each group's
+	// anchor per §3: the row that is not a linked worktree if the group has one (there is at most
+	// one, since only a main worktree's gitDir equals its own commonDir), otherwise the smallest
+	// (sortOrder, createdAt, id) — which repos' own sort above already put first in each group.
+	groups := make(map[string][]int)
+	for i, id := range identities {
+		if id.err != "" || id.commonDir == "" {
+			continue
+		}
+		groups[id.commonDir] = append(groups[id.commonDir], i)
+	}
+	for _, idxs := range groups {
+		anchor := idxs[0]
+		for _, i := range idxs {
+			if identities[i].gitDir == identities[i].commonDir {
+				anchor = i
+				break
+			}
+		}
+		for _, i := range idxs {
+			if i != anchor {
+				results[i].ParentID = repos[anchor].ID
+			}
+		}
+	}
+
 	return results, nil
 }
 

@@ -160,6 +160,27 @@ func (r *Repo) run(ctx context.Context, spec Spec) (Result, error) {
 	return res, nil
 }
 
+// WorktreeIdentity answers dir's absolute git dir and common dir — the two rev-parse lines a
+// linked worktree is told apart by (gitDir != commonDir), NFC-canonicalized the same way
+// Identify canonicalizes them (G27 D5a).
+func WorktreeIdentity(ctx context.Context, runner Runner, gitPath, dir string) (gitDir, commonDir string, err error) {
+	gitDir, err = revParseLine(ctx, runner, gitPath, dir, "--path-format=absolute", "--absolute-git-dir")
+	if err != nil {
+		return "", "", err
+	}
+	commonDir, err = revParseLine(ctx, runner, gitPath, dir, "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return "", "", err
+	}
+	// G27 D5a: gitDir/commonDir are canonicalized to NFC, not just Cleaned -- they are absolute
+	// directory paths (D2 tier 1), and RepoID derives from root/gitDir, so this one edit is what
+	// keeps two on-disk spellings of the same repository from producing two RepoEntry's worth of
+	// registry keys, watchers, and cat-file processes (F5).
+	gitDir = gitpath.CleanNFC(gitDir)
+	commonDir = gitpath.CleanNFC(commonDir)
+	return gitDir, commonDir, nil
+}
+
 // Identify runs the handful of `rev-parse` queries that make up a RepoSummary — line-based
 // output only (§0.2: this is not a porcelain parser; every value here is a single trimmed line
 // from a query whose shape `rev-parse` fixes).
@@ -169,20 +190,10 @@ func Identify(ctx context.Context, runner Runner, gitPath, path string) (RepoSum
 		return RepoSummary{}, err
 	}
 
-	gitDir, err := revParseLine(ctx, runner, gitPath, path, "--path-format=absolute", "--absolute-git-dir")
+	gitDir, commonDir, err := WorktreeIdentity(ctx, runner, gitPath, path)
 	if err != nil {
 		return RepoSummary{}, err
 	}
-	commonDir, err := revParseLine(ctx, runner, gitPath, path, "--path-format=absolute", "--git-common-dir")
-	if err != nil {
-		return RepoSummary{}, err
-	}
-	// G27 D5a: gitDir/commonDir/root are canonicalized to NFC, not just Cleaned -- they are
-	// absolute directory paths (D2 tier 1), and RepoID (below) derives from root/gitDir, so this
-	// one edit is what keeps two on-disk spellings of the same repository from producing two
-	// RepoEntry's worth of registry keys, watchers, and cat-file processes (F5).
-	gitDir = gitpath.CleanNFC(gitDir)
-	commonDir = gitpath.CleanNFC(commonDir)
 
 	root := ""
 	if !isBare {

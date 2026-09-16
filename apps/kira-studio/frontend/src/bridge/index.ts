@@ -466,6 +466,14 @@ const studioControl = {
     unwrap(CodeWorkspaceService.RepoHeads({ ids: ids ?? null })).then((r) =>
       trust<Array<{ id: string; head: HeadState | null; error?: string }>>(r ?? []),
     ),
+  // P84 plan §4.2/§4.3: each imported repository's worktree anchor in one batched call —
+  // GitPanel.vue's dedup filter reads parentId to hide a row that renders nested instead.
+  codeWorkspaceRepoWorktreeLinks: (): Promise<
+    Array<{ id: string; parentId: string; error?: string }>
+  > =>
+    unwrap(CodeWorkspaceService.RepoWorktreeLinks()).then((r) =>
+      trust<Array<{ id: string; parentId: string; error?: string }>>(r ?? []),
+    ),
   codeWorkspaceImportRepo: (path: string): Promise<RepoSummary> =>
     unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>
