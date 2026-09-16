@@ -479,6 +479,109 @@ sensitivity `budgets.spec.ts`'s own in-file comment already names, unrelated to 
 touched. The same full-parallel-run flakiness class P73/P74/P75's own result sections already
 documented, not a regression. No other known gaps against the plan.
 
+## P77 result
+
+Landed per plan (`docs/v1.8/plans/P77-branches-stashes-redesign.md`), 9 commits (`3a2b4ca5`..
+`2ab14e00`), in the plan's own §18.1 order plus two follow-ups (a fix and a split test commit, both
+noted below).
+
+**§9/§10/§11/§12/§7.1 (the shell).** `BranchPicker.vue`'s seven stacked sections fold into five
+`KuiSegmented` tabs (Branches, Tags, Stashes, Worktrees, Stacks), one filter box and one scrollable
+body shared across them. `pickerModel.ts` is new — the "pure fold out of the template" convention
+`refListModel.ts`/`stashListModel.ts`/`stackListModel.ts` already follow, staged in three commits
+(cap-only, then per-tab filter scoping, then pin/recency ordering) so each stage's own behavior
+could be checked independently against the final test file. `refListModel.ts` itself is untouched
+(`review/BaseSelector.vue`/`review/ReviewView.vue` still call it directly).
+
+**§5 (scoped filter, cross-tab counts).** The one filter box now matches each tab's own row
+identity (stash/worktree/stack rows, previously unreachable by it at all — N2) and every tab's
+`KuiSegmented` badge is a live match count, computed for all five tabs on every keystroke
+regardless of which is active, so a query typed on one tab still hints a match sitting on another.
+
+**§6 (rank by recency, pin HEAD).** Local branches rank HEAD first, then a branch checked out in
+another worktree, then the rest by `committerDate` descending (closing N3/N4); remote branches and
+the global stash bucket rank by recency alone. Tags keep `naturalCompare`, the stash stack keeps
+its own index, Stacks keeps its forest order — none of the three reordered. A pinned row is never
+capped out (`capWithPins`), and a per-list "Show more" step (`capSteps`, threaded from
+`BranchPicker.vue`) raises one list's own cap without touching any other's.
+
+**§7.2/§7.3 (focus and keyboard nav).** Opening the panel focuses the filter box (N6); `ArrowDown`
+from it moves into the first row; `ArrowUp`/`ArrowDown`/`Home`/`End`/`Enter` roam the active tab's
+rows via `enabledNeighbour`/`firstEnabled` (`@kira/kira-ui`'s own roving-focus primitives, the same
+ones `KuiMenuList` uses). One documented deviation from the plan's own prose: those two functions
+take `MenuItem[]`, not the narrower `{id, disabled}[]` `pickerModel.ts`'s `rowIds` produces, so
+`BranchPicker.vue` pads each row with a local `toMenuItems()` before calling either; a local
+`lastEnabled()` (kira-ui exports no such counterpart) backs the `End` key, since
+`enabledNeighbour(items, undefined, -1)` does not walk backward correctly from "no selection." All
+five row-owning children (`TagList`/`StashList`/`GlobalStashList`/`WorktreeList`/`StackList`) gained
+a `focusedRowId` prop purely for `:tabindex`/`:data-row-id` binding — the roving-focus logic itself
+lives entirely in `BranchPicker.vue`, reached via one native `keydown` listener on the shared
+scroll container (component boundaries don't block DOM event bubbling).
+
+**§14/N9 (stash-selection dead end, fixed).** Selecting a stash from the picker used to leave the
+detail pane showing nothing at a narrow breakpoint (`hasSelection` never true for a stash-only
+selection) and, at any breakpoint, left the picker open behind the pane it had just filled.
+`hasSelection` now also checks `selectionIsStash`; a new `stashState.selected` watch opens the
+detail pane at a narrow breakpoint exactly like the existing graph-row watch; `StashList.vue`/
+`GlobalStashList.vue` now emit `selected`, closed through the existing `closeForCheckout()` (the
+W20 focus-before-close fix), rather than inventing a second close path.
+
+**§13 (palette re-pointing).** Four new `UiActionKind` members — `openTagPicker`,
+`openStashPicker`, `openWorktreePicker`, `openStackPicker` — each opening the same panel on its own
+tab, replacing the eight `MUTATING_COMMANDS` entries (`tagDelete`, `stashApply`/`Pop`/`Drop`/
+`Branch`, `worktreeRemove`, `stackSet`, `globalStashRemove`) that used to funnel into plain
+`openBranchPicker` regardless of which row the command actually named. `App.vue`'s `runUiAction`
+gains four cases; `AppToolbar.vue`'s `openBranchPicker` expose forwards an optional tab to
+`BranchPicker.open`. Contract version 37 → 38 in both `validate.ts` and Go's `contract.go` (kept in
+lockstep — `stash_test.go`'s `TestContractVersion_Is37` renamed to `Is38` asserts the Go constant
+directly, the same pairing P74/P75's own result sections already established), `graphChunkFrame.
+{bin,json}` regenerated. One deviation from the plan's own §16 file table: `contract.go`'s bump
+isn't listed there, but is required by the Go-side assertion above — same "caught before landing,
+not by a follow-up commit" discipline P75's own result section names for the identical bump.
+
+**Follow-up fix, found while wiring the interaction spec, not part of the plan's own scope.**
+`toggle()` (the trigger's own click handler) opened the panel by flipping `isOpen` directly,
+bypassing `open()`'s nextTick filter-focus call — so §7.2/N6's focus-on-open only ever ran through
+the palette's `runUiAction` route, never a plain trigger click, contradicting `open()`'s own doc
+comment. Fixed by routing `toggle()`'s open half through `open()` (no `tab` argument, so the
+click-trigger path keeps whatever tab was last active) — landed as its own `fix:` commit
+(`7e8a5052`) ahead of the test commit that caught it.
+
+**§17 (tests).** `pickerModel.test.ts` — the one earned unit test, 15 cases per the plan's own
+table: HEAD/`checkedOutIn` pinning surviving a filter and a cap of 1, five orderings across seven
+row kinds (two of which must not reorder), five filter scopes each over a different field
+(`stashLabel`, not the raw message, for stashes), counts staying in sync with the filtered lists
+they badge across all five tabs at once, a cap step touching exactly one list, and `rowIds`
+unique/in-DOM-order per tab including both Stacks sub-groups. `fakeGraphHost.ts` gained five opt-in
+scripted responses (`refs.list`/`stash.list`/`globalStash.list`/`worktree.list`/`stack.list`)
+behind a new `withPickerData` option, additive per the plan's own "every existing caller keeps
+hanging on every method beyond what it already answered." `branch-picker.spec.ts` is new: five
+tabs' badges matching seeded counts, a tab switch swapping the body and the filter's own
+`aria-label`, a query's match count following a tab switch (with the matching row rendered after
+it), focus-on-open, and the filter/first-row roving-focus boundary in both directions. Per the
+plan's own §17.3, `rowMenuModel.test.ts`/`stashListModel.test.ts`/`stackListModel.test.ts` are
+untouched — nothing in their own scope changed.
+
+**Two further documented deviations from the plan's own §16 sketch, neither a scope change.**
+`pickerModel.ts` wraps a Stacks-tab entry as `PickerList<PickerStackGroup>` (`{summary, branches}`)
+rather than the plan's own looser bare-array sketch, so a stack's own base/`needsRestack` survive
+alongside its branches into `StackList.vue`. The `focusedRowId` prop on all five row-owning
+children is not named for that exact purpose in §16's own file table, though it is structurally
+required for §7.3's roving focus to reach real DOM attributes at all.
+
+Independently re-verified: `go build/vet` clean, `go test ./...` clean (including `gitrpc`/
+`gitsock` running fresh off the contract bump and fixture regen, not cached), `bun typecheck/lint`
+clean, both `bun run build` and `bun run build:vscode` succeed, 1482/1482 unit tests (`bun run
+test:unit`), 45/45 VS Code webview interaction/layout specs including the five new
+`branch-picker.spec.ts` cases (`bun run test:webview`) across two full runs, one of which also hit
+`graph-columns.spec.ts`'s own pre-existing `<date column width>`/`<rebuild gating>` flakes (neither
+in a file this phase touches; both confirmed passing standalone, the same class P73's own result
+section already documented for that spec). `bun run test:ui`: 270/276 passed, 2 failed
+(`cell-editor.spec.ts`'s own <250ms bound, `grpc-request.spec.ts`'s own debounce-timing assertion),
+4 not run after that pair — the identical two specs (and the identical assertions) P75's own result
+section already named as this sandbox's full-parallel-run wall-clock contention, in neither a file
+this phase touched; both confirmed passing standalone. No other known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
