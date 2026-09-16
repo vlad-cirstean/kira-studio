@@ -200,8 +200,12 @@ control.onWindowFlushBeforeClose(() => flushPendingTabState(control.windowFlushe
 // P71 §3.1: turning incognito on flushes the tab's existing row immediately, rather than at
 // whatever unrelated state change saves next — tabIncognito.ts cannot call saveNow directly (it
 // would recreate the cycle its own module comment avoids), so it publishes the toggle here instead.
-registerIncognitoSetListener((_tabId, on) => {
-  if (on) saveNow();
+// P79 review fix (Functional, LOW): saves unconditionally, not only when turning incognito ON —
+// setIncognito (tabIncognito.ts) already updates incognitoState.ids before firing this listener,
+// so persistableTabs()'s own isIncognito filter already sees the new state either direction; the
+// old on-only guard left a tab switched back to normal unpersisted until some unrelated save.
+registerIncognitoSetListener((_tabId, _on) => {
+  saveNow();
 });
 
 // D7: main's `tabs.connection_id` is ON DELETE CASCADE, so a deleted connection's `tabs` rows
