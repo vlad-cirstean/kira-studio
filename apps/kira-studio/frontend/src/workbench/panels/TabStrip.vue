@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
+import { isRepoWorkspace, repoIdOfWorkspace } from '@shared/domain/workspace';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
-import { openContextMenu } from '../../state/contextMenu';
+import { codeRepoRecord } from '../../state/coderepos';
+import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
 import { tabsForWorkspace } from '../../state/mode';
+import { openRepoTerminalTab } from '../../state/repoTabs';
 import { isIncognito } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
@@ -192,6 +195,36 @@ function onDragOver(id: string): void {
 function onDragEnd(): void {
   dragId.value = null;
 }
+
+// P83 §9: the tab strip's own "+" — a dropdown anchored under the button, not the click point
+// (openContextMenuAt, state/contextMenu.ts), so it hangs from the button's own bottom-left
+// regardless of where inside its 22px box the click landed.
+const newTabBtn = ref<HTMLButtonElement | null>(null);
+
+function onNewTab(): void {
+  const btn = newTabBtn.value;
+  if (!btn) return;
+  const rect = btn.getBoundingClientRect();
+  openContextMenuAt(rect.left, rect.bottom + 2, newTabMenuItems());
+}
+
+// One entry today. P84 adds "Claude Code", one item per configured script, and "Manage
+// scripts…" — appended here, with no change to this control.
+function newTabMenuItems(): MenuItem[] {
+  return [
+    {
+      type: 'item',
+      id: 'new-terminal',
+      label: 'Terminal',
+      icon: 'terminal-bash',
+      run: () => {
+        const repoId = repoIdOfWorkspace(workspaceState.active);
+        const repo = repoId ? codeRepoRecord(repoId) : undefined;
+        if (repoId && repo) openRepoTerminalTab(repoId, repo.root);
+      },
+    },
+  ];
+}
 </script>
 
 <template>
@@ -292,6 +325,28 @@ function onDragEnd(): void {
         >
           <CodiconIcon name="close" :size="13" />
         </span>
+      </button>
+    </div>
+    <!-- P83 §9.1: a third fixed child, after `.tab-strip`, mirroring `.tab-strip-pinned`'s own
+         leading-edge fix at the other end — flex-shrink: 0, outside the scroller's overflow-x, so
+         it never scrolls away. Repo-workspace only: every entry this dropdown will ever hold needs
+         a worktree directory, which Studio/Api workspaces have none of. -->
+    <div
+      v-if="isRepoWorkspace(workspaceState.active)"
+      class="tab-strip-actions"
+      data-testid="tab-strip-actions"
+    >
+      <button
+        ref="newTabBtn"
+        type="button"
+        class="tab-new"
+        aria-label="New tab"
+        aria-haspopup="menu"
+        data-testid="tab-strip-new"
+        v-tooltip="'New tab'"
+        @click="onNewTab"
+      >
+        <CodiconIcon name="add" :size="13" />
       </button>
     </div>
   </div>
@@ -426,5 +481,30 @@ function onDragEnd(): void {
 
 .tab-close:hover {
   background: var(--kira-hover);
+}
+
+/* P83 §9.1/§14: the trailing fixed slot, `.tab-strip-pinned`'s own mirror at the other end. */
+.tab-strip-actions {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 2px 4px 0 2px;
+  flex-shrink: 0;
+}
+.tab-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  color: var(--kira-fg-muted);
+  border-radius: var(--kira-radius-sm);
+  cursor: pointer;
+}
+.tab-new:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
 }
 </style>

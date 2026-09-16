@@ -6,6 +6,7 @@ import {
 } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
+import { canonicalPath } from './coderepos';
 import { tabsForWorkspace } from './mode';
 import {
   activateTab,
@@ -17,6 +18,7 @@ import {
   removeFromPreviewCohort,
   tabsState,
 } from './tabs';
+import { openRepoWorkspace } from './workspace';
 
 export interface OpenRepoFileOpts {
   preview: boolean;
@@ -202,6 +204,20 @@ export function openRepoReviewDiffTab(
       ),
     { reuse: false, workspaceId, preview: !pinned, previewCohort },
   );
+}
+
+// P83 §10.3: opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
+// "+" (active workspace's root) and both GitPanel.vue row menus (a repo's root or a worktree's own
+// path) all funnel through this. `reuse: false` — a terminal is a session, not a document
+// (openConsoleTab's own reasoning, state/tabs.ts). openRepoWorkspace runs first: a tab must belong
+// to a workspace whose strip is on screen, and right-clicking a closed repository's row would
+// otherwise open an invisible tab.
+export function openRepoTerminalTab(codeRepoId: string, cwd: string): OpenTabResult {
+  openRepoWorkspace(codeRepoId);
+  return openTab('terminal', null, cwd, () => ({ cwd: canonicalPath(cwd), codeRepoId }), {
+    reuse: false,
+    workspaceId: repoWorkspaceKey(codeRepoId),
+  });
 }
 
 // C5 §6.1: creates repoId's own pinned graph tab if it has none, and activates it only when the

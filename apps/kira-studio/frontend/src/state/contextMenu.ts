@@ -31,11 +31,18 @@ export const contextMenuState = reactive({
   items: [] as MenuItem[],
 });
 
-export function openContextMenu(ev: MouseEvent, items: MenuItem[]): void {
+// P83 §9.2: a point, not an event — a dropdown anchored under a button (TabStrip.vue's "+") has
+// no MouseEvent of its own to read clientX/clientY from. openContextMenu below is now this plus
+// one destructure.
+export function openContextMenuAt(x: number, y: number, items: MenuItem[]): void {
   contextMenuState.items = items;
-  contextMenuState.x = ev.clientX;
-  contextMenuState.y = ev.clientY;
+  contextMenuState.x = x;
+  contextMenuState.y = y;
   contextMenuState.open = true;
+}
+
+export function openContextMenu(ev: MouseEvent, items: MenuItem[]): void {
+  openContextMenuAt(ev.clientX, ev.clientY, items);
 }
 
 export function closeContextMenu(): void {
