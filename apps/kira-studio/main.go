@@ -192,6 +192,8 @@ func main() {
 	if err != nil {
 		startupfail.Fatal(startupfail.StepSettings, err)
 	}
+	// P72 §9.2: match the stored advanced.gitLogLevel rather than always booting at Info.
+	logging.SetLevel(settings.Advanced.GitLogLevel)
 
 	adapterDeps := adapters.Deps{Log: func(level, message string) {
 		switch level {

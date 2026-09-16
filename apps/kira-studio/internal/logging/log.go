@@ -50,6 +50,11 @@ func (w *dailyWriter) Write(p []byte) (int, error) {
 	return w.file.Write(p)
 }
 
+// level backs the process default handler's threshold — a slog.LevelVar so SetLevel can adjust
+// verbosity at runtime (advanced.gitLogLevel, P72 §9.2) instead of it being fixed at Init. Its
+// zero value is slog.LevelInfo (both are 0), matching this app's own default.
+var level slog.LevelVar
+
 // Init installs a slog handler writing to KIRA_HOME/logs/kira-YYYY-MM-DD.log as the process
 // default, so every existing slog.Default() call in storage/repos and enginehost lands there
 // with zero change to those packages (P54 §1.6). In a dev build the same records also go to
@@ -66,6 +71,27 @@ func Init() error {
 		w = io.MultiWriter(w, os.Stderr)
 	}
 
-	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	slog.SetDefault(slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: &level})))
 	return nil
+}
+
+// SetLevel adjusts the process-wide log verbosity at runtime — advanced.gitLogLevel's own actual
+// mechanism (until this phase the setting existed with no consumer). "off" needs a threshold
+// above every standard level: slog's Enabled check is level >= threshold, and slog.LevelError is
+// the highest standard level, so setting the threshold to LevelError would still let Error
+// records through. An unrecognized value is a no-op, never a panic — it can only reach here from
+// an already-validated settings write (model.ValidLogLevel).
+func SetLevel(s string) {
+	switch s {
+	case "off":
+		level.Set(slog.LevelError + 4)
+	case "error":
+		level.Set(slog.LevelError)
+	case "warn":
+		level.Set(slog.LevelWarn)
+	case "info":
+		level.Set(slog.LevelInfo)
+	case "debug":
+		level.Set(slog.LevelDebug)
+	}
 }
