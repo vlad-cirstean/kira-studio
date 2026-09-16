@@ -47,6 +47,7 @@ type candidate struct {
 	file         codeindex.FileRow
 	tier         int // 0 same file, 1 same directory, 2 repository-wide
 	sameFileRank int // tier 0 only: 0 enclosing, 1 sibling (shared parent), 2 other
+	sameReceiver bool
 	rule         string
 }
 
@@ -244,6 +245,12 @@ func sortCandidates(cands []candidate, refKind, language, refPath string) {
 		if fa, fb := sameLanguageFamily(language, a.file.Language), sameLanguageFamily(language, b.file.Language); fa != fb {
 			return fa
 		}
+		// §5.1: a call inside a Go method most often calls another method on the same receiver
+		// type. Not type resolution — a real heuristic, so it sits below the hard kind/language
+		// facts above and above the path conventions below.
+		if a.sameReceiver != b.sameReceiver {
+			return a.sameReceiver
+		}
 		if ba, bb := basenameMatches(language, refKind, a), basenameMatches(language, refKind, b); ba != bb {
 			return ba
 		}
@@ -263,7 +270,10 @@ func sortCandidates(cands []candidate, refKind, language, refPath string) {
 	})
 }
 
-func ruleFor(tier, sameFileRank int) string {
+func ruleFor(tier, sameFileRank int, sameReceiver bool) string {
+	if sameReceiver {
+		return "sameReceiver"
+	}
 	switch tier {
 	case 0:
 		switch sameFileRank {
@@ -372,6 +382,30 @@ func (g *Graph) resolveName(ctx context.Context, name string, refSymbols []codei
 		}
 	}
 
+	// §5.1: when the reference site itself sits inside a Go method, mark every candidate method
+	// sharing that method's own receiver type — a demotion among ties, never a filter. Skipped
+	// entirely for a non-Go site or one not inside a method, per §5.2's own cost note.
+	if site.File.Language == "go" && enclosing != nil && enclosing.Kind == "method" {
+		refs := referenceCache{}
+		receiverType, err := g.receiverTypeOf(ctx, refs, *enclosing)
+		if err != nil {
+			return nil, "", err
+		}
+		if receiverType != "" {
+			for i := range candidates {
+				c := &candidates[i]
+				if c.file.Language != "go" || c.sym.Kind != "method" {
+					continue
+				}
+				candReceiver, err := g.receiverTypeOf(ctx, refs, c.sym)
+				if err != nil {
+					return nil, "", err
+				}
+				c.sameReceiver = candReceiver != "" && candReceiver == receiverType
+			}
+		}
+	}
+
 	bestTier := minTier(candidates)
 	candidates = filterTier(candidates, bestTier)
 
@@ -389,7 +423,7 @@ func (g *Graph) resolveName(ctx context.Context, name string, refSymbols []codei
 		}
 	}
 	for i := range candidates {
-		candidates[i].rule = ruleFor(candidates[i].tier, candidates[i].sameFileRank)
+		candidates[i].rule = ruleFor(candidates[i].tier, candidates[i].sameFileRank, candidates[i].sameReceiver)
 	}
 	return candidates, confidence, nil
 }

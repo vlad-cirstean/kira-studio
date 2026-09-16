@@ -46,8 +46,14 @@ function renderHoverMarkdown(res: NavResult): string {
   lines.push(`**${first.kind}** \`${res.name}\``);
   for (const t of res.targets) lines.push(renderTargetLine(t));
   // Printed always, the same discipline render.go's own renderTargetLine follows for Rule/
-  // Confidence: name resolution here is never type resolution, worth saying on every hover.
-  lines.push('_Name-resolved, not type-resolved._');
+  // Confidence: name resolution here is never type resolution, worth saying on every hover. §5.1's
+  // own receiver tiebreak is a real Go relationship, not name proximity, so it earns its own line
+  // instead of the blanket disclaimer once every target was ranked that way.
+  lines.push(
+    res.targets.every((t) => t.rule === 'sameReceiver')
+      ? '_Receiver-matched (Go) — signatures are not compared._'
+      : '_Name-resolved, not type-resolved._',
+  );
   return lines.join('\n\n');
 }
 

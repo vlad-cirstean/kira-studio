@@ -318,6 +318,55 @@ func TestResolverSameLanguageFamilyRule(t *testing.T) {
 	}
 }
 
+// TestResolverGoSameReceiverTiebreak covers §5.1: a call inside a Go method ranks a same-name
+// method on the identical receiver type ahead of one on a different receiver, even when the path
+// rules below it would otherwise prefer the other file. "aaa/other.go" sorts ahead of
+// "zzz/server.go" alphabetically and neither shares any path prefix with the caller — without the
+// new rule, the wrong (Other-receiver) candidate would win on that tiebreak alone.
+func TestResolverGoSameReceiverTiebreak(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	callerSymbols := []codeparse.Symbol{
+		sym("method", "Handle", 0, 10, 60, 10, -1),
+	}
+	callerRefs := []codeparse.Reference{
+		ref("receiver", "Server", 0, 10, 60, 10), // Handle's own span — its receiver is Server
+		ref("call", "Helper", 0, 20, 30, 20),     // inside Handle's own span
+	}
+	callerFile := seedFile(t, store, "caller.go", "go", nil, callerSymbols, callerRefs)
+	callerFileSymbols, err := store.SymbolsInFile(ctx, callerFile.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seedFile(t, store, "aaa/other.go", "go", nil, []codeparse.Symbol{
+		sym("method", "Helper", 0, 0, 30, 0, -1),
+	}, []codeparse.Reference{
+		ref("receiver", "Other", 0, 0, 30, 0),
+	})
+	seedFile(t, store, "zzz/server.go", "go", nil, []codeparse.Symbol{
+		sym("method", "Helper", 0, 0, 30, 0, -1),
+	}, []codeparse.Reference{
+		ref("receiver", "Server", 0, 0, 30, 0),
+	})
+
+	site := resolveSite{File: callerFile, Kind: "call", StartByte: 20, EndByte: 30, NameStartByte: 20, NameEnd: 26}
+	cands, _, err := g.resolveName(ctx, "Helper", callerFileSymbols, site)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cands) != 2 {
+		t.Fatalf("want both candidates returned (a demotion, not a filter), got %+v", cands)
+	}
+	if cands[0].file.Path != "zzz/server.go" || cands[0].rule != "sameReceiver" {
+		t.Fatalf("want the same-receiver (Server) candidate ranked first, got %+v", cands)
+	}
+	if cands[1].file.Path != "aaa/other.go" {
+		t.Fatalf("want the different-receiver candidate still present, second, got %+v", cands)
+	}
+}
+
 func TestResolverKindDemotion(t *testing.T) {
 	g, store := newTestGraph(t)
 	ctx := context.Background()
