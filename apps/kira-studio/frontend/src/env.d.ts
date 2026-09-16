@@ -37,3 +37,12 @@ declare module 'monaco-editor/languages/features/json/tokenization.js' {
   import type { languages } from 'monaco-editor';
   export function createTokenizationSupport(supportComments: boolean): languages.TokensProvider;
 }
+
+// P78 §1.4: monacoEntry.ts's own deep re-export of the standalone service-override seam — no
+// sibling .d.ts ships for it either, same reasoning as the three declarations above. Typed to
+// exactly the one method this app calls (`initialize`), not the whole internal surface.
+declare module 'monaco-editor/editor/standalone/browser/standaloneServices.js' {
+  export const StandaloneServices: {
+    initialize(overrides: Record<string, unknown>): void;
+  };
+}

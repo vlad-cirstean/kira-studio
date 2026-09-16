@@ -118,6 +118,14 @@ export function dropRepoDiffTab(tabId: string): void {
   dropRepoFileTab(tabId);
 }
 
+// P78 §1.4: textModels.ts's own preview-model eviction registry reads this — "a URI a tab owns is
+// never evicted" needs one source of truth for "does a tab own uri," and this map already is it;
+// a second registry duplicating it would be the exact second-source-of-truth C14-5's own comment
+// above warns against.
+export function isTabOwnedUri(uri: string): boolean {
+  return tabIdsByUri.has(uri);
+}
+
 export function editorForTab(tabId: string): StandaloneEditor | undefined {
   const entry = entries.get(tabId);
   if (!entry?.editor) return undefined;

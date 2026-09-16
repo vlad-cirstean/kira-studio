@@ -122,6 +122,10 @@ export function loadMonaco(): Promise<MonacoModule> {
     monacoModule = import('../views/repo/monacoEntry')
       .then(async (mod) => {
         wireWorker(mod);
+        // P78 §1.4: must run before the first editor.create — an override only applies while
+        // ITextModelService is still an uninstantiated SyncDescriptor (standaloneServices.js).
+        const { installKiraTextModelService } = await import('../views/repo/textModels');
+        installKiraTextModelService(mod);
         const { defineKiraTheme } = await import('./monacoTheme');
         defineKiraTheme(mod);
         return mod;

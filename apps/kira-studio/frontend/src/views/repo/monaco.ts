@@ -112,6 +112,19 @@ export function repoLocationOf(
   return repoLocations.get(model);
 }
 
+// P78 §1.4: the new kira-repo ITextModelService's own reverse mapping — repoLocationOf above reads
+// an already-created model's own WeakMap entry; this reads straight off the Uri Monaco's own
+// peek/hover machinery hands the service before any model for it exists. A query string (a
+// revision pin, a diff side) is rejected exactly like repoLocations already excludes the diff's
+// own HEAD side (C6 D7) and a revision-pinned tab (P76 §2) — neither is byte-identical to what the
+// index parsed.
+export function repoLocationFromUri(
+  uri: import('monaco-editor').Uri,
+): { repoId: string; path: string } | undefined {
+  if (uri.scheme !== 'kira-repo' || uri.query !== '') return undefined;
+  return { repoId: uri.authority, path: uri.path.slice(1) };
+}
+
 export function getOrCreateModel(
   mod: MonacoModule,
   uri: string,

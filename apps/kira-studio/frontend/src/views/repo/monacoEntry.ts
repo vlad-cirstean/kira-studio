@@ -95,3 +95,11 @@ languages.registerTokensProviderFactory('kira-redis', {
 // here), never a language-service worker — `vs/language/*` is never imported anywhere in this
 // file, which is what keeps the typescript/json/css/html workers from ever existing.
 export { default as EditorWorker } from 'monaco-editor/editor/editor.worker.js?worker';
+
+// P78 §1.4: the override seam `views/repo/textModels.ts` calls to install a `kira-repo`-aware
+// `ITextModelService` before the first `editor.create` — `standaloneServices.js`'s own
+// `initialize(overrides)` keys each override by plain service-id string, and applies only while
+// the service is still an uninstantiated `SyncDescriptor`. Already loaded transitively by
+// `editor.api.js` (via `standaloneEditor.js`) by the time this file's import resolves, so this is
+// a deep re-export of an already-live module, not a second copy of it.
+export { StandaloneServices } from 'monaco-editor/editor/standalone/browser/standaloneServices.js';
