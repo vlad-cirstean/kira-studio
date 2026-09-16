@@ -15,10 +15,13 @@ on Wails (Go) and Vue 3, one app you switch between with a mode button.
   intelligence workspace inside Kira Studio's own window — import a repository, browse and diff its
   files, navigate its code — and v1.6 made **git** a full peer of **Studio**/**Api** (its own mode,
   its own native graph and code-review layer) and enabled real git-write operations from that
-  native surface. v1.7 (the current chapter) added a second local MCP server that exposes a chosen
-  connection's data to an AI client, under per-connection read/write/DDL permissions, with
-  per-column PII masking. The VS Code extension remains a fully supported second frontend over the
-  same backend. Expect bugs and breaking changes between builds. See
+  native surface. v1.7 added a second local MCP server that exposes a chosen connection's data to an
+  AI client, under per-connection read/write/DDL permissions, with per-column PII masking. v1.8 (the
+  current chapter) added incognito request tabs to the Api module, reworked the git module's graph/
+  commit-detail/review surface with GitHub PR status inline, added a status-bar git-blame readout,
+  and gave code navigation find-references, go-to-implementation and modifier-click. The VS Code
+  extension remains a fully supported second frontend over the same backend. Expect bugs and
+  breaking changes between builds. See
   [Development](#development) and [`docs/PACKAGING.md`](docs/PACKAGING.md) to build from source.
 - **macOS 14+, Apple Silicon (`arm64`) only. Dark mode only.**
 - The packaged build is **unsigned (ad-hoc)** — code signing and notarization are deferred past
@@ -131,9 +134,9 @@ A couple of things worth knowing up front:
   refresh, `⌘↩` run statement, `⇧⌘↩` run all, `⇧⌥F` format, `⌃Tab`/`⌃⇧Tab` switch tabs, `⌘W` close
   tab, `⇧⌘W` close window, `⇧⌘N` new window.
 - **Settings** — staged in a per-dialog draft and applied as one patch on Save, with a Revert to
-  Defaults action. Appearance (font family/size, row density, word wrap, row coloring), Data
-  (default page size), Cache (L2 byte budget, hit rate, clear caches), Advanced (op-log retention,
-  expensive-query row threshold).
+  Defaults action. Appearance (font family/size, row density, word wrap, row coloring, commit date
+  format), Data (default page size), Cache (L2 byte budget, hit rate, clear caches), Advanced
+  (op-log retention, expensive-query row threshold, git log level).
 
 ## Api features
 
@@ -150,6 +153,11 @@ A couple of things worth knowing up front:
   any request.
 - **Response history** — the last 30 responses per request are kept, raw body included, with a
   "only the last 30 are kept" notice once older ones roll off.
+- **Incognito request tabs** — a per-tab toggle from the tab's own context menu (the tab shows an
+  eye-closed marker while on). Nothing from that tab's session persists: no tab row saved, no
+  response-history entry, no op-log row, no environment/variable write. The tab still renders,
+  sends and shows responses normally, and a running incognito operation still appears live in the
+  Operations panel — it is simply never written down.
 - **Request timeline** — a per-request timing breakdown (DNS, connect, TLS, time-to-first-byte,
   download).
 - **gRPC support** — unary and streaming calls alongside HTTP, sharing the same collections,
@@ -164,9 +172,14 @@ A couple of things worth knowing up front:
 - **Diff tabs** — worktree-vs-HEAD diffs in Monaco's own diff editor.
 - **Code navigation** — go-to-definition and hover, backed by a tree-sitter code graph built in Go
   and cached in SQLite; covers Java, Python, JavaScript, TypeScript/TSX, Go and Rust, plus
-  HTML/CSS/JSON/Svelte and Vue (parsed as an HTML container with per-block injection). Go-to-
-  implementation returns nothing for Go specifically — interfaces there are structural, and the
-  index doesn't yet capture a method's receiver type.
+  HTML/CSS/JSON/Svelte and Vue (parsed as an HTML container with per-block injection).
+  Find-references and go-to-implementation join definitions and hover, rendered through Monaco's own
+  peek UI; Cmd/Ctrl+click navigates, with a cross-file link preview. Go implementations are answered
+  by a **method-set comparison, following embedding** — never a signature comparison and never real
+  type inference, so a result is a strong structural match, not a proof (Go has no `implements`
+  keyword for anything more precise).
+- **Navigation readout** — a status-bar item summarising the last references/implementations query
+  (e.g. "3 references · 2 unattributed"), cleared when the active tab changes.
 - **Search** — in-file via Monaco's own find widget; repository-wide in Go, with streamed results
   and no `ripgrep` subprocess.
 - **Quick Open (⌘P)** — a fuzzy file finder over the open repository.
@@ -174,7 +187,9 @@ A couple of things worth knowing up front:
   each workspace's pinned first tab, with the code-review layer (inline AI-review gutter icons,
   PR-review threads) alongside it.
 - **Inline git blame** — a per-line annotation over the file viewer, toggled by an Appearance
-  setting.
+  setting. The status bar also shows the cursor line's author, relative date and commit summary
+  regardless of that setting, and clicking it reveals the commit in the graph tab. A file tab pinned
+  to a historical revision shows no blame at all — blame only ever reflects the working tree.
 - **Markdown reading view** — a rendered-Markdown toggle beside the raw view, per tab.
 - **Repo-map MCP server** — a local MCP server exposing the same code graph to an AI client (Claude
   Code and similar), off by default and enabled per repository from Settings → Code intelligence.
@@ -225,7 +240,10 @@ extension-only for now.
   the backend as binary FlatBuffers chunks; per-lane ref badges, a checked-out-HEAD indicator, and
   in-graph search.
 - **Commit detail and diffs** — file tree, per-file and whole-commit diffs, blob reads, and a
-  line-mapped **Go to file** that works on historical content not checked out on disk.
+  line-mapped **Go to file** that works on historical content not checked out on disk. Opening a
+  commit's changes opens **every** changed file as one replaceable preview cohort rather than a
+  dozen permanent tabs — a cohort tab promotes to permanent on the same double-click convention the
+  file tree already uses.
 - **Refs, checkout and history rewriting** — branches and tags (create/rename/delete, local and
   remote), checkout, revert, reset in all three modes, cherry-pick, plus an in-progress banner with
   Continue/Abort/Skip for a merge, rebase or cherry-pick left mid-flight.
@@ -243,8 +261,10 @@ extension-only for now.
 - **Branch review** — a base resolver and a ranged walk, with **incremental review state**: what
   you last reviewed is kept per file as a compressed content snapshot, not just a commit sha, so a
   rebase, squash or amend still diffs correctly. Range-level marking happens in VS Code's own diff
-  editor. A flat list of file/line **AI review comments** exports as plain text to paste into a
-  chat — deliberately a copy-paste workflow, not a live integration.
+  editor. The file tree's mark-reviewed control is a real checkbox: a partially-reviewed file shows
+  an indeterminate state, and a fully-reviewed file's row tint clears. A flat list of file/line
+  **AI review comments** exports as plain text to paste into a chat — deliberately a copy-paste
+  workflow, not a live integration.
 - **Search** — a cancellable server-side `git log` tail scan paired with a client-side scan of
   already-loaded rows. Go's RE2 and JavaScript's `RegExp` are reconciled explicitly rather than
   approximated: a literal query runs no regex engine at all, a regex query is translated construct
@@ -252,11 +272,22 @@ extension-only for now.
   named result rather than silently mismatched.
 - **Worktrees and stacked branches** — `git worktree` create/list/switch/remove with an optional
   per-repository prepare script you approve once, and stacked branches with restacking and stack
-  navigation.
+  navigation. **Create worktree** is also offered from the row context menu on a branch, a remote
+  branch and a commit row, seeded from that row — the same create machinery the worktree list
+  already used.
+- **One tabbed picker for refs and working state** — branches, tags, stashes, worktrees and stacks
+  fold into five tabs behind one filter box, with a live per-tab match count (so a query typed on
+  one tab still hints a match on another), HEAD and any branch checked out in another worktree
+  pinned to the top, the rest ranked by recency, a per-list "Show more" step, and
+  arrow-key/Home/End/Enter roaming from the filter box down into the rows.
 - **GitHub PR links** — resolved **per commit**, not per branch tip, so the indicator shows on a
   commit in the middle of a branch's history or in a detached `HEAD`, not only on a checked-out
   tip. Authentication is delegated entirely to the `gh` CLI already on your machine: this app never
-  holds a GitHub token, and never reads `gh`'s own stored credential.
+  holds a GitHub token, and never reads `gh`'s own stored credential. A commit's PR now renders
+  **inline in the detail panel** with its open/closed/merged state, and the link opens in the OS
+  browser — never an embedded webview and never a real `<a href>`. **GitHub Enterprise hosts work**
+  too: the host check accepts `github.com` plus any host the `gh` CLI has itself authenticated
+  against, rather than a hardcoded literal.
 - **Several editors at once** — multiple VS Code windows connect to one backend, on the same
   repository or different ones. Repository-level state (the reader/writer gate, the file watcher,
   the caches, the undo slot) is shared; each connection's own paging and walk state is private. A
@@ -384,7 +415,8 @@ not a spec suite of its own — no `xvfb` is needed for any tier.
   heights** against the real emitted document and the real bundle, not DOM shape: a build once
   shipped a graph panel whose `aria-rowcount` was correct while the panel was visually collapsed to
   roughly 75 px, which is exactly the failure a DOM-shape check cannot see. `interaction` covers
-  the graph columns, the file tree, the review panel and the shared floating-UI geometry. No
+  the graph columns, the file tree, the review panel, the branch/tag/stash/worktree/stack picker
+  and the shared floating-UI geometry. No
   backend, no container, no VS Code.
 - **`apps/kira-studio/tests/e2e-real/`** — four specs against a real `-tags server` Go binary, run
   via `bun run test:e2e-real`, which deliberately launches Playwright through plain Node rather than
@@ -439,18 +471,19 @@ packages/git-core    client-side git logic: commit store, lane layout, the clien
 packages/git-ui      the git graph/review UI, hosted by the extension and by the native Git module
 packages/kira-ui     host-agnostic Vue components shared by the workbench and the git webviews
 packages/db-fixtures shared fixture corpus (fixtures/support code, not a spec suite of its own)
-docs                 architecture, performance, packaging, design system; docs/v1.7 is the live record
+docs                 architecture, performance, packaging, design system; docs/v1.8 is the live record
 scripts/demo-dbs     local fixture databases for manual testing
 ```
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state breakdown, and
-[`docs/v1.7/SPEC.md`](docs/v1.7/SPEC.md) for the live chapter. Earlier chapters, oldest first:
+[`docs/v1.8/SPEC.md`](docs/v1.8/SPEC.md) for the live chapter. Earlier chapters, oldest first:
 [`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) (Studio), [`docs/v1.2/SPEC.md`](docs/v1.2/SPEC.md) (Api),
 [`docs/v1.3/SPEC.md`](docs/v1.3/SPEC.md) (the headless git backend),
 [`docs/v1.4/SPEC.md`](docs/v1.4/SPEC.md) (reliability/tooling polish across existing modules),
-[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence), and
-[`docs/v1.6/SPEC.md`](docs/v1.6/SPEC.md) (editor consolidation and tooling upgrades) — all
-completed (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
+[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence),
+[`docs/v1.6/SPEC.md`](docs/v1.6/SPEC.md) (editor consolidation and tooling upgrades), and
+[`docs/v1.7/SPEC.md`](docs/v1.7/SPEC.md) (the database MCP server) — all completed
+(`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
 
 ## Documentation
 
@@ -461,10 +494,14 @@ completed (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
   numbers.
 - [`docs/PACKAGING.md`](docs/PACKAGING.md) — macOS build, the Wails bundle layout, verification
   checklist.
-- [`docs/v1.7/`](docs/v1.7/) — **the live chapter** (see `docs/v1.7/README.md`): a local database
-  MCP server with per-connection read/write/DDL permissions, an EXPLAIN path, and per-column PII
-  masking. [`SPEC.md`](docs/v1.7/SPEC.md) and [`plans/`](docs/v1.7/plans/), one implementation plan
-  per phase.
+- [`docs/v1.8/`](docs/v1.8/) — **the live chapter** (see `docs/v1.8/README.md`): Api incognito mode,
+  the git module's graph/detail/review/picker rework, and the code-navigation additions.
+  [`SPEC.md`](docs/v1.8/SPEC.md) and [`plans/`](docs/v1.8/plans/), one implementation plan per
+  phase.
+- [`docs/v1.7/`](docs/v1.7/) — the completed database-MCP chapter's own phasing record (see
+  `docs/v1.7/README.md`): a local database MCP server with per-connection read/write/DDL
+  permissions, an EXPLAIN path, and per-column PII masking. [`SPEC.md`](docs/v1.7/SPEC.md) and
+  [`plans/`](docs/v1.7/plans/), one implementation plan per phase.
 - [`docs/v1.6/`](docs/v1.6/) — the completed editor-consolidation/tooling chapter's own phasing
   record (see `docs/v1.6/README.md`): [`SPEC.md`](docs/v1.6/SPEC.md) and
   [`plans/`](docs/v1.6/plans/) — editor consolidation onto Monaco, a dependency/runtime upgrade,
