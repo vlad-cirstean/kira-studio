@@ -1814,6 +1814,24 @@ comes from `TabRecord.workspaceId` instead (`workspaceKeyOf`), and `tabsState.ac
 studio/api: `workspaceId` is `null` for both, so `workspaceKeyOf` falls straight back to
 `TAB_KIND_MODE[kind]` and every one of these six functions is byte-identical for them.
 
+**Incognito request tabs are a property of the tab system, not a subsystem (P71).** The flag is
+per-tab and in-memory only (`state/tabIncognito.ts`'s `incognitoState.ids`), exactly like
+`tabsState.hydrated`/`previewIdsByWorkspace` above — no schema change, and a restored session has
+nothing to restore, since an incognito tab was never saved. It lives in its own module rather than
+as a field on `tabsState`, purely to avoid a cycle: `tabKinds.ts` needs to read it for the
+context-menu entry, and `tabs.ts` already imports `tabKinds.ts`. The design is **suppress, don't
+mirror** — one flag consulted at each write site, not a parallel non-persisted store — and the
+module's own header states the standing rule that binds later phases: any new bridge write reachable
+from a request tab must consult `isIncognito` first. Turning it **on** flushes the tab's existing row
+immediately (a registered listener, so the dependency direction stays one-way); turning it **off**
+also saves (P79 review fix — only the on-transition used to). Closing a tab drops the flag through
+the same `registerTabRuntimeCleanup` path every other per-tab runtime uses. The Go half is two
+`Incognito bool` fields (`HttpSendArgs`, `GrpcCallArgs`) threaded into `adapterhost.OpSpec`, guarding
+`ResponseHistoryRepo.Record` and `internal/oplog`'s persistence — a deliberate asymmetry: a running
+incognito op still emits live events to the Operations panel and is simply never written to
+`op_log`. An incognito tab's active environment is a per-tab in-memory override
+(`incognitoEnvByTab`), never a write to the shared active-environment row.
+
 **The left panel is a shell with pluggable content; the tree host is a separate, mode-agnostic
 primitive.** `theme/primitives/PanelShell.vue` (P12 D10: moved out of `workbench/panels/`, since
 it is generic chrome with no Studio- or Api-specific knowledge) owns the header geometry, the
@@ -3724,6 +3742,26 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 | The seven `disable-*` Chromium switches | **No subject.** |
 | `grantFileProtocolExtraPrivileges` | **No subject, and the whole class with it.** Assets are no longer served over `file://` — `apps/kira-studio/main.go` embeds `frontend/dist` and serves it through a plain Go `http.Handler` (`AssetOptions.Handler`), so the `file://`-module-CORS trap that made this fuse mandatory does not exist. |
 | The three Electron fuses (`runAsNode` and friends) | **No subject.** There is no Electron binary to re-run as Node. |
+
+**The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
+(P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
+Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
+anchor: the PR surfaces (`CommitMeta.vue`, `BranchPicker.vue`/`StackList.vue` stack badges,
+`refBadges.ts`'s SlickGrid formatter) go through `pr.browserUrl`/`GitHubService.
+OpenPullRequestURL`, and a URL found inside a commit message body (`linkify.ts`) goes through a new
+generic `link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
+plain `<span>` when the host does not report it (`CommitMeta.vue`'s own button/span split — P79
+batch F closed the one PR icon that was missing the gate). `link.openExternal` is generic where
+`pr.openExternal` is not, per `internal/bridge/link.go`'s own reasoning: a PR URL is composed
+server-side from data the app controls, while a commit-body URL **is** the untrusted content,
+already visible to the renderer as linkified text — so the only check left is the URL's own shape.
+`LinkService.OpenExternal` refuses anything that is not a well-formed `http`/`https` URL with a
+non-empty host, before `Browser.OpenURL` ever sees it, and VS Code's `proxyHandlers.ts` does the
+equivalent shape validation it previously lacked (`prUrl.ts`). The host check for a PR URL is
+`gitsession.IsGitHubHost` — `github.com` plus any host `gh`'s own `Discovery` has authenticated
+against — shared by the composer and the validator, not two hand-rolled allowlists (P79 batch B; the
+previous hardcoded literal broke GitHub Enterprise Server entirely, since the validator's allowlist
+was not really an allowlist for a GHES host).
 
 **Whether the `WKWebView` itself is configurable beyond this table — checked, and closed, at P22
 (D5).** `MacWebviewPreferences` (`webview_window_options.go:762-786`) is Wails v3.0.0-beta.16's
