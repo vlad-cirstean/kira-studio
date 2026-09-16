@@ -84,7 +84,7 @@ test('bug 2 regression: a cold repo open reaches the graph with no boot-retry cl
   await installGitStreamMock(page, REPO.repoId);
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
 
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
@@ -107,7 +107,7 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   await installGitStreamMock(page, REPO.repoId);
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
 

@@ -75,7 +75,7 @@ test('a repo workspace: a markdown file opens on Source with a Reading toggle, a
   });
 
   await openGitModule(page);
-  await page.locator('[data-testid="repo-row"]').dblclick();
+  await page.locator('[data-testid="repo-row"]').click();
   await treeRow(page, 'README.md').click();
 
   // Opens on Source, toolbar present, editor visible.
@@ -142,7 +142,7 @@ test('a repo workspace: the markdown reading view escapes raw HTML and never nav
   });
 
   await openGitModule(page);
-  await page.locator('[data-testid="repo-row"]').dblclick();
+  await page.locator('[data-testid="repo-row"]').click();
   await treeRow(page, 'README.md').click();
   await page.locator('[data-testid="repo-file-view-reading"]').click();
 
@@ -189,7 +189,7 @@ test('a repo workspace: a non-markdown file gets no reading toggle at all', asyn
   });
 
   await openGitModule(page);
-  await page.locator('[data-testid="repo-row"]').dblclick();
+  await page.locator('[data-testid="repo-row"]').click();
   await treeRow(page, 'a.ts').click();
 
   await expect(page.locator('[data-testid="repo-file-editor"]')).toBeVisible();

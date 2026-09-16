@@ -175,9 +175,13 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and stu
   // Import a fixture repository (seeded above) — visible in the Git panel's repo list.
   await expect(repoRow(page)).toBeVisible();
 
-  // Opening it (double-click, the tree's own select/open split) activates its own workspace and
-  // the row itself, and adds no top-level tab (§0's correction — exactly three mode tabs, always).
-  await repoRow(page).dblclick();
+  // Opening it activates its own workspace and the row itself, and adds no top-level tab (§0's
+  // correction — exactly three mode tabs, always). A single click (onRowClick's own open-or-
+  // activate semantics), not a double click: P84 §8.3's auto-switch-to-Files already fires on
+  // this same click, so a genuine second click at the same fixed point (what `.dblclick()` sends)
+  // now lands on the Files tab's own relocated view-strip instead of the vanished row — a real
+  // double-click's second physical click racing the same instant re-layout, not a test artifact.
+  await repoRow(page).click();
   // P84 §8.3: opening the workspace auto-switched the panel to Files — switch back to see the row
   // itself, since this is a migrated spot the plan's own §13.2 line-180 note didn't separately
   // call out (it only tracked the later file-tree interaction, not this earlier row assertion).
@@ -240,7 +244,7 @@ test('a repo workspace: "Open changes" opens a diff tab', async ({ relaunch }) =
   });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await expect(treeRow(page, 'c.ts')).toBeVisible();
 
   await treeRow(page, 'c.ts').click({ button: 'right' });
@@ -280,7 +284,7 @@ test('a repo workspace: search streams results out of order and opens a match', 
   });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await page.locator('[data-testid="repo-view-search"]').click();
 
   const queryInput = page.locator('[data-testid="repo-search-query"]');
@@ -383,7 +387,7 @@ test('a repo workspace: quick open fuzzy-finds and opens a file', async ({ relau
   await expect(quickOpen()).toHaveCount(0);
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
 
   // Renders with every fixture file, unfiltered, on open (D8 loads the tree itself).
   await emitWailsEvent(page, IPC.quickOpen, null);
@@ -436,7 +440,7 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
   await installGitStreamMock(page, REPO.repoId);
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await page.locator('[data-testid="repo-view-review"]').click();
 
   await expect(page.locator('[data-testid="repo-review-host"]')).toBeVisible();
@@ -484,7 +488,7 @@ test('a repo workspace: the blame annotation stays off with no git record, and i
 
   await openGitModule(page);
   const noGitRepoRow = page.locator(`[data-testid="repo-row"][data-repo-id="${NO_GIT_REPO.id}"]`);
-  await noGitRepoRow.dblclick();
+  await noGitRepoRow.click();
   await expect(treeRow(page, 'a.ts')).toBeVisible();
   await treeRow(page, 'a.ts').click();
 
@@ -525,14 +529,14 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
   {
     const { window: page } = await relaunch({ control: CONTROL });
     // See :364's own comment: lazy `gitTransportFor`, so this lands before Stream('git') is ever
-    // called as long as it precedes the dblclick that opens the workspace.
+    // called as long as it precedes the click that opens the workspace.
     await installGitStreamMock(page, REPO.repoId, {
       'repo.open': undefined,
       'blame.line': BLAME_RESULT,
     });
 
     await openGitModule(page);
-    await repoRow(page).dblclick();
+    await repoRow(page).click();
     await treeRow(page, 'a.ts').click();
 
     const editor = page.locator('[data-testid="repo-file-editor"]');
@@ -600,7 +604,7 @@ test('a repo workspace: the status bar blame item follows the cursor, and never 
     });
 
     await openGitModule(page);
-    await repoRow(page).dblclick();
+    await repoRow(page).click();
 
     const editor = page.locator('[data-testid="repo-file-editor"]');
     await expect(editor).toBeVisible();
@@ -660,7 +664,7 @@ test('leaving Git for Api and returning lands back on the same repository', asyn
   const { window: page } = await relaunch({ control: CONTROL });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
 
   await modeTab(page, 'api').click();
@@ -684,7 +688,7 @@ test("closing the active repo workspace from its row menu falls back to the Git 
   const { window: page } = await relaunch({ control: CONTROL });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
 
   // P82: the row's hover × is gone — closing is the row menu's job now.
@@ -850,7 +854,7 @@ test('a repo workspace: file-tree rows carry per-language icons, directories kee
   });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
 
   const goIcon = treeRow(page, 'main.go').locator('.node-icon');
   const tsIcon = treeRow(page, 'app.ts').locator('.node-icon');
@@ -921,7 +925,7 @@ test('a repo workspace: modifier-click renders the definition-link affordance an
   });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await treeRow(page, 'a.ts').click();
 
   const editor = page.locator('[data-testid="repo-file-editor"]');
@@ -1008,7 +1012,7 @@ test('a repo workspace: Shift+F12 peeks references and publishes the status-bar 
   });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
   await treeRow(page, 'a.ts').click();
 
   const editor = page.locator('[data-testid="repo-file-editor"]');
@@ -1045,7 +1049,7 @@ test("the tab strip's + opens a terminal tab at the active worktree", async ({ r
   const { window: page, control } = await relaunch({ control: [...CONTROL, TERMINAL_OPEN_OK] });
 
   await openGitModule(page);
-  await repoRow(page).dblclick();
+  await repoRow(page).click();
 
   await page.locator('[data-testid="tab-strip-new"]').click();
   const menu = page.locator('[data-testid="context-menu"]');
