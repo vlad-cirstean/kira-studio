@@ -972,6 +972,83 @@ own subscriptions only) then, only when `!workspaceState.openRepos.includes(code
 `repoOpenMemo` entry so a later re-expand does a fresh `repo.open`. A static read of the invariant,
 not a live-process observation.
 
+## P83 result
+
+Landed per plan (`docs/v1.8/plans/P83-embedded-terminal.md`), 9 commits (`43b4149e`..`e702b93a`).
+
+**PTY layer (`43b4149e`).** `internal/terminal` (new domain package, no `internal/bridge` import,
+enforced by `layering_test.go`'s automatic scan): a `creack/pty`-backed `Session`/`Registry` — one
+reader goroutine per session, `Setsid: true` so a process started inside the terminal (`npm run
+dev`) dies with the tab instead of outliving it, `Close`'s SIGHUP-then-2s-grace-then-SIGKILL
+sequence against the whole process group. `loginShell()` resolves `$SHELL`, falling back to
+`/etc/passwd`'s seventh field, then `/bin/sh`; sessions spawn `-l -i` (login, interactive) at the
+caller's `cwd` — never `$HOME`, confirmed by reading `newSession` directly. `internal/bridge/
+terminal.go` is the one place turning this package's plain errors/callbacks into `ipcerr`
+responses and push-channel events, per the package doc comment's own layering rule.
+
+**Frontend terminal tab (`4441b518`).** A new `terminal` tab kind (`reuse: false`, never
+persisted, many per worktree) rendered by `RepoTerminalView.vue` via a lazy-loaded `@xterm/xterm` +
+`@xterm/addon-fit` renderer (`terminalRenderer.ts`), matching `RepoGraphView.vue`'s own mount/
+unmount lifecycle shape. `state/terminals.ts` owns the session registry client-side.
+
+**Entry points (`f7bed220`, `f97dce06`).** A new "+" button in `TabStrip.vue` opens a dropdown
+(one entry today, "Terminal", per the plan's own room-to-grow design for P85); `GitPanel.vue`'s
+repo-row and worktree-row context menus gained "Open terminal" items, rooted at that row's own
+path — deliberately not routed through `packages/git-ui/rowMenuModel.ts`, per the plan's own
+host-only-surface reasoning.
+
+**Left-panel indicator and branch-at-a-glance (`e538d343`, `bd75806d`, `a5acba41`).** A
+`terminalCountAtPath` registry drives `.repo-terminal-indicator` on any repo/worktree row with a
+live terminal open there. A new batched Go call (`gitclient.ResolveHead`/`RepoHeads`) plus
+`repo/state/repoHeads.ts` drives a `.repo-head` branch-label span on every repo row, collapsed or
+expanded — not only the worktree children P82 already labelled. `worktreeEntries()`
+(`repo/state/worktrees.ts`) now sorts the main worktree first always, rendering-layer only —
+`wt.isMain` itself stays positional from `internal/gitsession/worktree.go`'s `IsMain: i==0`, never
+redefined.
+
+**Bug found and fixed during verification, not part of the plan (`0e2e26b0`).**
+`closeTerminalSession` (`state/terminals.ts`) fired `TerminalService.Close` for every closed tab of
+*any* kind, violating this codebase's own "a tab kind's `dropResources` must be a safe no-op for an
+id it doesn't own" contract (the same pattern `dropRepoFileTab` already follows) — surfaced as 4
+failures in unrelated specs (`cell-editor.spec.ts`, `slick-grid.spec.ts`) on the first full
+`test:ui` run. Fixed with an early-return guard (`if (!byTabId.has(tabId)) return;`); all 4
+previously-failing tests re-run individually and pass.
+
+**Tests (`e702b93a`).** Three Playwright cases in `repo-workspace.spec.ts`: the tab strip's "+"
+opens a terminal at the active worktree and renders real `xterm.js` output from a synthesized
+`kira:terminal:data` chunk (a wiring test, not a call-count test — real shell I/O stays out of this
+tier, covered instead by `internal/terminal/session_test.go`); a worktree row's own context menu
+opens a terminal at that worktree's path with both rows showing the indicator; every repo row
+shows its checked-out branch, main worktree first. `ipcChannels.ts`/`mockRuntime.ts` gained the
+matching terminal-channel/`RepoHeads` harness entries. **One process note, not a content issue**:
+this commit's three files were briefly caught mid-race by an unrelated `SPEC.md` docs commit made
+concurrently in the same shared working directory by the orchestrating session — caught
+immediately, split back out via `git reset --soft` before either was pushed, verified by diff to
+match exactly what this phase's own tail verification wrote. Net effect is cosmetic only (this
+commit's message/footer was written by the orchestrating session rather than the implementing one)
+— confirmed no content difference.
+
+**Verification.** `go build/vet/test ./...` clean (`internal/terminal` and the layering test both
+green); one `internal/grpcclient` reflection-test EOF on an earlier run confirmed transient — a
+clean re-run of the full suite passed. `bun run test:unit`: 1509/1509 (13536 assertions). `bun run
+test:ui` (`ui`+`ui-timing`): 275/279 pre-fix (4 failures, the `closeTerminalSession` bug above, in
+files this phase touches); post-fix, `repo-workspace.spec.ts` (all cases, including the 3 new
+terminal ones), `tabs.spec.ts` and `repo-graph-lifecycle.spec.ts` all green — a second full run
+under concurrent sandbox load surfaced 49 scattered, timeout-flavored failures in unrelated specs
+(api-ui-consistency, autocomplete, console-format, grpc-request, http-*, slick-grid, sql-schema,
+mutations, leaks, fake-data, definition) with none reachable from this phase's own diff
+(`terminals.ts` + 3 test/harness files); one such failure re-run alone failed identically alone
+too, and system load (1.80/5.31/4.10 on 4 cores) points at CPU contention, not a regression — not
+re-verified with a clean quiet run, stated as a known gap rather than assumed. `bun run
+build:vscode` succeeds; `bun run test:webview` 45/45 — consistent with the diff-scope check
+confirming no `packages/git-*`/`apps/kira-studio-vscode` file touched by any of this phase's own
+feature commits.
+
+**Known gap, stated per the plan's own bar, not claimed.** A manual GUI pass (§17.4 item 5): not
+performed — beyond the no-display constraint prior phases already recorded, `apps/kira-studio`'s
+own Taskfile defines only `darwin:*` tasks (sign, notarize, `darwin:package:dmg`), no Linux build/
+dev task at all, so there is nothing to launch under this sandbox's own `Xvfb` even in principle.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
