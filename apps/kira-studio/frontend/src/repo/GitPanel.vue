@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
 import { repoIdOfWorkspace, repoWorkspaceKey } from '@shared/domain/workspace';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
@@ -11,6 +12,7 @@ import {
 } from '../state/coderepos';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import { ensureReviewPanelWidth } from '../state/layout';
+import { openRepoTerminalTab } from '../state/repoTabs';
 import {
   activateWorkspace,
   closeRepoWorkspace,
@@ -137,6 +139,13 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       icon: 'copy',
       run: () => void navigator.clipboard.writeText(repo.root),
     },
+    {
+      type: 'item' as const,
+      id: 'open-terminal',
+      label: 'Open terminal',
+      icon: 'terminal-bash',
+      run: () => void openRepoTerminalTab(repo.id, repo.root),
+    },
     { type: 'separator' as const },
   ];
   if (isOpen(repo.id)) {
@@ -163,6 +172,29 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
     run: () => onRemoveRepo(repo.id),
   });
   openContextMenu(e, items);
+}
+
+// P83 §10.2: a worktree row's own context menu — out of scope for P82 (nothing needed one yet),
+// needed now since without it a terminal could never be opened at a worktree that isn't the active
+// workspace. "Copy path" rides along since the menu must exist anyway and a one-item menu reads
+// like an accident — the same item the repo row already offers above.
+function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEntry): void {
+  openContextMenu(e, [
+    {
+      type: 'item' as const,
+      id: 'open-terminal',
+      label: 'Open terminal',
+      icon: 'terminal-bash',
+      run: () => void openRepoTerminalTab(repo.id, wt.path),
+    },
+    {
+      type: 'item' as const,
+      id: 'copy-path',
+      label: 'Copy path',
+      icon: 'copy',
+      run: () => void navigator.clipboard.writeText(wt.path),
+    },
+  ]);
 }
 
 const repoName = computed(
@@ -305,6 +337,7 @@ onUnmounted(() => {
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
                   @click.stop="switchToWorktree(repo.id, wt.path)"
+                  @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
                   <span class="worktree-label" v-tooltip="wt.path">{{ worktreeLabel(wt) }}</span>
