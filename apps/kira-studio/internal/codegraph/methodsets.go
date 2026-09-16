@@ -2,6 +2,7 @@ package codegraph
 
 import (
 	"context"
+	"sort"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 )
@@ -73,6 +74,32 @@ func (g *Graph) findGoType(ctx context.Context, typeName string) (codeindex.Symb
 	return codeindex.SymbolRow{}, codeindex.FileRow{}, false, nil
 }
 
+// typeLookup is cachedGoType's own memoized entry — findGoType's result (including a real "not
+// found") for one type name.
+type typeLookup struct {
+	sym  codeindex.SymbolRow
+	file codeindex.FileRow
+	ok   bool
+}
+
+// typeCache spares a repeated FindSymbolsByName+FileByID round trip for the same Go type name
+// within one call — fileCache/symbolCache/referenceCache's own counterpart. methodSet and
+// goConcreteTypesSatisfying both resolve the same typeName moments apart within one call; findGoType
+// itself stays uncached so a caller that genuinely wants a fresh lookup still can.
+type typeCache map[string]typeLookup
+
+func (g *Graph) cachedGoType(ctx context.Context, cache typeCache, typeName string) (codeindex.SymbolRow, codeindex.FileRow, bool, error) {
+	if v, ok := cache[typeName]; ok {
+		return v.sym, v.file, v.ok, nil
+	}
+	sym, file, ok, err := g.findGoType(ctx, typeName)
+	if err != nil {
+		return codeindex.SymbolRow{}, codeindex.FileRow{}, false, err
+	}
+	cache[typeName] = typeLookup{sym: sym, file: file, ok: ok}
+	return sym, file, ok, nil
+}
+
 // methodSetResult is goTypes' own memoized entry — the method set plus whether embedding
 // contributed at least one of its names (§4.3's own ".promoted" rule suffix).
 type methodSetResult struct {
@@ -87,14 +114,16 @@ type goTypes struct {
 	files   fileCache
 	syms    symbolCache
 	refs    referenceCache
+	types   typeCache
 	memo    map[string]methodSetResult
-	walking map[string]bool // embedding cycle guard
+	direct  map[string]map[string]bool // directGoMethods' own per-call memo
+	walking map[string]bool            // embedding cycle guard
 }
 
 func newGoTypes(g *Graph) *goTypes {
 	return &goTypes{
-		g: g, files: fileCache{}, syms: symbolCache{}, refs: referenceCache{},
-		memo: map[string]methodSetResult{}, walking: map[string]bool{},
+		g: g, files: fileCache{}, syms: symbolCache{}, refs: referenceCache{}, types: typeCache{},
+		memo: map[string]methodSetResult{}, direct: map[string]map[string]bool{}, walking: map[string]bool{},
 	}
 }
 
@@ -106,7 +135,12 @@ func newGoTypes(g *Graph) *goTypes {
 // Reused standalone by goImplementationsOf to tell a concrete type from an interface with no stored
 // kind to ask (§2.1): typeName is used as a receiver somewhere if and only if it is concrete — an
 // interface's own method_elem is never wrapped in a method_declaration with a receiver at all.
+// Memoized per call (ix.direct): goImplementationsOf's own standalone call and methodSet's first
+// step both ask for the same typeName moments apart.
 func (ix *goTypes) directGoMethods(ctx context.Context, typeName string) (map[string]bool, error) {
+	if cached, ok := ix.direct[typeName]; ok {
+		return cached, nil
+	}
 	refs, err := ix.g.store.ReferencesByName(ctx, ix.g.repoID, typeName)
 	if err != nil {
 		return nil, err
@@ -131,6 +165,7 @@ func (ix *goTypes) directGoMethods(ctx context.Context, typeName string) (map[st
 			set[m.Name] = true
 		}
 	}
+	ix.direct[typeName] = set
 	return set, nil
 }
 
@@ -138,42 +173,48 @@ func (ix *goTypes) directGoMethods(ctx context.Context, typeName string) (map[st
 // alike: (1) directGoMethods above, (2) typeName's own symbol's direct "method" children (an
 // interface's own method_elem rows, P78 §3.1), (3) every embedded type's own method set, recursed.
 // depth caps promotion at maxEmbedDepth; ix.walking refuses a name already on the stack, so a
-// malformed or mid-edit tree that embeds itself terminates instead of recursing forever. Memoized
-// per call only — never persisted.
-func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (map[string]bool, bool, error) {
+// malformed or mid-edit tree that embeds itself terminates instead of recursing forever.
+//
+// The third return, truncated, is true when THIS call — or any embedded type it recursed into —
+// hit the depth cap or the cycle guard rather than completing a real walk. A truncated result is
+// still returned to its own caller (so the walk terminates and produces something), but is never
+// written to ix.memo: memoizing it would let a later, unrelated top-level lookup for the same type
+// name reuse an incomplete set instead of recomputing it fully (P79 review) — memoization itself
+// stays per call only, never persisted, per this file's own "no edge table" discipline.
+func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (map[string]bool, bool, bool, error) {
 	if cached, ok := ix.memo[typeName]; ok {
-		return cached.methods, cached.promoted, nil
+		return cached.methods, cached.promoted, false, nil
 	}
 	if depth > maxEmbedDepth || ix.walking[typeName] {
-		return map[string]bool{}, false, nil
+		return map[string]bool{}, false, true, nil
 	}
 	ix.walking[typeName] = true
 	defer delete(ix.walking, typeName)
 
 	direct, err := ix.directGoMethods(ctx, typeName)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	set := map[string]bool{}
 	for m := range direct {
 		set[m] = true
 	}
 
-	typeSym, _, ok, err := ix.g.findGoType(ctx, typeName)
+	typeSym, _, ok, err := ix.g.cachedGoType(ctx, ix.types, typeName)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	if !ok {
 		// No Go symbol named typeName at all (an embedded stdlib/third-party type this index never
 		// saw, or a plain identifier that isn't a type) — direct is everything there is.
 		result := methodSetResult{methods: set, promoted: false}
 		ix.memo[typeName] = result
-		return result.methods, result.promoted, nil
+		return result.methods, result.promoted, false, nil
 	}
 
 	fileSymbols, err := ix.g.cachedSymbols(ctx, ix.syms, typeSym.FileID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	for i := range fileSymbols {
 		s := &fileSymbols[i]
@@ -184,9 +225,10 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 
 	fileRefs, err := ix.g.cachedReferences(ctx, ix.refs, typeSym.FileID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	promoted := false
+	truncated := false
 	for _, r := range fileRefs {
 		if r.Kind != "embed" {
 			continue
@@ -194,9 +236,12 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 		if r.StartByte < typeSym.StartByte || r.EndByte > typeSym.EndByte {
 			continue // not embedded by typeSym itself — some other type's own embed reference.
 		}
-		embedded, _, err := ix.methodSet(ctx, r.Name, depth+1)
+		embedded, _, childTruncated, err := ix.methodSet(ctx, r.Name, depth+1)
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
+		}
+		if childTruncated {
+			truncated = true
 		}
 		for m := range embedded {
 			if !set[m] {
@@ -206,9 +251,11 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 		}
 	}
 
-	result := methodSetResult{methods: set, promoted: promoted}
-	ix.memo[typeName] = result
-	return result.methods, result.promoted, nil
+	if !truncated {
+		result := methodSetResult{methods: set, promoted: promoted}
+		ix.memo[typeName] = result
+	}
+	return set, promoted, truncated, nil
 }
 
 // supersetOf reports whether have contains every name in want — the structural satisfaction test
@@ -258,6 +305,15 @@ func goMethodSetRule(promoted bool) string {
 // from want's rarest method name — every FindSymbolsByName row for it that is NOT an interface's
 // own method_elem child (ParentID nil, so it has a real receiver) names a concrete candidate; kept
 // when that candidate's own full method set is a superset of want.
+//
+// Known limitation (P79 review, docs/ARCHITECTURE.md's own "Known open items"): a type satisfying
+// want purely through promoted/embedded methods, with no method of its own literally named in
+// want, is never found. Candidates come only from a literal method declaration named after one of
+// want's members (the seed above) — type T struct { io.ReadCloser } satisfying
+// interface{ Read; Close } is invisible to this search, since T declares neither Read nor Close
+// itself. Extending discovery to promoted-only satisfiers needs a materially different (and more
+// expensive) strategy, out of scope for a review fix pass, and constrained by this file's own "no
+// edge table" rule (codegraph.go) on top of that.
 func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want map[string]bool) ([]Target, error) {
 	seed, seedSyms, err := g.rarestGoMethodName(ctx, want)
 	if err != nil || seed == "" {
@@ -286,14 +342,14 @@ func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want
 		}
 		seenType[typeName] = true
 
-		have, promoted, err := ix.methodSet(ctx, typeName, 0)
+		have, promoted, _, err := ix.methodSet(ctx, typeName, 0)
 		if err != nil {
 			return nil, err
 		}
 		if !supersetOf(have, want) {
 			continue
 		}
-		typeSym, typeFile, ok, err := g.findGoType(ctx, typeName)
+		typeSym, typeFile, ok, err := g.cachedGoType(ctx, ix.types, typeName)
 		if err != nil {
 			return nil, err
 		}
@@ -310,53 +366,68 @@ func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want
 }
 
 // goInterfacesSatisfiedBy is goImplementationsOf's reverse direction (§4.2): the cursor resolved to
-// a concrete type (or one of its methods, via its receiver), have is its own method set. Seeds from
-// have's rarest method name — every FindSymbolsByName row for it that IS an interface's own
-// method_elem child (ParentID set) names a candidate interface; kept when have is a superset of
-// that interface's own method set.
+// a concrete type (or one of its methods, via its receiver), have is its own method set. Unlike the
+// forward direction, a single rarest-name seed is NOT sound here: an interface only needs a SUBSET
+// of have's names, so seeding from one name misses every interface that doesn't happen to declare
+// that specific name (e.g. have = {Read, Close, Shutdown}, Reader{Read} — if Close is globally
+// rarest, seeding from Close alone never visits Reader at all). Candidates are instead the UNION
+// over every name in have: every FindSymbolsByName row for it that IS an interface's own
+// method_elem child (ParentID set) names a candidate interface, deduplicated by interface name;
+// kept when have is a superset of that interface's own method set. This issues one
+// FindSymbolsByName per name in have rather than one total — inherent to correctness here, not a
+// regression (§4.4 already bounds this by have's own size, never a repository-wide scan).
 func (g *Graph) goInterfacesSatisfiedBy(ctx context.Context, ix *goTypes, have map[string]bool) ([]Target, error) {
 	if len(have) == 0 {
 		return nil, nil
 	}
-	seed, seedSyms, err := g.rarestGoMethodName(ctx, have)
-	if err != nil || seed == "" {
-		return nil, err
+
+	// Sorted for deterministic candidate order across runs — map iteration order isn't.
+	names := make([]string, 0, len(have))
+	for m := range have {
+		names = append(names, m)
 	}
+	sort.Strings(names)
 
 	seenType := map[string]bool{}
 	var out []Target
-	for _, s := range seedSyms {
-		if s.Kind != "method" || s.ParentID == nil {
-			continue // a concrete, receiver-based method — never an interface candidate.
-		}
-		parent, ok, err := g.store.SymbolByID(ctx, *s.ParentID)
+	for _, m := range names {
+		syms, err := g.store.FindSymbolsByName(ctx, g.repoID, m)
 		if err != nil {
 			return nil, err
 		}
-		if !ok || seenType[parent.Name] {
-			continue
-		}
-		seenType[parent.Name] = true
+		for _, s := range syms {
+			if s.Kind != "method" || s.ParentID == nil {
+				continue // a concrete, receiver-based method — never an interface candidate.
+			}
+			parent, ok, err := g.store.SymbolByID(ctx, *s.ParentID)
+			if err != nil {
+				return nil, err
+			}
+			if !ok || seenType[parent.Name] {
+				continue
+			}
+			seenType[parent.Name] = true
 
-		want, promoted, err := ix.methodSet(ctx, parent.Name, 0)
-		if err != nil {
-			return nil, err
+			want, promoted, _, err := ix.methodSet(ctx, parent.Name, 0)
+			if err != nil {
+				return nil, err
+			}
+			if !supersetOf(have, want) {
+				continue
+			}
+			parentFile, ok, err := g.cachedFile(ctx, ix.files, parent.FileID)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			t, err := g.targetFromSymbol(ctx, parent, parentFile, goMethodSetRule(promoted), Scoped)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, t)
 		}
-		if !supersetOf(have, want) {
-			continue
-		}
-		parentFile, ok, err := g.cachedFile(ctx, ix.files, parent.FileID)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			continue
-		}
-		t, err := g.targetFromSymbol(ctx, parent, parentFile, goMethodSetRule(promoted), Scoped)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
 	}
 	return out, nil
 }
@@ -378,14 +449,14 @@ func (g *Graph) goImplementationsOf(ctx context.Context, name string) ([]Target,
 		return nil, err
 	}
 	if len(direct) > 0 {
-		have, _, err := ix.methodSet(ctx, name, 0)
+		have, _, _, err := ix.methodSet(ctx, name, 0)
 		if err != nil {
 			return nil, err
 		}
 		return g.goInterfacesSatisfiedBy(ctx, ix, have)
 	}
 
-	want, _, err := ix.methodSet(ctx, name, 0)
+	want, _, _, err := ix.methodSet(ctx, name, 0)
 	if err != nil {
 		return nil, err
 	}

@@ -34,41 +34,91 @@ type NavResult struct {
 	Targets []NavTarget `json:"targets"`
 }
 
-// Definitions resolves the name at (line, column) in relPath to its definition(s) (C6 §6). line
-// and column are Monaco's own 1-based line and 1-based UTF-16 column.
-func Definitions(ctx context.Context, s *Session, store *codeindex.Store, relPath string, line, column int) (NavResult, error) {
+// resolveQueryPoint runs Definitions/Implementations/References' own shared preamble (C6 §6, P78
+// §7.2): validate relPath, check the workspace's own graph exists and is ready (never blocking —
+// D8: a hover that hangs is worse than one that says "still building" and gets asked again on the
+// next dwell), confirm the index actually has relPath, read its current bytes and convert
+// (line, column) to a byte offset.
+//
+// status is "" when the caller should proceed — graph, li and off are then valid. Otherwise it's
+// "indexing" or "unavailable" (or err is set), and the caller returns its own Status-only result
+// immediately without touching graph/li, which are nil/zero in that case.
+func resolveQueryPoint(ctx context.Context, s *Session, store *codeindex.Store, relPath string, line, column int) (graph *codegraph.Graph, li *LineIndex, off int, status string, err error) {
 	absPath, err := ValidateRelPath(s.Root, relPath)
 	if err != nil {
-		return NavResult{}, err
+		return nil, nil, 0, "", err
 	}
 
 	graph, ready := s.graphAndReady()
 	if graph == nil || ready == nil {
-		return NavResult{Status: "indexing"}, nil
+		return nil, nil, 0, "indexing", nil
 	}
 	select {
 	case <-ready:
 	default:
-		// D8: never wait — a hover that hangs is worse than one that says "still building" and
-		// gets asked again on the next dwell.
-		return NavResult{Status: "indexing"}, nil
+		return nil, nil, 0, "indexing", nil
 	}
 
 	if _, ok, err := store.GetFile(ctx, s.IndexRepoID, relPath); err != nil {
-		return NavResult{}, err
+		return nil, nil, 0, "", err
 	} else if !ok {
 		// Not in the index at all: an unparsed language, a file over C1's 2 MiB parse cap, or a
 		// path added since the last sync — a real lookup, not a string match on codegraph's own
 		// error text.
-		return NavResult{Status: "unavailable"}, nil
+		return nil, nil, 0, "unavailable", nil
 	}
 
 	data, err := os.ReadFile(absPath) //nolint:gosec // absPath already validated (ValidateRelPath).
 	if err != nil {
+		return nil, nil, 0, "", err
+	}
+	fileLI := NewLineIndex(data)
+	return graph, fileLI, fileLI.ByteOffset(line, column), "", nil
+}
+
+// resolvePosition converts one result's own NameSpan to a 1-based line/1-based UTF-16 column pair
+// — Definitions/Implementations/References' identical per-result step. lineIndexes caches a
+// *LineIndex per path already read this call (relPath's own is seeded by the caller before the
+// loop); a path not yet in it is read here.
+//
+// C13-13: path is codegraph's own indexed path, not re-validated on this read like relPath is in
+// resolveQueryPoint above — a tracked/untracked symlink escaping s.Root at index time would
+// otherwise have its target's bytes read here (only to count line breaks for a position, never
+// returned to the caller, but still a real containment gap; the same class C13-8 already closed in
+// codeindex/sync.go). ValidateRelPath's own failure is handled exactly like a missing/unreadable
+// file: fileLI stays nil and the position falls back to one derived from NameSpan's own byte
+// offset instead of failing the whole call.
+func resolvePosition(s *Session, lineIndexes map[string]*LineIndex, path string, nameSpan codegraph.Span) (startLine, startColumn, endLine, endColumn int) {
+	fileLI, ok := lineIndexes[path]
+	if !ok {
+		if targetAbs, err := ValidateRelPath(s.Root, path); err == nil {
+			if fileData, err := os.ReadFile(targetAbs); err == nil { //nolint:gosec // targetAbs already validated (ValidateRelPath).
+				fileLI = NewLineIndex(fileData)
+			}
+		}
+		lineIndexes[path] = fileLI
+	}
+
+	if fileLI != nil {
+		startLine, startColumn = fileLI.Position(nameSpan.Start.Row, nameSpan.Start.Column)
+		endLine, endColumn = fileLI.Position(nameSpan.End.Row, nameSpan.End.Column)
+		return startLine, startColumn, endLine, endColumn
+	}
+	// The target file could not be read (deleted since the index last saw it, a permission error)
+	// — fall back rather than failing the whole call.
+	return nameSpan.Start.Row + 1, 1, nameSpan.End.Row + 1, 1
+}
+
+// Definitions resolves the name at (line, column) in relPath to its definition(s) (C6 §6). line
+// and column are Monaco's own 1-based line and 1-based UTF-16 column.
+func Definitions(ctx context.Context, s *Session, store *codeindex.Store, relPath string, line, column int) (NavResult, error) {
+	graph, li, off, status, err := resolveQueryPoint(ctx, s, store, relPath, line, column)
+	if err != nil {
 		return NavResult{}, err
 	}
-	li := NewLineIndex(data)
-	off := li.ByteOffset(line, column)
+	if status != "" {
+		return NavResult{Status: status}, nil
+	}
 
 	targets, err := graph.DefinitionOf(ctx, codegraph.Query{Path: relPath, Byte: off})
 	if err != nil {
@@ -82,34 +132,7 @@ func Definitions(ctx context.Context, s *Session, store *codeindex.Store, relPat
 	navTargets := make([]NavTarget, len(targets))
 	name := targets[0].Name
 	for i, t := range targets {
-		fileLI, ok := lineIndexes[t.Path]
-		if !ok {
-			// C13-13: t.Path is codegraph's own indexed path, not re-validated on this read like
-			// relPath is above — a tracked/untracked symlink escaping s.Root at index time would
-			// otherwise have its target's bytes read here (only to count line breaks for a
-			// position, never returned to the caller, but still a real containment gap; the same
-			// class C13-8 already closed in codeindex/sync.go). ValidateRelPath's own failure is
-			// handled exactly like a missing/unreadable file below — fileLI stays nil and the
-			// caller falls back to a byte-offset-derived position instead of failing the whole call.
-			if targetAbs, err := ValidateRelPath(s.Root, t.Path); err == nil {
-				if fileData, err := os.ReadFile(targetAbs); err == nil { //nolint:gosec // targetAbs already validated (ValidateRelPath).
-					fileLI = NewLineIndex(fileData)
-				}
-			}
-			lineIndexes[t.Path] = fileLI
-		}
-
-		var startLine, startColumn, endLine, endColumn int
-		if fileLI != nil {
-			startLine, startColumn = fileLI.Position(t.NameSpan.Start.Row, t.NameSpan.Start.Column)
-			endLine, endColumn = fileLI.Position(t.NameSpan.End.Row, t.NameSpan.End.Column)
-		} else {
-			// The target file could not be read (deleted since the index last saw it, a
-			// permission error) — fall back rather than failing the whole call.
-			startLine, startColumn = t.NameSpan.Start.Row+1, 1
-			endLine, endColumn = t.NameSpan.End.Row+1, 1
-		}
-
+		startLine, startColumn, endLine, endColumn := resolvePosition(s, lineIndexes, t.Path, t.NameSpan)
 		navTargets[i] = NavTarget{
 			Path:        t.Path,
 			Language:    t.Language,
@@ -132,33 +155,13 @@ func Definitions(ctx context.Context, s *Session, store *codeindex.Store, relPat
 // §7.2) — a structural copy of Definitions with codegraph.ImplementationsOf in place of
 // DefinitionOf; the wire shape is identical (NavTarget/NavResult), so no new type is needed.
 func Implementations(ctx context.Context, s *Session, store *codeindex.Store, relPath string, line, column int) (NavResult, error) {
-	absPath, err := ValidateRelPath(s.Root, relPath)
+	graph, li, off, status, err := resolveQueryPoint(ctx, s, store, relPath, line, column)
 	if err != nil {
 		return NavResult{}, err
 	}
-
-	graph, ready := s.graphAndReady()
-	if graph == nil || ready == nil {
-		return NavResult{Status: "indexing"}, nil
+	if status != "" {
+		return NavResult{Status: status}, nil
 	}
-	select {
-	case <-ready:
-	default:
-		return NavResult{Status: "indexing"}, nil
-	}
-
-	if _, ok, err := store.GetFile(ctx, s.IndexRepoID, relPath); err != nil {
-		return NavResult{}, err
-	} else if !ok {
-		return NavResult{Status: "unavailable"}, nil
-	}
-
-	data, err := os.ReadFile(absPath) //nolint:gosec // absPath already validated (ValidateRelPath).
-	if err != nil {
-		return NavResult{}, err
-	}
-	li := NewLineIndex(data)
-	off := li.ByteOffset(line, column)
 
 	targets, err := graph.ImplementationsOf(ctx, codegraph.Query{Path: relPath, Byte: off})
 	if err != nil {
@@ -172,27 +175,7 @@ func Implementations(ctx context.Context, s *Session, store *codeindex.Store, re
 	navTargets := make([]NavTarget, len(targets))
 	name := targets[0].Name
 	for i, t := range targets {
-		fileLI, ok := lineIndexes[t.Path]
-		if !ok {
-			// C13-13: see Definitions's own identical comment above — the same containment gap,
-			// the same fallback.
-			if targetAbs, err := ValidateRelPath(s.Root, t.Path); err == nil {
-				if fileData, err := os.ReadFile(targetAbs); err == nil { //nolint:gosec // targetAbs already validated (ValidateRelPath).
-					fileLI = NewLineIndex(fileData)
-				}
-			}
-			lineIndexes[t.Path] = fileLI
-		}
-
-		var startLine, startColumn, endLine, endColumn int
-		if fileLI != nil {
-			startLine, startColumn = fileLI.Position(t.NameSpan.Start.Row, t.NameSpan.Start.Column)
-			endLine, endColumn = fileLI.Position(t.NameSpan.End.Row, t.NameSpan.End.Column)
-		} else {
-			startLine, startColumn = t.NameSpan.Start.Row+1, 1
-			endLine, endColumn = t.NameSpan.End.Row+1, 1
-		}
-
+		startLine, startColumn, endLine, endColumn := resolvePosition(s, lineIndexes, t.Path, t.NameSpan)
 		navTargets[i] = NavTarget{
 			Path:        t.Path,
 			Language:    t.Language,
@@ -247,33 +230,13 @@ type RefResult struct {
 // Truncated/Unattributed are set — those three can be non-zero (every occurrence unattributed, say)
 // even when nothing is listed, and §7.3's status readout needs them regardless.
 func References(ctx context.Context, s *Session, store *codeindex.Store, relPath string, line, column int, includeDeclaration bool) (RefResult, error) {
-	absPath, err := ValidateRelPath(s.Root, relPath)
+	graph, li, off, status, err := resolveQueryPoint(ctx, s, store, relPath, line, column)
 	if err != nil {
 		return RefResult{}, err
 	}
-
-	graph, ready := s.graphAndReady()
-	if graph == nil || ready == nil {
-		return RefResult{Status: "indexing"}, nil
+	if status != "" {
+		return RefResult{Status: status}, nil
 	}
-	select {
-	case <-ready:
-	default:
-		return RefResult{Status: "indexing"}, nil
-	}
-
-	if _, ok, err := store.GetFile(ctx, s.IndexRepoID, relPath); err != nil {
-		return RefResult{}, err
-	} else if !ok {
-		return RefResult{Status: "unavailable"}, nil
-	}
-
-	data, err := os.ReadFile(absPath) //nolint:gosec // absPath already validated (ValidateRelPath).
-	if err != nil {
-		return RefResult{}, err
-	}
-	li := NewLineIndex(data)
-	off := li.ByteOffset(line, column)
 
 	refs, err := graph.ReferencesTo(ctx, codegraph.Query{Path: relPath, Byte: off}, codegraph.RefOpts{
 		Mode: codegraph.Resolved, IncludeDefinition: includeDeclaration,
@@ -290,27 +253,7 @@ func References(ctx context.Context, s *Session, store *codeindex.Store, relPath
 	lineIndexes := map[string]*LineIndex{relPath: li}
 	refSites := make([]RefSite, len(refs.Sites))
 	for i, site := range refs.Sites {
-		fileLI, ok := lineIndexes[site.Path]
-		if !ok {
-			// C13-13: see Definitions's own identical comment above — the same containment gap,
-			// the same fallback.
-			if siteAbs, err := ValidateRelPath(s.Root, site.Path); err == nil {
-				if fileData, err := os.ReadFile(siteAbs); err == nil { //nolint:gosec // siteAbs already validated (ValidateRelPath).
-					fileLI = NewLineIndex(fileData)
-				}
-			}
-			lineIndexes[site.Path] = fileLI
-		}
-
-		var startLine, startColumn, endLine, endColumn int
-		if fileLI != nil {
-			startLine, startColumn = fileLI.Position(site.NameSpan.Start.Row, site.NameSpan.Start.Column)
-			endLine, endColumn = fileLI.Position(site.NameSpan.End.Row, site.NameSpan.End.Column)
-		} else {
-			startLine, startColumn = site.NameSpan.Start.Row+1, 1
-			endLine, endColumn = site.NameSpan.End.Row+1, 1
-		}
-
+		startLine, startColumn, endLine, endColumn := resolvePosition(s, lineIndexes, site.Path, site.NameSpan)
 		refSites[i] = RefSite{
 			Path:        site.Path,
 			Language:    site.Language,

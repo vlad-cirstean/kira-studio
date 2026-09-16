@@ -382,9 +382,15 @@ func (g *Graph) resolveName(ctx context.Context, name string, refSymbols []codei
 		}
 	}
 
+	bestTier := minTier(candidates)
+	candidates = filterTier(candidates, bestTier)
+
 	// §5.1: when the reference site itself sits inside a Go method, mark every candidate method
 	// sharing that method's own receiver type — a demotion among ties, never a filter. Skipped
-	// entirely for a non-Go site or one not inside a method, per §5.2's own cost note.
+	// entirely for a non-Go site or one not inside a method, per §5.2's own cost note. Runs after
+	// filterTier narrows to the winning tier (P79 review): sameReceiver is only read by
+	// sortCandidates/ruleFor below, both after this point, so marking it before the tier filter
+	// spent a full ReferencesInFile read per candidate outside the winning tier for nothing.
 	if site.File.Language == "go" && enclosing != nil && enclosing.Kind == "method" {
 		refs := referenceCache{}
 		receiverType, err := g.receiverTypeOf(ctx, refs, *enclosing)
@@ -405,9 +411,6 @@ func (g *Graph) resolveName(ctx context.Context, name string, refSymbols []codei
 			}
 		}
 	}
-
-	bestTier := minTier(candidates)
-	candidates = filterTier(candidates, bestTier)
 
 	sortCandidates(candidates, site.Kind, site.File.Language, site.File.Path)
 	if len(candidates) > maxCandidates {

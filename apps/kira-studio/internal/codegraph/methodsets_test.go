@@ -173,12 +173,51 @@ func TestGoMethodSetMutualEmbeddingTerminates(t *testing.T) {
 	})
 
 	ix := newGoTypes(g)
-	methods, _, err := ix.methodSet(ctx, "X", 0)
+	methods, _, _, err := ix.methodSet(ctx, "X", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(methods) != 0 {
 		t.Fatalf("want no methods reachable from a mutually-embedding pair, got %+v", methods)
+	}
+}
+
+// TestGoMethodSetCycleDoesNotPoisonMemo covers the memo-poisoning fix (P79 review): A embeds B, B
+// embeds A — a legal Go embedding cycle at the type-graph level. Walking from A recurses into B,
+// which needs A again; the cycle guard refuses that and B's own computation completes with a
+// truncated view of itself. That truncated result must not be cached: a later, unrelated top-level
+// methodSet("B", 0) call on the same ix must still see B's full method set ({M, N}, reached fresh
+// through its own embed of A), not a poisoned {M} left behind by A's own walk.
+func TestGoMethodSetCycleDoesNotPoisonMemo(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	seedFile(t, store, "a.go", "go", nil, []codeparse.Symbol{
+		sym("type", "A", 0, 0, 100, 5, -1),
+		sym("method", "N", 0, 200, 220, 200, -1),
+	}, []codeparse.Reference{
+		ref("embed", "B", 0, 10, 30, 10), // within A's own span
+		ref("receiver", "A", 0, 200, 220, 200),
+	})
+	seedFile(t, store, "b.go", "go", nil, []codeparse.Symbol{
+		sym("type", "B", 0, 0, 100, 5, -1),
+		sym("method", "M", 0, 200, 220, 200, -1),
+	}, []codeparse.Reference{
+		ref("embed", "A", 0, 10, 30, 10), // within B's own span
+		ref("receiver", "B", 0, 200, 220, 200),
+	})
+
+	ix := newGoTypes(g)
+	if _, _, _, err := ix.methodSet(ctx, "A", 0); err != nil {
+		t.Fatal(err)
+	}
+
+	methods, _, _, err := ix.methodSet(ctx, "B", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !methods["M"] || !methods["N"] {
+		t.Fatalf("want B's full method set {M, N} via embedding A, got %+v (memo poisoned by A's own truncated walk)", methods)
 	}
 }
 
@@ -207,7 +246,7 @@ func TestGoMethodSetEmbeddingCapsAtDepth(t *testing.T) {
 	})
 
 	ix := newGoTypes(g)
-	methods, _, err := ix.methodSet(ctx, chainTypeName(0), 0)
+	methods, _, _, err := ix.methodSet(ctx, chainTypeName(0), 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,5 +363,40 @@ func TestGoMethodSetSameNameDifferentReceiverOnlyMatchingIncluded(t *testing.T) 
 	}
 	if len(targets) != 1 || targets[0].Name != "Foo" {
 		t.Fatalf("want only Foo (Bar shares the seed name but lacks Close), got %+v", targets)
+	}
+}
+
+// TestGoMethodSetReverseSeedsFromEveryMethodName covers the reverse-seeding fix (P79 review): an
+// interface only needs a SUBSET of a concrete type's methods, so candidate discovery must union
+// over every name in have, not just the rarest. Foo declares Read, Close and Shutdown; Reader wants
+// only Read. Close and Shutdown are each rarer than Read (Read has a second row: Reader's own
+// method_elem), so the old single-rarest-name seed picks Close or Shutdown — whose only row is
+// Foo's own concrete method (ParentID nil, never an interface candidate) — and wrongly returns
+// nothing.
+func TestGoMethodSetReverseSeedsFromEveryMethodName(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	seedFile(t, store, "iface.go", "go", nil, []codeparse.Symbol{
+		sym("type", "Reader", 0, 0, 100, 5, -1),
+		sym("method", "Read", 0, 10, 30, 10, 0),
+	}, nil)
+	seedFile(t, store, "foo.go", "go", nil, []codeparse.Symbol{
+		sym("type", "Foo", 0, 0, 10, 5, -1),
+		sym("method", "Read", 0, 20, 40, 20, -1),
+		sym("method", "Close", 0, 40, 60, 40, -1),
+		sym("method", "Shutdown", 0, 60, 80, 60, -1),
+	}, []codeparse.Reference{
+		ref("receiver", "Foo", 0, 20, 40, 20),
+		ref("receiver", "Foo", 0, 40, 60, 40),
+		ref("receiver", "Foo", 0, 60, 80, 60),
+	})
+
+	targets, err := g.goImplementationsOf(ctx, "Foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 || targets[0].Name != "Reader" {
+		t.Fatalf("want Reader recovered via union seeding even though Close/Shutdown are rarer, got %+v", targets)
 	}
 }
