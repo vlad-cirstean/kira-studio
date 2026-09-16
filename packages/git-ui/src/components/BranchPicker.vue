@@ -330,9 +330,18 @@ function close(): void {
   capSteps.value = {};
 }
 
+// P77 §7.2 fix: was `isOpen.value = !isOpen.value`, which opened the panel without ever calling
+// `open()` — the filter-focus fix below only ran for the palette's own `runUiAction` route
+// (§13), never for a plain trigger click, contradicting `open()`'s own doc comment ("both entry
+// points ... go through open()"). Routing the open half through `open()` (no `tab` argument, so
+// the click-trigger path keeps whatever tab was last active, unchanged) is what actually makes
+// that true.
 function toggle(): void {
-  isOpen.value = !isOpen.value;
-  if (!isOpen.value) close();
+  if (isOpen.value) {
+    close();
+    return;
+  }
+  open();
 }
 
 // G10 D17/P77 §13: forwarded so App.vue's palette dispatcher can open this panel exactly the way
