@@ -17,7 +17,7 @@
  * which dispatches a real, wire-correct `repo.changed` event frame so `graph-columns.spec.ts` can
  * drive the auto-refresh path end to end without a real watcher or a real `git` process.
  */
-import type { DecorationRef, PackedCommitChunk } from '@kira/git-ipc';
+import type { DecorationRef, PackedCommitChunk, RefRow, StashEntry } from '@kira/git-ipc';
 import { CONTRACT_VERSION } from '@kira/git-ipc';
 import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
 
@@ -93,6 +93,44 @@ function buildPackedChunk(): PackedCommitChunk {
   return buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 0);
 }
 
+// P77 §17.2: `branch-picker.spec.ts`'s own seed data for the five picker-tab requests
+// (`refs.list`/`stash.list`/`globalStash.list`/`worktree.list`/`stack.list`) — one row per tab,
+// with `feature-auth`/`auth work` both matching a `"auth"` query so that spec's own cross-tab
+// filter case (§17.2 case 3) has a real second tab to land on.
+function pickerRef(overrides: Partial<RefRow> & { shortName: string }): RefRow {
+  return {
+    refname: `refs/heads/${overrides.shortName}`,
+    kind: 'branch',
+    objectId: FAKE_SHA,
+    peeledObjectId: undefined,
+    upstream: undefined,
+    track: undefined,
+    committerDate: WIDEST_SAMPLE_TIMESTAMP,
+    isHead: false,
+    checkedOutIn: undefined,
+    annotation: undefined,
+    ...overrides,
+  };
+}
+
+function pickerStash(overrides: Partial<StashEntry> & { sha: string }): StashEntry {
+  return {
+    index: 0,
+    baseSha: FAKE_SHA,
+    baseSubject: FAKE_SUBJECT,
+    indexSha: FAKE_SHA,
+    untrackedSha: undefined,
+    message: 'On main: something else',
+    branch: 'main',
+    timestamp: WIDEST_SAMPLE_TIMESTAMP,
+    fileCount: 1,
+    includedUntracked: false,
+    scope: 'stack',
+    ref: '',
+    ...overrides,
+  };
+}
+
 function buildResponses(): {
   appInit: (id: number) => unknown;
   repoList: (id: number) => unknown;
@@ -103,6 +141,11 @@ function buildResponses(): {
   graphRefresh: (id: number) => unknown;
   graphStatus: (id: number) => unknown;
   repoChanged: (kind: 'refsChanged' | 'worktreeChanged', repoId: string) => unknown;
+  refsList: (id: number) => unknown;
+  stashList: (id: number) => unknown;
+  globalStashList: (id: number) => unknown;
+  worktreeList: (id: number) => unknown;
+  stackList: (id: number) => unknown;
 } {
   return {
     appInit: (id) =>
@@ -244,6 +287,94 @@ function buildResponses(): {
     // `panelView.ts`'s own `notifyConnectionState` drives in the real extension.
     connectionChanged: (state: { kind: string; detail?: string }) =>
       wrap({ t: 'evt', method: 'connection.changed', payload: { state } }),
+    // P77 §17.2: BranchPicker.vue's own five tabs, seeded so `branch-picker.spec.ts` sees a
+    // nonzero, distinct badge on every one — `main` (HEAD) and `feature-auth` on Branches,
+    // `v1` on Tags, one stack entry (`"auth work"`, matching the same spec's `"auth"` query) on
+    // Stashes, one worktree and one stacked branch on Worktrees/Stacks.
+    refsList: (id) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: {
+          branches: [
+            pickerRef({ shortName: 'main', isHead: true }),
+            pickerRef({ shortName: 'feature-auth' }),
+          ],
+          remoteBranches: [],
+          tags: [pickerRef({ shortName: 'v1', refname: 'refs/tags/v1', kind: 'tag' })],
+          head: { kind: 'branch', name: 'main' },
+        },
+      }),
+    stashList: (id) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: {
+          entries: [
+            pickerStash({
+              sha: '4444444444444444444444444444444444444444',
+              message: 'On main: auth work',
+            }),
+          ],
+        },
+      }),
+    globalStashList: (id) => wrap({ t: 'res', id, ok: true, result: { entries: [] } }),
+    worktreeList: (id) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: {
+          worktrees: [
+            {
+              path: FAKE_REPO_ROOT,
+              head: FAKE_SHA,
+              branch: 'refs/heads/main',
+              isBare: false,
+              isDetached: false,
+              isMain: true,
+              isCurrent: true,
+              locked: null,
+              prunable: null,
+              openElsewhere: false,
+            },
+          ],
+        },
+      }),
+    stackList: (id) =>
+      wrap({
+        t: 'res',
+        id,
+        ok: true,
+        result: {
+          stacks: [
+            {
+              base: 'main',
+              baseTip: FAKE_SHA,
+              needsRestack: false,
+              branches: [
+                {
+                  name: 'stacked-branch',
+                  parent: 'main',
+                  depth: 0,
+                  tip: FAKE_SHA,
+                  parentTip: FAKE_SHA,
+                  recordedBase: FAKE_SHA,
+                  behind: 0,
+                  ahead: 1,
+                  state: 'upToDate',
+                  checkedOutIn: undefined,
+                  track: undefined,
+                  isHead: false,
+                },
+              ],
+            },
+          ],
+          orphans: [],
+        },
+      }),
   };
 }
 
@@ -270,12 +401,21 @@ function buildResponses(): {
  * streams both `FAKE_SHA`/`FAKE_SHA_2` immediately, one after the other with no pause point —
  * `FAKE_SHA` undecorated, `FAKE_SHA_2` carrying a real tag decoration — so a spec can compare the
  * two rows' own real, rendered heights and node positions directly.
+ *
+ * `options.withPickerData` (P77 §17.2): additive, the same shape `streamMode` already set —
+ * every existing caller keeps hanging on `refs.list`/`stash.list`/`globalStash.list`/
+ * `worktree.list`/`stack.list` (this file's own doc comment's "deliberately unanswered" list)
+ * unless it opts in. `true` answers all five with `pickerRef`/`pickerStash`'s seed data, which is
+ * what `App.vue`'s own `setRepoId` sweep requests right after `repo.open` resolves — needed for
+ * `branch-picker.spec.ts` to see anything but empty tabs.
  */
 export function buildFakeGraphHostInitScript(options?: {
   readonly streamMode?: 'oneChunk' | 'twoChunksSameLane' | 'oneDecoratedOneNot';
+  readonly withPickerData?: boolean;
 }): string {
   const responses = buildResponses();
   const streamMode = options?.streamMode ?? 'oneChunk';
+  const withPickerData = options?.withPickerData ?? false;
   const data = {
     appInit: responses.appInit(0),
     repoList: responses.repoList(0),
@@ -301,6 +441,15 @@ export function buildFakeGraphHostInitScript(options?: {
       detail: 'Pairing was denied',
     }),
     connectionChangedConnected: responses.connectionChanged({ kind: 'connected' }),
+    ...(withPickerData
+      ? {
+          refsList: responses.refsList(0),
+          stashList: responses.stashList(0),
+          globalStashList: responses.globalStashList(0),
+          worktreeList: responses.worktreeList(0),
+          stackList: responses.stackList(0),
+        }
+      : {}),
   };
   const fixtureJson = JSON.stringify(data);
 
@@ -308,6 +457,7 @@ export function buildFakeGraphHostInitScript(options?: {
     (() => {
       const FIXTURES = ${fixtureJson};
       const STREAM_MODE = ${JSON.stringify(streamMode)};
+      const WITH_PICKER_DATA = ${JSON.stringify(withPickerData)};
       window.__graphRefreshCalls = [];
 
       function withId(template, id) {
@@ -395,6 +545,26 @@ export function buildFakeGraphHostInitScript(options?: {
           }
           if (body.t === 'req' && body.method === 'graph.status') {
             dispatch(withId(FIXTURES.graphStatus, body.id));
+            return;
+          }
+          if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'refs.list') {
+            dispatch(withId(FIXTURES.refsList, body.id));
+            return;
+          }
+          if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'stash.list') {
+            dispatch(withId(FIXTURES.stashList, body.id));
+            return;
+          }
+          if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'globalStash.list') {
+            dispatch(withId(FIXTURES.globalStashList, body.id));
+            return;
+          }
+          if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'worktree.list') {
+            dispatch(withId(FIXTURES.worktreeList, body.id));
+            return;
+          }
+          if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'stack.list') {
+            dispatch(withId(FIXTURES.stackList, body.id));
             return;
           }
           // Every other method is deliberately left unanswered — see this file's own doc comment.
