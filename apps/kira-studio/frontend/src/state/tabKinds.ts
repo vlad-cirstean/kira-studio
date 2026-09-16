@@ -60,7 +60,10 @@ import {
   TAB_KIND_MODE,
   type TabKind,
   type TabRecord,
+  type TerminalTabRecord,
+  type TerminalTabState,
   tabTitle,
+  terminalTabStateSchema,
   type VariableSetTabRecord,
   type VariableSetTabState,
   variableSetTabStateSchema,
@@ -79,6 +82,7 @@ import { connectionRecord } from './connections';
 import type { MenuItem } from './contextMenu';
 import { settingsState } from './settings';
 import { isIncognito, setIncognito } from './tabIncognito';
+import { closeTerminalSession } from './terminals';
 
 // P1 D4/F19: the tab-kind registry, split from workbench/tabViews.ts (C4) by the lint rules —
 // this half is component-free (title/icon/railColor/dropResources/menuExtras/state constructors
@@ -129,6 +133,13 @@ const KIND_ICON: Record<string, string> = {
 
 function railColor(tab: TabRecord): ConnectionColor | undefined {
   return connectionRecord(tab.connectionId)?.color;
+}
+
+// P83 §7.2: a filesystem basename (state.cwd is an absolute path, not an encoded NodePath — this
+// is not pathTail).
+function basename(path: string): string {
+  const slash = path.lastIndexOf('/');
+  return slash === -1 ? path : path.slice(slash + 1);
 }
 
 // P71 §5.2: both request kinds' own tab context-menu entry — `setIncognito`'s own listener
@@ -454,5 +465,24 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     dropResources: (tabId) => dropRepoDiffTab(tabId),
     menuExtras: () => [],
     parseState: parseStateWith(repoDiffTabStateSchema),
+  },
+  // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm.
+  terminal: {
+    mode: TAB_KIND_MODE.terminal,
+    // The cwd's basename, so two terminals at two worktrees read apart at a glance. Falls back to
+    // 'Terminal' for an empty cwd, which openRepoTerminalTab never produces.
+    title: (tab) => basename((tab as TerminalTabRecord).state.cwd) || 'Terminal',
+    // 'terminal-bash', not 'terminal': the 'console' kind (a SQL console) already owns that glyph.
+    icon: () => 'terminal-bash',
+    railColor: () => undefined,
+    defaultState: (): TerminalTabState => ({ cwd: '', codeRepoId: '' }),
+    // Copying the cwd means "Duplicate tab" on a terminal opens a second terminal at the same
+    // directory — which is what duplicating a terminal means, and needs no special case (§7.2).
+    duplicateState: (tab: TerminalTabRecord): TerminalTabState => ({ ...tab.state }),
+    // The one place a PTY dies on close — blind-called for every kind (dropPageStoresForTab), so
+    // a non-terminal tab id is a registry miss here, not a branch.
+    dropResources: (tabId) => closeTerminalSession(tabId),
+    menuExtras: () => [],
+    parseState: parseStateWith(terminalTabStateSchema),
   },
 };

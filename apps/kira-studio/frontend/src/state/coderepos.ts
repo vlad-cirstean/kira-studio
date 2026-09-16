@@ -49,8 +49,10 @@ export async function removeCodeRepo(id: string): Promise<void> {
 
 /** P82: canonicalized the way gitpath.CleanNFC canonicalizes a repository root
  *  (internal/gitpath/gitpath.go:46) — `git worktree list` reports paths verbatim, while
- *  RepoSummary.root/.repoId come back NFC-normalized from gitclient.Identify. */
-function canonicalPath(p: string): string {
+ *  RepoSummary.root/.repoId come back NFC-normalized from gitclient.Identify. Exported (P83 §5.1)
+ *  so state/terminals.ts's terminalCountAtPath and openTerminalSession compare cwd the same way,
+ *  instead of copying this logic a second time. */
+export function canonicalPath(p: string): string {
   return p.normalize('NFC').replace(/[/\\]+$/, '');
 }
 

@@ -42,6 +42,9 @@ export const CHANNEL = {
   codeSearch: 'kira:code:search',
   // M2 §7.1: the prompt-mode approval queue's live snapshot — gitPairing's own shape.
   dbMcpApproval: 'kira:dbmcp:approval',
+  // P83 §3.2: one terminal's coalesced output and its exit, delivered via EmitTo (one window
+  // only) — codeSearch's own shape, restated for a byte payload.
+  terminal: 'kira:terminal:data',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout
@@ -62,4 +65,17 @@ export interface AppMetricsSample {
   memoryBytes: number;
   logicalCPUs: number;
   processCount: number;
+}
+
+/** `kira:terminal:data`'s own payload (internal/bridge/terminal.go's TerminalEvent, field for
+ *  field) — one coalesced chunk of a session's output, or its exit. Never a bound-call arg or
+ *  return type, so it has no generated binding — a plain interface here, mirroring
+ *  AppMetricsSample just above: this event crosses no storage boundary and is never restored, so
+ *  there is nothing for a zod schema to guard that this interface doesn't already state. */
+export interface TerminalEvent {
+  terminalId: string;
+  data?: string; // base64, absent on the exit event
+  exited: boolean;
+  exitCode?: number;
+  error?: string;
 }

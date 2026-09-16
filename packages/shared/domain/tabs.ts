@@ -38,6 +38,8 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // C6 §7/§8.1: a HEAD-vs-worktree diff, opened from the tree's own "Open changes" action —
   // read-only, rendered by Monaco's diff editor.
   'repo-diff',
+  // P83 §7.1: an embedded shell at one worktree's directory, rendered with @xterm/xterm.
+  'terminal',
 ]);
 export type TabKind = z.infer<typeof tabKindSchema>;
 
@@ -60,6 +62,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'repo-graph',
   'repo-file',
   'repo-diff',
+  'terminal',
 ];
 
 // C5 D2/§4.1: TAB_KIND_MODE's value type widens from AppMode to TabScope — 'repo' is a sentinel
@@ -92,6 +95,7 @@ export const TAB_KIND_MODE: Record<TabKind, TabScope> = {
   'repo-graph': 'repo',
   'repo-file': 'repo',
   'repo-diff': 'repo',
+  terminal: 'repo',
 };
 
 const pageSizeSchema = /*#__PURE__*/ z.union([
@@ -311,6 +315,16 @@ export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
 
+// P83 §7.1: minimal on purpose — a terminal tab's whole content is a live process (never
+// persisted, §7.5), so state carries only what the tab's own title and dropResources path need
+// without a second lookup: cwd (the pty's own directory) and codeRepoId (which workspace this
+// terminal belongs to).
+export const terminalTabStateSchema = z.object({
+  cwd: z.string(),
+  codeRepoId: z.string(),
+});
+export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
+
 const tabRecordBase = {
   id: z.string(),
   connectionId: z.string().nullable(),
@@ -391,6 +405,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
     kind: z.literal('repo-diff'),
     state: repoDiffTabStateSchema,
   }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
+    kind: z.literal('terminal'),
+    state: terminalTabStateSchema,
+  }),
 ]);
 export type TabRecord = z.infer<typeof tabRecordSchema>;
 export type DataTabRecord = Extract<TabRecord, { kind: 'data' }>;
@@ -407,6 +426,7 @@ export type EnvironmentsTabRecord = Extract<TabRecord, { kind: 'environments' }>
 export type RepoGraphTabRecord = Extract<TabRecord, { kind: 'repo-graph' }>;
 export type RepoFileTabRecord = Extract<TabRecord, { kind: 'repo-file' }>;
 export type RepoDiffTabRecord = Extract<TabRecord, { kind: 'repo-diff' }>;
+export type TerminalTabRecord = Extract<TabRecord, { kind: 'terminal' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
   return tab && tab.kind === 'data' ? tab : null;

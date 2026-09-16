@@ -19,6 +19,7 @@ import * as RepoMapService from '@bindings/repomapservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
+import * as TerminalService from '@bindings/terminalservice.js';
 import * as TreeService from '@bindings/treeservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
@@ -68,7 +69,7 @@ import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
+import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
 import { apiControl } from './apiControl';
 import { on, trust, unwrap, windowKey } from './rpc';
 
@@ -520,6 +521,28 @@ const studioControl = {
   codeWorkspaceCancelSearch: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.CancelSearch({ id })),
   onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
+
+  // P83 §3.2: the embedded terminal's own bound surface — terminalId is client-supplied (the tab
+  // id) so state/terminals.ts subscribes to onTerminal before this call returns, and no output can
+  // race the subscription. windowKey addresses ChannelTerminal at this window only, exactly like
+  // codeWorkspaceStartSearch.
+  terminalOpen: (
+    terminalId: string,
+    cwd: string,
+    cols: number,
+    rows: number,
+  ): Promise<{ shell: string }> =>
+    unwrap(TerminalService.Open({ terminalId, cwd, cols, rows, windowKey })).then((r) =>
+      trust<{ shell: string }>(r),
+    ),
+  // data is base64 — keystrokes are not always valid UTF-8 (paste, Alt-meta, mouse reports).
+  terminalWrite: (terminalId: string, data: string): Promise<void> =>
+    unwrap(TerminalService.Write({ terminalId, data })),
+  terminalResize: (terminalId: string, cols: number, rows: number): Promise<void> =>
+    unwrap(TerminalService.Resize({ terminalId, cols, rows })),
+  terminalClose: (terminalId: string): Promise<void> =>
+    unwrap(TerminalService.Close({ terminalId })),
+  onTerminal: (cb: (event: TerminalEvent) => void): (() => void) => on(CHANNEL.terminal, cb),
 };
 
 // P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39

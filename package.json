@@ -79,6 +79,8 @@
   },
   "dependencies": {
     "@floating-ui/dom": "1.8.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "flatbuffers": "25.9.23",
     "fuzzysort": "4.0.2",
     "markdown-it": "15.0.2",

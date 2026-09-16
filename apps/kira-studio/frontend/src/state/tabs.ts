@@ -129,8 +129,10 @@ let pendingSnapshot: string | null = null;
 // P71 §3.1: an incognito tab is never written — left out of the snapshot entirely, and
 // TabsService.Save replaces the window's whole tab set, so a tab switched to incognito mid-session
 // also drops whatever row it already had, with no separate delete call needed.
+// P83 §7.5: a terminal tab's whole content is a live process — a restored row would be an empty
+// terminal wired to a PTY that died with the last run. Same filter shape as incognito above.
 function persistableTabs(): TabRecord[] {
-  return tabsState.tabs.filter((t) => !isIncognito(t.id));
+  return tabsState.tabs.filter((t) => !isIncognito(t.id) && t.kind !== 'terminal');
 }
 
 function saveIfChanged(): void {
