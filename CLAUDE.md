@@ -46,7 +46,7 @@ duplicated here; this file only points at them.
 - The **main session runs on Sonnet and orchestrates only** — it doesn't implement, edit code, or
   fix findings directly. Its job: spawn the right subagents in order, carry context between them,
   and track progress. The actual writing always happens in a subagent.
-- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.7/` today) needs an
+- Each phase (the current chapter's `SPEC.md` phasing table — `docs/v1.8/` today) needs an
   Opus-authored plan committed under that chapter's `plans/` before implementation starts — spawn
   an **Opus subagent** (`Agent` tool, `model: "opus"`) whose only job is writing that plan. No plan
   there means no implementing straight from the spec; get the plan written and committed first.
@@ -214,7 +214,7 @@ needed — but the printed `claude mcp add` command must be re-run, since the ol
 longer authenticates. To force a fresh token before it lapses, delete that repository's
 `mcp-repo-map-*-token.json` and restart.
 
-**Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.7/`
+**Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.8/`
 today). Trivial (config, registration, wiring): fix inline, log one line. Non-trivial (wrong result,
 missing tool, crash): log a full entry and fix nothing in that phase — the next phase waits for a
 dedicated fix pass to close it.
