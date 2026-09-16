@@ -42,3 +42,13 @@ export const STATE_ICONS = {
   warning: 'codicon-warning',
   commit: 'codicon-git-commit',
 } as const;
+
+/** P77 §4's tab strip — kept separate from `ACTION_ICONS` for the same reason `BADGE_ICONS`/
+ *  `STATE_ICONS` are: these decorate a `BranchPicker.vue` tab, not an action a click performs. */
+export const PICKER_TAB_ICONS = {
+  branches: 'codicon-git-branch',
+  tags: 'codicon-tag',
+  stashes: 'codicon-archive',
+  worktrees: 'codicon-multiple-windows',
+  stacks: 'codicon-list-tree',
+} as const;

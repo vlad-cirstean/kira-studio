@@ -11,14 +11,20 @@
  * has no `BridgeClient` of its own (only `ops`/`worktrees`, matching every other row component in
  * this file's own family). Remove is handled entirely locally: a plain `op.run`, no host
  * involvement, with its own small confirm dialog for D8's dirty route.
+ *
+ * P77 §11: renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
+ * the same `TagList.vue` contract. This is also the first cap this list has ever had (§1.1: it
+ * used to render `worktrees.entries.value` straight through, uncapped) — part of N1's fix.
  */
 import type { WorktreeEntry, WorktreeRemovePreflight } from '@kira/git-ipc';
 import { KuiButton, KuiDialog } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
+import { type PickerList, worktreeLabel } from './pickerModel.ts';
 
 const props = defineProps<{
+  section: PickerList<WorktreeEntry>;
   worktrees: WorktreeState;
   ops: OpsState;
   /** Gates the "Open in New Window" row action (D6/D14) — `false` in the harness. */
@@ -36,12 +42,6 @@ const emit = defineEmits<{
   (e: 'open-worktree-window', path: string): void;
   (e: 'create-worktree'): void;
 }>();
-
-function label(entry: WorktreeEntry): string {
-  if (entry.branch) return entry.branch.replace(/^refs\/heads\//, '');
-  if (entry.isDetached && entry.head) return `detached @ ${entry.head.slice(0, 7)}`;
-  return entry.isBare ? 'bare' : 'unknown';
-}
 
 function switchTo(entry: WorktreeEntry): void {
   if (entry.isCurrent) return;
@@ -123,7 +123,7 @@ async function confirmRemove(): Promise<void> {
         Create Worktree…
       </KuiButton>
     </div>
-    <div v-for="entry in worktrees.entries.value" :key="entry.path" class="kv-branch-row">
+    <div v-for="entry in section.visible" :key="entry.path" class="kv-branch-row">
       <div class="kv-branch-row-main kv-worktree-row-main">
         <span v-if="entry.isCurrent" class="kv-worktree-badge" v-kui-tooltip="'This window'">●</span>
         <span v-if="entry.isMain" class="kv-worktree-badge" v-kui-tooltip="'Main worktree'">M</span>
@@ -133,7 +133,7 @@ async function confirmRemove(): Promise<void> {
         <span v-if="entry.openElsewhere" class="kv-worktree-badge" v-kui-tooltip="'Open in another window'">
           <span class="codicon codicon-window" aria-hidden="true"></span>
         </span>
-        <span class="kv-worktree-label" v-kui-tooltip="entry.path">{{ label(entry) }}</span>
+        <span class="kv-worktree-label" v-kui-tooltip="entry.path">{{ worktreeLabel(entry) }}</span>
         <span class="kv-worktree-path">{{ entry.path }}</span>
       </div>
       <KuiButton
@@ -164,7 +164,10 @@ async function confirmRemove(): Promise<void> {
         <span class="codicon codicon-trash" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <div v-if="worktrees.entries.value.length === 0" class="kv-branch-empty">No worktrees</div>
+    <div v-if="section.hiddenCount > 0" class="kv-branch-more">
+      {{ section.hiddenCount }} more — refine your filter
+    </div>
+    <div v-if="section.visible.length === 0" class="kv-branch-empty">No worktrees</div>
 
     <KuiDialog
       :open="pendingRemove !== undefined"

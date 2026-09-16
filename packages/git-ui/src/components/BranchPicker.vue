@@ -1,26 +1,37 @@
 <script setup lang="ts">
 /**
- * `docs/plans/P6.md` W13: §6.2's `[branch ▾]` toolbar slot. One dropdown, three sections
- * (Branches / Remote branches / Tags — judgment call 5); `refListModel.ts` owns the filter, sort
- * and cap, this file only renders. `TagList.vue` renders the third section as a real component
- * (its own doc comment says why), reusing the same filter text this file's own input owns rather
- * than a second box (§13's "one filter box, matching across all three sections").
+ * `docs/plans/P6.md` W13: §6.2's `[branch ▾]` toolbar slot. P77 redesigns it from seven stacked
+ * sections in one scroll context into a five-tab structure — Branches (local + remote sub-group),
+ * Tags, Stashes (stack + global-bucket sub-group), Worktrees, Stacks — over one `KuiSegmented`
+ * strip (§3). `pickerModel.ts` owns the fold (filter/order/cap) for every tab; this file renders
+ * the strip, the filter box and the active tab's body, and still owns every ref-scoped write this
+ * file has always owned (checkout, rename, delete, the stack-navigation row-menu arms) — `TagList`/
+ * `StashList`/`GlobalStashList`/`WorktreeList`/`StackList` render their own tab's rows from an
+ * already filtered/ordered/capped prop, the same contract `TagList.vue` has had since P6.
  *
  * Every row also carries `RowContextMenu.vue`'s ref-scoped menu (W14: "every row also carries the
  * context menu W14 builds, which is where the destructive actions live") — a kebab button (mouse
  * *and* keyboard reachable) plus a plain right-click, both opening the same menu.
  */
 import type { RefRow, StashEntry } from '@kira/git-ipc';
-// `KuiButton` is a plain (not `import type`) import even though this file's own script only ever
-// reads it through `InstanceType<typeof KuiButton>` (the trigger's own ref type) — that is still a
-// genuine *value* read (`typeof` on an identifier requires the runtime binding in scope), and the
-// template's own `<KuiButton>` tags instantiate it as a component; biome's own static analysis
-// sees neither use and would otherwise "fix" this to `import type`, silently erasing the import
-// (AppToolbar.vue's own `useImportType` biome-ignore precedent, for the same reason).
+import type { KuiSegmentedOption } from '@kira/kira-ui';
+// `KuiButton`/`KuiSegmented` are plain (not `import type`) imports even though this file's own
+// script only ever reads `KuiButton` through `InstanceType<typeof KuiButton>` (the trigger's own
+// ref type) — that is still a genuine *value* read (`typeof` on an identifier requires the runtime
+// binding in scope), and the template's own `<KuiButton>`/`<KuiSegmented>` tags instantiate them as
+// components; biome's own static analysis sees neither use and would otherwise "fix" this to
+// `import type`, silently erasing the import (AppToolbar.vue's own `useImportType` biome-ignore
+// precedent, for the same reason).
 // biome-ignore lint/style/useImportType: see above
-import { KuiButton, KuiPopoverPanel, KuiSearchInput, KuiTextInput } from '@kira/kira-ui';
+import {
+  KuiButton,
+  KuiPopoverPanel,
+  KuiSearchInput,
+  KuiSegmented,
+  KuiTextInput,
+} from '@kira/kira-ui';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { STATE_ICONS } from '../icons/index.ts';
+import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { RefsState } from '../state/refs.ts';
@@ -28,9 +39,9 @@ import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 import GlobalStashList from './GlobalStashList.vue';
+import { buildPickerModel, type PickerInput, type PickerTab } from './pickerModel.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import {
-  buildRefListSections,
   formatTrack,
   localNameForRemoteBranch,
   remoteCheckoutLabel,
@@ -53,7 +64,7 @@ const props = defineProps<{
   /** G25 D6/D14 — see `WorktreeList.vue`'s own doc comment. */
   openWorktreeWindowCapability: boolean;
   /** C10 §4.2/§4.3 (S6/S7): `false` under the native read-only graph — this picker's own ref menu
-   *  falls back to `buildReadOnlyRefMenu`, and the flag threads on into every child section
+   *  falls back to `buildReadOnlyRefMenu`, and the flag threads on into every child tab
    *  (`TagList`/`StashList`/`GlobalStashList`/`WorktreeList`/`StackList`) that owns a write
    *  affordance of its own. */
   writeCapability: boolean;
@@ -110,12 +121,21 @@ const emit = defineEmits<{
   (e: 'openSetStackParentDialog', branch: string): void;
 }>();
 
+const TAB_LABELS: Readonly<Record<PickerTab, string>> = {
+  branches: 'Branches',
+  tags: 'Tags',
+  stashes: 'Stashes',
+  worktrees: 'Worktrees',
+  stacks: 'Stacks',
+};
+
 const isOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 // G34 D5/D14: `KuiButton` now exposes `focus()` (the same escape hatch `KuiSearchInput` already
 // has), so the trigger is a real `KuiButton` instead of the raw `<button>` this used to need.
 const triggerEl = ref<InstanceType<typeof KuiButton> | null>(null);
 const filter = ref('');
+const activeTab = ref<PickerTab>('branches');
 
 const triggerLabel = computed(() => {
   const head = props.refs.head.value;
@@ -125,16 +145,48 @@ const triggerLabel = computed(() => {
   return head.sha.slice(0, 7);
 });
 
-const sections = computed(() =>
-  buildRefListSections(
-    {
-      branches: props.refs.branches.value,
-      remoteBranches: props.refs.remoteBranches.value,
-      tags: props.refs.tags.value,
-    },
-    filter.value,
-  ),
+const pickerInput = computed<PickerInput>(() => ({
+  branches: props.refs.branches.value,
+  remoteBranches: props.refs.remoteBranches.value,
+  tags: props.refs.tags.value,
+  stashes: props.stash.entries.value,
+  globalStashes: props.stash.globalEntries.value,
+  worktrees: props.worktrees.entries.value,
+  stacks: props.stack.stacks.value,
+  orphans: props.stack.orphans.value,
+}));
+
+const model = computed(() =>
+  buildPickerModel(pickerInput.value, filter.value, activeTab.value, {}),
 );
+
+const tabOptions = computed<readonly KuiSegmentedOption[]>(() => [
+  {
+    id: 'branches',
+    icon: PICKER_TAB_ICONS.branches,
+    label: 'Branches',
+    badge: model.value.counts.branches,
+  },
+  { id: 'tags', icon: PICKER_TAB_ICONS.tags, label: 'Tags', badge: model.value.counts.tags },
+  {
+    id: 'stashes',
+    icon: PICKER_TAB_ICONS.stashes,
+    label: 'Stashes',
+    badge: model.value.counts.stashes,
+  },
+  {
+    id: 'worktrees',
+    icon: PICKER_TAB_ICONS.worktrees,
+    label: 'Worktrees',
+    badge: model.value.counts.worktrees,
+  },
+  {
+    id: 'stacks',
+    icon: PICKER_TAB_ICONS.stacks,
+    label: 'Stacks',
+    badge: model.value.counts.stacks,
+  },
+]);
 
 const knownRemotes = computed(() =>
   remoteNamesFrom(props.refs.remoteBranches.value.map((row) => row.shortName)),
@@ -145,6 +197,7 @@ function close(): void {
   refMenu.value = undefined;
   renaming.value = undefined;
   forceDeleteCandidate.value = undefined;
+  filter.value = '';
 }
 
 function toggle(): void {
@@ -152,11 +205,13 @@ function toggle(): void {
   if (!isOpen.value) close();
 }
 
-// G10 D17: forwarded so App.vue's palette dispatcher can open this panel exactly the way clicking
-// its own trigger does — the picker is the only place the UI names a ref to act on, so every
-// ref-scoped palette command (checkout, delete/rename branch, delete tag, delete remote branch)
-// reaches the same `openBranchPicker` action.
-function open(): void {
+// G10 D17/P77 §13: forwarded so App.vue's palette dispatcher can open this panel exactly the way
+// clicking its own trigger does — the picker is the only place the UI names a ref/stash/worktree/
+// stack to act on, so every such palette command reaches one of `openBranchPicker`/`openTagPicker`/
+// `openStashPicker`/`openWorktreePicker`/`openStackPicker`. `tab` is optional so the click-trigger
+// path (which always wants whatever tab was last open) is unchanged.
+function open(tab?: PickerTab): void {
+  if (tab !== undefined) activeTab.value = tab;
   isOpen.value = true;
 }
 defineExpose({ open });
@@ -173,7 +228,7 @@ function closeForCheckout(): void {
   close();
 }
 
-// C12-6: these are the row's own MAIN click handler, unlike every other write-capable affordance
+// C12-6: this is the row's own MAIN click handler, unlike every other write-capable affordance
 // in this file (the ref-scoped context menu, gated by `refMenuSections` falling back to
 // `buildReadOnlyRefMenu` above) — nothing upstream of this function stops it from running under
 // `writeCapability: false`. Before this guard, clicking a branch row on the native read-only graph
@@ -351,18 +406,20 @@ watch(isOpen, (open) => {
 
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
 // all — warms every visible branch's own PR record in one go. G32 round-3 performance review,
-// finding #3: "visible" used to mean the repo's FULL branch list, not what `sections` (above)
-// actually renders — `branch.resolvePr` answers a branch WITH an open PR from its already-cached
-// bulk snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch `gh
-// api` call, so a repo with hundreds of branches fanned out hundreds of `gh` spawns from one
-// picker open, easily arming GitHub's rate-limit breaker. Scoped to `sections.visible` (each
-// capped at `REF_LIST_SECTION_CAP`) and keyed off that computed itself, not just `isOpen`, so
-// typing a filter that surfaces a branch outside the initial page still gets it warmed.
+// finding #3: "visible" used to mean the repo's FULL branch list, not what `model` (above) actually
+// renders — `branch.resolvePr` answers a branch WITH an open PR from its already-cached bulk
+// snapshot at no extra cost (D6), but one WITHOUT falls through to its own per-branch `gh api`
+// call, so a repo with hundreds of branches fanned out hundreds of `gh` spawns from one picker
+// open, easily arming GitHub's rate-limit breaker. Scoped to the Branches tab's own visible rows
+// (each capped at `REF_LIST_SECTION_CAP`) and keyed off that computed itself, not just `isOpen`, so
+// typing a filter that surfaces a branch outside the initial page still gets it warmed. P77: a
+// picker opened on a non-Branches tab now warms nothing at all, since `model.branchesLocal`/
+// `branchesRemote` are only ever materialised for the active tab (§8's own closing note).
 const visibleBranchNames = computed<readonly string[]>(() => {
   if (!isOpen.value) return [];
   return [
-    ...sections.value.branches.visible.map((r) => r.shortName),
-    ...sections.value.remoteBranches.visible.map((r) => r.shortName),
+    ...model.value.branchesLocal.visible.map((r) => r.shortName),
+    ...model.value.branchesRemote.visible.map((r) => r.shortName),
   ];
 });
 watch(visibleBranchNames, (names) => {
@@ -392,8 +449,15 @@ onBeforeUnmount(() => {
       <span class="codicon" :class="STATE_ICONS.chevronDown" aria-hidden="true"></span>
     </KuiButton>
 
-    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="320" @close="close">
-    <div class="kv-branch-panel" role="dialog" aria-label="Branches and tags">
+    <KuiPopoverPanel v-if="isOpen" anchor="left" :width="380" @close="close">
+    <div class="kv-branch-panel" role="dialog" :aria-label="`${TAB_LABELS[activeTab]} picker`">
+      <KuiSegmented
+        class="kv-branch-tabs"
+        :options="tabOptions"
+        :model-value="activeTab"
+        ariaLabel="Picker section"
+        @update:model-value="(id) => (activeTab = id as PickerTab)"
+      />
       <KuiSearchInput
         class="kv-branch-filter"
         v-model="filter"
@@ -401,11 +465,12 @@ onBeforeUnmount(() => {
         ariaLabel="Filter branches and tags"
       />
 
-      <div class="kv-branch-panel-scroll">
+      <div class="kv-branch-panel-scroll" :aria-label="TAB_LABELS[activeTab]">
+        <template v-if="activeTab === 'branches'">
         <div class="kv-branch-section" aria-label="Branches">
           <div class="kv-branch-section-title">Branches</div>
           <div
-            v-for="row in sections.branches.visible"
+            v-for="row in model.branchesLocal.visible"
             :key="row.refname"
             class="kv-branch-row"
             :class="{ 'kv-branch-row--current': row.isHead }"
@@ -469,15 +534,15 @@ onBeforeUnmount(() => {
             <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
             <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
           </div>
-          <div v-if="sections.branches.hiddenCount > 0" class="kv-branch-more">
-            {{ sections.branches.hiddenCount }} more — refine your filter
+          <div v-if="model.branchesLocal.hiddenCount > 0" class="kv-branch-more">
+            {{ model.branchesLocal.hiddenCount }} more — refine your filter
           </div>
-          <div v-if="sections.branches.visible.length === 0" class="kv-branch-empty">No branches</div>
+          <div v-if="model.branchesLocal.visible.length === 0" class="kv-branch-empty">No branches</div>
         </div>
 
         <div class="kv-branch-section" aria-label="Remote branches">
           <div class="kv-branch-section-title">Remote branches</div>
-          <div v-for="row in sections.remoteBranches.visible" :key="row.refname" class="kv-branch-row">
+          <div v-for="row in model.branchesRemote.visible" :key="row.refname" class="kv-branch-row">
             <KuiButton class="kui-row kv-branch-row-main" icon="codicon-cloud" @click="checkoutRemote(row)">
               <span class="kv-branch-row-name">{{ row.shortName }}</span>
               <span class="kv-branch-remote-action">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
@@ -492,16 +557,18 @@ onBeforeUnmount(() => {
               <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
             </KuiButton>
           </div>
-          <div v-if="sections.remoteBranches.hiddenCount > 0" class="kv-branch-more">
-            {{ sections.remoteBranches.hiddenCount }} more — refine your filter
+          <div v-if="model.branchesRemote.hiddenCount > 0" class="kv-branch-more">
+            {{ model.branchesRemote.hiddenCount }} more — refine your filter
           </div>
-          <div v-if="sections.remoteBranches.visible.length === 0" class="kv-branch-empty">
+          <div v-if="model.branchesRemote.visible.length === 0" class="kv-branch-empty">
             No remote branches
           </div>
         </div>
+        </template>
 
         <TagList
-          :section="sections.tags"
+          v-else-if="activeTab === 'tags'"
+          :section="model.tags"
           :ops="ops"
           :known-remotes="knownRemotes"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
@@ -509,7 +576,9 @@ onBeforeUnmount(() => {
           @checked-out="close"
         />
 
+        <template v-else-if="activeTab === 'stashes'">
         <StashList
+          :section="model.stashStack"
           :stash="stash"
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
@@ -520,6 +589,7 @@ onBeforeUnmount(() => {
         />
 
         <GlobalStashList
+          :section="model.stashGlobal"
           :stash="stash"
           :ops="ops"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
@@ -528,8 +598,11 @@ onBeforeUnmount(() => {
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-global-stash="emit('saveGlobalStash')"
         />
+        </template>
 
         <WorktreeList
+          v-else-if="activeTab === 'worktrees'"
+          :section="model.worktrees"
           :worktrees="worktrees"
           :ops="ops"
           :open-worktree-window-capability="openWorktreeWindowCapability"
@@ -540,7 +613,9 @@ onBeforeUnmount(() => {
         />
 
         <StackList
-          :stack="stack"
+          v-else-if="activeTab === 'stacks'"
+          :stacks="model.stacks"
+          :orphans="model.orphans"
           :ops="ops"
           :pr="pr"
           :write-capability="writeCapability"
@@ -583,12 +658,22 @@ onBeforeUnmount(() => {
 }
 
 /* G20 D5: positioning (absolute/z-index/width) and chrome (background/border/shadow) move onto
-   KuiPopoverPanel's own `.kui-popover` — this is now just the content's own internal layout. */
+   KuiPopoverPanel's own `.kui-popover` — this is now just the content's own internal layout.
+   P77 §12: the two `--kui-float-max-*` vars are `floatingPosition.ts`'s own opt-in size cap
+   (written by `size()` on every `KuiPopoverPanel`, read by nobody until now) — this is what makes
+   the wider 380px panel (`:width` above) safe inside a narrow VS Code webview: `shift()` already
+   keeps the surface inside the viewport, and this cap keeps its *content* from overflowing when
+   the panel is genuinely wider than the space. */
 .kv-branch-panel {
-  max-height: 420px;
+  max-height: min(520px, var(--kui-float-max-h, 520px));
+  max-width: var(--kui-float-max-w, 380px);
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.kv-branch-tabs {
+  margin: var(--kv-s-2) var(--kv-s-2) 0;
 }
 
 .kv-branch-filter {

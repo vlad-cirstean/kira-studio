@@ -12,7 +12,9 @@ export interface KuiSegmentedOption {
   id: string;
   icon: string;
   label: string;
-  badge?: number;
+  /** P77 §5.3: widened from `number` so a picker tab strip can show `formatChangeCount`'s
+   *  abbreviated form (e.g. `"1.2K"`) for a four-figure match count, not just a raw integer. */
+  badge?: number | string;
 }
 
 export interface KuiSelectOption {
