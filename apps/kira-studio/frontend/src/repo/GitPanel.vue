@@ -54,7 +54,21 @@ import {
 // prop) — '' when the bare 'git' key is active, which is exactly the "list only" state.
 const repoId = computed(() => repoIdOfWorkspace(workspaceState.active) ?? '');
 
-const local = reactive({ search: '' });
+// P84 §8.4: two independent queries — one string would mean a filter typed on one tab silently
+// hides rows on the other. Each keeps its own text across tab switches.
+const local = reactive({ repoSearch: '', fileSearch: '' });
+
+// P84 §8.1/§8.3: which of the two top-level tabs is showing. Not persisted, not module-level
+// (§8.3): `{ immediate: true }` on the watcher below recomputes the right tab from repoId on every
+// remount, so a manual override would only ever survive within one mount anyway.
+const tab = ref<'repos' | 'files'>('repos');
+watch(
+  repoId,
+  (id) => {
+    tab.value = id ? 'files' : 'repos';
+  },
+  { immediate: true },
+);
 
 // P67b §4.4: a single click opens (if not yet open) or activates (if open) — OQ-2's adopted
 // recommendation. This panel's entire subject is repositories, so a click that only paints a
@@ -87,12 +101,10 @@ function worktreeRecordId(path: string): string {
 
 // P84 §3: a row with a non-empty parentId never renders at the top level — only nested under its
 // anchor's twisty (`worktreeEntries` below). §4.4: reads this panel's own PanelShell search box
-// (`local.search`), not the Studio tree's own `treeState.search` — that filter has no business
-// filtering this panel. The same box also filters the file tree below when Files is active
-// (`:search="local.search"`, unchanged from before).
+// (`local.repoSearch`), not the Studio tree's own `treeState.search`.
 const filteredRepos = computed<RepoSummary[]>(() => {
   const topLevel = codeReposState.records.filter((r) => !worktreeParentId(r.id));
-  const query = local.search.trim().toLowerCase();
+  const query = local.repoSearch.trim().toLowerCase();
   if (!query) return topLevel;
   return topLevel.filter((r) => r.name.toLowerCase().includes(query));
 });
@@ -264,10 +276,6 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
   openContextMenu(e, items);
 }
 
-const repoName = computed(
-  () => codeReposState.records.find((r) => r.id === repoId.value)?.name ?? '',
-);
-
 // C7 D9: lives in repo/state/search.ts, not component state, so switching workspaces and back
 // does not reset it. C11 §5.3: 'review' joins files/search as this segment's third value.
 const view = computed({
@@ -331,45 +339,45 @@ onUnmounted(() => {
 
 <template>
   <PanelShell
-    :search="local.search"
+    :search="tab === 'repos' ? local.repoSearch : local.fileSearch"
     :empty="codeReposState.records.length === 0"
     :searchable="true"
-    @update:search="local.search = $event"
+    @update:search="tab === 'repos' ? (local.repoSearch = $event) : (local.fileSearch = $event)"
   >
     <template #title>
-      <span>{{ repoId ? repoName : 'Repositories' }}</span>
+      <!-- P84 §8.1/§9: replaces the old repo-name title — the two tabs already say what's open. -->
+      <SegmentedControl
+        v-model="tab"
+        :options="[
+          { value: 'repos', label: 'Repositories', testid: 'git-panel-tab-repos' },
+          { value: 'files', label: 'Files', testid: 'git-panel-tab-files' },
+        ]"
+      />
     </template>
     <template #actions>
       <!-- C5 §3.3/§3.4: no new dialog, no new native picker — reuses FilesService.ChooseFolder. -->
       <IconButton
+        v-if="tab === 'repos'"
         icon="repo"
         aria-label="Import repository"
         v-tooltip="'Import repository…'"
         data-testid="import-repo"
         @click="onImport"
       />
-      <template v-if="repoId">
-        <SegmentedControl v-model="view" :options="viewOptions" />
-        <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a
-             tree refresh has nothing to do with a search result list. -->
-        <IconButton
-          v-if="view === 'files'"
-          icon="refresh"
-          aria-label="Refresh"
-          v-tooltip="'Refresh file tree'"
-          data-testid="repo-refresh"
-          @click="onRefresh"
-        />
-      </template>
+      <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a tree
+           refresh has nothing to do with a search result list. -->
+      <IconButton
+        v-if="tab === 'files' && view === 'files'"
+        icon="refresh"
+        aria-label="Refresh"
+        v-tooltip="'Refresh file tree'"
+        data-testid="repo-refresh"
+        @click="onRefresh"
+      />
     </template>
     <template #body>
       <div class="git-panel-body">
-        <section
-          v-if="codeReposState.records.length > 0"
-          class="repo-section"
-          :class="{ 'has-workspace': repoId }"
-          data-testid="repo-section"
-        >
+        <section v-if="tab === 'repos'" class="repo-section" data-testid="repo-section">
           <div class="repo-list">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
@@ -470,39 +478,46 @@ onUnmounted(() => {
             </div>
           </div>
         </section>
-        <template v-if="repoId">
-          <template v-if="view === 'files'">
-            <div
-              v-if="repoTreeError(repoId)"
-              class="p-strip note error-note"
-              data-testid="repo-tree-error"
-            >
-              {{ repoTreeError(repoId) }}
+        <template v-else>
+          <template v-if="repoId">
+            <div class="view-strip">
+              <SegmentedControl v-model="view" :options="viewOptions" />
             </div>
-            <div
-              v-if="repoTreeTruncated(repoId)"
-              class="p-strip note"
-              data-testid="repo-tree-truncated"
-            >
-              Showing the first 200,000 files.
-            </div>
-            <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted is
-                 what calls ensureRepoTreeLoaded in the first place; gating on the state it sets
-                 would mean it never gets the chance to. Its own `rows` computed is empty until the
-                 load resolves, then updates reactively — no separate loading placeholder needed for
-                 a first open this fast. -->
-            <RepoFileTree class="repo-tree" :repo-id="repoId" :search="local.search" />
+            <template v-if="view === 'files'">
+              <div
+                v-if="repoTreeError(repoId)"
+                class="p-strip note error-note"
+                data-testid="repo-tree-error"
+              >
+                {{ repoTreeError(repoId) }}
+              </div>
+              <div
+                v-if="repoTreeTruncated(repoId)"
+                class="p-strip note"
+                data-testid="repo-tree-truncated"
+              >
+                Showing the first 200,000 files.
+              </div>
+              <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted is
+                   what calls ensureRepoTreeLoaded in the first place; gating on the state it sets
+                   would mean it never gets the chance to. Its own `rows` computed is empty until
+                   the load resolves, then updates reactively — no separate loading placeholder
+                   needed for a first open this fast. -->
+              <RepoFileTree class="repo-tree" :repo-id="repoId" :search="local.fileSearch" />
+            </template>
+            <RepoSearchView v-else-if="view === 'search'" class="repo-tree" :repo-id="repoId" />
+            <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown,
+                 never destroyed, by a Files<->Review or Search<->Review switch within this same
+                 repo. -->
+            <RepoReviewView
+              v-if="reviewActivatedRepoIds.has(repoId)"
+              v-show="view === 'review'"
+              :key="repoId"
+              class="repo-tree"
+              :repo-id="repoId"
+            />
           </template>
-          <RepoSearchView v-else-if="view === 'search'" class="repo-tree" :repo-id="repoId" />
-          <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown, never
-               destroyed, by a Files<->Review or Search<->Review switch within this same repo. -->
-          <RepoReviewView
-            v-if="reviewActivatedRepoIds.has(repoId)"
-            v-show="view === 'review'"
-            :key="repoId"
-            class="repo-tree"
-            :repo-id="repoId"
-          />
+          <EmptyState v-else icon="source-control" label="No repository open" />
         </template>
       </div>
     </template>
@@ -540,16 +555,23 @@ onUnmounted(() => {
   min-height: 0;
 }
 
+/* P84 §8.6: the Repositories tab owns the whole panel height now — nothing stacks below the list
+   any more, so P82 §9's has-workspace 50% cap and this section's own border are both gone. */
 .repo-section {
-  flex-shrink: 0;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
-/* P82 §9: an expanded worktree list would otherwise push the file tree below the fold. Only
-   capped when a repo workspace is showing below — the list-only state still uses the whole panel. */
-.repo-section.has-workspace {
-  max-height: 50%;
-  overflow-y: auto;
+/* P84 §8.2: the Files/Search/Review picker, moved out of the header into a strip above the Files
+   tab's own body. */
+.view-strip {
+  flex-shrink: 0;
+  padding: 0 var(--kira-s-3);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  display: flex;
+  align-items: center;
+  height: var(--kira-row-height);
 }
 
 .repo-list {
@@ -639,10 +661,10 @@ onUnmounted(() => {
 .worktree-row.current {
   color: var(--kira-fg);
 }
-/* P84 §6.1: this app's own open/active workspace state, once the nested row is where a worktree's
-   marking has to live — reusing --kira-fg/--kira-select exactly as .repo-row does. Distinct from
-   .current (this git session's own worktree, a fact about the repository, not this app's
-   workspaces). */
+/* P84 §6.1/§8.6: this app's own open/active workspace state, once the nested row is where a
+   worktree's marking has to live — reusing --kira-fg/--kira-select exactly as .repo-row does.
+   Distinct from .current (this git session's own worktree, a fact about the repository, not this
+   app's workspaces). */
 .worktree-row.open {
   color: var(--kira-fg);
 }
