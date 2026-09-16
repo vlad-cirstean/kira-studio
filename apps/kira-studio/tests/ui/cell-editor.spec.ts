@@ -766,17 +766,29 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   };
   expect(opsAfter).toEqual(opsBaseline);
 
-  // --- scenario 11: populate latency tripwire ------------------------------------------------
-  // Deliberately far looser than §2.1's 50 ms budget: Playwright drives an instrumented,
-  // unoptimised build, so this catches "someone re-creates the EditorView per cell", not the
-  // budget itself — the real measurement is P12's.
-  const t0 = Date.now();
+  // --- scenario 11: the editor instance is reused across cells, never re-created --------------
+  // P81: this was a `Date.now()` budget standing in for "someone re-creates the EditorView per
+  // cell" (see git history). MonacoHost creates its editor once in onMounted and disposes it in
+  // onUnmounted, so a re-create means a new `.monaco-editor` subtree — the marker below cannot
+  // survive one. The real latency measurement is P12's; this never was one.
+  const monacoRoot = panel.locator('[data-testid="cell-editor-encoded"] .monaco-editor');
+  await monacoRoot.evaluate((el) => el.setAttribute('data-kira-p81-instance', 'pinned'));
   await selectCell(page, 3, 'sample');
   await expect
     .poll(async () => (await panel.getAttribute('data-cell-key')) ?? '')
     .toBe(`${tabId}:3:sample`);
-  const elapsed = Date.now() - t0;
-  expect(elapsed).toBeLessThan(250);
+  await expect(
+    panel.locator(
+      '[data-testid="cell-editor-encoded"] .monaco-editor[data-kira-p81-instance="pinned"]',
+    ),
+  ).toHaveCount(1);
+  // Reused *and* repopulated — the opposite failure mode a bare identity check would miss.
+  // Scoped to the encoded pane, not the whole panel: row 3 is the base64 fixture row, which opens
+  // a second MonacoHost (the decoded pane) alongside it, so the panel-wide `editorText(page)`
+  // helper is ambiguous here (two `.monaco-host` mounts) even though the app is behaving correctly.
+  expect(await sharedEditorText(panel.locator('[data-testid="cell-editor-encoded"]'))).toBe(
+    await cellText(page, 3, 'sample'),
+  );
 
   // --- scenario 12: visibility follows selection — no manual toggle exists anymore ------------
   await page.locator('[data-testid="grid-gutter-cell"]').first().click();
