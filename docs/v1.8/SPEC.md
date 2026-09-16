@@ -685,6 +685,124 @@ spec file against the pre-phase tree: zero overlap), all confirmed passing stand
 full-parallel-run wall-clock contention class P73 through P77's own result sections already document,
 not a regression. No other known gaps against the plan.
 
+## P79 result
+
+Single review round, by SPEC.md's own explicit instruction (not `CLAUDE.md`'s standard two). Three
+parallel Opus subagents — architecture/security, functional correctness, performance/resource
+efficiency — reviewed the full P71-P78 diff, findings-only. Combined: 2 blockers, 7 minor
+architecture/security findings, 14 functional-correctness findings, 8 performance findings (31
+total). Triaged into 6 file-disjoint fix batches so their Sonnet implementations could run in
+parallel (in isolated worktrees, merged back sequentially once all six landed); one finding
+(anonymous-nested-struct-embed over-promotion in `methodsets.go`) and one (always-on blame RPCs
+regardless of `inlineBlame`) were judged out of proportion for a review-fix pass — the first left as
+a documented limitation, the second confirmed a deliberate prior design choice, not forwarded to any
+batch.
+
+**Batch A — settings persistence + logging.** `AdvancedSettings.GitLogLevel`/`AppearanceSettings.
+DateFormat` existed in the settings schema but were never wired to `storage/model/settings.go`'s
+patch structs, `storage/repos/settings.go`'s read/write, or anything downstream — silently a no-op
+setting. Fixed end to end: struct fields, defaults, validation, `SettingsService.Set`'s conditional-
+hook pattern extended with a hook calling the also-broken `internal/logging`'s new `SetLevel`
+(previously hardcoded to `slog.LevelInfo`, "off" now genuinely silences via `LevelError + 4`). Deleted
+`SettingDef.instanceWide`, a dead flag left over from a deleted sentinel-row mechanism, once the
+app-wide replacement actually worked.
+
+**Batch B — PR link security.** Two blockers: `PrBrowserURL` (`gitsession/gh.go`) and its
+`bridge/github.go` validator both hardcoded `github.com`, breaking GitHub Enterprise entirely and,
+worse, meaning the validator's authenticated-host allowlist was never really an allowlist for GHES
+hosts. Both now thread `repo.Host` through composer and validator (`IsGitHubHost`, reused by both).
+VS Code's `proxyHandlers.ts` gained equivalent shape validation (`prUrl.ts`) it previously lacked
+entirely. `linkify.ts` still rendered a live `<a href>` for commit-body URLs, bypassing every other
+external-open capability gate in the app — replaced with a `<button>` through a new generic
+`link.openExternal` wire method (`CONTRACT_VERSION` 38→39) that validates scheme/host before handing
+off, wired into both hosts and all three `DetailActions` implementers.
+
+**Batch C — codegraph method-set correctness.** `goInterfacesSatisfiedBy`'s reverse-direction search
+seeded candidates from a single rarest method name (sound only forward) — now unions candidates over
+every name in `have`. A depth-cap/cycle-guard truncated result was being cached under an ordinary
+memo key, poisoning later unrelated lookups — a new `truncated bool` return, propagated through every
+call site, now gates the memo write. `resolve.go`'s `sameReceiver` tiebreak ran before `filterTier`
+narrowed the candidate set, wasting `ReferencesInFile` queries on candidates about to be discarded —
+reordered, no behavior change. `codeworkspace/nav.go`'s `Definitions`/`Implementations`/`References`
+each repeated ~120 lines including a security-relevant symlink-containment guard — extracted into
+shared `resolveQueryPoint`/`resolvePosition` helpers.
+
+**Batch D — PR ancestry correctness + rebuild coalescing.** `pr.ts`'s `rebuildAncestry` walked with no
+base cutoff, tagging nearly the entire loaded history behind any PR branch — a new
+`CommitStore.rowOfBranchTip` (local decoration scan, no new RPC) resolves each PR's `baseRef` and
+excludes its ancestors. Separately, `CommitGrid.vue` fired one full ancestry rebuild + grid
+invalidate/render per individually-resolved PR branch instead of coalescing a burst into one — a
+shared `ancestryRebuildPending` flag drained once via `nextTick` fixes both that and a second bug
+where newly-loaded rows (window growth) never got PR badges at all.
+
+**Batch E — tabs/preview-model lifecycle.** Six findings in `state/tabs.ts`/`views/repo/textModels.ts`/
+`views/repo/blameLine.ts`/`RepoGraphView.vue`: preview-cohort eviction called `closeTab()` once per
+evicted tab instead of batching into one state mutation + one save; incognito-off never triggered a
+save (only incognito-on did); `openRepoCommitDiffTab`'s tab-reuse path skipped cohort eviction
+entirely; the preview-model LRU returned stale content on a cache hit and could dispose a model a live
+peek still referenced (`dispose(): void {}` was a no-op); the per-mount blame cache had no cap and
+left `inFlight` pointing at settled controllers; `RepoGraphView.vue`'s `KeepAlive`'d graph kept doing
+full background work while backgrounded. Fixed directly in the main checkout (this batch's worktree
+was hit twice by the provisioning bug documented below, so its third attempt ran unisolated once the
+main tree was confirmed idle).
+
+**Batch F — picker/CommitMeta/navStatus polish.** `pickerModel.ts`'s Stacks tab counted branches
+where `capItems` counts entries (groups) — a real, visible undercount, fixed to match units.
+`navigation.ts`'s `provideReferences`/`provideImplementation` published a stale nav-status readout
+after a fast tab switch — both now capture the active tab id before `await` and check it unchanged
+after, mirroring `blameLine.ts`'s own guard. `pickerModel.ts`'s `buildPickerModel` recomputed its
+full (expensive) filter on every tab switch even when the query hadn't changed — split into
+`filterPickerInput` (expensive, query-gated) and `orderAndCapTab` (cheap, per-tab). `CommitMeta.vue`'s
+PR icon rendered with no `capabilities.openExternal` gate, unlike every other external-open surface.
+
+**Environment note.** The fix batches' isolated worktrees repeatedly (5 of 6) hit a provisioning bug
+where a fresh worktree checked out an orphaned "Initial commit" scaffold instead of the real branch
+tip — a race in this container, not a data-loss risk (each affected worktree held nothing of value,
+confirmed via `git status`/ancestry before any remediation). Four self-recovered inside their own
+isolated worktree via `git reset --hard`/`git merge --ff-only`/a fresh branch off the real tip; Batch
+E's two isolated attempts correctly stopped and reported per explicit instruction rather than
+self-remediating, so its third attempt ran directly in the main checkout instead.
+
+**Merge and a real regression, caught by full-suite verification.** All six batches' branches merged
+sequentially into the main checkout with one manual conflict (`CommitGrid.vue`'s `pr.generation`
+watcher: Batch D's coalescing simplification vs. Batch E's KeepAlive-visibility guard on the same
+watcher — resolved by composing both, matching the sibling `graphView.generation` watcher's own
+established pattern). The full-suite verification pass that followed (mandatory before closing a
+review round, not part of any batch's own scope) caught a genuine regression neither batch's own
+narrower verification could have: `graph-columns.spec.ts`'s date-column-width webview test failed
+deterministically post-merge. Root cause, found by a dedicated follow-up fix (`eab3047e`): Batch E's
+zero-size resize guard in `scheduleResize()` accidentally raced its own `detailOpen`-watcher-triggered
+rebuild — the same host resize was handled twice (once synchronously via the `detailOpen` watcher,
+once async via `ResizeObserver`), and under real CPU load the second pass's `invalidateAllRows()`
+could detach the exact DOM node a test had just read, mid-measurement. Fixed with two changes: a
+`lastRebuiltHostWidth` dedup (skip the async rebuild when the sync one already handled the same
+width) plus keying the KeepAlive skip off the actual `graphVisible` signal instead of inferring
+backgrounded-ness from a bare 0×0 read. Confirmed via 12 repeated full-suite webview runs, all green
+on the target test and its neighbor.
+
+That verification pass also surfaced (not fixed, per instruction — filed as the new P81 below) three
+pre-existing flaky UI tests under full-suite parallel load (`cell-editor.spec.ts`, `grpc-request.spec.
+ts`, `slick-grid.spec.ts`'s spike test — all pass standalone) plus a fourth found incidentally while
+fixing the regression above (`commit-meta-clamp.spec.ts`, confirmed present on the pre-fix baseline
+too, so unrelated to that fix).
+
+Then rebased onto `v1.7`'s own new tip (`b39f53d6`, advanced again since this chapter's last rebase)
+with `git rebase --rebase-merges` — a plain `git rebase` flattens merge commits and replays every
+batch's individual commits linearly, reproducing spurious conflicts against content already
+integrated by this phase's own merge commits; `--rebase-merges` preserves that structure and only
+replayed the same one real conflict (the `pr.generation` watcher, resolved identically) once, on the
+rebased `merge: P79 batch D` commit itself.
+
+**Final verification, on the rebased tree:** `go build/vet ./...` clean, `go test ./...` clean (every
+package). `bun run typecheck` clean (all 5 TS sub-projects). 1001/1001 unit tests (`bun test` across
+`apps/kira-studio/frontend/src`, `packages/git-ui/src`, `packages/git-ipc/src`,
+`apps/kira-studio-vscode/src`, `apps/kira-studio/tests/unit`). `biome check .` clean (one pre-existing
+unrelated info-level finding in `UncommittedChangesStrip.vue`, untouched by this phase). Both
+`bun run build` and `bun run build:vscode` succeed. `bun run test:ui`: the three known pre-existing
+flakes reproduced under full-suite load, all confirmed passing standalone — no new failures.
+`bun run test:webview`: 45/45 after the regression fix (verified across the 12 repeated runs above).
+Pushed (`git push --force-with-lease`, required since the rebase rewrote already-pushed history).
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
