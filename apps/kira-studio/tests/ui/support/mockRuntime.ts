@@ -174,6 +174,12 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceImplementations: 'CodeWorkspaceService.Implementations',
   codeWorkspaceStartSearch: 'CodeWorkspaceService.StartSearch',
   codeWorkspaceCancelSearch: 'CodeWorkspaceService.CancelSearch',
+  codeWorkspaceRepoHeads: 'CodeWorkspaceService.RepoHeads',
+
+  terminalOpen: 'TerminalService.Open',
+  terminalWrite: 'TerminalService.Write',
+  terminalResize: 'TerminalService.Resize',
+  terminalClose: 'TerminalService.Close',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -367,6 +373,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // Promise.all as hydrateGitClients()/hydrateRepoMap() above, same reasoning — a spec that never
   // imports a repository gets "nothing imported yet", not a fixture miss.
   [IPC.codeWorkspaceListRepos]: '[]',
+  // P83 §12.3 trigger 1: GitPanel.vue's own onMounted calls refreshRepoHeads() unconditionally,
+  // fire-and-forget, every time the Git module is opened — the same "every repo-workspace spec
+  // hits this, most don't care" reasoning codeWorkspaceListRepos just above already carries. A
+  // spec that DOES care (repo-workspace.spec.ts's own branch-label test) still wins with its own
+  // snapshot, same as every other wildcard here.
+  [IPC.codeWorkspaceRepoHeads]: '[]',
   // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
   // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
   // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard

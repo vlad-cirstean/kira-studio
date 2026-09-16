@@ -957,3 +957,190 @@ test('a repo workspace: Shift+F12 peeks references and publishes the status-bar 
   await expect(navStatus).toContainText('3 references');
   await expect(navStatus).toContainText('2 unattributed');
 });
+
+// terminalId is a client-generated UUID (state/tabs.ts's own crypto.randomUUID()) — unpredictable
+// ahead of time, so this carries no `args` at all and relies on mockRuntime.ts's own single-
+// snapshot shortcut ("a channel called with the same args every time … answers regardless of the
+// exact args it was called with"). Without a real answer here, the mocked call 422s and
+// openTerminalSession's own catch marks the session 'failed' — terminalCountAtPath excludes that
+// status, so the indicator test below would flip invisible again once the call resolves.
+const TERMINAL_OPEN_OK: ControlSnapshot = {
+  channel: IPC.terminalOpen,
+  response: { shell: '/bin/zsh' },
+};
+
+// P83 §17.2/§17.3: the embedded terminal's own wiring — real shell I/O is out of scope for this
+// tier (§17.3's own stated boundary; internal/terminal/session_test.go covers that). This is a
+// wiring test, not a call-count test: it proves subscribe -> decode -> term.write -> DOM by
+// rendering a synthesized `kira:terminal:data` chunk inside the real xterm.js DOM it mounts.
+test("the tab strip's + opens a terminal tab at the active worktree", async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({ control: [...CONTROL, TERMINAL_OPEN_OK] });
+
+  await openGitModule(page);
+  await repoRow(page).dblclick();
+
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  const menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await expect(menu.locator('[data-testid^="menu-item-"]')).toHaveCount(1);
+
+  await menu.locator('[data-testid="menu-item-new-terminal"]').click();
+
+  const terminalTab = tab(page, 'terminal');
+  await expect(terminalTab).toHaveCount(1);
+  const terminalId = await terminalTab.getAttribute('data-tab-id');
+  expect(terminalId).not.toBeNull();
+
+  // .xterm-rows appearing proves the dynamic import of terminalRenderer.ts settled and xterm
+  // mounted; the terminalOpen call itself is fire-and-forget from RepoTerminalView.vue's own
+  // mount(), so a plain synchronous check can race its still-in-flight mocked round trip —
+  // expect.poll rather than a fixed wait.
+  await expect(page.locator('.xterm-rows')).toBeVisible();
+
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.terminalOpen &&
+            (e.args as { cwd?: string } | undefined)?.cwd === REPO.root,
+        ),
+    )
+    .toBe(true);
+
+  await emitWailsEvent(page, IPC.terminal, {
+    terminalId,
+    data: Buffer.from('hello\r\n').toString('base64'),
+    exited: false,
+  });
+  await expect(page.locator('.xterm-rows')).toContainText('hello');
+});
+
+// P83 §10.2/§11.2: a worktree row's own context menu (out of scope for P82 — nothing needed one
+// until a terminal could be opened at a worktree that isn't the active workspace) plus the
+// indicator's own row-specificity: it must key off the terminal's cwd, not merely "a terminal is
+// open somewhere in this repository".
+test("a worktree row's menu opens a terminal there, and both rows show the indicator", async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: [...CONTROL, TERMINAL_OPEN_OK] });
+
+  // Installed before the expanding click — gitTransportFor is lazy (repo-workspace.spec.ts's own
+  // comment on the identical setup above).
+  await installGitStreamMock(page, REPO.repoId, {
+    'repo.open': undefined,
+    'worktree.list': WORKTREE_LIST_RESULT,
+  });
+
+  await openGitModule(page);
+  await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
+
+  const worktreeRows = page.locator('[data-testid="repo-worktree-row"]');
+  await expect(worktreeRows).toHaveCount(2);
+  const linkedRow = page.locator(
+    `[data-testid="repo-worktree-row"][data-worktree-path="${WORKTREE_PATH}"]`,
+  );
+  const mainRow = page.locator(
+    `[data-testid="repo-worktree-row"][data-worktree-path="${REPO.repoId}"]`,
+  );
+
+  await linkedRow.click({ button: 'right' });
+  const menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-testid="menu-item-open-terminal"]').click();
+
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.terminalOpen &&
+            (e.args as { cwd?: string } | undefined)?.cwd === WORKTREE_PATH,
+        ),
+    )
+    .toBe(true);
+
+  // Both row kinds share the same indicator markup (data-testid="repo-terminal-indicator",
+  // GitPanel.vue) — this proves it lands only on the row whose own path matches the terminal's
+  // cwd, on neither the sibling worktree row nor the collapsed repo row above them.
+  await expect(linkedRow.locator('[data-testid="repo-terminal-indicator"]')).toHaveCount(1);
+  await expect(mainRow.locator('[data-testid="repo-terminal-indicator"]')).toHaveCount(0);
+  await expect(repoRow(page).locator('[data-testid="repo-terminal-indicator"]')).toHaveCount(0);
+});
+
+// P83 §12/§13: a repo row's checked-out branch (RepoHeads, batched) and §13.2's sort, proven
+// together — the mock deliberately answers worktree.list linked-first, so a first-row assertion
+// that only ever matched the server's own order would pass vacuously here.
+test('every repo row shows its checked-out branch, main worktree first', async ({ relaunch }) => {
+  const REPO2 = {
+    id: 'repo-2',
+    name: 'demo-repo-2',
+    root: '/tmp/demo-repo-2',
+    repoId: '/tmp/demo-repo-2',
+    sortOrder: 2,
+    createdAt: '2026-01-03T00:00:00.000Z',
+  };
+  const REPO2_SHA = `abc1234${'0'.repeat(33)}`;
+
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO, REPO2] },
+      {
+        channel: IPC.codeWorkspaceRepoHeads,
+        args: { ids: null },
+        response: [
+          { id: REPO.id, head: { kind: 'branch', name: 'main' } },
+          { id: REPO2.id, head: { kind: 'detached', sha: REPO2_SHA } },
+        ],
+      },
+    ],
+  });
+
+  // worktree.list answers linked-first, deliberately — §13.2's sort must reorder it, not merely
+  // pass through the server's own order.
+  await installGitStreamMock(page, REPO.repoId, {
+    'repo.open': undefined,
+    'worktree.list': {
+      worktrees: [
+        {
+          path: WORKTREE_PATH,
+          head: '1'.repeat(40),
+          branch: 'refs/heads/feature',
+          isBare: false,
+          isDetached: false,
+          isMain: false,
+          isCurrent: false,
+          locked: null,
+          prunable: null,
+          openElsewhere: false,
+        },
+        {
+          path: REPO.repoId,
+          head: '0'.repeat(40),
+          branch: 'refs/heads/main',
+          isBare: false,
+          isDetached: false,
+          isMain: true,
+          isCurrent: true,
+          locked: null,
+          prunable: null,
+          openElsewhere: false,
+        },
+      ],
+    },
+  });
+
+  await openGitModule(page);
+
+  await expect(repoRow(page).locator('.repo-head')).toHaveText('main');
+  const repo2Row = page.locator(`[data-testid="repo-row"][data-repo-id="${REPO2.id}"]`);
+  await expect(repo2Row.locator('.repo-head')).toHaveText('detached @ abc1234');
+
+  await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
+  const worktreeRows = page.locator('[data-testid="repo-worktree-row"]');
+  await expect(worktreeRows).toHaveCount(2);
+  await expect(worktreeRows.first()).toHaveAttribute('data-worktree-path', REPO.repoId);
+  await expect(worktreeRows.first().locator('.worktree-badge')).toHaveText('main');
+});

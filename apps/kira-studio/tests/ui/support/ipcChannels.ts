@@ -172,6 +172,14 @@ export const IPC = {
   // C7 D7: the coalesced search-results push channel, EmitTo'd to one window — grpcCall's own
   // shape just above.
   codeSearch: 'kira:code:search',
+  // P83 §12.2: every imported repository's checked-out branch in one batched call.
+  codeWorkspaceRepoHeads: 'kira:codeWorkspace:repoHeads',
+
+  // P83 §3.2: the embedded terminal's own bound surface.
+  terminalOpen: 'kira:terminal:open',
+  terminalWrite: 'kira:terminal:write',
+  terminalResize: 'kira:terminal:resize',
+  terminalClose: 'kira:terminal:close',
 
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
@@ -183,4 +191,9 @@ export const IPC = {
   gitPairing: 'kira:git:pairing',
   gitClientsChanged: 'kira:git:clients',
   dbMcpApproval: 'kira:dbmcp:approval',
+  // P83 §3.2: one terminal's coalesced output and its exit, EmitTo'd to one window — codeSearch's
+  // own shape, restated for a byte payload. No FQN_SUFFIX_BY_IPC_KEY entry (it's a push channel,
+  // never a bound call) — driven by emitWailsEvent(page, IPC.terminal, …), codeSearch's own
+  // precedent above.
+  terminal: 'kira:terminal:data',
 } as const;
