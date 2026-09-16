@@ -134,7 +134,12 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // (params: repoId/sha, result: {revealed: boolean}) -- replaces the review row's VS Code-only
 // `command:` URI anchor with a real request both hosts answer locally, never reaching Go (the
 // same 'editor.*-shaped' precedent above). No new event, no new capability, no SQL migration.
-export const CONTRACT_VERSION = 37;
+// P77 §13 (2026-09-16): 37 -> 38, four new 'UiActionKind' members -- 'openTagPicker',
+// 'openStashPicker', 'openWorktreePicker', 'openStackPicker' -- routing the palette's tag/stash/
+// worktree/stack commands to the branch picker's own matching tab (D22's five-tab redesign)
+// instead of funnelling all of them into plain 'openBranchPicker'. No new request, no new event,
+// no new capability, no SQL migration.
+export const CONTRACT_VERSION = 38;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

@@ -82,7 +82,7 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   tagDelete: {
     command: 'kiraVersion.deleteTag',
     title: 'Delete Tag…',
-    action: 'openBranchPicker',
+    action: 'openTagPicker',
   },
   tagPush: { pending: 'unassigned' },
   tagDeleteRemote: { pending: 'unassigned' },
@@ -103,9 +103,10 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   },
   opSkip: { command: 'kiraVersion.skipCommit', title: 'Skip Commit', action: 'skipCommit' },
   // G17 D9: stashPush opens the create dialog directly (its own new UiActionKind member,
-  // 'stashChanges'); the other four reuse 'openBranchPicker' — the same surface that already
-  // contains `StashList.vue`'s own row-level Apply/Pop/Drop/Branch actions (F8), so no new UI is
-  // built here, only new palette entry points into what already exists.
+  // 'stashChanges'); the other four reuse 'openStashPicker' (P77: the branch picker's own Stashes
+  // tab, no longer plain 'openBranchPicker' — see that member's own doc comment) — the same
+  // surface that already contains `StashList.vue`'s own row-level Apply/Pop/Drop/Branch actions
+  // (F8), so no new UI is built here, only new palette entry points into what already exists.
   stashPush: {
     command: 'kiraVersion.stashChanges',
     title: 'Stash Changes…',
@@ -114,22 +115,22 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   stashApply: {
     command: 'kiraVersion.applyStash',
     title: 'Apply Stash…',
-    action: 'openBranchPicker',
+    action: 'openStashPicker',
   },
   stashPop: {
     command: 'kiraVersion.popStash',
     title: 'Pop Stash…',
-    action: 'openBranchPicker',
+    action: 'openStashPicker',
   },
   stashDrop: {
     command: 'kiraVersion.dropStash',
     title: 'Drop Stash…',
-    action: 'openBranchPicker',
+    action: 'openStashPicker',
   },
   stashBranch: {
     command: 'kiraVersion.createBranchFromStash',
     title: 'Create Branch from Stash…',
-    action: 'openBranchPicker',
+    action: 'openStashPicker',
   },
   // G22 D11: reset/cherryPick's own real commands, mirroring revert's own shape (a single-commit
   // op the row menu already offers — 'resetToThisCommit'/'cherryPickThisCommit', App.vue:410-429 —
@@ -155,9 +156,10 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   },
   // G25: worktreeAdd opens WorktreeDialog's create mode directly (its own new UiActionKind
   // member, 'createWorktree' — the same "stashPush opens its own dialog directly" shape stashPush
-  // already established above); worktreeRemove reuses 'openBranchPicker' — the same surface that
-  // already contains the fourth (worktree) section's own row-level Remove action, the same
-  // convention every other row-addressed mutating kind above already follows.
+  // already established above); worktreeRemove reuses 'openWorktreePicker' (P77: the branch
+  // picker's own Worktrees tab) — the same surface that already contains the fourth (worktree)
+  // section's own row-level Remove action, the same convention every other row-addressed mutating
+  // kind above already follows.
   worktreeAdd: {
     command: 'kiraVersion.createWorktree',
     title: 'Create Worktree…',
@@ -166,7 +168,7 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   worktreeRemove: {
     command: 'kiraVersion.removeWorktree',
     title: 'Remove Worktree…',
-    action: 'openBranchPicker',
+    action: 'openWorktreePicker',
   },
   undo: { command: 'kiraVersion.undo', title: 'Undo Last Operation', action: 'undo' },
   cancel: {
@@ -174,16 +176,16 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
     title: 'Cancel Remote Operation',
     action: 'cancelRemoteOperation',
   },
-  // G26 D13: stackSet reuses 'openBranchPicker' — the same surface that already contains the
-  // fifth (stack) section's own row-level "Set stack parent…"/"Remove from stack" actions, the
-  // same convention every other row-addressed mutating kind above already follows. restack opens
-  // StackDialog's own restack mode directly (its own new UiActionKind member, 'restackStack' —
-  // the same "stashPush/worktreeAdd open their own dialog directly" shape those two already
-  // established above).
+  // G26 D13: stackSet reuses 'openStackPicker' (P77: the branch picker's own Stacks tab) — the
+  // same surface that already contains the fifth (stack) section's own row-level "Set stack
+  // parent…"/"Remove from stack" actions, the same convention every other row-addressed mutating
+  // kind above already follows. restack opens StackDialog's own restack mode directly (its own
+  // new UiActionKind member, 'restackStack' — the same "stashPush/worktreeAdd open their own
+  // dialog directly" shape those two already established above).
   stackSet: {
     command: 'kiraVersion.setStackParent',
     title: 'Set Stack Parent…',
-    action: 'openBranchPicker',
+    action: 'openStackPicker',
   },
   restack: {
     command: 'kiraVersion.restackStack',
@@ -193,9 +195,10 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   // G28 D13: globalStashSave opens StashDialog's own fourth mode directly (its own new
   // UiActionKind member, 'saveGlobalStash' — the same "stashPush/worktreeAdd/restack open their
   // own dialog directly" shape those three already established above); globalStashRemove reuses
-  // 'openBranchPicker' — the same surface that already contains the sixth (global stash) section's
-  // own row-level Remove action, the same convention every other row-addressed mutating kind above
-  // already follows.
+  // 'openStashPicker' (P77: the branch picker's own Stashes tab, which holds both the stack and
+  // the global-stash sub-group) — the same surface that already contains the sixth (global stash)
+  // section's own row-level Remove action, the same convention every other row-addressed mutating
+  // kind above already follows.
   globalStashSave: {
     command: 'kiraVersion.saveGlobalStash',
     title: 'Save to Global Stash…',
@@ -204,7 +207,7 @@ export const MUTATING_COMMANDS: Record<MutatingAction, MutatingEntry> = {
   globalStashRemove: {
     command: 'kiraVersion.removeGlobalStash',
     title: 'Remove from Global Stash…',
-    action: 'openBranchPicker',
+    action: 'openStashPicker',
   },
 };
 

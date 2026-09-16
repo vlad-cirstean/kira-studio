@@ -57,6 +57,7 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 import BranchPicker from './BranchPicker.vue';
 // biome-ignore lint/style/useImportType: see above
 import PullStrategyPicker from './PullStrategyPicker.vue';
+import type { PickerTab } from './pickerModel.ts';
 // biome-ignore lint/style/useImportType: the template instantiates this — see above
 import RefreshButton from './RefreshButton.vue';
 import { remoteNamesFrom } from './rowMenuModel.ts';
@@ -257,7 +258,7 @@ async function doCancelWorktreePrepare(): Promise<void> {
 // `defineExpose`.
 defineExpose({
   refresh: () => refreshButtonRef.value?.refresh(),
-  openBranchPicker: () => branchPickerRef.value?.open(),
+  openBranchPicker: (tab?: PickerTab) => branchPickerRef.value?.open(tab),
   fetch: doFetch,
   pull: () => pullStrategyPickerRef.value?.run(),
   push: doPush,

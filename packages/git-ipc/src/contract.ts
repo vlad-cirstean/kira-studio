@@ -1392,6 +1392,15 @@ export type SearchRunResult =
  *  `pending` kind adds its own member here alongside its own table entry and manifest command. */
 export type UiActionKind =
   | 'openBranchPicker'
+  /** P77: the same panel, opened on its Tags / Stashes / Worktrees / Stacks tab. Before this, all
+   *  twelve of `commands.ts`'s `MUTATING_COMMANDS` entries for those rows funnelled into
+   *  `openBranchPicker` alone, which opens a five-tab panel on whichever tab it was last left on
+   *  and no closer to the row the command names. One member per tab, the same shape G22 D10 used
+   *  for `resetSelected`/`cherryPickSelected`. */
+  | 'openTagPicker'
+  | 'openStashPicker'
+  | 'openWorktreePicker'
+  | 'openStackPicker'
   | 'createBranch'
   | 'createTag'
   | 'revertSelected'
@@ -1422,7 +1431,7 @@ export type UiActionKind =
    *  toolbar's own "Stash changes…" button already makes (`App.vue`'s `@stash-changes` handler),
    *  so this is a second entry point into the same dialog, never a second implementation. The
    *  other four stash commands (`stashApply`/`stashPop`/`stashDrop`/`stashBranch`) reuse
-   *  `openBranchPicker` instead — no new member for those (`BranchPicker.vue`'s own stash section
+   *  `openStashPicker` instead — no new member for those (`BranchPicker.vue`'s own Stashes tab
    *  already has row-level Apply/Pop/Drop/Branch actions). */
   | 'stashChanges'
   /** G22 D10: the palette's own route into `ResetDialog.vue` — the same assignment the graph row
@@ -1437,9 +1446,9 @@ export type UiActionKind =
   /** G25: the palette's own route into `WorktreeDialog.vue`'s create mode — the same assignment
    *  the branch picker's own worktree section "Create Worktree…" button already makes, so this is
    *  a second entry point into the same dialog, never a second implementation. The other worktree
-   *  actions (switch, open in new window, remove) reuse `openBranchPicker` instead, the same
-   *  convention the five stash commands already established — `BranchPicker.vue`'s own worktree
-   *  section already has row-level actions for all three. */
+   *  actions (switch, open in new window, remove) reuse `openWorktreePicker` instead, the same
+   *  convention the five stash commands already established — `BranchPicker.vue`'s own Worktrees
+   *  tab already has row-level actions for all three. */
   | 'createWorktree'
   /** G26 D13: the palette's own route to "Restack this stack" — resolves the CURRENT branch's own
    *  stack client-side (`stackListModel`) and calls the same `runRestack` the row menu's
@@ -1455,7 +1464,7 @@ export type UiActionKind =
   /** G28 D13: the palette's own route into `StashDialog.vue`'s fourth mode, save-to-global-stash —
    *  the same assignment the global stash section's own "Save to global stash…" header button
    *  already makes, so this is a second entry point into the same dialog, never a second
-   *  implementation. `globalStashRemove`/`stashBranch`-for-a-global-entry reuse `openBranchPicker`
+   *  implementation. `globalStashRemove`/`stashBranch`-for-a-global-entry reuse `openStashPicker`
    *  instead, the same convention the five ordinary stash commands already established. */
   | 'saveGlobalStash'
   /** G-UX D9: the palette's own route to toggling the graph panel's search row — the same

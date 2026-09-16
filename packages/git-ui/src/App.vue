@@ -872,6 +872,18 @@ function runUiAction(
     case 'openBranchPicker':
       toolbarRef.value?.openBranchPicker();
       break;
+    case 'openTagPicker':
+      toolbarRef.value?.openBranchPicker('tags');
+      break;
+    case 'openStashPicker':
+      toolbarRef.value?.openBranchPicker('stashes');
+      break;
+    case 'openWorktreePicker':
+      toolbarRef.value?.openBranchPicker('worktrees');
+      break;
+    case 'openStackPicker':
+      toolbarRef.value?.openBranchPicker('stacks');
+      break;
     case 'createBranch':
       branchDialogState.value = { open: true, startPoint: selection.sha.value ?? 'HEAD' };
       break;
