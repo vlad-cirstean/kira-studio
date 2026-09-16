@@ -9,7 +9,8 @@ Linux box needs) belong in `docs/DEV_ENVIRONMENT.md`, not here.
 
 The tree outranks this file — if they disagree, the tree is right and this file needs fixing, not
 the other way around. Where this file and any chapter's `SPEC.md` disagree (`docs/v1/`,
-`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`, `docs/v1.4/`, `docs/v1.5/`, `docs/v1.6/`, `docs/v1.7/`),
+`docs/v1.1/`, `docs/v1.2/`, `docs/v1.3/`, `docs/v1.4/`, `docs/v1.5/`, `docs/v1.6/`, `docs/v1.7/`,
+`docs/v1.8/`),
 **this file is authoritative for behavior**: each `SPEC.md` records what that chapter was
 *specified* to be, phase by phase, kept as originally written rather than corrected to match later
 reality — see each chapter's own `README.md` for what those folders are and aren't.
@@ -942,7 +943,11 @@ cursor placed on the name itself matched nothing before this. The migration
 plus a `DROP`/`CREATE TABLE reference`, not an `ALTER TABLE ... ADD COLUMN` — a defaulted column
 would leave every pre-existing row claiming an identifier at byte 0, and since the fingerprint bump
 above rebuilds those rows at the next `Sync` regardless, a briefly *empty* cache beats one that is
-briefly *wrong*. See `internal/codegraph`, directly below, for what reads this range.
+briefly *wrong*. `reference.kind` is unconstrained `TEXT`, so P78's three new kinds (`field`,
+`receiver`, `embed`) needed no migration of their own — by construction, a new reference kind never
+does — and the new repo-authored query file that emits them flows into `meta.parser_fingerprint`
+automatically, since the fingerprint already hashes every query file's bytes. See
+`internal/codegraph`, directly below, for what reads this range.
 
 **`internal/codegraph` (C2) computes the code graph live over `codeindex.db`'s own rows — no edge
 table, ever.** `Graph` is built from a `*codeindex.Store` plus a `repo_id`, never from an `Index` —
@@ -975,7 +980,12 @@ unit and its one extra rule are per language family:
 | Rust | file, then directory | none |
 
 Stated plainly, the graph's own honest limits: two same-named methods on unrelated types are
-indistinguishable (no reference carries a receiver, no symbol carries a type); a Java/JavaScript
+indistinguishable for every language but Go — `queries/go/p78_method_sets.scm` stores a `receiver`
+reference per method declaration, and `resolve.go`'s own `sameReceiver` tiebreak demotes (never
+filters) a candidate method on a different receiver type, computed only when the reference site
+itself sits inside a Go method, and only after `filterTier` has already narrowed to the winning tier
+(cheaper: `sameReceiver` is read only by the ranking below, so computing it earlier would spend a
+full reference read per candidate outside the winning tier for nothing). A Java/JavaScript
 member call's stored reference range starts at the receiver, so a cursor placed before the method
 name still resolves through the wider node span rather than the identifier itself; a builtin or an
 external (`node_modules`) name resolves to nothing rather than erroring; and a same-name shadowing
@@ -987,7 +997,26 @@ per language because the stored evidence differs: Java, TypeScript, TSX, JavaScr
 recover an implementer by containment (the innermost enclosing symbol around an `implementation`
 reference elsewhere named the target, and the same rows read the other way for what a concrete type
 itself declares); Rust has no containing symbol to recover at all, so every matching reference *is*
-the impl block's own location, reported directly; Go returns nothing (Known open items, below).
+the impl block's own location, reported directly; Go is answered structurally, by method set (P78),
+since Go has no `implements` keyword to recover in the first place:
+
+- `methodSet(ctx, typeName, depth)` (`internal/codegraph/methodsets.go`) assembles a type's methods
+  from ordinary stored rows and walks embedding (a struct's embedded field, an interface's
+  `type_elem`) to a depth cap of **8**, with a cycle guard so mutual embedding terminates.
+- Candidate discovery is seeded by `rarestGoMethodName` — the wanted method with the fewest
+  `FindSymbolsByName` rows — an accepted bounded-cost heuristic. A type that owns the seeded method
+  only through promotion is invisible to the forward search (Known open items, below).
+- Matching is **by method name only, never by signature**. Confidence is always `Scoped`; the rule
+  strings are `implementationsOf.goMethodSet` / `…goMethodSet.promoted`. No case claims `Exact`.
+- The reverse direction (`goInterfacesSatisfiedBy`) unions candidates over every name in the
+  concrete type's method set, not one rarest name — seeding from one name is sound only in the
+  forward direction, since an interface needs only a subset of the concrete type's methods.
+- A depth-cap/cycle-guard truncated result is not memoised: `methodSet` returns a `truncated` bool
+  threaded through every call site, and the memo write is gated on it, so a truncated answer never
+  poisons a later unrelated lookup.
+
+None of this added an edge table or a schema column — every query above stays a function over rows,
+evaluated fresh per call, per this section's own "no result cached across calls" rule above.
 
 A Vue/Svelte SFC's `<script setup>` block is an ordinary module for every one of these operations —
 a definition there has a `block_id` and participates in cross-file resolution exactly like a `.ts`
@@ -1288,11 +1317,37 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   `internal/repomap/render.go`'s own discipline that a `repoWide` guess must never read like a fact.
   One scheme-scoped `LanguageFilter` (`{ scheme: 'kira-repo', hasAccessToAllModels: true }`) covers
   every open repo-file/repo-diff model in every registered language plus plaintext.
-  `gotoLocation.multipleDefinitions` is `'goto'`, never Monaco's default `'peek'` — standalone
-  Monaco's peek preview resolves a candidate through `ITextModelService`, which in the standalone
-  build only finds already-created models, so a cross-file candidate with no open tab would render
-  an empty preview pane; `'goto'` jumps through the editor opener instead, which needs no model at
-  all, and the hover keeps every candidate honestly visible regardless.
+  `gotoLocation.multipleDefinitions` is `'goto'`, never Monaco's default `'peek'` — kept as a
+  deliberate preference (the hover already lists every candidate), not a workaround: standalone
+  Monaco's peek preview used to resolve a candidate through `ITextModelService`, which in the
+  standalone build only found already-created models, so a cross-file candidate with no open tab
+  rendered an empty preview pane (the real cause of a missing modifier-click underline and preview —
+  the click itself already worked, since the editor opener needs no model at all). P78 §1.4 closed
+  that gap: `views/repo/textModels.ts` installs a `kira-repo`-aware `ITextModelService` at Monaco
+  bootstrap, resolving a tab-owned URI through `mod.editor.getModel` and an unopened `kira-repo` URI
+  by reading the file over `codeWorkspaceReadFile` and routing it through the same
+  `getOrCreateModel` cache a later tab open reuses. `find-references` and `go-to-implementation`
+  both use it too, and both render through Monaco's own peek UI —
+  `gotoLocation.multipleReferences`/`multipleImplementations` are `'peek'` in both `RepoFileView.vue`
+  and `RepoDiffView.vue`, definitions alone stay `'goto'`.
+- **The preview-model registry is a capped LRU.** `textModels.ts` keeps at most `PREVIEW_MODEL_LIMIT`
+  (40) models created with no owning tab, refcounting live holders so an open peek's model is never
+  disposed under it (P79 review fix — the returned `dispose()` used to be a no-op); a preview
+  promoted into a real tab leaves the registry rather than being evicted.
+- **Both new providers** (`views/repo/navigation.ts`'s `registerReferenceProvider`/
+  `registerImplementationProvider`) **use the same scheme-scoped `LanguageFilter`** as the
+  definition/hover pair above. `codegraph.Site` gained a `Confidence` field so a bare `Location[]`
+  isn't the only thing crossing the wire; `internal/codeworkspace/nav.go` gained `References` and
+  `Implementations`, with `References` deliberately never early-returning on an empty `Sites` list
+  (`Total`/`Truncated`/`Unattributed` can carry a real reading even when every occurrence is
+  unattributed); `bridge/codeworkspace.go` exposes both, `Implementations` reusing
+  `CodeWorkspaceDefinitionArgs`. The three handlers' shared preamble —
+  `resolveQueryPoint`/`resolvePosition`, including the symlink-containment guard — is one pair of
+  helpers, not three copies; security-relevant, so worth knowing it lives in one place.
+- **The hover swaps its disclaimer for a Go receiver match.** Each target's `Rule`/`Confidence` is
+  still printed on every line, under a blanket *"Name-resolved, not type-resolved"* disclaimer —
+  except `navigation.ts` swaps that line for *"Receiver-matched (Go) — signatures are not
+  compared."* when every target resolved via `sameReceiver`.
 - **Model URIs are built with `Uri.from`, not string interpolation** (`views/repo/monaco.ts`,
   `kira-repo://<repoId>/<path>`) — the editor opener has to recover `(repoId, path)` from a `Uri`
   the other direction, and a path containing a space, `#`, `?` or `%` does not survive a plain
@@ -1409,7 +1464,9 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   update.go`'s `OpenReleasePage()` is nullary specifically because `OpenURL` (`pkg/application`)
   validates nothing at all, and a markdown file's own link is exactly as untrusted as any other
   renderer-supplied string; reversing that needs its own vetted bridge method (a scheme allow-list
-  at minimum), not a sub-feature of a reading view.
+  at minimum), not a sub-feature of a reading view. That method now exists (`bridge/link.go`,
+  "Renderer security surface" below) — the reading pane still deliberately does not use it, and
+  every anchor click here stays `preventDefault()`ed.
 - **No syntax highlighting inside a fenced code block** — `markdown-it`'s `highlight` hook plus
   Monaco's `editor.colorize()` would do it, but `colorize` is async per block and this is a reading
   view, not a second editor; a fenced block renders as themed monospace instead.
@@ -3034,7 +3091,7 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**46 methods**, `app.init` through `worktree.prepare`), `ContractVersion`, and the wire types |
+| `gitrpc` | The method table (**56 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion`, and the wire types |
 | `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
@@ -3216,12 +3273,37 @@ same blob-frame body shape (`blobFrame.ts`, shared by both), but no length prefi
 no drain loop — a Wails stream is message-framed already, so the machinery that exists solely to
 turn a byte stream back into frames is simply absent.
 
+**The mount is kept alive across a tab switch (P72).** `MainView.vue` wraps the view in a `KeepAlive`
+with an explicit `include` (`KEEP_ALIVE_VIEWS = ['RepoGraphView']`, never a blanket `KeepAlive`), so
+switching away and back keeps the computed lane layout, scroll position, loaded rows and session
+alive instead of tearing down git-ui's whole nested app — P72's fix for the graph fully reloading on
+every focus. `RepoGraphView.vue`'s `defineOptions({ name: 'RepoGraphView' })` is what makes `include`
+match at all. A backgrounded, `KeepAlive`'d graph must not keep paying for work nobody can see:
+`graphVisibility.ts` provides a per-mount `GRAPH_VISIBLE_KEY` that `CommitGrid.vue` reads, deferring
+a generation-bump rebuild (layout-worker output plus a SlickGrid column/row rebuild) until the grid
+is visible again — provided only at `main.ts`'s own `mount()`, so the VS Code host and this
+package's own tests are unaffected. This shape produced a regression worth naming, since it is
+exactly the kind of thing a future change re-opens: the same host resize used to be handled twice
+(synchronously by the `detailOpen` watcher, asynchronously by `ResizeObserver`), and the second pass
+could tear down and recreate row DOM mid-measurement. Fixed by a `lastRebuiltHostWidth` dedup plus
+keying the `KeepAlive` skip off the real `graphVisible` signal instead of inferring
+backgrounded-ness from a 0×0 read (`eab3047e`).
+
+Also worth noting here: PR ancestry is now rebuilt with a **base cutoff** (`state/pr.ts`'s
+`rebuildAncestry`) — each PR's `baseRef` is resolved locally through
+`packages/git-core/src/store/commitStore.ts`'s `rowOfBranchTip` (a decoration scan, no new RPC) and
+its ancestors excluded, so a PR badge no longer tags nearly the whole loaded history behind any PR
+branch. A burst of individually-resolving PR branches now coalesces into one ancestry rebuild per
+tick (`scheduleAncestryRebuild`'s `nextTick` drain) rather than one rebuild per branch. This is
+user-visible — which commits show a PR icon — not an internal tidy-up.
+
 **The write boundary is still three layers, and only one of them is load-bearing — P67e widened
 what layer one admits, not the shape of the boundary itself.** `allowedMethods` in `gitstream.go`
 (`readOnlyMethods` before P67e) is a default-deny **allowlist**, not a denylist: a method the
 allowlist has not named is refused with `E_READ_ONLY` before the shared router handler is ever
 called, so a future contract addition is refused by construction rather than admitted by omission.
-Of the 55 methods `internal/gitrpc`'s `Router.ForConn` dispatches, the allowlist now admits 52 —
+Of the 57 methods `internal/gitrpc`'s `Router.ForConn` dispatches (56 requests plus the one
+`graph.stream` stream method), the allowlist now admits 54 —
 every operation that writes through git itself (`op.run`'s kinds, the five `remote.run` kinds,
 every `preflight.*`/`remote.*Preflight`, `undo.run`, `stack.restack`/`cancelRestack`,
 `credential.provide`) alongside every pre-existing read and the nine `review.*` methods (below).
@@ -3348,6 +3430,14 @@ The git work these handlers do perform is read-only porcelain (`cat-file`, `merg
 --is-ancestor`, `diff`) — no `update-index`, no `write-tree`, no `commit-tree`, no ref update,
 anywhere in the path. This is the same shape as `repoSettings.set`'s own pre-existing exception: a
 name that says "write" whose writes land in Kira's own storage, never the user's repository.
+
+**"Open in graph" from a review row is a real host-answered request, not a webview escape hatch
+(P75).** It used to be a `command:` URI — a VS Code webview mechanism with no handler in Kira
+Studio's Wails webview at all. It is now `graph.revealCommit` (`{repoId, sha} -> {revealed}`),
+answered locally by both hosts (`repo/git/hostHandlers.ts` here, `proxyHandlers.ts`'s
+`revealCommitInGraph` in the extension) and never reaching the Go server — the same class as
+`review.open`, so it needs no `gitstream.go` allowlist entry. The status-bar blame item's click
+(below) reuses this exact request rather than adding a second one.
 `review.session.save`/`.load` are a separate case — not a Go method at all (`handlers.go` has no
 case for either; they resume the extension's own `context.workspaceState`, replaced here by
 `repo/git/reviewSession.ts`'s use of the pinned graph tab's own state, below) — so they stay
@@ -3376,7 +3466,26 @@ keeps it enabled, byte-identical. A comment thread opens as an `IViewZone` hosti
 `markUnreviewed` give the same gestures a context-menu entry and keybinding. `repo/git/transport.ts`
 fans a mutation's success out to every open review surface (`onReviewRepaint`) regardless of which
 half of the UI made the call, since the panel and the editor share one `Transport` per repo
-workspace.
+workspace. Three more P75 facts, each read off source:
+
+- **A comment thread's view zone carries `z-index: 10`** (`VIEW_ZONE_Z_INDEX`). Pinned
+  `monaco-editor@0.56.0` appends `.view-zones` before `.view-lines` inside `.lines-content`, and
+  `.view-lines` carries `position: absolute; z-index: auto` — a later positioned sibling at
+  `z-index: auto` loses every hit test to it, which is why the compose zone painted but was
+  unclickable. The same fix applies to the pre-existing error-banner zone's Retry button. `10` is
+  VS Code's own value for its view-zone widgets, and the compose zone's height is corrected once
+  after mount from a real `scrollHeight` measurement rather than left at its 120px starting guess.
+- **A fully-reviewed file's whole-line tint is skipped**: `paint()` guards on
+  `coverage({start: 1, end: lineCount}, reviewedRanges) === 'full'`, reusing the helper the per-hunk
+  branch beside it already calls. Per-hunk glyphs and the partial-review overview ruler are
+  unchanged. Both hosts share the guard (`reviewDecorations.ts` here, `reviewMarking.ts` in the
+  extension).
+- **The file tree's mark-reviewed control is a real `<input type="checkbox">`** with a genuine
+  `indeterminate` state for a partial review (its own codicon-dash glyph via the shared checkbox
+  theming, not a third colour on a two-state control), placed at the row's leading edge so the
+  whole tree keeps one aligned column. It is `click.prevent` — the server's answer
+  (`ReviewFilesState.mark`'s applied `result.review`) is the control's only state, so an optimistic
+  native toggle would contradict it for the round trip.
 
 **Session resume goes through the pinned graph tab, not a new mechanism.** The review panel is not
 a tab and so has no persisted state of its own; `repoGraphTabStateSchema` gains a second opaque
@@ -3397,47 +3506,63 @@ built: a user writes plain-text comments on lines, they render as gutter icons a
 
 ### Git blame, inline (P62)
 
-**Reuses v1.4 P5's backend outright — no Go change, no contract bump.** `blame.line` (one line per
-`git blame` spawn, working tree only, no `atSha`) already answers the extension's status-bar
-widget; `views/repo/blameAnnotation.ts` calls the identical method over the identical wire.
-`ContractVersion` stays 35 on both sides and `internal/bridge/gitstream.go`'s allowlist is
-unchanged — the only Go touched by this phase at all is `internal/storage/{model,repos}/
-settings.go`, for the unrelated reason below.
+**Reuses v1.4 P5's backend outright — no Go change, no contract bump for this phase.** `blame.line`
+(one line per `git blame` spawn, working tree only, no `atSha`) already answers the extension's
+status-bar widget; `views/repo/blameAnnotation.ts` calls the identical method over the identical
+wire. P62 itself bumped neither `ContractVersion` nor `gitstream.go`'s allowlist — the only Go
+touched by this phase at all is `internal/storage/{model,repos}/settings.go`, for the unrelated
+reason below. (Both moved later, for unrelated reasons: `ContractVersion` is 39 as of this chapter,
+and the allowlist gained `pr.browserUrl`, P74 §3.3.)
 
-**Where it surfaces, and why not the status bar.** The annotation renders as injected text at the
-end of the cursor's line in `views/repo/RepoFileView.vue` — the one native surface whose displayed
-bytes and `blame.line`'s answer are the same document by construction (the diff tabs compare
-historical revisions `blame.line` structurally can't answer for). The status bar was the extension's
-own surface for this, but `workbench/StatusBar.vue`'s own LAW 14 reserves its left readout for
-"where is the caret", never a fact about the line under it — porting the widget literally would
-mean breaking that law or wiring a per-view caret readout first, a separate, unrelated deliverable.
-Whole-file gutter blame (a GitLens-style column beside every line) is deliberately not built either:
-`blame.line` is one spawn per line, so a real implementation needs a new multi-hunk porcelain
-parser, a new `blame.file` method, and a `ContractVersion` bump — real backend work SPEC's own P62
-row states this phase does not do.
+**Where it surfaces — the status bar shipped too, just not the way this paragraph used to expect.**
+The annotation renders as injected text at the end of the cursor's line in
+`views/repo/RepoFileView.vue` — the one native surface whose displayed bytes and `blame.line`'s
+answer are the same document by construction (the diff tabs compare historical revisions
+`blame.line` structurally can't answer for). The status bar was the extension's own surface for
+this, and `workbench/StatusBar.vue`'s own LAW 14 reserves its left readout for "where is the caret,"
+never a fact about the line under it — P62 declined the status bar for that reason, porting it
+literally would have meant breaking LAW 14 or wiring a per-view caret readout first. P76 shipped it
+anyway, a third way this paragraph didn't anticipate: a **sibling** left-side item, not the caret
+readout — `StatusBar.vue`'s own comment says so in place ("a sibling fact, not the caret-status slot
+above — that readout stays unwired"). Whole-file gutter blame (a GitLens-style column beside every
+line) is still deliberately not built: `blame.line` is one spawn per line, so a real implementation
+needs a new multi-hunk porcelain parser, a new `blame.file` method, and a real `ContractVersion`
+bump.
 
-**The repo hold, and the request shape.** `blame.line` requires the calling connection to already
-hold the repository (`gitsession.Conn.Entry`'s own `alreadyHeld` check) — `blameAnnotation.ts`
-ensures this itself with a memoised `repo.open`, the same idempotent-per-`(connection, repoId)`
-call the pinned graph tab's own mount already relies on, so a file tab opened before the graph ever
-mounts still works. The request itself follows the extension's own shape: cursor-line trigger,
-150 ms debounce, dedupe on the line, a per-mount cache (sound here in a way a server-side cache
-isn't — the model is immutable for the life of the mount), and `repo.changed` invalidation. There is
-no dirty-buffer state to track (P5's `'dirty'` display state): this view is `readOnly`/`domReadOnly`
-and nothing in this app ever writes the model, so the buffer is always the saved file. Failure is
-always silence — an untracked path, a line past EOF, an aborted request all render nothing, matching
-the extension's own posture that this is, from the reader's vantage, an ordinary file.
+**The controller, the repo hold, and the request shape.** `views/repo/blameLine.ts` owns the
+`blame.line` request, debounce, dedupe, per-mount cache and cancellation (extracted out of
+`blameAnnotation.ts` by P76 §4, so the status-bar renderer could share one request instead of
+issuing its own); `blameAnnotation.ts` keeps only the Monaco decoration/hover/reveal-action
+rendering, driven by the controller. P79 batch E added a cap to the per-mount cache and clears
+`inFlight` on settle. `blame.line` requires the calling connection to already hold the repository
+(`gitsession.Conn.Entry`'s own `alreadyHeld` check) — the controller ensures this itself with a
+memoised `repo.open`, the same idempotent-per-`(connection, repoId)` call the pinned graph tab's own
+mount already relies on, so a file tab opened before the graph ever mounts still works. The request
+itself follows the extension's own shape: cursor-line trigger, 150 ms debounce, dedupe on the line,
+a per-mount cache (sound here in a way a server-side cache isn't — the model is immutable for the
+life of the mount), and `repo.changed` invalidation. There is no dirty-buffer state to track (P5's
+`'dirty'` display state): this view is `readOnly`/`domReadOnly` and nothing in this app ever writes
+the model, so the buffer is always the saved file. Failure is always silence — an untracked path, a
+line past EOF, an aborted request all render nothing, matching the extension's own posture that
+this is, from the reader's vantage, an ordinary file.
+
+**Two surfaces, one setting.** `RepoFileView.vue` creates the controller whenever `blameable`,
+regardless of `appearance.inlineBlame` — the setting attaches or detaches only the inline renderer,
+resolved even when it's off, so the status bar still has a fact to show. The status-bar item
+publishes through `state/blameStatus.ts`, an owner-token store mirroring `cacheStats.ts`/
+`appMetrics.ts` so `workbench/` never imports `views/repo/`. `blameable` gained a revision guard:
+`gitRepoId !== undefined && rev === null` — P74's revision-pinned `repo-file` tabs read through
+`file.read`, never the worktree, and `blame.line` only ever blames the working tree, so a pinned tab
+shows no blame at all rather than the wrong blame.
 
 **Click-through mirrors C11's own cold-mount race.** A context-menu action ("Open Blame Commit in
-Graph") reveals the blamed commit in the pinned graph tab — but a file tab can be active before that
-tab has ever mounted, the identical race `review.open`'s own handler already solves for the review
-sidebar. `hostHandlers.ts` gains a second pending-target map (`pendingBlameRevealByCodeRepoId`,
-alongside the existing `pendingReviewTargetByCodeRepoId`), consumed once by `RepoGraphView.vue`'s
-own mount as `MountOptions.pendingUiAction` — the same "bootstrap-island" seam G10 D19's palette
-commands already use. `transport.ts` gains one new export, `emitUiAction`, because the local event
-bus's `emit` function was previously reachable only from inside a `hostHandlers.ts` request handler
-(`review.open`'s own `emitLocal` closure) — `blameAnnotation.ts` is a Monaco-layer module, not a
-request handler, so it needed a way to reach the same per-repo-workspace local emitter from outside.
+Graph") and the status-bar item's own click both reveal the blamed commit in the pinned graph tab
+through `graph.revealCommit` (C11 §2.6, above) — but a file tab can be active before that tab has
+ever mounted, the identical race `review.open`'s own handler already solves for the review sidebar.
+`hostHandlers.ts` gains a second pending-target map (`pendingBlameRevealByCodeRepoId`, alongside the
+existing `pendingReviewTargetByCodeRepoId`), consumed once by `RepoGraphView.vue`'s own mount as
+`MountOptions.pendingUiAction` — the same "bootstrap-island" seam G10 D19's palette commands already
+use.
 
 **The date formatters moved to `@kira/git-core`.** `formatRelativeDate`/`formatAbsoluteDate` lived
 in `packages/git-ui/src/components/dateFormat.ts`, with a second copy in the extension's own
@@ -3448,8 +3573,9 @@ already eager here (`reviewDecorations.ts`'s own static import) — so both func
 `measureAbsoluteDateWidth`), and the extension's own `blameAge.ts` copy is deleted in favor of the
 same import. One function, one home, three callers.
 
-**A settings toggle, defaulted on.** `appearance.inlineBlame` gates the whole layer —
-`views/repo/RepoFileView.vue` watches it live, so toggling takes effect on an open tab immediately.
+**A settings toggle, defaulted on.** `appearance.inlineBlame` gates the inline renderer (the
+status-bar item is unaffected by it, above) — `views/repo/RepoFileView.vue` watches it live, so
+toggling takes effect on an open tab immediately.
 Settings, unlike the git backend above, genuinely are Go-persisted: `SettingsRepo` stores one row
 per leaf, typed through `internal/storage/model/settings.go`'s `AppearanceSettings`/
 `AppearancePatch` structs — a leaf with no Go counterpart would have its value silently discarded on
