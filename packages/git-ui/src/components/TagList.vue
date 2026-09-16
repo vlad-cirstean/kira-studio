@@ -26,6 +26,10 @@ const props = defineProps<{
   /** P77 §6.3: raises this tab's own cap by `REF_LIST_SECTION_CAP` for the current panel-open —
    *  `BranchPicker.vue` owns the `capSteps` state every tab's own button reaches through this. */
   showMore: () => void;
+  /** P77 §7.3: the roving-tabindex list's own "current" row id (`BranchPicker.vue`'s own
+   *  `activeRowId`) — every row binds `tabindex`/`data-row-id` off it; the actual key handling
+   *  lives in `BranchPicker.vue`, which owns the body every tab's rows render into. */
+  focusedRowId?: string;
 }>();
 
 const emit = defineEmits<(e: 'checked-out') => void>();
@@ -109,7 +113,13 @@ async function onRefMenuSelect(id: string): Promise<void> {
 <template>
   <div class="kv-branch-section" aria-label="Tags">
     <div class="kv-branch-section-title">Tags</div>
-    <div v-for="row in section.visible" :key="row.refname" class="kv-branch-row">
+    <div
+      v-for="row in section.visible"
+      :key="row.refname"
+      class="kv-branch-row"
+      :data-row-id="`tag:${row.refname}`"
+      :tabindex="focusedRowId === `tag:${row.refname}` ? 0 : -1"
+    >
       <KuiButton class="kui-row kv-branch-row-main" @click="checkout(row)">
         <span
           class="codicon codicon-tag"

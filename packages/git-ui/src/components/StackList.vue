@@ -42,6 +42,8 @@ const props = defineProps<{
    *  `stacks`/`orphans` share one `capSteps` key (`pickerModel.ts`'s own `capFor('stacks')`), so
    *  one button raises both. */
   showMore: () => void;
+  /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
+  focusedRowId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -104,6 +106,8 @@ async function removeFromStack(branch: string): Promise<void> {
         :key="row.name"
         class="kv-branch-row kv-stack-row"
         :style="{ paddingLeft: `calc(var(--kv-s-2) + ${row.depth} * var(--kv-s-4))` }"
+        :data-row-id="`stack:${row.name}`"
+        :tabindex="focusedRowId === `stack:${row.name}` ? 0 : -1"
       >
         <div class="kv-branch-row-main kv-stack-row-main">
           <span v-if="row.isHead" class="kv-stack-badge" v-kui-tooltip="'Current branch'">●</span>
@@ -163,7 +167,13 @@ async function removeFromStack(branch: string): Promise<void> {
       <div class="kv-stack-header">
         <span class="kv-stack-base">Needs attention</span>
       </div>
-      <div v-for="row in orphanRows()" :key="row.name" class="kv-branch-row kv-stack-row">
+      <div
+        v-for="row in orphanRows()"
+        :key="row.name"
+        class="kv-branch-row kv-stack-row"
+        :data-row-id="`orphan:${row.name}`"
+        :tabindex="focusedRowId === `orphan:${row.name}` ? 0 : -1"
+      >
         <div class="kv-branch-row-main kv-stack-row-main">
           <span class="kv-stack-label">{{ row.name }}</span>
           <span class="kv-stack-orphan-reason">{{ row.orphanReason }}</span>

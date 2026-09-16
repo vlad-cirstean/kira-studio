@@ -24,13 +24,16 @@ import type { KuiSegmentedOption } from '@kira/kira-ui';
 // precedent, for the same reason).
 // biome-ignore lint/style/useImportType: see above
 import {
+  enabledNeighbour,
+  firstEnabled,
   KuiButton,
   KuiPopoverPanel,
   KuiSearchInput,
   KuiSegmented,
   KuiTextInput,
+  type MenuItem,
 } from '@kira/kira-ui';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
@@ -43,6 +46,7 @@ import {
   buildPickerModel,
   type PickerInput,
   type PickerListKey,
+  type PickerModel,
   type PickerTab,
 } from './pickerModel.ts';
 import RowContextMenu from './RowContextMenu.vue';
@@ -140,8 +144,13 @@ const rootEl = ref<HTMLElement | null>(null);
 // G34 D5/D14: `KuiButton` now exposes `focus()` (the same escape hatch `KuiSearchInput` already
 // has), so the trigger is a real `KuiButton` instead of the raw `<button>` this used to need.
 const triggerEl = ref<InstanceType<typeof KuiButton> | null>(null);
+const filterEl = ref<InstanceType<typeof KuiSearchInput> | null>(null);
 const filter = ref('');
 const activeTab = ref<PickerTab>('branches');
+// P77 §7.3: the roving-tabindex list's own "current" row — `undefined` until the user presses an
+// arrow key, at which point `activeRowId` below still resolves it (falls back to the first
+// enabled row), so a fresh tab/query always has exactly one tabbable row.
+const focusedRowId = ref<string | undefined>(undefined);
 // P77 §6.3: one list's own step count for the current panel-open — reset on close and on a filter
 // change (a new query is a new list, §6.3's own words), never persisted.
 const capSteps = ref<Partial<Record<PickerListKey, number>>>({});
@@ -183,6 +192,102 @@ function showMore(key: PickerListKey): void {
 watch(filter, () => {
   capSteps.value = {};
 });
+
+// ---------------------------------------------------------------------------------------
+// §7.3: roving focus over the active tab's own rows, via `@kira/kira-ui`'s `enabledNeighbour`/
+// `firstEnabled` — the same wrap-around neighbour walk `KuiMenuList` uses. Those take
+// `MenuItem[]`; `model.rowIds` is the narrower `{id, disabled}[]` §9 already produces as a
+// by-product, so `toMenuItems` pads it with the fields neither function actually reads.
+// ---------------------------------------------------------------------------------------
+function toMenuItems(rowIds: PickerModel['rowIds']): MenuItem[] {
+  return rowIds.map((r) => ({
+    id: r.id,
+    label: '',
+    disabled: r.disabled,
+    disabledReason: undefined,
+  }));
+}
+
+function lastEnabled(items: readonly MenuItem[]): string | undefined {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
+    if (item && !item.disabled) return item.id;
+  }
+  return undefined;
+}
+
+/** The row every tab's rows currently treat as "current" for `tabindex` purposes — resolves to
+ *  the first enabled row whenever `focusedRowId` is unset or belongs to a row set the active tab/
+ *  filter has since replaced (every row id is prefixed by kind, so a stale id from another tab can
+ *  never collide with a real one in the new set — no explicit reset needed on tab/filter change). */
+const activeRowId = computed<string | undefined>(() => {
+  const items = toMenuItems(model.value.rowIds);
+  if (focusedRowId.value !== undefined && items.some((item) => item.id === focusedRowId.value)) {
+    return focusedRowId.value;
+  }
+  return firstEnabled(items);
+});
+
+async function focusRow(id: string | undefined): Promise<void> {
+  if (id === undefined) return;
+  await nextTick();
+  rootEl.value?.querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)?.focus();
+}
+
+/** §7.2: `ArrowDown` from the filter box moves into the list — the same route
+ *  `KuiSearchInput.vue`'s own forwarded `keydown` emit exists for. */
+function onFilterKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'ArrowDown') return;
+  const items = toMenuItems(model.value.rowIds);
+  if (items.length === 0) return;
+  event.preventDefault();
+  focusedRowId.value = firstEnabled(items);
+  void focusRow(focusedRowId.value);
+}
+
+/** §7.3: `ArrowDown`/`ArrowUp` step through the active tab's rows (`ArrowUp` from the first row
+ *  returns to the filter); `Home`/`End` jump to the ends; `Enter` runs the focused row's own main
+ *  action where it has one (`.kv-branch-row-main` is a `<button>` for branch/tag/stash rows and a
+ *  plain, unclickable `<div>` for worktree/stack rows — one selector does both without a per-kind
+ *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons. */
+function onRowsKeydown(event: KeyboardEvent): void {
+  const rowEl = (event.target as HTMLElement).closest<HTMLElement>('.kv-branch-row[data-row-id]');
+  if (rowEl === null) return;
+  const items = toMenuItems(model.value.rowIds);
+  const currentId = rowEl.dataset.rowId;
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      focusedRowId.value = enabledNeighbour(items, currentId, 1);
+      void focusRow(focusedRowId.value);
+      return;
+    case 'ArrowUp':
+      event.preventDefault();
+      if (currentId === firstEnabled(items)) {
+        filterEl.value?.focus();
+        return;
+      }
+      focusedRowId.value = enabledNeighbour(items, currentId, -1);
+      void focusRow(focusedRowId.value);
+      return;
+    case 'Home':
+      event.preventDefault();
+      focusedRowId.value = firstEnabled(items);
+      void focusRow(focusedRowId.value);
+      return;
+    case 'End':
+      event.preventDefault();
+      focusedRowId.value = lastEnabled(items);
+      void focusRow(focusedRowId.value);
+      return;
+    case 'Enter':
+      rowEl.querySelector<HTMLElement>('.kv-branch-row-main')?.click();
+      return;
+    default:
+      return;
+  }
+}
 
 const tabOptions = computed<readonly KuiSegmentedOption[]>(() => [
   {
@@ -238,6 +343,9 @@ function toggle(): void {
 function open(tab?: PickerTab): void {
   if (tab !== undefined) activeTab.value = tab;
   isOpen.value = true;
+  // §7.2: both entry points (this picker's own trigger click and `runUiAction`'s palette route,
+  // §13) go through `open()`, so the filter is focused on the next tick either way.
+  void nextTick(() => filterEl.value?.focus());
 }
 defineExpose({ open });
 
@@ -484,13 +592,19 @@ onBeforeUnmount(() => {
         @update:model-value="(id) => (activeTab = id as PickerTab)"
       />
       <KuiSearchInput
+        ref="filterEl"
         class="kv-branch-filter"
         v-model="filter"
         :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
         :ariaLabel="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
+        @keydown="onFilterKeydown"
       />
 
-      <div class="kv-branch-panel-scroll" :aria-label="TAB_LABELS[activeTab]">
+      <div
+        class="kv-branch-panel-scroll"
+        :aria-label="TAB_LABELS[activeTab]"
+        @keydown="onRowsKeydown"
+      >
         <template v-if="activeTab === 'branches'">
         <div class="kv-branch-section" aria-label="Branches">
           <div class="kv-branch-section-title">Branches</div>
@@ -499,6 +613,8 @@ onBeforeUnmount(() => {
             :key="row.refname"
             class="kv-branch-row"
             :class="{ 'kv-branch-row--current': row.isHead }"
+            :data-row-id="`branch:${row.refname}`"
+            :tabindex="activeRowId === `branch:${row.refname}` ? 0 : -1"
           >
             <template v-if="renaming?.name === row.shortName">
               <KuiTextInput
@@ -572,7 +688,13 @@ onBeforeUnmount(() => {
 
         <div class="kv-branch-section" aria-label="Remote branches">
           <div class="kv-branch-section-title">Remote branches</div>
-          <div v-for="row in model.branchesRemote.visible" :key="row.refname" class="kv-branch-row">
+          <div
+            v-for="row in model.branchesRemote.visible"
+            :key="row.refname"
+            class="kv-branch-row"
+            :data-row-id="`remote:${row.refname}`"
+            :tabindex="activeRowId === `remote:${row.refname}` ? 0 : -1"
+          >
             <KuiButton class="kui-row kv-branch-row-main" icon="codicon-cloud" @click="checkoutRemote(row)">
               <span class="kv-branch-row-name">{{ row.shortName }}</span>
               <span class="kv-branch-remote-action">{{ remoteCheckoutLabel(row, refs.branches.value) }}</span>
@@ -609,6 +731,7 @@ onBeforeUnmount(() => {
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :write-capability="writeCapability"
           :show-more="() => showMore('tags')"
+          :focused-row-id="activeRowId"
           @checked-out="close"
         />
 
@@ -621,6 +744,7 @@ onBeforeUnmount(() => {
           :current-branch="refs.currentBranchName.value ?? null"
           :write-capability="writeCapability"
           :show-more="() => showMore('stashStack')"
+          :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
         />
@@ -633,6 +757,7 @@ onBeforeUnmount(() => {
           :current-branch="refs.currentBranchName.value ?? null"
           :write-capability="writeCapability"
           :show-more="() => showMore('stashGlobal')"
+          :focused-row-id="activeRowId"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-global-stash="emit('saveGlobalStash')"
         />
@@ -646,6 +771,7 @@ onBeforeUnmount(() => {
           :open-worktree-window-capability="openWorktreeWindowCapability"
           :write-capability="writeCapability"
           :show-more="() => showMore('worktrees')"
+          :focused-row-id="activeRowId"
           @switch-worktree="(path) => emit('switchWorktree', path)"
           @open-worktree-window="(path) => emit('openWorktreeWindow', path)"
           @create-worktree="emit('createWorktree')"
@@ -661,6 +787,7 @@ onBeforeUnmount(() => {
           :open-external-capability="openExternalCapability"
           :open-pull-request="openPullRequest"
           :show-more="() => showMore('stacks')"
+          :focused-row-id="activeRowId"
           @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
           @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />

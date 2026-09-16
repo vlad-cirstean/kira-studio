@@ -38,6 +38,8 @@ const props = defineProps<{
   writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
   showMore: () => void;
+  /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
+  focusedRowId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -126,7 +128,13 @@ async function confirmRemove(): Promise<void> {
         Create Worktree…
       </KuiButton>
     </div>
-    <div v-for="entry in section.visible" :key="entry.path" class="kv-branch-row">
+    <div
+      v-for="entry in section.visible"
+      :key="entry.path"
+      class="kv-branch-row"
+      :data-row-id="`worktree:${entry.path}`"
+      :tabindex="focusedRowId === `worktree:${entry.path}` ? 0 : -1"
+    >
       <div class="kv-branch-row-main kv-worktree-row-main">
         <span v-if="entry.isCurrent" class="kv-worktree-badge" v-kui-tooltip="'This window'">●</span>
         <span v-if="entry.isMain" class="kv-worktree-badge" v-kui-tooltip="'Main worktree'">M</span>

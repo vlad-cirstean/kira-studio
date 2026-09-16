@@ -42,6 +42,8 @@ const props = defineProps<{
   writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
   showMore: () => void;
+  /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
+  focusedRowId?: string;
 }>();
 
 /** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
@@ -115,6 +117,8 @@ async function onMenuSelect(id: string): Promise<void> {
       class="kv-branch-row"
       :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
       v-kui-tooltip="`Base: ${entry.baseSha.slice(0, 7)} ${entry.baseSubject}`"
+      :data-row-id="`stash:${entry.sha}`"
+      :tabindex="focusedRowId === `stash:${entry.sha}` ? 0 : -1"
     >
       <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
         <span class="kv-stash-index">{{ "stash@{" + entry.index + "}" }}</span>

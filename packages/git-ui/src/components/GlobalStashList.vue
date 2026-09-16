@@ -35,6 +35,8 @@ const props = defineProps<{
   writeCapability: boolean;
   /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
   showMore: () => void;
+  /** P77 §7.3 — see `TagList.vue`'s own doc comment on this prop. */
+  focusedRowId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -107,6 +109,8 @@ async function onMenuSelect(id: string): Promise<void> {
       :key="entry.sha"
       class="kv-branch-row"
       :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
+      :data-row-id="`global:${entry.sha}`"
+      :tabindex="focusedRowId === `global:${entry.sha}` ? 0 : -1"
     >
       <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
         <span
