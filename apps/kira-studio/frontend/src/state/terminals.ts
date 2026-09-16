@@ -146,8 +146,13 @@ export function resizeTerminal(tabId: string, cols: number, rows: number): void 
 }
 
 /** dropResources' own target (state/tabKinds.ts) — kills the pty and drops every trace of this
- *  tab's session, including anything still queued in the drain. */
+ *  tab's session, including anything still queued in the drain. `dropPageStoresForTab` blind-calls
+ *  every registered kind's own dropper on every tab close (state/tabs.ts), so a non-terminal tab
+ *  id reaches this too — the no-op-miss guard below is what makes that safe, the same contract
+ *  every other kind's dropResources (e.g. views/repo/editors.ts's dropRepoFileTab) already follows.
+ *  Without it, closing any tab of any kind fired a needless TerminalService.Close round trip. */
 export function closeTerminalSession(tabId: string): void {
+  if (!byTabId.has(tabId)) return;
   byTabId.delete(tabId);
   sinks.delete(tabId);
   drainByTabId.delete(tabId);
