@@ -104,3 +104,65 @@ export function sortIndicators(page: Page): Locator {
 export function nullMarker(cell: Locator): Locator {
   return cell.locator(':scope.cell-null, :scope .cell-null');
 }
+
+/** P81 §7.2. `viewport.scrollTop += deltaPx`, then count the DOM mutations (`childList` +
+ *  `subtree` + `attributes`) that follow. Waits for actual quiescence first — no MutationObserver
+ *  records across `quietFrames` consecutive animation frames (default 6, `slick-grid.spec.ts`'s
+ *  own §3a convergence horizon) — rather than a fixed sleep, since a scroll into never-rendered
+ *  territory converges over several self-scheduled catch-up renders (`kiraSlickGrid.ts`'s re-arming
+ *  chase loop), not instantly. The quiet wait and the measurement live in one `page.evaluate`, so
+ *  no round trip between them can let a catch-up render slip in unobserved.
+ *
+ *  Throws (via the in-page `Promise` rejecting) if the grid never goes quiet within `timeoutMs`
+ *  (default 10_000) — a real hang, not a false "zero mutations" pass. */
+export function mutationsForScroll(
+  viewport: Locator,
+  deltaPx: number,
+  opts?: { quietFrames?: number; timeoutMs?: number },
+): Promise<number> {
+  const quietFrames = opts?.quietFrames ?? 6;
+  const timeoutMs = opts?.timeoutMs ?? 10_000;
+  return viewport.evaluate(
+    async (el, { deltaPx, quietFrames, timeoutMs }) => {
+      const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      // 1. Wait for quiet: no mutation records across `quietFrames` consecutive frames.
+      await new Promise<void>((resolve, reject) => {
+        const deadline = Date.now() + timeoutMs;
+        let clean = 0;
+        const settleObserver = new MutationObserver(() => {
+          clean = 0;
+        });
+        settleObserver.observe(el, { childList: true, subtree: true, attributes: true });
+        const tick = () => {
+          if (clean >= quietFrames) {
+            settleObserver.disconnect();
+            resolve();
+            return;
+          }
+          if (Date.now() > deadline) {
+            settleObserver.disconnect();
+            reject(new Error(`mutationsForScroll: grid never went quiet within ${timeoutMs}ms`));
+            return;
+          }
+          clean += 1;
+          void frame().then(tick);
+        };
+        void frame().then(tick);
+      });
+
+      // 2. Arm a fresh observer, scroll, measure across two frames.
+      let count = 0;
+      const measureObserver = new MutationObserver((records) => {
+        count += records.length;
+      });
+      measureObserver.observe(el, { childList: true, subtree: true, attributes: true });
+      el.scrollTop += deltaPx;
+      await frame();
+      await frame();
+      measureObserver.disconnect();
+      return count;
+    },
+    { deltaPx, quietFrames, timeoutMs },
+  );
+}

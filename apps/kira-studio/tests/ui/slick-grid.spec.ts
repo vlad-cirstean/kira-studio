@@ -2,7 +2,7 @@ import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
-import { cellNavButton, gridCell, gridRow, gridScroller } from './support/grid';
+import { cellNavButton, gridCell, gridRow, gridScroller, mutationsForScroll } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
   APP_CHILDREN,
@@ -421,34 +421,16 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   expect(afterScrollRows).toBeLessThan(200);
 
   // --- 3. sub-row scroll -> zero DOM mutations; a scroll past the whole runway -> some -----------
+  // P81 §4: `mutationsForScroll` waits for the grid to actually go quiet (no mutation records
+  // across 6 consecutive frames) before arming the measurement observer, in one page.evaluate —
+  // a fixed sleep here raced the same multi-frame convergence §3a below proves takes ~10 frames.
   await rightViewport(page).evaluate((el) => {
     el.scrollTop = 5000; // an ordinary mid-scroll position, away from either end
   });
-  await page.waitForTimeout(300);
-  const subRowMutations = await rightViewport(page).evaluate(async (el) => {
-    let count = 0;
-    const observer = new MutationObserver((records) => {
-      count += records.length;
-    });
-    observer.observe(el, { childList: true, subtree: true, attributes: true });
-    el.scrollTop += 4; // well under a 28px row
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    observer.disconnect();
-    return count;
-  });
+  const subRowMutations = await mutationsForScroll(rightViewport(page), 4); // well under a 28px row
   expect(subRowMutations).toBe(0);
 
-  const crossRowMutations = await rightViewport(page).evaluate(async (el) => {
-    let count = 0;
-    const observer = new MutationObserver((records) => {
-      count += records.length;
-    });
-    observer.observe(el, { childList: true, subtree: true, attributes: true });
-    el.scrollTop += 3000; // far past the whole runway on either side
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    observer.disconnect();
-    return count;
-  });
+  const crossRowMutations = await mutationsForScroll(rightViewport(page), 3000); // past the runway
   expect(crossRowMutations).toBeGreaterThan(0);
 
   // --- 3a. the render batch converges over frames, not in one jump (P22 iter2-scroll-gaps D4) -----
@@ -501,26 +483,33 @@ test("SlickGrid spike — §7.4(a)'s eight sandbox-provable exit criteria", asyn
   // SlickGrid page and compare it to itself. The real invariant this was standing in for — the
   // mounted row band must cover at least the viewport's own visible height, with no gap a user
   // could scroll into and see blank rows — is asserted directly instead.
-  await page.waitForTimeout(100);
-  const slickBand = await page.evaluate(() => {
-    const els = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        '[data-testid="data-grid"] .grid-canvas-top.grid-canvas-right .slick-row',
-      ),
-    );
-    let top = Number.POSITIVE_INFINITY;
-    let bottom = Number.NEGATIVE_INFINITY;
-    for (const el of els) {
-      if (el.offsetTop < top) top = el.offsetTop;
-      const end = el.offsetTop + el.offsetHeight;
-      if (end > bottom) bottom = end;
-    }
-    return { top, bottom, rows: els.length };
-  });
-  expect(slickBand.rows).toBeGreaterThan(0);
-  const slickCoveragePx = slickBand.bottom - slickBand.top;
+  // P81 §4.5: was a fixed `waitForTimeout(100)` ahead of a one-shot lower-bound assertion — an
+  // unfinished catch-up render (same convergence §3a proves takes ~10 frames) makes the band too
+  // short under load. `expect.poll` on the coverage measurement itself is the idiomatic Playwright
+  // answer for a lower bound after a settle; the bound stays exactly what it was.
+  const slickBand = () =>
+    page.evaluate(() => {
+      const els = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-testid="data-grid"] .grid-canvas-top.grid-canvas-right .slick-row',
+        ),
+      );
+      let top = Number.POSITIVE_INFINITY;
+      let bottom = Number.NEGATIVE_INFINITY;
+      for (const el of els) {
+        if (el.offsetTop < top) top = el.offsetTop;
+        const end = el.offsetTop + el.offsetHeight;
+        if (end > bottom) bottom = end;
+      }
+      return { top, bottom, rows: els.length };
+    });
   const viewportHeightPx = await rightViewport(page).evaluate((el) => el.clientHeight);
-  expect(slickCoveragePx).toBeGreaterThanOrEqual(viewportHeightPx);
+  await expect
+    .poll(async () => {
+      const band = await slickBand();
+      return band.rows > 0 ? band.bottom - band.top : Number.NEGATIVE_INFINITY;
+    })
+    .toBeGreaterThanOrEqual(viewportHeightPx);
 
   // --- 6. tab-close teardown (D3's own three-part assertion) — the one item this brief singled out
   const { window: teardownPage } = await relaunch({ control: CONTROL, stream: PORT });
