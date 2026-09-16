@@ -57,10 +57,12 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "appearance.wordWrap", &result.Appearance.WordWrap)
 	leaf(stored, "appearance.rowColoring", &result.Appearance.RowColoring)
 	leaf(stored, "appearance.inlineBlame", &result.Appearance.InlineBlame)
+	leafValid(stored, "appearance.dateFormat", &result.Appearance.DateFormat, model.ValidDateFormat)
 	leafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
 	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, model.InRange(8, 1024))
 	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, model.InRange(1, 365))
 	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, model.InRange(1_000, 1_000_000_000))
+	leafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, model.ValidLogLevel)
 	leaf(stored, "git.protectedBranches", &result.Git.ProtectedBranches)
 	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
 	leaf(stored, "git.path", &result.Git.GitPath)
@@ -113,6 +115,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 				return model.Settings{}, err
 			}
 		}
+		if a.DateFormat != nil {
+			if err := upsertSettingsLeaf(tx, "appearance.dateFormat", *a.DateFormat); err != nil {
+				return model.Settings{}, err
+			}
+		}
 	}
 	if d := patch.Data; d != nil && d.DefaultPageSize != nil {
 		if err := upsertSettingsLeaf(tx, "data.defaultPageSize", *d.DefaultPageSize); err != nil {
@@ -132,6 +139,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if a.ExpensiveQueryRows != nil {
 			if err := upsertSettingsLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.GitLogLevel != nil {
+			if err := upsertSettingsLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
 				return model.Settings{}, err
 			}
 		}
