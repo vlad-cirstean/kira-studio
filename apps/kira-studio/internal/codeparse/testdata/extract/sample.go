@@ -125,3 +125,39 @@ func m1cAnonStruct() {
 	}
 	_ = m1cLocalStruct{X: 1}
 }
+
+// P78: method-set captures (docs/v1.8/plans/P78-code-navigation.md §3.1/§11.1) — a pointer, a
+// value and a generic receiver; a two-method interface; an interface embedding another; a struct
+// embedding a plain and a pointer type. Prefixed p78 per the fixture's own naming rule (§11.1) —
+// this fixture is indexed alongside the rest of the repository by the live MCP server, and a
+// colliding name would poison find_references.
+type p78Value struct{}
+
+func (v p78Value) ValueMethod() {}
+
+type p78Ptr struct{}
+
+func (p *p78Ptr) PtrMethod() {}
+
+type p78Box[T any] struct{ v T }
+
+func (b *p78Box[T]) GenericMethod() {}
+
+type p78Reader interface {
+	Read() string
+	Close() error
+}
+
+type p78ReadCloser interface {
+	p78Reader
+	Extra() int
+}
+
+type p78Animal struct{}
+
+func (p78Animal) Speak() string { return "" }
+
+type p78Dog struct {
+	p78Animal
+	*p78Ptr
+}

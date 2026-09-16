@@ -290,6 +290,12 @@ func TestExtractGoldenFixtures(t *testing.T) {
 			id: Go, file: "testdata/extract/sample.go",
 			syms: []symRow{
 				{"type", "Greeter", -1},
+				// P78 (docs/v1.8/plans/P78-code-navigation.md §3.1/§4.1): Greeter's own method_elem,
+				// previously invisible — parented to Greeter (index 0) the same way Java's vendored
+				// query already parents an interface method. Not a p78-prefixed fixture addition:
+				// this is the pre-existing Greeter interface gaining a row it never had, the same
+				// general capture p78Reader/p78ReadCloser below also exercise.
+				{"method", "Greet", 0},
 				{"type", "Person", -1},
 				{"method", "Greet", -1},
 				{"function", "helper", -1},
@@ -308,9 +314,11 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "p67fSampleContainer", -1},
 				// M1c (docs/v1.7/plans/M1c-repomap-struct-field-fix.md §4.2): the struct's own two
 				// fields, invisible before m1c_fields.scm — parented to p67fSampleContainer (index
-				// 16) via ordinary range containment, same as any other nested symbol.
-				{"field", "m", 16},
-				{"field", "items", 16},
+				// 17, shifted by one from M1c's own comment since P78's new Greeter.Greet row above
+				// inserted ahead of it) via ordinary range containment, same as any other nested
+				// symbol.
+				{"field", "m", 17},
+				{"field", "items", 17},
 				{"variable", "p67fSampleContainerVal", -1},
 				{"function", "p67fHelperReads", -1},
 				{"variable", "p69bArg", -1},
@@ -326,19 +334,45 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				// m1cLocalStruct itself still earns the pre-existing, unrelated "type" row every
 				// type_spec earns regardless of nesting).
 				{"type", "m1cStruct", -1},
-				{"field", "M1cExported", 26},
-				{"field", "m1cUnexported", 26},
+				{"field", "M1cExported", 27},
+				{"field", "m1cUnexported", 27},
 				{"method", "M1cMethod", -1},
 				{"variable", "m1cStructVal", -1},
 				{"function", "m1cHelperReads", -1},
 				{"function", "m1cAnonStruct", -1},
-				{"type", "m1cLocalStruct", 32},
+				{"type", "m1cLocalStruct", 33},
+				// P78 §11.1: a pointer, a value and a generic receiver (methodsets.go's own
+				// receiverTypeOf reads exactly this shape); a two-method interface and one embedding
+				// it (interface_type's own method_elem/type_elem, §2.2/§3.1); a struct embedding both
+				// a plain and a pointer type (§2.3) — each embedded type earns its own "field" symbol
+				// row (M1c's documented gap, closed by p78_method_sets.scm's second pattern) parented
+				// to p78Dog (index 49) exactly like any other field.
+				{"type", "p78Value", -1},
+				{"method", "ValueMethod", -1},
+				{"type", "p78Ptr", -1},
+				{"method", "PtrMethod", -1},
+				{"type", "p78Box", -1},
+				{"field", "v", 39},
+				{"method", "GenericMethod", -1},
+				{"type", "p78Reader", -1},
+				{"method", "Read", 42},
+				{"method", "Close", 42},
+				{"type", "p78ReadCloser", -1},
+				{"method", "Extra", 45},
+				{"type", "p78Animal", -1},
+				{"method", "Speak", -1},
+				{"type", "p78Dog", -1},
+				{"field", "p78Animal", 49},
+				{"field", "p78Ptr", 49},
 			},
 			refs: []refRow{
 				{"type", "Greeter"},
 				{"type", "string"},
 				{"type", "Person"},
-				{"type", "Person"},
+				// P78 §3.2: previously a second, duplicate {"type","Person"} at this identical name
+				// range — the receiver's own type identifier, now labelled "receiver" instead
+				// (dropDuplicateNameRangeRefs' own generalization of M1c's call-vs-field dedupe).
+				{"receiver", "Person"},
 				{"type", "string"},
 				{"call", "helper"},
 				{"type", "string"},
@@ -387,7 +421,8 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "m1cStruct"},
 				{"type", "int"},
 				{"type", "int"},
-				{"type", "m1cStruct"},
+				// P78 §3.2: M1cMethod's own receiver, the same duplicate-row fix as Person's above.
+				{"receiver", "m1cStruct"},
 				{"type", "int"},
 				{"field", "M1cExported"},
 				{"type", "m1cStruct"},
@@ -399,6 +434,35 @@ func TestExtractGoldenFixtures(t *testing.T) {
 				{"type", "m1cLocalStruct"},
 				{"type", "int"},
 				{"type", "m1cLocalStruct"},
+				// P78 §11.1: p78Value/p78Ptr/p78Box's own declaration-self "type" row plus their
+				// receiver's "receiver" row (§3.2's dedupe, same as Person/m1cStruct above); p78Box's
+				// own type parameter ("any", "T" — ordinary pre-existing "type" captures, incidental
+				// to a generic declaration); p78Reader's two method return types; p78ReadCloser's own
+				// "embed" row for embedding p78Reader (§3.1's interface type_elem pattern); p78Animal's
+				// blank-name receiver (still captured — a receiver reference needs no receiver
+				// variable name, only the type); p78Dog's own two "embed" rows for its plain and
+				// pointer embedded types (§2.3, §3.1's struct field_declaration pattern).
+				{"type", "p78Value"},
+				{"receiver", "p78Value"},
+				{"type", "p78Ptr"},
+				{"receiver", "p78Ptr"},
+				{"type", "p78Box"},
+				{"type", "any"},
+				{"type", "T"},
+				{"receiver", "p78Box"},
+				{"type", "T"},
+				{"type", "p78Reader"},
+				{"type", "string"},
+				{"type", "error"},
+				{"type", "p78ReadCloser"},
+				{"embed", "p78Reader"},
+				{"type", "int"},
+				{"type", "p78Animal"},
+				{"receiver", "p78Animal"},
+				{"type", "string"},
+				{"type", "p78Dog"},
+				{"embed", "p78Animal"},
+				{"embed", "p78Ptr"},
 			},
 		},
 		{
