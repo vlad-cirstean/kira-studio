@@ -854,6 +854,53 @@ Biome does not check `.md` files (confirmed — reports them ignored), so not re
 each doc read start to finish for internal consistency instead. `git diff 5f074684..HEAD --stat`
 touches exactly the four named files, nothing else.
 
+## P81 result
+
+Landed per plan (`docs/v1.8/plans/P81-fix-flaky-ui-tests.md`, `ff83352b`), 5 commits (`3b36715e`..
+`3bc9197b`). All 4 main flakes fixed, plus 3 folded-in siblings found during planning/fixing. No
+assertion loosened anywhere — every fix tightens to a real condition instead of a longer timeout,
+per the plan's own explicit constraint.
+
+**`cell-editor.spec.ts`** (`3b36715e`) — scenario 11's `elapsed < 250ms` timing assertion replaced
+with a structural check: a marker attribute on the Monaco root proves instance reuse across a cell
+switch. Scoped the editor-text read to the encoded pane specifically, not the file's panel-wide
+helper — row 3's base64 fixture opens a second MonacoHost (decoded pane), which made the panel-wide
+locator strict-mode-ambiguous.
+
+**`grpc-request.spec.ts`** (`aed80b26`) — the 150ms schema-load debounce now driven by
+`page.clock.runFor()` via a new `support/clock.ts` helper, installed after app boot. `page.clock
+.install()` alone doesn't freeze time (confirmed empirically — real time still elapsed pre-`runFor`);
+`pauseAt(Date.now())` also failed (CDP round-trip staleness racing into the past), fixed with a
+`Date.now() + 10_000` forward buffer, documented in the helper itself.
+
+**`slick-grid.spec.ts`** (`a433bba9`) — sub-row/cross-row mutation counts now wait for DOM-mutation
+quiescence (N consecutive quiet animation frames, `mutationsForScroll()` in `support/grid.ts`)
+instead of a fixed `waitForTimeout(300)`. Reverting to the old fixed-wait shape reproduced the flake
+(2/3 runs failed); the quiescence version held 3/3. Folded-in sibling at line 504
+(`waitForTimeout`→`expect.poll`) converted as planned — didn't reproduce a failure in this sandbox,
+reported as such rather than a fabricated mutation-test result; still strictly better since it polls
+a real condition.
+
+**`commit-meta-clamp.spec.ts`** (`53453fa3`, vscode webview) — root cause reproduced first:
+concurrent `startCommitMetaHarnessServer()` calls under `fullyParallel: true` raced into a shared
+on-disk `dist/`, one worker's `emptyOutDir` wiping files another worker's page was mid-load on.
+Fixed by building with `write: false` and serving from an in-memory `Map`, eliminating the shared
+resource rather than partitioning or serializing it. Build result typed as `Rolldown.RolldownOutput`
+— this repo's Vite 8.3.0 is rolldown-based, no `RollupOutput` export exists.
+
+**`http-curl.spec.ts` + `mode-switch.spec.ts`** (`3bc9197b`) — same fake-clock treatment as the gRPC
+fix, applied to the 400ms curl-preview and 150ms mode-write debounces.
+
+Every fix mutation-tested (a deliberate regression that should make the rewritten assertion fail,
+confirmed failing, then reverted) except the line-504 sibling, honestly reported as not reproducing.
+
+Verification: `bun run typecheck` clean. `bun run test:ui` 3 full runs (272/276, 274/275, 278/279) —
+every remaining failure pre-existing and unrelated (`api-ui-consistency.spec.ts:484`,
+`interaction.spec.ts:1144`, `slick-grid.spec.ts:1529`, `budgets.spec.ts`'s wall-clock perf tripwire),
+none touching the 5 rewritten tests. Targeted `--repeat-each=10` on those 5: 50/50 passed.
+`bun run test:webview` 3 full runs, 45/45 every time, all 7 `commit-meta-clamp.spec.ts` tests
+included. `git status --porcelain` clean; no `playwright.config.ts` touched in either app.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
