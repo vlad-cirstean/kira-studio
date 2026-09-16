@@ -279,9 +279,21 @@ export class PrState {
    *  once per rendered row. `store` is an explicit argument (this class holds no `CommitStore` of
    *  its own, only `bridge` — the same deviation `ensureSnapshot`'s own doc comment already
    *  documents, for the same reason: `PrState` has no other way to reach one). Called by
-   *  `CommitGrid.vue`'s existing `pr.generation` watcher, before its own `invalidateRowHeights` —
-   *  never a separate watcher, so a PR resolution and the ancestry it feeds always land in the
-   *  same render pass.
+   *  `CommitGrid.vue`'s existing `pr.generation`/`graphView.generation` triggers, before its own
+   *  `invalidateRowHeights` — never a separate watcher, so a PR resolution and the ancestry it
+   *  feeds always land in the same render pass.
+   *
+   *  **Base cutoff (P79 fix, Functional finding HIGH):** the walk used to have no stopping point
+   *  at all — every ancestor of a PR head got tagged, including all of `main`'s own history
+   *  behind the branch point, bounded only by `budget`'s own cost cap, never by correctness. Each
+   *  seeded branch's own `record.baseRef` (D14's recorded base branch name) is now resolved to a
+   *  loaded row via `store.rowOfBranchTip` — a local decoration lookup, no RPC — and that row's
+   *  own ancestor set (also budget-bounded, computed once per unique `baseRef` since PRs commonly
+   *  share one) is excluded from the walk: never tagged, never expanded past, mirroring
+   *  `<base>..<branch>`'s own two-dot exclusion (§6.8's `review.files`). A `baseRef` not resolvable
+   *  locally (outside the loaded window, or never fetched under that name) falls back to no
+   *  exclusion for that one branch — `rowOfBranchTip`'s own doc comment on why an RPC-based
+   *  fallback (a `mergeBase` request per PR) was declined in favor of this local-only answer.
    *
    *  `budget` defaults to `PR_ANCESTRY_WALK_BUDGET` — overridable only so `pr.test.ts` can prove
    *  the cutoff itself without building a 50,000-row fixture; no production caller passes it. */
@@ -299,6 +311,41 @@ export class PrState {
       recordOfRow.set(row, record);
       queue.push(row);
     }
+
+    // Base cutoff: every row reachable from a resolved `baseRef`'s own tip — excluded from the
+    // walk below, never tagged with that base's own PR (there isn't one) nor with the PR whose
+    // base it is. `budget` is shared with the main walk (the same closed-over variable, decremented
+    // by both) since this is still one bounded cost, not a second budget stacked on top.
+    const excludedRows = new Set<number>();
+    const baseAncestorCache = new Map<string, ReadonlySet<number>>();
+    const baseAncestorsOf = (baseRef: string): ReadonlySet<number> => {
+      const cached = baseAncestorCache.get(baseRef);
+      if (cached !== undefined) return cached;
+      const visited = new Set<number>();
+      const baseRow = store.rowOfBranchTip(baseRef);
+      if (baseRow !== -1) {
+        const baseQueue = [baseRow];
+        visited.add(baseRow);
+        let baseHead = 0;
+        while (baseHead < baseQueue.length && budget > 0) {
+          const row = baseQueue[baseHead];
+          baseHead += 1;
+          budget -= 1;
+          if (row === undefined) continue;
+          for (const parentRow of store.parentsOf(row)) {
+            if (parentRow === -1 || visited.has(parentRow)) continue;
+            visited.add(parentRow);
+            baseQueue.push(parentRow);
+          }
+        }
+      }
+      baseAncestorCache.set(baseRef, visited);
+      return visited;
+    };
+    for (const record of recordOfRow.values()) {
+      for (const row of baseAncestorsOf(record.baseRef)) excludedRows.add(row);
+    }
+
     const visited = new Set<number>(queue);
     let head = 0;
     while (head < queue.length && budget > 0) {
@@ -308,9 +355,10 @@ export class PrState {
       if (row === undefined) continue;
       const record = recordOfRow.get(row);
       if (record === undefined) continue;
+      if (excludedRows.has(row)) continue; // behind the PR's own base — not the PR's commit.
       next.set(store.shaAt(row), record);
       for (const parentRow of store.parentsOf(row)) {
-        if (parentRow === -1 || visited.has(parentRow)) continue;
+        if (parentRow === -1 || visited.has(parentRow) || excludedRows.has(parentRow)) continue;
         visited.add(parentRow);
         recordOfRow.set(parentRow, record);
         queue.push(parentRow);

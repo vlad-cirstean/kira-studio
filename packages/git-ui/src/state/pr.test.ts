@@ -536,6 +536,61 @@ describe('PrState — rebuildAncestry: bounded ancestry walk', () => {
     pr.dispose();
   });
 
+  // P79 fix, Functional finding HIGH: the walk used to have no stopping point at the PR's own
+  // base, tagging every ancestor of the tip including the base branch's own history behind the
+  // branch point. `main`'s tip is decorated here (the only fixture in this file that is) so
+  // `rowOfBranchTip` can resolve `baseRef` locally — every other test's chain has no decorations
+  // at all, which is exactly the "base not resolvable locally" fallback path those tests already
+  // cover by continuing to walk the whole chain.
+  test('stops the walk at the PR base — commits behind it are never tagged', async () => {
+    const mainTip = sha(3);
+    const m1 = sha(4);
+    const m2 = sha(5);
+    const f1 = sha(2);
+    const f2 = sha(1);
+    const fTip = sha(0);
+    const store = new CommitStore();
+    store.append(record(fTip, [f2]));
+    store.append(record(f2, [f1]));
+    store.append(record(f1, [mainTip]));
+    store.append({
+      ...record(mainTip, [m1]),
+      decoration: [{ kind: 'branch', name: 'main', isHead: false }],
+    });
+    store.append(record(m1, [m2]));
+    store.append(record(m2, []));
+
+    const transport = new FakeTransport();
+    const bridge = new BridgeClient(transport);
+    const pr = new PrState(bridge);
+    pr.setRepoId(REPO);
+    transport.onRequest = () => ({
+      kind: 'ok',
+      prs: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          state: 'open',
+          headRef: 'feature',
+          headSha: fTip,
+          baseRef: 'main',
+          updatedAt: 0,
+        },
+      ],
+    });
+    await pr.resolveBranch('feature');
+
+    pr.rebuildAncestry(store);
+
+    // Only the three commits the branch actually adds — mainTip and everything behind it belongs
+    // to main, not to this PR.
+    expect(pr.prByAncestry.value.size).toBe(3);
+    for (const s of [fTip, f2, f1]) expect(pr.prForCommit(s)?.[0]?.number).toBe(1);
+    for (const s of [mainTip, m1, m2]) expect(pr.prForCommit(s)).toBeUndefined();
+    pr.dispose();
+  });
+
   test('refsChanged clears prByAncestry, and so does a repo switch', async () => {
     const { store, shas } = buildChain(2);
     const transport = new FakeTransport();

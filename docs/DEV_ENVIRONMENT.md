@@ -174,6 +174,17 @@ running it here.
   `internal` itself for the layering test, not the whole tree — `docs/v1.3/SPEC.md`'s own "Full
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
   occasionally as a backstop, not per phase.
+- **A fresh worktree fails `bun run typecheck`/the pre-commit hook on a git-only change**, even
+  after `bun install` — `typecheck:web`/`typecheck:tests`/`typecheck:unit` all resolve
+  `apps/kira-studio/frontend`'s Wails-generated `@bindings/*` modules, which need
+  `scripts/setup.sh`'s full Go+`wails3` install and codegen (below), unrelated to `packages/git-*`.
+  For a change confined to `packages/git-core`/`git-ipc`/`git-ui`, verify with `bun run
+  typecheck:git` (or the three `tsgo`/`vue-tsc` invocations it chains, run separately) plus each
+  touched package's own `bun test` instead of the full `typecheck` — that's the real coverage for
+  those packages, and running full `setup.sh` just to commit a git-only fix is disproportionate.
+  The pre-commit hook itself still runs the unscoped `bun run typecheck`, so it fails regardless;
+  its own header comments a `--no-verify` bypass for exactly this — a change proven correct by the
+  scoped checks above, blocked only by an unrelated, unset-up workspace.
 
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 

@@ -348,6 +348,24 @@ export class CommitStore {
     return this.#decorations.get(row) ?? [];
   }
 
+  /** The loaded row decorated as branch (or remote-tracking branch) `refName` — `git-ui`'s own
+   *  `rebuildAncestry` (P79 fix) uses this to find a PR's recorded base branch locally, with no
+   *  RPC of its own: decorations already arrived with the loaded chunk, so this is a query over
+   *  data the store already holds, not a new fetch. A remote-tracking decoration matches by its
+   *  own unprefixed suffix (`origin/main` for `refName: "main"`) since a PR's `baseRef` (D14)
+   *  never carries a remote prefix itself. `-1` when no loaded row carries a match — the base is
+   *  outside the window, or was never fetched under that name. Scans `#decorations` directly
+   *  (never `decorationAt` row-by-row): bounded by ref count, not by history length. */
+  rowOfBranchTip(refName: string): number {
+    for (const [row, refs] of this.#decorations) {
+      for (const ref of refs) {
+        if (ref.kind === 'branch' && ref.name === refName) return row;
+        if (ref.kind === 'remoteBranch' && ref.name.endsWith(`/${refName}`)) return row;
+      }
+    }
+    return -1;
+  }
+
   /** The <=60-rows-on-screen path (§5.5): allocates one object, retains nothing. */
   commitAt(row: number): CommitRecord {
     const parentRows = this.parentsOf(row);
