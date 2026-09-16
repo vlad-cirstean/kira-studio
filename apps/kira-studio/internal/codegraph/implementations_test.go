@@ -69,10 +69,13 @@ func TestImplementationsOfRustIsAnImplSite(t *testing.T) {
 	}
 }
 
-func TestImplementationsOfGoIsAlwaysEmpty(t *testing.T) {
+func TestImplementationsOfGoEmptyInterfaceIsEmpty(t *testing.T) {
 	g, store := newTestGraph(t)
 	ctx := context.Background()
 
+	// A zero-method interface (methodsets.go's own len(want)==0 case, §4.2): every type satisfies
+	// it, so answering "every type" is noise, not an answer. Full Go method-set matching is covered
+	// by methodsets_test.go.
 	seedFile(t, store, "iface.go", "go", nil, []codeparse.Symbol{
 		sym("type", "Greeter", 0, 0, 50, 5, -1),
 	}, nil)
@@ -82,6 +85,6 @@ func TestImplementationsOfGoIsAlwaysEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(targets) != 0 {
-		t.Fatalf("want no results for Go (§6/D4), got %+v", targets)
+		t.Fatalf("want no results for a zero-method interface, got %+v", targets)
 	}
 }
