@@ -121,7 +121,23 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
   // Per-mount cache: the model is immutable for the life of the mount, so (path, line) is a
   // stable key until `repo.changed` says otherwise (§4.3). A cached `null` is a resolved miss
   // (untracked path, line past EOF, a real RPC error) — not retried on every revisit.
+  //
+  // P79 review fix (Performance, LOW): capped, not unbounded — holding the down-arrow through a
+  // very large file could otherwise grow this to one entry per line in the file. Same LRU idiom
+  // textModels.ts's own preview-model registry uses: a plain Map's insertion order doubles as
+  // recency (touching a key deletes then re-inserts it), so the least-recently-touched key is
+  // always whatever `cache.keys().next()` yields. A few thousand is a generous cap for a per-mount
+  // line-blame cache — a session rarely visits more than a few hundred distinct lines.
+  const CACHE_LIMIT = 2000;
   const cache = new Map<number, BlameResult | null>();
+
+  function touchCache(line: number, value: BlameResult | null): void {
+    cache.delete(line);
+    cache.set(line, value);
+    if (cache.size <= CACHE_LIMIT) return;
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
 
   function paint(line: number, result: BlameResult | null): void {
     if (disposed) return;
@@ -155,7 +171,7 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
         { repoId: deps.gitRepoId, path: deps.path, line },
         controller.signal,
       );
-      cache.set(line, result);
+      touchCache(line, result);
       if (line === lastLine) paint(line, result);
     } catch {
       // 5b: an ABORTED request (cancelPending's own inFlight.abort(), or a fresh resolveLine for a
@@ -163,8 +179,16 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
       // exactly that (untracked path, line past EOF, a genuine RPC error), never "we didn't wait to
       // find out". Caching it anyway combined with 5a's bug meant arrowing through lines faster than
       // responses land accumulated permanently blame-less lines that never retried, even on revisit.
-      if (!controller.signal.aborted) cache.set(line, null);
+      if (!controller.signal.aborted) touchCache(line, null);
       if (line === lastLine) paint(line, null);
+    } finally {
+      // P79 review fix (Performance, LOW): cleared on every settle (success or failure), not left
+      // pointing at an already-settled controller — otherwise a later cancelPending() couldn't tell
+      // "a request is genuinely still live" from "the last one already finished" (harmless in
+      // practice, since aborting a settled controller is a no-op, but not a signal any future
+      // reader of this file could trust). Guarded by identity in case a future change ever lets a
+      // second resolveLine start before this one's own finally runs.
+      if (inFlight === controller) inFlight = undefined;
     }
   }
 
@@ -181,6 +205,7 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
 
     const cached = cache.get(line);
     if (cached !== undefined) {
+      touchCache(line, cached); // rule 2's own re-resolving-refreshes-recency, mirrored on read too.
       paint(line, cached);
       return;
     }
