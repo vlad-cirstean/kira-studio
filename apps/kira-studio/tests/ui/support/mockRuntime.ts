@@ -170,6 +170,8 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceCloseWorkspace: 'CodeWorkspaceService.CloseWorkspace',
   codeWorkspaceReadDiff: 'CodeWorkspaceService.ReadDiff',
   codeWorkspaceDefinitions: 'CodeWorkspaceService.Definitions',
+  codeWorkspaceReferences: 'CodeWorkspaceService.References',
+  codeWorkspaceImplementations: 'CodeWorkspaceService.Implementations',
   codeWorkspaceStartSearch: 'CodeWorkspaceService.StartSearch',
   codeWorkspaceCancelSearch: 'CodeWorkspaceService.CancelSearch',
 };

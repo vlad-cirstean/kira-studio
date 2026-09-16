@@ -96,6 +96,37 @@ export const navResultSchema = /*#__PURE__*/ z.object({
 });
 export type NavResult = z.infer<typeof navResultSchema>;
 
+// P78 §7.1/§7.2: one reference occurrence — codegraph.Site carried across the wire the same way
+// navTargetSchema carries codegraph.Target. confidence is per-site, not per-result: an included
+// site can come from an Exact/Scoped group or a singleton RepoWide one, materially different
+// evidence a caller should be able to tell apart.
+export const refSiteSchema = /*#__PURE__*/ z.object({
+  path: z.string(),
+  language: z.string(),
+  kind: z.string(),
+  name: z.string(),
+  enclosing: z.string(),
+  confidence: /*#__PURE__*/ z.enum(['exact', 'scoped', 'repoWide']),
+  startLine: z.number(),
+  startColumn: z.number(),
+  endLine: z.number(),
+  endColumn: z.number(),
+});
+export type RefSite = z.infer<typeof refSiteSchema>;
+
+// P78 §7.2: find-references' own wire shape — status follows navResultSchema's own convention;
+// total/truncated/unattributed carry through even when sites is empty (every occurrence
+// unattributed, say), since §7.3's status readout needs them regardless.
+export const refResultSchema = /*#__PURE__*/ z.object({
+  status: /*#__PURE__*/ z.enum(['ready', 'indexing', 'unavailable']),
+  name: z.string(),
+  sites: z.array(refSiteSchema),
+  total: z.number(),
+  truncated: z.boolean(),
+  unattributed: z.number(),
+});
+export type RefResult = z.infer<typeof refResultSchema>;
+
 // C7 §3.1: a repository-wide search request — Monaco's own find-widget vocabulary (case/whole-word/
 // regex), so the panel's own options read the same as the in-file find widget (D13).
 export const searchRequestSchema = /*#__PURE__*/ z.object({

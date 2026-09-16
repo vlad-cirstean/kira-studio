@@ -56,6 +56,7 @@ import type {
   FileContent,
   FileListing,
   NavResult,
+  RefResult,
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
@@ -480,6 +481,29 @@ const studioControl = {
     unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.Definitions>>>(
       CodeWorkspaceService.Definitions({ id, path, line, column }),
     ).then((r) => trust<NavResult>({ ...r, targets: r.targets ?? [] })),
+  // P78 §7.2/§8.2: Definitions's own structural sibling — Implementations answers the same wire
+  // shape (NavResult), Go included now that Part B's method-set matching lands.
+  codeWorkspaceImplementations: (
+    id: string,
+    path: string,
+    line: number,
+    column: number,
+  ): Promise<NavResult> =>
+    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.Implementations>>>(
+      CodeWorkspaceService.Implementations({ id, path, line, column }),
+    ).then((r) => trust<NavResult>({ ...r, targets: r.targets ?? [] })),
+  // P78 §7.2/§8.1: includeDeclaration maps straight to Monaco's own
+  // ReferenceContext.includeDeclaration.
+  codeWorkspaceReferences: (
+    id: string,
+    path: string,
+    line: number,
+    column: number,
+    includeDeclaration: boolean,
+  ): Promise<RefResult> =>
+    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.References>>>(
+      CodeWorkspaceService.References({ id, path, line, column, includeDeclaration }),
+    ).then((r) => trust<RefResult>({ ...r, sites: r.sites ?? [] })),
 
   // C7 §5/D7: StartSearch returns as soon as the background scan starts — its own searchId is how
   // the renderer matches a later onCodeSearch event to the run that's waiting on it. windowKey

@@ -321,6 +321,57 @@ func (s *CodeWorkspaceService) Definitions(ctx context.Context, args CodeWorkspa
 	return result, nil
 }
 
+// Implementations answers go-to-implementation for args.Path at (args.Line, args.Column) (P78
+// §7.2) — Definitions's own structural copy, one call swapped.
+func (s *CodeWorkspaceService) Implementations(ctx context.Context, args CodeWorkspaceDefinitionArgs) (codeworkspace.NavResult, error) {
+	if args.ID == "" {
+		return codeworkspace.NavResult{}, ipcerr.BadRequest("id is required")
+	}
+	if args.Path == "" {
+		return codeworkspace.NavResult{}, ipcerr.BadRequest("path is required")
+	}
+	sess, _, err := s.session(ctx, args.ID)
+	if err != nil {
+		return codeworkspace.NavResult{}, err
+	}
+	sess.EnsureIndex(s.IndexStore, s.home(), slog.Default())
+	result, err := codeworkspace.Implementations(ctx, sess, s.IndexStore, args.Path, args.Line, args.Column)
+	if err != nil {
+		return codeworkspace.NavResult{}, ipcerr.Internal(err.Error())
+	}
+	return result, nil
+}
+
+// CodeWorkspaceReferenceArgs is References's own args — IncludeDeclaration maps straight to
+// Monaco's own ReferenceContext.includeDeclaration (P78 §8.1).
+type CodeWorkspaceReferenceArgs struct {
+	ID                 string `json:"id"`
+	Path               string `json:"path"`
+	Line               int    `json:"line"`
+	Column             int    `json:"column"`
+	IncludeDeclaration bool   `json:"includeDeclaration"`
+}
+
+// References answers find-references for args.Path at (args.Line, args.Column) (P78 §7.2).
+func (s *CodeWorkspaceService) References(ctx context.Context, args CodeWorkspaceReferenceArgs) (codeworkspace.RefResult, error) {
+	if args.ID == "" {
+		return codeworkspace.RefResult{}, ipcerr.BadRequest("id is required")
+	}
+	if args.Path == "" {
+		return codeworkspace.RefResult{}, ipcerr.BadRequest("path is required")
+	}
+	sess, _, err := s.session(ctx, args.ID)
+	if err != nil {
+		return codeworkspace.RefResult{}, err
+	}
+	sess.EnsureIndex(s.IndexStore, s.home(), slog.Default())
+	result, err := codeworkspace.References(ctx, sess, s.IndexStore, args.Path, args.Line, args.Column, args.IncludeDeclaration)
+	if err != nil {
+		return codeworkspace.RefResult{}, ipcerr.Internal(err.Error())
+	}
+	return result, nil
+}
+
 // Shutdown stops every open session and closes the shared index store — process teardown
 // (main.go's own teardown, beside repositories.Close()). Not a bound method: called directly from
 // main.go, the same way bridge.StopRepoMap(repoMapSvc) is.

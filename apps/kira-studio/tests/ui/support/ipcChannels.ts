@@ -165,6 +165,8 @@ export const IPC = {
   codeWorkspaceCloseWorkspace: 'kira:codeWorkspace:closeWorkspace',
   codeWorkspaceReadDiff: 'kira:codeWorkspace:readDiff',
   codeWorkspaceDefinitions: 'kira:codeWorkspace:definitions',
+  codeWorkspaceReferences: 'kira:codeWorkspace:references',
+  codeWorkspaceImplementations: 'kira:codeWorkspace:implementations',
   codeWorkspaceStartSearch: 'kira:codeWorkspace:startSearch',
   codeWorkspaceCancelSearch: 'kira:codeWorkspace:cancelSearch',
   // C7 D7: the coalesced search-results push channel, EmitTo'd to one window — grpcCall's own
