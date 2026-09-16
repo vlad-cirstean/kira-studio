@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installFakeTimers } from './support/clock';
 import { acceptConfirm } from './support/dialogs';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -207,21 +208,29 @@ test('gRPC request — the method select is as wide as the address field beside 
 test('gRPC request — typing the target debounces schema loads to one call', async ({
   relaunch,
 }) => {
+  // GrpcRequestView.vue's own constant — restated here rather than imported across the web/node
+  // tsconfig boundary (this suite's existing convention, see `global.d.ts:1`-`5`).
+  const SCHEMA_LOAD_DEBOUNCE_MS = 150;
   const CONTROL: ControlSnapshot[] = [{ channel: IPC.grpcDescribe, response: UNARY_SCHEMA }];
   const { window: page, control } = await relaunch({ control: CONTROL });
 
   await openHttpModeAndNewGrpcRequest(page);
+  await installFakeTimers(page); // support/clock.ts — after boot, never before
   await page.click('[data-testid="grpc-target"]');
   await page.keyboard.type('demo.example.com:443');
 
-  // Nothing has fired yet — still inside the debounce window.
-  expect(control.log().filter((e) => e.channel === IPC.grpcDescribe)).toHaveLength(0);
-
-  await expect
-    .poll(() => control.log().filter((e) => e.channel === IPC.grpcDescribe).length)
-    .toBe(1);
-  const call = control.log().filter((e) => e.channel === IPC.grpcDescribe)[0];
-  expect(call?.args).toMatchObject({ target: 'demo.example.com:443' });
+  const describeCalls = () => control.log().filter((e) => e.channel === IPC.grpcDescribe);
+  // Time has not moved, so no wall-clock budget is being asserted here: the debounce *cannot*
+  // have elapsed, however slowly the harness typed.
+  expect(describeCalls()).toHaveLength(0);
+  await page.clock.runFor(SCHEMA_LOAD_DEBOUNCE_MS - 1);
+  expect(describeCalls()).toHaveLength(0);
+  await page.clock.runFor(2);
+  await expect.poll(() => describeCalls().length).toBe(1);
+  expect(describeCalls()[0]?.args).toMatchObject({ target: 'demo.example.com:443' });
+  // No trailing duplicate: one debounce, one call, not one-per-keystroke arriving late.
+  await page.clock.runFor(2_000);
+  expect(describeCalls()).toHaveLength(1);
 });
 
 test('gRPC request — choosing a method seeds the Message editor with its template', async ({
