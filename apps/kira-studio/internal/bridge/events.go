@@ -59,6 +59,10 @@ const (
 	// ChannelDbMcpApproval is M2 §7.1's own push channel — the prompt-mode approval queue's live
 	// snapshot, ChannelGitPairing's own shape applied to run_query's approval broker.
 	ChannelDbMcpApproval = "kira:dbmcp:approval"
+	// ChannelTerminal is P83's own push channel — one terminal's output and its exit, EmitTo'd to
+	// the one window that opened it, exactly like ChannelCodeSearch above (internal/bridge/
+	// terminal.go's own coalescer).
+	ChannelTerminal = "kira:terminal:data"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

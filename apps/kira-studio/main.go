@@ -52,6 +52,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/terminal"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
@@ -301,6 +302,10 @@ func main() {
 		OnRepoRenamed: func(id, name string) { bridge.RepoMapNotifyRepoRenamed(repoMapSvc, id, name) },
 	}
 
+	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
+	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
+	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry()}
+
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
 
@@ -335,6 +340,7 @@ func main() {
 		bridge.StopRepoMap(repoMapSvc)
 		bridge.StopDbMcp(dbMcpSvc)
 		codeWorkspaceSvc.Shutdown()
+		terminalSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
@@ -400,6 +406,7 @@ func main() {
 			// needs one read-only runner and the resolved git.path, never gitsession's refcounted
 			// lifecycle).
 			application.NewService(codeWorkspaceSvc),
+			application.NewService(terminalSvc),
 			application.NewService(&bridge.UpdateService{Checker: updateChecker, Browser: browserOpener}),
 			application.NewService(&bridge.GitHubService{Deps: deps, Browser: browserOpener}),
 			application.NewService(&bridge.LinkService{Browser: browserOpener}),
@@ -576,6 +583,9 @@ func main() {
 			// full timeout (C8) — a no-op when no quit is in flight, since Quitter.Flushed
 			// ignores a key it isn't currently waiting on.
 			quitter.Flushed(rec.Key)
+			// P83 §4's teardown table: a terminal never outlives the window that opened it, even
+			// when the renderer never gets to ack.
+			terminalSvc.Registry.CloseWindow(rec.Key)
 			if windows.RemoveAndCount(rec.Key) > 0 {
 				if err := repositories.Windows.Delete(rec.Key); err != nil {
 					slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
