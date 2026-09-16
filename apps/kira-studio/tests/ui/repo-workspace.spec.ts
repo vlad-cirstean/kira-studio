@@ -1134,6 +1134,12 @@ test("a worktree row's menu opens a terminal there, and both rows show the indic
     )
     .toBe(true);
 
+  // openRepoTerminalTab opens repo.id's own workspace as a side effect (it calls
+  // openRepoWorkspace), so P84 §8.3's auto-switch already flipped the panel to Files — switch
+  // back to see the worktree rows again (the same migration §13.2 applies at :652/:673; this
+  // test's own "never opens a workspace" note in the P84 plan missed this call chain).
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
+
   // Both row kinds share the same indicator markup (data-testid="repo-terminal-indicator",
   // GitPanel.vue) — this proves it lands only on the row whose own path matches the terminal's
   // cwd, on neither the sibling worktree row nor the collapsed repo row above them.
