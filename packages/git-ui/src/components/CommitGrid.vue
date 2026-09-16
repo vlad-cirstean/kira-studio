@@ -18,7 +18,7 @@
 import type { CommitRecord } from '@kira/git-core';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { graphColumnWidth } from '../graph/geometry.ts';
 import { createGraphFormatter } from '../graph/graphColumn.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
@@ -526,6 +526,36 @@ function handleKeyDown(event: KeyboardEvent): boolean {
 // re-rendered — see App.vue's own doc comment on why it moved here rather than firing at mount.
 let layoutCompleteMarked = false;
 
+// P79 fix (Performance MEDIUM + Functional MEDIUM): every ancestry-affecting signal —
+// `pr.generation` (a resolved branch) and the graph window growing/resetting
+// (`graphView.loadedRows`/`graphView.generation`) — used to either skip `rebuildAncestry`
+// entirely (the window-growth case, the desync bug) or run it once per signal with no
+// coalescing (the N-branches-in-one-burst case, the performance finding). Both watchers below
+// now only set this flag; `nextTick` (this file's own established pattern — see the `detailOpen`
+// watcher's `flush: 'post'`) drains it into exactly one `rebuildAncestry` + one grid
+// invalidate/render per tick, however many signals fired within it.
+let ancestryRebuildPending = false;
+
+function scheduleAncestryRebuild(): void {
+  if (ancestryRebuildPending) return;
+  ancestryRebuildPending = true;
+  void nextTick(() => {
+    ancestryRebuildPending = false;
+    // P74 §4.2/§4.3: rebuilds the ancestry derivation `prsFor` (currentColumns/createCommitDataView
+    // above) now reads, BEFORE invalidateRowHeights below — a row's own expanded/compact height
+    // must never be computed against a stale ancestry map.
+    if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
+    // P72 §5.1: `rowMetadata` (columns.ts) derives a row's `height` from `rowHasBadges`, which
+    // reads `prsFor` — a PR resolution can flip a row between the compact and expanded height
+    // without a row-count change, exactly the case `invalidateRowHeights`'s own doc comment (and
+    // the token-change listener above) calls out as needing this explicit call, or SlickGrid's
+    // row-position index goes stale against the new heights (the scroll-flicker symptom).
+    grid?.invalidateRowHeights();
+    grid?.invalidateAllRows();
+    grid?.render();
+  });
+}
+
 /** The row range that just gained lane layout (`GraphViewState.onChunkLayout`, W5) — rebuild the
  *  column set in case `laneCount` grew (the graph column's width formula depends on it), then
  *  invalidate exactly the rows that changed rather than the whole grid. */
@@ -802,6 +832,12 @@ watch(
   () => {
     grid?.updateRowCount();
     grid?.render();
+    // P79 fix (Functional MEDIUM): newly-loaded rows (`graph.loadMore`) can be ancestors of an
+    // already-resolved PR tip — without this, they showed no badge until some unrelated PR
+    // resolution happened to bump `pr.generation` again (`prByAncestry` desyncing from the
+    // store's own, larger row set). A no-op via `scheduleAncestryRebuild`'s own guard when there
+    // is no `pr` source at all.
+    if (props.pr) scheduleAncestryRebuild();
   },
 );
 watch(
@@ -815,6 +851,9 @@ watch(
     grid?.invalidateAllRows();
     grid?.updateRowCount();
     grid?.render();
+    // P79 fix (Functional MEDIUM): a restart-at-row-0 re-walk is the other shape of "the loaded
+    // window changed" `rebuildAncestry` must track — see the `loadedRows` watcher directly above.
+    if (props.pr) scheduleAncestryRebuild();
   },
 );
 // P11 W13: mirrors the `generation` watcher directly above — a new `searchGeneration` means the
@@ -831,22 +870,14 @@ watch(
 // G24 D9: mirrors the `search.searchGeneration` watcher directly above — a third instance of the
 // same pattern. A new PR resolution never changes how many rows are loaded, same reasoning as
 // `search.searchGeneration`'s own doc comment.
+// P79 fix (Performance MEDIUM): used to call `rebuildAncestry` + a full grid invalidate/render
+// directly, once per fired watcher — `PrState.resolveBranch` bumps `generation` once per
+// individual `branch.resolvePr` response, so warming N branches in one burst (e.g. entering
+// Refs search scope, `search.ts`'s own "warms in full" comment) ran N full rebuilds/re-renders
+// for the same final state. Now only marks the shared dirty flag — see `scheduleAncestryRebuild`.
 watch(
   () => props.pr?.generation.value,
-  () => {
-    // P74 §4.2/§4.3: rebuilds the ancestry derivation `prsFor` (currentColumns/createCommitDataView
-    // above) now reads, BEFORE invalidateRowHeights below — a row's own expanded/compact height
-    // must never be computed against a stale ancestry map.
-    if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
-    // P72 §5.1: `rowMetadata` (columns.ts) derives a row's `height` from `rowHasBadges`, which
-    // reads `prsFor` — a PR resolution can flip a row between the compact and expanded height
-    // without a row-count change, exactly the case `invalidateRowHeights`'s own doc comment (and
-    // the token-change listener above) calls out as needing this explicit call, or SlickGrid's
-    // row-position index goes stale against the new heights (the scroll-flicker symptom).
-    grid?.invalidateRowHeights();
-    grid?.invalidateAllRows();
-    grid?.render();
-  },
+  () => scheduleAncestryRebuild(),
 );
 // G26 D-4.13: mirrors the `pr.generation` watcher directly above — the fourth instance of the
 // same pattern (F12). A new stack resolution never changes how many rows are loaded either.
