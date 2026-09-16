@@ -11,6 +11,7 @@
 // existing edges stay acyclic.
 import type { NavResult, NavTarget, RefResult } from '@shared/domain/repo';
 import { control } from '../../bridge/control';
+import { activeTab } from '../../state/mode';
 import { type NavStatusState, publishNavStatus } from '../../state/navStatus';
 import { openRepoFileTab } from '../../state/repoTabs';
 import type { MonacoModule } from './monaco';
@@ -164,6 +165,10 @@ export function ensureNavigationRegistered(mod: MonacoModule): void {
     async provideReferences(model, position, context) {
       const loc = repoLocationOf(model);
       if (!loc) return null; // D7: the diff's own HEAD side, deliberately.
+      // P79: the tab active when this request started — the status bar belongs to whichever tab
+      // is active when the response actually lands, not the one that asked (blameLine.ts's own
+      // `line !== lastLine` guard is the same "stale response after the world moved on" shape).
+      const requestTabId = activeTab.value?.id;
       const res = await control.codeWorkspaceReferences(
         loc.repoId,
         loc.path,
@@ -171,11 +176,12 @@ export function ensureNavigationRegistered(mod: MonacoModule): void {
         position.column,
         context.includeDeclaration,
       );
+      const stillActive = activeTab.value?.id === requestTabId;
       if (res.status !== 'ready') {
-        publishNavStatus(null);
+        if (stillActive) publishNavStatus(null);
         return null;
       }
-      publishNavStatus(referenceSummary(res));
+      if (stillActive) publishNavStatus(referenceSummary(res));
       return res.sites.map((s) => ({
         uri: repoFileUriObject(mod, loc.repoId, s.path),
         range: rangeOf(s),
@@ -187,17 +193,19 @@ export function ensureNavigationRegistered(mod: MonacoModule): void {
     async provideImplementation(model, position) {
       const loc = repoLocationOf(model);
       if (!loc) return null;
+      const requestTabId = activeTab.value?.id; // P79: see the reference provider's own comment.
       const res = await control.codeWorkspaceImplementations(
         loc.repoId,
         loc.path,
         position.lineNumber,
         position.column,
       );
+      const stillActive = activeTab.value?.id === requestTabId;
       if (res.status !== 'ready') {
-        publishNavStatus(null);
+        if (stillActive) publishNavStatus(null);
         return null;
       }
-      publishNavStatus(implementationSummary(res));
+      if (stillActive) publishNavStatus(implementationSummary(res));
       return res.targets.map((t) => ({
         uri: repoFileUriObject(mod, loc.repoId, t.path),
         range: rangeOf(t),
