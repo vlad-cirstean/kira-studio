@@ -19,6 +19,7 @@ import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowContextMenu from './RowContextMenu.vue';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildGlobalStashMenu, buildReadOnlyStashMenu } from './rowMenuModel.ts';
 import { globalRowModel } from './stashListModel.ts';
 
@@ -32,6 +33,8 @@ const props = defineProps<{
    *  global stash…" button (`globalStashSave`, a write) and falls the row menu back to
    *  `buildReadOnlyStashMenu` (Show changes only) instead of `buildGlobalStashMenu`. */
   writeCapability: boolean;
+  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
+  showMore: () => void;
 }>();
 
 const emit = defineEmits<{
@@ -128,9 +131,9 @@ async function onMenuSelect(id: string): Promise<void> {
         <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <div v-if="section.hiddenCount > 0" class="kv-branch-more">
-      {{ section.hiddenCount }} more — remove some to see the rest
-    </div>
+    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
+    </KuiButton>
     <div v-if="section.visible.length === 0" class="kv-branch-empty">No saved entries</div>
 
     <RowContextMenu

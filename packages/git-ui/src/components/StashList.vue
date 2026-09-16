@@ -23,6 +23,7 @@ import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
 import RowContextMenu from './RowContextMenu.vue';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildReadOnlyStashMenu, buildStashMenu } from './rowMenuModel.ts';
 import { isAutoStash, originLabel, stashLabel } from './stashListModel.ts';
 
@@ -39,6 +40,8 @@ const props = defineProps<{
   /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — the row menu falls back to
    *  `buildReadOnlyStashMenu` (Show changes only) instead of `buildStashMenu`. */
   writeCapability: boolean;
+  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
+  showMore: () => void;
 }>();
 
 /** Bubbled to `BranchPicker.vue` → `App.vue`, which owns `StashDialog.vue`'s branch-mode state —
@@ -137,9 +140,9 @@ async function onMenuSelect(id: string): Promise<void> {
         <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <div v-if="section.hiddenCount > 0" class="kv-branch-more">
-      {{ section.hiddenCount }} more — apply, pop or drop some to see the rest
-    </div>
+    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
+    </KuiButton>
     <div v-if="section.visible.length === 0" class="kv-branch-empty">No stashes</div>
 
     <RowContextMenu

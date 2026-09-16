@@ -22,6 +22,7 @@ import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { WorktreeState } from '../state/worktrees.ts';
 import { type PickerList, worktreeLabel } from './pickerModel.ts';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 
 const props = defineProps<{
   section: PickerList<WorktreeEntry>;
@@ -35,6 +36,8 @@ const props = defineProps<{
    *  `openWorktreeWindowCapability` above, and-ed with this one for the same reason that row is
    *  hidden even where a future host reported both true independently. */
   writeCapability: boolean;
+  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop. */
+  showMore: () => void;
 }>();
 
 const emit = defineEmits<{
@@ -164,9 +167,9 @@ async function confirmRemove(): Promise<void> {
         <span class="codicon codicon-trash" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <div v-if="section.hiddenCount > 0" class="kv-branch-more">
-      {{ section.hiddenCount }} more — refine your filter
-    </div>
+    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
+    </KuiButton>
     <div v-if="section.visible.length === 0" class="kv-branch-empty">No worktrees</div>
 
     <KuiDialog
