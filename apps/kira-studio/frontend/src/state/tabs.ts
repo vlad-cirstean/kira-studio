@@ -416,7 +416,13 @@ export function openTab<S>(
       const evictedIdx = tabsState.tabs.findIndex((t) => t.id === evictedIds[0]);
       const insertAt = evictedIdx < 0 ? tabsState.tabs.length : evictedIdx;
       tabsState.tabs.splice(insertAt, 0, record);
-      for (const evictedId of evictedIds) closeTab(evictedId);
+      // P79 review fix (Performance, MEDIUM): closeTabInternal, not closeTab — a bulk eviction
+      // (e.g. "Open all changes" on a 150-file commit) used to do N full-array JSON.stringify +
+      // IPC round trips here, one per evicted tab. This function's own saveNow() call below
+      // (unconditional, runs regardless of cohort size) is now the only save the whole eviction
+      // does — setActiveTabId right after still lands on the correct active tab either way, since
+      // it always runs after every evicted tab is gone.
+      for (const evictedId of evictedIds) closeTabInternal(evictedId);
     } else {
       // §5.2 rule 4: no preview cohort yet — create at the end.
       tabsState.tabs.push(record);
@@ -597,7 +603,11 @@ export function duplicateTab(id: string): string {
   return newId;
 }
 
-export function closeTab(id: string): void {
+// P79 review fix (Performance, MEDIUM): the state-mutation half of closeTab, minus saveNow() —
+// split out so a bulk eviction (openTab's own preview-cohort branch below) can remove several
+// tabs and persist once, instead of one synchronous full-array save per tab. closeTab() itself is
+// just this plus its own saveNow() call, so a single ordinary close is byte-for-byte unchanged.
+function closeTabInternal(id: string): void {
   const idx = tabsState.tabs.findIndex((t) => t.id === id);
   if (idx < 0) return;
   const closed = tabsState.tabs[idx];
@@ -629,6 +639,10 @@ export function closeTab(id: string): void {
       tabsState.activeIdByWorkspace[key] = next.id;
     }
   }
+}
+
+export function closeTab(id: string): void {
+  closeTabInternal(id);
   saveNow();
 }
 

@@ -139,6 +139,31 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
     expect(isPreview(b.id)).toBe(true);
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, permanent.id]);
   });
+
+  // P79 review fix (Performance, MEDIUM): evicting a large cohort ("Open all changes" on a
+  // many-file commit) used to call closeTab() per evicted tab, each doing its own synchronous
+  // full-array control.tabsSave() round trip. Asserts the whole eviction now costs exactly one.
+  test('evicting a large cohort in one go saves exactly once', () => {
+    const ws = freshWorkspace();
+    openFile(ws, 'seed.ts', true, false);
+    for (let i = 0; i < 20; i++) openFile(ws, `bulk${i}.ts`, true, true);
+    expect(tabsState.previewIdsByWorkspace[ws]?.length).toBe(21);
+
+    let saveCalls = 0;
+    const original = control.tabsSave;
+    (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = (...args) => {
+      saveCalls += 1;
+      return original(...args);
+    };
+    let evictor: { id: string };
+    try {
+      evictor = openFile(ws, 'evict-all.ts', true, false); // a plain preview click, not a bulk open
+    } finally {
+      (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = original;
+    }
+    expect(saveCalls).toBe(1);
+    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([evictor.id]);
+  });
 });
 
 describe('P74 §6: promoting a preview tab on double click', () => {
