@@ -24,6 +24,7 @@ import * as TreeService from '@bindings/treeservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
+import type { HeadState } from '@kira/git-ipc';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -456,6 +457,15 @@ const studioControl = {
   // already turns into a rejected promise — every call site here just lets it propagate.
   codeWorkspaceListRepos: (): Promise<RepoSummary[]> =>
     unwrap(CodeWorkspaceService.ListRepos()).then((r) => trust<RepoSummary[]>(r ?? [])),
+  // P83 plan §12.2: every imported repository's checked-out branch in one batched call — GitPanel
+  // .vue's own repo-row label. `ids` omitted answers every row; repo/state/repoHeads.ts's
+  // refsChanged trigger passes one id to refresh a single row instead.
+  codeWorkspaceRepoHeads: (
+    ids?: string[],
+  ): Promise<Array<{ id: string; head: HeadState | null; error?: string }>> =>
+    unwrap(CodeWorkspaceService.RepoHeads({ ids: ids ?? null })).then((r) =>
+      trust<Array<{ id: string; head: HeadState | null; error?: string }>>(r ?? []),
+    ),
   codeWorkspaceImportRepo: (path: string): Promise<RepoSummary> =>
     unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
   codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>

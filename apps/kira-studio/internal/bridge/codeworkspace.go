@@ -16,6 +16,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"golang.org/x/sync/errgroup"
 )
 
 // CodeWorkspaceService is C5 §3.3's whole bound surface, extended by C6 §7 with the index
@@ -120,6 +121,77 @@ func (s *CodeWorkspaceService) ListRepos() ([]model.CodeRepo, error) {
 		return nil, ipcerr.Internal(err.Error())
 	}
 	return repos, nil
+}
+
+// CodeRepoHeadsArgs optionally scopes RepoHeads to specific rows — an empty/omitted IDs answers
+// every imported repository. repo/state/repoHeads.ts's refsChanged trigger (P83 plan §12.3) passes
+// one id here to refresh a single repository's entry, the same batched call with a filtered arg.
+type CodeRepoHeadsArgs struct {
+	IDs []string `json:"ids,omitempty"`
+}
+
+// CodeRepoHead is one repository row's checked-out branch, or the reason it has none. Head is nil
+// for a bare repository (no HEAD to show) or a row RepoHeads could not read — Error names why.
+type CodeRepoHead struct {
+	ID    string               `json:"id"`
+	Head  *gitclient.HeadState `json:"head"`
+	Error string               `json:"error,omitempty"`
+}
+
+// repoHeadsConcurrency mirrors gitclient's own maxConcurrentReads (repo.go:37) — the same
+// per-repository read-pool ceiling, applied here across repositories instead of within one.
+const repoHeadsConcurrency = 4
+
+// RepoHeads answers every imported repository's checked-out branch in one batched call (P83 plan
+// §12.2) — GitPanel.vue's own repo-row label, one round trip regardless of row count rather than
+// one bound call per row. Reuses gitclient.ResolveHead (repo.go:251) unchanged; no new git-side
+// code. A row whose repository can no longer be read (removed from disk, permission denied)
+// resolves to {Head: nil, Error: …} rather than failing the whole call.
+func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeadsArgs) ([]CodeRepoHead, error) {
+	repos, err := s.Deps.Repos.CodeRepos.List()
+	if err != nil {
+		return nil, ipcerr.Internal(err.Error())
+	}
+	if len(args.IDs) > 0 {
+		want := make(map[string]bool, len(args.IDs))
+		for _, id := range args.IDs {
+			want[id] = true
+		}
+		filtered := repos[:0]
+		for _, r := range repos {
+			if want[r.ID] {
+				filtered = append(filtered, r)
+			}
+		}
+		repos = filtered
+	}
+
+	status := s.Discovery.Status(ctx, s.gitPathSetting())
+	if status.Kind != "ok" {
+		return nil, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
+	}
+
+	results := make([]CodeRepoHead, len(repos))
+	var g errgroup.Group
+	g.SetLimit(repoHeadsConcurrency)
+	for i, repo := range repos {
+		i, repo := i, repo
+		results[i] = CodeRepoHead{ID: repo.ID}
+		if repo.Root == "" {
+			continue // a bare repository (§12.2) has no worktree, so no HEAD to show
+		}
+		g.Go(func() error {
+			head, err := gitclient.ResolveHead(ctx, s.Runner, status.Path, repo.Root)
+			if err != nil {
+				results[i].Error = err.Error()
+				return nil
+			}
+			results[i].Head = &head
+			return nil
+		})
+	}
+	g.Wait()
+	return results, nil
 }
 
 // ImportRepo identifies path via gitclient.Identify and stores it as a code_repos row — a plain

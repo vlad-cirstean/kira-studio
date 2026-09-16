@@ -31,6 +31,7 @@ import RepoFileTree from './RepoFileTree.vue';
 import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
+import { refreshRepoHeads, repoHeadLabel } from './state/repoHeads';
 import { repoSearchView, setRepoSearchView } from './state/search';
 import {
   collapseRepoWorktrees,
@@ -257,6 +258,9 @@ onMounted(() => {
   unregisterSearchCommand = registerCommand('repo.search', () => {
     view.value = 'search';
   });
+  // P83 plan §12.3 trigger 1: the panel is mounted for as long as the Git module is, so this is
+  // once per session, not once per render.
+  void refreshRepoHeads();
 });
 onUnmounted(() => {
   unregisterSearchCommand?.();
@@ -331,6 +335,13 @@ onUnmounted(() => {
                 </button>
                 <CodiconIcon name="source-control" :size="16" class="repo-icon" />
                 <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
+                <span
+                  v-if="repoHeadLabel(repo.id)"
+                  class="repo-head"
+                  v-tooltip="repoHeadLabel(repo.id)"
+                >
+                  {{ repoHeadLabel(repo.id) }}
+                </span>
                 <CodiconIcon
                   v-if="terminalCountAtPath(repo.root) > 0"
                   name="terminal-bash"
@@ -514,6 +525,21 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* P83 plan §12.4: a repo row's checked-out branch. `.repo-name` keeps `flex: 1`, so it yields
+   first and this is what survives on a narrow panel. Same size/colour pair as `.worktree-badge`
+   below, so a collapsed row's branch and its expanded children's read as the same class of
+   information. */
+.repo-head {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-subtle);
 }
 
 .repo-twisty { /* RepoTreeRow.vue's .twisty, ported */
