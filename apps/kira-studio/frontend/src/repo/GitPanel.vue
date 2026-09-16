@@ -30,7 +30,9 @@ import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
 import { repoSearchView, setRepoSearchView } from './state/search';
 import {
+  collapseRepoWorktrees,
   isWorktreesExpanded,
+  switchToWorktree,
   toggleRepoWorktrees,
   worktreeEntries,
   worktreeLabel,
@@ -143,7 +145,13 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       id: 'close',
       label: 'Close',
       icon: 'close',
-      run: () => closeRepoWorkspace(repo.id),
+      // P82 §8.3: collapse first, so the lease release is synchronous with the close instead of a
+      // watch flush later — the same reason quickOpen.ts:178 exposes dropQuickOpen alongside its
+      // own watch. The §6.6 watch would collapse it anyway.
+      run: () => {
+        collapseRepoWorktrees(repo.id);
+        closeRepoWorkspace(repo.id);
+      },
     });
   }
   items.push({
@@ -296,6 +304,7 @@ onUnmounted(() => {
                   :class="{ current: wt.isCurrent }"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
+                  @click.stop="switchToWorktree(repo.id, wt.path)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
                   <span class="worktree-label" v-tooltip="wt.path">{{ worktreeLabel(wt) }}</span>

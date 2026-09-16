@@ -1,6 +1,6 @@
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
 import { reactive, watch } from 'vue';
-import { codeRepoRecord, codeReposState } from '../../state/coderepos';
+import { codeRepoRecord, codeReposState, openRepoAtPath } from '../../state/coderepos';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { workspaceState } from '../../state/workspace';
 import { disposeGitTransport, gitTransportFor } from '../git/transport';
@@ -115,6 +115,19 @@ export function toggleRepoWorktrees(codeRepoId: string): void {
 export function collapseRepoWorktrees(codeRepoId: string): void {
   release(codeRepoId);
   byRepo.delete(codeRepoId);
+}
+
+/** §7: "switch to this worktree" — a worktree row's click. Clicking the entry that *is* this row's
+ *  own repository needs no special case: openRepoAtPath's recordForRoot finds that row and
+ *  openRepoWorkspace opens-or-activates it, same as onRowClick. */
+export async function switchToWorktree(codeRepoId: string, path: string): Promise<void> {
+  const state = stateFor(codeRepoId);
+  state.error = null;
+  try {
+    await openRepoAtPath(path);
+  } catch (err) {
+    state.error = err instanceof Error ? err.message : String(err);
+  }
 }
 
 /** git-ui's `pickerModel.ts:94`-`98` twin, four lines, replicated rather than imported:

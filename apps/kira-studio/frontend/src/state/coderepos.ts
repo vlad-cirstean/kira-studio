@@ -1,7 +1,7 @@
 import type { RepoSummary } from '@shared/domain/repo';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
-import { closeRepoWorkspace } from './workspace';
+import { closeRepoWorkspace, openRepoWorkspace } from './workspace';
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
 // import, rename, remove. No connect/disconnect lifecycle (a repository is a path, not a live
@@ -45,4 +45,43 @@ export async function removeCodeRepo(id: string): Promise<void> {
   await control.codeWorkspaceRemoveRepo(id);
   codeReposState.records = codeReposState.records.filter((r) => r.id !== id);
   closeRepoWorkspace(id);
+}
+
+/** P82: canonicalized the way gitpath.CleanNFC canonicalizes a repository root
+ *  (internal/gitpath/gitpath.go:46) — `git worktree list` reports paths verbatim, while
+ *  RepoSummary.root/.repoId come back NFC-normalized from gitclient.Identify. */
+function canonicalPath(p: string): string {
+  return p.normalize('NFC').replace(/[/\\]+$/, '');
+}
+
+function recordForRoot(path: string): RepoSummary | undefined {
+  const target = canonicalPath(path);
+  return codeReposState.records.find(
+    (r) => canonicalPath(r.root) === target || canonicalPath(r.repoId) === target,
+  );
+}
+
+/** P82: "switch to this worktree". A worktree is its own repository root (gitclient.Identify's
+ *  RepoID is the worktree root), so switching to one is opening its own workspace — the same
+ *  premise WorktreeList.vue's own switch rests on, not a second worktree-switching path. Imports
+ *  it first when this app has no row for that root yet. */
+export async function openRepoAtPath(path: string): Promise<void> {
+  const existing = recordForRoot(path);
+  if (existing) {
+    openRepoWorkspace(existing.id);
+    return;
+  }
+  try {
+    const imported = await control.codeWorkspaceImportRepo(path);
+    codeReposState.records = [...codeReposState.records, imported];
+    openRepoWorkspace(imported.id);
+  } catch (err) {
+    // Another window imported this root between the lookup above and this call — re-read the list
+    // and use the row that now exists. Anything else propagates to the caller's own error surface.
+    if ((err as { code?: string }).code !== 'E_ALREADY_IMPORTED') throw err;
+    await hydrateCodeRepos();
+    const row = recordForRoot(path);
+    if (!row) throw err;
+    openRepoWorkspace(row.id);
+  }
 }
