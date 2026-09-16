@@ -1049,6 +1049,79 @@ performed — beyond the no-display constraint prior phases already recorded, `a
 own Taskfile defines only `darwin:*` tasks (sign, notarize, `darwin:package:dmg`), no Linux build/
 dev task at all, so there is nothing to launch under this sandbox's own `Xvfb` even in principle.
 
+## P84 result
+
+Landed per plan (`docs/v1.8/plans/P84-git-panel-repositories-files-tabs.md`), 6 commits
+(`cc9b1ce5`..`2fb50654`), in the plan's own §14 order.
+
+**Part A, the duplicate listing (`cc9b1ce5`, `16c3c42d`).** `gitclient.WorktreeIdentity` lifted
+verbatim out of `Identify`'s own two `rev-parse` lines (`--absolute-git-dir`,
+`--git-common-dir`), with `Identify` refactored onto it. `CodeWorkspaceService.RepoWorktreeLinks`
+answers one `parentId` per `code_repos` row, grouped by common dir per §3's anchor rule (the row
+that is not a linked worktree, or else the smallest `(sortOrder, createdAt, id)`), shaped like
+`RepoHeads` — same `errgroup`, same never-fail-the-batch error handling. Wails bindings
+regenerated in the same commit as `ipcChannels.ts`/`mockRuntime.ts`'s harness entries, per
+`mockRuntime.spec.ts`'s own FQN guard. `repo/state/repoLinks.ts` (new store, session-scoped
+`Map`), `worktrees.ts`'s `switchToWorktree` writing the click-time hint so the newly-imported
+worktree never flashes at the top level, and `GitPanel.vue`'s top-level filter
+(`!worktreeParentId(r.id)`) plus §6's row state (`isOpen` reading "this row, or a row parented to
+it, is open") and both context menus gaining Rename/Close/Remove on the nested row.
+
+**Part B, the two tabs (`337a5ea9`).** One `PanelShell`, a two-option `SegmentedControl`
+("Repositories" / "Files") in the `#title` slot the repo-name title vacated; `#body` switches on
+it. The Files/Search/Review segmented control and its icon buttons moved into the Files tab's own
+body as a `.view-strip`, with `local.repoSearch`/`local.fileSearch` split so a filter typed on one
+tab no longer hides rows on the other. A local `tab` ref, driven by an `immediate` watcher on
+`repoId`, auto-switches to Files whenever a workspace opens or activates and back to Repositories
+when the last one closes — OQ-2's confirmed answer. `.repo-section.has-workspace`'s 50% height cap
+and bottom border deleted; nothing stacks below the list once Files owns its own tab.
+
+**Tests (`f459f4e0`).** §13.2's two migrations (`git-panel-tab-repos` click inserted where a test
+asserts on the repo row after opening it), §13.3's rewrite of P82's own worktree-switch test onto
+the dedup rule (`toHaveCount(0)` for the top-level duplicate, then the nested row carries `active`
+after switching tabs), §13.4's new hydration-path test (`RepoWorktreeLinks` seeded with both rows
+from a restart, no click at all, proving the batched path independent of §4.5's hint).
+
+**Bugs found and fixed during verification, not part of the plan (`95ad3246`, `2fb50654`).** The
+full `test:ui` run surfaced two failures the plan's own migration list (§13.2) missed:
+
+- Every `repoRow(page).dblclick()` across `repo-workspace.spec.ts`, `repo-graph-lifecycle.spec.ts`
+  and `markdown-reading.spec.ts` raced the new auto-switch: `onRowClick` (P67b) already opens or
+  activates on one click, so the double click's second physical click — sent at fixed coordinates
+  — landed on the Files tab's own relocated view-strip once §8.3's watcher moved it there instead
+  of the row a real double click's second click was aimed at. Traced by history: these specs'
+  `dblclick` predates P67b, from when repo rows lived in `ProjectPanel.vue` with a real
+  `@click`/`@dblclick` select/open split (`4d5b5f9f`); P67b's single-click consolidation
+  (`f1bedaf1`) made the second click redundant but harmless, until this phase's tab split gave it
+  somewhere wrong to land. Mechanical `.dblclick()` -> `.click()` across all three files.
+- "a worktree row's menu opens a terminal there, and both rows show the indicator"
+  (`repo-workspace.spec.ts`) opens a terminal via the worktree row's context menu, which calls
+  `openRepoTerminalTab` -> `openRepoWorkspace(repo.id)` as a side effect — the same auto-switch
+  trigger, so the Repositories tab (and the worktree rows the test asserts on) was gone from the
+  DOM by the time it checked the indicator. The plan's own §13.2 named this test as one that
+  "never opens a workspace"; that call chain says otherwise. Fixed the same way as §13.2's two
+  migrations: one `git-panel-tab-repos` click before reading row state.
+
+**Verification.** `go build/vet/test ./...` clean — 1655 tests across 65 packages; one
+`internal/grpcclient` reflection-test EOF on a `-count=1` run reproduced as transient (3/3 in
+isolation, and a full re-run went clean), the same flake shape P83's result section already
+recorded, in an unrelated package this phase never touches. `bun run typecheck` clean. `bun run
+test:unit`: 1509/1509 (13537 assertions). `bun run test:ui` (`ui`+`ui-timing`): 284/284 on a clean
+run, after the two fixes above; re-run three times before the fixes landed to confirm neither
+failure was a parallel-worker flake (the terminal-indicator one failed deterministically 3/3, the
+markdown-reading scroll-position one turned out to be an unrelated one-off — passed 3/3 standalone
+and clean on every full-suite re-run afterward). `bun run build:vscode` succeeds; `bun run
+test:webview` 45/45 — consistent with the diff-scope check confirming no `packages/git-*`/
+`apps/kira-studio-vscode` file touched by any of this phase's commits, `GitPanel.vue` being
+desktop-only.
+
+**No known gap.** Unlike P82/P83, this phase has no native-window-dependent manual pass in its own
+§13.6 that a headless sandbox cannot perform in principle — its "manual, on a real repository"
+checks are a supplement to, not a replacement for, the full Playwright coverage above, and §13.5
+already states plainly (not as a gap discovered here) that the flash window and the
+`RepoWorktreeLinks` error path have no dedicated Playwright coverage, for the same
+`installGitStreamMock`-cannot-hold-open reason P74/P75/P82 already recorded.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
