@@ -1177,6 +1177,8 @@ export interface GhStatus {
 export interface PrRecord {
   readonly number: number;
   readonly title: string;
+  /** P79 finding 6: never hand this straight to a host/renderer as a clickable link — go through
+   *  `pr.openExternal` instead. */
   readonly url: string;
   readonly state: 'open' | 'draft' | 'merged' | 'closed';
   readonly headRef: string;
