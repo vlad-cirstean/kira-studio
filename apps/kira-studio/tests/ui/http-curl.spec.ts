@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installFakeTimers } from './support/clock';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
@@ -131,6 +132,9 @@ test('warnings are shown before Import, and the coerced method sticks after impo
 // character-by-character (unlike .fill's single input event) is what actually exercises the
 // debounce this fix adds.
 test('the curl preview is debounced, not re-lexed on every keystroke', async ({ relaunch }) => {
+  // ImportCurlDialog.vue's own constant — restated here rather than imported across the web/node
+  // tsconfig boundary (this suite's existing convention, see `global.d.ts:1`-`5`).
+  const PREVIEW_DEBOUNCE_MS = 400;
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.collectionsList, response: { collections: [], items: [] } },
   ];
@@ -140,13 +144,18 @@ test('the curl preview is debounced, not re-lexed on every keystroke', async ({ 
   await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
   await page.click('[data-testid="import-curl-start"]');
   await expect(page.locator('[data-testid="import-curl-dialog"]')).toBeVisible();
+  await installFakeTimers(page); // support/clock.ts — after boot, never before
 
   const summary = page.locator('[data-testid="import-curl-summary"]');
   await page.click('[data-testid="import-curl-textarea"]');
   await page.keyboard.type('curl https://api.example.com/orders');
 
-  // Immediately after typing, before the debounce settles, the preview has not caught up yet.
+  // Time has not moved, so no wall-clock budget is being asserted here: the debounce *cannot*
+  // have elapsed, however slowly the harness typed (P81 §3.3/§6 — same shape as grpc-request's).
   await expect(summary).toHaveText('');
+  await page.clock.runFor(PREVIEW_DEBOUNCE_MS - 1);
+  await expect(summary).toHaveText('');
+  await page.clock.runFor(2);
 
   await expect(summary).toContainText('api.example.com/orders');
 });

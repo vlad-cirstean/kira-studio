@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installFakeTimers } from './support/clock';
 import { IPC } from './support/ipcChannels';
 import {
   ORDER_ITEMS_PATH,
@@ -185,14 +186,22 @@ test('a window boots into whatever mode windowsEnsure answers with (P22 D12)', a
 test('switching mode reaches windowsSetMode eventually, never synchronously (P22 D12/F20)', async ({
   relaunch,
 }) => {
+  // state/mode.ts's own constant — restated here rather than imported across the web/node
+  // tsconfig boundary (this suite's existing convention, see `global.d.ts:1`-`5`).
+  const MODE_WRITE_DEBOUNCE_MS = 150;
   const { window: page, control } = await relaunch({ control: [] });
+  await installFakeTimers(page); // support/clock.ts — after boot, never before
 
   const setModeCalls = () => control.log().filter((e) => e.channel === IPC.windowsSetMode);
 
   await modeTab(page, 'api').click();
-  // Nothing yet — the click itself must not fire a synchronous IPC (F20's own invariant).
+  // Nothing yet — the click itself must not fire a synchronous IPC (F20's own invariant). Time
+  // has not moved, so this isn't a wall-clock budget: the debounce *cannot* have elapsed, however
+  // slowly the harness's own click landed (P81 §3.3/§6 — same shape as grpc-request's).
   expect(setModeCalls()).toHaveLength(0);
-
+  await page.clock.runFor(MODE_WRITE_DEBOUNCE_MS - 1);
+  expect(setModeCalls()).toHaveLength(0);
+  await page.clock.runFor(2);
   await expect.poll(() => setModeCalls().length).toBe(1);
   expect(setModeCalls()[0]?.args).toMatchObject({ mode: 'api' });
 
@@ -200,6 +209,7 @@ test('switching mode reaches windowsSetMode eventually, never synchronously (P22
   // value, the same coalescing behaviour state/layout.ts's own patchLayout has.
   await modeTab(page, 'studio').click();
   await modeTab(page, 'api').click();
+  await page.clock.runFor(MODE_WRITE_DEBOUNCE_MS + 1);
   await expect.poll(() => setModeCalls().length).toBe(2);
   expect(setModeCalls()[1]?.args).toMatchObject({ mode: 'api' });
 });
