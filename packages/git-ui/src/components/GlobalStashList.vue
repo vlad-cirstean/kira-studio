@@ -7,6 +7,9 @@
  * Row menu: Apply here, Create branch from this…, Show changes, Remove from global stash — no
  * Pop, no Drop (`buildGlobalStashMenu`, D12: both are position-addressed by necessity and a
  * global entry has no stack position at all).
+ *
+ * P77 §11: renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
+ * the same `TagList.vue`/`StashList.vue` contract, this component owns no fold of its own.
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
@@ -14,12 +17,13 @@ import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
 import { formatRelativeDate } from './dateFormat.ts';
+import type { PickerList } from './pickerModel.ts';
 import RowContextMenu from './RowContextMenu.vue';
-import { capItems } from './refListModel.ts';
 import { buildGlobalStashMenu, buildReadOnlyStashMenu } from './rowMenuModel.ts';
 import { globalRowModel } from './stashListModel.ts';
 
 const props = defineProps<{
+  section: PickerList<StashEntry>;
   stash: StashState;
   ops: OpsState;
   inProgress: InProgressOperation | null;
@@ -34,8 +38,6 @@ const emit = defineEmits<{
   (e: 'branchFromStash', entry: StashEntry): void;
   (e: 'saveGlobalStash'): void;
 }>();
-
-const section = computed(() => capItems(props.stash.globalEntries.value));
 
 function select(entry: StashEntry): void {
   props.stash.select(entry.sha);

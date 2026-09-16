@@ -1,22 +1,29 @@
 <script setup lang="ts">
 /**
- * G26 D3/F13/F14: `BranchPicker.vue`'s fifth section — one sub-list per `StackSummary`, rows
+ * G26 D3/F13/F14: `BranchPicker.vue`'s Stacks tab — one sub-list per `StackSummary`, rows
  * pre-order bottom-to-top with `depth`-driven indent (D3), a PR badge and track text reused
  * verbatim from `PrState.byBranch`/`RefRow` (F13/F14), a stale chip, and a header "Restack" button
  * per stack. Row-level "Set stack parent…"/"Remove from stack" mirror `WorktreeList.vue`'s own
  * "this component has nowhere of its own to do X" shape: both EMIT the intent for `App.vue` to
  * open `StackDialog.vue` with, rather than this file owning a second dialog. The Restack button
  * does the same — `StackDialog.vue` is the one place the plan/blockers/progress actually render.
+ *
+ * P77 §11: `stacks`/`orphans` are already filtered/capped by `pickerModel.ts` (each stack group
+ * carries its own already-`StackSummary`, so the per-stack header's "Restack" target/`needsRestack`
+ * gate reads `group.summary` directly rather than a second, unfiltered lookup) — this component no
+ * longer reads `stack.stacks.value`/`stack.orphans.value` for rendering, and no longer needs the
+ * `stack` prop at all (nothing else in this file ever read it).
  */
 import type { StackBranch } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
-import type { StackState } from '../state/stack.ts';
+import type { PickerList, PickerStackGroup } from './pickerModel.ts';
 import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
 const props = defineProps<{
-  stack: StackState;
+  stacks: PickerList<PickerStackGroup>;
+  orphans: PickerList<StackBranch>;
   ops: OpsState;
   /** G24 D9's own branch-tip badge — optional so a caller with nothing to show yet gets a
    *  plain, badge-free list (mirrors `BranchPicker.vue`'s own `pr` prop). */
@@ -52,7 +59,7 @@ function rowsFor(branches: readonly StackBranch[]): StackRow[] {
 }
 
 function orphanRows(): StackRow[] {
-  return buildOrphanRows(props.stack.orphans.value, byBranchMap());
+  return buildOrphanRows(props.orphans.visible, byBranchMap());
 }
 
 function requestRestack(branch: string): void {
@@ -74,21 +81,21 @@ async function removeFromStack(branch: string): Promise<void> {
   <div class="kv-branch-section" aria-label="Stacks">
     <div class="kv-branch-section-title">Stacks</div>
 
-    <div v-for="summary in stack.stacks.value" :key="summary.base" class="kv-stack-group">
+    <div v-for="group in stacks.visible" :key="group.summary.base" class="kv-stack-group">
       <div class="kv-stack-header">
-        <span class="kv-stack-base" v-kui-tooltip="`Base: ${summary.base}`">{{ summary.base }}</span>
+        <span class="kv-stack-base" v-kui-tooltip="`Base: ${group.summary.base}`">{{ group.summary.base }}</span>
         <KuiButton
           v-if="writeCapability"
           class="kv-stack-restack"
-          :disabled="!summary.needsRestack"
-          @click="requestRestack(summary.branches[summary.branches.length - 1]?.name ?? summary.base)"
+          :disabled="!group.summary.needsRestack"
+          @click="requestRestack(group.summary.branches[group.summary.branches.length - 1]?.name ?? group.summary.base)"
         >
           Restack
         </KuiButton>
       </div>
 
       <div
-        v-for="row in rowsFor(summary.branches)"
+        v-for="row in rowsFor(group.branches)"
         :key="row.name"
         class="kv-branch-row kv-stack-row"
         :style="{ paddingLeft: `calc(var(--kv-s-2) + ${row.depth} * var(--kv-s-4))` }"
@@ -147,7 +154,7 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <div v-if="stack.orphans.value.length > 0" class="kv-stack-group">
+    <div v-if="orphans.visible.length > 0" class="kv-stack-group">
       <div class="kv-stack-header">
         <span class="kv-stack-base">Needs attention</span>
       </div>
@@ -168,8 +175,12 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
+    <div v-if="stacks.hiddenCount > 0 || orphans.hiddenCount > 0" class="kv-branch-more">
+      {{ stacks.hiddenCount + orphans.hiddenCount }} more — refine your filter
+    </div>
+
     <div
-      v-if="stack.stacks.value.length === 0 && stack.orphans.value.length === 0"
+      v-if="stacks.visible.length === 0 && orphans.visible.length === 0"
       class="kv-branch-empty"
     >
       No stacked branches
