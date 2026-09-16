@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import type { SettingDef, SettingKey } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
 import type {
   EventKey,
@@ -216,25 +215,5 @@ describe('RepoSettingsState', () => {
 
     expect(state.settings.value['kiraVersion.graph.scope']).toBe('head');
     state.dispose();
-  });
-});
-
-// P72 §9.2: replaces G18 D13/D10's own guard — instanceWide's only user (kiraVersion.log.level)
-// is gone, so no repo-sourced key sets it any more.
-describe('instanceWide flag the dialog would read off SETTINGS directly (D13)', () => {
-  test('no repo-sourced key is instanceWide', () => {
-    const repoKeys: SettingKey[] = [
-      'kiraVersion.graph.pageSize',
-      'kiraVersion.graph.scope',
-      'kiraVersion.stash.showInGraph',
-      'kiraVersion.stash.includeUntracked',
-      'kiraVersion.review.baseCandidates',
-      'kiraVersion.pull.strategy',
-      'kiraVersion.log.level',
-    ];
-    for (const key of repoKeys) {
-      const def: SettingDef<unknown> = SETTINGS[key];
-      expect(Boolean(def.instanceWide)).toBe(false);
-    }
   });
 });

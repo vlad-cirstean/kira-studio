@@ -10,6 +10,9 @@ type AppearanceSettings struct {
 	RowColoring bool   `json:"rowColoring"`
 	// InlineBlame is P62's git-blame annotation toggle in the repo file viewer.
 	InlineBlame bool `json:"inlineBlame"`
+	// DateFormat is P72 §9.1's relative-vs-absolute commit timestamp preference, moved here from
+	// the per-repo RepoSettingsDialog.vue/PersistedViewState.
+	DateFormat string `json:"dateFormat"`
 }
 
 type DataSettings struct {
@@ -25,6 +28,9 @@ type AdvancedSettings struct {
 	// P18 D14/D20: an estimated-rows-read threshold, never a cost unit — settings.ts's own
 	// EXPENSIVE_QUERY_ROWS_RANGE comment carries the full argument.
 	ExpensiveQueryRows int `json:"expensiveQueryRows"`
+	// GitLogLevel is P72 §9.2's genuinely app-wide replacement for the per-repo
+	// kiraVersion.log.level — internal/logging.SetLevel is its actual mechanism.
+	GitLogLevel string `json:"gitLogLevel"`
 }
 
 // GitSettings mirrors G7 D16's two server-owned git leaves: two windows disagreeing about either
@@ -75,12 +81,14 @@ func DefaultSettings() Settings {
 			WordWrap:    true,
 			RowColoring: true,
 			InlineBlame: true,
+			DateFormat:  "relative",
 		},
 		Data:  DataSettings{DefaultPageSize: 100},
 		Cache: CacheSettings{L2BudgetMb: 64},
 		Advanced: AdvancedSettings{
 			OpLogRetentionDays: 30,
 			ExpensiveQueryRows: 100_000,
+			GitLogLevel:        "info",
 		},
 		// docs/v1.3/plans/G7 D16: the same three-pattern default upstream's own
 		// kiraVersion.protectedBranches carried, before this phase moved it server-side.
@@ -104,6 +112,7 @@ type AppearancePatch struct {
 	WordWrap    *bool   `json:"wordWrap,omitempty"`
 	RowColoring *bool   `json:"rowColoring,omitempty"`
 	InlineBlame *bool   `json:"inlineBlame,omitempty"`
+	DateFormat  *string `json:"dateFormat,omitempty"`
 }
 
 type DataPatch struct {
@@ -115,8 +124,9 @@ type CachePatch struct {
 }
 
 type AdvancedPatch struct {
-	OpLogRetentionDays *int `json:"opLogRetentionDays,omitempty"`
-	ExpensiveQueryRows *int `json:"expensiveQueryRows,omitempty"`
+	OpLogRetentionDays *int    `json:"opLogRetentionDays,omitempty"`
+	ExpensiveQueryRows *int    `json:"expensiveQueryRows,omitempty"`
+	GitLogLevel        *string `json:"gitLogLevel,omitempty"`
 }
 
 // GitPatch mirrors GitSettings' own `.partial()` shape (G7 D16).
@@ -151,6 +161,11 @@ func ValidRowDensity(v string) bool {
 	return v == "compact" || v == "comfortable"
 }
 
+// ValidDateFormat mirrors settings.ts's appearanceSettingsSchema.dateFormat enum.
+func ValidDateFormat(v string) bool {
+	return v == "relative" || v == "absolute"
+}
+
 // ValidPageSize mirrors settings.ts's pageSizeSchema (shared with tabs.ts's per-kind page sizes).
 func ValidPageSize(v int) bool {
 	switch v {
@@ -177,8 +192,13 @@ var (
 // the offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema
 // either, so they are accepted as-is.
 func (p SettingsPatch) Validate() error {
-	if p.Appearance != nil && p.Appearance.RowDensity != nil && !ValidRowDensity(*p.Appearance.RowDensity) {
-		return fmt.Errorf("model: appearance.rowDensity: invalid value %q", *p.Appearance.RowDensity)
+	if p.Appearance != nil {
+		if p.Appearance.RowDensity != nil && !ValidRowDensity(*p.Appearance.RowDensity) {
+			return fmt.Errorf("model: appearance.rowDensity: invalid value %q", *p.Appearance.RowDensity)
+		}
+		if p.Appearance.DateFormat != nil && !ValidDateFormat(*p.Appearance.DateFormat) {
+			return fmt.Errorf("model: appearance.dateFormat: invalid value %q", *p.Appearance.DateFormat)
+		}
 	}
 	if p.Data != nil && p.Data.DefaultPageSize != nil && !ValidPageSize(*p.Data.DefaultPageSize) {
 		return fmt.Errorf("model: data.defaultPageSize: invalid value %d", *p.Data.DefaultPageSize)
@@ -192,6 +212,9 @@ func (p SettingsPatch) Validate() error {
 		}
 		if p.Advanced.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*p.Advanced.ExpensiveQueryRows) {
 			return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *p.Advanced.ExpensiveQueryRows)
+		}
+		if p.Advanced.GitLogLevel != nil && !ValidLogLevel(*p.Advanced.GitLogLevel) {
+			return fmt.Errorf("model: advanced.gitLogLevel: invalid value %q", *p.Advanced.GitLogLevel)
 		}
 	}
 	if p.Git != nil && p.Git.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*p.Git.FetchAutoIntervalMinutes) {

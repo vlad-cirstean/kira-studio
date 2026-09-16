@@ -3,6 +3,7 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -44,6 +45,11 @@ func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 	// is a different, per-repo settings surface that never carries it.
 	if args.Patch.Git != nil && args.Patch.Git.FetchAutoIntervalMinutes != nil && s.Deps.GitRegistry != nil {
 		s.Deps.GitRegistry.ReconcileAutoFetch()
+	}
+	// P72 §9.2: advanced.gitLogLevel's own actual mechanism — apply the new verbosity immediately
+	// rather than only on next launch.
+	if args.Patch.Advanced != nil && args.Patch.Advanced.GitLogLevel != nil {
+		logging.SetLevel(*args.Patch.Advanced.GitLogLevel)
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 	return merged, nil
