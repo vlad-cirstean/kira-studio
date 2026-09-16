@@ -43,7 +43,8 @@ import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 import GlobalStashList from './GlobalStashList.vue';
 import {
-  buildPickerModel,
+  filterPickerInput,
+  orderAndCapTab,
   type PickerInput,
   type PickerListKey,
   type PickerModel,
@@ -174,9 +175,12 @@ const pickerInput = computed<PickerInput>(() => ({
   orphans: props.stack.orphans.value,
 }));
 
-const model = computed(() =>
-  buildPickerModel(pickerInput.value, filter.value, activeTab.value, capSteps.value),
-);
+// P79: split into two computeds so a tab switch or "show more" click (only ever changing
+// `activeTab`/`capSteps`) never re-runs the expensive filter fold over every list —
+// `filteredPicker` depends only on `(pickerInput, filter)`, `model` only adds the cheap per-tab
+// ordering/cap pass on top. See `pickerModel.ts`'s own doc comment on `filterPickerInput`.
+const filteredPicker = computed(() => filterPickerInput(pickerInput.value, filter.value));
+const model = computed(() => orderAndCapTab(filteredPicker.value, activeTab.value, capSteps.value));
 
 /** P77 §6.3: "Show 50 more (150 remaining)" — raises one list's own cap by
  *  `REF_LIST_SECTION_CAP` for the current panel-open. Every tab-body button below calls this with
