@@ -132,9 +132,8 @@ function filterStackGroups(
   if (needle === '') return [...groups];
   const filtered: PickerStackGroup[] = [];
   for (const group of groups) {
-    const branches = group.branches.filter(
-      (b) => matchesText(b.name, needle) || matchesText(group.summary.base, needle),
-    );
+    const baseMatches = matchesText(group.summary.base, needle);
+    const branches = group.branches.filter((b) => baseMatches || matchesText(b.name, needle));
     if (branches.length > 0) filtered.push({ summary: group.summary, branches });
   }
   return filtered;
@@ -198,37 +197,63 @@ function capWithPins<T>(rows: readonly T[], pinned: number, cap: number): Picker
   return { visible: rows.slice(0, limit), hiddenCount: rows.length - limit };
 }
 
-export function buildPickerModel(
-  input: PickerInput,
-  filter: string,
-  tab: PickerTab,
-  capSteps: Readonly<Partial<Record<PickerListKey, number>>>,
-): PickerModel {
-  const capFor = (key: PickerListKey): number => capSteps[key] ?? REF_LIST_SECTION_CAP;
+/** The expensive half of the fold (§5.1's filter, plus §5.3's cross-tab counts) — depends only on
+ *  `(input, filter)`, never on `activeTab`/`capSteps`. P79: split out of `buildPickerModel` so
+ *  clicking a different tab or "show more" (which only ever changes ordering/capping below) does
+ *  not re-lowercase/re-filter every one of the eight lists on a repo with thousands of rows. */
+export interface FilteredPicker {
+  readonly counts: Readonly<Record<PickerTab, number>>;
+  readonly local: readonly RefRow[];
+  readonly remote: readonly RefRow[];
+  readonly tags: readonly RefRow[];
+  readonly stashStack: readonly StashEntry[];
+  readonly stashGlobal: readonly StashEntry[];
+  readonly worktrees: readonly WorktreeEntry[];
+  readonly stackGroups: readonly PickerStackGroup[];
+  readonly orphans: readonly StackBranch[];
+}
+
+export function filterPickerInput(input: PickerInput, filter: string): FilteredPicker {
   const needle = filter.trim().toLowerCase();
 
   // §5.1: the one box now scopes to each tab's own field — every tab's filtered set is computed
   // here (not only the active tab's) since §5.3's cross-tab counts need every tab's match count on
   // every call.
-  const filteredLocal = filterRefs(input.branches, filter);
-  const filteredRemote = filterRefs(input.remoteBranches, filter);
-  const filteredTags = filterRefs(input.tags, filter);
-  const filteredStashStack = filterStashes(input.stashes, needle);
-  const filteredStashGlobal = filterStashes(input.globalStashes, needle);
-  const filteredWorktrees = filterWorktrees(input.worktrees, needle);
-  const filteredStackGroups = filterStackGroups(groupStacks(input.stacks), needle);
-  const filteredOrphans = filterOrphans(input.orphans, needle);
+  const local = filterRefs(input.branches, filter);
+  const remote = filterRefs(input.remoteBranches, filter);
+  const tags = filterRefs(input.tags, filter);
+  const stashStack = filterStashes(input.stashes, needle);
+  const stashGlobal = filterStashes(input.globalStashes, needle);
+  const worktrees = filterWorktrees(input.worktrees, needle);
+  const stackGroups = filterStackGroups(groupStacks(input.stacks), needle);
+  const orphans = filterOrphans(input.orphans, needle);
 
   const counts: Record<PickerTab, number> = {
-    branches: filteredLocal.length + filteredRemote.length,
-    tags: filteredTags.length,
-    stashes: filteredStashStack.length + filteredStashGlobal.length,
-    worktrees: filteredWorktrees.length,
-    stacks: filteredStackGroups.reduce((n, g) => n + g.branches.length, 0) + filteredOrphans.length,
+    branches: local.length + remote.length,
+    tags: tags.length,
+    stashes: stashStack.length + stashGlobal.length,
+    worktrees: worktrees.length,
+    // P79: entries (a stack group counts as one, same as an orphan), not branches summed across
+    // groups — `capItems`/`StackList.vue`'s own "Show N more" both already count entries, so the
+    // badge now agrees with what's capped and what's reported hidden instead of mixing units.
+    stacks: stackGroups.length + orphans.length,
   };
 
+  return { counts, local, remote, tags, stashStack, stashGlobal, worktrees, stackGroups, orphans };
+}
+
+/** The cheap half: only orders/caps the active tab's already-filtered rows — depends on
+ *  `(filtered, tab, capSteps)`, so a tab switch or a "show more" click never touches the other
+ *  four tabs' lists. */
+export function orderAndCapTab(
+  filtered: FilteredPicker,
+  tab: PickerTab,
+  capSteps: Readonly<Partial<Record<PickerListKey, number>>>,
+): PickerModel {
+  const capFor = (key: PickerListKey): number => capSteps[key] ?? REF_LIST_SECTION_CAP;
+
   const base: Omit<PickerModel, 'rowIds'> = {
-    counts,
+    counts: filtered.counts,
     branchesLocal: emptyList(),
     branchesRemote: emptyList(),
     tags: emptyList(),
@@ -240,9 +265,9 @@ export function buildPickerModel(
   };
 
   if (tab === 'branches') {
-    const { rows: orderedLocal, pinned } = orderLocalBranches(filteredLocal);
+    const { rows: orderedLocal, pinned } = orderLocalBranches(filtered.local);
     const branchesLocal = capWithPins(orderedLocal, pinned, capFor('branchesLocal'));
-    const branchesRemote = capItems(orderRemoteBranches(filteredRemote), capFor('branchesRemote'));
+    const branchesRemote = capItems(orderRemoteBranches(filtered.remote), capFor('branchesRemote'));
     return {
       ...base,
       branchesLocal,
@@ -255,7 +280,7 @@ export function buildPickerModel(
   }
 
   if (tab === 'tags') {
-    const tags = capItems(sortTags(filteredTags), capFor('tags'));
+    const tags = capItems(sortTags(filtered.tags), capFor('tags'));
     return {
       ...base,
       tags,
@@ -264,8 +289,8 @@ export function buildPickerModel(
   }
 
   if (tab === 'stashes') {
-    const stashStack = capItems(orderStashStack(filteredStashStack), capFor('stashStack'));
-    const stashGlobal = capItems(orderGlobalStash(filteredStashGlobal), capFor('stashGlobal'));
+    const stashStack = capItems(orderStashStack(filtered.stashStack), capFor('stashStack'));
+    const stashGlobal = capItems(orderGlobalStash(filtered.stashGlobal), capFor('stashGlobal'));
     return {
       ...base,
       stashStack,
@@ -278,7 +303,7 @@ export function buildPickerModel(
   }
 
   if (tab === 'worktrees') {
-    const worktrees = capItems(orderWorktrees(filteredWorktrees), capFor('worktrees'));
+    const worktrees = capItems(orderWorktrees(filtered.worktrees), capFor('worktrees'));
     return {
       ...base,
       worktrees,
@@ -287,8 +312,8 @@ export function buildPickerModel(
   }
 
   // tab === 'stacks'
-  const stacks = capItems(filteredStackGroups, capFor('stacks'));
-  const orphans = capItems(filteredOrphans, capFor('stacks'));
+  const stacks = capItems(filtered.stackGroups, capFor('stacks'));
+  const orphans = capItems(filtered.orphans, capFor('stacks'));
   return {
     ...base,
     stacks,
@@ -300,4 +325,16 @@ export function buildPickerModel(
       ...orphans.visible.map((o) => ({ id: `orphan:${o.name}`, disabled: false })),
     ],
   };
+}
+
+/** Composes the two halves above — the one entry point `pickerModel.test.ts` exercises with plain
+ *  fixtures. `BranchPicker.vue` calls `filterPickerInput`/`orderAndCapTab` directly instead, as two
+ *  separate computeds, so a tab switch or "show more" click recomputes only the cheap half. */
+export function buildPickerModel(
+  input: PickerInput,
+  filter: string,
+  tab: PickerTab,
+  capSteps: Readonly<Partial<Record<PickerListKey, number>>>,
+): PickerModel {
+  return orderAndCapTab(filterPickerInput(input, filter), tab, capSteps);
 }
