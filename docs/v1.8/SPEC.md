@@ -909,6 +909,57 @@ none touching the 5 rewritten tests. Targeted `--repeat-each=10` on those 5: 50/
 `bun run test:webview` 3 full runs, 45/45 every time, all 7 `commit-meta-clamp.spec.ts` tests
 included. `git status --porcelain` clean; no `playwright.config.ts` touched in either app.
 
+## P82 result
+
+Landed per plan (`docs/v1.8/plans/P82-git-repo-row-worktrees.md`), 4 commits (`cbaedb4f`..
+`87ef598b`), in the plan's own §13 order.
+
+**Part A (`cbaedb4f`).** `onRowClose`, the `.repo-row-close` markup and its three CSS rules deleted,
+after confirming §2.2's dead-code claims by grep first (`onRowClose`/`repo-row-close`/
+`workspace-repo-close`/`closeRepoWorkspace` all matched exactly what the plan stated).
+`repo-workspace.spec.ts`'s close test rewritten onto the row's context-menu "Close" item, plus a new
+assertion the button is gone.
+
+**Part B (`2147341d`, `7acb366b`, `87ef598b`).** New `repo/state/worktrees.ts`: per-repo expansion
+store (§6), fetching over the same `gitTransportFor`/`ensureRepoOpen`/`worktree.list` shape
+`blameLine.ts:158` already uses, §6.3's lease invariant (a lease exists exactly while a row is
+expanded, disposing the shared transport too once no workspace has it open), live `repo.changed`
+refresh, and both eviction watches (§6.6) mirroring `quickOpen.ts`'s established pattern.
+`GitPanel.vue` gained the twisty control, the expanded worktree list (rows/error/loading/empty
+states), the `.repo-section.has-workspace` height cap, and new token-based CSS — landed with rows
+rendering but not yet clickable, per the plan's own staged-commit sequencing. `state/coderepos.ts`
+gained `canonicalPath`/`recordForRoot`/`openRepoAtPath` (§7) — opens an existing row or imports the
+worktree first, with the `E_ALREADY_IMPORTED` race fallback — then the store's `switchToWorktree`
+and the row's `@click.stop` wiring, plus §8.3's synchronous lease-collapse in the Close menu item.
+One new Playwright test (§12.3) covers the whole path: expand doesn't open the workspace (the
+`@click.stop` guard), two worktree rows render with the linked one's branch label, clicking it
+imports+opens+activates it with its own pinned graph tab (proven via `control.log()`, not just a
+click), and collapse drops the list.
+
+No Go file, no `packages/` file, no contract change, no new dependency — matches §11's file list
+exactly.
+
+**Verification.** Per-commit `bun run typecheck`, `biome check .`, `scripts/check-tokens.sh`,
+`bun run build` clean throughout (biome's one finding every run is the known pre-existing
+`UncommittedChangesStrip.vue` info-level item). `bun run test:ui` (`ui`+`ui-timing`): 280/280 on a
+clean run; a first run's single `markdown-reading.spec.ts` scroll-position failure reproduced as a
+pre-existing parallel-worker flake (passed standalone, and the clean rerun went fully green) —
+unrelated to any file this phase touched. `repo-workspace.spec.ts` (all 14 tests, including the new
+worktree one), `repo-graph-lifecycle.spec.ts` and `markdown-reading.spec.ts` all green.
+
+**Two known gaps, stated per the plan's own §12.4 bar, not claimed.** A manual GUI pass (item 2):
+not performed — this is a Wails v3 native app (GTK4/WebKitGTK on Linux, not Electron/CDP) with no
+remote-debugging hook, and repo import goes through a native folder-picker dialog no driver in this
+sandbox can reach, the same constraint prior phases' own result sections already recorded. A live
+leak check (item 3): not performed live either — confirmed Xvfb is present (a real feasibility check)
+but the full check needs the same native-window driving as the manual pass, correlated against Go
+`advanced.gitLogLevel=debug` output; disproportionate to build a dedicated driver for one check. What
+is confirmed by reading the code itself: `release()` calls `held.transport.dispose()` (that lease's
+own subscriptions only) then, only when `!workspaceState.openRepos.includes(codeRepoId)`, the same
+`disposeGitTransport` `closeRepoWorkspace` uses — which closes the real socket and clears the
+`repoOpenMemo` entry so a later re-expand does a fresh `repo.open`. A static read of the invariant,
+not a live-process observation.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
