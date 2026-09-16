@@ -116,10 +116,13 @@ func renderReferences(name string, sites []codegraph.Site, total int, truncated 
 	for _, s := range sites {
 		b.WriteByte('\n')
 		loc := position(s.Path, s.NameSpan.Start)
+		// §7.1: Confidence prints on every line, the same discipline renderTargetLine already
+		// applies to a Target — an included site can come from an Exact/Scoped group or a
+		// singleton RepoWide one, materially different evidence that stays visible here.
 		if s.Enclosing != "" {
-			b.WriteString(fmt.Sprintf("%s   %s   in %s", loc, s.Kind, s.Enclosing))
+			b.WriteString(fmt.Sprintf("%s   %s   in %s   %s", loc, s.Kind, s.Enclosing, s.Confidence))
 		} else {
-			b.WriteString(fmt.Sprintf("%s   %s", loc, s.Kind))
+			b.WriteString(fmt.Sprintf("%s   %s   %s", loc, s.Kind, s.Confidence))
 		}
 		writeSource(&b, src, s.Path, s.NameSpan.Start.Row)
 	}

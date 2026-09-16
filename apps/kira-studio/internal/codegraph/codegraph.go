@@ -69,6 +69,11 @@ type Site struct {
 	Kind, Name     string
 	Span, NameSpan Span
 	Enclosing      string // innermost enclosing definition's name, "" at file top level
+	// Confidence is this site's own resolved confidence (§7.1): the group's own resolveName result
+	// in Resolved mode, Exact for an IncludeDefinition site (the definition's own name span is not
+	// a guess), RepoWide for a NameOnly site (nothing was resolved, so a repository-wide name match
+	// is literally what the row is).
+	Confidence Confidence
 }
 
 // Query names a position (or a bare name) to resolve against. Byte is -1 when unset; Point is an

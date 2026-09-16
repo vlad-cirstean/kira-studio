@@ -131,6 +131,7 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 	// (discriminant, below).
 	type groupResult struct {
 		ids          map[int64]bool
+		conf         Confidence
 		discriminant bool
 	}
 	// groupTargets memoizes, per (directory, kind, language), the set of symbol ids a reference to
@@ -162,6 +163,10 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		}
 
 		included := mode == NameOnly
+		// siteConf is §7.1's own per-site signal: RepoWide for a NameOnly site (nothing was
+		// resolved, so a repository-wide name match is literally what the row is), else the
+		// resolving group's own confidence.
+		siteConf := RepoWide
 		if !included {
 			dir := dirOf(rf.Path)
 			key := dir + "\x00" + r.Kind + "\x00" + rf.Language
@@ -177,13 +182,14 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 				// means. A singleton candidate is kept regardless of tier: a name with exactly one
 				// definition repository-wide is unambiguous even at RepoWide, which is what
 				// preserves recall for the ordinary cross-directory case (P69d §A.4 commit 2).
-				group = groupResult{ids: ids, discriminant: conf != RepoWide || len(ids) == 1}
+				group = groupResult{ids: ids, conf: conf, discriminant: conf != RepoWide || len(ids) == 1}
 				groupTargets[key] = group
 			}
 			if !group.discriminant {
 				unattributed++
 				continue
 			}
+			siteConf = group.conf
 			for id := range targetIDs {
 				if group.ids[id] {
 					included = true
@@ -211,7 +217,7 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 			Path: rf.Path, Language: rf.Language,
 			Kind: r.Kind, Name: r.Name,
 			Span: referenceSpan(r), NameSpan: referenceNameSpan(r),
-			Enclosing: enclosingName,
+			Enclosing: enclosingName, Confidence: siteConf,
 		})
 	}
 
@@ -229,7 +235,7 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 					Path: t.file.Path, Language: t.file.Language,
 					Kind: t.sym.Kind, Name: t.sym.Name,
 					Span: symbolSpan(t.sym), NameSpan: symbolNameSpan(t.sym),
-					Enclosing: enclosingName,
+					Enclosing: enclosingName, Confidence: Exact,
 				})
 			}
 		}
