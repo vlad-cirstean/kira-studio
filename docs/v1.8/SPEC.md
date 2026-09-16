@@ -803,6 +803,52 @@ flakes reproduced under full-suite load, all confirmed passing standalone — no
 `bun run test:webview`: 45/45 after the regression fix (verified across the 12 repeated runs above).
 Pushed (`git push --force-with-lease`, required since the rebase rewrote already-pushed history).
 
+## P80 result
+
+Landed per plan (`docs/v1.8/plans/P80-update-main-docs.md`, `5f074684`), 7 commits (`39fb7e16`..
+`0391cb1a`) — the plan's own 6 plus one fix-up. Every quoted fact/count was re-verified against
+current source at edit time rather than trusted from the plan's own prose (itself already written
+against a tree-read, not SPEC.md summaries).
+
+**`CLAUDE.md`** — two `docs/v1.7/` → `docs/v1.8/` pointer fixes only, per the plan's own call that
+nothing else chapter-specific belongs here.
+
+**`docs/DEV_ENVIRONMENT.md`** — the P79 worktree-scaffold provisioning bug and the `git rebase
+--rebase-merges` hazard (a plain rebase flattens merge commits and reproduces spurious conflicts)
+recorded as environment facts, plus the `setup.sh` unconditional-bindings-task clause.
+
+**`docs/ARCHITECTURE.md`** — the largest edit (311 lines): deleted the now-false "`ImplementationsOf`
+returns nothing for Go" Known-open-item (P78 fixed it) and reworded the neighboring promoted-methods
+item to stand alone; rewrote the P62 blame section (P76 shipped the status-bar readout as a sibling
+item, not a LAW-14 violation, as the stale prose claimed); recounted (not reasserted) the gitrpc
+method table and the C10 write-boundary allowlist directly from `gitstream.go`/`gitrpc/handlers.go`;
+added incognito tabs and the external-open capability (`link.openExternal`, `IsGitHubHost`/GHES
+support) as new facts with no prior home; added the P77 tabbed-picker paragraph the plan's own §2
+omitted but its §6 verification checklist required (flagged as a plan gap rather than silently
+dropping the verification bar or silently expanding scope).
+
+**`README.md`** — full v1.8 pass: incognito, the two now-working settings leaves, find-references/
+go-to-implementation/nav-status readout, the blame status-bar item, Git-feature clauses, the tabbed
+picker, review-checkbox polish, chapter-pointer and Documentation-list updates (v1.8 now live, v1.7
+demoted).
+
+**Selectivity on P79, per instruction.** Only genuinely externally-visible P79 changes got doc
+mentions (the two settings leaves, GHES host support, `link.openExternal`, the PR-ancestry base
+cutoff, preview-model LRU refcounting, the KeepAlive-visibility pause + its resize-race fix); the
+purely internal correctness fixes (memo-poisoning, `resolve.go` reordering, `nav.go` helper
+extraction, tab-batching, blame-cache cap, `pickerModel` split, nav-status race fix) stayed out, per
+the plan's own explicit out-of-scope list.
+
+**Not absorbed, flagged during planning, not acted on:** `docs/v1.8/mcp-repo-map-issues.md` carries
+two still-open non-trivial dogfooding entries with no dedicated fix-pass phase in this chapter's own
+phasing table — per `CLAUDE.md`'s own repo-map process ("the next phase waits for a dedicated fix
+pass to close it"), left open rather than folded into a docs-only phase.
+
+Verification: `bun run typecheck` clean (all 5 sub-projects) on every commit via the pre-commit hook.
+Biome does not check `.md` files (confirmed — reports them ignored), so not relied on for markdown;
+each doc read start to finish for internal consistency instead. `git diff 5f074684..HEAD --stat`
+touches exactly the four named files, nothing else.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
