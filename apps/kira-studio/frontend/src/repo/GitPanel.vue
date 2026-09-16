@@ -13,6 +13,7 @@ import {
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import { ensureReviewPanelWidth } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
+import { terminalCountAtPath } from '../state/terminals';
 import {
   activateWorkspace,
   closeRepoWorkspace,
@@ -174,6 +175,13 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
   openContextMenu(e, items);
 }
 
+// P83 §11.2: the indicator's own tooltip text — terminalCountAtPath is §11's whole signal (the
+// terminal registry, already keyed by canonical cwd), so opening or exiting a terminal repaints
+// the row with no event plumbing of this panel's own.
+function terminalTooltip(n: number): string {
+  return n === 1 ? 'A terminal is open here' : `${n} terminals are open here`;
+}
+
 // P83 §10.2: a worktree row's own context menu — out of scope for P82 (nothing needed one yet),
 // needed now since without it a terminal could never be opened at a worktree that isn't the active
 // workspace. "Copy path" rides along since the menu must exist anyway and a one-item menu reads
@@ -323,6 +331,14 @@ onUnmounted(() => {
                 </button>
                 <CodiconIcon name="source-control" :size="16" class="repo-icon" />
                 <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
+                <CodiconIcon
+                  v-if="terminalCountAtPath(repo.root) > 0"
+                  name="terminal-bash"
+                  :size="12"
+                  class="worktree-badge-icon"
+                  data-testid="repo-terminal-indicator"
+                  v-tooltip="terminalTooltip(terminalCountAtPath(repo.root))"
+                />
               </div>
               <div
                 v-if="isWorktreesExpanded(repo.id)"
@@ -342,6 +358,14 @@ onUnmounted(() => {
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
                   <span class="worktree-label" v-tooltip="wt.path">{{ worktreeLabel(wt) }}</span>
                   <span v-if="wt.isMain" class="worktree-badge" v-tooltip="'Main worktree'">main</span>
+                  <CodiconIcon
+                    v-if="terminalCountAtPath(wt.path) > 0"
+                    name="terminal-bash"
+                    :size="12"
+                    class="worktree-badge-icon"
+                    data-testid="repo-terminal-indicator"
+                    v-tooltip="terminalTooltip(terminalCountAtPath(wt.path))"
+                  />
                   <CodiconIcon
                     v-if="wt.locked"
                     name="lock"
