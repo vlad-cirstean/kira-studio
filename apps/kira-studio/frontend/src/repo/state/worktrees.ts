@@ -42,7 +42,13 @@ export function isWorktreesExpanded(codeRepoId: string): boolean {
 }
 
 export function worktreeEntries(codeRepoId: string): readonly WorktreeEntry[] {
-  return byRepo.get(codeRepoId)?.entries ?? [];
+  const entries = byRepo.get(codeRepoId)?.entries ?? [];
+  // P83 plan §13.2: the main worktree first, always. `git worktree list` already emits it first
+  // (the property gitsession/worktree.go:92's `IsMain: i == 0` itself relies on) — this makes the
+  // rendered order a guarantee of this function rather than an inherited one. Stable otherwise:
+  // every non-main entry keeps the server's order. A copy before sorting, since `sort` mutates in
+  // place and `entries` is the store's own array.
+  return [...entries].sort((a, b) => Number(b.isMain) - Number(a.isMain));
 }
 
 export function worktreesLoading(codeRepoId: string): boolean {
