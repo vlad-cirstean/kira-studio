@@ -317,6 +317,22 @@ function updateHandlePositions(): void {
  *  `messageWidth`), so only `handleChunkLayout`'s call is gated. */
 let lastRebuiltLaneCount = -1;
 
+// Regression fix (post-P79-merge): the host width `rebuildColumns()` last actually ran against —
+// `-1` (never equals a real `clientWidth`) until the first call. `scheduleResize` below reads this
+// to skip a rebuild that would only repeat one some other caller (almost always the `detailOpen`
+// watcher, per this function's own "G-UX (item 9)" comment) already did against the same width a
+// moment earlier. Without it, closing the detail pane triggered TWO full `setColumns()` passes for
+// the one width change — the watcher's own synchronous one (`flush: 'post'`, already the true,
+// final width) and a second, purely redundant one a frame later when the same resize also reached
+// the ResizeObserver — each of which tears down and recreates every row's DOM (`setColumns()` ->
+// `invalidateAllRows()`) before rebuilding it. Two teardown/rebuild cycles a frame apart, for
+// identical output, is wasted work on its own; under real load (contended CPU, several webview
+// tests' own Chromium instances running at once) it also widens the window in which anything
+// reading the grid's DOM — a test, `applyAccessibility`'s own focus restore — can catch a row
+// mid-teardown between the two passes and see a stale, zero-width cell. Deduplicating by width
+// closes that window by making the second pass a no-op instead of a second real rebuild.
+let lastRebuiltHostWidth = -1;
+
 function rebuildColumns(): void {
   // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
   // to already reflect the host's current size before the new column set (and its `left` offsets)
@@ -328,6 +344,7 @@ function rebuildColumns(): void {
   grid?.setColumns(currentColumns());
   updateHandlePositions();
   lastRebuiltLaneCount = props.graphView.laneCount.value;
+  lastRebuiltHostWidth = host.value?.clientWidth ?? 0;
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
@@ -586,15 +603,26 @@ function scheduleResize(): void {
   if (resizeRaf !== 0) return;
   resizeRaf = requestAnimationFrame(() => {
     resizeRaf = 0;
-    // P79 review fix (Performance, LOW): a KeepAlive'd host (RepoGraphView.vue) shrinks this
-    // grid's container to 0×0 on deactivate — the ResizeObserver above fires for that transition
-    // too, and without this guard `resizeCanvas()`/`rebuildColumns()` would do a full layout pass
-    // against a grid nobody can see. The real, non-zero size on reactivate still runs this
-    // normally (its own doc comment two functions up: the observer reliably fires that transition
-    // too, so nothing else needs to trigger a resize on return).
+    // P79 review fix (Performance, LOW), corrected post-merge regression: a KeepAlive'd host
+    // (RepoGraphView.vue) shrinks this grid's container to 0×0 on deactivate — the ResizeObserver
+    // above fires for that transition too, and without a guard `resizeCanvas()`/`rebuildColumns()`
+    // would do a full layout pass against a grid nobody can see. The original fix inferred "nobody
+    // can see this" from a 0×0 read, which also matched a real host's transient 0×0 during initial
+    // mount (layout not yet settled when this callback's rAF ran) — the observer never fires again
+    // once the host settles at its true size unchanged from that reading, so the grid's columns
+    // never got laid out at all. `graphVisible` (already threaded through for the four generation
+    // watchers above) is the actual signal for "backgrounded", not a proxy for it: `RepoGraphView
+    // .vue`'s `onDeactivated` sets it `false` synchronously, before the resulting 0×0 resize ever
+    // reaches this async callback (`graphVisibility.ts`), and it stays `true` through every plain
+    // mount/resize — including one that happens to observe 0×0 before its real layout settles — so
+    // gating on it here skips exactly the intended case and no other.
+    if (!graphVisible.value) return;
+    // `lastRebuiltHostWidth`'s own doc comment (above `rebuildColumns`): skip a rebuild that would
+    // only repeat one already done, synchronously, against this exact width — closing the detail
+    // pane is the common case, but this covers any caller of `rebuildColumns()` racing this same
+    // async callback for the same resize.
     const width = host.value?.clientWidth ?? 0;
-    const height = host.value?.clientHeight ?? 0;
-    if (width === 0 || height === 0) return;
+    if (width === lastRebuiltHostWidth) return;
     grid?.resizeCanvas();
     rebuildColumns();
   });
