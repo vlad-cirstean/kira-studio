@@ -1,0 +1,152 @@
+import type { Transport, WorktreeEntry } from '@kira/git-ipc';
+import { reactive, watch } from 'vue';
+import { codeRepoRecord, codeReposState } from '../../state/coderepos';
+import { ensureRepoOpen } from '../../state/repoOpenHold';
+import { workspaceState } from '../../state/workspace';
+import { disposeGitTransport, gitTransportFor } from '../git/transport';
+
+// P82 §6: per-repo worktree disclosure state, session-scoped and module-level — same shape and
+// reasoning as fileTree.ts's byRepo/search.ts's repoSearchView. Not persisted (§0/§10): a future
+// phase that wants that needs a new settings key or DB column.
+interface RepoWorktreeState {
+  expanded: boolean;
+  loading: boolean;
+  error: string | null;
+  entries: readonly WorktreeEntry[];
+}
+
+// reactive() on the Map itself, not just each value — fileTree.ts:144-152's own reasoning: the
+// template reads byRepo.get(id) before any entry exists, and a plain Map makes that read untracked.
+const byRepo = reactive(new Map<string, RepoWorktreeState>());
+
+function stateFor(codeRepoId: string): RepoWorktreeState {
+  let state = byRepo.get(codeRepoId);
+  if (!state) {
+    state = reactive({
+      expanded: false,
+      loading: false,
+      error: null,
+      entries: [],
+    }) as RepoWorktreeState;
+    byRepo.set(codeRepoId, state);
+  }
+  return state;
+}
+
+// Leases are not reactive state (§6.1) — a real Stream('git') client plus its repo.changed
+// subscription, kept alive for exactly as long as a row is expanded (§6.3's invariant).
+const leases = new Map<string, { transport: Transport; off: () => void }>();
+
+export function isWorktreesExpanded(codeRepoId: string): boolean {
+  return byRepo.get(codeRepoId)?.expanded ?? false;
+}
+
+export function worktreeEntries(codeRepoId: string): readonly WorktreeEntry[] {
+  return byRepo.get(codeRepoId)?.entries ?? [];
+}
+
+export function worktreesLoading(codeRepoId: string): boolean {
+  return byRepo.get(codeRepoId)?.loading ?? false;
+}
+
+export function worktreesError(codeRepoId: string): string | null {
+  return byRepo.get(codeRepoId)?.error ?? null;
+}
+
+/** §6.2: `blameLine.ts:158`'s own fetch shape, verbatim — same transport, same `ensureRepoOpen`
+ *  hold, same request. Always refetches (worktree.list is never cached server-side); the previous
+ *  entries stay visible while loading, replaced only on success. */
+async function refresh(codeRepoId: string): Promise<void> {
+  const state = stateFor(codeRepoId);
+  const record = codeRepoRecord(codeRepoId);
+  if (!record) return;
+  const transport = leases.get(codeRepoId)?.transport;
+  if (!transport) return;
+  state.loading = true;
+  try {
+    await ensureRepoOpen(transport, record.repoId);
+    const { worktrees } = await transport.request('worktree.list', { repoId: record.repoId });
+    // A refetch that resolves for a row since collapsed (or removed) must not write — the same
+    // stale-reply guard WorktreeState.reload makes.
+    if (!byRepo.get(codeRepoId)?.expanded) return;
+    state.entries = worktrees;
+    state.error = null;
+  } catch (err) {
+    if (!byRepo.get(codeRepoId)?.expanded) return;
+    state.error = err instanceof Error ? err.message : String(err);
+  } finally {
+    if (byRepo.get(codeRepoId)?.expanded) state.loading = false;
+  }
+}
+
+/** §6.3: releases this row's lease — the shared client this expansion created, plus its
+ *  repo.changed subscription. Invariant: a lease exists exactly while a row is expanded. */
+function release(codeRepoId: string): void {
+  const held = leases.get(codeRepoId);
+  if (!held) return;
+  leases.delete(codeRepoId);
+  held.off();
+  held.transport.dispose();
+  // Nothing else holds a client for a repo with no open workspace — no tabs exist for one — so
+  // this expansion is what opened the socket and the repo hold, and must be what ends them.
+  if (!workspaceState.openRepos.includes(codeRepoId)) disposeGitTransport(codeRepoId);
+}
+
+export function toggleRepoWorktrees(codeRepoId: string): void {
+  const state = stateFor(codeRepoId);
+  if (state.expanded) {
+    collapseRepoWorktrees(codeRepoId);
+    return;
+  }
+  state.expanded = true;
+  state.error = null;
+  const transport = gitTransportFor(codeRepoId);
+  // §6.4: live refresh while expanded — the same repo.changed filter WorktreeState uses, so a
+  // worktree created from the graph's own dialog appears without a collapse/expand round trip.
+  const off = transport.on('repo.changed', (event) => {
+    const record = codeRepoRecord(codeRepoId);
+    if (!record || event.repoId !== record.repoId || event.kind !== 'refsChanged') return;
+    void refresh(codeRepoId);
+  });
+  leases.set(codeRepoId, { transport, off });
+  void refresh(codeRepoId);
+}
+
+export function collapseRepoWorktrees(codeRepoId: string): void {
+  release(codeRepoId);
+  byRepo.delete(codeRepoId);
+}
+
+/** git-ui's `pickerModel.ts:94`-`98` twin, four lines, replicated rather than imported:
+ *  `pickerModel.ts` is not on `@kira/git-ui`'s exports map (only "." and "./icons"), and "."
+ *  pulls the whole graph chunk. Keep the two in step by hand if either changes. */
+export function worktreeLabel(entry: WorktreeEntry): string {
+  if (entry.branch) return entry.branch.replace(/^refs\/heads\//, '');
+  if (entry.isDetached && entry.head) return `detached @ ${entry.head.slice(0, 7)}`;
+  return entry.isBare ? 'bare' : 'unknown';
+}
+
+// §6.6: eviction, without inverting an import — state/workspace.ts must not import this module (it
+// already imports fileTree.ts/search.ts, and this module imports it), so both closures are watched
+// here instead, the pattern quickOpen.ts:183-210 established for exactly this.
+
+// A closed workspace's lease dies with its shared client (closeRepoWorkspace -> disposeGitTransport),
+// so collapse here rather than leave a row expanded over a dead subscription. openRepos is always
+// reassigned wholesale, so a plain watch sees the pre-close membership as `previous`.
+watch(
+  () => workspaceState.openRepos,
+  (openRepos, previous) => {
+    if (!previous) return;
+    for (const id of previous) if (!openRepos.includes(id)) collapseRepoWorktrees(id);
+  },
+);
+
+// removeCodeRepo reassigns `records` wholesale; a removed repository must not keep an entry (or a
+// lease) here. It also calls closeRepoWorkspace, but only the open case is covered by the watch above.
+watch(
+  () => codeReposState.records,
+  (records) => {
+    const live = new Set(records.map((r) => r.id));
+    for (const id of [...byRepo.keys()]) if (!live.has(id)) collapseRepoWorktrees(id);
+  },
+);

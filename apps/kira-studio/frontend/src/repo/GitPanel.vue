@@ -29,6 +29,14 @@ import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
 import { repoSearchView, setRepoSearchView } from './state/search';
+import {
+  isWorktreesExpanded,
+  toggleRepoWorktrees,
+  worktreeEntries,
+  worktreeLabel,
+  worktreesError,
+  worktreesLoading,
+} from './state/worktrees';
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -246,21 +254,77 @@ onUnmounted(() => {
         <section
           v-if="codeReposState.records.length > 0"
           class="repo-section"
+          :class="{ 'has-workspace': repoId }"
           data-testid="repo-section"
         >
           <div class="repo-list">
-            <div
-              v-for="repo in filteredRepos"
-              :key="repo.id"
-              class="repo-row"
-              :class="{ open: isOpen(repo.id), active: isActive(repo.id) }"
-              data-testid="repo-row"
-              :data-repo-id="repo.id"
-              @click="onRowClick(repo.id)"
-              @contextmenu.prevent="onRepoContextMenu($event, repo)"
-            >
-              <CodiconIcon name="source-control" :size="16" class="repo-icon" />
-              <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
+            <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
+              <div
+                class="repo-row"
+                :class="{ open: isOpen(repo.id), active: isActive(repo.id) }"
+                data-testid="repo-row"
+                :data-repo-id="repo.id"
+                @click="onRowClick(repo.id)"
+                @contextmenu.prevent="onRepoContextMenu($event, repo)"
+              >
+                <button
+                  type="button"
+                  class="repo-twisty"
+                  tabindex="-1"
+                  :aria-label="isWorktreesExpanded(repo.id) ? 'Collapse worktrees' : 'Expand worktrees'"
+                  :aria-expanded="isWorktreesExpanded(repo.id)"
+                  data-testid="repo-row-expand"
+                  @click.stop="toggleRepoWorktrees(repo.id)"
+                >
+                  <CodiconIcon
+                    :name="isWorktreesExpanded(repo.id) ? 'chevron-down' : 'chevron-right'"
+                    :size="13"
+                  />
+                </button>
+                <CodiconIcon name="source-control" :size="16" class="repo-icon" />
+                <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
+              </div>
+              <div
+                v-if="isWorktreesExpanded(repo.id)"
+                class="worktree-list"
+                data-testid="repo-worktrees"
+              >
+                <div
+                  v-for="wt in worktreeEntries(repo.id)"
+                  :key="wt.path"
+                  class="worktree-row"
+                  :class="{ current: wt.isCurrent }"
+                  data-testid="repo-worktree-row"
+                  :data-worktree-path="wt.path"
+                >
+                  <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
+                  <span class="worktree-label" v-tooltip="wt.path">{{ worktreeLabel(wt) }}</span>
+                  <span v-if="wt.isMain" class="worktree-badge" v-tooltip="'Main worktree'">main</span>
+                  <CodiconIcon
+                    v-if="wt.locked"
+                    name="lock"
+                    :size="12"
+                    class="worktree-badge-icon"
+                    v-tooltip="wt.locked.reason"
+                  />
+                </div>
+                <div
+                  v-if="worktreesError(repo.id)"
+                  class="worktree-note error"
+                  data-testid="repo-worktree-error"
+                >
+                  {{ worktreesError(repo.id) }}
+                </div>
+                <div
+                  v-else-if="worktreesLoading(repo.id) && worktreeEntries(repo.id).length === 0"
+                  class="worktree-note"
+                >
+                  Loading…
+                </div>
+                <div v-else-if="worktreeEntries(repo.id).length === 0" class="worktree-note">
+                  No worktrees
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -339,6 +403,13 @@ onUnmounted(() => {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
+/* P82 §9: an expanded worktree list would otherwise push the file tree below the fold. Only
+   capped when a repo workspace is showing below — the list-only state still uses the whole panel. */
+.repo-section.has-workspace {
+  max-height: 50%;
+  overflow-y: auto;
+}
+
 .repo-list {
   display: flex;
   flex-direction: column;
@@ -377,6 +448,70 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.repo-twisty { /* RepoTreeRow.vue's .twisty, ported */
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--kira-fg-muted);
+  padding: 0;
+  cursor: pointer;
+}
+
+.worktree-row {
+  height: var(--kira-row-height);
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-2);
+  /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap. */
+  padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
+  cursor: default;
+  user-select: none;
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-muted);
+}
+.worktree-row:hover {
+  background: var(--kira-hover);
+}
+.worktree-row.current {
+  color: var(--kira-fg);
+}
+
+.worktree-icon {
+  flex-shrink: 0;
+}
+
+.worktree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.worktree-badge {
+  flex-shrink: 0;
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-subtle);
+}
+
+.worktree-badge-icon {
+  flex-shrink: 0;
+  color: var(--kira-fg-subtle);
+}
+
+.worktree-note {
+  padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
+  font-size: var(--kira-t-sm);
+  color: var(--kira-fg-subtle);
+}
+.worktree-note.error {
+  color: var(--kira-error);
 }
 
 .repo-tree {
