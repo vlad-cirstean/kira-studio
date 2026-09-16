@@ -143,7 +143,7 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   accidentally can never weaken it. `apps/kira-studio/tests/ui/secrets.spec.ts`'s "keychain
   available" scenario guards this.
 
-## The git module — running and testing it here (G1-G34)
+## The git module — running and testing it here (G1-G34, updated P79)
 
 See `docs/ARCHITECTURE.md`'s Git module section for what it is and why. This section is only about
 running it here.
@@ -185,6 +185,19 @@ running it here.
   The pre-commit hook itself still runs the unscoped `bun run typecheck`, so it fails regardless;
   its own header comments a `--no-verify` bypass for exactly this — a change proven correct by the
   scoped checks above, blocked only by an unrelated, unset-up workspace.
+- **A fresh `git worktree` in this container can check out an orphaned "Initial commit" scaffold
+  instead of the real branch tip.** Hit by 5 of P79's 6 fix batches. It is a provisioning race, not
+  data loss — the affected worktree holds nothing of value, confirmed by `git status` and an
+  ancestry check *before* any remediation. Recovery inside the isolated worktree is
+  `git reset --hard`/`git merge --ff-only`/a fresh branch off the real tip; check what you actually
+  have before choosing, and prefer stopping and reporting over self-remediating when the worktree
+  might hold real work.
+- **Rebasing this chapter's branch onto an advanced base needs `git rebase --rebase-merges`.** A
+  plain `git rebase` flattens merge commits and replays every merged batch's individual commits
+  linearly, reproducing spurious conflicts against content the branch's own merge commits already
+  integrated. With `--rebase-merges` the same rebase replayed exactly one real conflict, once.
+  State the shape that makes this apply (a feature branch that carries merge commits of its own),
+  not just the flag.
 
 ## Wails v3 / Go — building and testing in this environment (P51, P52, P55)
 
@@ -229,7 +242,10 @@ running it here.
   a result.
 - **Regenerate bindings via `wails3 task common:generate:bindings`** (or `scripts/setup.sh`, which
   calls it) — never a hand-typed `wails3 generate bindings` flag list, which has already drifted
-  from the task's real flags once. `apps/kira-studio/frontend/bindings/**` are real Vite import
+  from the task's real flags once. `scripts/setup.sh` now calls the task **unconditionally on every
+  run**; a CLI/toolchain-identity stamp only decides whether Task's own checksum cache gets wiped
+  first, so a plain `bun run setup` always spends the task's own up-to-date check (~0.2s when
+  nothing changed, ~7s on a real source change) rather than skipping it. `apps/kira-studio/frontend/bindings/**` are real Vite import
   targets, so a missing one fails the build with an unresolvable import rather than a stale-bindings
   surprise; regenerate whenever a bridge service's method set changes, and before any frontend
   build. **`-names` is load-bearing, not cosmetic**: without it, every generated call site emits
