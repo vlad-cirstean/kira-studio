@@ -326,7 +326,7 @@ const prIcon = computed(() => {
       </button>
       <code v-else class="kv-meta-sha-static" data-testid="commit-meta-sha">{{ shortSha }}</code>
       <button
-        v-if="prIcon"
+        v-if="prIcon && actions.capabilities.openExternal"
         type="button"
         class="kv-meta-pr-icon codicon codicon-github"
         :class="`kv-meta-pr-icon--${prIcon.state}`"
