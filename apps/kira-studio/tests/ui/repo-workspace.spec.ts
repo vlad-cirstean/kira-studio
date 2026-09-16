@@ -628,10 +628,10 @@ test('leaving Git for Api and returning lands back on the same repository', asyn
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
 });
 
-// P67b §4.2/§9: closing the active repo workspace from the panel's own × falls back to the Git
+// P67b §4.2/§9: closing the active repo workspace from its row menu falls back to the Git
 // module's own empty state (GitStart.vue), not to Studio — a repo workspace closing is a
 // Git-module event.
-test("closing the active repo workspace from the panel's × falls back to the Git module's empty state, not Studio", async ({
+test("closing the active repo workspace from its row menu falls back to the Git module's empty state, not Studio", async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: CONTROL });
@@ -640,7 +640,12 @@ test("closing the active repo workspace from the panel's × falls back to the Gi
   await repoRow(page).dblclick();
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
 
-  await page.locator('[data-testid="workspace-repo-close"]').click();
+  // P82: the row's hover × is gone — closing is the row menu's job now.
+  await expect(page.locator('[data-testid="workspace-repo-close"]')).toHaveCount(0);
+
+  await repoRow(page).click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await page.locator('[data-testid="menu-item-close"]').click();
 
   await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'studio')).not.toHaveClass(/is-active/);

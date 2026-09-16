@@ -53,10 +53,6 @@ function onRowClick(id: string): void {
   if (isOpen(id)) activateWorkspace(repoWorkspaceKey(id));
   else openRepoWorkspace(id);
 }
-function onRowClose(e: MouseEvent, id: string): void {
-  e.stopPropagation();
-  closeRepoWorkspace(id);
-}
 
 // §4.4: reads this panel's own PanelShell search box (`local.search`), not the Studio tree's own
 // `treeState.search` — that filter has no business filtering this panel. The same box also filters
@@ -265,16 +261,6 @@ onUnmounted(() => {
             >
               <CodiconIcon name="source-control" :size="16" class="repo-icon" />
               <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
-              <span
-                v-if="isOpen(repo.id)"
-                class="repo-row-close"
-                role="button"
-                aria-label="Close repository"
-                data-testid="workspace-repo-close"
-                @click="onRowClose($event, repo.id)"
-              >
-                <CodiconIcon name="close" :size="13" />
-              </span>
             </div>
           </div>
         </section>
@@ -391,28 +377,6 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Open, not active: hover reveals the ×. Open and active: always visible — the exact
-   `.repo-tab`/`.repo-tab-close` behaviour this row replaces (former TitleBar.vue). */
-.repo-row-close {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--kira-radius-sm);
-  opacity: 0;
-}
-
-.repo-row:hover .repo-row-close,
-.repo-row.active .repo-row-close {
-  opacity: 1;
-}
-
-.repo-row-close:hover {
-  background: var(--kira-hover);
 }
 
 .repo-tree {
