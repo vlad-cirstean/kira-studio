@@ -56,7 +56,10 @@ export function canonicalPath(p: string): string {
   return p.normalize('NFC').replace(/[/\\]+$/, '');
 }
 
-function recordForRoot(path: string): RepoSummary | undefined {
+/** P84 §4.5: exported under a name that says what it matches on — the same lookup
+ *  openRepoAtPath uses below, reused by worktrees.ts's switchToWorktree to resolve the record its
+ *  own import just created. */
+export function codeRepoRecordForPath(path: string): RepoSummary | undefined {
   const target = canonicalPath(path);
   return codeReposState.records.find(
     (r) => canonicalPath(r.root) === target || canonicalPath(r.repoId) === target,
@@ -68,7 +71,7 @@ function recordForRoot(path: string): RepoSummary | undefined {
  *  premise WorktreeList.vue's own switch rests on, not a second worktree-switching path. Imports
  *  it first when this app has no row for that root yet. */
 export async function openRepoAtPath(path: string): Promise<void> {
-  const existing = recordForRoot(path);
+  const existing = codeRepoRecordForPath(path);
   if (existing) {
     openRepoWorkspace(existing.id);
     return;
@@ -82,7 +85,7 @@ export async function openRepoAtPath(path: string): Promise<void> {
     // and use the row that now exists. Anything else propagates to the caller's own error surface.
     if ((err as { code?: string }).code !== 'E_ALREADY_IMPORTED') throw err;
     await hydrateCodeRepos();
-    const row = recordForRoot(path);
+    const row = codeRepoRecordForPath(path);
     if (!row) throw err;
     openRepoWorkspace(row.id);
   }

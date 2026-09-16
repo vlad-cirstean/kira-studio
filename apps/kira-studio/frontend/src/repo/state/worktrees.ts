@@ -1,9 +1,15 @@
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
 import { reactive, watch } from 'vue';
-import { codeRepoRecord, codeReposState, openRepoAtPath } from '../../state/coderepos';
+import {
+  codeRepoRecord,
+  codeRepoRecordForPath,
+  codeReposState,
+  openRepoAtPath,
+} from '../../state/coderepos';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { workspaceState } from '../../state/workspace';
 import { disposeGitTransport, gitTransportFor } from '../git/transport';
+import { noteWorktreeLink, worktreeParentId } from './repoLinks';
 
 // P82 §6: per-repo worktree disclosure state, session-scoped and module-level — same shape and
 // reasoning as fileTree.ts's byRepo/search.ts's repoSearchView. Not persisted (§0/§10): a future
@@ -124,13 +130,20 @@ export function collapseRepoWorktrees(codeRepoId: string): void {
 }
 
 /** §7: "switch to this worktree" — a worktree row's click. Clicking the entry that *is* this row's
- *  own repository needs no special case: openRepoAtPath's recordForRoot finds that row and
- *  openRepoWorkspace opens-or-activates it, same as onRowClick. */
-export async function switchToWorktree(codeRepoId: string, path: string): Promise<void> {
+ *  own repository needs no special case: openRepoAtPath's codeRepoRecordForPath finds that row and
+ *  openRepoWorkspace opens-or-activates it, same as onRowClick.
+ *
+ *  P84 §4.5: takes the entry, not the bare path, so it can write the click-time parent hint —
+ *  between the import resolving and the next batched RepoWorktreeLinks answering, this is what
+ *  keeps the freshly-imported row from flashing at the top level. */
+export async function switchToWorktree(codeRepoId: string, wt: WorktreeEntry): Promise<void> {
   const state = stateFor(codeRepoId);
   state.error = null;
   try {
-    await openRepoAtPath(path);
+    await openRepoAtPath(wt.path);
+    if (wt.isMain) return; // clicking the main worktree imports the *anchor*, which has no parent
+    const record = codeRepoRecordForPath(wt.path);
+    if (record) noteWorktreeLink(record.id, worktreeParentId(codeRepoId) || codeRepoId);
   } catch (err) {
     state.error = err instanceof Error ? err.message : String(err);
   }

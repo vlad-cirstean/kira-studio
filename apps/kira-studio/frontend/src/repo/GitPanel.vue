@@ -5,6 +5,7 @@ import { repoIdOfWorkspace, repoWorkspaceKey } from '@shared/domain/workspace';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
 import {
+  codeRepoRecordForPath,
   codeReposState,
   importRepoViaDialog,
   removeCodeRepo,
@@ -32,6 +33,7 @@ import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
 import { refreshRepoHeads, repoHeadLabel } from './state/repoHeads';
+import { refreshRepoWorktreeLinks, worktreeParentId } from './state/repoLinks';
 import { repoSearchView, setRepoSearchView } from './state/search';
 import {
   collapseRepoWorktrees,
@@ -57,8 +59,17 @@ const local = reactive({ search: '' });
 // P67b §4.4: a single click opens (if not yet open) or activates (if open) — OQ-2's adopted
 // recommendation. This panel's entire subject is repositories, so a click that only paints a
 // highlight is a dead control; double-click still works, since it is a click first.
+//
+// P84 §6.3: an anchor row whose *worktree* is the open workspace must not read as closed — "open"
+// now also means "some row parented to me is open". Guarded on `id` since worktreeRecordId can
+// return '' for a worktree never opened in this app, and '' would otherwise match every open
+// top-level repo (every anchor's own parentId is '' too).
 function isOpen(id: string): boolean {
-  return workspaceState.openRepos.includes(id);
+  if (!id) return false;
+  return (
+    workspaceState.openRepos.includes(id) ||
+    workspaceState.openRepos.some((o) => worktreeParentId(o) === id)
+  );
 }
 function isActive(id: string): boolean {
   return workspaceState.active === repoWorkspaceKey(id);
@@ -68,13 +79,22 @@ function onRowClick(id: string): void {
   else openRepoWorkspace(id);
 }
 
-// §4.4: reads this panel's own PanelShell search box (`local.search`), not the Studio tree's own
-// `treeState.search` — that filter has no business filtering this panel. The same box also filters
-// the file tree below when Files is active (`:search="local.search"`, unchanged from before).
+/** P84 §6.1: the code_repos id backing a worktree path, once it has been opened in this app —
+ *  '' before that (no row to mark open/active, no row to attach Rename/Close/Remove to yet). */
+function worktreeRecordId(path: string): string {
+  return codeRepoRecordForPath(path)?.id ?? '';
+}
+
+// P84 §3: a row with a non-empty parentId never renders at the top level — only nested under its
+// anchor's twisty (`worktreeEntries` below). §4.4: reads this panel's own PanelShell search box
+// (`local.search`), not the Studio tree's own `treeState.search` — that filter has no business
+// filtering this panel. The same box also filters the file tree below when Files is active
+// (`:search="local.search"`, unchanged from before).
 const filteredRepos = computed<RepoSummary[]>(() => {
+  const topLevel = codeReposState.records.filter((r) => !worktreeParentId(r.id));
   const query = local.search.trim().toLowerCase();
-  if (!query) return codeReposState.records;
-  return codeReposState.records.filter((r) => r.name.toLowerCase().includes(query));
+  if (!query) return topLevel;
+  return topLevel.filter((r) => r.name.toLowerCase().includes(query));
 });
 
 async function onImport(): Promise<void> {
@@ -188,7 +208,7 @@ function terminalTooltip(n: number): string {
 // workspace. "Copy path" rides along since the menu must exist anyway and a one-item menu reads
 // like an accident — the same item the repo row already offers above.
 function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEntry): void {
-  openContextMenu(e, [
+  const items: MenuItem[] = [
     {
       type: 'item' as const,
       id: 'open-terminal',
@@ -203,7 +223,45 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
       icon: 'copy',
       run: () => void navigator.clipboard.writeText(wt.path),
     },
-  ]);
+  ];
+  // P84 §6.2: once the flat top-level row is gone, Rename/Close/Remove for this record are
+  // reachable from nowhere else — the same three items onRepoContextMenu builds, same handlers, no
+  // second code path. Only offered once the worktree has its own code_repos row (it has been
+  // opened in this app at least once); a worktree never opened here has nothing to rename or remove.
+  const record = codeRepoRecordForPath(wt.path);
+  if (record) {
+    items.push({ type: 'separator' as const });
+    items.push({
+      type: 'item' as const,
+      id: 'rename',
+      label: 'Rename…',
+      icon: 'edit',
+      run: () => onRenameRepo(record.id, record.name),
+    });
+    if (isOpen(record.id)) {
+      items.push({
+        type: 'item' as const,
+        id: 'close',
+        label: 'Close',
+        icon: 'close',
+        run: () => {
+          collapseRepoWorktrees(record.id);
+          closeRepoWorkspace(record.id);
+        },
+      });
+    }
+    items.push({
+      type: 'item' as const,
+      id: 'remove',
+      label: 'Remove',
+      icon: 'trash',
+      danger: true,
+      // Removes the code_repos record, never the worktree on disk — the nested row survives it,
+      // since it comes from `git worktree list`, not from codeReposState.
+      run: () => onRemoveRepo(record.id),
+    });
+  }
+  openContextMenu(e, items);
 }
 
 const repoName = computed(
@@ -261,6 +319,9 @@ onMounted(() => {
   // P83 plan §12.3 trigger 1: the panel is mounted for as long as the Git module is, so this is
   // once per session, not once per render.
   void refreshRepoHeads();
+  // P84 §4.4 trigger 1: same reasoning — one batched worktree-parent read per session, not once
+  // per row.
+  void refreshRepoWorktreeLinks();
 });
 onUnmounted(() => {
   unregisterSearchCommand?.();
@@ -360,10 +421,14 @@ onUnmounted(() => {
                   v-for="wt in worktreeEntries(repo.id)"
                   :key="wt.path"
                   class="worktree-row"
-                  :class="{ current: wt.isCurrent }"
+                  :class="{
+                    current: wt.isCurrent,
+                    open: isOpen(worktreeRecordId(wt.path)),
+                    active: isActive(worktreeRecordId(wt.path)),
+                  }"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
-                  @click.stop="switchToWorktree(repo.id, wt.path)"
+                  @click.stop="switchToWorktree(repo.id, wt)"
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
@@ -573,6 +638,16 @@ onUnmounted(() => {
 }
 .worktree-row.current {
   color: var(--kira-fg);
+}
+/* P84 §6.1: this app's own open/active workspace state, once the nested row is where a worktree's
+   marking has to live — reusing --kira-fg/--kira-select exactly as .repo-row does. Distinct from
+   .current (this git session's own worktree, a fact about the repository, not this app's
+   workspaces). */
+.worktree-row.open {
+  color: var(--kira-fg);
+}
+.worktree-row.active {
+  background: var(--kira-select);
 }
 
 .worktree-icon {
