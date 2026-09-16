@@ -71,6 +71,45 @@ function repoRow(page: import('@playwright/test').Page) {
   return page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`);
 }
 
+// P82 §12.3: a linked worktree and the row it becomes once switched to.
+const WORKTREE_PATH = '/tmp/demo-repo-feature';
+const WORKTREE_REPO = {
+  id: 'repo-2',
+  name: 'demo-repo-feature',
+  root: WORKTREE_PATH,
+  repoId: WORKTREE_PATH,
+  sortOrder: 2,
+  createdAt: '2026-01-02T00:00:00.000Z',
+};
+const WORKTREE_LIST_RESULT = {
+  worktrees: [
+    {
+      path: REPO.repoId,
+      head: '0'.repeat(40),
+      branch: 'refs/heads/main',
+      isBare: false,
+      isDetached: false,
+      isMain: true,
+      isCurrent: true,
+      locked: null,
+      prunable: null,
+      openElsewhere: false,
+    },
+    {
+      path: WORKTREE_PATH,
+      head: '1'.repeat(40),
+      branch: 'refs/heads/feature',
+      isBare: false,
+      isDetached: false,
+      isMain: false,
+      isCurrent: false,
+      locked: null,
+      prunable: null,
+      openElsewhere: false,
+    },
+  ],
+};
+
 function treeRow(page: import('@playwright/test').Page, path: string) {
   return page.locator(`[data-testid="repo-tree-row"][data-path="${path}"]`);
 }
@@ -651,6 +690,72 @@ test("closing the active repo workspace from its row menu falls back to the Git 
   await expect(modeTab(page, 'studio')).not.toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="git-start"]')).toBeVisible();
   await expect(page.locator('[data-testid="project-panel"]')).not.toContainText('Connections');
+});
+
+// P82 §12.3: expanding a row lists its worktrees without opening it (the twisty's own
+// @click.stop, §8.1), and clicking a linked worktree switches to it — importing it as its own
+// code_repos row first, since this app has none for that root yet — the same premise
+// WorktreeList.vue's own switch rests on, not a second worktree-switching path (§5).
+test('a repo workspace: expanding a row lists its worktrees, and switching to one opens its own workspace', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      ...CONTROL,
+      {
+        channel: IPC.codeWorkspaceImportRepo,
+        args: { path: WORKTREE_PATH },
+        response: WORKTREE_REPO,
+      },
+      {
+        channel: IPC.codeWorkspaceListFiles,
+        args: { id: WORKTREE_REPO.id },
+        response: FILE_LISTING,
+      },
+    ],
+  });
+
+  // Installed before the expanding click — repo/git/transport.ts's gitTransportFor is lazy, so
+  // Stream('git') is first called only once the row actually expands (repo-workspace.spec.ts:485's
+  // own comment gives the identical reason).
+  await installGitStreamMock(page, REPO.repoId, {
+    'repo.open': undefined,
+    'worktree.list': WORKTREE_LIST_RESULT,
+  });
+
+  await openGitModule(page);
+  await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
+
+  // Expanding must not open the workspace — the assertion that guards the twisty's own @click.stop.
+  await expect(tab(page, 'repo-graph')).toHaveCount(0);
+
+  const worktreeRows = page.locator('[data-testid="repo-worktree-row"]');
+  await expect(worktreeRows).toHaveCount(2);
+  const linkedRow = page.locator(
+    `[data-testid="repo-worktree-row"][data-worktree-path="${WORKTREE_PATH}"]`,
+  );
+  await expect(linkedRow).toContainText('feature');
+
+  await linkedRow.click();
+
+  // The switch actually happened, not just that a call was made.
+  expect(
+    control
+      .log()
+      .some(
+        (e) =>
+          e.channel === IPC.codeWorkspaceImportRepo &&
+          JSON.stringify(e.args) === JSON.stringify({ path: WORKTREE_PATH }),
+      ),
+  ).toBe(true);
+  const switchedRow = page.locator(`[data-testid="repo-row"][data-repo-id="${WORKTREE_REPO.id}"]`);
+  await expect(switchedRow).toHaveCount(1);
+  await expect(switchedRow).toHaveClass(/active/);
+  await expect(tab(page, 'repo-graph')).toHaveCount(1);
+
+  // Collapsing again drops the worktree list.
+  await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
+  await expect(page.locator('[data-testid="repo-worktrees"]')).toHaveCount(0);
 });
 
 // P67b §6/§9: a .ts row and a .go row carry different per-language icon styles (ported from the
