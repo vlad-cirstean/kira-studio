@@ -31,6 +31,27 @@ const PREVIEW_MODEL_LIMIT = 40;
 // re-order idiom is the same either way and this reads slightly clearer at the call sites below).
 const previewUris = new Map<string, true>();
 
+// P79 review fix (Functional, MEDIUM): `createModelReference`'s returned `dispose()` used to be a
+// pure no-op — nothing refcounted a live holder, so `registerPreview`'s eviction could dispose a
+// model a still-open peek/references list (find-references, implementations) was still displaying
+// mid-browse, since `isTabOwnedUri` only ever protected a *tab*-owned uri. Keyed the same as
+// `previewUris`; a uri with no entry here has zero live holders.
+const liveRefCounts = new Map<string, number>();
+
+function retainLive(uri: string): void {
+  liveRefCounts.set(uri, (liveRefCounts.get(uri) ?? 0) + 1);
+}
+
+function releaseLive(uri: string): void {
+  const count = liveRefCounts.get(uri) ?? 0;
+  if (count <= 1) liveRefCounts.delete(uri);
+  else liveRefCounts.set(uri, count - 1);
+}
+
+function isLiveReferenced(uri: string): boolean {
+  return (liveRefCounts.get(uri) ?? 0) > 0;
+}
+
 function touchPreview(uri: string): void {
   previewUris.delete(uri);
   previewUris.set(uri, true);
@@ -40,13 +61,36 @@ function touchPreview(uri: string): void {
 // picked as oldest might already be tab-owned (a promotion this registry hasn't been told about
 // since nothing calls back on tab-open, §1.4) — dropped from the registry either way, but only
 // actually disposed when it still isn't.
+//
+// P79 review fix: scans oldest-first for the first entry that is safe to act on at all — a live-
+// referenced entry (isLiveReferenced) is skipped over entirely (left exactly where it sits in
+// recency order, reconsidered on the next call) rather than evicted, so the cap can be briefly
+// exceeded while a peek list is open rather than disposing a model still on screen.
 function registerPreview(uri: string): void {
   touchPreview(uri);
   if (previewUris.size <= PREVIEW_MODEL_LIMIT) return;
-  const oldest = previewUris.keys().next().value;
-  if (oldest === undefined) return;
-  previewUris.delete(oldest);
-  if (!isTabOwnedUri(oldest)) disposeModel(oldest);
+  for (const oldest of previewUris.keys()) {
+    if (isLiveReferenced(oldest)) continue;
+    previewUris.delete(oldest);
+    if (!isTabOwnedUri(oldest)) disposeModel(oldest);
+    return;
+  }
+}
+
+/** A `ModelReference` whose `dispose()` actually decrements `liveRefCounts` exactly once, however
+ *  many times it's called — Monaco's own callers (`goToDefinitionAtPosition.js`,
+ *  `referencesWidget.js`) treat a resolved reference's `dispose()` as idempotent. */
+function referenceTo(model: ITextModel, key: string): ModelReference {
+  retainLive(key);
+  let released = false;
+  return {
+    object: { textEditorModel: model },
+    dispose(): void {
+      if (released) return;
+      released = true;
+      releaseLive(key);
+    },
+  };
 }
 
 /** The service object itself — a plain object, not a class, since `StandaloneServices.initialize`
@@ -68,7 +112,7 @@ export function createKiraTextModelService(mod: MonacoModule): {
       const existing = mod.editor.getModel(uri);
       if (existing) {
         if (previewUris.has(key)) touchPreview(key); // rule 2: re-resolving refreshes recency.
-        return { object: { textEditorModel: existing }, dispose(): void {} };
+        return referenceTo(existing, key);
       }
 
       // Stock StandaloneTextModelService's own failure mode (resolverService.js), reproduced
@@ -85,7 +129,7 @@ export function createKiraTextModelService(mod: MonacoModule): {
       // so navigation resolves from inside a peek preview too, not only from an open tab.
       const model = getOrCreateModel(mod, key, content.text, monacoLanguageFor(loc.path), loc);
       registerPreview(key);
-      return { object: { textEditorModel: model }, dispose(): void {} };
+      return referenceTo(model, key);
     },
   };
 }

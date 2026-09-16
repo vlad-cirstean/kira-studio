@@ -133,7 +133,17 @@ export function getOrCreateModel(
   location?: { repoId: string; path: string },
 ): import('monaco-editor').editor.ITextModel {
   const existing = modelCache.get(uri);
-  if (existing && !existing.isDisposed()) return existing;
+  if (existing && !existing.isDisposed()) {
+    // P79 review fix (Functional, MEDIUM): a cache hit used to hand back whatever content the
+    // model already held, silently ignoring the fresh text the caller just read — harmless before
+    // P78 (a model only ever existed while a tab owned it, so any open always meant a fresh model),
+    // but a tab-less preview model (textModels.ts) can now outlive an external change (a `git
+    // pull`) with nothing to invalidate it: opening the file as a real tab afterward would read the
+    // new bytes from disk and then get the stale preview-era model back. setValue only touches the
+    // model when content actually differs, so the common case (nothing changed) is a cheap compare.
+    if (existing.getValue() !== text) existing.setValue(text);
+    return existing;
+  }
   const model = mod.editor.createModel(text, language, mod.Uri.parse(uri));
   modelCache.set(uri, model);
   if (location) repoLocations.set(model, location);

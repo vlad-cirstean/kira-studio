@@ -21,21 +21,28 @@ const { registerDiffEditor, dropRepoDiffTab } = await import(
 interface FakeModel {
   isDisposed: () => boolean;
   dispose: () => void;
+  getValue: () => string;
+  setValue: (text: string) => void;
 }
 
-function fakeModel(): FakeModel {
+function fakeModel(text: string): FakeModel {
   let disposed = false;
+  let value = text;
   return {
     isDisposed: () => disposed,
     dispose: () => {
       disposed = true;
+    },
+    getValue: () => value,
+    setValue: (next: string) => {
+      value = next;
     },
   };
 }
 
 function fakeMod(): MonacoModule {
   return {
-    editor: { createModel: () => fakeModel() },
+    editor: { createModel: (text: string) => fakeModel(text) },
     Uri: { parse: (s: string) => s },
     // biome-ignore lint/suspicious/noExplicitAny: a minimal structural fake, not the real module
   } as any;
