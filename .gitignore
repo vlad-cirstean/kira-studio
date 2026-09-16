@@ -149,8 +149,12 @@ playwright-report/
 .DS_Store
 
 # Claude Code agent worktrees — isolated scratch checkouts for background
-# subagents (see .claude/worktrees/*), never repo content.
-.claude/
+# subagents (see .claude/worktrees/*), never repo content. Project-level hook
+# config (settings.json, hooks/) is repo content and stays tracked.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/hooks/*
 
 # Design canvas — the seeded page is a 3 MB build product (it bundles the
 # canvas editor). Rebuild it with docs/design/kira-design-system/build.mjs
