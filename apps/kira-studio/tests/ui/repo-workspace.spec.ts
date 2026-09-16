@@ -178,6 +178,10 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and stu
   // Opening it (double-click, the tree's own select/open split) activates its own workspace and
   // the row itself, and adds no top-level tab (§0's correction — exactly three mode tabs, always).
   await repoRow(page).dblclick();
+  // P84 §8.3: opening the workspace auto-switched the panel to Files — switch back to see the row
+  // itself, since this is a migrated spot the plan's own §13.2 line-180 note didn't separately
+  // call out (it only tracked the later file-tree interaction, not this earlier row assertion).
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
   await expect(repoRow(page)).toHaveClass(/active/);
   await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
   await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
@@ -190,6 +194,7 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and stu
 
   // Single click opens a preview tab (§5.2 rule 1/4) — the strip now shows two tabs: pinned +
   // one preview, italic.
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
   await expect(treeRow(page, 'a.ts')).toBeVisible();
   await treeRow(page, 'a.ts').click();
   await expect(tab(page)).toHaveCount(2);
@@ -663,6 +668,9 @@ test('leaving Git for Api and returning lands back on the same repository', asyn
 
   await modeTab(page, 'git').click();
   await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
+  // P84 §8.3: a repo workspace being active auto-switches the panel to Files — switch back to see
+  // the repo row itself.
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
   await expect(repoRow(page)).toHaveClass(/active/);
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
 });
@@ -682,6 +690,9 @@ test("closing the active repo workspace from its row menu falls back to the Git 
   // P82: the row's hover × is gone — closing is the row menu's job now.
   await expect(page.locator('[data-testid="workspace-repo-close"]')).toHaveCount(0);
 
+  // P84 §8.3: the panel auto-switched to Files when the workspace opened — switch back to reach
+  // the repo row's own context menu.
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
   await repoRow(page).click({ button: 'right' });
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.locator('[data-testid="menu-item-close"]').click();
@@ -748,14 +759,71 @@ test('a repo workspace: expanding a row lists its worktrees, and switching to on
           JSON.stringify(e.args) === JSON.stringify({ path: WORKTREE_PATH }),
       ),
   ).toBe(true);
-  const switchedRow = page.locator(`[data-testid="repo-row"][data-repo-id="${WORKTREE_REPO.id}"]`);
-  await expect(switchedRow).toHaveCount(1);
-  await expect(switchedRow).toHaveClass(/active/);
+
+  // P84: the opened worktree renders nowhere at the top level — only nested under its parent's
+  // twisty. Without §4.5's click-time hint this would be racy-then-green (the row appears for one
+  // round trip before the batched RepoWorktreeLinks answer removes it); toHaveCount(0) catches that.
+  const flatDuplicateRow = page.locator(
+    `[data-testid="repo-row"][data-repo-id="${WORKTREE_REPO.id}"]`,
+  );
+  await expect(flatDuplicateRow).toHaveCount(0);
+
+  // P84 §8.3: switching opened the workspace, which flipped the panel to Files — switch back to
+  // see the nested row's own active marking.
+  await page.locator('[data-testid="git-panel-tab-repos"]').click();
+  await expect(linkedRow).toHaveClass(/active/);
   await expect(tab(page, 'repo-graph')).toHaveCount(1);
 
   // Collapsing again drops the worktree list.
   await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
   await expect(page.locator('[data-testid="repo-worktrees"]')).toHaveCount(0);
+});
+
+// P84 §13.4: the hydration path — a worktree imported in an *earlier* session has both rows already
+// in codeWorkspaceListRepos on boot, with no click to supply §4.5's hint. This is what proves the
+// batched RepoWorktreeLinks call itself is wired: §13.3's own test would pass even if it were never
+// called, since the click-time hint alone is enough there.
+test('a worktree imported in an earlier session lists only under its parent', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({
+    control: [
+      { channel: IPC.codeWorkspaceListRepos, response: [REPO, WORKTREE_REPO] },
+      {
+        channel: IPC.codeWorkspaceRepoWorktreeLinks,
+        response: [
+          { id: REPO.id, parentId: '' },
+          { id: WORKTREE_REPO.id, parentId: REPO.id },
+        ],
+      },
+    ],
+  });
+
+  await installGitStreamMock(page, REPO.repoId, {
+    'repo.open': undefined,
+    'worktree.list': WORKTREE_LIST_RESULT,
+  });
+
+  await openGitModule(page);
+
+  // Exactly one top-level row — the anchor. The worktree's own row never renders flat.
+  await expect(page.locator('[data-testid="repo-row"]')).toHaveCount(1);
+  await expect(repoRow(page)).toHaveCount(1);
+
+  await repoRow(page).locator('[data-testid="repo-row-expand"]').click();
+  const worktreeRows = page.locator('[data-testid="repo-worktree-row"]');
+  await expect(worktreeRows).toHaveCount(2);
+  // Main worktree first (worktrees.ts:44-52's own sort).
+  await expect(worktreeRows.first()).toContainText('main');
+
+  // §6.2's reachability guarantee: the nested row still offers Rename/Close/Remove, the thing that
+  // makes hiding its flat duplicate safe.
+  const linkedRow = page.locator(
+    `[data-testid="repo-worktree-row"][data-worktree-path="${WORKTREE_PATH}"]`,
+  );
+  await linkedRow.click({ button: 'right' });
+  await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
+  await expect(page.locator('[data-testid="menu-item-remove"]')).toBeVisible();
 });
 
 // P67b §6/§9: a .ts row and a .go row carry different per-language icon styles (ported from the
