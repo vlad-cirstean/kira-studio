@@ -627,17 +627,18 @@ of Playwright. No new dependency, no migration, no contract change.
 
 ## 16. Open questions
 
-- **OQ-1 (for the user, not blocking).** When a worktree workspace is the active one and its anchor
-  row is collapsed, the Repositories tab shows only the anchor, marked open (§6.3) — the active
-  worktree itself is one twisty click away. The alternative is auto-expanding the anchor, which
-  costs a `Stream('git')` lease for a repository that may have no workspace open (P82 §6.3).
-  This plan takes the cheap option; say so if the expanded behaviour is wanted and it is a
-  three-line follow-up.
-- **OQ-2 (for the user, not blocking).** §8.3 flips the panel to Files whenever a workspace opens.
-  If the intent is instead "open several repositories in a row without the panel moving", the
-  watcher comes out and the two specs in §13.2 grow to roughly ten. The auto-switch is also what
-  makes the Files tab's empty state rare.
-- **OQ-3 (for the implementer).** §3's rule-2 tiebreak assumes `CodeRepos.List()` returns a stable
+One open, two closed before implementation started. Both closed ones are recorded because they were
+real forks, and the implementer should not reopen either.
+
+- **OQ-1 — closed, no auto-expand.** When a worktree workspace is the active one and its anchor row
+  is collapsed, the Repositories tab shows only the anchor, marked open (§6.3); the active worktree
+  is one twisty click away. Auto-expanding the anchor instead would cost a `Stream('git')` lease for
+  a repository that may have no workspace open (P82 §6.3). **Confirmed by the user: keep the cheap
+  option.** §6.4's first bullet stands as written.
+- **OQ-2 — closed, keep the auto-switch.** §8.3 flips the panel to Files whenever a workspace opens.
+  **Confirmed by the user:** opening a repository should show its content immediately. It is also
+  what holds §13.2's migration list at two specs instead of roughly ten.
+- **OQ-3 (open, for the implementer).** §3's rule-2 tiebreak assumes `CodeRepos.List()` returns a stable
   order (it reads `sort_order`). Confirm that when implementing; if the ordering is not total, sort
   by `(SortOrder, CreatedAt, ID)` explicitly inside `RepoWorktreeLinks` rather than relying on it.
 
