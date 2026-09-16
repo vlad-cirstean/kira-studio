@@ -17,9 +17,9 @@ type namedSymbol struct {
 // type," per §6's own per-language semantics — real content differs by language because the
 // stored evidence does:
 //
-//   - Go: nothing. Structural interfaces need a method-set comparison, and C1's own
-//     method_declaration capture stores no receiver at all, so a type's method set can't be
-//     assembled from stored rows, let alone compared. A deliberate empty result, not an error.
+//   - Go: method-name-only structural matching (methodsets.go), forward and reverse folded into
+//     one call. No signature is stored or compared, so a result is never Exact, only Scoped
+//     (§4.3) — honestly weaker evidence than every other language's containment recovery below.
 //   - Rust: every "implementation" reference named q's own name IS the answer directly — the
 //     reference's own stored range already covers the whole impl_item (trait or inherent), and no
 //     row anywhere names the concrete type of a trait impl, so there is nothing to recover by
@@ -61,7 +61,7 @@ func (g *Graph) ImplementationsOf(ctx context.Context, q Query) ([]Target, error
 
 	switch language {
 	case "go":
-		return nil, nil // §6/D4: no receiver stored, no method set to compare.
+		return g.goImplementationsOf(ctx, name)
 	case "rust":
 		return g.rustImplementationsOf(ctx, name)
 	default:
