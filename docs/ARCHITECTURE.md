@@ -3238,6 +3238,22 @@ to Go.
 | `packages/git-ui` | The webview UI itself — the graph panel, the review panel, the dialogs, the file tree — Vue, mounted by the extension in both webview roots |
 | `packages/kira-ui` | Host-agnostic Vue components (`KuiButton`, `KuiContextMenu`, `KuiDialog`, `KuiIconBox`, `KuiPopoverPanel`, `KuiSearchInput`, `KuiSegmented`, `KuiSelect`, `KuiTextInput`, `KuiTooltip`) plus the shared Floating-UI positioning, tooltip and modal-focus machinery — shared by the workbench and the git webviews so the two frontends stop diverging component by component |
 
+**Branches, tags, stashes, worktrees and stacks fold into one tabbed picker (P77).**
+`BranchPicker.vue`'s tab fold is a pure-fold module, `pickerModel.ts`
+(`packages/git-ui/src/components/`) — no Vue, no bridge, so `pickerModel.test.ts` exercises it
+directly with plain fixtures, the same "pure fold out of the template" convention
+`refListModel.ts`/`stashListModel.ts`/`stackListModel.ts` already follow. `filterPickerInput` scopes
+the one filter box to the active tab while still computing every tab's own live match count (so a
+query typed on one tab hints a match on another); `orderAndCapTab` ranks local branches HEAD-first,
+then worktree-checked-out rows, then
+`committerDate` descending, while tags/the stash stack/stacks keep their own existing order (a
+version sequence, a stack-position addressing scheme, and a forest whose order *is* its structure,
+respectively) — `capWithPins`/`capStackGroups` never cap a pinned row out and never split a stack
+group mid-order, and `capSteps` lets a caller raise one list's own cap for the current panel-open
+without touching any other list's. `refListModel.ts` itself is deliberately not modified: its
+`buildRefListSections` has two other consumers (`review/BaseSelector.vue`, `review/ReviewView.vue`)
+whose own sort must not silently change to recency.
+
 **Every viewport-anchored floating surface in both frontends goes through Floating UI's
 collision-aware middleware** (`flip`/`shift`/`size`), rendered teleported so no `overflow: hidden`
 ancestor can clip it. The audit establishing this is stated per *mechanism*, not per module,
@@ -3747,9 +3763,9 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
 Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
 anchor: the PR surfaces (`CommitMeta.vue`, `BranchPicker.vue`/`StackList.vue` stack badges,
-`refBadges.ts`'s SlickGrid formatter) go through `pr.browserUrl`/`GitHubService.
-OpenPullRequestURL`, and a URL found inside a commit message body (`linkify.ts`) goes through a new
-generic `link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
+`refBadges.ts`'s SlickGrid formatter) go through `pr.browserUrl`/`GitHubService.OpenPullRequestURL`,
+and a URL found inside a commit message body (`linkify.ts`) goes through a new generic
+`link.openExternal`. Both are gated on `capabilities.openExternal`, and a surface renders a
 plain `<span>` when the host does not report it (`CommitMeta.vue`'s own button/span split — P79
 batch F closed the one PR icon that was missing the gate). `link.openExternal` is generic where
 `pr.openExternal` is not, per `internal/bridge/link.go`'s own reasoning: a PR URL is composed
