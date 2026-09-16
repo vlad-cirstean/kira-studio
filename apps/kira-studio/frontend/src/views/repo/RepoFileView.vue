@@ -216,13 +216,18 @@ async function mount(): Promise<void> {
     codeLens: false,
     renderValidationDecorations: 'off',
     scrollBeyondLastLine: false,
-    // C6 D4: never Monaco's own peek widget for a multi-candidate result — standalone Monaco's
-    // peek preview resolves each candidate through ITextModelService, which in the standalone
-    // build only finds already-created models, so a cross-file candidate with no open tab would
-    // render an empty preview pane. 'goto' jumps to the first (best-ranked) candidate through the
-    // editor opener instead, which needs no model at all. Honesty is preserved by the hover, which
-    // lists every candidate with its own rule/confidence.
-    gotoLocation: { multipleDefinitions: 'goto' },
+    // P78 §8.3: 'goto' for a multi-candidate definition is no longer a standalone-Monaco
+    // workaround (§1.4's kira-repo-aware ITextModelService now resolves any repo file on demand,
+    // preview tab or not) — kept because the hover already lists every candidate with its own
+    // rule/confidence, so jumping straight to the best-ranked one loses nothing, and a peek would
+    // put a second candidate list behind an extra dismissal. References/implementations are a
+    // different shape (occurrences to browse, not one name to resolve), so they default to
+    // Monaco's own peek instead, stated explicitly rather than left to Monaco's own default.
+    gotoLocation: {
+      multipleDefinitions: 'goto',
+      multipleReferences: 'peek',
+      multipleImplementations: 'peek',
+    },
     fontFamily: settingsState.appearance.fontFamily,
     fontSize: settingsState.appearance.fontSize,
   });

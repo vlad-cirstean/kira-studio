@@ -9,8 +9,9 @@
 // views/repo/monaco.ts — putting the import there would close a module cycle (tabKinds -> editors
 // -> monaco -> repoTabs -> tabs -> tabKinds). Only the two mounted views import this module, so the
 // existing edges stay acyclic.
-import type { NavResult, NavTarget } from '@shared/domain/repo';
+import type { NavResult, NavTarget, RefResult } from '@shared/domain/repo';
 import { control } from '../../bridge/control';
+import { type NavStatusState, publishNavStatus } from '../../state/navStatus';
 import { openRepoFileTab } from '../../state/repoTabs';
 import type { MonacoModule } from './monaco';
 import { repoFileUriObject, repoLocationOf } from './monaco';
@@ -57,8 +58,61 @@ function renderHoverMarkdown(res: NavResult): string {
   return lines.join('\n\n');
 }
 
-/** Registers the definition/hover providers and the cross-file editor opener exactly once —
- *  called from RepoFileView.vue's and RepoDiffView.vue's own mount, right after loadMonaco(). */
+function rangeOf(s: {
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
+}) {
+  return {
+    startLineNumber: s.startLine,
+    startColumn: s.startColumn,
+    endLineNumber: s.endLine,
+    endColumn: s.endColumn,
+  };
+}
+
+// §7.3: 0 and 1 are spelled out ("no references"/"1 reference") rather than "0 references"/
+// "1 references" — the plural noun reads wrong at either edge.
+function countLabel(n: number, noun: string): string {
+  if (n === 0) return `no ${noun}s`;
+  if (n === 1) return `1 ${noun}`;
+  return `${n} ${noun}s`;
+}
+
+// §7.3: the unattributed/truncated clauses are omitted when zero/false, not printed as "0
+// unattributed" — a clause with nothing to say is noise, the same discipline StatusBar.vue's own
+// items already follow (absent, not a zero reading).
+function referenceSummary(res: RefResult): NavStatusState {
+  const parts = [countLabel(res.total, 'reference')];
+  if (res.unattributed > 0) parts.push(`${res.unattributed} unattributed`);
+  if (res.truncated) parts.push('truncated');
+
+  const repoWide = res.sites.filter((s) => s.confidence === 'repoWide').length;
+  const exactOrScoped = res.sites.length - repoWide;
+  const tooltip = `${exactOrScoped} exact/scoped · ${repoWide} repo-wide`;
+
+  return { kind: 'references', summary: parts.join(' · '), tooltip };
+}
+
+// §7.3: the method-set caveat is added only when every target came from Go's own structural
+// matching (methodsets.go) — a mix with containment-recovered targets (a cross-language search
+// this phase never produces, but the check costs nothing) would make the caveat read like it
+// covers all of them.
+function implementationSummary(res: NavResult): NavStatusState {
+  const parts = [countLabel(res.targets.length, 'implementation')];
+  if (
+    res.targets.length > 0 &&
+    res.targets.every((t) => t.rule.startsWith('implementationsOf.goMethodSet'))
+  ) {
+    parts.push('method set, signatures not compared');
+  }
+  return { kind: 'implementations', summary: parts.join(' · ') };
+}
+
+/** Registers the definition/hover/reference/implementation providers and the cross-file editor
+ *  opener exactly once — called from RepoFileView.vue's and RepoDiffView.vue's own mount, right
+ *  after loadMonaco(). */
 export function ensureNavigationRegistered(mod: MonacoModule): void {
   if (registered) return;
   registered = true;
@@ -103,6 +157,51 @@ export function ensureNavigationRegistered(mod: MonacoModule): void {
             }
           : undefined,
       };
+    },
+  });
+
+  mod.languages.registerReferenceProvider(SELECTOR, {
+    async provideReferences(model, position, context) {
+      const loc = repoLocationOf(model);
+      if (!loc) return null; // D7: the diff's own HEAD side, deliberately.
+      const res = await control.codeWorkspaceReferences(
+        loc.repoId,
+        loc.path,
+        position.lineNumber,
+        position.column,
+        context.includeDeclaration,
+      );
+      if (res.status !== 'ready') {
+        publishNavStatus(null);
+        return null;
+      }
+      publishNavStatus(referenceSummary(res));
+      return res.sites.map((s) => ({
+        uri: repoFileUriObject(mod, loc.repoId, s.path),
+        range: rangeOf(s),
+      }));
+    },
+  });
+
+  mod.languages.registerImplementationProvider(SELECTOR, {
+    async provideImplementation(model, position) {
+      const loc = repoLocationOf(model);
+      if (!loc) return null;
+      const res = await control.codeWorkspaceImplementations(
+        loc.repoId,
+        loc.path,
+        position.lineNumber,
+        position.column,
+      );
+      if (res.status !== 'ready') {
+        publishNavStatus(null);
+        return null;
+      }
+      publishNavStatus(implementationSummary(res));
+      return res.targets.map((t) => ({
+        uri: repoFileUriObject(mod, loc.repoId, t.path),
+        range: rangeOf(t),
+      }));
     },
   });
 

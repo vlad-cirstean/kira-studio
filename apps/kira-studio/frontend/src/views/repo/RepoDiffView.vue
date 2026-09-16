@@ -179,7 +179,12 @@ async function mount(): Promise<void> {
     ...(review !== null ? { glyphMargin: true } : {}),
     minimap: { enabled: false },
     scrollBeyondLastLine: false,
-    gotoLocation: { multipleDefinitions: 'goto' },
+    // P78 §8.3: RepoFileView.vue's own identical options, same reasoning.
+    gotoLocation: {
+      multipleDefinitions: 'goto',
+      multipleReferences: 'peek',
+      multipleImplementations: 'peek',
+    },
     fontFamily: settingsState.appearance.fontFamily,
     fontSize: settingsState.appearance.fontSize,
   });

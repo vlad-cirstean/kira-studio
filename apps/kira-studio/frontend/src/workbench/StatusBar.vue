@@ -6,6 +6,7 @@ import { appMetricsState } from '../state/appMetrics';
 import { appUpdateState } from '../state/appUpdate';
 import { blameStatusState } from '../state/blameStatus';
 import { cacheStatsState } from '../state/cacheStats';
+import { navStatusState } from '../state/navStatus';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 import { engineState } from './state/engine';
@@ -80,6 +81,15 @@ const blameTooltip = computed(() => (blame.value ? blameLineTooltip(blame.value)
 function onRevealBlameCommit(): void {
   if (blame.value) blameStatusState.reveal?.(blame.value.sha);
 }
+
+// P78 §7.3: a sibling fact to the blame readout above, same "absent, not a zero reading" rule —
+// nothing to show when no find-references/find-implementations request is in flight or answered.
+const navStatus = computed(() =>
+  navStatusState.status.kind === 'none' ? null : navStatusState.status,
+);
+const navStatusTooltip = computed(() =>
+  navStatus.value?.kind === 'references' ? navStatus.value.tooltip : undefined,
+);
 </script>
 
 <template>
@@ -103,6 +113,15 @@ function onRevealBlameCommit(): void {
         <CodiconIcon name="git-commit" :size="13" />
         <span class="blame-text">{{ blameText }}</span>
       </button>
+      <span
+        v-if="navStatus"
+        class="p-status"
+        data-testid="nav-status"
+        v-tooltip="navStatusTooltip"
+      >
+        <CodiconIcon name="references" :size="13" />
+        {{ navStatus.summary }}
+      </span>
     </div>
 
     <div class="side">
