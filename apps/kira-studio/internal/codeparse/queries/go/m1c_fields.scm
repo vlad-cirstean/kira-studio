@@ -7,7 +7,8 @@
 ; Struct field declarations. Anchored at source_file through a named type_declaration, the same
 ; choice p64b_declarations.scm makes for const/var: a table test's anonymous
 ; `[]struct{ name string }{…}` and a function-local type never become symbols. An embedded field has
-; no `name` field and is not matched.
+; no `name` field and is not matched — p78_method_sets.scm's own pair of patterns is what captures
+; it (as a symbol and as a promotion reference both), load-bearing for Go's method-set assembly.
 (source_file
   (type_declaration
     (type_spec

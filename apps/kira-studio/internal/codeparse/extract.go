@@ -44,7 +44,10 @@ type Symbol struct {
 // a JavaScript member call, the reference node's own range (StartByte/EndByte) starts before the
 // name and would otherwise never match a cursor placed on it.
 type Reference struct {
-	Kind       string // 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read' | 'field'
+	// 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read' | 'field' | 'receiver' |
+	// 'embed' — the last two are P78's own (docs/v1.8/plans/P78-code-navigation.md §3.2): a
+	// method's own receiver type, and an embedded interface/struct field's own type.
+	Kind       string
 	Name       string
 	StartByte  int
 	EndByte    int
@@ -69,7 +72,7 @@ var definitionKinds = map[string]bool{
 
 var referenceKinds = map[string]bool{
 	"call": true, "type": true, "implementation": true, "import": true, "class": true, "read": true,
-	"field": true,
+	"field": true, "receiver": true, "embed": true,
 }
 
 // extractSymbols runs id's vendored tags.scm query (S2) over root and returns the file's own symbols
@@ -170,26 +173,37 @@ func extractSymbols(root *sitter.Node, source []byte, id ID) ([]Symbol, []Refere
 		// bare `(package_clause "package" (package_identifier) @name)`) produces no row at all.
 	}
 
-	references = dropCallDuplicateFields(references)
+	references = dropDuplicateNameRangeRefs(references)
 	linkParents(symbols)
 	return symbols, references, nil
 }
 
-// dropCallDuplicateFields removes a "field" reference covering the identical NAME range as a "call"
-// reference from the same root. A method call is captured twice by design — tags.scm's own call
-// pattern and M1c's selector/member pattern both match `c.Greet()` — and the call is the more
-// specific of the two, so find_references lists a call site once rather than twice. Keyed on the
-// name range, not the node span: the two patterns' spans deliberately differ.
-func dropCallDuplicateFields(references []Reference) []Reference {
-	calls := map[[2]int]bool{}
+// nameRangePriority is dropDuplicateNameRangeRefs' own closed ranking: when two patterns match one
+// site under different kinds at the identical name range, the higher-priority kind is kept. Any
+// kind absent from this table (import/read/class/implementation, none of which this repo's own
+// queries ever double-capture at a shared name range) sorts below everything listed, same as
+// priority 0's own "no more specific alternative exists" meaning for "type".
+var nameRangePriority = map[string]int{
+	"type": 0, "field": 1, "call": 2, "receiver": 2, "embed": 2,
+}
+
+// dropDuplicateNameRangeRefs keeps one row per name range when two patterns match one site under
+// different kinds, preferring the more specific kind: a call over a field (M1c §2.6), a receiver or
+// an embed over the blanket type capture (P78 §3.2). Keyed on the name range, not the node span:
+// the competing patterns' spans deliberately differ (M1c's own field/call example; a receiver's own
+// span is the whole method_declaration, P78 §3.2).
+func dropDuplicateNameRangeRefs(references []Reference) []Reference {
+	type nameRange struct{ start, end int }
+	winner := map[nameRange]string{}
 	for _, r := range references {
-		if r.Kind == "call" {
-			calls[[2]int{r.NameStartByte, r.NameEndByte}] = true
+		key := nameRange{r.NameStartByte, r.NameEndByte}
+		if cur, ok := winner[key]; !ok || nameRangePriority[r.Kind] > nameRangePriority[cur] {
+			winner[key] = r.Kind
 		}
 	}
 	out := references[:0]
 	for _, r := range references {
-		if r.Kind == "field" && calls[[2]int{r.NameStartByte, r.NameEndByte}] {
+		if winner[nameRange{r.NameStartByte, r.NameEndByte}] != r.Kind {
 			continue
 		}
 		out = append(out, r)

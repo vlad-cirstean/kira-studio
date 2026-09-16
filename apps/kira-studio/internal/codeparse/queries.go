@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/javascript/p67f_reads.scm queries/javascript/m1c_members.scm queries/javascript/m1c_member_reads.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/typescript/m1c_members.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/go/p67f_reads.scm queries/go/m1c_fields.scm queries/rust/tags.scm
+//go:embed queries/java/tags.scm queries/python/tags.scm queries/python/c2_implements.scm queries/javascript/tags.scm queries/javascript/c2_implements.scm queries/javascript/p64b_declarations.scm queries/javascript/p67f_reads.scm queries/javascript/m1c_members.scm queries/javascript/m1c_member_reads.scm queries/typescript/tags.scm queries/typescript/c2_implements.scm queries/typescript/p64_declarations.scm queries/typescript/m1c_members.scm queries/tsx/c2_implements.scm queries/tsx/p64_declarations.scm queries/go/tags.scm queries/go/p64b_declarations.scm queries/go/p67f_reads.scm queries/go/m1c_fields.scm queries/go/p78_method_sets.scm queries/rust/tags.scm
 var queryFS embed.FS
 
 // QuerySource is one query file's provenance (§4.1/NOTICES.md): a future license or version audit
@@ -95,6 +95,12 @@ var Provenance = []QuerySource{
 	// as a value produces no reference row. One file, registered on JavaScript, TypeScript and TSX
 	// alike (below), since member_expression/property_identifier are plain syntax all three share.
 	{JavaScript, thisRepo, "queries/javascript/m1c_member_reads.scm", ""},
+
+	// P78-authored receiver/interface-method/embedded-type query (docs/v1.8/plans/
+	// P78-code-navigation.md §3.1) — the vendored tags.scm captures a method's own name but nothing
+	// about its receiver, an interface's own method_elem children, or an embedded interface/struct
+	// field's type, so a type's method set can't be assembled from stored rows at all.
+	{Go, thisRepo, "queries/go/p78_method_sets.scm", ""},
 }
 
 // querySourcePaths maps a symbol-bearing language id to every embedded query file compiled into
@@ -110,7 +116,7 @@ var querySourcePaths = map[ID][]string{
 	JavaScript: {"queries/javascript/tags.scm", "queries/javascript/c2_implements.scm", "queries/javascript/p64b_declarations.scm", "queries/javascript/p67f_reads.scm", "queries/javascript/m1c_members.scm", "queries/javascript/m1c_member_reads.scm"},
 	TypeScript: {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/typescript/c2_implements.scm", "queries/typescript/p64_declarations.scm", "queries/javascript/p67f_reads.scm", "queries/typescript/m1c_members.scm", "queries/javascript/m1c_member_reads.scm"},
 	TSX:        {"queries/javascript/tags.scm", "queries/typescript/tags.scm", "queries/tsx/c2_implements.scm", "queries/tsx/p64_declarations.scm", "queries/javascript/p67f_reads.scm", "queries/typescript/m1c_members.scm", "queries/javascript/m1c_member_reads.scm"},
-	Go:         {"queries/go/tags.scm", "queries/go/p64b_declarations.scm", "queries/go/p67f_reads.scm", "queries/go/m1c_fields.scm"},
+	Go:         {"queries/go/tags.scm", "queries/go/p64b_declarations.scm", "queries/go/p67f_reads.scm", "queries/go/m1c_fields.scm", "queries/go/p78_method_sets.scm"},
 	Rust:       {"queries/rust/tags.scm"},
 }
 

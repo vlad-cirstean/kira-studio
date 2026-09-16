@@ -22,6 +22,12 @@ var kindCompatibility = map[string]map[string]bool{
 	"type":           {"class": true, "interface": true, "struct": true, "enum": true, "type": true, "module": true},
 	"class":          {"class": true, "struct": true, "type": true, "interface": true},
 	"implementation": {"interface": true, "class": true, "type": true},
+	// P78 §3.2: both new Go reference kinds name a type the same way "type" itself does (a
+	// receiver's own type, an embedded interface/struct field's own type) — same candidate set, or
+	// the demotion "type" already gets is silently lost for these two instead (kindCompatible's own
+	// unrecognized-kind branch treats a missing entry as "compatible with everything").
+	"receiver": {"class": true, "interface": true, "struct": true, "enum": true, "type": true, "module": true},
+	"embed":    {"class": true, "interface": true, "struct": true, "enum": true, "type": true, "module": true},
 }
 
 func kindCompatible(refKind, symKind string) bool {

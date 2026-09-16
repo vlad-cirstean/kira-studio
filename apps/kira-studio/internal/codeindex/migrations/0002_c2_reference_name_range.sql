@@ -7,6 +7,8 @@ CREATE TABLE reference (
   repo_id    TEXT    NOT NULL,
   block_id   INTEGER REFERENCES file_block(id) ON DELETE CASCADE,
   kind       TEXT    NOT NULL,   -- 'call' | 'type' | 'implementation' | 'import' | 'class' | 'read'
+                                 -- 'field' | 'receiver' | 'embed' (P78) — unconstrained TEXT, so a
+                                 -- new kind never needs a migration of its own.
   name       TEXT    NOT NULL,
   start_byte INTEGER NOT NULL,
   end_byte   INTEGER NOT NULL,
