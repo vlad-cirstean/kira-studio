@@ -1,8 +1,9 @@
 import type { EventPayload, HostKind, Transport, UiActionKind } from '@kira/git-ipc';
 import { vKuiTooltip } from '@kira/kira-ui';
-import { createApp, type App as VueApp } from 'vue';
+import { createApp, shallowRef, type App as VueApp } from 'vue';
 import AppRoot from './App.vue';
 import ReviewView from './components/review/ReviewView.vue';
+import { GRAPH_VISIBLE_KEY } from './graphVisibility.ts';
 import type { ReviewTarget } from './state/review.ts';
 import type { DateFormat, ViewStateStore } from './state/viewState.ts';
 // G16 D1/D2: the document-level height chain and gutter reset. Imported first so it is the base
@@ -20,6 +21,14 @@ import './theme/kira-structure.css';
 
 export interface MountHandle {
   unmount(): void;
+  /** P79 review fix (Performance, LOW): `false` while backgrounded (a KeepAlive deactivate) lets
+   *  `CommitGrid.vue`'s own generation-triggered rebuild defer to a single catch-up on the next
+   *  `true`, instead of paying that cost once per missed bump against a grid nobody can see. Only
+   *  meaningful for `view: "graph"` — a no-op call for a `"review"` mount, which has no
+   *  `CommitGrid.vue` at all. Optional so every existing caller (VS Code's own webview host, this
+   *  package's own tests) that never calls it keeps today's always-visible behavior exactly. See
+   *  `graphVisibility.ts`. */
+  setVisible?(visible: boolean): void;
 }
 
 export interface MountOptions {
@@ -91,6 +100,11 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
       : createApp(AppRoot, { ...rest, pendingUiAction, dateFormat });
   // G20 D2: `v-kui-tooltip` — replaces every native `title`/`:title` attribute in this bundle.
   app.directive('kui-tooltip', vKuiTooltip);
+  // P79 review fix: scoped to this one app instance, not module-level — several repo workspaces'
+  // graphs can be mounted (and independently backgrounded) at once. A no-op provide for a
+  // `"review"` mount (no CommitGrid.vue there to read it) is harmless.
+  const graphVisible = shallowRef(true);
+  app.provide(GRAPH_VISIBLE_KEY, graphVisible);
   // G16 D1/D2: the other half of app-shell.css's `.kv-mount-root` rule — the class and the rule
   // are useless apart, and they live in two files because the class must follow whatever
   // container the host hands us, not a naming convention two packages have to agree on.
@@ -100,6 +114,9 @@ export function mount(container: Element, opts: MountOptions): MountHandle {
     unmount(): void {
       app.unmount();
       container.classList.remove('kv-mount-root');
+    },
+    setVisible(visible: boolean): void {
+      graphVisible.value = visible;
     },
   };
 }

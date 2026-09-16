@@ -21,6 +21,7 @@ import { SlickGrid } from 'slickgrid';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { graphColumnWidth } from '../graph/geometry.ts';
 import { createGraphFormatter } from '../graph/graphColumn.ts';
+import { useGraphVisible } from '../graphVisibility.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
 import type { PrState } from '../state/pr.ts';
 import type { SearchState } from '../state/search.ts';
@@ -174,6 +175,14 @@ let resizeObserver: ResizeObserver | undefined;
 let resizeRaf = 0;
 let scrollRaf = 0;
 let previousSelectedRow = -1;
+
+// P79 review fix (Performance, LOW): `false` while a KeepAlive host has backgrounded this mount
+// (RepoGraphView.vue's own onDeactivated, via main.ts's `setVisible`) — the four generation
+// watchers below skip their own rebuild while hidden, marking one owed instead of doing it once
+// per missed bump against a grid nobody can see; the catch-up watch further down replays it once,
+// combined, the moment this flips back to visible.
+const graphVisible = useGraphVisible();
+let pendingRebuildOnVisible = false;
 
 // W14: the row a click or a keyboard move just selected, so the accessibility pass below can
 // move real DOM focus onto it the moment it next renders (`selection scrolls it into view first,
@@ -547,6 +556,15 @@ function scheduleResize(): void {
   if (resizeRaf !== 0) return;
   resizeRaf = requestAnimationFrame(() => {
     resizeRaf = 0;
+    // P79 review fix (Performance, LOW): a KeepAlive'd host (RepoGraphView.vue) shrinks this
+    // grid's container to 0×0 on deactivate — the ResizeObserver above fires for that transition
+    // too, and without this guard `resizeCanvas()`/`rebuildColumns()` would do a full layout pass
+    // against a grid nobody can see. The real, non-zero size on reactivate still runs this
+    // normally (its own doc comment two functions up: the observer reliably fires that transition
+    // too, so nothing else needs to trigger a resize on return).
+    const width = host.value?.clientWidth ?? 0;
+    const height = host.value?.clientHeight ?? 0;
+    if (width === 0 || height === 0) return;
     grid?.resizeCanvas();
     rebuildColumns();
   });
@@ -807,6 +825,12 @@ watch(
 watch(
   () => props.graphView.generation.value,
   () => {
+    // P79 review fix: a generation bump while backgrounded marks the rebuild owed instead of
+    // doing it now — the catch-up watch below replays it, once, on the next reactivate.
+    if (!graphVisible.value) {
+      pendingRebuildOnVisible = true;
+      return;
+    }
     // P72 §4: a generation bump (a refresh's restart-at-row-0 chunk) is exactly the moment
     // laneCount may have moved — a checkout onto a branch with a different lane shape. Same
     // lastRebuiltLaneCount guard handleChunkLayout already uses, so this only rebuilds when the
@@ -824,6 +848,10 @@ watch(
 watch(
   () => props.search?.searchGeneration.value,
   () => {
+    if (!graphVisible.value) {
+      pendingRebuildOnVisible = true;
+      return;
+    }
     grid?.invalidateAllRows();
     grid?.render();
   },
@@ -834,6 +862,10 @@ watch(
 watch(
   () => props.pr?.generation.value,
   () => {
+    if (!graphVisible.value) {
+      pendingRebuildOnVisible = true;
+      return;
+    }
     // P74 §4.2/§4.3: rebuilds the ancestry derivation `prsFor` (currentColumns/createCommitDataView
     // above) now reads, BEFORE invalidateRowHeights below — a row's own expanded/compact height
     // must never be computed against a stale ancestry map.
@@ -853,10 +885,29 @@ watch(
 watch(
   () => props.stack?.generation.value,
   () => {
+    if (!graphVisible.value) {
+      pendingRebuildOnVisible = true;
+      return;
+    }
     grid?.invalidateAllRows();
     grid?.render();
   },
 );
+// P79 review fix (Performance, LOW): replays whatever the four watchers above deferred while
+// backgrounded, once, combined, rather than once per missed generation bump. Runs the union of
+// their own effects — safe as a superset since `invalidateAllRows`/`render` are idempotent, and
+// `rebuildColumns`/`rebuildAncestry`/`invalidateRowHeights` are the same "make everything current"
+// calls each of them already does independently.
+watch(graphVisible, (visible) => {
+  if (!visible || !pendingRebuildOnVisible) return;
+  pendingRebuildOnVisible = false;
+  if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
+  if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
+  grid?.invalidateRowHeights();
+  grid?.invalidateAllRows();
+  grid?.updateRowCount();
+  grid?.render();
+});
 // G-UX D1: the detail pane opening/closing changes the column model itself (compact vs. full),
 // unlike every watcher above — a full `rebuildColumns()`, not just an invalidate/render.
 // G-UX (item 9): `flush: 'post'` — this must run AFTER Vue has applied the pane's own width
