@@ -23,6 +23,23 @@ v1.7's M1c.
   so a future session reaches for it immediately instead of trying to read the token out of the
   JSON. No fix needed.
 
+- **P83 (planning)**: used for navigation throughout, over plain HTTP/JSON-RPC (`CLAUDE.md` step 4 —
+  the native tool surface is unavailable in an agent-harness session, as its own step-3 caveat
+  says). `find_definition {"symbol":"ResolveHead"}` returned `gitclient/repo.go:251:6` with its
+  signature, settling in one call whether a HEAD helper already existed;
+  `find_references {"symbol":"worktreeLabel"}` correctly reported two same-named symbols and asked
+  for disambiguation, independently confirming P82's own decision to replicate git-ui's helper
+  rather than import it. Also worth recording: a **second** concurrent instance binds an
+  OS-assigned ephemeral port and prints the "Using this repository's existing token" banner — it is
+  usable as long as the first run's banner is still in hand, which is the one case `CLAUDE.md`'s
+  step-2 warning does not cover. No fix needed.
+
+- **P83 (planning)**: the two open entries below reproduce unchanged at `dc8867f5` —
+  `find_references {"symbol":"GEOMETRY"}` still answers `no references found`, and
+  `find_references {"symbol":"TAB_KINDS"}` still returns 12 hits, all in `.ts` files, with none of
+  `TabStrip.vue`'s eight `<script setup>` reads. Re-check only; no new entry, since this is the same
+  defect at new line numbers, not a new finding.
+
 ### Non-trivial
 
 - **P72 (planning) — `find_references` returns "no references found" for a TypeScript `const`
