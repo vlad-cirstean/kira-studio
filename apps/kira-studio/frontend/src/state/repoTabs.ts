@@ -10,6 +10,7 @@ import { tabsForWorkspace } from './mode';
 import {
   activateTab,
   createPinnedRepoGraphTab,
+  evictPreviewCohort,
   type OpenTabResult,
   openTab,
   patchRepoFileTabState,
@@ -122,11 +123,24 @@ export function openRepoCommitDiffTab(
     );
   });
   if (existing) {
+    if (pinned) {
+      // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
+      // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
+      // rule since it never reaches openTab's.
+      removeFromPreviewCohort(workspaceId, existing.id);
+    } else if (!previewCohort) {
+      // P79 review fix (Functional, LOW): this reuse path short-circuits past openTab entirely,
+      // so a preview-type open (not a cohort-joining one) never reached openTab's own §5.2 rule 3
+      // eviction — "Open all changes" reusing file 0's own already-open (permanent) tab left
+      // whatever preview cohort/slot preceded it (an unrelated previewed tab) untouched instead
+      // of being replaced. Mirrors openTab's own `previewIdsByWorkspace[key] = [id]` outcome for a
+      // freshly created preview tab: `existing.id` becomes the sole surviving cohort member,
+      // exactly as it would if a fresh tab had been created here instead of reused. Ordered before
+      // activateTab below so its own saveNow() call persists the eviction too, not a later,
+      // unrelated save.
+      evictPreviewCohort(workspaceId, existing.id);
+    }
     activateTab(existing.id);
-    // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
-    // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
-    // rule since it never reaches openTab's.
-    if (pinned) removeFromPreviewCohort(workspaceId, existing.id);
     return { id: existing.id, reused: true };
   }
   return openTab(

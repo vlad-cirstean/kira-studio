@@ -26,6 +26,9 @@ const {
   promoteTab,
   tabsState,
 } = await import('../../frontend/src/state/tabs');
+const { openRepoCommitDiffTab, openRepoFileTab } = await import(
+  '../../frontend/src/state/repoTabs'
+);
 
 // Every test gets its own fresh workspace ids — tabsState.tabs is one shared module-level array
 // with no per-test reset, so reusing a workspace id across tests would leak tabs between them.
@@ -33,6 +36,15 @@ let workspaceCounter = 0;
 function freshWorkspace() {
   workspaceCounter += 1;
   return repoWorkspaceKey(`test-${workspaceCounter}`);
+}
+
+// openRepoCommitDiffTab/openRepoFileTab take a raw repoId (they compute the workspace key
+// themselves via repoWorkspaceKey) — a separate counter from freshWorkspace's own, same
+// leak-avoidance reason.
+let repoIdCounter = 0;
+function freshRepoId(): string {
+  repoIdCounter += 1;
+  return `test-repo-${repoIdCounter}`;
 }
 
 function openFile(workspace: string, path: string, preview: boolean, previewCohort = false) {
@@ -163,6 +175,34 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
     }
     expect(saveCalls).toBe(1);
     expect(tabsState.previewIdsByWorkspace[ws]).toEqual([evictor.id]);
+  });
+});
+
+describe('P79 review fix: openRepoCommitDiffTab reuse still evicts the preview cohort', () => {
+  test("reusing file 0's existing permanent tab still evicts a stale cohort, and later files join fresh", () => {
+    const repoId = freshRepoId();
+    const ws = repoWorkspaceKey(repoId);
+    const diffLabels = { left: 'base', right: 'sha1' };
+
+    // file 0's diff tab already exists as a permanent (pinned) tab.
+    const file0 = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, true);
+    expect(isPreview(file0.id)).toBe(false);
+
+    // An unrelated preview tab is open in the same workspace beforehand.
+    const stale = openRepoFileTab(repoId, 'unrelated.ts', { preview: true });
+    expect(isPreview(stale.id)).toBe(true);
+
+    // "Open all changes": file 0 reuses its existing permanent tab (pinned: false,
+    // previewCohort unset) — the reuse short-circuit must still evict the stale cohort.
+    const reused = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, false);
+    expect(reused.id).toBe(file0.id);
+    expect(reused.reused).toBe(true);
+    expect(tabsState.tabs.find((t) => t.id === stale.id)).toBeUndefined();
+    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([file0.id]);
+
+    // file 1 joins the cohort file 0 just started.
+    const file1 = openRepoCommitDiffTab(repoId, 'b.ts', 'base', 'sha1', diffLabels, false, true);
+    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([file0.id, file1.id]);
   });
 });
 

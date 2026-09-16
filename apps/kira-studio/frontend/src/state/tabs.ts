@@ -314,6 +314,26 @@ export function removeFromPreviewCohort(key: WorkspaceKey, id: string): void {
   tabsState.previewIdsByWorkspace[key] = cohort.filter((x) => x !== id);
 }
 
+// §5.2 rule 3's own state-mutation half: closes every current cohort member (via closeTabInternal
+// — closeTab's own saveNow() would fire once per evicted tab, the same batching problem the
+// eviction branch below exists to avoid) except `keepId`, then leaves the cohort holding just
+// `keepId` (or empty, with none to keep). `keepId` lets a caller reusing an already-open tab as the
+// new preview content survive its own eviction, exactly as openTab's own branch below does for a
+// freshly created one via `previewIdsByWorkspace[key] = [id]`.
+//
+// P79 review fix (Functional, LOW): exported so state/repoTabs.ts's openRepoCommitDiffTab can call
+// it from its own existing-tab reuse branch, which short-circuits past openTab entirely and so
+// never reached this eviction at all — "Open all changes" reusing file 0's own already-open
+// permanent tab left whatever preview cohort/slot preceded it (an unrelated previewed tab) sitting
+// there untouched instead of being replaced.
+export function evictPreviewCohort(key: WorkspaceKey, keepId?: string): void {
+  const cohort = tabsState.previewIdsByWorkspace[key] ?? [];
+  for (const id of cohort) {
+    if (id !== keepId) closeTabInternal(id);
+  }
+  tabsState.previewIdsByWorkspace[key] = keepId ? [keepId] : [];
+}
+
 // Result of an open*Tab call: `reused` tells the caller whether an existing tab was activated
 // (Task 62) rather than a fresh one created — a fresh tab is about to fetch on mount anyway, so
 // only a caller that cares about the double-click "also reload the data" behavior needs to check
@@ -420,13 +440,14 @@ export function openTab<S>(
       const evictedIdx = tabsState.tabs.findIndex((t) => t.id === evictedIds[0]);
       const insertAt = evictedIdx < 0 ? tabsState.tabs.length : evictedIdx;
       tabsState.tabs.splice(insertAt, 0, record);
-      // P79 review fix (Performance, MEDIUM): closeTabInternal, not closeTab — a bulk eviction
-      // (e.g. "Open all changes" on a 150-file commit) used to do N full-array JSON.stringify +
-      // IPC round trips here, one per evicted tab. This function's own saveNow() call below
-      // (unconditional, runs regardless of cohort size) is now the only save the whole eviction
-      // does — setActiveTabId right after still lands on the correct active tab either way, since
-      // it always runs after every evicted tab is gone.
-      for (const evictedId of evictedIds) closeTabInternal(evictedId);
+      // P79 review fix (Performance, MEDIUM): evictPreviewCohort closes each evicted tab via
+      // closeTabInternal (no per-tab saveNow()) — a bulk eviction (e.g. "Open all changes" on a
+      // 150-file commit) used to do N full-array JSON.stringify + IPC round trips here, one per
+      // evicted tab. This function's own saveNow() call below (unconditional, runs regardless of
+      // cohort size) is now the only save the whole eviction does — setActiveTabId right after
+      // still lands on the correct active tab either way, since it always runs after every evicted
+      // tab is gone.
+      evictPreviewCohort(workspaceKey);
     } else {
       // §5.2 rule 4: no preview cohort yet — create at the end.
       tabsState.tabs.push(record);
