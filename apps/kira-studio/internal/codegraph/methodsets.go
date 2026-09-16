@@ -74,6 +74,32 @@ func (g *Graph) findGoType(ctx context.Context, typeName string) (codeindex.Symb
 	return codeindex.SymbolRow{}, codeindex.FileRow{}, false, nil
 }
 
+// typeLookup is cachedGoType's own memoized entry — findGoType's result (including a real "not
+// found") for one type name.
+type typeLookup struct {
+	sym  codeindex.SymbolRow
+	file codeindex.FileRow
+	ok   bool
+}
+
+// typeCache spares a repeated FindSymbolsByName+FileByID round trip for the same Go type name
+// within one call — fileCache/symbolCache/referenceCache's own counterpart. methodSet and
+// goConcreteTypesSatisfying both resolve the same typeName moments apart within one call; findGoType
+// itself stays uncached so a caller that genuinely wants a fresh lookup still can.
+type typeCache map[string]typeLookup
+
+func (g *Graph) cachedGoType(ctx context.Context, cache typeCache, typeName string) (codeindex.SymbolRow, codeindex.FileRow, bool, error) {
+	if v, ok := cache[typeName]; ok {
+		return v.sym, v.file, v.ok, nil
+	}
+	sym, file, ok, err := g.findGoType(ctx, typeName)
+	if err != nil {
+		return codeindex.SymbolRow{}, codeindex.FileRow{}, false, err
+	}
+	cache[typeName] = typeLookup{sym: sym, file: file, ok: ok}
+	return sym, file, ok, nil
+}
+
 // methodSetResult is goTypes' own memoized entry — the method set plus whether embedding
 // contributed at least one of its names (§4.3's own ".promoted" rule suffix).
 type methodSetResult struct {
@@ -88,14 +114,16 @@ type goTypes struct {
 	files   fileCache
 	syms    symbolCache
 	refs    referenceCache
+	types   typeCache
 	memo    map[string]methodSetResult
-	walking map[string]bool // embedding cycle guard
+	direct  map[string]map[string]bool // directGoMethods' own per-call memo
+	walking map[string]bool            // embedding cycle guard
 }
 
 func newGoTypes(g *Graph) *goTypes {
 	return &goTypes{
-		g: g, files: fileCache{}, syms: symbolCache{}, refs: referenceCache{},
-		memo: map[string]methodSetResult{}, walking: map[string]bool{},
+		g: g, files: fileCache{}, syms: symbolCache{}, refs: referenceCache{}, types: typeCache{},
+		memo: map[string]methodSetResult{}, direct: map[string]map[string]bool{}, walking: map[string]bool{},
 	}
 }
 
@@ -107,7 +135,12 @@ func newGoTypes(g *Graph) *goTypes {
 // Reused standalone by goImplementationsOf to tell a concrete type from an interface with no stored
 // kind to ask (§2.1): typeName is used as a receiver somewhere if and only if it is concrete — an
 // interface's own method_elem is never wrapped in a method_declaration with a receiver at all.
+// Memoized per call (ix.direct): goImplementationsOf's own standalone call and methodSet's first
+// step both ask for the same typeName moments apart.
 func (ix *goTypes) directGoMethods(ctx context.Context, typeName string) (map[string]bool, error) {
+	if cached, ok := ix.direct[typeName]; ok {
+		return cached, nil
+	}
 	refs, err := ix.g.store.ReferencesByName(ctx, ix.g.repoID, typeName)
 	if err != nil {
 		return nil, err
@@ -132,6 +165,7 @@ func (ix *goTypes) directGoMethods(ctx context.Context, typeName string) (map[st
 			set[m.Name] = true
 		}
 	}
+	ix.direct[typeName] = set
 	return set, nil
 }
 
@@ -166,7 +200,7 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 		set[m] = true
 	}
 
-	typeSym, _, ok, err := ix.g.findGoType(ctx, typeName)
+	typeSym, _, ok, err := ix.g.cachedGoType(ctx, ix.types, typeName)
 	if err != nil {
 		return nil, false, false, err
 	}
@@ -306,7 +340,7 @@ func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want
 		if !supersetOf(have, want) {
 			continue
 		}
-		typeSym, typeFile, ok, err := g.findGoType(ctx, typeName)
+		typeSym, typeFile, ok, err := g.cachedGoType(ctx, ix.types, typeName)
 		if err != nil {
 			return nil, err
 		}
