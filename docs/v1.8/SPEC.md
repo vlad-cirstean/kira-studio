@@ -582,6 +582,107 @@ section already documented for that spec). `bun run test:ui`: 270/276 passed, 2 
 section already named as this sandbox's full-parallel-run wall-clock contention, in neither a file
 this phase touched; both confirmed passing standalone. No other known gaps against the plan.
 
+## P78 result
+
+Landed per plan (`docs/v1.8/plans/P78-code-navigation.md`), 11 commits (`21db4135`..`52ce834f`), in
+the plan's own §12.1 order, no parallel subagents (the plan's own note: only the seam after commit 2
+was real).
+
+**Part A — §1 (the modifier-click affordance).** Root-caused exactly as the plan measured it:
+Ctrl+click on macOS is not a bug (`clickLinkGesture.js` picks `metaKey` under `isMacintosh`, never
+both), but the cross-file underline/preview never rendered because standalone Monaco's
+`StandaloneTextModelService.createModelReference` only resolves an already-open model, and
+`goToDefinitionAtPosition.js`'s single-result branch only calls `addDecoration` inside that promise's
+`.then`. Fixed with a new `apps/kira-studio/frontend/src/views/repo/textModels.ts`, installed once in
+`loadMonaco()`'s existing `.then` (before the first `editor.create`, while `ITextModelService` is
+still an uninstantiated `SyncDescriptor`) — it resolves a tab-owned URI straight through
+`mod.editor.getModel`, and a `kira-repo` URI with no open tab by reading the file over
+`codeWorkspaceReadFile` and routing it through `getOrCreateModel` (the one cache a tab open later
+reuses, never a second model path). A capped LRU registry evicts least-recently-resolved preview
+models; a preview promoted to a real tab leaves the registry rather than being evicted out from under
+it. `RepoDiffView.vue` needed no equivalent change — its own two models are always already open.
+
+**Part B — §2-§5 (Go structural implementations).** `queries/go/p78_method_sets.scm` (new capture
+query) plus `codeparse`'s registration now carry a Go method's own receiver type (anonymous today —
+`§2.1`'s own gap, closed by naming it off the `receiver` capture), an interface's own method names,
+and an embedded field/interface name per type — all as ordinary reference/symbol rows, no schema
+migration. `internal/codegraph/methodsets.go` is new: `methodSet(ctx, typeName, depth)` walks
+embedding up to a depth cap of 8 with a cycle guard (mutual embedding terminates cleanly, proven by
+`TestGoMethodSetMutualEmbeddingTerminates`/`TestGoMethodSetEmbeddingCapsAtDepth`), seeded by
+`rarestGoMethodName` (the wanted method with the fewest `FindSymbolsByName` rows, an accepted
+bounded-cost heuristic — see Known gaps below) and matched by method name only, never a signature.
+`implementations.go`'s Go arm now calls `goImplementationsOf` instead of returning `nil, nil`;
+confidence is always `Scoped`, rule strings are `implementationsOf.goMethodSet` (own methods) or
+`implementationsOf.goMethodSet.promoted` (completed via embedding) — no case ever claims `Exact`. A
+seventh `resolve.go` tiebreak (`sameReceiver`) now demotes-not-filters same-receiver-type Go method
+candidates ahead of `basenameMatches`, computed only when the reference site itself sits inside a Go
+method (`receiverTypeOf` on both site and candidate, skipped entirely off that path per §5.2's own
+cost note).
+
+**Part C — §6-§8 (reference/implementation wiring).** `codegraph.Site` gained a `Confidence` field
+(`Exact` for an `IncludeDefinition` row, the group's own confidence otherwise, `RepoWide` for a
+singleton) — a thin field assignment, not tested per its own bar. `internal/codeworkspace/nav.go`
+gained `Implementations` (a structural copy of `Definitions` over `graph.ImplementationsOf`) and
+`References` (over `graph.ReferencesTo`, `RefOpts{Mode: Resolved, IncludeDefinition}`) — `References`
+deliberately never early-returns on an empty `Sites` list, since `Total`/`Truncated`/`Unattributed`
+can carry a real reading (every occurrence unattributed) even then. `bridge/codeworkspace.go` exposes
+both over the wire (`CodeWorkspaceReferenceArgs` new, `Implementations` reuses
+`CodeWorkspaceDefinitionArgs`); `packages/shared/domain/repo.ts` gained `refSiteSchema`/
+`refResultSchema` and their inferred types. `views/repo/navigation.ts` registers
+`registerReferenceProvider`/`registerImplementationProvider` on the same scheme-scoped selector the
+existing definition/hover providers already use, publishing a `state/navStatus.ts` readout (new,
+no-owner-token store per its own doc comment — `navigation.ts` is the sole writer) that
+`StatusBar.vue` renders as a left-side item (`data-testid="nav-status"`) reading e.g. "3 references ·
+2 unattributed" or "N implementations · method set, signatures not compared" (the caveat only when
+every target's rule starts with `implementationsOf.goMethodSet`); the hover markdown grows its own
+"Receiver-matched (Go)" line when every target resolved via `sameReceiver`, replacing the blanket
+"not type-resolved" disclaimer for that case only. Both `RepoFileView.vue`/`RepoDiffView.vue` set
+`gotoLocation.multipleReferences`/`multipleImplementations: 'peek'` explicitly (still `'goto'` for
+definitions — §1.4's fix already lists every candidate in the hover, so the peek's own extra
+dismissal buys nothing there).
+
+**§11 (tests).** `implementations_test.go` narrowed to
+`TestImplementationsOfGoEmptyInterfaceIsEmpty` (the zero-method-interface path only); the new
+`methodsets_test.go` (9 cases) covers structural matching, missing-method exclusion, promotion
+through embedding, interface-embedding on the want side, the mutual-embedding cycle guard, the
+depth-8 cap, the empty-interface case, the reverse (concrete-name) query direction, and a
+same-method-name-different-receiver disambiguation. `resolve_test.go` gained
+`TestResolverGoSameReceiverTiebreak` (demotion, not filter — both candidates still returned). UI:
+`repo-workspace.spec.ts` gained two Playwright cases per the plan's own §11.3 — modifier-click
+(`Meta`, never `Control`; this tier's WebKit reports a Macintosh UA, so a `Control` press would pass
+vacuously) rendering `.goto-definition-link` and navigating cross-file, and Shift+F12 opening
+`.reference-zone-widget` with the status-bar readout. Case 1 was verified as a genuine regression
+guard, not just a green test: temporarily disabling `textModels.ts`'s install call reproduces exactly
+the plan's own predicted failure shape (the `.goto-definition-link` assertion fails while a plain
+click-then-assert-tab test would have stayed green), then re-enabling it restores the pass. No
+dedicated unit test for `Site.Confidence`, `nav.go`'s two new functions, `bridge/codeworkspace.go`'s
+two methods, or `render.go`'s extra column — CLAUDE.md's own bar names each as a thin pass-through,
+matching the plan's own §11.1 call.
+
+**Known gap, found while writing tests, not fixed (in scope for Part B's own stated heuristic, not a
+defect).** `rarestGoMethodName`'s seed-by-fewest-rows heuristic can miss a genuine implementer that
+owns the seeded method *only* through embedding/promotion (never as its own literal receiver-based
+method row) — `TestGoMethodSetPromotionThroughEmbeddedStruct`'s own comment documents the concrete
+shape of this. This is the same "no signature-aware Go matching, no real type inference" boundary the
+plan states explicitly as out of scope, not a bug introduced by this phase; it means a promotion-only
+implementer can be invisible to `goImplementationsOf` specifically when its own directly-declared
+methods are never the rarest name in the interface being queried. No open item filed in
+`docs/ARCHITECTURE.md` — it is a property of the bounded-cost algorithm, not a currently-true
+limitation of a specific feature.
+
+Independently re-verified: `go build/vet` clean, `go test ./...` clean, `bun typecheck/lint` clean,
+both `bun run build` and `bun run build:vscode` succeed (the latter, and `bun run test:webview`'s 44/
+45-then-45/45 across two runs, completely unaffected by this phase's diff — no file either build
+touches was changed). 1487/1487 unit tests (`bun run test:unit`). `bun run test:ui` (`ui`+
+`ui-timing`): two full runs, six distinct failures total across both
+(`cell-editor.spec.ts`'s own <250ms bound, `data-view.spec.ts`'s own stop-then-poll race,
+`slick-grid.spec.ts`'s own two filter/selection timing cases, `sql-schema.spec.ts`'s own dialog-stage
+timing case) plus one VS Code webview flake (`commit-meta-clamp.spec.ts`) on a third, separate
+`test:webview` run — none in a file this phase's diff touches (confirmed by diffing every touched
+spec file against the pre-phase tree: zero overlap), all confirmed passing standalone, the same
+full-parallel-run wall-clock contention class P73 through P77's own result sections already document,
+not a regression. No other known gaps against the plan.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
