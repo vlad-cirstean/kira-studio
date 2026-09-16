@@ -43,6 +43,8 @@ import type {
 } from '@kira/git-ipc';
 import type { ConnectionManager } from './connection.ts';
 import { goToFile } from './goToFile.ts';
+import { isValidExternalLinkUrl } from './linkUrl.ts';
+import { isValidPrBrowserUrl } from './prUrl.ts';
 import { virtualKey } from './virtualKey.ts';
 
 // D11: the server contract's own app.init is the webview contract's AppInitResult minus host/
@@ -561,9 +563,23 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     // requests pr.browserUrl over the socket, then hands the URL (when non-null) to the OS
     // browser. A null url (github disabled, or no GitHub remote) is a silent no-op: the caller
     // already gated the button on this very lookup resolving in the first place.
+    //
+    // P79 finding 3: isValidPrBrowserUrl re-validates the URL before openExternal ever sees it —
+    // the same boundary bridge/github.go's OpenPullRequestURL already defends on the desktop side,
+    // now checked here too rather than trusting the socket's answer unconditionally.
     'pr.openExternal': async ({ repoId, number }, ctx) => {
       const result = await connection.request('pr.browserUrl', { repoId, number }, ctx.signal);
-      if (result.url !== null) await browser.openExternal(result.url);
+      if (result.url !== null && isValidPrBrowserUrl(result.url)) {
+        await browser.openExternal(result.url);
+      }
+      return {};
+    },
+    // P79 finding 4: a commit message body's own URL (linkify.ts, git-ui) — unlike pr.openExternal
+    // above this is genuinely untrusted renderer-supplied content, never Go-composed, so it is
+    // answered entirely here (no socket round trip at all) after the same shape check
+    // bridge/link.go's LinkService.OpenExternal applies desktop-side.
+    'link.openExternal': async ({ url }) => {
+      if (isValidExternalLinkUrl(url)) await browser.openExternal(url);
       return {};
     },
     // G25: five plain forwards, answered entirely by the Go server, same as every other

@@ -63,13 +63,17 @@ function renderBody(): void {
   const container = bodyEl.value;
   if (!container) return;
   container.replaceChildren();
+  // P79 finding 4: undefined (renders inert text) unless this host can open external URLs at
+  // all — the same `actions.capabilities.openExternal` gate the PR row's own button/span split
+  // already uses below.
+  const onOpenExternal = props.actions.capabilities.openExternal ? openLink : undefined;
   for (const [index, paragraph] of bodyParagraphs.value.entries()) {
     if (index > 0) container.appendChild(document.createElement('br'));
     if (index > 0) container.appendChild(document.createElement('br'));
     const lines = paragraph.split('\n');
     lines.forEach((line, lineIndex) => {
       if (lineIndex > 0) container.appendChild(document.createElement('br'));
-      appendLinkifiedText(container, line);
+      appendLinkifiedText(container, line, onOpenExternal);
     });
   }
 }
@@ -272,6 +276,18 @@ async function openPullRequest(number: number): Promise<void> {
   }
 }
 
+/** P79 finding 4: the message body's own linkified URLs (`renderBody`, above) — the same
+ *  try/announce shape `openPullRequest` already uses. */
+async function openLink(url: string): Promise<void> {
+  try {
+    await props.actions.openExternalLink(url);
+  } catch (err) {
+    props.actions.announce(
+      `Couldn't open the link — ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 /** P74 §4.3: the facts row's own icon — the first PR `prForCommit` names (ancestry's own
  *  first-writer-wins already resolved which branch wins when more than one claims a commit;
  *  `bySha`'s own array is realistically always length 1 in practice, never fanned out further
@@ -458,8 +474,21 @@ const prIcon = computed(() => {
   white-space: normal;
 }
 
-.kv-meta-body a {
+/* P79 finding 4: a <button>, not an <a> (linkify.ts's own doc comment) — reset to read as
+   ordinary link-styled text, since it sits inline inside message-body prose rather than beside a
+   badge the way .kv-meta-pr-link does. */
+.kv-linkify-url {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
   color: var(--kv-focus-border);
+  cursor: pointer;
+}
+
+.kv-linkify-url:hover {
+  text-decoration: underline;
 }
 
 /* Deliberately not a standard control's box: "Show more"/"Show less" reads as an inline link

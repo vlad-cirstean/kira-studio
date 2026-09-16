@@ -67,6 +67,13 @@ export interface DetailActions {
    *  composes/opens the URL itself. A no-op (never called) when `capabilities.openExternal` is
    *  false; callers gate the button on that themselves, same convention `openInEditor` uses. */
   openPullRequest(params: { number: number }): Promise<void>;
+  /** P79 finding 4: opens an arbitrary URL found in a commit message body (`linkify.ts`) in the
+   *  external browser. Unlike `openPullRequest`, this URL is genuinely renderer-supplied — it is
+   *  the untrusted commit message text itself, not something the host composes — so each host
+   *  validates the URL's own shape rather than trusting it outright. A no-op (never called) when
+   *  `capabilities.openExternal` is false; callers gate on that themselves, same convention
+   *  `openPullRequest`/`openInEditor` use. */
+  openExternalLink(url: string): Promise<void>;
   /** P75 §2.3: reveals and selects `sha` in the graph — review-row-only today
    *  (`ReviewCommitRow.vue`'s "Open in graph"), implemented in every bundle because
    *  `DetailActions` is one interface, the same way `openPullRequest` is (P74 §3.3).
@@ -118,6 +125,9 @@ export function createDetailActions(
       const repo = repoId();
       if (!repo) throw new Error('createDetailActions: openPullRequest called with no active repo');
       await bridge.request('pr.openExternal', { repoId: repo, number });
+    },
+    async openExternalLink(url) {
+      await bridge.request('link.openExternal', { url });
     },
     async revealInGraph({ sha }) {
       const repo = repoId();

@@ -61,9 +61,9 @@ export function takePendingReviewTarget(
 
 // P62 §4.5: the blame annotation's own click-through ("Open Blame Commit in Graph") hits the
 // identical race — a repo-file tab can be active before the pinned graph tab has ever mounted, so
-// a `ui.action` emitted straight onto the transport (`transport.ts`'s `emitUiAction`) would have
-// nothing listening. Mirrors `pendingReviewTargetByCodeRepoId` above exactly: stashed here,
-// consumed once by `RepoGraphView.vue`'s own mount as `MountOptions.pendingUiAction`. P75 §2.3:
+// emitting `ui.action` straight onto the transport would have nothing listening. Mirrors
+// `pendingReviewTargetByCodeRepoId` above exactly: stashed here, consumed once by
+// `RepoGraphView.vue`'s own mount as `MountOptions.pendingUiAction`. P75 §2.3:
 // the review row's "Open in graph" (`graph.revealCommit`, below) hits the same race and shares
 // this one stash rather than a second copy of it.
 const pendingBlameRevealByCodeRepoId = new Map<string, { repoId: string; sha: string }>();
@@ -149,8 +149,8 @@ export interface HostHandlersDeps {
    *  handler that pushes an event with no caller needing to know whether anything was listening.
    *  P75 §2.3: typed `boolean`, matching `transport.ts`'s own `local.emit` (returning since P68) —
    *  `graph.revealCommit`'s handler needs that to decide between "delivered live" and "stash for
-   *  the next cold mount", the same distinction `emitUiAction` already made for the blame reveal
-   *  this handler absorbs. */
+   *  the next cold mount", the same distinction the blame-reveal handler this absorbs already
+   *  needed. */
   readonly emitLocal: <K extends EventKey>(method: K, payload: EventPayload<K>) => boolean;
 }
 
@@ -416,6 +416,17 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     'pr.openExternal': async ({ repoId, number }, signal) => {
       const result = await deps.remoteRequest('pr.browserUrl', { repoId, number }, signal);
       if (result.url !== null) await control.githubOpenPullRequestUrl(result.url);
+      return {};
+    },
+
+    // P79 finding 4: linkify.ts's own message-body URL, opened through LinkService.OpenExternal
+    // — the same "one Go-side path that ever opens the OS browser" shape pr.openExternal above
+    // uses, except this URL is untrusted renderer-visible content already (the commit message
+    // itself), so Go-side validation checks the URL's own shape, never a known-host allowlist.
+    // Answered entirely here (no repoId, no socket round trip) rather than forwarded — Go's
+    // gitrpc has no case for it at all.
+    'link.openExternal': async ({ url }) => {
+      await control.linkOpenExternal(url);
       return {};
     },
 

@@ -251,9 +251,12 @@ func (s *ghState) snapshotPut(prs []ghclient.PR) {
 	s.snapshotValid = true
 }
 
-// isGitHubHost is D15's own test: the literal "github.com", or a host the Client's own Discovery
-// has ever probed successfully (a GHES install).
-func isGitHubHost(host string, ghHosts []string) bool {
+// IsGitHubHost is D15's own test: the literal "github.com", or a host the Client's own Discovery
+// has ever probed successfully (a GHES install). Exported so bridge.GitHubService's own
+// OpenPullRequestURL validator (P79 finding 2) can apply the same "known GitHub host" rule to a
+// URL it re-validates, rather than hardcoding a single literal host that a GHES user's repo would
+// never match.
+func IsGitHubHost(host string, ghHosts []string) bool {
 	if host == "github.com" {
 		return true
 	}
@@ -285,7 +288,7 @@ func (e *RepoEntry) githubRepo(ctx context.Context) (ghclient.Repo, bool) {
 		url := strings.TrimSpace(string(res.Stdout))
 		if parsed, parsedOK := ghclient.ParseRemote(url); parsedOK {
 			hosts := e.ghClient.Hosts(ctx)
-			if isGitHubHost(parsed.Host, hosts) {
+			if IsGitHubHost(parsed.Host, hosts) {
 				repo, ok = parsed, true
 			}
 		}
@@ -461,11 +464,13 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 	return okResult([]ghclient.PR{*latest})
 }
 
-// PrBrowserURL is pr.browserUrl's own orchestration (P74 §3.3): composes the PR's own github.com
-// URL server-side, never trusting a URL the renderer might supply (bridge.GitHubService's own doc
-// comment). false when github.enabled is off or there is no GitHub remote — the same "disabled
-// collapses to nothing" posture PrLookupResult already takes; the caller renders that as the PR
-// number staying plain text.
+// PrBrowserURL is pr.browserUrl's own orchestration (P74 §3.3): composes the PR's own browser URL
+// server-side, never trusting a URL the renderer might supply (bridge.GitHubService's own doc
+// comment). repo.Host carries github.com or a GHES hostname (P79 finding 2 — this used to
+// hardcode "github.com", breaking every GHES repo even though githubRepo already resolved and
+// verified the real host via IsGitHubHost). false when github.enabled is off or there is no
+// GitHub remote — the same "disabled collapses to nothing" posture PrLookupResult already takes;
+// the caller renders that as the PR number staying plain text.
 func (e *RepoEntry) PrBrowserURL(ctx context.Context, number int) (string, bool) {
 	if !e.githubEnabled() {
 		return "", false
@@ -474,7 +479,7 @@ func (e *RepoEntry) PrBrowserURL(ctx context.Context, number int) (string, bool)
 	if !ok {
 		return "", false
 	}
-	return fmt.Sprintf("https://github.com/%s/pull/%d", repo.Path(), number), true
+	return fmt.Sprintf("https://%s/%s/pull/%d", repo.Host, repo.Path(), number), true
 }
 
 // maxEagerPurgeBranches bounds D8's own eager post-fetch re-resolve pass, triggered by refsChanged

@@ -145,7 +145,15 @@ package gitrpc
 // openWorktreePicker, openStackPicker -- extension<->webview only, this Go server neither emits
 // nor parses ui.action payloads, the same reason this constant moves for every ui.action-only
 // addition since G10 D9. No new request, no new capability, no SQL migration.
-const ContractVersion = 38
+// P79 finding 4: 38 -> 39, one new host-answered request, link.openExternal (params: {url:
+// string}, result: {}) -- opens a commit message body's own URL (linkify.ts) in the OS browser,
+// never reaching this server: unlike pr.openExternal the URL is untrusted renderer-visible
+// content already, not something this server can compose, so each host only validates the URL's
+// own shape before its own OS-open call. This constant moves for the same reason ui.action-only
+// additions always have (G10 D9): it is the sole compatibility authority, even for a method this
+// server neither emits nor parses. No new event, no new capability (openExternal already gates
+// this the same way it gates pr.openExternal), no SQL migration.
+const ContractVersion = 39
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

@@ -1177,6 +1177,8 @@ export interface GhStatus {
 export interface PrRecord {
   readonly number: number;
   readonly title: string;
+  /** P79 finding 6: never hand this straight to a host/renderer as a clickable link — go through
+   *  `pr.openExternal` instead. */
   readonly url: string;
   readonly state: 'open' | 'draft' | 'merged' | 'closed';
   readonly headRef: string;
@@ -2129,6 +2131,17 @@ export type Contract = {
      *  browser-open path — never answered by the Go server itself. */
     'pr.openExternal': {
       params: { repoId: string; number: number };
+      result: Record<string, never>;
+    };
+    /** P79 finding 4: opens an arbitrary URL `linkify.ts` found in a commit message body, in the
+     *  OS browser — `CommitMeta.vue`'s message-body links, unlike the PR row above, cannot be
+     *  server-composed (the URL *is* the untrusted renderer-visible content, a commit message).
+     *  Host-answered like `pr.openExternal`, never proxied to the Go server; each host still
+     *  refuses anything that is not a well-formed http(s) URL before its own OS-open call ever
+     *  sees it — the same "boundary is the thing being defended" posture, applied to a URL this
+     *  process can only validate, never compose. */
+    'link.openExternal': {
+      params: { url: string };
       result: Record<string, never>;
     };
     // ---- G25: worktree support (D1/D4/D8/D9-D14) -------------------------------------------

@@ -139,7 +139,16 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // worktree/stack commands to the branch picker's own matching tab (D22's five-tab redesign)
 // instead of funnelling all of them into plain 'openBranchPicker'. No new request, no new event,
 // no new capability, no SQL migration.
-export const CONTRACT_VERSION = 38;
+// P79 finding 4 (2026-09-16): 38 -> 39, one new host-answered request, 'link.openExternal'
+// (params: {url: string}, result: {}) -- opens an arbitrary URL 'linkify.ts' found in a commit
+// message body in the OS browser, replacing 'CommitMeta.vue's own raw `<a href>` (a real
+// whole-window navigation under Wails, which has no anchor-click interception the way
+// 'pr.openExternal' already gets one from Go-side re-validation). Never reaches the Go server --
+// unlike 'pr.openExternal' this URL is untrusted renderer-visible content already (the commit
+// message itself), not something the Go side can compose, so each host still refuses anything but
+// a well-formed http(s) URL before its own OS-open call. No new event, no new capability
+// ('openExternal' already gates this the same way it gates 'pr.openExternal'), no SQL migration.
+export const CONTRACT_VERSION = 39;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;
@@ -251,6 +260,7 @@ const REQUEST_KEY_MAP: Record<RequestKey, true> = {
   'branch.resolvePr': true,
   'pr.browserUrl': true,
   'pr.openExternal': true,
+  'link.openExternal': true,
   'worktree.list': true,
   'preflight.worktreeAdd': true,
   'preflight.worktreeRemove': true,

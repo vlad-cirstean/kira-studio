@@ -353,6 +353,9 @@ const filesActions = computed<DetailActions | undefined>(() => {
       if (!repo) throw new Error('ReviewView: openPullRequest called with no active repo');
       await bridge.request('pr.openExternal', { repoId: repo, number });
     },
+    async openExternalLink(url) {
+      await bridge.request('link.openExternal', { url });
+    },
     async revealInGraph({ sha }) {
       const repo = repoId.value;
       if (!repo) return { revealed: false };

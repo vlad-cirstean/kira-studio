@@ -55,9 +55,9 @@ const LOCAL_EVENT_KEYS: ReadonlySet<EventKey> = new Set(['review.target', 'ui.ac
  *  transport (per repo workspace), matching `remote.on`'s own scoping. */
 function createLocalEmitter(): {
   on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void;
-  /** Returns whether any listener was actually registered for `method` — emitUiAction's own callers
-   *  (Group 6, P68 review) need to tell "delivered live" apart from "nothing was listening" to
-   *  decide whether a cold-mount stash is still needed. */
+  /** Returns whether any listener was actually registered for `method` — a caller (e.g.
+   *  `graph.revealCommit`'s handler, Group 6, P68 review) needs to tell "delivered live" apart
+   *  from "nothing was listening" to decide whether a cold-mount stash is still needed. */
   emit<K extends EventKey>(method: K, payload: EventPayload<K>): boolean;
 } {
   const handlersByMethod = new Map<EventKey, Set<(payload: unknown) => void>>();
@@ -126,16 +126,6 @@ const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
 // `emitLocal` closure of its own. Keyed by codeRepoId (not the git repoId) so this module — the
 // one that actually owns each repo workspace's local emitter — can be asked directly.
 const localEmittersByCodeRepoId = new Map<string, ReturnType<typeof createLocalEmitter>>();
-
-/** A no-op (returning false) for a codeRepoId whose graph tab (and therefore transport) was never
- *  mounted — nothing is listening yet, the same "cold" outcome every other local-bus emission
- *  already tolerates (`review.open`'s own `emitLocal` call has the identical property while the
- *  review sidebar is unmounted). Returns whether any listener actually consumed it, so a caller
- *  (`blameAnnotation.ts`'s `revealBlameCommit`, Group 6) can fall back to a cold-mount stash only
- *  when this was truly a no-op. */
-export function emitUiAction(codeRepoId: string, payload: EventPayload<'ui.action'>): boolean {
-  return localEmittersByCodeRepoId.get(codeRepoId)?.emit('ui.action', payload) ?? false;
-}
 
 function createNativeGitTransport(codeRepoId: string): Transport {
   const remote = createRpcClient(createStreamChannel(Stream('git')));
