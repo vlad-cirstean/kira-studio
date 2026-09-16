@@ -40,19 +40,6 @@ export interface SettingDef<T> {
    *  below skips both), since contributing either would be a duplicate declaration of a setting
    *  this extension does not itself own the value of. */
   readonly source?: 'extension' | 'host' | 'repo';
-  /** G18 D10/D14: meaningful only when `source === 'repo'` — `true` marks a key whose stored
-   *  value is shared across every repository this installation opens, not scoped by repoId, even
-   *  though it lives in the same per-repo storage and dialog as every other `'repo'`-sourced key
-   *  (a reserved sentinel row, not a schema change — storage/repos.GitRepoSettingsRepo's own
-   *  D14). P72 §9.2: `kiraVersion.log.level` was the only key that ever set this, and the
-   *  cross-repo-collapse mechanism it named (`gitreposettings.go`'s sentinel-row special case,
-   *  `repoSettings.ts`'s merge literal) is now deleted rather than generalised — Kira Studio gets
-   *  its own, genuinely app-wide `advanced.gitLogLevel` control instead (`packages/shared/domain/
-   *  settings.ts`), and `kiraVersion.log.level` itself reverts to an ordinary, honestly-per-repo
-   *  `'repo'` key (still the only surface VS Code has to set it). No key currently sets
-   *  `instanceWide`. Kept as a documented schema capability rather than removed alongside its only
-   *  consumer, so a later instance-wide `'repo'` leaf does not have to re-derive this design. */
-  readonly instanceWide?: boolean;
 }
 
 export const SETTINGS = {
