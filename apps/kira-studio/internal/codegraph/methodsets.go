@@ -139,21 +139,27 @@ func (ix *goTypes) directGoMethods(ctx context.Context, typeName string) (map[st
 // alike: (1) directGoMethods above, (2) typeName's own symbol's direct "method" children (an
 // interface's own method_elem rows, P78 §3.1), (3) every embedded type's own method set, recursed.
 // depth caps promotion at maxEmbedDepth; ix.walking refuses a name already on the stack, so a
-// malformed or mid-edit tree that embeds itself terminates instead of recursing forever. Memoized
-// per call only — never persisted.
-func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (map[string]bool, bool, error) {
+// malformed or mid-edit tree that embeds itself terminates instead of recursing forever.
+//
+// The third return, truncated, is true when THIS call — or any embedded type it recursed into —
+// hit the depth cap or the cycle guard rather than completing a real walk. A truncated result is
+// still returned to its own caller (so the walk terminates and produces something), but is never
+// written to ix.memo: memoizing it would let a later, unrelated top-level lookup for the same type
+// name reuse an incomplete set instead of recomputing it fully (P79 review) — memoization itself
+// stays per call only, never persisted, per this file's own "no edge table" discipline.
+func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (map[string]bool, bool, bool, error) {
 	if cached, ok := ix.memo[typeName]; ok {
-		return cached.methods, cached.promoted, nil
+		return cached.methods, cached.promoted, false, nil
 	}
 	if depth > maxEmbedDepth || ix.walking[typeName] {
-		return map[string]bool{}, false, nil
+		return map[string]bool{}, false, true, nil
 	}
 	ix.walking[typeName] = true
 	defer delete(ix.walking, typeName)
 
 	direct, err := ix.directGoMethods(ctx, typeName)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	set := map[string]bool{}
 	for m := range direct {
@@ -162,19 +168,19 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 
 	typeSym, _, ok, err := ix.g.findGoType(ctx, typeName)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	if !ok {
 		// No Go symbol named typeName at all (an embedded stdlib/third-party type this index never
 		// saw, or a plain identifier that isn't a type) — direct is everything there is.
 		result := methodSetResult{methods: set, promoted: false}
 		ix.memo[typeName] = result
-		return result.methods, result.promoted, nil
+		return result.methods, result.promoted, false, nil
 	}
 
 	fileSymbols, err := ix.g.cachedSymbols(ctx, ix.syms, typeSym.FileID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	for i := range fileSymbols {
 		s := &fileSymbols[i]
@@ -185,9 +191,10 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 
 	fileRefs, err := ix.g.cachedReferences(ctx, ix.refs, typeSym.FileID)
 	if err != nil {
-		return nil, false, err
+		return nil, false, false, err
 	}
 	promoted := false
+	truncated := false
 	for _, r := range fileRefs {
 		if r.Kind != "embed" {
 			continue
@@ -195,9 +202,12 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 		if r.StartByte < typeSym.StartByte || r.EndByte > typeSym.EndByte {
 			continue // not embedded by typeSym itself — some other type's own embed reference.
 		}
-		embedded, _, err := ix.methodSet(ctx, r.Name, depth+1)
+		embedded, _, childTruncated, err := ix.methodSet(ctx, r.Name, depth+1)
 		if err != nil {
-			return nil, false, err
+			return nil, false, false, err
+		}
+		if childTruncated {
+			truncated = true
 		}
 		for m := range embedded {
 			if !set[m] {
@@ -207,9 +217,11 @@ func (ix *goTypes) methodSet(ctx context.Context, typeName string, depth int) (m
 		}
 	}
 
-	result := methodSetResult{methods: set, promoted: promoted}
-	ix.memo[typeName] = result
-	return result.methods, result.promoted, nil
+	if !truncated {
+		result := methodSetResult{methods: set, promoted: promoted}
+		ix.memo[typeName] = result
+	}
+	return set, promoted, truncated, nil
 }
 
 // supersetOf reports whether have contains every name in want — the structural satisfaction test
@@ -287,7 +299,7 @@ func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want
 		}
 		seenType[typeName] = true
 
-		have, promoted, err := ix.methodSet(ctx, typeName, 0)
+		have, promoted, _, err := ix.methodSet(ctx, typeName, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -353,7 +365,7 @@ func (g *Graph) goInterfacesSatisfiedBy(ctx context.Context, ix *goTypes, have m
 			}
 			seenType[parent.Name] = true
 
-			want, promoted, err := ix.methodSet(ctx, parent.Name, 0)
+			want, promoted, _, err := ix.methodSet(ctx, parent.Name, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -394,14 +406,14 @@ func (g *Graph) goImplementationsOf(ctx context.Context, name string) ([]Target,
 		return nil, err
 	}
 	if len(direct) > 0 {
-		have, _, err := ix.methodSet(ctx, name, 0)
+		have, _, _, err := ix.methodSet(ctx, name, 0)
 		if err != nil {
 			return nil, err
 		}
 		return g.goInterfacesSatisfiedBy(ctx, ix, have)
 	}
 
-	want, _, err := ix.methodSet(ctx, name, 0)
+	want, _, _, err := ix.methodSet(ctx, name, 0)
 	if err != nil {
 		return nil, err
 	}
