@@ -10,13 +10,16 @@
  * recency. This module reuses that file's `filterRefs`/`sortByName`/`sortTags`/`capItems`/
  * `REF_LIST_SECTION_CAP` and owns the picker-specific ordering itself.
  *
- * P77 §18.1 commit 1: today's filtering (the one box matches branches/remote/tags only, §2 N2)
- * and today's ordering (alphabetical/`naturalCompare`/received-order — §2 N3/N4's own defects,
- * unfixed) carry over unchanged into the new tabbed structure; only WHERE each list renders moves.
- * Every list also gains a real cap here (`REF_LIST_SECTION_CAP`), including the two — worktrees,
- * stacks — that had none before (part of N1's fix, since `WorktreeList.vue`/`StackList.vue` move
- * to the same pre-capped `section`-prop contract `TagList.vue` already has). §5/§6 land the actual
- * scoped-filter and recency/pin fixes on top of this in later commits.
+ * P77 §18.1 commit 1: every list gained a real cap here (`REF_LIST_SECTION_CAP`), including the
+ * two — worktrees, stacks — that had none before (part of N1's fix, since `WorktreeList.vue`/
+ * `StackList.vue` move to the same pre-capped `section`-prop contract `TagList.vue` already has).
+ *
+ * P77 §18.1 commit 2 (§5): the one filter box now scopes to the active tab — stash/worktree/stack
+ * are matched against the same text their own row already renders as its identity (§5.1's table),
+ * closing N2 for the four lists the box never reached. Every tab's `counts` badge is a live match
+ * count once the query is non-empty (§5.3), computed with that tab's own field scope regardless of
+ * which tab is active — so typing on one tab still hints a match sitting on another. §6 lands the
+ * recency/pin ordering fix on top of this in a later commit.
  */
 import type { RefRow, StackBranch, StackSummary, StashEntry, WorktreeEntry } from '@kira/git-ipc';
 import {
@@ -26,6 +29,7 @@ import {
   sortByName,
   sortTags,
 } from './refListModel.ts';
+import { stashLabel } from './stashListModel.ts';
 
 export type PickerTab = 'branches' | 'tags' | 'stashes' | 'worktrees' | 'stacks';
 
@@ -95,6 +99,50 @@ function groupStacks(stacks: readonly StackSummary[]): PickerStackGroup[] {
   return stacks.map((summary) => ({ summary, branches: summary.branches }));
 }
 
+/** §5.1/§5.2: case-insensitive substring, not fuzzy — the same rule `filterRefs`/`filterFiles`
+ *  already apply to this module family. `needle` is pre-trimmed/lowered by the caller once per
+ *  call rather than per row. */
+function matchesText(haystack: string, needle: string): boolean {
+  return haystack.toLowerCase().includes(needle);
+}
+
+function filterStashes(entries: readonly StashEntry[], needle: string): StashEntry[] {
+  if (needle === '') return [...entries];
+  return entries.filter(
+    (e) =>
+      matchesText(stashLabel(e), needle) || (e.branch !== null && matchesText(e.branch, needle)),
+  );
+}
+
+function filterWorktrees(entries: readonly WorktreeEntry[], needle: string): WorktreeEntry[] {
+  if (needle === '') return [...entries];
+  return entries.filter(
+    (w) => matchesText(worktreeLabel(w), needle) || matchesText(w.path, needle),
+  );
+}
+
+/** Stacks tab (§5.1): a branch matches by its own name or its stack's `base`; a group with no
+ *  matching branch is dropped entirely rather than shown empty-bodied. */
+function filterStackGroups(
+  groups: readonly PickerStackGroup[],
+  needle: string,
+): PickerStackGroup[] {
+  if (needle === '') return [...groups];
+  const filtered: PickerStackGroup[] = [];
+  for (const group of groups) {
+    const branches = group.branches.filter(
+      (b) => matchesText(b.name, needle) || matchesText(group.summary.base, needle),
+    );
+    if (branches.length > 0) filtered.push({ summary: group.summary, branches });
+  }
+  return filtered;
+}
+
+function filterOrphans(orphans: readonly StackBranch[], needle: string): StackBranch[] {
+  if (needle === '') return [...orphans];
+  return orphans.filter((o) => matchesText(o.name, needle));
+}
+
 export function buildPickerModel(
   input: PickerInput,
   filter: string,
@@ -102,19 +150,26 @@ export function buildPickerModel(
   capSteps: Readonly<Partial<Record<PickerListKey, number>>>,
 ): PickerModel {
   const capFor = (key: PickerListKey): number => capSteps[key] ?? REF_LIST_SECTION_CAP;
+  const needle = filter.trim().toLowerCase();
 
-  // Today's filter scope (§2 N2): the one box matches branches/remote/tags only, everywhere,
-  // regardless of which tab is active — stash/worktree/stack are never touched by it yet.
+  // §5.1: the one box now scopes to each tab's own field — every tab's filtered set is computed
+  // here (not only the active tab's) since §5.3's cross-tab counts need every tab's match count on
+  // every call.
   const filteredLocal = filterRefs(input.branches, filter);
   const filteredRemote = filterRefs(input.remoteBranches, filter);
   const filteredTags = filterRefs(input.tags, filter);
+  const filteredStashStack = filterStashes(input.stashes, needle);
+  const filteredStashGlobal = filterStashes(input.globalStashes, needle);
+  const filteredWorktrees = filterWorktrees(input.worktrees, needle);
+  const filteredStackGroups = filterStackGroups(groupStacks(input.stacks), needle);
+  const filteredOrphans = filterOrphans(input.orphans, needle);
 
   const counts: Record<PickerTab, number> = {
     branches: filteredLocal.length + filteredRemote.length,
     tags: filteredTags.length,
-    stashes: input.stashes.length + input.globalStashes.length,
-    worktrees: input.worktrees.length,
-    stacks: input.stacks.reduce((n, s) => n + s.branches.length, 0) + input.orphans.length,
+    stashes: filteredStashStack.length + filteredStashGlobal.length,
+    worktrees: filteredWorktrees.length,
+    stacks: filteredStackGroups.reduce((n, g) => n + g.branches.length, 0) + filteredOrphans.length,
   };
 
   const base: Omit<PickerModel, 'rowIds'> = {
@@ -153,8 +208,8 @@ export function buildPickerModel(
   }
 
   if (tab === 'stashes') {
-    const stashStack = capItems(input.stashes, capFor('stashStack'));
-    const stashGlobal = capItems(input.globalStashes, capFor('stashGlobal'));
+    const stashStack = capItems(filteredStashStack, capFor('stashStack'));
+    const stashGlobal = capItems(filteredStashGlobal, capFor('stashGlobal'));
     return {
       ...base,
       stashStack,
@@ -167,7 +222,7 @@ export function buildPickerModel(
   }
 
   if (tab === 'worktrees') {
-    const worktrees = capItems(input.worktrees, capFor('worktrees'));
+    const worktrees = capItems(filteredWorktrees, capFor('worktrees'));
     return {
       ...base,
       worktrees,
@@ -176,9 +231,8 @@ export function buildPickerModel(
   }
 
   // tab === 'stacks'
-  const groups = groupStacks(input.stacks);
-  const stacks = capItems(groups, capFor('stacks'));
-  const orphans = capItems(input.orphans, capFor('stacks'));
+  const stacks = capItems(filteredStackGroups, capFor('stacks'));
+  const orphans = capItems(filteredOrphans, capFor('stacks'));
   return {
     ...base,
     stacks,

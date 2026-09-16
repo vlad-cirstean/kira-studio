@@ -461,8 +461,8 @@ onBeforeUnmount(() => {
       <KuiSearchInput
         class="kv-branch-filter"
         v-model="filter"
-        placeholder="Filter branches and tags"
-        ariaLabel="Filter branches and tags"
+        :placeholder="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
+        :ariaLabel="`Filter ${TAB_LABELS[activeTab].toLowerCase()}`"
       />
 
       <div class="kv-branch-panel-scroll" :aria-label="TAB_LABELS[activeTab]">
