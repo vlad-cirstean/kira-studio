@@ -305,6 +305,15 @@ func goMethodSetRule(promoted bool) string {
 // from want's rarest method name — every FindSymbolsByName row for it that is NOT an interface's
 // own method_elem child (ParentID nil, so it has a real receiver) names a concrete candidate; kept
 // when that candidate's own full method set is a superset of want.
+//
+// Known limitation (P79 review, docs/ARCHITECTURE.md's own "Known open items"): a type satisfying
+// want purely through promoted/embedded methods, with no method of its own literally named in
+// want, is never found. Candidates come only from a literal method declaration named after one of
+// want's members (the seed above) — type T struct { io.ReadCloser } satisfying
+// interface{ Read; Close } is invisible to this search, since T declares neither Read nor Close
+// itself. Extending discovery to promoted-only satisfiers needs a materially different (and more
+// expensive) strategy, out of scope for a review fix pass, and constrained by this file's own "no
+// edge table" rule (codegraph.go) on top of that.
 func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want map[string]bool) ([]Target, error) {
 	seed, seedSyms, err := g.rarestGoMethodName(ctx, want)
 	if err != nil || seed == "" {

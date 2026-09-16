@@ -3905,6 +3905,14 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   window is resized once. Fixing this needs deferring startup window creation until after that
   event fires — a materially larger structural change than this fix.
 
+- **Go implementation search (`internal/codegraph/methodsets.go`) misses a type satisfying an
+  interface purely through promoted (embedded) methods** (P79 review). Forward candidates
+  (`goConcreteTypesSatisfying`) come only from a literal method declaration named after one of the
+  interface's own methods — `type T struct { io.ReadCloser }` satisfying `interface{ Read; Close }`
+  is invisible, since `T` itself declares neither method. Fixing this needs a materially different,
+  more expensive candidate-discovery strategy than a review fix pass covers, and is further
+  constrained by this file's own "no edge table" rule (`codegraph.go`).
+
 - **`codegraph.ImplementationsOf` returns nothing for Go** (C2 §6/D4). Go's interfaces are
   structural, so the only correct answer is a method-set comparison — but C1's `method_declaration`
   capture stores a method's *name* only, never its receiver type, so a type's method set can't be
