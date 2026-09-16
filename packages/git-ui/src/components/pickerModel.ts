@@ -7,8 +7,8 @@
  *
  * `refListModel.ts` is NOT modified: `buildRefListSections` has two other consumers
  * (`review/BaseSelector.vue`, `review/ReviewView.vue`) whose own sort must not silently change to
- * recency. This module reuses that file's `filterRefs`/`sortByName`/`sortTags`/`capItems`/
- * `REF_LIST_SECTION_CAP` and owns the picker-specific ordering itself.
+ * recency. This module reuses that file's `filterRefs`/`sortTags`/`capItems`/`REF_LIST_SECTION_CAP`
+ * and owns the picker-specific ordering itself.
  *
  * P77 §18.1 commit 1: every list gained a real cap here (`REF_LIST_SECTION_CAP`), including the
  * two — worktrees, stacks — that had none before (part of N1's fix, since `WorktreeList.vue`/
@@ -18,17 +18,19 @@
  * are matched against the same text their own row already renders as its identity (§5.1's table),
  * closing N2 for the four lists the box never reached. Every tab's `counts` badge is a live match
  * count once the query is non-empty (§5.3), computed with that tab's own field scope regardless of
- * which tab is active — so typing on one tab still hints a match sitting on another. §6 lands the
- * recency/pin ordering fix on top of this in a later commit.
+ * which tab is active — so typing on one tab still hints a match sitting on another.
+ *
+ * P77 §18.1 commit 3 (§6): local branches rank HEAD, then worktree-checked-out rows, then
+ * `committerDate` descending (ties by name) — closing N3/N4. Remote branches and the global stash
+ * bucket rank by recency alone (no pin step: neither can ever BE the current branch). Tags, the
+ * stash stack and Stacks keep their existing order (§6.1's own reasons: a version sequence, a
+ * stack-position addressing scheme, and a forest whose order IS its structure, respectively).
+ * `capWithPins`/`capStackGroups` never cap a pinned row out and never split a stack group mid-order
+ * (§6.2's "pin before cap"); `capSteps` (threaded from `BranchPicker.vue`, §6.3) lets a caller raise
+ * one list's own cap for the current panel-open without touching any other list's.
  */
 import type { RefRow, StackBranch, StackSummary, StashEntry, WorktreeEntry } from '@kira/git-ipc';
-import {
-  capItems,
-  filterRefs,
-  REF_LIST_SECTION_CAP,
-  sortByName,
-  sortTags,
-} from './refListModel.ts';
+import { capItems, filterRefs, REF_LIST_SECTION_CAP, sortTags } from './refListModel.ts';
 import { stashLabel } from './stashListModel.ts';
 
 export type PickerTab = 'branches' | 'tags' | 'stashes' | 'worktrees' | 'stacks';
@@ -143,6 +145,59 @@ function filterOrphans(orphans: readonly StackBranch[], needle: string): StackBr
   return orphans.filter((o) => matchesText(o.name, needle));
 }
 
+/** §6.1's shared comparator for every ref list ranked by recency: `committerDate` descending,
+ *  ties by name — used for local branches' own unpinned tail and for remote branches outright
+ *  (a remote-tracking ref can never be HEAD or `checkedOutIn`, so it never has a pin step). */
+function byRecencyThenName(a: RefRow, b: RefRow): number {
+  return b.committerDate - a.committerDate || a.shortName.localeCompare(b.shortName);
+}
+
+/** §6.1/§6.2: HEAD first, then a branch checked out in another worktree, then everything else by
+ *  recency — closing N3/N4. `pinned` is handed to `capWithPins` so the cap floor never drops a
+ *  pinned row. */
+function orderLocalBranches(rows: readonly RefRow[]): { rows: RefRow[]; pinned: number } {
+  const isPinned = (r: RefRow) => r.isHead || r.checkedOutIn !== undefined;
+  const pinned = rows
+    .filter(isPinned)
+    .sort((a, b) => Number(b.isHead) - Number(a.isHead) || a.shortName.localeCompare(b.shortName));
+  const rest = rows.filter((r) => !isPinned(r)).sort(byRecencyThenName);
+  return { rows: [...pinned, ...rest], pinned: pinned.length };
+}
+
+function orderRemoteBranches(rows: readonly RefRow[]): RefRow[] {
+  return [...rows].sort(byRecencyThenName);
+}
+
+/** §6.1: the stack's own index — `stash@{0}` is already newest, and the index is the addressing
+ *  scheme Pop/Drop use — kept explicit rather than assumed, since a filtered/reordered array must
+ *  not silently drift from it. */
+function orderStashStack(entries: readonly StashEntry[]): StashEntry[] {
+  return [...entries].sort((a, b) => a.index - b.index);
+}
+
+/** §6.1: the global bucket has no stack position at all, so recency is what is left. */
+function orderGlobalStash(entries: readonly StashEntry[]): StashEntry[] {
+  return [...entries].sort((a, b) => b.timestamp - a.timestamp);
+}
+
+/** §6.1: current, then main, then the rest by path — today's order is whatever `worktree.list`
+ *  returned. */
+function orderWorktrees(entries: readonly WorktreeEntry[]): WorktreeEntry[] {
+  const byPath = (a: WorktreeEntry, b: WorktreeEntry) => a.path.localeCompare(b.path);
+  const current = entries.filter((e) => e.isCurrent).sort(byPath);
+  const main = entries.filter((e) => !e.isCurrent && e.isMain).sort(byPath);
+  const rest = entries.filter((e) => !e.isCurrent && !e.isMain).sort(byPath);
+  return [...current, ...main, ...rest];
+}
+
+/** `capItems` with a floor: a pinned row is never capped out, and never duplicated — the rows are
+ *  already ordered pinned-first, so one slice does both (§6.2). */
+function capWithPins<T>(rows: readonly T[], pinned: number, cap: number): PickerList<T> {
+  const limit = Math.max(cap, pinned);
+  if (rows.length <= limit) return { visible: rows, hiddenCount: 0 };
+  return { visible: rows.slice(0, limit), hiddenCount: rows.length - limit };
+}
+
 export function buildPickerModel(
   input: PickerInput,
   filter: string,
@@ -185,8 +240,9 @@ export function buildPickerModel(
   };
 
   if (tab === 'branches') {
-    const branchesLocal = capItems(sortByName(filteredLocal), capFor('branchesLocal'));
-    const branchesRemote = capItems(sortByName(filteredRemote), capFor('branchesRemote'));
+    const { rows: orderedLocal, pinned } = orderLocalBranches(filteredLocal);
+    const branchesLocal = capWithPins(orderedLocal, pinned, capFor('branchesLocal'));
+    const branchesRemote = capItems(orderRemoteBranches(filteredRemote), capFor('branchesRemote'));
     return {
       ...base,
       branchesLocal,
@@ -208,8 +264,8 @@ export function buildPickerModel(
   }
 
   if (tab === 'stashes') {
-    const stashStack = capItems(filteredStashStack, capFor('stashStack'));
-    const stashGlobal = capItems(filteredStashGlobal, capFor('stashGlobal'));
+    const stashStack = capItems(orderStashStack(filteredStashStack), capFor('stashStack'));
+    const stashGlobal = capItems(orderGlobalStash(filteredStashGlobal), capFor('stashGlobal'));
     return {
       ...base,
       stashStack,
@@ -222,7 +278,7 @@ export function buildPickerModel(
   }
 
   if (tab === 'worktrees') {
-    const worktrees = capItems(filteredWorktrees, capFor('worktrees'));
+    const worktrees = capItems(orderWorktrees(filteredWorktrees), capFor('worktrees'));
     return {
       ...base,
       worktrees,

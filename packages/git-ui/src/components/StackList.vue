@@ -19,6 +19,7 @@ import { KuiButton } from '@kira/kira-ui';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
 import type { PickerList, PickerStackGroup } from './pickerModel.ts';
+import { REF_LIST_SECTION_CAP } from './refListModel.ts';
 import { buildOrphanRows, buildStackRows, prBadgeLabel, type StackRow } from './stackListModel.ts';
 
 const props = defineProps<{
@@ -37,6 +38,10 @@ const props = defineProps<{
    *  through from `AppToolbar.vue`. */
   openExternalCapability: boolean;
   openPullRequest: (number: number) => void;
+  /** P77 §6.3: raises this tab's own cap — see `TagList.vue`'s own doc comment on this prop.
+   *  `stacks`/`orphans` share one `capSteps` key (`pickerModel.ts`'s own `capFor('stacks')`), so
+   *  one button raises both. */
+  showMore: () => void;
 }>();
 
 const emit = defineEmits<{
@@ -175,9 +180,14 @@ async function removeFromStack(branch: string): Promise<void> {
       </div>
     </div>
 
-    <div v-if="stacks.hiddenCount > 0 || orphans.hiddenCount > 0" class="kv-branch-more">
-      {{ stacks.hiddenCount + orphans.hiddenCount }} more — refine your filter
-    </div>
+    <KuiButton
+      v-if="stacks.hiddenCount > 0 || orphans.hiddenCount > 0"
+      class="kv-branch-more-button"
+      @click="showMore"
+    >
+      Show {{ Math.min(REF_LIST_SECTION_CAP, stacks.hiddenCount + orphans.hiddenCount) }} more
+      ({{ stacks.hiddenCount + orphans.hiddenCount }} remaining)
+    </KuiButton>
 
     <div
       v-if="stacks.visible.length === 0 && orphans.visible.length === 0"

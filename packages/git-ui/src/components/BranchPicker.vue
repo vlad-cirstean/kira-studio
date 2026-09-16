@@ -39,11 +39,17 @@ import type { StackState } from '../state/stack.ts';
 import type { StashState } from '../state/stash.ts';
 import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 import GlobalStashList from './GlobalStashList.vue';
-import { buildPickerModel, type PickerInput, type PickerTab } from './pickerModel.ts';
+import {
+  buildPickerModel,
+  type PickerInput,
+  type PickerListKey,
+  type PickerTab,
+} from './pickerModel.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import {
   formatTrack,
   localNameForRemoteBranch,
+  REF_LIST_SECTION_CAP,
   remoteCheckoutLabel,
   remoteCheckoutTarget,
 } from './refListModel.ts';
@@ -136,6 +142,9 @@ const rootEl = ref<HTMLElement | null>(null);
 const triggerEl = ref<InstanceType<typeof KuiButton> | null>(null);
 const filter = ref('');
 const activeTab = ref<PickerTab>('branches');
+// P77 §6.3: one list's own step count for the current panel-open — reset on close and on a filter
+// change (a new query is a new list, §6.3's own words), never persisted.
+const capSteps = ref<Partial<Record<PickerListKey, number>>>({});
 
 const triggerLabel = computed(() => {
   const head = props.refs.head.value;
@@ -157,8 +166,23 @@ const pickerInput = computed<PickerInput>(() => ({
 }));
 
 const model = computed(() =>
-  buildPickerModel(pickerInput.value, filter.value, activeTab.value, {}),
+  buildPickerModel(pickerInput.value, filter.value, activeTab.value, capSteps.value),
 );
+
+/** P77 §6.3: "Show 50 more (150 remaining)" — raises one list's own cap by
+ *  `REF_LIST_SECTION_CAP` for the current panel-open. Every tab-body button below calls this with
+ *  its own `PickerListKey`; `StackList.vue`'s single button raises `'stacks'`, which
+ *  `pickerModel.ts` already shares between its `stacks`/`orphans` lists. */
+function showMore(key: PickerListKey): void {
+  capSteps.value = {
+    ...capSteps.value,
+    [key]: (capSteps.value[key] ?? REF_LIST_SECTION_CAP) + REF_LIST_SECTION_CAP,
+  };
+}
+
+watch(filter, () => {
+  capSteps.value = {};
+});
 
 const tabOptions = computed<readonly KuiSegmentedOption[]>(() => [
   {
@@ -198,6 +222,7 @@ function close(): void {
   renaming.value = undefined;
   forceDeleteCandidate.value = undefined;
   filter.value = '';
+  capSteps.value = {};
 }
 
 function toggle(): void {
@@ -534,9 +559,14 @@ onBeforeUnmount(() => {
             <KuiButton variant="danger" @click="confirmForceDelete">Force delete</KuiButton>
             <KuiButton @click="forceDeleteCandidate = undefined">Cancel</KuiButton>
           </div>
-          <div v-if="model.branchesLocal.hiddenCount > 0" class="kv-branch-more">
-            {{ model.branchesLocal.hiddenCount }} more — refine your filter
-          </div>
+          <KuiButton
+            v-if="model.branchesLocal.hiddenCount > 0"
+            class="kv-branch-more-button"
+            @click="showMore('branchesLocal')"
+          >
+            Show {{ Math.min(REF_LIST_SECTION_CAP, model.branchesLocal.hiddenCount) }} more
+            ({{ model.branchesLocal.hiddenCount }} remaining)
+          </KuiButton>
           <div v-if="model.branchesLocal.visible.length === 0" class="kv-branch-empty">No branches</div>
         </div>
 
@@ -557,9 +587,14 @@ onBeforeUnmount(() => {
               <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
             </KuiButton>
           </div>
-          <div v-if="model.branchesRemote.hiddenCount > 0" class="kv-branch-more">
-            {{ model.branchesRemote.hiddenCount }} more — refine your filter
-          </div>
+          <KuiButton
+            v-if="model.branchesRemote.hiddenCount > 0"
+            class="kv-branch-more-button"
+            @click="showMore('branchesRemote')"
+          >
+            Show {{ Math.min(REF_LIST_SECTION_CAP, model.branchesRemote.hiddenCount) }} more
+            ({{ model.branchesRemote.hiddenCount }} remaining)
+          </KuiButton>
           <div v-if="model.branchesRemote.visible.length === 0" class="kv-branch-empty">
             No remote branches
           </div>
@@ -573,6 +608,7 @@ onBeforeUnmount(() => {
           :known-remotes="knownRemotes"
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :write-capability="writeCapability"
+          :show-more="() => showMore('tags')"
           @checked-out="close"
         />
 
@@ -584,6 +620,7 @@ onBeforeUnmount(() => {
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
           :write-capability="writeCapability"
+          :show-more="() => showMore('stashStack')"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-entry-to-global-stash="(entry) => emit('saveEntryToGlobalStash', entry)"
         />
@@ -595,6 +632,7 @@ onBeforeUnmount(() => {
           :in-progress="ops.statusSummary.value?.inProgress ?? null"
           :current-branch="refs.currentBranchName.value ?? null"
           :write-capability="writeCapability"
+          :show-more="() => showMore('stashGlobal')"
           @branch-from-stash="(entry) => emit('branchFromStash', entry)"
           @save-global-stash="emit('saveGlobalStash')"
         />
@@ -607,6 +645,7 @@ onBeforeUnmount(() => {
           :ops="ops"
           :open-worktree-window-capability="openWorktreeWindowCapability"
           :write-capability="writeCapability"
+          :show-more="() => showMore('worktrees')"
           @switch-worktree="(path) => emit('switchWorktree', path)"
           @open-worktree-window="(path) => emit('openWorktreeWindow', path)"
           @create-worktree="emit('createWorktree')"
@@ -621,6 +660,7 @@ onBeforeUnmount(() => {
           :write-capability="writeCapability"
           :open-external-capability="openExternalCapability"
           :open-pull-request="openPullRequest"
+          :show-more="() => showMore('stacks')"
           @open-restack-dialog="(branch) => emit('openRestackDialog', branch)"
           @open-set-parent-dialog="(branch) => emit('openSetStackParentDialog', branch)"
         />
@@ -760,11 +800,28 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
-.kv-branch-more,
 .kv-branch-empty {
   padding: var(--kv-s-1) var(--kv-s-4);
   color: var(--kv-description-fg);
   font-size: 0.85em;
+}
+
+/* P77 §6.3: the cap's own step button — a plain-text-shaped `KuiButton` so it reads as the same
+   "N more" line the static div used to be, but is actually clickable. */
+.kv-branch-more-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--kv-s-1) var(--kv-s-4);
+  color: var(--kv-description-fg);
+  font-size: 0.85em;
+  background: none;
+  border: none;
+}
+
+.kv-branch-more-button:hover {
+  color: var(--kv-app-fg);
+  text-decoration: underline;
 }
 
 .kv-branch-force-delete {

@@ -12,7 +12,7 @@ import { KuiButton } from '@kira/kira-ui';
 import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowContextMenu from './RowContextMenu.vue';
-import type { RefListSection } from './refListModel.ts';
+import { REF_LIST_SECTION_CAP, type RefListSection } from './refListModel.ts';
 import { buildReadOnlyRefMenu, buildRefMenu } from './rowMenuModel.ts';
 
 const props = defineProps<{
@@ -23,6 +23,9 @@ const props = defineProps<{
   /** C10 §4.2/§4.3 (S6): `false` under the native read-only graph — the row menu falls back to
    *  `buildReadOnlyRefMenu` (empty) instead of `buildRefMenu`. */
   writeCapability: boolean;
+  /** P77 §6.3: raises this tab's own cap by `REF_LIST_SECTION_CAP` for the current panel-open —
+   *  `BranchPicker.vue` owns the `capSteps` state every tab's own button reaches through this. */
+  showMore: () => void;
 }>();
 
 const emit = defineEmits<(e: 'checked-out') => void>();
@@ -130,9 +133,9 @@ async function onRefMenuSelect(id: string): Promise<void> {
         <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
       </KuiButton>
     </div>
-    <div v-if="section.hiddenCount > 0" class="kv-branch-more">
-      {{ section.hiddenCount }} more — refine your filter
-    </div>
+    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
+      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
+    </KuiButton>
     <div v-if="section.visible.length === 0" class="kv-branch-empty">No tags</div>
 
     <RowContextMenu
