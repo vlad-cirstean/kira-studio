@@ -400,6 +400,7 @@ func main() {
 			application.NewService(codeWorkspaceSvc),
 			application.NewService(&bridge.UpdateService{Checker: updateChecker, Browser: browserOpener}),
 			application.NewService(&bridge.GitHubService{Deps: deps, Browser: browserOpener}),
+			application.NewService(&bridge.LinkService{Browser: browserOpener}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{

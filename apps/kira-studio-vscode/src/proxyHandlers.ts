@@ -43,6 +43,7 @@ import type {
 } from '@kira/git-ipc';
 import type { ConnectionManager } from './connection.ts';
 import { goToFile } from './goToFile.ts';
+import { isValidExternalLinkUrl } from './linkUrl.ts';
 import { isValidPrBrowserUrl } from './prUrl.ts';
 import { virtualKey } from './virtualKey.ts';
 
@@ -571,6 +572,14 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       if (result.url !== null && isValidPrBrowserUrl(result.url)) {
         await browser.openExternal(result.url);
       }
+      return {};
+    },
+    // P79 finding 4: a commit message body's own URL (linkify.ts, git-ui) — unlike pr.openExternal
+    // above this is genuinely untrusted renderer-supplied content, never Go-composed, so it is
+    // answered entirely here (no socket round trip at all) after the same shape check
+    // bridge/link.go's LinkService.OpenExternal applies desktop-side.
+    'link.openExternal': async ({ url }) => {
+      if (isValidExternalLinkUrl(url)) await browser.openExternal(url);
       return {};
     },
     // G25: five plain forwards, answered entirely by the Go server, same as every other

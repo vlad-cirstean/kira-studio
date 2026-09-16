@@ -419,6 +419,17 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return {};
     },
 
+    // P79 finding 4: linkify.ts's own message-body URL, opened through LinkService.OpenExternal
+    // — the same "one Go-side path that ever opens the OS browser" shape pr.openExternal above
+    // uses, except this URL is untrusted renderer-visible content already (the commit message
+    // itself), so Go-side validation checks the URL's own shape, never a known-host allowlist.
+    // Answered entirely here (no repoId, no socket round trip) rather than forwarded — Go's
+    // gitrpc has no case for it at all.
+    'link.openExternal': async ({ url }) => {
+      await control.linkOpenExternal(url);
+      return {};
+    },
+
     // P74 §7.2: file.goToTarget (Go-served) already resolves the live-vs-historical decision;
     // this handler only composes its three outcomes onto the tab helpers this file already
     // imports. `mapLineAcrossDiff` is `goToFile.ts`'s own algorithm (G4 D11) — reused verbatim,

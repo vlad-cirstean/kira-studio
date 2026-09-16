@@ -8,8 +8,16 @@
  *
  * Split in two, matching `refBadges.ts`'s own precedent: `linkifySegments` is pure and unit
  * tested directly (the boundary case worth a test — trailing sentence punctuation is not part of
- * the URL); `appendLinkifiedText` is the thin DOM-construction layer (`<a>` elements built as
- * DOM, never `innerHTML`) `CommitMeta.vue` calls per line of the message body.
+ * the URL); `appendLinkifiedText` is the thin DOM-construction layer (elements built as DOM,
+ * never `innerHTML`) `CommitMeta.vue` calls per line of the message body.
+ *
+ * P79 finding 4: a URL segment used to build a real `<a href>` — under the Wails desktop app,
+ * which has no anchor-click interception, clicking one navigated the whole app window off the app
+ * with no way back, exactly the hazard `CommitMeta.vue`'s PR row was fixed to avoid one component
+ * over (P74 §3.3). `appendLinkifiedText` now takes `onOpenExternal` (`undefined` when the host
+ * cannot open external URLs at all) and builds a `<button>` that calls it, or plain inert text
+ * when there is none — the same "button when capable, inert text otherwise" shape the PR row
+ * already established, never a raw `<a>` either way.
  */
 export type LinkifiedSegment =
   | { readonly kind: 'text'; readonly text: string }
@@ -60,19 +68,29 @@ export function linkifySegments(text: string): LinkifiedSegment[] {
   return segments;
 }
 
-/** Appends one line's worth of linkified DOM to `parent` — a text node per plain-text segment, a
- *  real `<a>` (opened by the host's own webview link handling, `rel="noopener noreferrer"`) per
- *  URL segment. */
-export function appendLinkifiedText(parent: HTMLElement, text: string): void {
+/** Appends one line's worth of linkified DOM to `parent` — a text node per plain-text segment,
+ *  and per URL segment: a `<button class="kv-linkify-url">` calling `onOpenExternal` when given,
+ *  or a plain text node (matching `CommitMeta.vue`'s PR row's own inert-text sibling) when
+ *  `onOpenExternal` is `undefined` — never a raw `<a href>` (P79 finding 4). */
+export function appendLinkifiedText(
+  parent: HTMLElement,
+  text: string,
+  onOpenExternal: ((url: string) => void) | undefined,
+): void {
   for (const segment of linkifySegments(text)) {
     if (segment.kind === 'text') {
       parent.appendChild(document.createTextNode(segment.text));
       continue;
     }
-    const a = document.createElement('a');
-    a.href = segment.url;
-    a.textContent = segment.url;
-    a.rel = 'noopener noreferrer';
-    parent.appendChild(a);
+    if (!onOpenExternal) {
+      parent.appendChild(document.createTextNode(segment.url));
+      continue;
+    }
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'kv-linkify-url';
+    button.textContent = segment.url;
+    button.addEventListener('click', () => onOpenExternal(segment.url));
+    parent.appendChild(button);
   }
 }

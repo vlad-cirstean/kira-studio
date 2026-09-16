@@ -10,6 +10,7 @@ import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as GitHubService from '@bindings/githubservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
+import * as LinkService from '@bindings/linkservice.js';
 import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
@@ -85,6 +86,10 @@ const studioControl = {
   // git socket (pr.browserUrl composes the URL server-side); this is only the final "open it" hop.
   githubOpenPullRequestUrl: (url: string): Promise<void> =>
     unwrap(GitHubService.OpenPullRequestURL({ url })),
+  // P79 finding 4: link.openExternal's own OS-browser leg — linkify.ts's message-body URLs are
+  // untrusted renderer-visible text (unlike a PR URL), so LinkService.OpenExternal validates the
+  // URL's own shape (a well-formed http(s) URL) rather than composing or re-checking a host.
+  linkOpenExternal: (url: string): Promise<void> => unwrap(LinkService.OpenExternal({ url })),
   settingsGetAll: (): Promise<Settings> =>
     unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),
   settingsSet: (patch: SettingsPatch): Promise<Settings> =>

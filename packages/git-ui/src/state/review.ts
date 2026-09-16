@@ -443,6 +443,9 @@ export class ReviewSessionState {
       openPullRequest: async ({ number }) => {
         await this.#bridge.request('pr.openExternal', { repoId, number });
       },
+      openExternalLink: async (url) => {
+        await this.#bridge.request('link.openExternal', { url });
+      },
       revealInGraph: async ({ sha }) => this.#bridge.request('graph.revealCommit', { repoId, sha }),
     };
   }
