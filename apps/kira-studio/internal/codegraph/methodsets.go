@@ -2,6 +2,7 @@ package codegraph
 
 import (
 	"context"
+	"sort"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 )
@@ -310,53 +311,68 @@ func (g *Graph) goConcreteTypesSatisfying(ctx context.Context, ix *goTypes, want
 }
 
 // goInterfacesSatisfiedBy is goImplementationsOf's reverse direction (§4.2): the cursor resolved to
-// a concrete type (or one of its methods, via its receiver), have is its own method set. Seeds from
-// have's rarest method name — every FindSymbolsByName row for it that IS an interface's own
-// method_elem child (ParentID set) names a candidate interface; kept when have is a superset of
-// that interface's own method set.
+// a concrete type (or one of its methods, via its receiver), have is its own method set. Unlike the
+// forward direction, a single rarest-name seed is NOT sound here: an interface only needs a SUBSET
+// of have's names, so seeding from one name misses every interface that doesn't happen to declare
+// that specific name (e.g. have = {Read, Close, Shutdown}, Reader{Read} — if Close is globally
+// rarest, seeding from Close alone never visits Reader at all). Candidates are instead the UNION
+// over every name in have: every FindSymbolsByName row for it that IS an interface's own
+// method_elem child (ParentID set) names a candidate interface, deduplicated by interface name;
+// kept when have is a superset of that interface's own method set. This issues one
+// FindSymbolsByName per name in have rather than one total — inherent to correctness here, not a
+// regression (§4.4 already bounds this by have's own size, never a repository-wide scan).
 func (g *Graph) goInterfacesSatisfiedBy(ctx context.Context, ix *goTypes, have map[string]bool) ([]Target, error) {
 	if len(have) == 0 {
 		return nil, nil
 	}
-	seed, seedSyms, err := g.rarestGoMethodName(ctx, have)
-	if err != nil || seed == "" {
-		return nil, err
+
+	// Sorted for deterministic candidate order across runs — map iteration order isn't.
+	names := make([]string, 0, len(have))
+	for m := range have {
+		names = append(names, m)
 	}
+	sort.Strings(names)
 
 	seenType := map[string]bool{}
 	var out []Target
-	for _, s := range seedSyms {
-		if s.Kind != "method" || s.ParentID == nil {
-			continue // a concrete, receiver-based method — never an interface candidate.
-		}
-		parent, ok, err := g.store.SymbolByID(ctx, *s.ParentID)
+	for _, m := range names {
+		syms, err := g.store.FindSymbolsByName(ctx, g.repoID, m)
 		if err != nil {
 			return nil, err
 		}
-		if !ok || seenType[parent.Name] {
-			continue
-		}
-		seenType[parent.Name] = true
+		for _, s := range syms {
+			if s.Kind != "method" || s.ParentID == nil {
+				continue // a concrete, receiver-based method — never an interface candidate.
+			}
+			parent, ok, err := g.store.SymbolByID(ctx, *s.ParentID)
+			if err != nil {
+				return nil, err
+			}
+			if !ok || seenType[parent.Name] {
+				continue
+			}
+			seenType[parent.Name] = true
 
-		want, promoted, err := ix.methodSet(ctx, parent.Name, 0)
-		if err != nil {
-			return nil, err
+			want, promoted, err := ix.methodSet(ctx, parent.Name, 0)
+			if err != nil {
+				return nil, err
+			}
+			if !supersetOf(have, want) {
+				continue
+			}
+			parentFile, ok, err := g.cachedFile(ctx, ix.files, parent.FileID)
+			if err != nil {
+				return nil, err
+			}
+			if !ok {
+				continue
+			}
+			t, err := g.targetFromSymbol(ctx, parent, parentFile, goMethodSetRule(promoted), Scoped)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, t)
 		}
-		if !supersetOf(have, want) {
-			continue
-		}
-		parentFile, ok, err := g.cachedFile(ctx, ix.files, parent.FileID)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			continue
-		}
-		t, err := g.targetFromSymbol(ctx, parent, parentFile, goMethodSetRule(promoted), Scoped)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, t)
 	}
 	return out, nil
 }

@@ -326,3 +326,38 @@ func TestGoMethodSetSameNameDifferentReceiverOnlyMatchingIncluded(t *testing.T) 
 		t.Fatalf("want only Foo (Bar shares the seed name but lacks Close), got %+v", targets)
 	}
 }
+
+// TestGoMethodSetReverseSeedsFromEveryMethodName covers the reverse-seeding fix (P79 review): an
+// interface only needs a SUBSET of a concrete type's methods, so candidate discovery must union
+// over every name in have, not just the rarest. Foo declares Read, Close and Shutdown; Reader wants
+// only Read. Close and Shutdown are each rarer than Read (Read has a second row: Reader's own
+// method_elem), so the old single-rarest-name seed picks Close or Shutdown — whose only row is
+// Foo's own concrete method (ParentID nil, never an interface candidate) — and wrongly returns
+// nothing.
+func TestGoMethodSetReverseSeedsFromEveryMethodName(t *testing.T) {
+	g, store := newTestGraph(t)
+	ctx := context.Background()
+
+	seedFile(t, store, "iface.go", "go", nil, []codeparse.Symbol{
+		sym("type", "Reader", 0, 0, 100, 5, -1),
+		sym("method", "Read", 0, 10, 30, 10, 0),
+	}, nil)
+	seedFile(t, store, "foo.go", "go", nil, []codeparse.Symbol{
+		sym("type", "Foo", 0, 0, 10, 5, -1),
+		sym("method", "Read", 0, 20, 40, 20, -1),
+		sym("method", "Close", 0, 40, 60, 40, -1),
+		sym("method", "Shutdown", 0, 60, 80, 60, -1),
+	}, []codeparse.Reference{
+		ref("receiver", "Foo", 0, 20, 40, 20),
+		ref("receiver", "Foo", 0, 40, 60, 40),
+		ref("receiver", "Foo", 0, 60, 80, 60),
+	})
+
+	targets, err := g.goImplementationsOf(ctx, "Foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(targets) != 1 || targets[0].Name != "Reader" {
+		t.Fatalf("want Reader recovered via union seeding even though Close/Shutdown are rarer, got %+v", targets)
+	}
+}
