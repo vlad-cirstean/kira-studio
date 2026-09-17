@@ -1244,6 +1244,99 @@ further gaps in Playwright coverage specifically (no real shell running a real c
 cross-window broadcast coverage) as deliberate, not oversights — restated here rather than
 re-argued.
 
+## P86 result
+
+Landed per plan (`docs/v1.8/plans/P86-claude-hooks-agent-status-widget.md`), 7 commits
+(`625fddf2`..`a36c7296`), in the plan's own §4/§5/§7/§11/§13 order.
+
+**Groundwork (`625fddf2`).** `terminal.Registry` gains `OnChange`/`AgentSessions` and `Session`
+gains `cwd`/`agent`; `TerminalOpenArgs.LaunchKind` (`'shell' | 'claude-code' | 'script'`) is
+validated and threaded through `domain/tabs.ts`, `state/repoTabs.ts`, `state/terminals.ts`,
+`state/tabKinds.ts` and `TabStrip.vue`'s Claude Code/script producers — the explicit discriminator
+P85 OQ-3 asked for, never `command === 'claude'`. No user-visible change in this commit.
+
+**The hook transport (`f877ab87`).** New `internal/agenthooks` domain package: a per-enable 0700
+temp dir holding a generated `hooks.json`, a 0700 shim script and a 0600 unix socket served by
+stdlib `net/http`. The listener decodes only the nine hook-payload fields this app keeps, truncates
+a `Notification` message to 200 bytes on a rune boundary (OQ-6), and never retains
+`tool_input`/`tool_response`/`transcript_path`. Self-contained — nothing called it yet.
+
+**Opt-in wiring (`4be5422f`).** New `AgentHooksService` starts/stops the listener behind
+`claudeCode.hooksEnabled`, read fresh at every launch; `TerminalService.Open` composes the
+`--settings` flag and env only when a launch is `claude-code` and the listener is running. New
+Settings > Claude Code section (instant-effect toggle, error/path display) between Scripts and Code
+intelligence (OQ-3, shipped as planned). `launchFor` stays unexported — an exported method would
+have been bound to the wire by Wails and leaked `KIRA_AGENT_HOOK_TOKEN` to the webview.
+
+**The status-bar count (`9a35d671`).** `terminal.Registry` is the one place an app-wide session
+count exists (a per-window map would disagree between windows, and P87's keep-awake control needs
+one shared truth too). `TerminalService.AgentSessions()` hydrates a late-opened window;
+`ChannelAgentSessions` (`Emit`, not `EmitTo`) broadcasts the live list on every `Registry.OnChange`.
+`StatusBar.vue` renders a sparkle-icon count beside app-metrics, absent rather than zero (the
+established P76/P78 convention) — count is PTY liveness (OQ-5: a script is never counted as an
+agent), decoupled from the hook stream by design (§10 of the plan).
+
+**Per-session activity (`dc7b26ac`).** `AgentHooksService.onEvent` -> `ChannelAgentEvent` (`Emit` —
+a hook event has no window to address; the receiving window filters by `terminalId`).
+`state/agentSessions.ts`'s `reduceAgentActivity` is a pure `(prev, event) => next` reducer, pairing
+`PreToolUse`/`PostToolUse` by `tool_use_id` rather than a depth counter, since each hook fires from
+its own `curl` process and `PostToolUse` can arrive before its own `PreToolUse`. `SessionEnd` drops
+the activity entry outright. `StatusBar.vue`'s tooltip appends activity text
+("waiting for you"/"running `<tool>`"/"working"/"idle") after each session's `basename(cwd)`;
+`TabStrip.vue` gains the attention dot on a non-active Claude Code tab in the `'attention'` phase,
+cleared by activating it.
+
+**Discoverability (`1b5dbe80`).** A dismissible banner above `RepoTerminalView.vue`'s xterm host,
+shown only on a Claude Code tab with hooks off and the prompt not yet dismissed — Enable calls
+`setAgentHooksEnabled` (never types into the PTY, applies to the next Claude Code tab, the running
+session is untouched); Not now persists `hooksPromptDismissed` and the banner never returns. No
+project file is written by this flow or anywhere else in the phase — `--settings` always points at
+Kira Studio's own generated temp path (see verification below).
+
+**Tests (`a36c7296`).** `tests/unit/agent-activity-reducer.spec.ts` — the plan's own §19.1, 7 cases,
+one per interacting rule (out-of-order pairing, `SessionEnd` clearing, an unknown `tool_use_id`,
+etc.). `settings-claude-code.spec.ts` (modelled on `settings-code-intelligence.spec.ts`): off by
+default, the toggle calling `agentHooksSetEnabled`, a running status showing the path, a start
+failure showing the error instead. `repo-workspace.spec.ts` gains three cases: the existing Claude
+Code launch assertion now also checks `launchKind: 'claude-code'`; the agent-sessions widget is
+absent with nothing running and shows the live count from a broadcast; a `Notification` event sets
+the attention dot on a non-active tab, cleared by activating it.
+
+**OQ-1, closed — not merely asserted.** The plan flagged `--settings`'s additive-loading claim
+(project `.claude/settings.json` hooks still fire alongside a `--settings`-supplied file) as
+"documented but not exercised end to end," explicitly blocking this result section's own honesty
+until checked. Run directly during this verification pass, outside the repo (a scratch project with
+its own `SessionStart` hook, plus `claude --settings <generated hooks.json> -p 'say hi'` pointing at
+a second, independent `SessionStart` hook): both hooks fired, confirmed by two separate marker
+files each carrying their own hook's own output. `--settings` is genuinely additive, not a
+replacement — the mechanism this whole phase is built on holds.
+
+**Verification (run directly by the orchestrating session, not a subagent — the implementing agent
+was cut by a session-limit 429 immediately after its own commit 7, before running its own closing
+checks).** `bun run lint` (biome + `check-tokens.sh`): clean, one pre-existing `info`-level hint in
+`UncommittedChangesStrip.vue` (untouched by this phase, not an error). `bun run typecheck`: all five
+projects clean. `go build ./...`: clean. `go test ./...`: one failure,
+`TestDescribe_Reflection_NoReflection_YieldsSchemaError` (`internal/grpcclient`) — unrelated to this
+phase (`git diff --stat` since `58861e85` touches no file under `internal/grpcclient`, and the
+test's own last touch, `dd585aad`, long predates this branch's work); passes clean standalone
+re-run, consistent with the load-dependent flakiness this chapter already documented for
+`internal/gitsock`'s `TestBroker_QueueBoundedAgainstUnlimitedEnqueue`. `bun run test:unit`:
+1516/1516 (13562 `expect()` calls, 155 files). `bun run test:ui` (`ui`+`ui-timing`): 288 passed, 2
+failed — `interaction.spec.ts`'s grid context-menu case (`scrollIntoViewIfNeeded`: element not
+attached) and `sql-schema.spec.ts`'s no-completion case (a stray `.suggest-widget.visible`) — both
+in files this phase's diff never touches (`git diff --stat` since `58861e85` touches no file under
+`views/grid`, `views/sql`, or either spec file), both timing/DOM-attachment-sensitive assertions
+consistent with environmental flakiness, not a regression. Every P86-specific case
+(`settings-claude-code.spec.ts`'s three, and `repo-workspace.spec.ts`'s three new agent-widget/
+attention-dot/launch-kind cases) passed.
+
+**Known gap, stated per the plan's own bar, not claimed.** A manual GUI pass (launch Claude Code
+with hooks enabled, confirm the banner/toggle/status-bar count/tooltip/attention-dot render and
+update live against a real running session) was not performed — the same no-display, no-Linux-dev-
+task constraint every phase in this chapter has already recorded (P83 §17.4, restated in P85's own
+result). OQ-2 (curl shim vs. re-invoking the app binary) and OQ-6's exact truncation length stay
+open as the plan itself left them — reversible with a measurement, not treated as settled here.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
