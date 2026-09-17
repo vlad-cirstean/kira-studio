@@ -1,6 +1,6 @@
 # Kira Studio
 
-[![CI](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/ci.yml)
+[![PR](https://github.com/vlad-cirstean/kira-studio/actions/workflows/pr.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/pr.yml)
 
 A native macOS workbench combining a visual database client (DataGrip/DBeaver class, ten database
 engines), an HTTP/gRPC API client (Postman/Insomnia class), and a git client with code intelligence
