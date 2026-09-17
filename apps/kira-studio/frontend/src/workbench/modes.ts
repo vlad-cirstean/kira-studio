@@ -34,4 +34,12 @@ export const MODES: Record<AppMode, ModeDef> = {
     panel: defineAsyncComponent(() => import('../repo/GitPanel.vue')),
     start: defineAsyncComponent(() => import('../repo/GitStart.vue')),
   },
+  // P91 §2: a fourth peer module, lazy for the identical reason git's own two are (§1.1) — nothing
+  // in a Studio-only session should pay for the terminal panel's own launch chunk.
+  terminal: {
+    label: 'Terminal',
+    icon: 'terminal-bash',
+    panel: defineAsyncComponent(() => import('../terminal/TerminalPanel.vue')),
+    start: defineAsyncComponent(() => import('../terminal/TerminalStart.vue')),
+  },
 };

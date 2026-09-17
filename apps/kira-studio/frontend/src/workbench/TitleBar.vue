@@ -10,7 +10,8 @@ import SettingsDialog from './SettingsDialog.vue';
 
 // P67b §4.3: three peer modules — Studio, Api, Git. A repository is an instance inside Git, not a
 // fourth top-level tab of its own (§0's correction); the repo switcher lives in GitPanel.vue now.
-const MODE_ORDER: AppMode[] = ['studio', 'api', 'git'];
+// P91 OQ-1: Terminal joins last — a cosmetic call, shipped as the plan's own stated default.
+const MODE_ORDER: AppMode[] = ['studio', 'api', 'git', 'terminal'];
 
 // P67b §4.2: clicking Git returns to whichever repository was last active there
 // (workspaceState.lastRepoKey), not to a bare generic landing page — the same "return to where you

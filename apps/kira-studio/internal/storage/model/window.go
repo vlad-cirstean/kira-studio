@@ -13,9 +13,9 @@ type WindowBounds struct {
 // WindowRecord is one row of the `windows` table (P8 D2/D4) — a durable, shell-minted identity
 // for one workbench. Bounds is nil until the window has been moved or resized at least once
 // (D10: a freshly minted window with no stored rectangle inherits its cascade position instead).
-// Mode (P22 D12) is the app mode (packages/shared/domain/mode.ts's AppMode — "studio" or "api")
-// this window was last closed in; a fresh row (no explicit mode column value on INSERT) reads
-// back the migration's own DEFAULT 'studio'.
+// Mode (P22 D12) is the app mode (packages/shared/domain/mode.ts's AppMode) this window was last
+// closed in; a fresh row (no explicit mode column value on INSERT) reads back the migration's own
+// DEFAULT 'studio'.
 type WindowRecord struct {
 	Key    string        `json:"key"`
 	Order  int           `json:"order"`
@@ -23,11 +23,12 @@ type WindowRecord struct {
 	Mode   string        `json:"mode"`
 }
 
-// validWindowModes are the only three values AppMode (packages/shared/domain/mode.ts) can be.
+// validWindowModes are the only values AppMode (packages/shared/domain/mode.ts) can be.
 // P67b §4.2: 'git' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint,
 // no migration needed), so an older binary reading a 'git' row still degrades cleanly through
-// NormalizeMode below.
-var validWindowModes = map[string]bool{"studio": true, "api": true, "git": true}
+// NormalizeMode below. P91 §3: 'terminal' joins the same way — without an entry here, a window
+// closed in the Terminal module would silently reopen in Studio.
+var validWindowModes = map[string]bool{"studio": true, "api": true, "git": true, "terminal": true}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this
 // constant deliberately agree, so there is exactly one place the default lives on each side.

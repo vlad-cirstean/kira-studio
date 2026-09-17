@@ -32,7 +32,7 @@ import {
   type TabKind,
   type TabRecord,
 } from '@shared/domain/tabs';
-import type { WorkspaceKey } from '@shared/domain/workspace';
+import { isRepoWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { clearPending } from '../views/grid/pendingChanges';
@@ -273,7 +273,11 @@ export async function hydrateTabs(): Promise<void> {
   const openRepos: string[] = [];
   for (const t of tabs) {
     const key = workspaceKeyOf(t);
-    if (key === 'studio' || key === 'api') continue;
+    // P91 §5: was `key === 'studio' || key === 'api'` — a literal comparison against exactly two
+    // non-repo keys, which a third one ('terminal') would fall through and get sliced as if it
+    // were `repo:nal`. Unreachable today (terminal tabs are never persisted, persistableTabs
+    // above), hardened here so this stays true once a fourth non-repo key exists.
+    if (!isRepoWorkspace(key)) continue;
     const repoId = key.slice('repo:'.length);
     if (!openRepos.includes(repoId)) openRepos.push(repoId);
   }

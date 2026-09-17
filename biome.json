@@ -156,6 +156,30 @@
       }
     },
     {
+      "includes": ["apps/kira-studio/frontend/src/terminal/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/views/**"],
+                    "message": "P91 §11: terminal/ must not import views/ directly — dispatch through state/ instead, mirroring repo/'s own rule."
+                  },
+                  {
+                    "group": ["**/http/**", "**/api/**"],
+                    "message": "P91 §11: terminal/ must not import http/ or api/ — mirrors repo/'s own rule against the same two modules."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["apps/kira-studio/frontend/src/api/**"],
       "linter": {
         "rules": {

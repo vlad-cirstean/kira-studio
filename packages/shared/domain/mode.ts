@@ -6,4 +6,7 @@
 //
 // P67b §4.1: 'git' — the third top-level module, beside 'studio' and 'api'. Every repo workspace
 // (workspace.ts's `repo:${string}`) lives inside it; moduleOfWorkspace names the mapping.
-export type AppMode = 'studio' | 'api' | 'git';
+//
+// P91 §2: 'terminal' — a fourth peer module, plugged into the same registry git itself took in
+// P67b. No workspace beyond the bare 'terminal' key exists inside it (§4's own conclusion).
+export type AppMode = 'studio' | 'api' | 'git' | 'terminal';
