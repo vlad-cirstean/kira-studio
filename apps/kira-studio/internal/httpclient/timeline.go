@@ -91,6 +91,12 @@ type hop struct {
 	connectStart, connectDone time.Time
 	tlsStart, tlsDone         time.Time
 	wroteRequest, firstByte   time.Time
+
+	// sentCookieValues is P90 item 2: every Cookie header value httptrace.WroteHeaderField saw
+	// written on this hop — the jar injects Cookie inside net/http, after CheckRedirect, so there
+	// is nowhere else to read what actually went out (client.go's own Send never sees the final
+	// wire headers, only the ones it built before net/http added the jar's own cookies).
+	sentCookieValues []string
 }
 
 // timeline is one Send call's collector, installed once on sendCtx and inherited across every
@@ -105,6 +111,12 @@ type timeline struct {
 	mu    sync.Mutex
 	start time.Time
 	hops  []*hop
+
+	// receivedCookies is P90 item 2: every Set-Cookie parsed from a hop's raw response headers, as
+	// they arrive — closeHop and finishFinal both append to this directly from resp.Header, before
+	// capHopHeaders (below) ever elides anything from the hop's own displayed Headers, so a long
+	// Set-Cookie never silently vanishes from the Cookies tab the way a capped header would.
+	receivedCookies []Cookie
 }
 
 // newTimeline opens hop 0 with the original request's own method/URL already known — Send calls
@@ -225,6 +237,7 @@ func (tl *timeline) closeHop(resp *http.Response, nextMethod, nextURL string) {
 	tl.mu.Lock()
 	defer tl.mu.Unlock()
 	h := tl.current()
+	tl.receivedCookies = append(tl.receivedCookies, receivedCookiesFromHeader(resp.Header, h.Index)...)
 	tl.finish(h, time.Now(), resp.StatusCode, resp.Status, resp.Proto, flattenHeaders(resp.Header))
 	tl.openHop(nextMethod, nextURL)
 }
@@ -236,6 +249,7 @@ func (tl *timeline) finishFinal(now time.Time, resp *http.Response) Timeline {
 	tl.mu.Lock()
 	defer tl.mu.Unlock()
 	h := tl.current()
+	tl.receivedCookies = append(tl.receivedCookies, receivedCookiesFromHeader(resp.Header, h.Index)...)
 	tl.finish(h, now, resp.StatusCode, resp.Status, resp.Proto, nil)
 	return tl.snapshotLocked(now)
 }
@@ -281,6 +295,32 @@ func (tl *timeline) redirectHops() []RedirectHop {
 	for _, h := range tl.hops[:len(tl.hops)-1] {
 		out = append(out, RedirectHop{Status: h.Status, URL: h.URL})
 	}
+	return out
+}
+
+// sentCookies is P90 item 2's own projection: every Cookie header value seen written on any hop
+// (sentCookieValues), parsed into individual cookies and tagged with the hop they went out on.
+func (tl *timeline) sentCookies() []Cookie {
+	tl.mu.Lock()
+	defer tl.mu.Unlock()
+	var out []Cookie
+	for _, h := range tl.hops {
+		for _, v := range h.sentCookieValues {
+			out = append(out, sentCookiesFromHeaderValue(v, h.Index)...)
+		}
+	}
+	return out
+}
+
+// receivedCookiesSnapshot copies out what closeHop/finishFinal have accumulated so far.
+func (tl *timeline) receivedCookiesSnapshot() []Cookie {
+	tl.mu.Lock()
+	defer tl.mu.Unlock()
+	if len(tl.receivedCookies) == 0 {
+		return nil
+	}
+	out := make([]Cookie, len(tl.receivedCookies))
+	copy(out, tl.receivedCookies)
 	return out
 }
 
@@ -342,6 +382,15 @@ func (tl *timeline) trace() *httptrace.ClientTrace {
 		},
 		WroteRequest: func(_ httptrace.WroteRequestInfo) {
 			tl.with(func(h *hop) { h.wroteRequest = time.Now() })
+		},
+		// P90 item 2: the only place a Cookie header's actual sent value can be read — the jar (if
+		// any) injects it inside net/http's own Client.send, strictly after CheckRedirect runs and
+		// after this hop's request was built, so nothing upstream of the wire write ever sees it.
+		WroteHeaderField: func(key string, value []string) {
+			if textproto.CanonicalMIMEHeaderKey(key) != "Cookie" {
+				return
+			}
+			tl.with(func(h *hop) { h.sentCookieValues = append(h.sentCookieValues, value...) })
 		},
 		GotFirstResponseByte: func() {
 			tl.with(func(h *hop) {

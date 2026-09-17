@@ -8,7 +8,6 @@ package httpclient
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"io"
 	"log/slog"
 	"mime"
@@ -23,31 +22,6 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
 )
-
-// defaultTimeout applies via context.WithTimeout on the caller's ctx, never http.Client.Timeout —
-// one mechanism for both timeout and cancel, so both abort an in-progress body read too. A var,
-// not a const, so client_test.go can shrink it around the two cases that need a fast deadline.
-var defaultTimeout = 30 * time.Second
-
-// maxRedirects — Postman's own default follow-and-record shape (D4): the redirect chain and every
-// hop's status/URL both end up in Response, so a 301 never silently renders as a 200 from a
-// different origin.
-const maxRedirects = 10
-
-// maxResponseBytes — 10 MiB. A response body larger than this is truncated, not refused; the
-// truncation is reported (Response.BodyTruncated), never hidden.
-const maxResponseBytes = 10 * 1024 * 1024
-
-// sharedClient — one package-level *http.Client over one *http.Transport, for connection reuse
-// across sends to the same host (D4). TLS verification is always on: TLSClientConfig is left nil,
-// so the transport's own secure default (InsecureSkipVerify: false) applies with no per-request
-// opt-out (P2 has nowhere to put one, §8 OQ-4). Jar stays nil — no cookie replay (§0.2).
-var sharedClient = &http.Client{
-	Transport: &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-	},
-	CheckRedirect: checkRedirect,
-}
 
 var validMethods = map[string]bool{
 	"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true, "HEAD": true,
@@ -104,46 +78,19 @@ type Response struct {
 	// D10) — always populated for a response Send actually returns; unlike Wire, it is small
 	// enough (F17) that repos/response_history.go keeps it rather than stripping it.
 	Timeline Timeline `json:"timeline"`
+	// SentCookies/ReceivedCookies are P90 item 2. Sent is what actually went out per hop, captured
+	// from httptrace's WroteHeaderField (the jar injects Cookie inside net/http, after
+	// CheckRedirect, so there is nowhere else to read it). Received is every hop's Set-Cookie,
+	// parsed by the stdlib. Populated regardless of whether the cookie jar itself is on — these
+	// reflect the literal wire, not the jar's own retained state.
+	SentCookies     []Cookie `json:"sentCookies,omitempty"`
+	ReceivedCookies []Cookie `json:"receivedCookies,omitempty"`
 }
 
 // redirectHeaderNamesCtxKey carries the user-supplied header names through context, sibling to
 // timelineCtxKey, so checkRedirect (which only ever sees *http.Request/[]*http.Request per its
 // stdlib-mandated signature) can strip them on a cross-host hop (P21 round 3 finding 5).
 type redirectHeaderNamesCtxKey struct{}
-
-// checkRedirect is sharedClient's CheckRedirect: net/http sets req.Response to the redirect
-// response before invoking this (net/http/client.go's do()), so the status of each hop is
-// available here even though CheckRedirect's own signature carries only requests. tl is threaded
-// through via a context value rather than a package-level field, since sharedClient is shared
-// across concurrent Send calls (P10 D3: the collector that used to be a bare *[]RedirectHop).
-func checkRedirect(req *http.Request, via []*http.Request) error {
-	if len(via) >= maxRedirects {
-		return fmt.Errorf("httpclient: stopped after %d redirects", maxRedirects)
-	}
-	if tl, _ := req.Context().Value(timelineCtxKey{}).(*timeline); tl != nil && req.Response != nil {
-		// F13: the hop's own method, status text and headers are all readable here and nowhere
-		// else; req is the next request about to be issued, so its method/URL address the hop
-		// this call is opening (D9) before a single byte of it has gone out.
-		tl.closeHop(req.Response, req.Method, req.URL.String())
-	}
-
-	// P21 round 3 finding 5: net/http's redirect machinery copies every header from the previous
-	// hop onto this one by default, stripping only Authorization/WWW-Authenticate/Cookie/Cookie2
-	// when the host changes. A saved request's own custom headers — X-Api-Key, PRIVATE-TOKEN,
-	// X-Amz-Security-Token and the like are at least as common in this app's requests as
-	// Authorization — would otherwise silently follow a redirect to a different host, replaying a
-	// secret to whatever answered the redirect (an open redirect, a compromised CDN, a stale DNS
-	// record). Drop every header the user actually typed the moment a hop crosses hosts; the
-	// transport itself never depends on the caller's own headers being present.
-	if len(via) > 0 && !sameRedirectHost(via[len(via)-1].URL, req.URL) {
-		if names, ok := req.Context().Value(redirectHeaderNamesCtxKey{}).([]string); ok {
-			for _, name := range names {
-				req.Header.Del(name)
-			}
-		}
-	}
-	return nil
-}
 
 // sameRedirectHost mirrors net/http's own shouldCopyHeaderOnRedirect host check
 // (isDomainOrSubdomain): dest is allowed to be the same host as, or a subdomain of, from —
@@ -255,9 +202,10 @@ func statusText(status string) string {
 
 // Send issues exactly one HTTP request and returns exactly one response — no retry, no second
 // request, no rewriting of what the caller asked for. Both request send and body read happen
-// under one deadline (defaultTimeout, layered onto ctx so the Stop button and the window-close
-// abort both reach a body read in progress too).
-func Send(ctx context.Context, req Request) (Response, error) {
+// under one deadline (opts' resolved timeout, layered onto ctx so the Stop button and the
+// window-close abort both reach a body read in progress too) — unless that timeout resolves to
+// 0/none, in which case only ctx's own cancellation applies.
+func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 	if !validMethods[req.Method] {
 		return Response{}, newError(CodeBadRequest, "unsupported method: "+req.Method, nil)
 	}
@@ -265,8 +213,17 @@ func Send(ctx context.Context, req Request) (Response, error) {
 	if err != nil {
 		return Response{}, err
 	}
+	r := opts.normalize()
 
-	sendCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	var (
+		sendCtx context.Context
+		cancel  context.CancelFunc
+	)
+	if r.timeout > 0 {
+		sendCtx, cancel = context.WithTimeout(ctx, r.timeout)
+	} else {
+		sendCtx, cancel = context.WithCancel(ctx)
+	}
 	defer cancel()
 	// P10 D2/D3: one trace, inherited across every redirect hop because net/http's redirect path
 	// builds each subsequent request with ctx: ireq.ctx (F1) — replaces the old bare
@@ -381,21 +338,34 @@ func Send(ctx context.Context, req Request) (Response, error) {
 	// comment where tl was created.
 	httpReq = httpReq.WithContext(httptrace.WithClientTrace(sendCtx, tl.trace()))
 
+	// P90: one *http.Client per send, over a cached *http.Transport (transportFor) — an
+	// http.Client value is three fields, so building one per send costs nothing and is what lets
+	// CheckRedirect and Jar vary per-Options without a third context key; connection reuse across
+	// sends is what the cached transport itself is for.
+	client := &http.Client{
+		Transport:     transportFor(transportKey{http1: r.http1, skipVerify: !r.sslVerify}),
+		CheckRedirect: checkRedirectFor(r),
+		Jar:           jarFor(r),
+	}
+
 	start := time.Now()
-	resp, err := sharedClient.Do(httpReq)
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return Response{}, classifySendErr(sendCtx, err, tl.finishFailed(time.Now(), err.Error()))
 	}
 	defer resp.Body.Close()
 
-	limited := io.LimitReader(resp.Body, maxResponseBytes+1)
-	data, readErr := io.ReadAll(limited)
+	var reader io.Reader = resp.Body
+	if r.maxResponseBytes > 0 {
+		reader = io.LimitReader(resp.Body, r.maxResponseBytes+1)
+	}
+	data, readErr := io.ReadAll(reader)
 	if readErr != nil {
 		return Response{}, classifySendErr(sendCtx, readErr, tl.finishFailed(time.Now(), readErr.Error()))
 	}
 	truncated := false
-	if len(data) > maxResponseBytes {
-		data = data[:maxResponseBytes]
+	if r.maxResponseBytes > 0 && int64(len(data)) > r.maxResponseBytes {
+		data = data[:r.maxResponseBytes]
 		truncated = true
 	}
 	// now is also P10 D5's own "the hop's end" instant for the final hop's download phase — the
@@ -416,20 +386,26 @@ func Send(ctx context.Context, req Request) (Response, error) {
 		finalURL = resp.Request.URL.String()
 	}
 
+	// finishFinal must run before sentCookies/receivedCookiesSnapshot below — it is what appends
+	// the final hop's own Set-Cookie headers to the timeline's accumulator (timeline.go).
+	timeline := tl.finishFinal(now, resp)
+
 	return Response{
-		Status:        resp.StatusCode,
-		StatusText:    statusText(resp.Status),
-		Proto:         resp.Proto,
-		Headers:       flattenHeaders(resp.Header),
-		Body:          bodyStr,
-		BodyEncoding:  encoding,
-		BodyBytes:     len(data),
-		BodyTruncated: truncated,
-		ElapsedMs:     int(elapsed.Milliseconds()),
-		FinalURL:      finalURL,
-		Redirects:     tl.redirectHops(),
-		Wire:          buildWireExchange(reqHead, dumpErr, httpReq, resp, req.Body, formBoundary),
-		Timeline:      tl.finishFinal(now, resp),
+		Status:          resp.StatusCode,
+		StatusText:      statusText(resp.Status),
+		Proto:           resp.Proto,
+		Headers:         flattenHeaders(resp.Header),
+		Body:            bodyStr,
+		BodyEncoding:    encoding,
+		BodyBytes:       len(data),
+		BodyTruncated:   truncated,
+		ElapsedMs:       int(elapsed.Milliseconds()),
+		FinalURL:        finalURL,
+		Redirects:       tl.redirectHops(),
+		Wire:            buildWireExchange(reqHead, dumpErr, httpReq, resp, req.Body, formBoundary),
+		Timeline:        timeline,
+		SentCookies:     tl.sentCookies(),
+		ReceivedCookies: tl.receivedCookiesSnapshot(),
 	}, nil
 }
 
