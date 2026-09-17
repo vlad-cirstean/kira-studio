@@ -6,8 +6,10 @@ import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
 import { codeRepoRecord } from '../../state/coderepos';
 import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
+import { customScriptsState } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
 import { openRepoTerminalTab, type TerminalLaunch } from '../../state/repoTabs';
+import { openSettingsAt } from '../../state/settings';
 import { isIncognito } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
@@ -218,10 +220,10 @@ function launchInActiveWorkspace(launch?: TerminalLaunch, cwdOverride?: string):
 }
 
 // P85 §6.1: Terminal and Claude Code (this app's own launch targets) sit together with no rule
-// between them; one item per configured script and "Manage scripts…" follow, appended in
-// state/customScripts.ts's own commit.
+// between them; one item per configured script follows, separated, then "Manage scripts…"
+// (§6.4: settings/customScripts.ts's own reactive list, no separate load here).
 function newTabMenuItems(): MenuItem[] {
-  return [
+  const items: MenuItem[] = [
     {
       type: 'item',
       id: 'new-terminal',
@@ -238,6 +240,34 @@ function newTabMenuItems(): MenuItem[] {
         launchInActiveWorkspace({ command: 'claude', label: 'Claude Code', color: 'none' }),
     },
   ];
+  if (customScriptsState.records.length > 0) {
+    items.push({ type: 'separator' });
+    for (const script of customScriptsState.records) {
+      items.push({
+        type: 'item',
+        id: `script-${script.id}`,
+        label: script.name,
+        hint: script.command,
+        ...(script.color === 'none' ? { icon: 'play' } : { swatch: script.color }),
+        run: () =>
+          launchInActiveWorkspace(
+            { command: script.command, label: script.name, color: script.color },
+            script.workingDir || undefined,
+          ),
+      });
+    }
+  }
+  items.push(
+    { type: 'separator' },
+    {
+      type: 'item',
+      id: 'manage-scripts',
+      label: 'Manage scripts…',
+      icon: 'settings-gear',
+      run: () => openSettingsAt('Scripts'),
+    },
+  );
+  return items;
 }
 </script>
 
