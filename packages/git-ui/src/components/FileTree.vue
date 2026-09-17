@@ -561,22 +561,24 @@ function reviewToggleTitle(path: string): string {
             class="kv-file-tree-file-dir"
             >{{ dirOf(row.node.path) }}</span
           >
-          <span
-            class="kv-file-tree-status"
-            :class="statusClass(row.node.change)"
-            v-kui-tooltip="fileTitle(row.node.change)"
-            >{{ statusLetter(row.node.change) }}</span
-          >
-          <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
+          <span class="kv-file-tree-trailing">
+            <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
+              <span
+                class="kv-diff-added-fg"
+                v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
+                >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
+              >
+              <span
+                class="kv-diff-deleted-fg"
+                v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
+                >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
+              >
+            </span>
             <span
-              class="kv-diff-added-fg"
-              v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
-              >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
-            >
-            <span
-              class="kv-diff-deleted-fg"
-              v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
-              >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
+              class="kv-file-tree-status"
+              :class="statusClass(row.node.change)"
+              v-kui-tooltip="fileTitle(row.node.change)"
+              >{{ statusLetter(row.node.change) }}</span
             >
           </span>
           <span
@@ -719,14 +721,20 @@ function reviewToggleTitle(path: string): string {
  * `.kv-file-tree-file-dir` used to carry is dropped — at the 13px default it and `--kv-t-xs`
  * (11px vs. 11.05px) are visually identical, and `--kv-t-xs` is now unconditional
  * (kira-structure.css is `:root`-scoped, so it always resolves). G-UX (item 8): moved from
- * leading (just after the file icon) to trailing (just before the change counts, on the row's
- * right edge) — see its own `margin-left: auto`, below. */
-.kv-file-tree-status {
-  /* G-UX (item 8): moved from just after the file icon to just before the change counts, on the
-   * row's right edge — `margin-left: auto` (moved here from `.kv-file-tree-counts`, below) is
-   * what pushes it there; a binary file with no counts span still lands the letter at the right
-   * edge on its own. */
+ * leading (just after the file icon) to trailing, on the row's right edge — see
+ * `.kv-file-tree-trailing`'s own `margin-left: auto`, below. Bug fix (manual testing): the letter
+ * now renders after the +N/-N counts, at the very right edge, not before them — the wrapper below
+ * pushes the pair as a unit; a binary file with no counts span still lands the letter at the right
+ * edge on its own. */
+.kv-file-tree-trailing {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--kv-s-2);
+  flex-shrink: 0;
+}
+
+.kv-file-tree-status {
   min-width: 1ch;
   font-family: var(--kv-mono-font-family);
   font-size: var(--kv-t-xs);
