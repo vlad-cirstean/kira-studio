@@ -1122,6 +1122,128 @@ already states plainly (not as a gap discovered here) that the flash window and 
 `RepoWorktreeLinks` error path have no dedicated Playwright coverage, for the same
 `installGitStreamMock`-cannot-hold-open reason P74/P75/P82 already recorded.
 
+## P85 result
+
+Landed per plan (`docs/v1.8/plans/P85-claude-code-custom-scripts.md`), 7 commits (`0f04bdfe`..
+`f0b49b04`), in the plan's own §17 order plus one follow-up fix commit.
+
+**Part A, the PTY layer (`0f04bdfe`).** `terminal.OpenParams.Command` threaded end to end into
+`TerminalOpenArgs.Command` and the shell invocation: non-empty runs as `$SHELL -l -i -c <command>`
+(P83's own login/interactive flags kept verbatim, the command as a single argv element, no quoting
+layer); empty stays P83's plain login shell. `maxTerminalCommandBytes` (64 KiB) bounds it well
+under macOS's ARG_MAX, for a clear `E_INVALID` instead of an opaque E2BIG. `newSession(OpenParams)`
+replaces six positional args. New `TestSessionRunsInitialCommand` guards the one non-obvious
+property P86 will need: the command's own exit status reaches `onExit`, not a wrapper shell's.
+Bindings regenerated; `bridge/index.ts`'s `terminalOpen` gains an optional `command` argument.
+
+**Part B, launching Claude Code (`03d6a00a`).** `terminalTabStateSchema` gains `command`/`label`/
+`color` (each defaulted, so an older persisted record still parses through `duplicateState` ->
+`parseState`); `tabKinds.ts`'s terminal entry reads `label` (falling back to the cwd's basename)
+for its title and `state.color` for its rail colour. `openRepoTerminalTab` gains an optional
+`TerminalLaunch` (command/label/color) — every existing call site (`TabStrip.vue`'s own Terminal
+entry, `GitPanel.vue`'s two row menus) is unchanged, since it stays optional. `state/terminals.ts`
+threads `command` through `openTerminalSession` to `control.terminalOpen`. `TabStrip.vue`'s
+`newTabMenuItems()` factors the Terminal item's run body into `launchInActiveWorkspace(launch?,
+cwdOverride?)` — the helper every dropdown entry (this commit's and the next two) calls — and adds
+a "Claude Code" entry launching the fixed command `claude`: not configurable, not probed for
+availability (a user wanting flags writes a custom script instead).
+
+**Part C, storing custom scripts (`056c9a79`).** New `custom_scripts` table (migration 0024) — a
+named, ordered, immediately-mutated list, `code_repos`' own shape, not a settings leaf.
+`model.CustomScript`/`CustomScriptFields`, `CustomScriptFields.Validate()` (name/command required
+and trimmed in place, `workingDir` empty or absolute, colour a valid palette value) is the sole
+authority; the mirrored `packages/shared/domain/scripts.ts` zod schema is only the dialog's own
+affordance. `CustomScriptsRepo` (`CodeReposRepo`'s own plain shape) and `CustomScriptsService`
+(`MaskRulesService`'s own per-method-args shape) — every mutation broadcasts the full list on
+`ChannelCustomScriptsChanged` (`Emit`, not `EmitTo`) so a second window's dropdown stays live.
+`state/customScripts.ts` hydrates in `main.ts`'s boot `Promise.all`, subscribing to that broadcast.
+
+**Part D, the Settings section (`349693d2`).** `sections`/`Section` moved out of
+`SettingsDialog.vue` into `state/settings.ts`, plus a new `openSettingsAt(section)` so
+`TabStrip.vue`'s "Manage scripts…" can deep-link into Settings without importing the dialog
+component (workbench/ -> state/, the permitted direction — OQ-2 confirmed, no lint rule blocks
+it). New "Scripts" section between Git and Code intelligence (OQ-1's placement, shipped as
+planned, not re-decided). Per-row name/command/working-dir fields commit on blur (empty reverts,
+matching `VariableSetView.vue`'s own `onEnvFieldBlur` posture), a colour swatch commits
+immediately, remove asks to confirm, and an add row stages locally until Add is clicked — this
+section bypasses draft/Save entirely, the same posture 'Connected editors'/'Code intelligence'
+already take.
+
+**Part E, listing scripts in the dropdown (`754dc282`).** `newTabMenuItems()` extended past
+Terminal/Claude Code: one entry per configured script (name, command as hint, colour swatch or a
+play icon when colourless) behind a separator when any exist, then "Manage scripts…" deep-linking
+via `openSettingsAt('Scripts')`.
+
+**Tests (`110abab3`).** The dropdown's existing one-item-count assertion migrated to three
+(Terminal, Claude Code, Manage scripts…, no scripts configured). Two new `repo-workspace.spec.ts`
+cases following P83's own shape (`control.log()` polling, not a call-count test): the dropdown
+launches Claude Code in its own terminal tab titled "Claude Code" with `{cwd: REPO.root, command:
+'claude'}`; a configured script joins the dropdown and launches at its own `workingDir`, not the
+active repo's root — proven by the cwd differing from `REPO.root`. New `settings-scripts.spec.ts`
+(modelled on `settings-code-intelligence.spec.ts`): empty state, adding a script calls
+`customScriptsCreate` with the trimmed fields, Add stays disabled with an empty name or command,
+and a non-absolute working directory surfaces the backend validation error.
+
+**Bug found and fixed during verification, not part of the plan (`f0b49b04`).** The full
+`test:ui` run surfaced two issues the plan's own migration didn't anticipate:
+
+- `onAddScript` (`SettingsDialog.vue`) sent `newScriptName.value`/`newScriptCommand.value`
+  untrimmed over IPC, while the sibling `onScriptFieldBlur` (editing an existing script) already
+  trimmed both — an inconsistency the new
+  `settings-scripts.spec.ts` "…calls customScriptsCreate with the trimmed fields" case caught
+  directly (`workingDir` was already trimmed; unaffected). Fixed by trimming both before building
+  `CustomScriptFields`, matching the existing pattern.
+- The new "a configured script appears in the dropdown…" test in `repo-workspace.spec.ts` used
+  `menu-item-${SCRIPT.id}` as its locator, but `TabStrip.vue`'s script row id is
+  `script-${script.id}` and the fixture's own `SCRIPT.id` is itself `'script-1'` — so the real
+  rendered testid is `menu-item-script-script-1`, not `menu-item-script-1`. The wrong locator
+  never matched, hanging the click to a 60s timeout. Fixed by matching the real id.
+
+**Verification.** Per-commit `bun run typecheck`, `biome check .`, `scripts/check-tokens.sh`,
+`bun run build` clean throughout. `go build ./...` and `go vet ./...` both clean. `bun run
+test:unit`: 1509/1509 (13541 `expect()` calls, 154 files). `bun run test:ui` (`ui`+`ui-timing`):
+289/289 clean on a fresh run (4.5m), after the two fixes above — both new `repo-workspace.spec.ts`
+launch-kind tests and all three `settings-scripts.spec.ts` cases included; no re-run needed to
+confirm a flake, since neither failure mode is timing-sensitive. `bun run build:vscode` succeeds;
+`bun run test:webview`: 45/45 — consistent with the diff-scope check confirming no
+`packages/git-*`/`apps/kira-studio-vscode` file touched by any of this phase's commits (`git diff
+--stat f71867b2..110abab3 -- 'packages/git-*' 'apps/kira-studio-vscode'` is empty).
+
+A full `go test ./...` was already confirmed clean by the first implementing subagent; this closing
+pass does not re-run it (only `internal/gitsock` standalone, below), since this pass's own fix
+commit touches no Go file.
+
+**`internal/gitsock` — independently re-confirmed a non-issue for this phase, not re-investigated
+from scratch.** `git diff --stat f71867b2..110abab3 -- apps/kira-studio/internal/gitsock` is
+empty and `pairing_test.go`'s own last touch (`7aa97296`) long predates this phase — no P85 commit
+comes near this package. `go test ./internal/gitsock/... -count=1` run standalone this session
+itself hit Go's own 10-minute default test-binary deadline and dumped goroutine stacks, all
+rooted in `TestBroker_QueueBoundedAgainstUnlimitedEnqueue` (`pairing_test.go`): that test's own
+final assertion is a non-blocking `select`/`default` check, so the test function itself returns
+quickly, but it deliberately never resolves (approve/deny, or advances the fake clock past
+`pairingTimeout`) the `maxQueueLen` goroutines it parked mid-`Broker.Request` — by the test's own
+design (proving the queue stays capped, not that those requests ever complete), those goroutines
+leak for the rest of the binary's run. Under this run's measured system load (`uptime`:
+10.04/8.62 over 5min/15min on 4 cores), scheduling pressure from those leaked goroutines across
+the package's other 134 tests evidently pushed total runtime past the default 10-minute deadline —
+consistent with, not contradicting, the two implementing agents' own earlier standalone runs
+passing clean under lower load. Not re-run a second time to check reproducibility under today's
+load — the one decision this check exists for (is it a P85 regression) is already settled by the
+diff being empty, and CLAUDE.md's own measurement bar is "a real, concrete question genuinely at
+stake," not routine reproduction.
+
+**Known gap, stated per the plan's own §16 bar, not claimed.** A manual GUI pass (§16's own
+checklist: launch Claude Code, confirm the CLI starts with the user's own PATH and the footer's
+exit code, add/launch a script with and without a working directory, confirm a script's colour
+paints its tab rail, confirm a second window sees a script added in the first without a relaunch):
+not performed — the same no-display, no-Linux-dev-task constraint every phase in this chapter has
+already recorded (P83 §17.4's own wording: this is a Wails v3 native app with no remote-debugging
+hook, and `apps/kira-studio`'s own Taskfile defines no Linux build/dev task at all, so there is
+nothing to launch under this sandbox's `Xvfb` even in principle). The plan's own §15.3 records two
+further gaps in Playwright coverage specifically (no real shell running a real command; no
+cross-window broadcast coverage) as deliberate, not oversights — restated here rather than
+re-argued.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
