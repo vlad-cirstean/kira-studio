@@ -1341,6 +1341,58 @@ task constraint every phase in this chapter has already recorded (P83 §17.4, re
 result). OQ-2 (curl shim vs. re-invoking the app binary) and OQ-6's exact truncation length stay
 open as the plan itself left them — reversible with a measurement, not treated as settled here.
 
+## P88 result
+
+Implemented directly, no plan doc (explicit instruction for this phase). One commit
+(`f156554e66b812be5aedc1e519b09ff3fcc08746`).
+
+**Root cause.** Not a CSS mistake in either checkbox implementation — the codicon `check`/`dash`
+glyphs' own artwork isn't centered within their own 16x16 icon tile. Measured directly against
+`@vscode/codicons`' own SVG source (`src/icons/check.svg`/`dash.svg`, rasterized and pixel-bbox'd):
+check's ink center sits at y=7.495 of a 16-unit tile (true center is 8, so ~0.5/16 units, ~3%,
+high); dash's sits at y=8.495 (~3% low) — opposite bias, near-identical magnitude. Both checkbox
+implementations center the glyph *tile* (flexbox `align-items`/`justify-content` on
+`Checkbox.vue`'s `.p-check .glyph`, and the equivalent on git-ui's own `input[type=checkbox]::after`
+re-implementation for VS Code webview parity, P67c) — correct centering of the tile, which
+faithfully reproduces the tile's own internal bias instead of correcting it.
+
+**Fix.** `apps/kira-studio/frontend/src/theme/primitives.css` (`.p-check .glyph.codicon-check`/
+`.codicon-dash`) and `packages/git-ui/src/theme/app-shell.css`
+(`input[type="checkbox"]:checked::after`/`:indeterminate::after`) each get an `em`-based
+`translateY` nudge, sign per glyph (`+0.03125em` for check, `-0.03125em` for dash — `0.5/16`),
+so the correction tracks font-size automatically at either package's own glyph size (10px/11px).
+Two files, not one, since the two checkbox styling sources aren't literally shared code (git-ui's
+own comment already states why: it can't reach the host app's CSS) — same design, same bug, same
+fix, applied once per source rather than per call site.
+
+**Verification, not assumption.** Built a byte-faithful reproduction of each implementation's real
+markup/CSS/token values (`.p-check`'s actual `--kira-control-inline-h: 14px`/`--kira-s-1: 2px`,
+git-ui's actual `11px`/`line-height:1`) against the real `@vscode/codicons` font asset, and measured
+ink-bbox-vs-box-center offset by pixel analysis — in real WebKit (`playwright.config.ts`'s own
+`browserName: 'webkit'`, the app's actual runtime engine, not a Chromium stand-in) at true
+production checkbox size (14px), deviceScaleFactor 16 for sub-pixel resolution. Before: check
+offset 0.0px horizontal / -0.31px vertical (kira-ui), 0.0/-0.34px (git-ui) — matching the SVG
+source's own measured bias almost exactly, confirming the mechanism, not a browser quirk. After:
+0.0px both axes, both glyphs, both implementations. Also spot-checked in Chromium — same direction
+and order of magnitude, ruling out an engine-specific fluke.
+
+**Also verified:** `bun run lint` clean (same one pre-existing `UncommittedChangesStrip.vue`
+`info`-level hint as P86's own result, untouched here). `bun run typecheck`: a fresh worktree has
+no Wails-generated `apps/kira-studio/frontend/bindings/` (gitignored, needs `scripts/setup.sh`'s
+Go+`wails3` install) — installed the pinned `wails3` CLI (`go.mod`'s `v3.0.0-beta.21`) and ran
+`wails3 task common:generate:bindings` directly rather than working around it, since this phase's
+own change touches `apps/kira-studio/frontend` and DEV_ENVIRONMENT.md's scoped-typecheck workaround
+covers a git-only change, not this one; typecheck passes clean with real bindings in place, no
+`--no-verify` needed.
+
+**Not done: a real end-to-end screenshot of the checkbox inside the running app** (Settings dialog,
+review sidebar, etc.) — `bun run build:test` needs the same bindings, now present, but wiring a
+full `wails3 task dev`/mocked-IPC boot was outside this fix's own footprint (two CSS files) to
+justify; the isolated reproduction above uses every real token/asset/font the app itself uses, in
+the app's own rendering engine, which is the part that was actually in question (glyph-vs-tile
+centering, not layout/composition). No known open item — the fix is geometrically exact (0.0px
+residual), not a tuned approximation.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
