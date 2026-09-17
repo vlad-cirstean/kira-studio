@@ -35,6 +35,9 @@ type TerminalOpenArgs struct {
 	Cols       int    `json:"cols"`
 	Rows       int    `json:"rows"`
 	WindowKey  string `json:"windowKey"`
+	// Command, when non-empty, runs as `$SHELL -l -i -c Command` instead of a plain login shell
+	// (P85 §2.1) — the initial command a Claude Code or custom-script launch seeds the tab with.
+	Command string `json:"command"`
 }
 
 type TerminalOpenResult struct {
@@ -61,6 +64,10 @@ type TerminalCloseArgs struct {
 // enough that a malformed arg cannot ask the pty for an absurd winsize.
 const maxTerminalDim = 1000
 
+// maxTerminalCommandBytes bounds args.Command well under macOS's ARG_MAX (1 MiB for argv plus
+// environment together, P85 §4) — a clear E_INVALID instead of an opaque E2BIG out of exec.
+const maxTerminalCommandBytes = 64 * 1024
+
 func validTerminalDim(n int) bool { return n >= 1 && n <= maxTerminalDim }
 
 // Open validates args, spawns a new session and returns its resolved shell path. terminalId is
@@ -86,6 +93,9 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	if err != nil || !info.IsDir() {
 		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "cwd does not exist or is not a directory")
 	}
+	if len(args.Command) > maxTerminalCommandBytes {
+		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "command is too long")
+	}
 
 	coalescer := newTerminalCoalescer(s.Emit, args.WindowKey, args.TerminalID)
 	sess, err := s.Registry.Open(terminal.OpenParams{
@@ -94,6 +104,7 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 		Cwd:       args.Cwd,
 		Cols:      uint16(args.Cols),
 		Rows:      uint16(args.Rows),
+		Command:   args.Command,
 		OnData:    coalescer.push,
 		OnExit: func(code int, exitErr error) {
 			msg := ""

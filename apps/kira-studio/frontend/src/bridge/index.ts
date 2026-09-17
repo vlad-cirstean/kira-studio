@@ -549,10 +549,11 @@ const studioControl = {
     cwd: string,
     cols: number,
     rows: number,
+    command?: string,
   ): Promise<{ shell: string }> =>
-    unwrap(TerminalService.Open({ terminalId, cwd, cols, rows, windowKey })).then((r) =>
-      trust<{ shell: string }>(r),
-    ),
+    unwrap(
+      TerminalService.Open({ terminalId, cwd, cols, rows, windowKey, command: command ?? '' }),
+    ).then((r) => trust<{ shell: string }>(r)),
   // data is base64 — keystrokes are not always valid UTF-8 (paste, Alt-meta, mouse reports).
   terminalWrite: (terminalId: string, data: string): Promise<void> =>
     unwrap(TerminalService.Write({ terminalId, data })),

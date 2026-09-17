@@ -60,13 +60,20 @@ func (s *Session) ID() string { return s.id }
 // result field.
 func (s *Session) Shell() string { return s.shell }
 
-// newSession spawns shell as a login, interactive process (§2.3) at cwd, with the given initial
+// newSession spawns shell as a login, interactive process (§2.3) at p.Cwd, with the given initial
 // size, and returns before the reader goroutine has started — Registry.Open starts it once the
 // session is registered, so onData/onExit can never fire on a session no lookup can find yet.
-func newSession(id, cwd string, cols, rows uint16, onData func([]byte), onExit func(int, error)) (*Session, error) {
+// p.Command, when non-empty, runs as one extra `-c <command>` argv pair (P85 §2.1) — the shell
+// stays login and interactive either way, so a launched command sees the same PATH a plain
+// terminal in this app sees.
+func newSession(p OpenParams) (*Session, error) {
 	shellPath := loginShell()
-	cmd := exec.Command(shellPath, "-l", "-i")
-	cmd.Dir = cwd
+	args := []string{"-l", "-i"}
+	if p.Command != "" {
+		args = append(args, "-c", p.Command)
+	}
+	cmd := exec.Command(shellPath, args...)
+	cmd.Dir = p.Cwd
 	cmd.Env = append(os.Environ(), sessionEnv()...)
 	// Setsid: true makes this shell its own process-group leader — Close signals the whole group
 	// (syscall.Kill(-pid, …)), so a process the user started inside the terminal (an `npm run dev`)
@@ -74,18 +81,18 @@ func newSession(id, cwd string, cols, rows uint16, onData func([]byte), onExit f
 	// process's controlling terminal.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: rows, Cols: cols})
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: p.Rows, Cols: p.Cols})
 	if err != nil {
 		return nil, err
 	}
 
 	return &Session{
-		id:     id,
+		id:     p.ID,
 		shell:  shellPath,
 		cmd:    cmd,
 		ptmx:   ptmx,
-		onData: onData,
-		onExit: onExit,
+		onData: p.OnData,
+		onExit: p.OnExit,
 		done:   make(chan struct{}),
 	}, nil
 }
@@ -200,6 +207,9 @@ type OpenParams struct {
 	Cwd       string
 	Cols      uint16
 	Rows      uint16
+	// Command, when non-empty, runs as `$SHELL -l -i -c Command` (P85 §2.1) instead of a plain
+	// login shell. Empty means a plain login shell — P83's own behaviour, unchanged.
+	Command string
 	// OnData is called from the session's own reader goroutine for every chunk read — never
 	// concurrently with itself, and never after OnExit (§4 rule 4).
 	OnData func([]byte)
@@ -235,7 +245,7 @@ func (r *Registry) Open(p OpenParams) (*Session, error) {
 	r.sessions[p.ID] = nil // reserved: a spawn is in flight for this id
 	r.mu.Unlock()
 
-	sess, err := newSession(p.ID, p.Cwd, p.Cols, p.Rows, p.OnData, p.OnExit)
+	sess, err := newSession(p)
 	if err != nil {
 		r.mu.Lock()
 		delete(r.sessions, p.ID)

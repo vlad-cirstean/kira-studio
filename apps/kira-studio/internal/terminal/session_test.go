@@ -93,6 +93,34 @@ func TestSessionSpawnsAtCwd(t *testing.T) {
 	waitFor(t, 5*time.Second, func() bool { return strings.Contains(col.text(), dir) })
 }
 
+// TestSessionRunsInitialCommand guards P85 §2's one non-obvious property: the command's own exit
+// status reaches onExit rather than the wrapper shell's — the signal P86 will count sessions with.
+func TestSessionRunsInitialCommand(t *testing.T) {
+	dir := t.TempDir()
+	reg := NewRegistry()
+	col := &collector{}
+	sess, err := reg.Open(OpenParams{
+		ID: "initial-command", WindowKey: "w1", Cwd: dir, Cols: 80, Rows: 24,
+		Command: "printf ready; exit 7",
+		OnData:  col.onData, OnExit: col.onExit,
+	})
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(sess.Close)
+
+	waitFor(t, 5*time.Second, func() bool { return col.exitCount() > 0 })
+	if !strings.Contains(col.text(), "ready") {
+		t.Fatalf("output = %q, want it to contain %q", col.text(), "ready")
+	}
+	col.mu.Lock()
+	code := col.exitCode
+	col.mu.Unlock()
+	if code != 7 {
+		t.Fatalf("exit code = %d, want 7", code)
+	}
+}
+
 func TestSessionResizeAppliesWinsize(t *testing.T) {
 	dir := t.TempDir()
 	_, sess, col := openTestSession(t, "resize-winsize", dir, 80, 24)
