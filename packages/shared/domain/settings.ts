@@ -102,6 +102,9 @@ export const gitSettingsSchema = /*#__PURE__*/ z.object({
   // phase — a third leaf of this same trio, fixed the same way, not a redesign. Empty means "auto-
   // discover" (VS Code's own git.path, then PATH) — gitclient.Discovery's own existing contract.
   gitPath: z.string().default(''),
+  // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
+  // diff, review) through --vscode-font-size, which nothing else in this app consumes.
+  graphFontSize: z.number().int().min(0).max(FONT_SIZE_RANGE.max).default(0),
 });
 export type GitSettings = z.infer<typeof gitSettingsSchema>;
 
@@ -189,6 +192,7 @@ export const settingsSchema = /*#__PURE__*/ z.object({
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
+    graphFontSize: 0,
   }),
   api: apiSettingsSchema.default({
     httpVersion: '2',
@@ -246,6 +250,7 @@ export const defaultSettings: Settings = {
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
+    graphFontSize: 0,
   },
   api: {
     httpVersion: '2',

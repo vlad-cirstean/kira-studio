@@ -448,6 +448,14 @@ function onFetchAutoIntervalInput(e: Event): void {
   draft.git.fetchAutoIntervalMinutes = Number((e.target as HTMLInputElement).value);
 }
 
+// P92 item 9: an emptied field writes 0 (the "follow appearance.fontSize" sentinel), same rule
+// applyAppearance() reads — not NaN, which onFetchAutoIntervalInput's plain Number(...) would let
+// through unnoticed for a genuinely blank input.
+function onGraphFontSizeInput(e: Event): void {
+  const raw = (e.target as HTMLInputElement).value;
+  draft.git.graphFontSize = raw === '' ? 0 : Number(raw);
+}
+
 // P90 §2.7: the global Api section's own handlers — same shape as every other leaf above.
 function onHttpVersionChange(e: Event): void {
   draft.api.httpVersion = (e.target as HTMLSelectElement).value as Settings['api']['httpVersion'];
@@ -544,6 +552,19 @@ const fetchAutoIntervalError = computed<string | null>(() => {
   return null;
 });
 
+// P92 item 9: 0 is the valid "follow appearance.fontSize" sentinel, but 1..8 is below
+// FONT_SIZE_RANGE.min and unreadable — reject that gap here, in the control, since the schema
+// itself accepts the full 0..max range (a stored out-of-range value must still hydrate).
+const graphFontSizeError = computed<string | null>(() => {
+  const v = draft.git.graphFontSize;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v === 0) return null;
+  if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
+    return `0, or ${FONT_SIZE_RANGE.min}–${FONT_SIZE_RANGE.max} px`;
+  }
+  return null;
+});
+
 const requestTimeoutMsError = computed<string | null>(() => {
   const v = draft.api.requestTimeoutMs;
   if (!Number.isFinite(v)) return 'Enter a number.';
@@ -578,6 +599,7 @@ const isValid = computed(
     !opLogRetentionError.value &&
     !expensiveQueryRowsError.value &&
     !fetchAutoIntervalError.value &&
+    !graphFontSizeError.value &&
     !requestTimeoutMsError.value &&
     !maxResponseMbError.value &&
     !maxRedirectsError.value,
@@ -1411,6 +1433,37 @@ async function onAddScript(): Promise<void> {
                 >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
                 time, never cached, so a change here takes effect on the next one.</span
               >
+            </label>
+            <h3 class="section-subhead">Graph</h3>
+            <label class="field">
+              <div class="field-head">
+                <span>Font size</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-git-graphFontSize"
+                  :disabled="isAtDefault('git', 'graphFontSize')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('git', 'graphFontSize')"
+                />
+              </div>
+              <TextField
+                type="number"
+                :min="FONT_SIZE_RANGE.min"
+                :max="FONT_SIZE_RANGE.max"
+                size="md"
+                :invalid="!!graphFontSizeError"
+                data-testid="settings-git-graphFontSize"
+                :model-value="String(draft.git.graphFontSize)"
+                @input="onGraphFontSizeInput"
+              />
+              <span
+                v-if="graphFontSizeError"
+                class="field-error"
+                data-testid="settings-git-graphFontSize-error"
+              >
+                {{ graphFontSizeError }}
+              </span>
+              <span v-else class="helper-text">0 = match the app font size.</span>
             </label>
           </template>
 

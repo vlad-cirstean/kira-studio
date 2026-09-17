@@ -46,6 +46,10 @@ type GitSettings struct {
 	// string" (a bad path is tolerated the same way Discovery's own probe already falls through
 	// its classified-error states rather than pre-validating).
 	GitPath string `json:"gitPath"`
+	// GraphFontSize is P92 item 9's git-graph font size, in whole pixels; 0 means "follow
+	// appearance.fontSize" — see settings.ts's own doc comment for the propagation path
+	// (--kira-graph-font-size -> --vscode-font-size, git-ui's only consumer of that token).
+	GraphFontSize int `json:"graphFontSize"`
 }
 
 // CodeIntelSettings mirrors C3 §7.1's one leaf — the embedded repo-map MCP server instance's
@@ -123,6 +127,7 @@ func DefaultSettings() Settings {
 			ProtectedBranches:        []string{"main", "master", "release/*"},
 			FetchAutoIntervalMinutes: 0,
 			GitPath:                  "",
+			GraphFontSize:            0,
 		},
 		// P90 §2.1: three deliberate default changes from pre-P90 httpclient behaviour — timeout
 		// 30s -> none, max response 10 MiB -> 50 MB, max redirects unchanged at 10.
@@ -173,6 +178,7 @@ type GitPatch struct {
 	ProtectedBranches        *[]string `json:"protectedBranches,omitempty"`
 	FetchAutoIntervalMinutes *int      `json:"fetchAutoIntervalMinutes,omitempty"`
 	GitPath                  *string   `json:"gitPath,omitempty"`
+	GraphFontSize            *int      `json:"graphFontSize,omitempty"`
 }
 
 // ApiPatch mirrors ApiSettings' own `.partial()` shape (P90 item 1).
@@ -250,6 +256,9 @@ var (
 	validOpLogRetentionDays       = InRange(1, 365)
 	validExpensiveQueryRows       = InRange(1_000, 1_000_000_000)
 	validFetchAutoIntervalMinutes = InRange(0, 1440)
+	// P92 item 9: settings.ts's own FONT_SIZE_RANGE, floored at 0 (the "follow the app" sentinel)
+	// rather than FONT_SIZE_RANGE.min — the schema's own comment states why.
+	validGraphFontSize = InRange(0, 24)
 	// P90 §2.1: settings.ts's own REQUEST_TIMEOUT_MS_RANGE/MAX_RESPONSE_MB_RANGE/MAX_REDIRECTS_RANGE.
 	validRequestTimeoutMs = InRange(0, 3_600_000)
 	validMaxResponseMb    = InRange(0, 2048)
@@ -287,6 +296,9 @@ func (p SettingsPatch) Validate() error {
 	}
 	if p.Git != nil && p.Git.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*p.Git.FetchAutoIntervalMinutes) {
 		return fmt.Errorf("model: git.fetchAutoIntervalMinutes: out of range value %d", *p.Git.FetchAutoIntervalMinutes)
+	}
+	if p.Git != nil && p.Git.GraphFontSize != nil && !validGraphFontSize(*p.Git.GraphFontSize) {
+		return fmt.Errorf("model: git.graphFontSize: out of range value %d", *p.Git.GraphFontSize)
 	}
 	if a := p.Api; a != nil {
 		if a.HTTPVersion != nil && !ValidHTTPVersion(*a.HTTPVersion) {

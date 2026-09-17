@@ -58,6 +58,12 @@ function applyAppearance(): void {
     '--kira-row-height',
     settingsState.appearance.rowDensity === 'compact' ? '22px' : '28px',
   );
+  // P92 item 9: 0 = follow appearance.fontSize — vscode-bridge.css's own fallback
+  // (var(--kira-graph-font-size, var(--kira-t-md))) is what "follow" actually means, so removing
+  // the property (not writing 0px) is what lets that fallback apply.
+  const graph = settingsState.git.graphFontSize;
+  if (graph > 0) root.setProperty('--kira-graph-font-size', `${graph}px`);
+  else root.removeProperty('--kira-graph-font-size');
   appearanceVersion.n++;
 }
 

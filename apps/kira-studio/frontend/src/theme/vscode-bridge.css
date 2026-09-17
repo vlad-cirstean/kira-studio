@@ -91,7 +91,11 @@
   /* Fonts — LAW 08's UI/data split (tokens.css) maps directly onto VS Code's own general-UI vs.
      editor-content split. */
   --vscode-font-family: var(--kira-font-ui);
-  --vscode-font-size: var(--kira-t-md);
+  /* P92 item 9: --kira-graph-font-size (state/settings.ts's applyAppearance, git.graphFontSize)
+     overrides this when set — the only consumer of --vscode-font-size in the whole tree
+     (vscode-tokens.css's own --kv-font-size), so this is how the git graph's own font size setting
+     reaches every embedded git-ui surface without touching anything else in the app. */
+  --vscode-font-size: var(--kira-graph-font-size, var(--kira-t-md));
   --vscode-editor-font-family: var(--kira-font-data);
   --vscode-editor-font-size: var(--kira-t-md);
 

@@ -66,6 +66,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "git.protectedBranches", &result.Git.ProtectedBranches)
 	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
 	leaf(stored, "git.path", &result.Git.GitPath)
+	leafValid(stored, "git.graphFontSize", &result.Git.GraphFontSize, model.InRange(0, 24))
 	leafValid(stored, "api.httpVersion", &result.Api.HTTPVersion, model.ValidHTTPVersion)
 	leafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, model.InRange(0, 3_600_000))
 	leafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, model.InRange(0, 2048))
@@ -170,6 +171,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if g.GitPath != nil {
 			if err := upsertSettingsLeaf(tx, "git.path", *g.GitPath); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if g.GraphFontSize != nil {
+			if err := upsertSettingsLeaf(tx, "git.graphFontSize", *g.GraphFontSize); err != nil {
 				return model.Settings{}, err
 			}
 		}
