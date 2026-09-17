@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import type { PaletteColor } from '@shared/domain/color';
 import type { ConnectionSummary } from '@shared/domain/connection';
+import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import {
   CACHE_L2_BUDGET_MB_RANGE,
   defaultSettings,
@@ -19,6 +21,12 @@ import { cacheStatsState } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
 import { connectionsState, setConnectionMcpEnabled } from '../state/connections';
 import {
+  createCustomScript,
+  customScriptsState,
+  removeCustomScript,
+  updateCustomScript,
+} from '../state/customScripts';
+import {
   dbMcpState,
   installDbMcpClaudeCode,
   regenerateDbMcpToken,
@@ -34,10 +42,17 @@ import {
   setRepoMapEnabled,
   setRepoMapRepoEnabled,
 } from '../state/repomap';
-import { patchSettings, settingsState } from '../state/settings';
+import {
+  patchSettings,
+  type Section,
+  sections,
+  settingsSection,
+  settingsState,
+} from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import Checkbox from '../theme/primitives/Checkbox.vue';
+import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
@@ -112,22 +127,10 @@ const pendingPatch = computed<SettingsPatch>(() => {
 
 const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 
-// G12 D9: 'Connected editors' became pairing-only (every row on it bypasses draft/Save, "a
-// revoke must take effect immediately") and the two server-owned git settings that used to share
-// its template branch moved to their own 'Git' section, so no tab mixes instant actions with
-// settings that apply on Save.
-const sections = [
-  'Appearance',
-  'Data',
-  'Cache',
-  'Connected editors',
-  'Git',
-  'Code intelligence',
-  'Database MCP',
-  'Advanced',
-] as const;
-type Section = (typeof sections)[number];
-const activeSection = ref<Section>('Appearance');
+// P85 §10.1: activeSection seeds from settingsSection (state/settings.ts's own module-level ref,
+// set by openSettingsAt for a "Manage scripts…" deep link) — null (a plain open) falls back to
+// 'Appearance', G12 D9's own default.
+const activeSection = ref<Section>(settingsSection.value ?? 'Appearance');
 
 // D16: this section bypasses draft/pendingPatch entirely — a revoke must take effect immediately,
 // not wait for Save, and gitClientsState is a module-level store, not a settings leaf.
@@ -248,7 +251,12 @@ watch(
   },
   { immediate: true },
 );
-onBeforeUnmount(stopRepoMapPoll);
+onBeforeUnmount(() => {
+  stopRepoMapPoll();
+  // §10.1: a later plain open (TitleBar.vue's gear icon, the command palette) must not inherit a
+  // deep link this instance was opened with.
+  settingsSection.value = null;
+});
 
 const repoMapInstalling = ref(false);
 async function onInstallRepoMapClaudeCode(): Promise<void> {
@@ -552,6 +560,120 @@ async function onSave(): Promise<void> {
     emit('close');
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+// P85 §10.2: the Scripts section — ConnectionDialog.vue's own Privacy-tab list-editing layout
+// (mask rules), restated for scripts. This section bypasses draft/pendingPatch entirely, the same
+// posture 'Connected editors'/'Code intelligence' already take (§10.1) — customScriptsState is a
+// module-level store, not a settings leaf, and a script edited here must apply immediately so the
+// tab strip's own dropdown reflects it without a Save.
+interface ScriptDraft {
+  name: string;
+  command: string;
+  workingDir: string;
+}
+const scriptDrafts = reactive<Record<string, ScriptDraft>>({});
+function syncScriptDrafts(): void {
+  for (const key of Object.keys(scriptDrafts)) delete scriptDrafts[key];
+  for (const script of customScriptsState.records) {
+    scriptDrafts[script.id] = {
+      name: script.name,
+      command: script.command,
+      workingDir: script.workingDir,
+    };
+  }
+}
+watch(() => customScriptsState.records, syncScriptDrafts, { immediate: true });
+
+// name/command commit on blur, not per keystroke (§10.2); a cleared field reverts rather than
+// saving an invalid row — VariableSetView.vue's own onEnvFieldBlur takes the same "empty reverts"
+// posture for a name field, and model.CustomScriptFields.Validate would reject it anyway.
+async function onScriptFieldBlur(script: CustomScript): Promise<void> {
+  const draft = scriptDrafts[script.id];
+  if (!draft) return;
+  const name = draft.name.trim();
+  const command = draft.command.trim();
+  if (name === '' || command === '') {
+    draft.name = script.name;
+    draft.command = script.command;
+    draft.workingDir = script.workingDir;
+    return;
+  }
+  if (
+    name === script.name &&
+    command === script.command &&
+    draft.workingDir === script.workingDir
+  ) {
+    return;
+  }
+  try {
+    await updateCustomScript(script.id, {
+      name,
+      command,
+      workingDir: draft.workingDir,
+      color: script.color,
+    });
+  } catch {
+    // A rejected edit (e.g. a non-absolute workingDir) never arrives via the broadcast to
+    // overwrite this draft, so revert it here instead of leaving unsaved text on screen.
+    draft.name = script.name;
+    draft.command = script.command;
+    draft.workingDir = script.workingDir;
+  }
+}
+
+// §10.2/VariableSetView.vue's own D17/D19: a swatch click applies immediately, unlike
+// name/command's blur-commit — a colour choice is a discrete action with its own visible
+// feedback, not text a user is still composing.
+async function onScriptColorChange(script: CustomScript, color: PaletteColor): Promise<void> {
+  await updateCustomScript(script.id, {
+    name: script.name,
+    command: script.command,
+    workingDir: script.workingDir,
+    color,
+  });
+}
+
+async function onRemoveScript(script: CustomScript): Promise<void> {
+  const ok = await confirmDialog(
+    `Remove "${script.name}"? It will no longer launch from the tab strip.`,
+    {
+      danger: true,
+    },
+  );
+  if (ok) await removeCustomScript(script.id);
+}
+
+const newScriptName = ref('');
+const newScriptCommand = ref('');
+const newScriptWorkingDir = ref('');
+const newScriptColor = ref<PaletteColor>('none');
+const scriptError = ref<string | null>(null);
+
+// The dialog's own affordance (§10.3's "the Go check is the authority, the zod one is the
+// affordance") — disables Add before a round trip rather than duplicating Validate's full rule.
+const canAddScript = computed(
+  () => newScriptName.value.trim() !== '' && newScriptCommand.value.trim() !== '',
+);
+
+async function onAddScript(): Promise<void> {
+  if (!canAddScript.value) return;
+  scriptError.value = null;
+  const fields: CustomScriptFields = {
+    name: newScriptName.value,
+    command: newScriptCommand.value,
+    workingDir: newScriptWorkingDir.value.trim(),
+    color: newScriptColor.value,
+  };
+  try {
+    await createCustomScript(fields);
+    newScriptName.value = '';
+    newScriptCommand.value = '';
+    newScriptWorkingDir.value = '';
+    newScriptColor.value = 'none';
+  } catch (err) {
+    scriptError.value = err instanceof Error ? err.message : String(err);
   }
 }
 </script>
@@ -1031,6 +1153,109 @@ async function onSave(): Promise<void> {
                 time, never cached, so a change here takes effect on the next one.</span
               >
             </label>
+          </template>
+
+          <template v-else-if="activeSection === 'Scripts'">
+            <p class="helper-text">
+              Each script becomes an entry in the tab strip's "+" button, opening a new terminal
+              tab running its command. An empty working directory uses the active repository's
+              own worktree root.
+            </p>
+
+            <div
+              v-if="customScriptsState.records.length"
+              class="custom-script-list"
+              data-testid="custom-script-list"
+            >
+              <div
+                v-for="script in customScriptsState.records"
+                :key="script.id"
+                class="custom-script-row"
+                :data-testid="`custom-script-${script.id}`"
+              >
+                <div class="script-name">
+                  <TextField
+                    v-model="scriptDrafts[script.id].name"
+                    placeholder="Name"
+                    size="md"
+                    data-testid="custom-script-name"
+                    @blur="onScriptFieldBlur(script)"
+                  />
+                </div>
+                <div class="script-command">
+                  <TextField
+                    v-model="scriptDrafts[script.id].command"
+                    placeholder="Command"
+                    size="md"
+                    class="mono"
+                    data-testid="custom-script-command"
+                    @blur="onScriptFieldBlur(script)"
+                  />
+                </div>
+                <div class="script-workingdir">
+                  <TextField
+                    v-model="scriptDrafts[script.id].workingDir"
+                    placeholder="Active repository"
+                    size="md"
+                    data-testid="custom-script-workingdir"
+                    @blur="onScriptFieldBlur(script)"
+                  />
+                </div>
+                <ColorPicker
+                  :model-value="script.color"
+                  label="Script colour"
+                  @update:model-value="(color) => onScriptColorChange(script, color)"
+                />
+                <IconButton
+                  icon="trash"
+                  data-testid="custom-script-remove"
+                  v-tooltip="'Remove this script'"
+                  @click="onRemoveScript(script)"
+                />
+              </div>
+            </div>
+            <p v-else class="helper-text">
+              No scripts yet. Add one to launch it from the tab strip's + button.
+            </p>
+
+            <div class="custom-script-add field-row">
+              <div class="script-name">
+                <TextField
+                  v-model="newScriptName"
+                  placeholder="Name"
+                  size="md"
+                  data-testid="custom-script-add-name"
+                />
+              </div>
+              <div class="script-command">
+                <TextField
+                  v-model="newScriptCommand"
+                  placeholder="Command"
+                  size="md"
+                  class="mono"
+                  data-testid="custom-script-add-command"
+                />
+              </div>
+              <div class="script-workingdir">
+                <TextField
+                  v-model="newScriptWorkingDir"
+                  placeholder="Active repository"
+                  size="md"
+                  data-testid="custom-script-add-workingdir"
+                />
+              </div>
+              <ColorPicker v-model="newScriptColor" label="Script colour" />
+              <AppButton
+                kind="dialog"
+                :disabled="!canAddScript"
+                data-testid="custom-script-add"
+                @click="onAddScript"
+                >Add</AppButton
+              >
+            </div>
+            <span v-if="scriptError" class="field-error" data-testid="custom-script-error">{{
+              scriptError
+            }}</span>
           </template>
 
           <template v-else-if="activeSection === 'Code intelligence'">
@@ -1752,5 +1977,49 @@ async function onSave(): Promise<void> {
   min-width: 0;
   display: flex;
   align-items: center;
+}
+
+/* P85 §10.2: the Scripts section's list/add row — ConnectionDialog.vue's own
+   .mask-rule-list/.mask-rule-row/.mask-rule-add, restated here since that file's scoped styles
+   don't reach this one. */
+.field-row {
+  display: flex;
+  gap: var(--kira-s-4);
+  align-items: flex-start;
+}
+
+.custom-script-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-2);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.custom-script-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  padding: var(--kira-s-2) 0;
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.custom-script-add {
+  align-items: center;
+}
+
+.script-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.script-command {
+  flex: 2;
+  min-width: 0;
+}
+
+.script-workingdir {
+  flex: 2;
+  min-width: 0;
 }
 </style>

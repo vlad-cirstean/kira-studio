@@ -9,6 +9,37 @@ import { control } from '../bridge/control';
 export const settingsState = reactive<Settings>(structuredClone(defaultSettings));
 export const settingsOpen = ref(false);
 
+// P85 §10.1: moved out of SettingsDialog.vue so `Manage scripts…` (TabStrip.vue, workbench/) can
+// deep-link to the Scripts section without SettingsDialog.vue itself in scope — a workbench/ ->
+// state/ read, the direction this app's layering already permits. G12 D9's own reasoning for the
+// list is unchanged: 'Connected editors' and 'Code intelligence'/'Database MCP' each bypass
+// draft/Save for their own stated reason; 'Scripts' joins them for the same reason (§10.1: a CRUD
+// section, not a staged leaf).
+export const sections = [
+  'Appearance',
+  'Data',
+  'Cache',
+  'Connected editors',
+  'Git',
+  'Scripts',
+  'Code intelligence',
+  'Database MCP',
+  'Advanced',
+] as const;
+export type Section = (typeof sections)[number];
+
+// null: no deep link pending — SettingsDialog.vue falls back to 'Appearance'. Set by
+// openSettingsAt below, read once on the dialog's own mount, and cleared when it unmounts so a
+// later plain open (TitleBar.vue's gear icon, the command palette) never inherits a stale section.
+export const settingsSection = ref<Section | null>(null);
+
+/** TabStrip.vue's "Manage scripts…" — opens Settings already switched to `section`, api/menus.ts's
+ *  own `Environments…` precedent restated for a section instead of a whole dialog. */
+export function openSettingsAt(section: Section): void {
+  settingsSection.value = section;
+  settingsOpen.value = true;
+}
+
 // P31 D11: bumped by applyAppearance() below. A component that measures text against
 // --kira-font-data (the grid's column widths, views/shared/page/columns.ts's memoized measuring
 // context) takes this as an explicit reactive dependency so a font change re-measures instead of
