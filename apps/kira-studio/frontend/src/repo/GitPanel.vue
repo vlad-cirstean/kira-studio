@@ -61,11 +61,15 @@ const local = reactive({ repoSearch: '', fileSearch: '' });
 // P84 §8.1/§8.3: which of the two top-level tabs is showing. Not persisted, not module-level
 // (§8.3): `{ immediate: true }` on the watcher below recomputes the right tab from repoId on every
 // remount, so a manual override would only ever survive within one mount anyway.
+//
+// Bug fix (manual testing): only auto-switch to Files on a genuine no-repo -> repo transition
+// (oldId === ''). Switching between two already-open repos must leave the user's chosen tab alone.
 const tab = ref<'repos' | 'files'>('repos');
 watch(
   repoId,
-  (id) => {
-    tab.value = id ? 'files' : 'repos';
+  (id, oldId) => {
+    if (!oldId && id) tab.value = 'files';
+    else if (!id) tab.value = 'repos';
   },
   { immediate: true },
 );
