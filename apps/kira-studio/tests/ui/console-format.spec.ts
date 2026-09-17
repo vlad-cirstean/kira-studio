@@ -528,3 +528,52 @@ test('Query console — Format immediately after typing, then undo, restores the
   await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(() => consoleText(view)).toBe(original);
 });
+
+// P89 §5: `localDoc` is a shallowRef, and Vue skips a dep trigger when an assigned value equals
+// the ref's current one — so an external write (here, Format's own result) equal to the last
+// value written to `localDoc` never reached Monaco, leaving the editor showing stale text while
+// the store believed it had already advanced. Format-undo-format is the deterministic repro: the
+// second Format's result is byte-identical to the first (which `localDoc` still holds), so it's
+// exactly the write the old code silently dropped.
+test('Query console — Format after an undo reaches the editor even when the result repeats a prior format (P89)', async ({
+  relaunch,
+}) => {
+  const CONNECTION_ID = 'conn-console-format-after-undo';
+  const CONNECTION_SUMMARY = postgresConnectionSummary(
+    CONNECTION_ID,
+    'Format After Undo DB',
+    'violet',
+  );
+  const FIXTURE = orderItemsFixture(CONNECTION_ID);
+
+  const CONTROL: ControlSnapshot[] = [
+    { channel: IPC.connectionsList, response: [] },
+    {
+      channel: IPC.connectionsCreate,
+      args: postgresCreateArgs('Format After Undo DB', 'violet'),
+      response: CONNECTION_SUMMARY,
+    },
+    ...FIXTURE.control,
+  ];
+
+  const { window: page } = await relaunch({ control: CONTROL });
+  await connectAndExpandPostgres(page, 'Format After Undo DB', 'violet');
+  await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
+  const view = page.locator('[data-testid="console-view"]');
+  await expect(view).toBeVisible();
+
+  const original = 'SELECT a,b FROM t WHERE a=1';
+  await typeInto(view, page, original);
+  await page.click('[data-testid="console-format"]');
+  await expect.poll(() => consoleText(view)).toMatch(/^SELECT\n/);
+
+  await view.locator('.view-lines').click();
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => consoleText(view)).toBe(original);
+
+  // The bug: this used to leave the editor showing `original` (one line), since the reformatted
+  // text is byte-identical to what `localDoc` already held from the first Format.
+  await page.click('[data-testid="console-format"]');
+  await expect.poll(() => consoleText(view)).toMatch(/^SELECT\n/);
+  await expect(view.locator('[data-testid="console-format-note"]')).toHaveCount(0);
+});

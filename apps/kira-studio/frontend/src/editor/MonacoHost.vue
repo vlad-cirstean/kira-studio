@@ -474,34 +474,40 @@ defineExpose({
     editor.setPosition(position);
     editor.revealPositionInCenter(position);
   },
+  setDoc: applyExternalDoc,
 });
+
+// The prop alone cannot express "write this again": `doc` is a string, so a value equal to the one
+// already bound triggers no watcher, and the editor keeps text the owner has since replaced
+// (P89 §5). `setDoc` is that same write, reachable imperatively.
+function applyExternalDoc(doc: string): void {
+  if (!editor || !model) return;
+  // Guards the editable round trip — same as `CodeMirrorHost.vue:329`.
+  if (doc === model.getValue()) return;
+  const currentPosition = editor.getPosition();
+  const priorOffset = currentPosition ? model.getOffsetAt(currentPosition) : 0;
+  // §4.7: the hard undo boundary around every external write — both `pushStackElement()` calls
+  // are mandatory (one alone leaves the write mergeable on one side); `model.setValue()` is never
+  // used here, since it discards the whole undo stack instead of isolating just this edit.
+  applyingExternal = true;
+  model.pushStackElement();
+  model.pushEditOperations(null, [{ range: model.getFullModelRange(), text: doc }], () => null);
+  model.pushStackElement();
+  applyingExternal = false;
+  if (props.keepSelectionOnExternalSync) {
+    const clamped = Math.min(priorOffset, doc.length);
+    const position = model.getPositionAt(clamped);
+    editor.setPosition(position);
+    editor.revealPositionInCenter(position);
+  } else {
+    editor.setPosition({ lineNumber: 1, column: 1 });
+    editor.setScrollTop(0);
+  }
+}
 
 watch(
   () => props.doc,
-  (doc) => {
-    if (!editor || !model) return;
-    // Guards the editable round trip — same as `CodeMirrorHost.vue:329`.
-    if (doc === model.getValue()) return;
-    const currentPosition = editor.getPosition();
-    const priorOffset = currentPosition ? model.getOffsetAt(currentPosition) : 0;
-    // §4.7: the hard undo boundary around every external write — both `pushStackElement()` calls
-    // are mandatory (one alone leaves the write mergeable on one side); `model.setValue()` is never
-    // used here, since it discards the whole undo stack instead of isolating just this edit.
-    applyingExternal = true;
-    model.pushStackElement();
-    model.pushEditOperations(null, [{ range: model.getFullModelRange(), text: doc }], () => null);
-    model.pushStackElement();
-    applyingExternal = false;
-    if (props.keepSelectionOnExternalSync) {
-      const clamped = Math.min(priorOffset, doc.length);
-      const position = model.getPositionAt(clamped);
-      editor.setPosition(position);
-      editor.revealPositionInCenter(position);
-    } else {
-      editor.setPosition({ lineNumber: 1, column: 1 });
-      editor.setScrollTop(0);
-    }
-  },
+  (doc) => applyExternalDoc(doc),
 );
 
 watch(

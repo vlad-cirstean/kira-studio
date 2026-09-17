@@ -268,7 +268,11 @@ function onShowAutoExplainPlan(): void {
 // Typed as the bare exposed shape (rather than InstanceType<typeof MonacoHost>) so this ref
 // doesn't read as a type-only use of the MonacoHost import — same convention as
 // ConsoleSavedMenu.vue's promptInput/views/shared/page/SearchToolbar.vue's own template ref.
-const editorHost = ref<{ focus: () => void; setCursor: (pos: number) => void } | null>(null);
+const editorHost = ref<{
+  focus: () => void;
+  setCursor: (pos: number) => void;
+  setDoc: (text: string) => void;
+} | null>(null);
 // The saved-queries popover unmounts its own focused entry on close (ConsoleSavedMenu's apply()
 // closes right after loading), and nothing else in the tree reclaims focus — without this the
 // editor is left unfocused (DOM focus falls to <body>) right after a saved query loads, even
@@ -311,7 +315,13 @@ watch(
   () => props.tab.state.text,
   (text) => {
     if (text === lastEmitted) return;
+    // The editor is about to hold exactly this, so the echo guard must say so — otherwise the next
+    // keystroke is compared against text the editor no longer has.
+    lastEmitted = text;
+    // Keeps the prop honest for a remount/the pending <pre>; may be a no-op when this text was
+    // already pushed once, which is exactly why the write below cannot be left to it (P89 §5).
     localDoc.value = text;
+    editorHost.value?.setDoc(text);
     resetStalePreviewState();
   },
 );
@@ -407,7 +417,9 @@ function onFormat(): void {
         // looks broken" (F19): the difference between "the button is dead" and "the button ran
         // and there was nothing to change".
         formatNote.value =
-          'Already formatted — indentation only; keywords keep the case you typed (ClickHouse identifiers).';
+          kind === 'clickhouse'
+            ? 'Already formatted — indentation only; keywords keep the case you typed (ClickHouse identifiers).'
+            : 'Already formatted — indentation only; keywords keep the case you typed.';
       }
     });
   })();
