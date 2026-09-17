@@ -1173,13 +1173,26 @@ async function onAddScript(): Promise<void> {
                 class="custom-script-row"
                 :data-testid="`custom-script-${script.id}`"
               >
-                <div class="script-name">
-                  <TextField
-                    v-model="scriptDrafts[script.id].name"
-                    placeholder="Name"
-                    size="md"
-                    data-testid="custom-script-name"
-                    @blur="onScriptFieldBlur(script)"
+                <div class="script-row-top">
+                  <div class="script-name">
+                    <TextField
+                      v-model="scriptDrafts[script.id].name"
+                      placeholder="Name"
+                      size="md"
+                      data-testid="custom-script-name"
+                      @blur="onScriptFieldBlur(script)"
+                    />
+                  </div>
+                  <ColorPicker
+                    :model-value="script.color"
+                    label="Script colour"
+                    @update:model-value="(color) => onScriptColorChange(script, color)"
+                  />
+                  <IconButton
+                    icon="trash"
+                    data-testid="custom-script-remove"
+                    v-tooltip="'Remove this script'"
+                    @click="onRemoveScript(script)"
                   />
                 </div>
                 <div class="script-command">
@@ -1201,31 +1214,30 @@ async function onAddScript(): Promise<void> {
                     @blur="onScriptFieldBlur(script)"
                   />
                 </div>
-                <ColorPicker
-                  :model-value="script.color"
-                  label="Script colour"
-                  @update:model-value="(color) => onScriptColorChange(script, color)"
-                />
-                <IconButton
-                  icon="trash"
-                  data-testid="custom-script-remove"
-                  v-tooltip="'Remove this script'"
-                  @click="onRemoveScript(script)"
-                />
               </div>
             </div>
             <p v-else class="helper-text">
               No scripts yet. Add one to launch it from the tab strip's + button.
             </p>
 
-            <div class="custom-script-add field-row">
-              <div class="script-name">
-                <TextField
-                  v-model="newScriptName"
-                  placeholder="Name"
-                  size="md"
-                  data-testid="custom-script-add-name"
-                />
+            <div class="custom-script-add">
+              <div class="script-row-top">
+                <div class="script-name">
+                  <TextField
+                    v-model="newScriptName"
+                    placeholder="Name"
+                    size="md"
+                    data-testid="custom-script-add-name"
+                  />
+                </div>
+                <ColorPicker v-model="newScriptColor" label="Script colour" />
+                <AppButton
+                  kind="dialog"
+                  :disabled="!canAddScript"
+                  data-testid="custom-script-add"
+                  @click="onAddScript"
+                  >Add</AppButton
+                >
               </div>
               <div class="script-command">
                 <TextField
@@ -1244,14 +1256,6 @@ async function onAddScript(): Promise<void> {
                   data-testid="custom-script-add-workingdir"
                 />
               </div>
-              <ColorPicker v-model="newScriptColor" label="Script colour" />
-              <AppButton
-                kind="dialog"
-                :disabled="!canAddScript"
-                data-testid="custom-script-add"
-                @click="onAddScript"
-                >Add</AppButton
-              >
             </div>
             <span v-if="scriptError" class="field-error" data-testid="custom-script-error">{{
               scriptError
@@ -1982,44 +1986,52 @@ async function onAddScript(): Promise<void> {
 /* P85 §10.2: the Scripts section's list/add row — ConnectionDialog.vue's own
    .mask-rule-list/.mask-rule-row/.mask-rule-add, restated here since that file's scoped styles
    don't reach this one. */
-.field-row {
-  display: flex;
-  gap: var(--kira-s-4);
-  align-items: flex-start;
-}
-
 .custom-script-list {
   display: flex;
   flex-direction: column;
-  gap: var(--kira-s-2);
-  max-height: 220px;
+  gap: var(--kira-s-3);
+  max-height: 320px;
   overflow-y: auto;
 }
 
+/* Bug fix (manual testing, "there's no space to see and edit anything"): a script's own Name
+   (paired with its colour picker and remove/add button), Command, and Working directory each get
+   a full-width line, stacked, instead of cramming three text fields into one row alongside the
+   colour picker and a button. */
 .custom-script-row {
   display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-2) 0;
+  flex-direction: column;
+  gap: var(--kira-s-2);
+  padding: var(--kira-s-3) 0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .custom-script-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kira-s-2);
+}
+
+.script-row-top {
+  display: flex;
   align-items: center;
+  gap: var(--kira-s-3);
 }
 
 .script-name {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
 }
 
-.script-command {
-  flex: 2;
-  min-width: 0;
-}
-
+/* .field's own column-flex pattern (above): a TextField's own root is inline-flex, so it only
+   stretches to fill its wrapper's width when the wrapper is itself a column-flex container
+   (width is the cross axis there, and align-items defaults to stretch). */
+.script-command,
 .script-workingdir {
-  flex: 2;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
 }
 </style>
