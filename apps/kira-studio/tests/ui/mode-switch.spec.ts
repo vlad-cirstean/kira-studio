@@ -72,17 +72,21 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, 'database:kira_test/schema:app');
 }
 
-function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api' | 'git') {
+function modeTab(
+  page: import('@playwright/test').Page,
+  mode: 'studio' | 'api' | 'git' | 'terminal',
+) {
   return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
-test('mode switch — three mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
+test('mode switch — four mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({
   relaunch,
 }) => {
   const { window: page, control } = await relaunch({ control: CONTROL });
 
-  // 1. three mode tabs (P67b §4.1: Git joins as a peer of Studio/Api), Studio active by default.
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
+  // 1. four mode tabs (P67b §4.1: Git joins as a peer of Studio/Api; P91 §2: Terminal joins as a
+  // fourth peer), Studio active by default.
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
   await expect(modeTab(page, 'studio')).toHaveClass(/is-active/);
   await expect(modeTab(page, 'api')).not.toHaveClass(/is-active/);
   await expect(modeTab(page, 'git')).not.toHaveClass(/is-active/);
@@ -280,7 +284,7 @@ async function inkBounds(
 
 async function modeTabInk(
   page: Page,
-  mode: 'studio' | 'api' | 'git',
+  mode: 'studio' | 'api' | 'git' | 'terminal',
 ): Promise<{ iconCentreY: number; labelCentreY: number; iconRightInset: number }> {
   const tab = modeTab(page, mode);
   const iconBoxLocator = tab.locator('.icon-box');
@@ -312,13 +316,15 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   // P67b §4.3/§9: Git is a third real .mode-tab now (icon 'source-control', the same glyph the
   // former per-repo tabs used) — the same ink guard applies to it, not just Studio/Api.
   const git = await modeTabInk(page, 'git');
+  // P91 §17.3: Terminal is a fourth — same guard extended the same way P67b extended it to Git.
+  const terminal = await modeTabInk(page, 'terminal');
 
   // (a) F9(a)/D6(a): both icons render close to filling their own 16px box — measured, not
   // merely inferred from the font's stated design grid. Before D6 (a 13px glyph in a 16px box)
   // this sandbox's own headless-Chromium render measures a 4px inset on "database" alone, purely
   // from the box/glyph size mismatch, on top of whatever the glyph's own side bearing adds; at
   // native size that mismatch is gone and only the glyph's own (smaller) bearing remains.
-  for (const { iconRightInset } of [studio, api, git]) {
+  for (const { iconRightInset } of [studio, api, git, terminal]) {
     expect(iconRightInset).toBeLessThanOrEqual(3.5);
   }
 
@@ -327,7 +333,7 @@ test('a mode tab’s icon renders at its own design size, with its ink lined up 
   // A generous tolerance: F9(b)'s own residual is sub-pixel on the two words this app actually
   // renders ("Studio" has no descender, "Api" does — a real, permanent, per-word difference in
   // ink extent that a shared line-height can't and shouldn't erase).
-  for (const { iconCentreY, labelCentreY } of [studio, api, git]) {
+  for (const { iconCentreY, labelCentreY } of [studio, api, git, terminal]) {
     expect(Math.abs(iconCentreY - labelCentreY)).toBeLessThanOrEqual(1.5);
   }
 

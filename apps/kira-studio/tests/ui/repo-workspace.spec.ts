@@ -188,7 +188,8 @@ test('a repo workspace: pinned graph tab, preview-slot reuse, promotion, and stu
   await page.locator('[data-testid="git-panel-tab-repos"]').click();
   await expect(repoRow(page)).toHaveClass(/active/);
   await expect(modeTab(page, 'git')).toHaveClass(/is-active/);
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
+  // P91 §2: Terminal joins Studio/Api/Git as a fourth mode tab.
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
 
   // The pinned graph tab exists, alone, and has no close button.
   await expect(tab(page)).toHaveCount(1);
