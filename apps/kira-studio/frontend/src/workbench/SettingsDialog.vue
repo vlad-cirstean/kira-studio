@@ -661,8 +661,8 @@ async function onAddScript(): Promise<void> {
   if (!canAddScript.value) return;
   scriptError.value = null;
   const fields: CustomScriptFields = {
-    name: newScriptName.value,
-    command: newScriptCommand.value,
+    name: newScriptName.value.trim(),
+    command: newScriptCommand.value.trim(),
     workingDir: newScriptWorkingDir.value.trim(),
     color: newScriptColor.value,
   };

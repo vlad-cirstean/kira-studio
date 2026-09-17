@@ -1150,7 +1150,9 @@ test("the tab strip's + lists a configured script and launches it at its own wor
   // Terminal, Claude Code, Dev server, Manage scripts….
   await expect(menu.locator('[data-testid^="menu-item-"]')).toHaveCount(4);
 
-  await menu.locator(`[data-testid="menu-item-${SCRIPT.id}"]`).click();
+  // TabStrip.vue's script row id is `script-${script.id}` — SCRIPT.id is already 'script-1'
+  // above, so the rendered testid is `menu-item-script-script-1`, not `menu-item-script-1`.
+  await menu.locator(`[data-testid="menu-item-script-${SCRIPT.id}"]`).click();
 
   const terminalTab = tab(page, 'terminal');
   await expect(terminalTab).toHaveCount(1);
