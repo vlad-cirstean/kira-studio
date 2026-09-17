@@ -12,7 +12,45 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Full adapter auth/config permutation matrix (P25/P26, docs/v1.1/plans/P25-connection-auth-test-matrix.md).
+  # pr.yml deliberately never runs this (it's the on-demand "complete" tier, not the per-push
+  # general tier) — a release is exactly the on-demand moment it exists for, so it gates here
+  # instead, and this is now the suite's only CI entry point (no more standalone
+  # .github/workflows/test-matrix.yml — it added nothing a release gate plus `bun run test:matrix
+  # -- --only <kind>` run locally didn't already cover). ubuntu-latest for Docker, same as pr.yml's
+  # container-tests job; no bun/Wails setup needed since scripts/test-matrix.sh only calls straight
+  # into `go test` against the adapter packages.
+  test-matrix:
+    name: test-matrix (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: sh scripts/test-matrix.sh
+
+  # Same reasoning as test-matrix above, applied to the other on-demand complete-tier suite (P16
+  # D5, docs/v1.1/plans/P16-db-compat-suite.md): the per-adapter conformance package test:go
+  # already runs, just against each kind's oldest/newest supported server image instead of one
+  # pinned default — the one axis a regression could ship on without pr.yml (or this file, before
+  # now) ever catching it. Standalone .github/workflows/db-compat.yml dropped for the same reason
+  # test-matrix.yml was: this job is now the real gate, and a one-off single-kind/extreme run
+  # during adapter work uses `bun run test:compat -- --only <kind> --min|--max` locally instead.
+  db-compat:
+    name: db-compat (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: sh scripts/db-compat.sh
+
   release:
+    needs: [test-matrix, db-compat]
     runs-on: macos-15
     timeout-minutes: 40
     env:
@@ -31,7 +69,7 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bun install --frozen-lockfile
-      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary; same key as ci.yml's checks/package-smoke, so a release right after a merge to main usually finds it already warm)
+      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary; same key as pr.yml's checks job, so a release right after a merge to main usually finds it already warm)
         uses: actions/cache@v4
         with:
           path: ~/go/bin/wails3
@@ -80,9 +118,9 @@ jobs:
       - name: Verify packaging
         run: bun run verify:packaging
 
-      - name: Assert packaged bundle and disk image (docs/PACKAGING.md §4 — moved here from ci.yml's
-          own package-smoke job so it checks the actual tagged release build, not a separate
-          merge-to-main run that could sit at a different commit)
+      - name: Assert packaged bundle and disk image (docs/PACKAGING.md §4 — moved here from pr.yml's
+          former package-smoke job, since removed, so it checks the actual tagged release build,
+          not a separate merge-to-main run that could sit at a different commit)
         run: |
           set -eu
           APP="apps/kira-studio/bin/Kira Studio.app"
@@ -104,18 +142,34 @@ jobs:
       - name: Compose release notes
         run: |
           cat > release-notes.md <<'EOF'
-          Unsigned (ad-hoc), local, arm64-only macOS build — macOS 14+. See docs/PACKAGING.md
-          and README.md for details.
+          Requires macOS 14 or later on Apple Silicon (arm64). Background: docs/PACKAGING.md and
+          README.md.
 
-          Open the disk image and drag Kira Studio onto the Applications shortcut inside it.
+          ## Install
 
-          Since this build is unsigned, macOS Gatekeeper will block the first launch. Either
-          right-click the app and choose Open, or run:
+          1. Open the downloaded disk image.
+          2. Drag **Kira Studio** onto the **Applications** shortcut inside it.
 
-              xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+          ## First launch: Gatekeeper warning
 
-          This release has no auto-update. The artifact below carries no update metadata or feed
-          — see docs/PACKAGING.md §7 for why, and what would need to change first.
+          This build isn't signed by Apple, so macOS blocks it the first time you open it.
+          Either of these fixes it:
+
+          - Right-click the app (or the disk image, if it's blocked at that step instead) and
+            choose **Open**.
+          - Or run this in Terminal, once for the disk image and once for the installed app:
+
+            ```
+            xattr -dr com.apple.quarantine ~/Downloads/kira-studio-macos-arm64.dmg
+            xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+            ```
+
+            (adjust the first path if you saved the disk image somewhere else)
+
+          ## No auto-update
+
+          New versions don't install themselves — check back here to download the next one. See
+          docs/PACKAGING.md §7 for why, and what would need to change first.
           EOF
 
       - name: Create draft release

@@ -1715,7 +1715,7 @@ this container's stock `fs.inotify.max_user_instances` (128). Each open repo hol
 watcher, one inotify instance apiece; a 100-plus-test parallel run exhausts the ceiling faster than
 teardown frees it. Raising the limit to 8192 (`sysctl -w fs.inotify.max_user_instances=8192`) made
 the same run pass clean in 59s (`-race`) / 23.1s (plain). macOS (`checks`, kqueue-backed) never hits
-this; Linux CI (`container-tests`) does, so `.github/workflows/ci.yml` now raises the limit there
+this; Linux CI (`container-tests`) does, so `.github/workflows/pr.yml` now raises the limit there
 before `test:go` runs.
 
 **`internal/preconnect` — planned as a safe win, found unsafe, reverted.** The original research
