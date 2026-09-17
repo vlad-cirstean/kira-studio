@@ -17,8 +17,8 @@
  * `node` dependency anywhere (verify-packaging.sh's own S5 note), and `vsce` under Bun produces a
  * byte-comparable `.vsix` to running it under Node (F6).
  */
-import { closeSync, openSync, readSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { closeSync, mkdirSync, openSync, readSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { buildVsCodeBundles } from './build-vscode.ts';
 
 const ROOT = join(import.meta.dir, '..');
@@ -28,6 +28,13 @@ const VSCE = join(ROOT, 'node_modules', '@vscode', 'vsce', 'vsce');
 
 async function main(): Promise<void> {
   await buildVsCodeBundles();
+
+  // `bin/` is gitignored and, on a fresh checkout, only otherwise created by the sibling `go
+  // build` task — which this task's own Taskfile entry doesn't depend on (both are `deps:` of
+  // `package:`, which go-task runs concurrently). vsce's own `--out`, unlike `go build -o`, does
+  // not create missing parent directories, so without this the two tasks race and vsce ENOENTs
+  // whenever it loses.
+  mkdirSync(dirname(OUT), { recursive: true });
 
   const proc = Bun.spawn([process.execPath, VSCE, 'package', '--no-dependencies', '--out', OUT], {
     cwd: VSCODE_APP,
