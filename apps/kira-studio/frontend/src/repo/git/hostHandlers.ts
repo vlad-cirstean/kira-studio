@@ -217,8 +217,18 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       };
     },
 
+    // Bug fix (live-reported): one transport is already bound to exactly one repo workspace
+    // (this file's own class doc comment, "one transport per repo workspace") — unlike VS Code's
+    // multi-root case candidates/activeRepoId were designed for, there is no real ambiguity to
+    // resolve here. Returning every imported repo made `App.vue`'s bootstrap() candidates loop
+    // (which tries each in import order and stops at the first that opens, never reading
+    // activeRepoId) open whichever repo was imported first, not this transport's own — the graph
+    // appeared "stuck" on that first repo whenever a different repo's tab mounted for the first
+    // time. Scoping candidates to this transport's own repo makes the loop open the right one
+    // unconditionally, with no change needed to the shared (VS Code too) bootstrap logic itself.
     'repo.list': async () => {
-      const candidates = codeReposState.records.map((r) => ({ path: r.root, label: r.name }));
+      const own = codeRepoRecord(deps.codeRepoId);
+      const candidates = own ? [{ path: own.root, label: own.name }] : [];
       return { candidates, activeRepoId: gitRepoIdFor(deps.codeRepoId) ?? null };
     },
 
