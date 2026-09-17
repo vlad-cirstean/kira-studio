@@ -710,7 +710,7 @@ async function onScriptColorChange(script: CustomScript, color: PaletteColor): P
 
 async function onRemoveScript(script: CustomScript): Promise<void> {
   const ok = await confirmDialog(
-    `Remove "${script.name}"? It will no longer launch from the tab strip.`,
+    `Remove "${script.name}"? It will no longer launch from the tab strip or the Terminal panel.`,
     {
       danger: true,
     },
@@ -1416,9 +1416,9 @@ async function onAddScript(): Promise<void> {
 
           <template v-else-if="activeSection === 'Scripts'">
             <p class="helper-text">
-              Each script becomes an entry in the tab strip's "+" button, opening a new terminal
-              tab running its command. An empty working directory uses the active repository's
-              own worktree root.
+              Each script becomes an entry in the tab strip's "+" button and the Terminal module's
+              own quick-command panel, opening a new terminal tab running its command. An empty
+              working directory uses the active repository's own worktree root.
             </p>
 
             <div
