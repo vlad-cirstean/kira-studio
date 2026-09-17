@@ -84,11 +84,18 @@ body {
   color: var(--kv-button-fg);
   pointer-events: none;
 }
+/* P88: codicon's check/dash artwork isn't centered within its own 16x16 tile (measured against
+   @vscode/codicons' own SVG source: check's ink sits 0.5/16 units high, dash's 0.5/16 units low),
+   so the shared `::after` rule above (flex-centering the tile) faithfully reproduces that bias
+   instead of correcting it — see primitives.css's own P88 comment, this is the same fix for the
+   raw-`<input>` checkbox this package draws itself. `em` ties the nudge to font-size. */
 .kv-mount-root input[type="checkbox"]:checked::after {
   content: "\eab2";
+  transform: translateY(0.03125em);
 }
 .kv-mount-root input[type="checkbox"]:indeterminate::after {
   content: "\eacc";
+  transform: translateY(-0.03125em);
 }
 
 .kv-mount-root input[type="checkbox"]:focus-visible {

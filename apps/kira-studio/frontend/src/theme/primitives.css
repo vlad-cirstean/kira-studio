@@ -367,6 +367,17 @@
   color: var(--kira-accent-fg);
   pointer-events: none;
 }
+/* P88: flex-centering the glyph tile isn't the same as centering the glyph's own ink — codicon's
+   check/dash artwork isn't centered within its own 16x16 tile (measured against
+   @vscode/codicons' own SVG source: check's ink sits 0.5/16 units high, dash's 0.5/16 units low),
+   so the tile-center rule above faithfully reproduces that bias instead of correcting it. `em`
+   ties the nudge to font-size (CodiconIcon's own `:size`), so it stays correct at any glyph size. */
+.p-check .glyph.codicon-check {
+  transform: translateY(0.03125em);
+}
+.p-check .glyph.codicon-dash {
+  transform: translateY(-0.03125em);
+}
 
 /* ---------- P13 dialog body ---------- */
 /* The column wrapper every DialogFrame consumer puts inside .dialog-body (which is the scroll
