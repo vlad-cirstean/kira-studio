@@ -20,6 +20,7 @@ export const sections = [
   'Appearance',
   'Data',
   'Cache',
+  'Api',
   'Connected editors',
   'Git',
   'Scripts',
@@ -68,6 +69,7 @@ function applySettings(settings: Settings): void {
   Object.assign(settingsState.cache, settings.cache);
   Object.assign(settingsState.advanced, settings.advanced);
   Object.assign(settingsState.git, settings.git);
+  Object.assign(settingsState.api, settings.api);
   Object.assign(settingsState.codeIntel, settings.codeIntel);
   Object.assign(settingsState.dbMcp, settings.dbMcp);
   Object.assign(settingsState.claudeCode, settings.claudeCode);

@@ -105,6 +105,48 @@ export const gitSettingsSchema = /*#__PURE__*/ z.object({
 });
 export type GitSettings = z.infer<typeof gitSettingsSchema>;
 
+// P90 §2.1: the seven request-settings leaves that used to be internal/httpclient package
+// constants (options.go states the coupling back at this file: its normalize() defaults must
+// equal this section's own defaults, field for field, since neither package may import the
+// other). Three deliberate default changes from pre-P90 httpclient behaviour: timeout 30s -> none,
+// max response 10 MiB -> 50 MB, max redirects unchanged at 10.
+export const HTTP_VERSIONS = ['1.1', '2'] as const;
+export const httpVersionSchema = /*#__PURE__*/ z.enum(HTTP_VERSIONS);
+export type HttpVersion = z.infer<typeof httpVersionSchema>;
+
+// 0 = no timeout. Ceiling is one hour — past that a request is a subscription, not a request.
+export const REQUEST_TIMEOUT_MS_RANGE = { min: 0, max: 3_600_000 } as const;
+// 0 = unlimited. Whole MB, cache.l2BudgetMb's own unit. 2048 is well past any response a
+// request builder should be holding in memory and rendering.
+export const MAX_RESPONSE_MB_RANGE = { min: 0, max: 2048 } as const;
+export const MAX_REDIRECTS_RANGE = { min: 0, max: 100 } as const;
+
+export const apiSettingsSchema = /*#__PURE__*/ z.object({
+  httpVersion: httpVersionSchema.default('2'),
+  requestTimeoutMs: z
+    .number()
+    .int()
+    .min(REQUEST_TIMEOUT_MS_RANGE.min)
+    .max(REQUEST_TIMEOUT_MS_RANGE.max)
+    .default(0),
+  maxResponseMb: z
+    .number()
+    .int()
+    .min(MAX_RESPONSE_MB_RANGE.min)
+    .max(MAX_RESPONSE_MB_RANGE.max)
+    .default(50),
+  sslVerify: z.boolean().default(true),
+  followRedirects: z.boolean().default(true),
+  maxRedirects: z
+    .number()
+    .int()
+    .min(MAX_REDIRECTS_RANGE.min)
+    .max(MAX_REDIRECTS_RANGE.max)
+    .default(10),
+  disableCookieJar: z.boolean().default(true),
+});
+export type ApiSettings = z.infer<typeof apiSettingsSchema>;
+
 // C3 §7.1: one leaf, default false. The embedded repo-map MCP server instance's own on/off switch
 // (internal/bridge/repomap.go owns the actual start/stop side effect; this leaf is only the
 // persisted, cross-restart record of "should it be on"). A new section on its own, not folded into
@@ -148,6 +190,15 @@ export const settingsSchema = /*#__PURE__*/ z.object({
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
   }),
+  api: apiSettingsSchema.default({
+    httpVersion: '2',
+    requestTimeoutMs: 0,
+    maxResponseMb: 50,
+    sslVerify: true,
+    followRedirects: true,
+    maxRedirects: 10,
+    disableCookieJar: true,
+  }),
   codeIntel: codeIntelSettingsSchema.default({ mcpServerEnabled: false }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
   claudeCode: claudeCodeSettingsSchema.default({
@@ -163,6 +214,7 @@ export const settingsPatchSchema = /*#__PURE__*/ z.object({
   cache: cacheSettingsSchema.partial().optional(),
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
+  api: apiSettingsSchema.partial().optional(),
   codeIntel: codeIntelSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
   claudeCode: claudeCodeSettingsSchema.partial().optional(),
@@ -194,6 +246,15 @@ export const defaultSettings: Settings = {
     protectedBranches: ['main', 'master', 'release/*'],
     fetchAutoIntervalMinutes: 0,
     gitPath: '',
+  },
+  api: {
+    httpVersion: '2',
+    requestTimeoutMs: 0,
+    maxResponseMb: 50,
+    sslVerify: true,
+    followRedirects: true,
+    maxRedirects: 10,
+    disableCookieJar: true,
   },
   codeIntel: {
     mcpServerEnabled: false,

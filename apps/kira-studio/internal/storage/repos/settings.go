@@ -66,6 +66,13 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "git.protectedBranches", &result.Git.ProtectedBranches)
 	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
 	leaf(stored, "git.path", &result.Git.GitPath)
+	leafValid(stored, "api.httpVersion", &result.Api.HTTPVersion, model.ValidHTTPVersion)
+	leafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, model.InRange(0, 3_600_000))
+	leafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, model.InRange(0, 2048))
+	leaf(stored, "api.sslVerify", &result.Api.SSLVerify)
+	leaf(stored, "api.followRedirects", &result.Api.FollowRedirects)
+	leafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, model.InRange(0, 100))
+	leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
 	leaf(stored, "codeIntel.mcpServerEnabled", &result.CodeIntel.McpServerEnabled)
 	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
 	leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
@@ -163,6 +170,43 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if g.GitPath != nil {
 			if err := upsertSettingsLeaf(tx, "git.path", *g.GitPath); err != nil {
+				return model.Settings{}, err
+			}
+		}
+	}
+	if a := patch.Api; a != nil {
+		if a.HTTPVersion != nil {
+			if err := upsertSettingsLeaf(tx, "api.httpVersion", *a.HTTPVersion); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.RequestTimeoutMs != nil {
+			if err := upsertSettingsLeaf(tx, "api.requestTimeoutMs", *a.RequestTimeoutMs); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.MaxResponseMb != nil {
+			if err := upsertSettingsLeaf(tx, "api.maxResponseMb", *a.MaxResponseMb); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.SSLVerify != nil {
+			if err := upsertSettingsLeaf(tx, "api.sslVerify", *a.SSLVerify); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.FollowRedirects != nil {
+			if err := upsertSettingsLeaf(tx, "api.followRedirects", *a.FollowRedirects); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.MaxRedirects != nil {
+			if err := upsertSettingsLeaf(tx, "api.maxRedirects", *a.MaxRedirects); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if a.DisableCookieJar != nil {
+			if err := upsertSettingsLeaf(tx, "api.disableCookieJar", *a.DisableCookieJar); err != nil {
 				return model.Settings{}, err
 			}
 		}

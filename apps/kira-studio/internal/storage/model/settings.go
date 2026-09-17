@@ -71,12 +71,28 @@ type ClaudeCodeSettings struct {
 	HooksPromptDismissed bool `json:"hooksPromptDismissed"`
 }
 
+// ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema (P90 item 1) — the
+// seven request settings that used to be httpclient package constants (internal/httpclient's own
+// options.go states the coupling back at this file: its normalize() defaults must equal
+// DefaultSettings().Api field for field). HTTPVersion is "1.1" | "2"; RequestTimeoutMs is
+// milliseconds, 0 = none; MaxResponseMb is whole MB, 0 = unlimited.
+type ApiSettings struct {
+	HTTPVersion      string `json:"httpVersion"`
+	RequestTimeoutMs int    `json:"requestTimeoutMs"`
+	MaxResponseMb    int    `json:"maxResponseMb"`
+	SSLVerify        bool   `json:"sslVerify"`
+	FollowRedirects  bool   `json:"followRedirects"`
+	MaxRedirects     int    `json:"maxRedirects"`
+	DisableCookieJar bool   `json:"disableCookieJar"`
+}
+
 type Settings struct {
 	Appearance AppearanceSettings `json:"appearance"`
 	Data       DataSettings       `json:"data"`
 	Cache      CacheSettings      `json:"cache"`
 	Advanced   AdvancedSettings   `json:"advanced"`
 	Git        GitSettings        `json:"git"`
+	Api        ApiSettings        `json:"api"`
 	CodeIntel  CodeIntelSettings  `json:"codeIntel"`
 	DbMcp      DbMcpSettings      `json:"dbMcp"`
 	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
@@ -107,6 +123,17 @@ func DefaultSettings() Settings {
 			ProtectedBranches:        []string{"main", "master", "release/*"},
 			FetchAutoIntervalMinutes: 0,
 			GitPath:                  "",
+		},
+		// P90 §2.1: three deliberate default changes from pre-P90 httpclient behaviour — timeout
+		// 30s -> none, max response 10 MiB -> 50 MB, max redirects unchanged at 10.
+		Api: ApiSettings{
+			HTTPVersion:      "2",
+			RequestTimeoutMs: 0,
+			MaxResponseMb:    50,
+			SSLVerify:        true,
+			FollowRedirects:  true,
+			MaxRedirects:     10,
+			DisableCookieJar: true,
 		},
 		CodeIntel:  CodeIntelSettings{McpServerEnabled: false},
 		DbMcp:      DbMcpSettings{ServerEnabled: false},
@@ -148,6 +175,17 @@ type GitPatch struct {
 	GitPath                  *string   `json:"gitPath,omitempty"`
 }
 
+// ApiPatch mirrors ApiSettings' own `.partial()` shape (P90 item 1).
+type ApiPatch struct {
+	HTTPVersion      *string `json:"httpVersion,omitempty"`
+	RequestTimeoutMs *int    `json:"requestTimeoutMs,omitempty"`
+	MaxResponseMb    *int    `json:"maxResponseMb,omitempty"`
+	SSLVerify        *bool   `json:"sslVerify,omitempty"`
+	FollowRedirects  *bool   `json:"followRedirects,omitempty"`
+	MaxRedirects     *int    `json:"maxRedirects,omitempty"`
+	DisableCookieJar *bool   `json:"disableCookieJar,omitempty"`
+}
+
 // CodeIntelPatch mirrors CodeIntelSettings' own `.partial()` shape (C3 §7.1).
 type CodeIntelPatch struct {
 	McpServerEnabled *bool `json:"mcpServerEnabled,omitempty"`
@@ -170,6 +208,7 @@ type SettingsPatch struct {
 	Cache      *CachePatch      `json:"cache,omitempty"`
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
+	Api        *ApiPatch        `json:"api,omitempty"`
 	CodeIntel  *CodeIntelPatch  `json:"codeIntel,omitempty"`
 	DbMcp      *DbMcpPatch      `json:"dbMcp,omitempty"`
 	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
@@ -183,6 +222,12 @@ func ValidRowDensity(v string) bool {
 // ValidDateFormat mirrors settings.ts's appearanceSettingsSchema.dateFormat enum.
 func ValidDateFormat(v string) bool {
 	return v == "relative" || v == "absolute"
+}
+
+// ValidHTTPVersion mirrors settings.ts's HTTP_VERSIONS — Go's HTTP/1 *is* 1.1, so "1" is never a
+// member (internal/httpclient/options.go's own comment states why).
+func ValidHTTPVersion(v string) bool {
+	return v == "1.1" || v == "2"
 }
 
 // ValidPageSize mirrors settings.ts's pageSizeSchema (shared with tabs.ts's per-kind page sizes).
@@ -205,6 +250,10 @@ var (
 	validOpLogRetentionDays       = InRange(1, 365)
 	validExpensiveQueryRows       = InRange(1_000, 1_000_000_000)
 	validFetchAutoIntervalMinutes = InRange(0, 1440)
+	// P90 §2.1: settings.ts's own REQUEST_TIMEOUT_MS_RANGE/MAX_RESPONSE_MB_RANGE/MAX_REDIRECTS_RANGE.
+	validRequestTimeoutMs = InRange(0, 3_600_000)
+	validMaxResponseMb    = InRange(0, 2048)
+	validMaxRedirects     = InRange(0, 100)
 )
 
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
@@ -238,6 +287,20 @@ func (p SettingsPatch) Validate() error {
 	}
 	if p.Git != nil && p.Git.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*p.Git.FetchAutoIntervalMinutes) {
 		return fmt.Errorf("model: git.fetchAutoIntervalMinutes: out of range value %d", *p.Git.FetchAutoIntervalMinutes)
+	}
+	if a := p.Api; a != nil {
+		if a.HTTPVersion != nil && !ValidHTTPVersion(*a.HTTPVersion) {
+			return fmt.Errorf("model: api.httpVersion: invalid value %q", *a.HTTPVersion)
+		}
+		if a.RequestTimeoutMs != nil && !validRequestTimeoutMs(*a.RequestTimeoutMs) {
+			return fmt.Errorf("model: api.requestTimeoutMs: out of range value %d", *a.RequestTimeoutMs)
+		}
+		if a.MaxResponseMb != nil && !validMaxResponseMb(*a.MaxResponseMb) {
+			return fmt.Errorf("model: api.maxResponseMb: out of range value %d", *a.MaxResponseMb)
+		}
+		if a.MaxRedirects != nil && !validMaxRedirects(*a.MaxRedirects) {
+			return fmt.Errorf("model: api.maxRedirects: out of range value %d", *a.MaxRedirects)
+		}
 	}
 	return nil
 }

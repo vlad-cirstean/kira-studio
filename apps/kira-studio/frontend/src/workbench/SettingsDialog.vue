@@ -8,7 +8,11 @@ import {
   EXPENSIVE_QUERY_ROWS_RANGE,
   FETCH_AUTO_INTERVAL_MINUTES_RANGE,
   FONT_SIZE_RANGE,
+  HTTP_VERSIONS,
+  MAX_REDIRECTS_RANGE,
+  MAX_RESPONSE_MB_RANGE,
   OP_LOG_RETENTION_DAYS_RANGE,
+  REQUEST_TIMEOUT_MS_RANGE,
   type RowDensity,
   type Settings,
   type SettingsPatch,
@@ -76,6 +80,7 @@ const cloneSections = (s: Settings): Settings =>
       cache: s.cache,
       advanced: s.advanced,
       git: s.git,
+      api: s.api,
     }),
   );
 
@@ -123,6 +128,8 @@ const pendingPatch = computed<SettingsPatch>(() => {
   if (advanced) patch.advanced = advanced;
   const git = diffSection(baseline.git, draft.git);
   if (git) patch.git = git;
+  const api = diffSection(baseline.api, draft.api);
+  if (api) patch.api = api;
   return patch;
 });
 
@@ -441,6 +448,29 @@ function onFetchAutoIntervalInput(e: Event): void {
   draft.git.fetchAutoIntervalMinutes = Number((e.target as HTMLInputElement).value);
 }
 
+// P90 §2.7: the global Api section's own handlers — same shape as every other leaf above.
+function onHttpVersionChange(e: Event): void {
+  draft.api.httpVersion = (e.target as HTMLSelectElement).value as Settings['api']['httpVersion'];
+}
+function onRequestTimeoutMsInput(e: Event): void {
+  draft.api.requestTimeoutMs = Number((e.target as HTMLInputElement).value);
+}
+function onMaxResponseMbInput(e: Event): void {
+  draft.api.maxResponseMb = Number((e.target as HTMLInputElement).value);
+}
+function onSslVerifyChange(checked: boolean): void {
+  draft.api.sslVerify = checked;
+}
+function onFollowRedirectsChange(checked: boolean): void {
+  draft.api.followRedirects = checked;
+}
+function onMaxRedirectsInput(e: Event): void {
+  draft.api.maxRedirects = Number((e.target as HTMLInputElement).value);
+}
+function onDisableCookieJarChange(checked: boolean): void {
+  draft.api.disableCookieJar = checked;
+}
+
 // P72 §9.2: kira-version's own diagnostic log verbosity, moved here from the per-repo
 // RepoSettingsDialog.vue's kiraVersion.log.level — genuinely installation-wide, not a per-repo
 // fact, so this is now the one control that sets it.
@@ -514,13 +544,43 @@ const fetchAutoIntervalError = computed<string | null>(() => {
   return null;
 });
 
+const requestTimeoutMsError = computed<string | null>(() => {
+  const v = draft.api.requestTimeoutMs;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < REQUEST_TIMEOUT_MS_RANGE.min || v > REQUEST_TIMEOUT_MS_RANGE.max) {
+    return `${REQUEST_TIMEOUT_MS_RANGE.min}–${REQUEST_TIMEOUT_MS_RANGE.max.toLocaleString()} ms`;
+  }
+  return null;
+});
+
+const maxResponseMbError = computed<string | null>(() => {
+  const v = draft.api.maxResponseMb;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < MAX_RESPONSE_MB_RANGE.min || v > MAX_RESPONSE_MB_RANGE.max) {
+    return `${MAX_RESPONSE_MB_RANGE.min}–${MAX_RESPONSE_MB_RANGE.max} MB`;
+  }
+  return null;
+});
+
+const maxRedirectsError = computed<string | null>(() => {
+  const v = draft.api.maxRedirects;
+  if (!Number.isFinite(v)) return 'Enter a number.';
+  if (v < MAX_REDIRECTS_RANGE.min || v > MAX_REDIRECTS_RANGE.max) {
+    return `${MAX_REDIRECTS_RANGE.min}–${MAX_REDIRECTS_RANGE.max}`;
+  }
+  return null;
+});
+
 const isValid = computed(
   () =>
     !fontSizeError.value &&
     !cacheBudgetError.value &&
     !opLogRetentionError.value &&
     !expensiveQueryRowsError.value &&
-    !fetchAutoIntervalError.value,
+    !fetchAutoIntervalError.value &&
+    !requestTimeoutMsError.value &&
+    !maxResponseMbError.value &&
+    !maxRedirectsError.value,
 );
 
 const hitRateLabel = computed(() => {
@@ -1012,6 +1072,192 @@ async function onAddScript(): Promise<void> {
             >
               Clear caches
             </AppButton>
+          </template>
+
+          <template v-else-if="activeSection === 'Api'">
+            <label class="field">
+              <div class="field-head">
+                <span>HTTP version</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-api-httpVersion"
+                  :disabled="isAtDefault('api', 'httpVersion')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('api', 'httpVersion')"
+                />
+              </div>
+              <select
+                class="p-select bordered md"
+                data-testid="settings-api-httpVersion"
+                :value="draft.api.httpVersion"
+                @change="onHttpVersionChange"
+              >
+                <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <div class="field-head">
+                <span>Request timeout (ms)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-api-requestTimeoutMs"
+                  :disabled="isAtDefault('api', 'requestTimeoutMs')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('api', 'requestTimeoutMs')"
+                />
+              </div>
+              <TextField
+                type="number"
+                :min="REQUEST_TIMEOUT_MS_RANGE.min"
+                :max="REQUEST_TIMEOUT_MS_RANGE.max"
+                size="md"
+                :invalid="!!requestTimeoutMsError"
+                data-testid="settings-api-requestTimeoutMs"
+                :model-value="String(draft.api.requestTimeoutMs)"
+                @input="onRequestTimeoutMsInput"
+              />
+              <span
+                v-if="requestTimeoutMsError"
+                class="field-error"
+                data-testid="settings-api-requestTimeoutMs-error"
+              >
+                {{ requestTimeoutMsError }}
+              </span>
+              <span v-else class="helper-text">0 = no timeout.</span>
+            </label>
+
+            <label class="field">
+              <div class="field-head">
+                <span>Max response size (MB)</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-api-maxResponseMb"
+                  :disabled="isAtDefault('api', 'maxResponseMb')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('api', 'maxResponseMb')"
+                />
+              </div>
+              <TextField
+                type="number"
+                :min="MAX_RESPONSE_MB_RANGE.min"
+                :max="MAX_RESPONSE_MB_RANGE.max"
+                size="md"
+                :invalid="!!maxResponseMbError"
+                data-testid="settings-api-maxResponseMb"
+                :model-value="String(draft.api.maxResponseMb)"
+                @input="onMaxResponseMbInput"
+              />
+              <span
+                v-if="maxResponseMbError"
+                class="field-error"
+                data-testid="settings-api-maxResponseMb-error"
+              >
+                {{ maxResponseMbError }}
+              </span>
+              <span v-else class="helper-text">0 = unlimited. A larger body is truncated, not refused.</span>
+            </label>
+
+            <div class="field checkbox-row">
+              <label class="field checkbox">
+                <Checkbox
+                  :model-value="draft.api.sslVerify"
+                  data-testid="settings-api-sslVerify"
+                  @update:model-value="onSslVerifyChange"
+                />
+                <span>Verify SSL certificates</span>
+              </label>
+              <IconButton
+                icon="discard"
+                class="p-push"
+                data-testid="settings-reset-api-sslVerify"
+                :disabled="isAtDefault('api', 'sslVerify')"
+                v-tooltip="'Reset to default'"
+                @click="resetLeaf('api', 'sslVerify')"
+              />
+            </div>
+            <p v-if="!draft.api.sslVerify" class="field-error" data-testid="settings-api-sslVerify-warning">
+              Turning certificate verification off lets any server present any certificate.
+              Anything on the network between you and the server can then read and modify every
+              request and response, including credentials. Leave this on unless you are testing
+              against a server with a self-signed certificate you control.
+            </p>
+
+            <div class="field checkbox-row">
+              <label class="field checkbox">
+                <Checkbox
+                  :model-value="draft.api.followRedirects"
+                  data-testid="settings-api-followRedirects"
+                  @update:model-value="onFollowRedirectsChange"
+                />
+                <span>Follow redirects</span>
+              </label>
+              <IconButton
+                icon="discard"
+                class="p-push"
+                data-testid="settings-reset-api-followRedirects"
+                :disabled="isAtDefault('api', 'followRedirects')"
+                v-tooltip="'Reset to default'"
+                @click="resetLeaf('api', 'followRedirects')"
+              />
+            </div>
+
+            <label class="field">
+              <div class="field-head">
+                <span>Max redirects</span>
+                <IconButton
+                  icon="discard"
+                  data-testid="settings-reset-api-maxRedirects"
+                  :disabled="isAtDefault('api', 'maxRedirects')"
+                  v-tooltip="'Reset to default'"
+                  @click="resetLeaf('api', 'maxRedirects')"
+                />
+              </div>
+              <TextField
+                type="number"
+                :min="MAX_REDIRECTS_RANGE.min"
+                :max="MAX_REDIRECTS_RANGE.max"
+                size="md"
+                :disabled="!draft.api.followRedirects"
+                :invalid="!!maxRedirectsError"
+                data-testid="settings-api-maxRedirects"
+                :model-value="String(draft.api.maxRedirects)"
+                @input="onMaxRedirectsInput"
+              />
+              <span
+                v-if="maxRedirectsError"
+                class="field-error"
+                data-testid="settings-api-maxRedirects-error"
+              >
+                {{ maxRedirectsError }}
+              </span>
+              <span v-else-if="!draft.api.followRedirects" class="helper-text">
+                Follow redirects is off — this has no effect.
+              </span>
+            </label>
+
+            <div class="field checkbox-row">
+              <label class="field checkbox">
+                <Checkbox
+                  :model-value="draft.api.disableCookieJar"
+                  data-testid="settings-api-disableCookieJar"
+                  @update:model-value="onDisableCookieJarChange"
+                />
+                <span>Disable cookie jar</span>
+                <span class="helper-text"
+                  >Off keeps a session cookie a server sets and replays it on later requests to
+                  the same host.</span
+                >
+              </label>
+              <IconButton
+                icon="discard"
+                class="p-push"
+                data-testid="settings-reset-api-disableCookieJar"
+                :disabled="isAtDefault('api', 'disableCookieJar')"
+                v-tooltip="'Reset to default'"
+                @click="resetLeaf('api', 'disableCookieJar')"
+              />
+            </div>
           </template>
 
           <template v-else-if="activeSection === 'Connected editors'">
