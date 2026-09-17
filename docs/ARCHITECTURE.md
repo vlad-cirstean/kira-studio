@@ -3878,10 +3878,10 @@ file per engine, run by `bun run test:go`. **No CI wiring in v1** — but that s
 on demand against each kind's version extremes: `scripts/db-compat.sh` (`bun run test:compat`, P16)
 runs the identical conformance packages against every supported kind's oldest and newest server
 image, sixteen (kind, min|max) pairs, via `testsupport.ImageFor`'s env-var override, running every
-pair even after an earlier one fails. Its `workflow_dispatch` CI workflow is written and staged, not
-live — `docs/pending-workflows/test-matrix.yml`, staged rather than committed for the push-scope
-reason `CLAUDE.md`'s own `.github/workflows/` section explains. The version floor/ceiling this proves also surfaces to the
-user: `packages/shared/domain/connection.ts`'s `MIN_SERVER_VERSION` map, rendered per kind by
+pair even after an earlier one fails. Its CI workflow, `.github/workflows/db-compat.yml`, is live
+and `workflow_dispatch`-only — no push, no pull_request, no schedule. The version floor/ceiling
+this proves also surfaces to the user: `packages/shared/domain/connection.ts`'s
+`MIN_SERVER_VERSION` map, rendered per kind by
 `apps/kira-studio/frontend/src/project/ConnectionDialog.vue`.
 
 **Each adapter's real-container coverage is two suites, by design (P25, populated P26).** A
@@ -3895,7 +3895,11 @@ least-privilege principal, with/without password, with/without the database-equi
 every connecting case's own functional consequences (a real read, a real write, a real permission
 refusal) attached via `testsupport.Scenario`/`RunMatrix`'s `Then`. `testsupport.RunScenarios` runs the
 same `Scenario` body outside a matrix table, which is what lets one scenario back both tiers
-instead of being written twice. A permission *refusal* getting the wrong `ErrorCode` — an
+instead of being written twice. Its only CI entry point is `.github/workflows/release.yml`, which
+runs `scripts/test-matrix.sh` directly as a `needs:`-gated job every release tag must pass before
+the `release` job builds and drafts the release — it has no standalone `workflow_dispatch`
+workflow of its own (unlike `db-compat.yml`); a one-off single-adapter run during driver work uses
+`bun run test:matrix -- --only <kind>` locally instead. A permission *refusal* getting the wrong `ErrorCode` — an
 authorization failure read as a wrong password (`E_AUTH`) rather than a query/permission failure — is
 the specific risk the complete suite is built to catch, and four adapters (clickhouse, mongo, redis,
 kafka) are known, pinned instances of exactly that conflation, each with a comment at the assertion

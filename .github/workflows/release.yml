@@ -12,7 +12,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Full adapter auth/config permutation matrix (P25/P26, docs/v1.1/plans/P25-connection-auth-test-matrix.md).
+  # ci.yml deliberately never runs this (it's the on-demand "complete" tier, not the per-push
+  # general tier) — a release is exactly the on-demand moment it exists for, so it gates here
+  # instead, and this is now the suite's only CI entry point (no more standalone
+  # .github/workflows/test-matrix.yml — it added nothing a release gate plus `bun run test:matrix
+  # -- --only <kind>` run locally didn't already cover). ubuntu-latest for Docker, same as ci.yml's
+  # container-tests job; no bun/Wails setup needed since scripts/test-matrix.sh only calls straight
+  # into `go test` against the adapter packages.
+  test-matrix:
+    name: test-matrix (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: sh scripts/test-matrix.sh
+
   release:
+    needs: test-matrix
     runs-on: macos-15
     timeout-minutes: 40
     env:
@@ -104,18 +124,34 @@ jobs:
       - name: Compose release notes
         run: |
           cat > release-notes.md <<'EOF'
-          Unsigned (ad-hoc), local, arm64-only macOS build — macOS 14+. See docs/PACKAGING.md
-          and README.md for details.
+          Requires macOS 14 or later on Apple Silicon (arm64). Background: docs/PACKAGING.md and
+          README.md.
 
-          Open the disk image and drag Kira Studio onto the Applications shortcut inside it.
+          ## Install
 
-          Since this build is unsigned, macOS Gatekeeper will block the first launch. Either
-          right-click the app and choose Open, or run:
+          1. Open the downloaded disk image.
+          2. Drag **Kira Studio** onto the **Applications** shortcut inside it.
 
-              xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+          ## First launch: Gatekeeper warning
 
-          This release has no auto-update. The artifact below carries no update metadata or feed
-          — see docs/PACKAGING.md §7 for why, and what would need to change first.
+          This build isn't signed by Apple, so macOS blocks it the first time you open it.
+          Either of these fixes it:
+
+          - Right-click the app (or the disk image, if it's blocked at that step instead) and
+            choose **Open**.
+          - Or run this in Terminal, once for the disk image and once for the installed app:
+
+            ```
+            xattr -dr com.apple.quarantine ~/Downloads/kira-studio-macos-arm64.dmg
+            xattr -dr com.apple.quarantine "/Applications/Kira Studio.app"
+            ```
+
+            (adjust the first path if you saved the disk image somewhere else)
+
+          ## No auto-update
+
+          New versions don't install themselves — check back here to download the next one. See
+          docs/PACKAGING.md §7 for why, and what would need to change first.
           EOF
 
       - name: Create draft release
