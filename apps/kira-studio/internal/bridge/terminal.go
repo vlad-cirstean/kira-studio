@@ -35,6 +35,49 @@ func (s *TerminalService) Shutdown() {
 	s.Registry.CloseAll()
 }
 
+// AgentSessionWire is terminal.AgentSession's own wire projection — AgentSessionsEvent's own
+// per-session shape (P86 §11), field for field.
+type AgentSessionWire struct {
+	TerminalID string `json:"terminalId"`
+	Cwd        string `json:"cwd"`
+}
+
+// AgentSessionsEvent is ChannelAgentSessions' own payload — a list, not a bare count (§11): a bare
+// number would leave the widget's own tooltip unable to say *which* sessions are running.
+type AgentSessionsEvent struct {
+	Sessions []AgentSessionWire `json:"sessions"`
+}
+
+func toWireAgentSessions(sessions []terminal.AgentSession) []AgentSessionWire {
+	out := make([]AgentSessionWire, len(sessions))
+	for i, s := range sessions {
+		out[i] = AgentSessionWire{TerminalID: s.ID, Cwd: s.Cwd}
+	}
+	return out
+}
+
+// AgentSessions is the boot-time hydrate (§12) — a window opened after every currently-live
+// session already started needs a snapshot, since ChannelAgentSessions only fires on change.
+func (s *TerminalService) AgentSessions() AgentSessionsEvent {
+	return AgentSessionsEvent{Sessions: toWireAgentSessions(s.Registry.AgentSessions())}
+}
+
+// emitAgentSessions is terminal.Registry.OnChange's own callback body — Emit, not EmitTo: the
+// count is app-wide by definition (§11), so every window's widget sees the same list.
+func (s *TerminalService) emitAgentSessions() {
+	s.Emit.Emit(ChannelAgentSessions, s.AgentSessions())
+}
+
+// TerminalAgentSessionsChanged is main.go's own Registry.OnChange target — a package-level
+// function rather than a call to the exported method a Wails-bound Registry.OnChange closure
+// would need, because every exported method of a registered service is bound to the wire
+// (repomap.go's startIfEnabled doc comment records the identical reasoning): emitAgentSessions
+// itself stays unexported so it can never become a renderer-triggerable broadcast, and this
+// function is the one place outside this package allowed to reach it.
+func TerminalAgentSessionsChanged(s *TerminalService) {
+	s.emitAgentSessions()
+}
+
 type TerminalOpenArgs struct {
 	TerminalID string `json:"terminalId"`
 	Cwd        string `json:"cwd"`

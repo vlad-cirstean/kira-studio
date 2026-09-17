@@ -312,6 +312,9 @@ func main() {
 	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
 	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
 	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
+	// P86 §11: the status-bar widget's own app-wide authority — every window's live session list,
+	// republished whenever a Claude Code session's own liveness changes anywhere.
+	terminalSvc.Registry.OnChange = func() { bridge.TerminalAgentSessionsChanged(terminalSvc) }
 
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})

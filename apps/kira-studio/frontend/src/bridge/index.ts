@@ -27,6 +27,7 @@ import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
 import type { HeadState } from '@kira/git-ipc';
+import type { AgentSessionsEvent } from '@shared/domain/agent';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -582,6 +583,15 @@ const studioControl = {
   terminalClose: (terminalId: string): Promise<void> =>
     unwrap(TerminalService.Close({ terminalId })),
   onTerminal: (cb: (event: TerminalEvent) => void): (() => void) => on(CHANNEL.terminal, cb),
+
+  // P86 §11/§12: every live Claude Code session across every window — the boot-time hydrate for a
+  // window opened after sessions already started (ChannelAgentSessions only fires on change), plus
+  // the broadcast subscription. Emit, not EmitTo (customScriptsChanged's own shape): the count is
+  // app-wide by definition, so this is not windowKey-addressed.
+  terminalAgentSessions: (): Promise<AgentSessionsEvent> =>
+    unwrap(TerminalService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),
+  onAgentSessions: (cb: (event: AgentSessionsEvent) => void): (() => void) =>
+    on(CHANNEL.agentSessions, cb),
 
   // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
   // state/customScripts.ts, the one store that wraps these.

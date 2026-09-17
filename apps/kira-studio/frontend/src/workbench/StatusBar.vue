@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
+import { agentSessionsState } from '../state/agentSessions';
 import { appMetricsState } from '../state/appMetrics';
 import { appUpdateState } from '../state/appUpdate';
 import { blameStatusState } from '../state/blameStatus';
@@ -90,6 +91,24 @@ const navStatus = computed(() =>
 const navStatusTooltip = computed(() =>
   navStatus.value?.kind === 'references' ? navStatus.value.tooltip : undefined,
 );
+
+// P86 §14.1: an app-wide fact like app-metrics/cache-size beside it, not a caret fact — §11's own
+// count, absent (not a zero reading, StatusBar's own rule above) rather than shown as "0".
+// state.cwd is an absolute path, not an encoded NodePath (tabKinds.ts's own basename, restated
+// here since it is not exported there).
+function basename(path: string): string {
+  const slash = path.lastIndexOf('/');
+  return slash === -1 ? path : path.slice(slash + 1);
+}
+
+const agentCount = computed(() => agentSessionsState.sessions.length);
+
+// One line per session, basename(cwd) only for now — activity text (§13's "waiting for you" /
+// "running <tool>" / "working" / "idle") is a later phase commit's own addition once
+// state/agentSessions.ts's reducer half exists; this window has no activity data to show yet.
+const agentTooltip = computed(() =>
+  agentSessionsState.sessions.map((s) => basename(s.cwd)).join('\n'),
+);
 </script>
 
 <template>
@@ -135,6 +154,15 @@ const navStatusTooltip = computed(() =>
         <CodiconIcon name="cloud-download" :size="13" />
         Update {{ appUpdateState.latestVersion }}
       </button>
+      <span
+        v-if="agentCount > 0"
+        class="p-status"
+        data-testid="agent-sessions"
+        v-tooltip="agentTooltip"
+      >
+        <CodiconIcon name="sparkle" :size="13" />
+        {{ agentCount }}
+      </span>
       <span
         v-if="appMetricsState.sample"
         class="p-status"

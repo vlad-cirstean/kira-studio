@@ -48,6 +48,9 @@ export const CHANNEL = {
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape (Emit, not EmitTo,
   // so every window's tab-strip dropdown stays in sync).
   customScriptsChanged: 'kira:customScripts:changed',
+  // P86 §11: every live Claude Code session across every window, Emit'd (not EmitTo) whenever
+  // terminal.Registry.OnChange fires — customScriptsChanged's own shape, app-wide by definition.
+  agentSessions: 'kira:agent:sessions',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

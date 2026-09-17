@@ -6,6 +6,7 @@ import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
 import { hydrateAgentHooks } from './state/agentHooks';
+import { initAgentSessions } from './state/agentSessions';
 import { initAppMetrics } from './state/appMetrics';
 import { initAppUpdate } from './state/appUpdate';
 import { initCacheStats } from './state/cacheStats';
@@ -308,6 +309,7 @@ async function bootstrap(): Promise<void> {
     hydrateDbMcp(),
     hydrateDbMcpApprovals(),
     hydrateAgentHooks(),
+    initAgentSessions(),
     hydrateOps(),
     hydrateTabs(),
   ]);

@@ -67,6 +67,10 @@ const (
 	// Create/Update/Remove Emit (not EmitTo) the full list, ChannelConnectionsChanged's own shape,
 	// so every window's tab-strip dropdown stays in sync with a script added or removed elsewhere.
 	ChannelCustomScriptsChanged = "kira:customScripts:changed"
+	// ChannelAgentSessions is P86 §11's own app-wide broadcast — every live Claude Code session
+	// across every window, Emit'd (not EmitTo) whenever terminal.Registry.OnChange fires, so the
+	// status-bar widget in every window agrees on the same count.
+	ChannelAgentSessions = "kira:agent:sessions"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in
