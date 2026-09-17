@@ -69,7 +69,7 @@ import type { ConnectionDdl } from '@shared/domain/schema';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
-import type { TabRecord } from '@shared/domain/tabs';
+import type { TabRecord, TerminalLaunchKind } from '@shared/domain/tabs';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
@@ -545,16 +545,25 @@ const studioControl = {
   // P83 §3.2: the embedded terminal's own bound surface — terminalId is client-supplied (the tab
   // id) so state/terminals.ts subscribes to onTerminal before this call returns, and no output can
   // race the subscription. windowKey addresses ChannelTerminal at this window only, exactly like
-  // codeWorkspaceStartSearch.
+  // codeWorkspaceStartSearch. P86 §4: launchKind forwards to TerminalOpenArgs.LaunchKind as-is.
   terminalOpen: (
     terminalId: string,
     cwd: string,
     cols: number,
     rows: number,
     command?: string,
+    launchKind?: TerminalLaunchKind,
   ): Promise<{ shell: string }> =>
     unwrap(
-      TerminalService.Open({ terminalId, cwd, cols, rows, windowKey, command: command ?? '' }),
+      TerminalService.Open({
+        terminalId,
+        cwd,
+        cols,
+        rows,
+        windowKey,
+        command: command ?? '',
+        launchKind: launchKind ?? 'shell',
+      }),
     ).then((r) => trust<{ shell: string }>(r)),
   // data is base64 — keystrokes are not always valid UTF-8 (paste, Alt-meta, mouse reports).
   terminalWrite: (terminalId: string, data: string): Promise<void> =>

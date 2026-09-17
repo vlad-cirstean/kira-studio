@@ -237,7 +237,12 @@ function newTabMenuItems(): MenuItem[] {
       label: 'Claude Code',
       icon: 'sparkle',
       run: () =>
-        launchInActiveWorkspace({ command: 'claude', label: 'Claude Code', color: 'none' }),
+        launchInActiveWorkspace({
+          command: 'claude',
+          label: 'Claude Code',
+          color: 'none',
+          kind: 'claude-code',
+        }),
     },
   ];
   if (customScriptsState.records.length > 0) {
@@ -251,7 +256,7 @@ function newTabMenuItems(): MenuItem[] {
         ...(script.color === 'none' ? { icon: 'play' } : { swatch: script.color }),
         run: () =>
           launchInActiveWorkspace(
-            { command: script.command, label: script.name, color: script.color },
+            { command: script.command, label: script.name, color: script.color, kind: 'script' },
             script.workingDir || undefined,
           ),
       });

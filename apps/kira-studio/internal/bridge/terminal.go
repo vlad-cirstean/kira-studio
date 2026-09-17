@@ -38,6 +38,29 @@ type TerminalOpenArgs struct {
 	// Command, when non-empty, runs as `$SHELL -l -i -c Command` instead of a plain login shell
 	// (P85 §2.1) — the initial command a Claude Code or custom-script launch seeds the tab with.
 	Command string `json:"command"`
+	// LaunchKind is P86 §4's own discriminator — one of launchKindShell/ClaudeCode/Script, never
+	// inferred from Command (P85 OQ-3's "no heuristic" rule, carried forward). "" is accepted and
+	// treated as launchKindShell, so an older caller keeps working.
+	LaunchKind string `json:"launchKind"`
+}
+
+// P86 §4: the three wire values TerminalOpenArgs.LaunchKind accepts — packages/shared/domain/
+// tabs.ts's terminalLaunchKindSchema, field for field. Only launchKindClaudeCode ever gets hooks
+// (§8.3) or counts toward the agent widget (§11); a custom script that happens to run `claude`
+// counts as a script, deliberately (§4: "so the implementation does not 'fix' it into a heuristic").
+const (
+	launchKindShell      = "shell"
+	launchKindClaudeCode = "claude-code"
+	launchKindScript     = "script"
+)
+
+func validLaunchKind(v string) bool {
+	switch v {
+	case "", launchKindShell, launchKindClaudeCode, launchKindScript:
+		return true
+	default:
+		return false
+	}
 }
 
 type TerminalOpenResult struct {
@@ -96,6 +119,10 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	if len(args.Command) > maxTerminalCommandBytes {
 		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "command is too long")
 	}
+	if !validLaunchKind(args.LaunchKind) {
+		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
+	}
+	agent := args.LaunchKind == launchKindClaudeCode
 
 	coalescer := newTerminalCoalescer(s.Emit, args.WindowKey, args.TerminalID)
 	sess, err := s.Registry.Open(terminal.OpenParams{
@@ -105,6 +132,7 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 		Cols:      uint16(args.Cols),
 		Rows:      uint16(args.Rows),
 		Command:   args.Command,
+		Agent:     agent,
 		OnData:    coalescer.push,
 		OnExit: func(code int, exitErr error) {
 			msg := ""

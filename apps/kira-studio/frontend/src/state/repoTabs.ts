@@ -4,6 +4,7 @@ import {
   asRepoFileTab,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
+  type TerminalLaunchKind,
 } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
@@ -208,10 +209,13 @@ export function openRepoReviewDiffTab(
 }
 
 // P85 §5.3: what a non-plain launch (Claude Code, or a custom script) seeds a terminal tab with.
+// P86 §4: `kind` is the tab's own launchKind — always given explicitly by the one caller that
+// constructs a TerminalLaunch (TabStrip.vue), never left to infer from `command`.
 export interface TerminalLaunch {
   command: string;
   label: string;
   color: PaletteColor;
+  kind: TerminalLaunchKind;
 }
 
 // P83 §10.3: opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
@@ -237,6 +241,7 @@ export function openRepoTerminalTab(
       command: launch?.command ?? '',
       label: launch?.label ?? '',
       color: launch?.color ?? 'none',
+      launchKind: launch?.kind ?? 'shell',
     }),
     { reuse: false, workspaceId: repoWorkspaceKey(codeRepoId) },
   );

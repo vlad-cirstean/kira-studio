@@ -316,6 +316,14 @@ export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
 
+// P86 §4: which kind of launch a terminal tab is — 'claude-code' is the only kind that gets hooks
+// (a session reporting its own activity) and the only kind the status-bar widget counts. Decided
+// once at launch time by the caller (TabStrip.vue's three producers), never inferred from
+// `command` (P85 OQ-3's own "matching on command === 'claude' would break a future flag on the
+// built-in entry, and misclassify a custom script that happens to run claude" reasoning).
+export const terminalLaunchKindSchema = /*#__PURE__*/ z.enum(['shell', 'claude-code', 'script']);
+export type TerminalLaunchKind = z.infer<typeof terminalLaunchKindSchema>;
+
 // P83 §7.1: minimal on purpose — a terminal tab's whole content is a live process (never
 // persisted, §7.5), so state carries only what the tab's own title and dropResources path need
 // without a second lookup: cwd (the pty's own directory) and codeRepoId (which workspace this
@@ -330,6 +338,10 @@ export const terminalTabStateSchema = z.object({
   // basename, exactly as P83 titled every terminal.
   label: z.string().default(''),
   color: paletteColorSchema.default('none'),
+  // P86 §4: `.default('shell')` for the same already-saved-tab discipline as P85's own three
+  // fields above — a terminal tab is never persisted, but parseState runs on duplicateState's
+  // output too, so an older in-memory record still needs to parse.
+  launchKind: terminalLaunchKindSchema.default('shell'),
 });
 export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
 

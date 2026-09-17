@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -35,8 +36,12 @@ var ErrDuplicateSession = errors.New("terminal: session id already in use")
 // Session is one live PTY: the process, the master fd, and the single reader goroutine that owns
 // both (§4). Every exported method is safe to call from any goroutine.
 type Session struct {
-	id     string
-	shell  string
+	id    string
+	shell string
+	// cwd and agent are set once, from OpenParams, in newSession — Registry.AgentSessions' own
+	// read of them (P86 §8.2).
+	cwd    string
+	agent  bool
 	cmd    *exec.Cmd
 	ptmx   *os.File
 	onData func([]byte)
@@ -75,6 +80,11 @@ func newSession(p OpenParams) (*Session, error) {
 	cmd := exec.Command(shellPath, args...)
 	cmd.Dir = p.Cwd
 	cmd.Env = append(os.Environ(), sessionEnv()...)
+	// p.Env is extra environment appended after sessionEnv() (P86 §5.4) — this package stays
+	// agnostic and only forwards the strings; internal/bridge/terminal.go decides what they are
+	// (KIRA_TERMINAL_ID/KIRA_AGENT_HOOK_SOCKET/KIRA_AGENT_HOOK_TOKEN for a Claude Code launch with
+	// hooks enabled, nothing for a plain terminal or a script).
+	cmd.Env = append(cmd.Env, p.Env...)
 	// Setsid: true makes this shell its own process-group leader — Close signals the whole group
 	// (syscall.Kill(-pid, …)), so a process the user started inside the terminal (an `npm run dev`)
 	// dies with the tab instead of outliving it. pty.StartWithSize already makes the pty this
@@ -89,6 +99,8 @@ func newSession(p OpenParams) (*Session, error) {
 	return &Session{
 		id:     p.ID,
 		shell:  shellPath,
+		cwd:    p.Cwd,
+		agent:  p.Agent,
 		cmd:    cmd,
 		ptmx:   ptmx,
 		onData: p.OnData,
@@ -210,6 +222,13 @@ type OpenParams struct {
 	// Command, when non-empty, runs as `$SHELL -l -i -c Command` (P85 §2.1) instead of a plain
 	// login shell. Empty means a plain login shell — P83's own behaviour, unchanged.
 	Command string
+	// Env is extra environment appended after sessionEnv() (P86 §5.4) — the domain package never
+	// composes it, only forwards it; internal/bridge/terminal.go decides what these strings are.
+	Env []string
+	// Agent marks this session as a Claude Code launch (P86 §4/§8.2) — counted by
+	// Registry.AgentSessions and Registry.OnChange, never inferred from Command (P85 OQ-3's own
+	// "no heuristic" rule, carried forward).
+	Agent bool
 	// OnData is called from the session's own reader goroutine for every chunk read — never
 	// concurrently with itself, and never after OnExit (§4 rule 4).
 	OnData func([]byte)
@@ -218,11 +237,26 @@ type OpenParams struct {
 	OnExit func(code int, err error)
 }
 
+// AgentSession is one live Claude Code launch's own wire-agnostic shape — Registry.AgentSessions'
+// return type, turned into the wire projection by internal/bridge/terminal.go (P86 §11: the count's
+// authority is Go, since Registry holds every live session across every window).
+type AgentSession struct {
+	ID  string
+	Cwd string
+}
+
 // Registry holds one Session per live id, and indexes them by windowKey for CloseWindow.
 type Registry struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	byWindow map[string]map[string]struct{}
+
+	// OnChange, when set, is called — outside the mutex, so it may safely call back into
+	// AgentSessions below — after Open registers a new agent session and after remove deletes one
+	// (P86 §8.2). readLoop calls onExit *before* unregister (remove), so emitting a "what changed"
+	// signal from OnExit would report a dying session as still live; OnChange fires from remove,
+	// after the map entry is already gone, which is the one place that ordering is correct.
+	OnChange func()
 }
 
 func NewRegistry() *Registry {
@@ -262,6 +296,10 @@ func (r *Registry) Open(p OpenParams) (*Session, error) {
 	r.byWindow[p.WindowKey][p.ID] = struct{}{}
 	r.mu.Unlock()
 
+	if p.Agent && r.OnChange != nil {
+		r.OnChange()
+	}
+
 	go sess.readLoop()
 	return sess, nil
 }
@@ -300,9 +338,12 @@ func (r *Registry) Close(id string) {
 }
 
 // remove is Session's own unregister callback — called from the reader goroutine once, whether
-// the exit was requested or spontaneous.
+// the exit was requested or spontaneous. **The ordering here is load-bearing** (P86 §8.2):
+// readLoop (above) calls onExit *before* this, so OnChange must fire from here, after the map
+// entry is gone, never from onExit — otherwise a dying session would still count as live.
 func (r *Registry) remove(windowKey, id string) {
 	r.mu.Lock()
+	sess := r.sessions[id]
 	delete(r.sessions, id)
 	if m := r.byWindow[windowKey]; m != nil {
 		delete(m, id)
@@ -311,6 +352,26 @@ func (r *Registry) remove(windowKey, id string) {
 		}
 	}
 	r.mu.Unlock()
+
+	if sess != nil && sess.agent && r.OnChange != nil {
+		r.OnChange()
+	}
+}
+
+// AgentSessions returns every live session opened with Agent: true, across every window — sorted
+// by id for a deterministic wire order. This is the app-wide count's sole authority (P86 §11):
+// state/terminals.ts's own map is per-window, so only this registry ever sees the whole picture.
+func (r *Registry) AgentSessions() []AgentSession {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]AgentSession, 0, len(r.sessions))
+	for _, sess := range r.sessions {
+		if sess != nil && sess.agent {
+			out = append(out, AgentSession{ID: sess.id, Cwd: sess.cwd})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out
 }
 
 // CloseWindow closes every session opened under windowKey — a window's own close handler

@@ -484,6 +484,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
       command: '',
       label: '',
       color: 'none',
+      launchKind: 'shell',
     }),
     // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a
     // second session with the same launch — which needs no special case (§7.2/P85 §5.2).

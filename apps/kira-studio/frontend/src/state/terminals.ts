@@ -1,3 +1,4 @@
+import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { canonicalPath } from './coderepos';
@@ -100,7 +101,9 @@ function ensureSubscribed(): void {
 /** Subscribes, then calls TerminalService.Open — terminalId is the tab id, client-supplied, so
  *  ensureSubscribed runs (synchronously) before the bound call ever reaches Go, and no output can
  *  race the subscription (§3.2/§5.2). cwd is canonicalized once here, so every other read in this
- *  module (terminalCountAtPath, the tab's own cwd) compares like with like. */
+ *  module (terminalCountAtPath, the tab's own cwd) compares like with like. P86 §4: launchKind is
+ *  forwarded to TerminalOpenArgs.LaunchKind as-is — Go, not this module, decides what a
+ *  'claude-code' launch gets (hooks, the agent count). */
 export async function openTerminalSession(
   tabId: string,
   codeRepoId: string,
@@ -108,6 +111,7 @@ export async function openTerminalSession(
   cols: number,
   rows: number,
   command = '',
+  launchKind: TerminalLaunchKind = 'shell',
 ): Promise<void> {
   ensureSubscribed();
   const cwdCanonical = canonicalPath(cwd);
@@ -123,7 +127,14 @@ export async function openTerminalSession(
   });
 
   try {
-    const { shell } = await control.terminalOpen(tabId, cwdCanonical, cols, rows, command);
+    const { shell } = await control.terminalOpen(
+      tabId,
+      cwdCanonical,
+      cols,
+      rows,
+      command,
+      launchKind,
+    );
     const sess = byTabId.get(tabId);
     if (sess) sess.shell = shell;
   } catch (err) {
