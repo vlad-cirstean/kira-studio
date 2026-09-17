@@ -17,7 +17,9 @@ import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
+import { openRepoFileTab } from '../../state/repoTabs';
 import { settingsState } from '../../state/settings';
+import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import { registerDiffEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
@@ -57,6 +59,13 @@ const container = ref<HTMLElement | null>(null);
 let unregisterFind: (() => void) | null = null;
 let unregisterGoToFile: (() => void) | null = null;
 let reviewDecorations: ReviewDecorationsHandle | null = null;
+// P92 item 7: set once mount() reaches the editor, so both registerCommand's callback and the
+// header button (template, below) share one implementation. Never reset back to a stub mid-mount —
+// only onUnmounted below clears it.
+let goToFile: (() => void) | null = null;
+function onGoToFile(): void {
+  goToFile?.();
+}
 
 // §11: read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
 // paste; renderMarginRevertIcon/renderGutterMenu are the second layer, hiding the revert/apply
@@ -200,41 +209,42 @@ async function mount(): Promise<void> {
     void modifiedEditor.getAction('actions.find')?.run();
   });
 
-  // P74 §7.4 item 1: the diff editor's own "go to file" — the extension contributes this to its
-  // diff editor's title bar (diffToolbar.ts); this app has no toolbar there, so a command
-  // instead, the same mechanism view.find above already uses. Revision-backed diffs only (right
-  // !== null) — C6's plain worktree-vs-HEAD comparison already shows the live file on disk, with
-  // nothing else to jump to.
-  if (gitRepoId !== undefined && right !== null) {
+  // P74 §7.4 item 1 / P92 item 7: the diff editor's own "go to file" — both the palette command
+  // (the same mechanism view.find above already uses) and the visible header button (template).
+  // Two branches: a revision-backed diff resolves the target through the git transport;  C6's
+  // plain worktree-vs-HEAD comparison already shows the live file on disk (right === null), so the
+  // modified pane *is* that file — open it directly, no round trip.
+  goToFile = () => {
+    const line = modifiedEditor.getPosition()?.lineNumber ?? 1;
+    if (gitRepoId === undefined || right === null) {
+      openRepoFileTab(repoId, props.tab.path, { preview: false, reveal: { line } });
+      return;
+    }
     const targetGitRepoId = gitRepoId;
     const targetRev = right;
-    unregisterGoToFile = registerCommand('repo.goToFileFromDiff', () => {
-      const line = modifiedEditor.getPosition()?.lineNumber ?? 1;
-      const transport = gitTransportFor(repoId);
-      transport
-        .request('editor.goToFile', {
-          repoId: targetGitRepoId,
-          rev: targetRev,
-          path: props.tab.path,
-          line,
-        })
-        .then((outcome) => {
-          // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
-          // composition) — the tab switch is the visible confirmation. `unavailable` is the one
-          // branch with no other signal; this raw editor view has no toast/live-region channel
-          // to surface it through, so it goes to the console rather than dropping silently.
-          if (outcome.kind === 'unavailable') {
-            console.warn(
-              `repo.goToFileFromDiff: ${props.tab.path} unavailable — ${outcome.reason}`,
-            );
-          }
-        })
-        .catch((err: unknown) => {
-          console.warn('repo.goToFileFromDiff failed:', err);
-        })
-        .finally(() => transport.dispose());
-    });
-  }
+    const transport = gitTransportFor(repoId);
+    transport
+      .request('editor.goToFile', {
+        repoId: targetGitRepoId,
+        rev: targetRev,
+        path: props.tab.path,
+        line,
+      })
+      .then((outcome) => {
+        // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
+        // composition) — the tab switch is the visible confirmation. `unavailable` is the one
+        // branch with no other signal; this raw editor view has no toast/live-region channel to
+        // surface it through, so it goes to the console rather than dropping silently.
+        if (outcome.kind === 'unavailable') {
+          console.warn(`repo.goToFileFromDiff: ${props.tab.path} unavailable — ${outcome.reason}`);
+        }
+      })
+      .catch((err: unknown) => {
+        console.warn('repo.goToFileFromDiff failed:', err);
+      })
+      .finally(() => transport.dispose());
+  };
+  unregisterGoToFile = registerCommand('repo.goToFileFromDiff', () => goToFile?.());
 
   // C11 §7.4/S11: the comment-thread/mark-reviewed layer, only for a review diff tab. `left` is
   // never null here — openRepoReviewDiffTab (S8) always supplies both revisions alongside `review`.
@@ -260,6 +270,7 @@ onUnmounted(() => {
   unregisterFind = null;
   unregisterGoToFile?.();
   unregisterGoToFile = null;
+  goToFile = null;
   reviewDecorations?.dispose();
   reviewDecorations = null;
   unmountEditor(props.tab.id);
@@ -267,33 +278,56 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-if="state === 'loading' || state === 'found'"
-    ref="container"
-    class="monaco-host"
-    data-testid="repo-diff-editor"
-  />
-  <EmptyState
-    v-else-if="state === 'binary'"
-    icon="file-binary"
-    label="This file is binary and can't be compared."
-  />
-  <EmptyState
-    v-else-if="state === 'tooLarge'"
-    icon="warning"
-    label="This file is too large to compare (over 8 MB)."
-  />
-  <EmptyState
-    v-else-if="state === 'bothMissing'"
-    icon="warning"
-    label="This file no longer exists."
-  />
-  <EmptyState v-else icon="warning" :label="errorMessage || 'Could not open this diff.'" />
+  <div class="repo-diff-root">
+    <!-- P92 item 7: the same action the repo.goToFileFromDiff palette command runs — P74 built the
+         behaviour and gave it no other affordance. -->
+    <div v-if="state === 'found'" class="diff-actions">
+      <AppButton icon="go-to-file" data-testid="repo-diff-go-to-file" @click="onGoToFile">
+        Go to file
+      </AppButton>
+    </div>
+    <div
+      v-if="state === 'loading' || state === 'found'"
+      ref="container"
+      class="monaco-host"
+      data-testid="repo-diff-editor"
+    />
+    <EmptyState
+      v-else-if="state === 'binary'"
+      icon="file-binary"
+      label="This file is binary and can't be compared."
+    />
+    <EmptyState
+      v-else-if="state === 'tooLarge'"
+      icon="warning"
+      label="This file is too large to compare (over 8 MB)."
+    />
+    <EmptyState
+      v-else-if="state === 'bothMissing'"
+      icon="warning"
+      label="This file no longer exists."
+    />
+    <EmptyState v-else icon="warning" :label="errorMessage || 'Could not open this diff.'" />
+  </div>
 </template>
 
 <style scoped>
-.monaco-host {
+.repo-diff-root {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-actions {
+  flex: 0 0 auto;
+  display: flex;
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-bottom: var(--kira-border-width) solid var(--kira-border);
+}
+
+.monaco-host {
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
 }
 </style>
