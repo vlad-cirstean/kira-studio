@@ -1,6 +1,6 @@
-# P91 — git graph column/scroll/labels, titlebar, diff tabs, review nav, tab persistence
+# P92 — git graph column/scroll/labels, titlebar, diff tabs, review nav, tab persistence
 
-`docs/v1.8/SPEC.md`'s P91 row (`:165`), turned into concrete steps. Everything below was read in the
+`docs/v1.8/SPEC.md`'s P92 row (`:166`), turned into concrete steps. Everything below was read in the
 current tree (`claude/v1-8-p82-p83-implementation-ocpvj1` at `56e0401c`, P71-P90 landed); every line
 number is from that tree.
 
@@ -56,7 +56,7 @@ So the graph column is the one column with no user control and the one whose wid
 **`graph/geometry.ts`** — one new constant beside `GEOMETRY`:
 
 ```ts
-/** P91 item 1: the widest a *default* graph column gets — six lanes, not `maxLanes`' twelve.
+/** P92 item 1: the widest a *default* graph column gets — six lanes, not `maxLanes`' twelve.
  *  Only the seed; a user drag is free to go past it, up to `MAX_COLUMN_WIDTH`. */
 export const DEFAULT_GRAPH_LANE_CAP = 6;
 ```
@@ -127,7 +127,7 @@ Two edits:
   .kv-graph-svg {
     display: block;
     overflow: visible;
-    /* P91 item 1: the column is user-resizable now, so a lane past its right edge must be cut.
+    /* P92 item 1: the column is user-resizable now, so a lane past its right edge must be cut.
        `overflow: hidden` cannot do it — one non-visible axis forces the other to `auto` — and the
        0.5px vertical overdraw (GEOMETRY.overdraw) has to survive, or two rows' runs meet with a
        hairline seam at a fractional DPR. */
@@ -171,7 +171,7 @@ content", exactly.
 Measure the box SlickGrid actually lays out into.
 
 ```ts
-/** P91 item 2: the width the column model must sum to — SlickGrid's own viewport content box, not
+/** P92 item 2: the width the column model must sum to — SlickGrid's own viewport content box, not
  *  the host's. `clientWidth` already excludes the vertical scrollbar's gutter; `host.clientWidth`
  *  does not, and the difference is a permanent horizontal scrollbar. Floored because the canvas is
  *  sized in whole pixels against a fractional `getBoundingClientRect()` measurement. `host` is the
@@ -263,7 +263,7 @@ Second edit, so a future overlap covers instead of doubling:
 
 ```css
 .kv-commit-grid .slick-row.ui-widget-content {
-  /* P91 item 4: opaque, not transparent — the canvas already paints this exact token underneath
+  /* P92 item 4: opaque, not transparent — the canvas already paints this exact token underneath
      (`.grid-canvas`, above), so nothing changes visually, but a repainted row now erases the band
      it owns instead of compositing over whatever was there. */
   background-color: var(--kv-panel-bg);
@@ -429,7 +429,7 @@ number.
 
 1. `packages/shared/domain/settings.ts` — in `gitSettingsSchema` (`:92`):
    ```ts
-   // P91 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
+   // P92 item 9: 0 = follow appearance.fontSize. Reaches every embedded git-ui surface (graph,
    // diff, review) through --vscode-font-size, which nothing else in this app consumes.
    graphFontSize: z.number().int().min(0).max(FONT_SIZE_RANGE.max).default(0),
    ```
@@ -541,7 +541,7 @@ Overloading it with an optional file list would put an `if (files)` in every one
 **`packages/shared/domain/tabs.ts`**:
 
 ```ts
-// P91 item 5: one commit's whole changed-file set, in one tab (VS Code's multi-file diff). `files`
+// P92 item 5: one commit's whole changed-file set, in one tab (VS Code's multi-file diff). `files`
 // is the commit's own file order, captured at open time — a re-resolve on restore would be a
 // different commit's answer if the ref moved.
 export const repoMultiDiffTabStateSchema = /*#__PURE__*/ z.object({
@@ -658,7 +658,7 @@ ordinary thing to open, so `ensureWorkspaceShell` runs more often and `saveNow()
 ## 9.2 Fix, at the creation site
 
 ```ts
-    // P91 item 8: a repo-graph tab has no file behind it, but `path` is a required column
+    // P92 item 8: a repo-graph tab has no file behind it, but `path` is a required column
     // (model.TabRecord.Validate) and an empty one aborts the whole window's tab save, not just this
     // row. The workspace key is this tab's real identity — stable, unique per workspace, and
     // already what `title` resolves the repo name from.
