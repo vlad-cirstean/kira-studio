@@ -437,17 +437,22 @@ feed and updater wiring.
 **Whether the release workflow has actually run:** *no — the first tag pushed will be the first real
 exercise of `release.yml`.*
 
-**The on-demand DB compatibility suite is not part of either workflow.** `scripts/db-compat.sh`
-(`bun run test:compat`, P16) runs the same per-engine conformance packages against each kind's
-oldest and newest supported server image, sixteen (kind, min|max) pairs — deliberately outside
-`bun run test:go` and outside `ci.yml`, since it runs occasionally, not on
-every push. It has its own `workflow_dispatch`-only workflow, `.github/workflows/db-compat.yml`,
-which nothing else references — an ordinary CI run is byte-identical to before it existed.
+**The on-demand DB compatibility suite is outside `ci.yml`, but gates `release.yml`.**
+`scripts/db-compat.sh` (`bun run test:compat`, P16) runs the same per-engine conformance packages
+against each kind's oldest and newest supported server image, sixteen (kind, min|max) pairs —
+deliberately outside `bun run test:go` and outside `ci.yml`, since it's too expensive to run on
+every push. It used to also have its own standalone `workflow_dispatch`-only workflow,
+`.github/workflows/db-compat.yml`; that file is gone — `release.yml`'s own `db-compat` job now runs
+it directly, as a `needs:`-gated step every release tag must pass before the `release` job builds
+and drafts the release, and a one-off single-kind/extreme run during adapter work uses `bun run
+test:compat -- --only <kind> --min|--max` locally instead. `scripts/test-matrix.sh` (P25's complete
+auth/config tier) is the same shape and made the same move, for the same reason — see
+`docs/ARCHITECTURE.md`'s own note on it.
 
-**All three workflows are now live.** `db-compat.yml` (P16), and P19's `actions/{checkout,setup-go,
-upload-artifact}` bumps to `@v7` across `ci.yml` and `release.yml` together with P20's rerouting of
-all three inline binding-generation blocks through `sh scripts/setup.sh`, spent several phases
-staged under `docs/v1.1/plans/p1{6,9}-pending-ci-workflow/` because the sessions that wrote them
-had GitHub push access without the `workflow` OAuth scope, which GitHub requires for any commit
-touching `.github/workflows/*.yml`. A session with that scope applied them; both staging
-directories are gone. No CI run has exercised any of the three yet.
+**P19's `actions/{checkout,setup-go,upload-artifact}` bumps to `@v7` across `ci.yml` and
+`release.yml`, together with P20's rerouting of all three inline binding-generation blocks through
+`sh scripts/setup.sh`, spent several phases staged under
+`docs/v1.1/plans/p1{6,9}-pending-ci-workflow/`** because the sessions that wrote them had GitHub
+push access without the `workflow` OAuth scope, which GitHub requires for any commit touching
+`.github/workflows/*.yml`. A session with that scope applied them; both staging directories are
+gone.

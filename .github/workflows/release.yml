@@ -31,8 +31,26 @@ jobs:
           go-version-file: go.mod
       - run: sh scripts/test-matrix.sh
 
+  # Same reasoning as test-matrix above, applied to the other on-demand complete-tier suite (P16
+  # D5, docs/v1.1/plans/P16-db-compat-suite.md): the per-adapter conformance package test:go
+  # already runs, just against each kind's oldest/newest supported server image instead of one
+  # pinned default — the one axis a regression could ship on without ci.yml (or this file, before
+  # now) ever catching it. Standalone .github/workflows/db-compat.yml dropped for the same reason
+  # test-matrix.yml was: this job is now the real gate, and a one-off single-kind/extreme run
+  # during adapter work uses `bun run test:compat -- --only <kind> --min|--max` locally instead.
+  db-compat:
+    name: db-compat (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: sh scripts/db-compat.sh
+
   release:
-    needs: test-matrix
+    needs: [test-matrix, db-compat]
     runs-on: macos-15
     timeout-minutes: 40
     env:
