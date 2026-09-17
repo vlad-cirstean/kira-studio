@@ -161,6 +161,7 @@ const graphFormatter = createGraphFormatter(
   props.graphView.store,
   (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
   () => compactRowHeightPx(tokenReader),
+  () => widths.value.graph,
 );
 
 // Positions of the two drag handles (message|author, author|date), recomputed whenever the
@@ -168,6 +169,9 @@ const graphFormatter = createGraphFormatter(
 // existed here until the sha column itself was deleted.)
 const handleLeftAuthor = ref(0);
 const handleLeftDate = ref(0);
+// P92 item 1: graph|message, unlike the other two, renders in compact mode too — compact drops
+// author/date (G-UX D1) but keeps the graph column, so this one has no `!detailOpen` gate.
+const handleLeftGraph = ref(0);
 
 let unsubscribeLayout: (() => void) | undefined;
 let unsubscribeTokens: (() => void) | undefined;
@@ -225,11 +229,13 @@ function handleFocusIn(event: FocusEvent): void {
   focusedRowIndex = rowAttr != null ? Number(rowAttr) : null;
 }
 
-function computeMessageWidth(hostWidth: number, laneCount: number): number {
+function computeMessageWidth(hostWidth: number): number {
   // G-UX D1: with the detail pane open, `author`/`date` are not rendered at all (`currentColumns`
   // passes `compact: true`) — the width they would have reserved goes to the subject instead.
   const reserved = props.detailOpen ? 0 : widths.value.author + widths.value.date;
-  const fixed = graphColumnWidth(laneCount) + reserved;
+  // P92 item 1: widths.value.graph — the column's actual, user-set width — not
+  // graphColumnWidth(laneCount), which no longer tracks what the column is sized to.
+  const fixed = widths.value.graph + reserved;
   return Math.max(MIN_MESSAGE_WIDTH, hostWidth - fixed);
 }
 
@@ -281,7 +287,7 @@ function currentColumns(): Column<CommitRecord>[] {
   const hostWidth = availableWidth();
   const laneCount = props.graphView.laneCount.value;
   return buildColumns(
-    { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth, laneCount) },
+    { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth) },
     { dateFormat: () => props.dateFormat, now: () => Date.now() },
     graphFormatter,
     { pattern: searchPattern },
@@ -308,27 +314,15 @@ function currentColumns(): Column<CommitRecord>[] {
 }
 
 function updateHandlePositions(): void {
-  // G-UX D1: no handles are rendered in compact mode (`v-if` below) — a handle for a column that
-  // is not there would be a dead hit target, so this skips the computation entirely rather than
-  // just leaving it unused.
+  // P92 item 1: the graph|message handle renders in compact mode too (see `handleLeftGraph`'s own
+  // comment), so its position is computed unconditionally; the author/date handles stay gated —
+  // G-UX D1's own reason (compact mode drops those two columns entirely) still holds for them.
+  handleLeftGraph.value = widths.value.graph;
   if (props.detailOpen) return;
   const hostWidth = availableWidth();
-  const laneCount = props.graphView.laneCount.value;
-  handleLeftAuthor.value = graphColumnWidth(laneCount) + computeMessageWidth(hostWidth, laneCount);
+  handleLeftAuthor.value = widths.value.graph + computeMessageWidth(hostWidth);
   handleLeftDate.value = handleLeftAuthor.value + widths.value.author;
 }
-
-/** G32 round-3 performance review, finding #7: `handleChunkLayout` (below) used to call
- *  `rebuildColumns()` unconditionally on EVERY streamed chunk, even though its own doc comment
- *  says the only reason it needs to is "`laneCount` grew" — a full `setColumns()` is a real
- *  SlickGrid structural rebuild (new header cells, a fresh column-position stylesheet, `left`
- *  offsets recomputed for every column), and a large history streams in dozens of 500-row chunks
- *  whose lane count is unchanged from the previous chunk far more often than not. Tracked here
- *  (rather than inside `rebuildColumns` itself) because every OTHER caller — the `detailOpen`
- *  watcher, `scheduleResize`'s own host-width changes, mount — has its own unconditional reason to
- *  rebuild regardless of lane count (compact mode changes the column set's shape; a resize changes
- *  `messageWidth`), so only `handleChunkLayout`'s call is gated. */
-let lastRebuiltLaneCount = -1;
 
 // Regression fix (post-P79-merge): the width `rebuildColumns()` last actually ran against —
 // `-1` (never equals a real width) until the first call. `scheduleResize` below reads this
@@ -357,7 +351,6 @@ function rebuildColumns(): void {
   grid?.resizeCanvas();
   grid?.setColumns(currentColumns());
   updateHandlePositions();
-  lastRebuiltLaneCount = props.graphView.laneCount.value;
   lastRebuiltWidth = availableWidth();
 }
 
@@ -596,8 +589,12 @@ function scheduleAncestryRebuild(): void {
   });
 }
 
-/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — rebuild the column
- *  set in case `laneCount` grew, then invalidate.
+/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — invalidate its
+ *  heights. P92 item 1: no longer rebuilds columns here even when `laneCount` grows — the graph
+ *  column's width is user-set (`widths.value.graph`), not derived from lane count, so a growing
+ *  history streaming in new lanes never needs a `setColumns()` structural rebuild; the row itself
+ *  still redraws wider via `invalidateRowHeights()` below, since its formatter reads the *current*
+ *  `widths.value.graph` on every call regardless.
  *
  *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
  *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
@@ -607,7 +604,6 @@ function scheduleAncestryRebuild(): void {
  *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
 function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
-  if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
   grid.invalidateRowHeights();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
@@ -745,6 +741,14 @@ onMounted(() => {
     // `DEFAULT_COLUMN_WIDTHS.date`, e.g. a user who explicitly chose it) is never overridden.
     const seeded = Math.max(DEFAULT_COLUMN_WIDTHS.date, measuredDateWidth.value);
     if (seeded !== widths.value.date) widths.value = { ...widths.value, date: seeded };
+    // P92 item 1: a one-lane repository opens at its own true width (30px), not the six-lane
+    // DEFAULT_COLUMN_WIDTHS.graph (95px) — the cap only bounds how wide the *default* gets, never
+    // forces every repo up to it.
+    const graphSeed = Math.min(
+      graphColumnWidth(props.graphView.laneCount.value),
+      DEFAULT_COLUMN_WIDTHS.graph,
+    );
+    if (graphSeed !== widths.value.graph) widths.value = { ...widths.value, graph: graphSeed };
   }
 
   const dataView = createCommitDataView({
@@ -773,10 +777,6 @@ onMounted(() => {
     rowTopOffsetRenderType: 'transform', // matches how --kv-row-height drives row positioning
   });
   grid = instance;
-  // Matches the laneCount currentColumns() just used to build the grid's initial column set above
-  // — otherwise the very first streamed chunk would trigger one redundant rebuild even when its
-  // laneCount already agrees with what mount just built.
-  lastRebuiltLaneCount = props.graphView.laneCount.value;
 
   // W14/V2: SlickGrid's own internal structural elements — `_focusSink`/`_focusSink2` (two
   // invisible divs it binds its own keyboard handling to) and, less obviously, six `.slick-pane`,
@@ -913,11 +913,6 @@ watch(
       pendingRebuildOnVisible = true;
       return;
     }
-    // P72 §4: a generation bump (a refresh's restart-at-row-0 chunk) is exactly the moment
-    // laneCount may have moved — a checkout onto a branch with a different lane shape. Same
-    // lastRebuiltLaneCount guard handleChunkLayout already uses, so this only rebuilds when the
-    // shape actually changed rather than on every generation bump.
-    if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
     grid?.invalidateAllRows();
     grid?.updateRowCount();
     grid?.render();
@@ -975,12 +970,13 @@ watch(
 // P79 review fix (Performance, LOW): replays whatever the four watchers above deferred while
 // backgrounded, once, combined, rather than once per missed generation bump. Runs the union of
 // their own effects — safe as a superset since `invalidateAllRows`/`render` are idempotent, and
-// `rebuildColumns`/`rebuildAncestry`/`invalidateRowHeights` are the same "make everything current"
-// calls each of them already does independently.
+// `rebuildAncestry`/`invalidateRowHeights` are the same "make everything current" calls each of
+// them already does independently. P92 item 1: no `rebuildColumns()` here any more — the generation
+// watcher above stopped calling it too, now that the graph column's width no longer depends on
+// `laneCount`.
 watch(graphVisible, (visible) => {
   if (!visible || !pendingRebuildOnVisible) return;
   pendingRebuildOnVisible = false;
-  if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
   if (props.pr) props.pr.rebuildAncestry(props.graphView.store);
   grid?.invalidateRowHeights();
   grid?.invalidateAllRows();
@@ -1078,6 +1074,20 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
          shown, never a fifth grid column. -->
     <span ref="dateWidthProbe" class="kv-cell-date kv-date-width-probe" aria-hidden="true"></span>
+    <div
+      class="kv-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize graph column"
+      :aria-valuenow="widths.graph"
+      :aria-valuemin="minWidthFor('graph')"
+      :aria-valuemax="MAX_COLUMN_WIDTH"
+      :aria-valuetext="`${widths.graph} pixels`"
+      tabindex="0"
+      :style="{ left: `${handleLeftGraph}px` }"
+      @mousedown="startDrag('graph', $event)"
+      @keydown="handleHandleKeydown('graph', $event)"
+    ></div>
     <div
       v-if="!detailOpen"
       class="kv-resize-handle"
@@ -1269,6 +1279,11 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-graph-svg {
   display: block;
   overflow: visible;
+  /* P92 item 1: the column is user-resizable now, so a lane past its right edge must be cut.
+     `overflow: hidden` cannot do it — one non-visible axis forces the other to `auto` — and the
+     0.5px vertical overdraw (GEOMETRY.overdraw) has to survive, or two rows' runs meet with a
+     hairline seam at a fractional DPR. */
+  clip-path: inset(-2px 0);
 }
 
 /* G19 D1: the graph column's own HEAD indicator — an unfilled ring in the same token the

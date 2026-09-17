@@ -73,12 +73,18 @@ function readSlice(
  * not a stale grid-wide default. `compactRowHeight` feeds `rowSvg.ts`'s `nodeCenterY` (the node's
  * y, anchored to the subject line rather than the row's own midpoint — a `--kv-row-height-compact`
  * theme change is reflected on the next render without rebuilding this formatter, same as before).
+ *
+ * P92 item 1: `columnWidth` is likewise an accessor, not a value — `CommitGrid.vue` passes
+ * `() => widths.value.graph`, so a column drag never rebuilds this formatter (matching
+ * `DateFormatterContext`/`MessageSearchContext`'s own convention), and every row still draws into
+ * the column's *current* width even though this closure is only built once per grid instance.
  */
 export function createGraphFormatter(
   layout: LayoutStore,
   store: CommitStore,
   rowHeight: (row: number) => number,
   compactRowHeight: () => number,
+  columnWidth: () => number,
 ): Formatter<CommitRecord> {
   const reusable: EdgeSegment[] = [];
   return (row) => {
@@ -86,13 +92,18 @@ export function createGraphFormatter(
     wrapper.className = 'kv-graph-cell';
     const total = rowHeight(row);
     const nodeCenterY = total - compactRowHeight() / 2;
+    const width = columnWidth();
     const samples = window.__kiraRowBuildSamplesMs;
     if (samples) {
       const start = performance.now();
-      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), total, nodeCenterY));
+      wrapper.appendChild(
+        buildRowSvg(readSlice(layout, store, row, reusable), total, nodeCenterY, width),
+      );
       samples.push(performance.now() - start);
     } else {
-      wrapper.appendChild(buildRowSvg(readSlice(layout, store, row, reusable), total, nodeCenterY));
+      wrapper.appendChild(
+        buildRowSvg(readSlice(layout, store, row, reusable), total, nodeCenterY, width),
+      );
     }
     return wrapper;
   };

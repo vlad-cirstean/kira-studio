@@ -53,3 +53,7 @@ export function graphColumnWidth(laneCount: number): number {
     GEOMETRY.gutterPad
   );
 }
+
+/** P92 item 1: the widest a *default* graph column gets — six lanes, not `maxLanes`' twelve.
+ *  Only the seed; a user drag is free to go past it, up to `MAX_COLUMN_WIDTH`. */
+export const DEFAULT_GRAPH_LANE_CAP = 6;

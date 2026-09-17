@@ -17,7 +17,7 @@
  * depend on W6, not the reverse, so the shared constants had to exist before W8 could).
  */
 import { type DecorationRef, EDGE_KIND_MERGE_IN, UNRESOLVED_ROW } from '@kira/git-core';
-import { GEOMETRY, graphColumnWidth } from './geometry.ts';
+import { GEOMETRY } from './geometry.ts';
 import type { EdgeSegment } from './layoutStore.ts';
 import { laneClass, NODE_CLASS, type NodeKind } from './palette.ts';
 
@@ -354,12 +354,16 @@ function buildNodeElement(plan: NodeShapePlan): SVGCircleElement {
   return circle;
 }
 
-/** Builds one row's `<svg>` — sized to the *current* graph column width (`slice.laneCount`, the
- *  store's own high-water mark, not a per-row value, so every row's SVG stays the same width as
- *  the column SlickGrid itself sized via `columns.ts`) and `rowHeight` (this row's own real
- *  height — `CommitGrid.vue`'s `grid.getRowHeight(row)`, P7 (item 1) — so lanes and rows cannot
- *  drift). `overflow: visible` (`CommitGrid.vue`'s `<style>`) is what lets the `GEOMETRY.overdraw`
- *  fragments `edgeCommand` emits actually paint past this element's own bounds.
+/** Builds one row's `<svg>` — sized to `columnWidth()` (P92 item 1: the column's actual,
+ *  user-resizable width, `CommitGrid.vue`'s own `widths.value.graph`, not derived from
+ *  `slice.laneCount` — a narrowed column must clip its lanes, not overflow into the message
+ *  column) and `rowHeight` (this row's own real height — `CommitGrid.vue`'s
+ *  `grid.getRowHeight(row)`, P7 (item 1) — so lanes and rows cannot drift). Lane x-coordinates
+ *  (`laneX`, `planEdgePaths`/`planNode`) are unchanged — only the box around the drawing is the
+ *  column's; `.kv-graph-svg`'s own `clip-path` (`CommitGrid.vue`'s `<style>`) is what actually
+ *  cuts a lane at the column's right edge, since `overflow: hidden` cannot do it (one non-visible
+ *  axis forces the other to `auto`) while still letting `GEOMETRY.overdraw`'s vertical bleed
+ *  through — see that rule's own comment.
  *
  *  `nodeCenterY` (P7, item 1) is this row's own node-anchor y (`planNode`'s own doc comment has
  *  the formula) — passed in rather than derived here so a caller only ever computes it once per
@@ -369,8 +373,8 @@ export function buildRowSvg(
   slice: RowSlice,
   rowHeight: number,
   nodeCenterY: number,
+  width: number,
 ): SVGSVGElement {
-  const width = graphColumnWidth(slice.laneCount);
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'kv-graph-svg');
   svg.setAttribute('width', String(width));

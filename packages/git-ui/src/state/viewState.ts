@@ -36,12 +36,18 @@
  * `Ctrl+Alt+F` keybinding), so whether it was left open survives a hide/reveal exactly like
  * `detailOpen` already does. The query text itself is still deliberately not persisted — see this
  * file's own v4 doc comment above.
+ *
+ * P92 item 1 (version 7): `ColumnWidths` gains `graph` — the graph column is now user-resizable,
+ * not derived from lane count alone, so its width needs the same persistence every other column
+ * width already gets. A v6 blob has no opinion on it, so the whole blob is discarded and the panel
+ * re-seeds from `DEFAULT_COLUMN_WIDTHS`, same policy as every prior version bump above.
  */
 import type { SearchScope } from '@kira/git-core';
+import { DEFAULT_GRAPH_LANE_CAP, graphColumnWidth } from '../graph/geometry.ts';
 import type { FileListMode } from './detail.ts';
 
 export interface PersistedViewState {
-  readonly version: 6;
+  readonly version: 7;
   readonly repoId: string | null;
   readonly loadedRows: number;
   readonly detailOpen: boolean;
@@ -66,6 +72,7 @@ export interface PersistedViewState {
 export interface ColumnWidths {
   readonly author: number;
   readonly date: number;
+  readonly graph: number;
 }
 
 export type DateFormat = 'relative' | 'absolute';
@@ -79,7 +86,13 @@ export type DateFormat = 'relative' | 'absolute';
 // itself is deleted); `date`'s own 152 is now only the *floor* CommitGrid.vue's measured seed
 // (`dateFormat.ts`'s `measureAbsoluteDateWidth`) clamps up from — see that component's own
 // `computeDateWidthSeed`.
-export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = { author: 140, date: 152 };
+// P92 item 1: 95 = graphColumnWidth(6) — a six-lane default, not `maxLanes`' twelve (173px);
+// narrower panels start narrower, a user drag is free to go wider.
+export const DEFAULT_COLUMN_WIDTHS: ColumnWidths = {
+  author: 140,
+  date: 152,
+  graph: graphColumnWidth(DEFAULT_GRAPH_LANE_CAP),
+};
 export const DEFAULT_DETAIL_WIDTH = 380;
 
 export interface ViewStateStore {
@@ -90,14 +103,18 @@ export interface ViewStateStore {
 function isColumnWidthsShape(value: unknown): value is ColumnWidths {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.author === 'number' && typeof record.date === 'number';
+  return (
+    typeof record.author === 'number' &&
+    typeof record.date === 'number' &&
+    typeof record.graph === 'number'
+  );
 }
 
 function isPersistedViewStateShape(value: unknown): value is PersistedViewState {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   return (
-    record.version === 6 &&
+    record.version === 7 &&
     (typeof record.repoId === 'string' || record.repoId === null) &&
     typeof record.loadedRows === 'number' &&
     typeof record.detailOpen === 'boolean' &&

@@ -17,7 +17,6 @@
 import type { CommitRecord, CommitStore, DecorationRef } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
-import { graphColumnWidth } from '../graph/geometry.ts';
 // G19 D1: isHeadDecoration is promoted to rowSvg.ts (the graph column's own module), imported
 // from there rather than defined here — mirroring isStashRow's already-established precedent for
 // crossing this exact boundary.
@@ -190,9 +189,10 @@ function dateFormatter(ctx: DateFormatterContext): Formatter<CommitRecord> {
 }
 
 /** The explicit widths `CommitGrid.vue` computes before building columns: `messageWidth` is
- *  whatever remains of the host's own width once every other column is accounted for, the graph
- *  column's width is `graphColumnWidth(laneCount)`, and `author`/`date` come from `viewState`'s
- *  persisted `ColumnWidths` (or `DEFAULT_COLUMN_WIDTHS` on first mount). */
+ *  whatever remains of the host's own width once every other column is accounted for; `graph`/
+ *  `author`/`date` (from `ColumnWidths`) come from `viewState`'s persisted state (or
+ *  `DEFAULT_COLUMN_WIDTHS` on first mount) — `laneCount` is still needed here, separately, by the
+ *  graph column's own *formatter* (drawing lanes inside whatever width `graph` is set to). */
 export interface ColumnWidthInputs extends ColumnWidths {
   readonly laneCount: number;
   readonly messageWidth: number;
@@ -209,14 +209,15 @@ export interface BuildColumnsOptions {
 
 /** Builds the column definitions in display order (G21 D5: the fifth, `sha`, is gone — the
  *  details panel's own single click-to-copy SHA, `CommitMeta.vue`, is now the only sha-copy
- *  affordance). Not user-resizable: `graph` (its width is derived from `laneCount`, not a user
- *  choice — its `graphFormatter` and geometry are W8's `graphColumn.ts`/`rowSvg.ts`, built once
- *  per grid instance and passed in here rather than built by this stateless module) and `message`
- *  (it is "remaining width", recomputed by `CommitGrid.vue` on every resize rather than dragged).
- *  `author`/`date` are resizable via `CommitGrid.vue`'s own drag handles (§6.1:
- *  `showColumnHeader: false` costs SlickGrid's built-in header resize handles, so this repo keeps
- *  its own), which write back through `grid.setColumns(...)` — this function, called again with
- *  the new widths, is the single source of the column model either way. `searchCtx` (W13) and
+ *  affordance). Not user-resizable: `message` (it is "remaining width", recomputed by
+ *  `CommitGrid.vue` on every resize rather than dragged). `graph`/`author`/`date` are resizable via
+ *  `CommitGrid.vue`'s own drag handles (§6.1: `showColumnHeader: false` costs SlickGrid's built-in
+ *  header resize handles, so this repo keeps its own — `resizable: false` below only governs the
+ *  header-row handle this grid never shows), which write back through `grid.setColumns(...)` —
+ *  this function, called again with the new widths, is the single source of the column model
+ *  either way. `graph`'s own `graphFormatter` and geometry are W8's `graphColumn.ts`/`rowSvg.ts`,
+ *  built once per grid instance and passed in here rather than built by this stateless module.
+ *  `searchCtx` (W13) and
  *  `laneCtx` (G21 D4) are both optional and default to "no highlight"/"no lane colour" so a
  *  caller that only needs the basic shape keeps working unchanged — only `CommitGrid.vue` passes
  *  real ones. `options.compact` (D1) returns only `graph`/`message` — `author`/`date` are omitted
@@ -237,7 +238,7 @@ export function buildColumns(
       id: GRAPH_COLUMN_ID,
       field: 'sha',
       name: '',
-      width: graphColumnWidth(widths.laneCount),
+      width: widths.graph,
       resizable: false,
       sortable: false,
       focusable: false,

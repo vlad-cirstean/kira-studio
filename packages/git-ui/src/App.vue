@@ -1038,7 +1038,7 @@ function retryBootstrap(): void {
 // (judgment call 7) — a remembered term silently re-running against a repository that has moved
 // on is the same stale-state argument the diff/selected-file omission already made.
 let lastPersisted: PersistedViewState = {
-  version: 6,
+  version: 7,
   repoId: null,
   loadedRows: 0,
   detailOpen: true,
