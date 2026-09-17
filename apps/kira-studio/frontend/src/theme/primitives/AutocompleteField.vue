@@ -603,19 +603,34 @@ onBeforeUnmount(() => {
 
 /* P71 §8.2: the overlay must wrap on exactly the same boundaries as a `grow` textarea — same font,
    same width, same white-space/overflow-wrap — and top-align rather than vertically centre a
-   single line. */
+   single line. P90: `line-height: inherit` picks up `1.45` from `.p-input.is-grow` — a `grow`
+   textarea's own line height comes from there, not from `normal` below, and the two must agree or
+   the overlay's lines and the textarea's own lines drift apart by line 2. `line-height: normal` on
+   `.highlight-overlay` above stays for every non-grow field, so no single-line field moves by a
+   pixel. */
 .autocomplete-field.is-grow .highlight-overlay {
   display: block;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  line-height: inherit;
 }
 
-/* The real input stays the only interactive/focusable/selectable element — its own text is
-   painted transparent so only the overlay's coloured glyphs underneath show through, while its
+/* The real input/textarea stays the only interactive/focusable/selectable element — its own text
+   is painted transparent so only the overlay's coloured glyphs underneath show through, while its
    native caret (caret-color, unaffected by `color`) and selection painting keep working exactly
-   as before. Only applied when an overlay actually exists (`highlighted`) — every other field
-   using this component keeps today's plain look untouched. */
-.input-wrap input.has-overlay {
+   as before, and the overlay paints *behind* whichever of the two is rendered. Only applied when
+   an overlay actually exists (`highlighted`) — every other field using this component keeps
+   today's plain look untouched. P90: widened from `input.has-overlay` alone — the class was
+   already bound on a `grow` textarea too, but the selector's type component never matched it, so
+   the textarea stayed fully opaque and painted a second, unstyled copy of the value on top of the
+   overlay while also losing the `position: relative; z-index: 1` that keeps it above the overlay.
+   No non-`grow` field can match the new half of this selector: a `<textarea>` carrying
+   `has-overlay` exists only under `grow`. No padding rule is needed here either — this box is
+   `inset: 0` on `.input-wrap`, and the textarea is now zero-padded inside the same box (primitives.
+   css), so the two elements' first glyphs land on the same pixel; do not add a compensating
+   offset. */
+.input-wrap input.has-overlay,
+.input-wrap textarea.has-overlay {
   position: relative;
   z-index: 1;
   color: transparent;
