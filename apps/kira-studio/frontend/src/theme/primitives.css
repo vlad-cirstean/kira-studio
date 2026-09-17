@@ -224,6 +224,12 @@
   grid-area: 1 / 1;
   resize: none;
   overflow-y: auto;
+  /* CSS Box Alignment §8.3: a grid item's `normal` alignment behaves as `stretch` *except* for a
+     replaced box with an intrinsic size in that axis — and a <textarea> counts, via its `rows`
+     attribute. Unstretched, it sat at its own 1-row intrinsic height inside a track the ::after
+     replica had already grown to fit, so it scrolled from row 2 on, regardless of the padding fix
+     below. This is what makes it fill the track like the replica next to it. */
+  align-self: stretch;
   /* P90: the UA gives a textarea `padding: 2px`, which the plain `.p-input textarea` reset above
      does not clear. The ::after replica that sizes this grid track has none, so the textarea
      wrapped ~4px earlier than the replica measured and was ~4px shorter than the track it was
