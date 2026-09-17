@@ -23,7 +23,8 @@ function loadTerminalRenderer(): Promise<typeof import('./terminalRenderer')> {
 // already-live DOM subtree into this component's own container; it never calls term.open() twice.
 import type { TerminalTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { settingsState } from '../../state/settings';
+import { setAgentHooksEnabled } from '../../state/agentHooks';
+import { patchSettings, settingsState } from '../../state/settings';
 import { openTerminalSession, resizeTerminal, terminalSession } from '../../state/terminals';
 
 const props = defineProps<{ tab: TerminalTabRecord }>();
@@ -95,10 +96,52 @@ watch(
     if (d) resizeTerminal(props.tab.id, d.cols, d.rows);
   },
 );
+
+// P86 §9.4: discoverability for hooks reporting, without a write anywhere until the user actually
+// clicks Enable. Shown while this tab is a Claude Code launch, hooks are off, and the prompt was
+// never dismissed; hooksJustEnabled keeps the banner in place with a different line for the rest
+// of this tab's life once Enable is clicked — settingsState.claudeCode.hooksEnabled flipping true
+// would otherwise make showHooksPrompt false and the banner vanish outright.
+const hooksJustEnabled = ref(false);
+
+const showHooksPrompt = computed(
+  () =>
+    props.tab.state.launchKind === 'claude-code' &&
+    !settingsState.claudeCode.hooksPromptDismissed &&
+    (hooksJustEnabled.value || !settingsState.claudeCode.hooksEnabled),
+);
+
+// Never types into the PTY (P83 §8.2, P85 §3.1) — the running session is not restarted and not
+// touched; the flag change applies to the next Claude Code tab opened.
+async function onEnableHooksPrompt(): Promise<void> {
+  await setAgentHooksEnabled(true);
+  hooksJustEnabled.value = true;
+}
+
+async function onDismissHooksPrompt(): Promise<void> {
+  await patchSettings({ claudeCode: { hooksPromptDismissed: true } });
+}
 </script>
 
 <template>
   <div class="repo-terminal">
+    <div
+      v-if="showHooksPrompt"
+      class="claude-code-hooks-prompt"
+      data-testid="claude-code-hooks-prompt"
+    >
+      <span v-if="hooksJustEnabled">
+        Session reporting is on. It applies to the next Claude Code tab you open.
+      </span>
+      <template v-else>
+        <span>
+          Kira Studio can show what this session is doing — a running-session count and a tab dot
+          when it needs your attention.
+        </span>
+        <button type="button" class="p-btn primary" @click="onEnableHooksPrompt">Enable</button>
+        <button type="button" class="p-btn" @click="onDismissHooksPrompt">Not now</button>
+      </template>
+    </div>
     <div ref="container" class="terminal-host" data-testid="repo-terminal-host" />
     <div
       v-if="session && (session.status === 'exited' || session.status === 'failed')"
@@ -132,5 +175,20 @@ watch(
 }
 .terminal-footer-error {
   color: var(--kira-error);
+}
+.claude-code-hooks-prompt {
+  display: flex;
+  align-items: center;
+  gap: var(--kira-s-3);
+  flex-shrink: 0;
+  margin-bottom: var(--kira-s-2);
+  padding: var(--kira-s-2) var(--kira-s-3);
+  border-radius: var(--kira-radius-sm);
+  background: var(--kira-bg-chrome);
+  color: var(--kira-fg-muted);
+  font-size: var(--kira-t-sm);
+}
+.claude-code-hooks-prompt span {
+  flex: 1;
 }
 </style>
