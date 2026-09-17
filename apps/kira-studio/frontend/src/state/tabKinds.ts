@@ -35,6 +35,7 @@ import {
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
   defaultRepoGraphTabState,
+  defaultRepoMultiDiffTabState,
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
@@ -51,9 +52,12 @@ import {
   type RepoFileTabState,
   type RepoGraphTabRecord,
   type RepoGraphTabState,
+  type RepoMultiDiffTabRecord,
+  type RepoMultiDiffTabState,
   repoDiffTabStateSchema,
   repoFileTabStateSchema,
   repoGraphTabStateSchema,
+  repoMultiDiffTabStateSchema,
   type StreamTabRecord,
   type StreamTabState,
   streamTabStateSchema,
@@ -74,7 +78,7 @@ import { revealPath } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
-import { dropRepoDiffTab, dropRepoFileTab } from '../views/repo/editors';
+import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { codeRepoRecord } from './coderepos';
@@ -203,6 +207,15 @@ function repoDiffTitle(tab: TabRecord): string {
     return `${repoFileTitle(tab)} (${left} ↔ ${right})`;
   }
   return `${repoFileTitle(tab)} (Working Tree)`;
+}
+
+// P92 item 5: no `repoFileTitle`-style basename — `path` doesn't exist on this kind (it covers a
+// whole commit's file set, not one file), so the title is the revision pair plus a file count,
+// mirroring repoDiffTitle's own `leftLabel`/`rightLabel` fallback.
+function repoMultiDiffTitle(tab: TabRecord): string {
+  const diff = tab as RepoMultiDiffTabRecord;
+  const count = diff.state.files.length;
+  return `${diff.state.leftLabel} ↔ ${diff.state.rightLabel} (${count} file${count === 1 ? '' : 's'})`;
 }
 
 // P3 D3: every parseState below is a one-liner over the schema its own kind already imports —
@@ -465,6 +478,30 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     dropResources: (tabId) => dropRepoDiffTab(tabId),
     menuExtras: () => [],
     parseState: parseStateWith(repoDiffTabStateSchema),
+  },
+  // P92 item 5: one commit's whole changed-file set, one tab (VS Code's multi-file diff) —
+  // read-only, mirroring 'repo-diff''s own shape. No badge, no pinned, same reasoning.
+  'repo-multi-diff': {
+    mode: TAB_KIND_MODE['repo-multi-diff'],
+    title: repoMultiDiffTitle,
+    icon: () => 'diff-multiple',
+    railColor: () => undefined,
+    // Never reached through a generic "new tab of this kind" affordance (mirrors 'variable-set'
+    // above) — openRepoMultiDiffTab always supplies a real files/revision pair. This placeholder
+    // only satisfies TabKindDef's own required member.
+    defaultState: (): RepoMultiDiffTabState =>
+      defaultRepoMultiDiffTabState([], { left: '', right: '', leftLabel: '', rightLabel: '' }),
+    // files/review are arrays/objects — copied fresh so editing the duplicate's own state (were
+    // it ever mutated in place) can't reach back into the original's, mirroring http-request's
+    // own array-field reasoning above.
+    duplicateState: (tab: RepoMultiDiffTabRecord): RepoMultiDiffTabState => ({
+      ...tab.state,
+      files: [...tab.state.files],
+      review: tab.state.review ? { ...tab.state.review } : null,
+    }),
+    dropResources: (tabId) => dropRepoMultiDiffTab(tabId),
+    menuExtras: () => [],
+    parseState: parseStateWith(repoMultiDiffTabStateSchema),
   },
   // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm. P85
   // §5.2: a launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.

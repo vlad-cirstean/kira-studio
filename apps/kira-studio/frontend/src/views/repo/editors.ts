@@ -118,6 +118,17 @@ export function dropRepoDiffTab(tabId: string): void {
   dropRepoFileTab(tabId);
 }
 
+/** repo-multi-diff's own dropResources (P92 item 5) — a multi-diff tab registers several diff
+ *  editors under one tab id, each keyed `${tabId}:${path}` (useDiffEditor.ts's own editorKey,
+ *  set once per expanded section), never the plain tabId itself. Every entry whose key belongs to
+ *  this tab is found and dropped, not a single exact-key lookup like dropRepoFileTab's. */
+export function dropRepoMultiDiffTab(tabId: string): void {
+  const prefix = `${tabId}:`;
+  for (const key of [...entries.keys()]) {
+    if (key.startsWith(prefix)) dropRepoFileTab(key);
+  }
+}
+
 // P78 §1.4: textModels.ts's own preview-model eviction registry reads this — "a URI a tab owns is
 // never evicted" needs one source of truth for "does a tab own uri," and this map already is it;
 // a second registry duplicating it would be the exact second-source-of-truth C14-5's own comment

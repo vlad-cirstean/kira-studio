@@ -39,6 +39,9 @@ export const tabKindSchema = /*#__PURE__*/ z.enum([
   // C6 §7/§8.1: a HEAD-vs-worktree diff, opened from the tree's own "Open changes" action —
   // read-only, rendered by Monaco's diff editor.
   'repo-diff',
+  // P92 item 5: one commit's whole changed-file set in one tab (VS Code's multi-file diff),
+  // instead of `editor.openAllChanges`' old one-`repo-diff`-tab-per-file loop.
+  'repo-multi-diff',
   // P83 §7.1: an embedded shell at one worktree's directory, rendered with @xterm/xterm.
   'terminal',
 ]);
@@ -63,6 +66,7 @@ export const RENDERABLE_TAB_KINDS: readonly TabKind[] = [
   'repo-graph',
   'repo-file',
   'repo-diff',
+  'repo-multi-diff',
   'terminal',
 ];
 
@@ -96,6 +100,7 @@ export const TAB_KIND_MODE: Record<TabKind, TabScope> = {
   'repo-graph': 'repo',
   'repo-file': 'repo',
   'repo-diff': 'repo',
+  'repo-multi-diff': 'repo',
   terminal: 'repo',
 };
 
@@ -289,6 +294,16 @@ export const repoFileTabStateSchema = /*#__PURE__*/ z.object({
 });
 export type RepoFileTabState = z.infer<typeof repoFileTabStateSchema>;
 
+// C11 §7.5: a review diff's own target — which branch this review is against, that branch's tip
+// at review-open time, and the left side's display label. Named so P92 item 5's multi-diff state
+// below can reuse it verbatim instead of restating the shape a second time.
+export const reviewRefSchema = /*#__PURE__*/ z.object({
+  branch: z.string(),
+  branchTip: z.string(),
+  leftLabel: z.string(),
+});
+export type ReviewRef = z.infer<typeof reviewRefSchema>;
+
 // C6 §8.1/D10: a diff tab carried no session state at first — a restored tab re-read both sides
 // and opened at Monaco's own first change. C10 §6.1 extends this, rather than forking a second
 // diff-tab kind, to also address a *commit* diff: the revision pair. Both null (the default) is
@@ -305,16 +320,22 @@ export const repoDiffTabStateSchema = /*#__PURE__*/ z.object({
   right: z.string().nullable().default(null),
   leftLabel: z.string().nullable().default(null),
   rightLabel: z.string().nullable().default(null),
-  review: /*#__PURE__*/ z
-    .object({
-      branch: z.string(),
-      branchTip: z.string(),
-      leftLabel: z.string(),
-    })
-    .nullable()
-    .default(null),
+  review: reviewRefSchema.nullable().default(null),
 });
 export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
+
+// P92 item 5: one commit's whole changed-file set, in one tab (VS Code's multi-file diff). `files`
+// is the commit's own file order, captured at open time — a re-resolve on restore would be a
+// different commit's answer if the ref moved.
+export const repoMultiDiffTabStateSchema = /*#__PURE__*/ z.object({
+  left: z.string(),
+  right: z.string(),
+  leftLabel: z.string(),
+  rightLabel: z.string(),
+  files: /*#__PURE__*/ z.array(z.string()).default([]),
+  review: reviewRefSchema.nullable().default(null),
+});
+export type RepoMultiDiffTabState = z.infer<typeof repoMultiDiffTabStateSchema>;
 
 // P86 §4: which kind of launch a terminal tab is — 'claude-code' is the only kind that gets hooks
 // (a session reporting its own activity) and the only kind the status-bar widget counts. Decided
@@ -427,6 +448,11 @@ export const tabRecordSchema = /*#__PURE__*/ z.discriminatedUnion('kind', [
   }),
   /*#__PURE__*/ z.object({
     ...tabRecordBase,
+    kind: z.literal('repo-multi-diff'),
+    state: repoMultiDiffTabStateSchema,
+  }),
+  /*#__PURE__*/ z.object({
+    ...tabRecordBase,
     kind: z.literal('terminal'),
     state: terminalTabStateSchema,
   }),
@@ -446,6 +472,7 @@ export type EnvironmentsTabRecord = Extract<TabRecord, { kind: 'environments' }>
 export type RepoGraphTabRecord = Extract<TabRecord, { kind: 'repo-graph' }>;
 export type RepoFileTabRecord = Extract<TabRecord, { kind: 'repo-file' }>;
 export type RepoDiffTabRecord = Extract<TabRecord, { kind: 'repo-diff' }>;
+export type RepoMultiDiffTabRecord = Extract<TabRecord, { kind: 'repo-multi-diff' }>;
 export type TerminalTabRecord = Extract<TabRecord, { kind: 'terminal' }>;
 
 export function asDataTab(tab: TabRecord | null | undefined): DataTabRecord | null {
@@ -494,6 +521,12 @@ export function asRepoFileTab(tab: TabRecord | null | undefined): RepoFileTabRec
 
 export function asRepoDiffTab(tab: TabRecord | null | undefined): RepoDiffTabRecord | null {
   return tab && tab.kind === 'repo-diff' ? tab : null;
+}
+
+export function asRepoMultiDiffTab(
+  tab: TabRecord | null | undefined,
+): RepoMultiDiffTabRecord | null {
+  return tab && tab.kind === 'repo-multi-diff' ? tab : null;
 }
 
 export function defaultDataTabState(pageSize: PageSize): DataTabState {
@@ -571,6 +604,23 @@ export function defaultRepoDiffTabState(
     right: revision?.right ?? null,
     leftLabel: revision?.leftLabel ?? null,
     rightLabel: revision?.rightLabel ?? null,
+    review: review ?? null,
+  };
+}
+
+/** P92 item 5: `files` is captured at open time (the commit's own order) — the caller's job, not
+ *  this function's, since a re-resolve on restore would answer for whatever the ref points at now. */
+export function defaultRepoMultiDiffTabState(
+  files: string[],
+  revision: { left: string; right: string; leftLabel: string; rightLabel: string },
+  review?: ReviewRef,
+): RepoMultiDiffTabState {
+  return {
+    left: revision.left,
+    right: revision.right,
+    leftLabel: revision.leftLabel,
+    rightLabel: revision.rightLabel,
+    files,
     review: review ?? null,
   };
 }

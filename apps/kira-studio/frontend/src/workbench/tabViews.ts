@@ -13,6 +13,7 @@ import KeyValueTabView from '../views/keyvalue/KeyValueView.vue';
 import RepoDiffTabView from '../views/repo/RepoDiffView.vue';
 import RepoFileTabView from '../views/repo/RepoFileView.vue';
 import RepoGraphTabView from '../views/repo/RepoGraphView.vue';
+import RepoMultiDiffTabView from '../views/repo/RepoMultiDiffView.vue';
 import RepoTerminalTabView from '../views/repo/RepoTerminalView.vue';
 import StreamTabView from '../views/stream/StreamView.vue';
 
@@ -39,6 +40,8 @@ export const TAB_VIEWS: Record<TabKind, Component> = {
   'repo-file': RepoFileTabView,
   // C6 §8.1: the HEAD-vs-worktree diff mount.
   'repo-diff': RepoDiffTabView,
+  // P92 item 5: one commit's whole changed-file set, one tab.
+  'repo-multi-diff': RepoMultiDiffTabView,
   // P83 §6.2: the embedded terminal — a static entry like every kind above; @xterm/xterm itself
   // stays behind terminalRenderer.ts's own dynamic import(), RepoFileTabView's own Monaco pattern.
   terminal: RepoTerminalTabView,

@@ -52,6 +52,9 @@ var RenderableTabKinds = map[string]bool{
 	// scoping as the two kinds above. Same F8 warning: this is the one TypeScript's own
 	// exhaustiveness checks cannot catch a miss on (tests/unit/go-ts-vocabulary-parity.spec.ts).
 	"repo-diff": true,
+	// P92 item 5: one commit's whole changed-file set in one tab. Same repo-workspace scoping and
+	// same F8 warning as repo-diff above.
+	"repo-multi-diff": true,
 	// P83 §7.1: an embedded shell tab. Never actually reaches restore (persistableTabs() filters
 	// it out before save, tabs.ts:132) — still required here, same F8 warning: the parity test
 	// (go-ts-vocabulary-parity.spec.ts) demands a vocabulary complete regardless of what currently
@@ -61,7 +64,9 @@ var RenderableTabKinds = map[string]bool{
 
 // repoTabKinds is the subset of RenderableTabKinds that must carry a non-nil WorkspaceID (D2) —
 // every other kind derives its workspace from TAB_KIND_MODE instead.
-var repoTabKinds = map[string]bool{"repo-graph": true, "repo-file": true, "repo-diff": true, "terminal": true}
+var repoTabKinds = map[string]bool{
+	"repo-graph": true, "repo-file": true, "repo-diff": true, "repo-multi-diff": true, "terminal": true,
+}
 
 // IsRenderableTabKind reports whether kind is one of the renderable tab kinds.
 func IsRenderableTabKind(kind string) bool {

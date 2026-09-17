@@ -6,71 +6,40 @@
 // C10 §6.1/§6.2: extends this same tab kind for a *commit* diff (openRepoCommitDiffTab, S15)
 // rather than forking a second one — repoDiffTabStateSchema's revision pair (S8) is null on both
 // sides for C6's original HEAD-vs-worktree comparison (unchanged below) and non-null for a commit
-// diff, whose two sides are read via two file.read calls over the GIT transport instead of
-// control.codeWorkspaceReadDiff, reshaped into the identical DiffSide classification so every
-// branch below (binary/tooLarge/bothMissing, Monaco model creation) is one implementation for both.
-import type { DiffSide } from '@shared/domain/repo';
+// diff.
+//
+// P92 item 5: the content-resolution + editor-construction body now lives in useDiffEditor.ts,
+// shared with RepoMultiDiffView.vue's own per-file sections — this view keeps only what stays
+// single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
+// registrations, and review-decorations wiring.
 import type { RepoDiffTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { onMounted, onUnmounted, ref } from 'vue';
-import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
-import { openRepoFileTab } from '../../state/repoTabs';
-import { settingsState } from '../../state/settings';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
-import { registerDiffEditor, unmountEditor } from './editors';
-import { monacoLanguageFor } from './language';
-import {
-  getOrCreateModel,
-  loadMonaco,
-  REPO_THEME_NAME,
-  repoDiffUris,
-  repoRevisionDiffUris,
-} from './monaco';
-import { ensureNavigationRegistered } from './navigation';
+import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
-
-// C10 §6.1: file.read's own four-way result, reshaped into DiffSide — the same classification
-// codeWorkspaceReadDiff's own two sides already use, so the binary/tooLarge/bothMissing branches
-// below and the Monaco model creation stay one implementation for both kinds of diff.
-function toDiffSide(result: {
-  readonly kind: 'found' | 'missing' | 'binary' | 'tooLarge';
-  readonly content?: string;
-  readonly bytes?: number;
-  readonly limitBytes?: number;
-}): DiffSide {
-  return {
-    kind: result.kind,
-    text: result.content ?? '',
-    bytes: result.bytes ?? 0,
-    limitBytes: result.limitBytes ?? 0,
-  };
-}
+import { useDiffEditor } from './useDiffEditor';
 
 const props = defineProps<{ tab: RepoDiffTabRecord }>();
 
-type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
-const state = ref<ViewState>('loading');
 const errorMessage = ref('');
 const container = ref<HTMLElement | null>(null);
 let unregisterFind: (() => void) | null = null;
 let unregisterGoToFile: (() => void) | null = null;
 let reviewDecorations: ReviewDecorationsHandle | null = null;
-// P92 item 7: set once mount() reaches the editor, so both registerCommand's callback and the
-// header button (template, below) share one implementation. Never reset back to a stub mid-mount —
-// only onUnmounted below clears it.
-let goToFile: (() => void) | null = null;
+
+type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
+const state = ref<ViewState>('loading');
 function onGoToFile(): void {
-  goToFile?.();
+  diffEditor?.goToFile();
 }
 
-// §11: read-only, unchanged from the file viewer — readOnly/domReadOnly block the keyboard and
-// paste; renderMarginRevertIcon/renderGutterMenu are the second layer, hiding the revert/apply
-// affordances that would otherwise let a user trigger a write from a widget built for the
-// extension's read-write use (C6 §8.1, not cosmetic).
+let diffEditor: ReturnType<typeof useDiffEditor> | null = null;
+
 async function mount(): Promise<void> {
   const repoId = props.tab.workspaceId
     ? repoIdOfWorkspace(props.tab.workspaceId as WorkspaceKey)
@@ -81,128 +50,29 @@ async function mount(): Promise<void> {
     return;
   }
 
-  // C10 §6.1/§6.2: repoDiffTabStateSchema's own revision pair — both null is C6's original
-  // HEAD-vs-worktree comparison, byte-identical below; a commit diff (openRepoCommitDiffTab, S15)
-  // always supplies both (a root commit's left is git's well-known empty-tree sha, never null).
   const { left, right, review } = props.tab.state;
-  let gitRepoId: string | undefined;
-  let diff: { head: DiffSide; worktree: DiffSide };
-  if (left === null) {
-    try {
-      diff = await control.codeWorkspaceReadDiff(repoId, props.tab.path);
-    } catch (err) {
-      state.value = 'error';
-      errorMessage.value = err instanceof Error ? err.message : String(err);
-      return;
-    }
-  } else {
-    gitRepoId = gitRepoIdFor(repoId);
-    if (!gitRepoId || right === null) {
-      state.value = 'error';
-      errorMessage.value = 'This repository is not open.';
-      return;
-    }
-    // 7d (P68 review): this lease is only ever used for the two requests below, so it is released
-    // as soon as they settle rather than left to leak for the rest of the mount (unlike the
-    // review-decorations lease further down, which reviewDecorations.ts's own dispose() now owns).
-    const transport = gitTransportFor(repoId);
-    try {
-      const [leftResult, rightResult] = await Promise.all([
-        transport.request('file.read', { repoId: gitRepoId, rev: left, path: props.tab.path }),
-        transport.request('file.read', { repoId: gitRepoId, rev: right, path: props.tab.path }),
-      ]);
-      diff = { head: toDiffSide(leftResult), worktree: toDiffSide(rightResult) };
-    } catch (err) {
-      state.value = 'error';
-      errorMessage.value = err instanceof Error ? err.message : String(err);
-      return;
-    } finally {
-      transport.dispose();
-    }
-  }
-
-  if (diff.head.kind === 'binary' || diff.worktree.kind === 'binary') {
-    state.value = 'binary';
-    return;
-  }
-  if (diff.head.kind === 'tooLarge' || diff.worktree.kind === 'tooLarge') {
-    state.value = 'tooLarge';
-    return;
-  }
-  if (diff.head.kind === 'missing' && diff.worktree.kind === 'missing') {
-    state.value = 'bothMissing';
-    return;
-  }
-
-  const mod = await loadMonaco();
-  ensureNavigationRegistered(mod);
-  // Unmounted (tab closed/switched away) while the read/import above was in flight.
-  if (!container.value) return;
-
-  let headUri: import('monaco-editor').Uri;
-  let worktreeUri: import('monaco-editor').Uri;
-  if (left === null) {
-    ({ head: headUri, worktree: worktreeUri } = repoDiffUris(mod, repoId, props.tab.path));
-  } else {
-    ({ left: headUri, right: worktreeUri } = repoRevisionDiffUris(
-      mod,
-      repoId,
-      props.tab.path,
-      left,
-      // biome-ignore lint/style/noNonNullAssertion: checked alongside left above — both null or both set.
-      right!,
-    ));
-  }
-  const language = monacoLanguageFor(props.tab.path);
-  // D7: the HEAD side is deliberately never recorded as navigable — its content is a different
-  // revision than the index describes, so answering a definition there would be a lie. The
-  // worktree side is, since it's byte-identical to what the index parsed. C10: for a commit diff,
-  // NEITHER side is on disk, so neither is registered — this extends D7's own rule rather than
-  // special-casing it.
-  const original = getOrCreateModel(mod, headUri.toString(), diff.head.text, language);
-  const modified = getOrCreateModel(
-    mod,
-    worktreeUri.toString(),
-    diff.worktree.text,
-    language,
-    left === null ? { repoId, path: props.tab.path } : undefined,
-  );
-
-  const editor = mod.editor.createDiffEditor(container.value, {
-    theme: REPO_THEME_NAME,
-    readOnly: true,
-    domReadOnly: true,
-    originalEditable: false,
-    renderMarginRevertIcon: false,
-    renderGutterMenu: false,
-    automaticLayout: true,
-    renderSideBySide: true,
-    ignoreTrimWhitespace: false,
-    // C11 §7.3 gotcha 2: 0.56.0 has no public API to expand one specific collapsed unchanged
-    // region, so a comment anchored inside one would be invisible — only the review variant
-    // disables this; C6/C10's plain diff keeps it enabled, byte-identical.
-    hideUnchangedRegions: { enabled: review === null },
-    // §7.3 gotcha 1: the registered option default and the .d.ts prose disagree — set explicitly
-    // for the review variant rather than depend on either being right in a future Monaco bump.
-    // The plain diff passes nothing, unchanged from before this phase.
-    ...(review !== null ? { glyphMargin: true } : {}),
-    minimap: { enabled: false },
-    scrollBeyondLastLine: false,
-    // P78 §8.3: RepoFileView.vue's own identical options, same reasoning.
-    gotoLocation: {
-      multipleDefinitions: 'goto',
-      multipleReferences: 'peek',
-      multipleImplementations: 'peek',
-    },
-    fontFamily: settingsState.appearance.fontFamily,
-    fontSize: settingsState.appearance.fontSize,
+  diffEditor = useDiffEditor(container, {
+    editorKey: props.tab.id,
+    repoId,
+    path: props.tab.path,
+    left,
+    right,
+    review: review !== null,
   });
-  editor.setModel({ original, modified });
-  registerDiffEditor(props.tab.id, [headUri.toString(), worktreeUri.toString()], editor);
+  await diffEditor.mount();
+  state.value = diffEditor.state.value;
+  errorMessage.value = diffEditor.errorMessage.value;
+  if (state.value !== 'found') return;
 
-  // C7 D13/§6: the modified (worktree) pane, never the HEAD pane — it's the side whose content
-  // matches the file on disk (C6 D7's own reasoning for which side is navigable), and
-  // IStandaloneDiffEditor itself has no getAction, so this has to reach through to one pane.
+  const editor = diffEditor.editor.value;
+  if (!editor) return; // Unmounted while mount() awaited above — nothing left to wire.
+  const mod = await loadMonaco();
+  const gitRepoId = left === null ? undefined : gitRepoIdFor(repoId);
+
+  // C7 D13/§6: the modified (worktree) pane, never the HEAD pane — the same reasoning
+  // useDiffEditor's own goToFile follows for which side is navigable. view.find is a global
+  // command, so it must reach through to one editor pane rather than the diff editor as a whole
+  // (IStandaloneDiffEditor itself has no getAction).
   const modifiedEditor = editor.getModifiedEditor();
   unregisterFind = registerCommand('view.find', () => {
     modifiedEditor.focus();
@@ -210,41 +80,8 @@ async function mount(): Promise<void> {
   });
 
   // P74 §7.4 item 1 / P92 item 7: the diff editor's own "go to file" — both the palette command
-  // (the same mechanism view.find above already uses) and the visible header button (template).
-  // Two branches: a revision-backed diff resolves the target through the git transport;  C6's
-  // plain worktree-vs-HEAD comparison already shows the live file on disk (right === null), so the
-  // modified pane *is* that file — open it directly, no round trip.
-  goToFile = () => {
-    const line = modifiedEditor.getPosition()?.lineNumber ?? 1;
-    if (gitRepoId === undefined || right === null) {
-      openRepoFileTab(repoId, props.tab.path, { preview: false, reveal: { line } });
-      return;
-    }
-    const targetGitRepoId = gitRepoId;
-    const targetRev = right;
-    const transport = gitTransportFor(repoId);
-    transport
-      .request('editor.goToFile', {
-        repoId: targetGitRepoId,
-        rev: targetRev,
-        path: props.tab.path,
-        line,
-      })
-      .then((outcome) => {
-        // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
-        // composition) — the tab switch is the visible confirmation. `unavailable` is the one
-        // branch with no other signal; this raw editor view has no toast/live-region channel to
-        // surface it through, so it goes to the console rather than dropping silently.
-        if (outcome.kind === 'unavailable') {
-          console.warn(`repo.goToFileFromDiff: ${props.tab.path} unavailable — ${outcome.reason}`);
-        }
-      })
-      .catch((err: unknown) => {
-        console.warn('repo.goToFileFromDiff failed:', err);
-      })
-      .finally(() => transport.dispose());
-  };
-  unregisterGoToFile = registerCommand('repo.goToFileFromDiff', () => goToFile?.());
+  // and the visible header button (template) run useDiffEditor's own goToFile().
+  unregisterGoToFile = registerCommand('repo.goToFileFromDiff', () => diffEditor?.goToFile());
 
   // C11 §7.4/S11: the comment-thread/mark-reviewed layer, only for a review diff tab. `left` is
   // never null here — openRepoReviewDiffTab (S8) always supplies both revisions alongside `review`.
@@ -257,8 +94,6 @@ async function mount(): Promise<void> {
       review,
     });
   }
-
-  state.value = 'found';
 }
 
 onMounted(() => void mount());
@@ -270,10 +105,10 @@ onUnmounted(() => {
   unregisterFind = null;
   unregisterGoToFile?.();
   unregisterGoToFile = null;
-  goToFile = null;
   reviewDecorations?.dispose();
   reviewDecorations = null;
-  unmountEditor(props.tab.id);
+  diffEditor?.dispose();
+  diffEditor = null;
 });
 </script>
 

@@ -3,6 +3,8 @@ import {
   asRepoFileTab,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
+  defaultRepoMultiDiffTabState,
+  type ReviewRef,
 } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
@@ -162,6 +164,34 @@ export function openRepoCommitDiffTab(
         rightLabel: labels.right,
       }),
     { reuse: false, workspaceId, preview: !pinned, previewCohort },
+  );
+}
+
+// P92 item 5 (§7.2): one commit's whole changed-file set in one tab — `editor.openAllChanges`'s
+// own replacement for its old one-`repo-diff`-tab-per-file loop. Unlike openRepoCommitDiffTab
+// above, the dedupe key needs no extra revision-pair lookup of its own: `right` (the commit sha)
+// IS the tab's `path`, already unique per commit, so openTab's own `reuse: true` is enough — a
+// second "See commit changes" on the same commit reuses the tab, a different commit opens a
+// second one.
+export function openRepoMultiDiffTab(
+  repoId: string,
+  files: string[],
+  left: string,
+  right: string,
+  labels: { left: string; right: string },
+  review?: ReviewRef,
+): OpenTabResult {
+  return openTab(
+    'repo-multi-diff',
+    null,
+    right,
+    () =>
+      defaultRepoMultiDiffTabState(
+        files,
+        { left, right, leftLabel: labels.left, rightLabel: labels.right },
+        review,
+      ),
+    { reuse: true, workspaceId: repoWorkspaceKey(repoId), preview: false },
   );
 }
 

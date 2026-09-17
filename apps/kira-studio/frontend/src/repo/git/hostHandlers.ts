@@ -32,6 +32,7 @@ import {
   openRepoCommitDiffTab,
   openRepoDiffTab,
   openRepoFileTab,
+  openRepoMultiDiffTab,
   openRepoReviewDiffTab,
 } from '../../state/repoTabs';
 import { activateTab } from '../../state/tabs';
@@ -281,8 +282,11 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return {};
     },
 
-    // §6.1: "N tabs instead" of a single multi-diff editor (§13) — the native workspace has none.
-    // Always mode: 'tabs', matching detailActions.ts's own existing result shape (`:54`).
+    // §6.1/P92 item 5: "N tabs instead" of a single multi-diff editor was §13's own gap — now one
+    // `repo-multi-diff` tab, VS Code's own multi-file diff editor's counterpart. `mode: 'tabs'`
+    // stays, byte-identical to before this phase: detailActions.ts's own result shape (`:54`)
+    // still means "opened via tabs, not the extension's native multi-diff editor", which remains
+    // true — one Kira tab, not N.
     'editor.openAllChanges': async (params, signal) => {
       const { repoId: gitRepoId, sha, parentIndex } = params;
       const codeRepoId = codeRepoIdFor(gitRepoId);
@@ -298,24 +302,13 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       const leftRev = baseSha ?? EMPTY_TREE_SHA;
       const leftLabel = baseSha ? baseSha.slice(0, 7) : 'empty tree';
       const rightLabel = sha.slice(0, 7);
-      // P74 §5.2: every changed file opens as a preview tab, not a permanent one (`pinned:
-      // true`'s own comment before this covered only "N tabs instead of one multi-diff editor",
-      // never "as preview tabs" — this repo's own git blame at 3e9a9a7a shows it was never
-      // revisited once the preview cohort existed to ask for). The first file (no `previewCohort`)
-      // evicts whatever preview cohort/slot preceded it; every file after that joins the cohort
-      // the first one just started, rather than each replacing the last (`openTab`'s own
-      // `previewCohort` doc comment).
-      detail.files.forEach((change, index) => {
-        openRepoCommitDiffTab(
-          codeRepoId,
-          change.path,
-          leftRev,
-          sha,
-          { left: leftLabel, right: rightLabel },
-          false,
-          index > 0,
-        );
-      });
+      openRepoMultiDiffTab(
+        codeRepoId,
+        detail.files.map((change) => change.path),
+        leftRev,
+        sha,
+        { left: leftLabel, right: rightLabel },
+      );
       return { opened: detail.files.length, failed: 0, mode: 'tabs' };
     },
 
