@@ -1430,6 +1430,59 @@ this record" button; the format-undo-format-format sequence re-indents correctly
 Format (not stuck one-line), and a third press with no edit shows the note with the ClickHouse
 aside correctly absent on this Postgres console.
 
+## P90 result
+
+Landed per plan (`docs/v1.8/plans/P90-api-settings-cookies-grow-fix.md`), 10 commits (`6ff4ff2b`,
+`41d8ae21`, `4293c6ae`, `9f15641a`, `0f055018`, `f3901e42`, `884a3a66`, `8ce90a3b`, `fd17baef`,
+`54e223d3`). Three items: a global Api settings section, per-request overrides plus a Cookies tab,
+and the grow-field fix.
+
+**Api settings.** Seven leaves (httpVersion, requestTimeoutMs, maxResponseMb, sslVerify,
+followRedirects, maxRedirects, disableCookieJar) on `Settings`, a new Api section in the dialog. Go's
+`httpclient.Send` takes an `Options` (all-pointer, nil-means-default) instead of reading package
+constants — `resolveSendOptions`/`orGlobal` (`bridge/http.go`) resolve a request's seven
+`null`-means-inherit tab-state leaves against the global row before every send. `sslVerify: false`
+shows the plain-prose security warning verbatim from the plan (CLAUDE.md's own carve-out for that
+class of text).
+
+**Cookies.** One process-wide `cookiejar.Jar` (publicsuffix-keyed), a throwaway per-send jar for
+incognito. `Response` gained `SentCookies`/`ReceivedCookies` off the trace's `WroteHeaderField`
+hook and every hop's own `Set-Cookie`. Two panes reuse one `CookiesPane.vue` component: request mode
+(what the jar would send next, debounced on URL change and after every send) and response mode
+(sent/received grouped by hop). Both new leaves' secrets get masked the same way every other response
+field does (`maskSecrets`, two new loops).
+
+**Grow-field fix, two defects, not one.** The plan's own diagnosis (UA `padding: 2px` on the
+textarea, absent from the sizing replica) was real and fixed as written. Testing surfaced a second,
+independent defect the plan didn't name: a grid item's `normal` alignment resolves to `start`, not
+`stretch`, for a replaced box with an intrinsic size in that axis (CSS Box Alignment §8.3) — and a
+`<textarea>` counts, via its `rows` attribute. Unstretched, the textarea sat at its own 1-row
+intrinsic height inside a track the replica had already grown to fit, so it scrolled from row 2 on
+regardless of the padding fix. Fixed with an explicit `align-self: stretch`. Separately, the overlay
+never painted on a `grow` textarea at all (`.input-wrap input.has-overlay` didn't match a
+`<textarea>`) — widened to `input.has-overlay, textarea.has-overlay`, plus `line-height: inherit` so
+the overlay's lines don't drift from the textarea's own past line 2.
+
+**Verification.** `go build`/`go vet`/`go test` clean throughout
+(`internal/httpclient`/`bridge`/`storage`/`apivars`) — six new Go tests per the plan's §6.1
+(redirects off, max-redirects, body-cap both directions, zero-timeout, cookie-jar replay including
+the ephemeral case, forced HTTP/1.1), all passing against a real `httptest.Server`. `bun run
+typecheck`/`lint`/`build` clean after each commit (same pre-existing `UncommittedChangesStrip.vue`
+lint info as every other phase). Seven new Playwright tests (`http-request.spec.ts` ×6,
+`settings-apply-on-save.spec.ts` ×1): Api section round-trip, an override reaching `httpSend`'s own
+`options` as exactly the one leaf changed, that override surviving a tab restore, the response
+Cookies tab rendering both groups, the request Cookies tab's jar-off empty state, and the grow-field
+fix (line boundaries read off the overlay's own `Range` client rects, not a hard-coded character
+count) — all pass. Full `bun run test:ui` (`ui`/webkit project): 250 passed, 47 failed, every failure
+a pre-existing Monaco-editor-loading timeout (`data-kira-editor-text` never appears) spread across
+files this phase never touched (console, grpc, cell-editor, slick-grid, sql-schema, and others) —
+confirmed pre-existing, not a P90 regression, by reverting `primitives.css` and
+`AutocompleteField.vue` to their pre-P90 content in place, rebuilding, and re-running one of the
+failing tests: it still failed identically with none of this phase's code present. A manual
+GUI launch (`bun run dev`) was not attempted — this container has no display (`docs/DEV_ENVIRONMENT.md`),
+and the Playwright `ui` project is this repo's own established substitute for a GUI-driven check in
+that setting.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
