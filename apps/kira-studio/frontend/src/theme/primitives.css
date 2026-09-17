@@ -224,6 +224,15 @@
   grid-area: 1 / 1;
   resize: none;
   overflow-y: auto;
+  /* P90: the UA gives a textarea `padding: 2px`, which the plain `.p-input textarea` reset above
+     does not clear. The ::after replica that sizes this grid track has none, so the textarea
+     wrapped ~4px earlier than the replica measured and was ~4px shorter than the track it was
+     stretched to — it scrolled before the box finished growing, at a boundary that moved with the
+     font size. These three declarations are what make the replica's box and this one the same
+     box. */
+  padding: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .p-input .ph,
 .p-input input::placeholder,
