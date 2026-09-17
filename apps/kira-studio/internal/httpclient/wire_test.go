@@ -297,7 +297,7 @@ func TestSend_WireResponseHeadNeverCarriesTheBinaryBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}

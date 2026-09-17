@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -30,7 +31,7 @@ func TestSend_RedirectChain(t *testing.T) {
 	defer srv.Close()
 	serverURL = srv.URL
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/start"})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/start"}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestSend_CrossHostRedirectStripsUserHeaders(t *testing.T) {
 		Method:  "GET",
 		URL:     startSrv.URL + "/cross-host",
 		Headers: []Header{{Name: "X-Api-Key", Value: "sk-secret"}},
-	}); err != nil {
+	}, Options{}); err != nil {
 		t.Fatalf("Send (cross-host): %v", err)
 	}
 	if finalHeader != "" {
@@ -98,7 +99,7 @@ func TestSend_CrossHostRedirectStripsUserHeaders(t *testing.T) {
 		Method:  "GET",
 		URL:     startSrv.URL + "/same-host",
 		Headers: []Header{{Name: "X-Api-Key", Value: "sk-secret"}},
-	}); err != nil {
+	}, Options{}); err != nil {
 		t.Fatalf("Send (same-host redirect): %v", err)
 	}
 	if sameHostHeader != "sk-secret" {
@@ -106,28 +107,45 @@ func TestSend_CrossHostRedirectStripsUserHeaders(t *testing.T) {
 	}
 }
 
-// §6.3 case 2: a response larger than the cap — BodyTruncated is true, BodyBytes reports what
-// was read, and the reader is not left open.
+// §6.3 case 2 / §6.1: a response larger than Options.MaxResponseMb — BodyTruncated is true,
+// BodyBytes reports what was read, and the reader is not left open. A second case with
+// MaxResponseMb: ptr(0) asserts the size cap is off entirely (P90 §2.3).
 func TestSend_BodySizeTruncation(t *testing.T) {
-	oversized := bytes.Repeat([]byte("a"), maxResponseBytes+1000)
+	const capBytes = 1 * 1024 * 1024
+	oversized := bytes.Repeat([]byte("a"), capBytes+1000)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(oversized)
 	}))
 	defer srv.Close()
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL})
-	if err != nil {
-		t.Fatalf("Send: %v", err)
-	}
-	if !resp.BodyTruncated {
-		t.Fatal("BodyTruncated = false, want true")
-	}
-	if resp.BodyBytes != maxResponseBytes {
-		t.Fatalf("BodyBytes = %d, want %d", resp.BodyBytes, maxResponseBytes)
-	}
-	if len(resp.Body) != maxResponseBytes {
-		t.Fatalf("len(Body) = %d, want %d", len(resp.Body), maxResponseBytes)
-	}
+	t.Run("truncated at the cap", func(t *testing.T) {
+		resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL}, Options{MaxResponseMb: ptr(1)})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		if !resp.BodyTruncated {
+			t.Fatal("BodyTruncated = false, want true")
+		}
+		if resp.BodyBytes != capBytes {
+			t.Fatalf("BodyBytes = %d, want %d", resp.BodyBytes, capBytes)
+		}
+		if len(resp.Body) != capBytes {
+			t.Fatalf("len(Body) = %d, want %d", len(resp.Body), capBytes)
+		}
+	})
+
+	t.Run("MaxResponseMb 0 is unlimited", func(t *testing.T) {
+		resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL}, Options{MaxResponseMb: ptr(0)})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		if resp.BodyTruncated {
+			t.Fatal("BodyTruncated = true, want false")
+		}
+		if resp.BodyBytes != len(oversized) {
+			t.Fatalf("BodyBytes = %d, want %d", resp.BodyBytes, len(oversized))
+		}
+	})
 }
 
 // §6.3 case 3: a body of invalid UTF-8 — BodyEncoding == "base64" and the bytes decode back
@@ -139,7 +157,7 @@ func TestSend_NonUTF8BodyBase64RoundTrip(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -171,11 +189,7 @@ func TestSend_TimeoutVsCancellation(t *testing.T) {
 	defer close(block)
 
 	t.Run("timeout", func(t *testing.T) {
-		old := defaultTimeout
-		defaultTimeout = 50 * time.Millisecond
-		defer func() { defaultTimeout = old }()
-
-		_, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL})
+		_, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL}, Options{RequestTimeoutMs: ptr(50)})
 		code, ok := CodeOf(err)
 		if !ok || code != CodeTimeout {
 			t.Fatalf("CodeOf(err) = %v, %v, want %v, true (err: %v)", code, ok, CodeTimeout, err)
@@ -188,12 +202,36 @@ func TestSend_TimeoutVsCancellation(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 			cancel()
 		}()
-		_, err := Send(ctx, Request{Method: "GET", URL: srv.URL})
+		_, err := Send(ctx, Request{Method: "GET", URL: srv.URL}, Options{RequestTimeoutMs: ptr(50)})
 		code, ok := CodeOf(err)
 		if !ok || code != CodeCancelled {
 			t.Fatalf("CodeOf(err) = %v, %v, want %v, true (err: %v)", code, ok, CodeCancelled, err)
 		}
 	})
+}
+
+// TestSend_TimeoutZeroMeansNone is P90 §2.3/§6.1: RequestTimeoutMs 0 disables the deadline
+// entirely, so a server sleeping past the old 30s default still returns, and cancelling the
+// caller's own ctx still classifies CodeCancelled (sendCtx.Err() can only ever be
+// context.Canceled with no deadline set).
+func TestSend_TimeoutZeroMeansNone(t *testing.T) {
+	block := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-block
+	}))
+	defer srv.Close()
+	defer close(block)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+	}()
+	_, err := Send(ctx, Request{Method: "GET", URL: srv.URL}, Options{RequestTimeoutMs: ptr(0)})
+	code, ok := CodeOf(err)
+	if !ok || code != CodeCancelled {
+		t.Fatalf("CodeOf(err) = %v, %v, want %v, true (err: %v)", code, ok, CodeCancelled, err)
+	}
 }
 
 // §6.3 case 5: a user-supplied Host header actually reaches the server as the request's Host
@@ -209,11 +247,201 @@ func TestSend_HostHeaderReachesServer(t *testing.T) {
 		Method:  "GET",
 		URL:     srv.URL,
 		Headers: []Header{{Name: "Host", Value: "example.internal"}},
-	})
+	}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 	if gotHost != "example.internal" {
 		t.Fatalf("server saw Host = %q, want %q", gotHost, "example.internal")
 	}
+}
+
+// ptr is a small generic helper for building an Options field's *T from a literal — every test
+// below needs several of these.
+func ptr[T any](v T) *T { return &v }
+
+// TestSend_FollowRedirectsOff is P90 §6.1: FollowRedirects: ptr(false) must return the 3xx itself
+// as the response, with Redirects empty, FinalURL the original URL, and exactly one Timeline hop
+// — this is the assertion that catches the ErrUseLastResponse-before-closeHop ordering (§2.3) if
+// it is ever written the other way round (closing the hop twice, or not at all).
+func TestSend_FollowRedirectsOff(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/final", http.StatusMovedPermanently)
+	}))
+	defer srv.Close()
+
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/start"}, Options{FollowRedirects: ptr(false)})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	if resp.Status != http.StatusMovedPermanently {
+		t.Fatalf("Status = %d, want %d", resp.Status, http.StatusMovedPermanently)
+	}
+	if len(resp.Redirects) != 0 {
+		t.Fatalf("len(Redirects) = %d, want 0: %+v", len(resp.Redirects), resp.Redirects)
+	}
+	if resp.FinalURL != srv.URL+"/start" {
+		t.Fatalf("FinalURL = %q, want %q", resp.FinalURL, srv.URL+"/start")
+	}
+	if len(resp.Timeline.Hops) != 1 {
+		t.Fatalf("len(Timeline.Hops) = %d, want 1: %+v", len(resp.Timeline.Hops), resp.Timeline.Hops)
+	}
+}
+
+// TestSend_MaxRedirectsHonoured is P90 §6.1: a 3-hop chain with MaxRedirects: ptr(1) must fail
+// with CodeHTTPTransport and a message naming how many redirects it stopped after.
+func TestSend_MaxRedirectsHonoured(t *testing.T) {
+	var serverURL string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/1", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, serverURL+"/2", http.StatusFound)
+	})
+	mux.HandleFunc("/2", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, serverURL+"/3", http.StatusFound)
+	})
+	mux.HandleFunc("/3", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, serverURL+"/final", http.StatusFound)
+	})
+	mux.HandleFunc("/final", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("final"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	serverURL = srv.URL
+
+	_, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/1"}, Options{MaxRedirects: ptr(1)})
+	code, ok := CodeOf(err)
+	if !ok || code != CodeHTTPTransport {
+		t.Fatalf("CodeOf(err) = %v, %v, want %v, true (err: %v)", code, ok, CodeHTTPTransport, err)
+	}
+	if !strings.Contains(err.Error(), "stopped after 1 redirects") {
+		t.Fatalf("err = %v, want it to contain %q", err, "stopped after 1 redirects")
+	}
+}
+
+// TestSend_CookieJarReplaysAcrossSends is P90 §6.1/§2.4: the jar's default-off state, its on
+// state, and its ephemeral (incognito) state — three interacting rules, one table, ClearJar()
+// between cases since the shared jar is package state and these would otherwise be order-dependent.
+func TestSend_CookieJarReplaysAcrossSends(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{Name: "session", Value: "abc123"})
+		_, _ = w.Write([]byte("logged in"))
+	})
+	mux.HandleFunc("/me", func(w http.ResponseWriter, r *http.Request) {
+		c, err := r.Cookie("session")
+		if err == nil {
+			_, _ = w.Write([]byte("session=" + c.Value))
+		} else {
+			_, _ = w.Write([]byte("no session"))
+		}
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	cases := []struct {
+		name           string
+		opts           Options
+		wantSecondBody string
+		wantSentCookie bool
+	}{
+		{"jar off (default)", Options{}, "no session", false},
+		{"jar on", Options{DisableCookieJar: ptr(false)}, "session=abc123", true},
+		{"jar on, ephemeral", Options{DisableCookieJar: ptr(false), Ephemeral: true}, "no session", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ClearJar()
+			if _, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/login"}, tc.opts); err != nil {
+				t.Fatalf("Send (login): %v", err)
+			}
+			resp, err := Send(context.Background(), Request{Method: "GET", URL: srv.URL + "/me"}, tc.opts)
+			if err != nil {
+				t.Fatalf("Send (me): %v", err)
+			}
+			if resp.Body != tc.wantSecondBody {
+				t.Fatalf("second send body = %q, want %q", resp.Body, tc.wantSecondBody)
+			}
+		})
+	}
+
+	// The ephemeral case still carries its cookie within one send's own redirect chain: assert
+	// SentCookies names it on a send that both sets and immediately uses the cookie via a redirect.
+	t.Run("ephemeral jar works within one send's own chain", func(t *testing.T) {
+		ClearJar()
+		var loginURL string
+		chainMux := http.NewServeMux()
+		chainMux.HandleFunc("/set-and-redirect", func(w http.ResponseWriter, r *http.Request) {
+			http.SetCookie(w, &http.Cookie{Name: "session", Value: "xyz"})
+			http.Redirect(w, r, loginURL+"/check", http.StatusFound)
+		})
+		chainMux.HandleFunc("/check", func(w http.ResponseWriter, r *http.Request) {
+			c, err := r.Cookie("session")
+			if err == nil {
+				_, _ = w.Write([]byte("session=" + c.Value))
+			} else {
+				_, _ = w.Write([]byte("no session"))
+			}
+		})
+		chainSrv := httptest.NewServer(chainMux)
+		defer chainSrv.Close()
+		loginURL = chainSrv.URL
+
+		resp, err := Send(context.Background(), Request{Method: "GET", URL: chainSrv.URL + "/set-and-redirect"},
+			Options{DisableCookieJar: ptr(false), Ephemeral: true})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		if resp.Body != "session=xyz" {
+			t.Fatalf("body = %q, want the redirect hop to carry the cookie an ephemeral jar set moments earlier", resp.Body)
+		}
+
+		// Nothing reached the shared jar: a fresh, non-ephemeral send to the same host sees none.
+		resp2, err := Send(context.Background(), Request{Method: "GET", URL: chainSrv.URL + "/check"}, Options{DisableCookieJar: ptr(false)})
+		if err != nil {
+			t.Fatalf("Send: %v", err)
+		}
+		if resp2.Body != "no session" {
+			t.Fatalf("body = %q, want the ephemeral send's cookie to never reach the shared jar", resp2.Body)
+		}
+	})
+}
+
+// TestSend_ForcedHTTP1 is P90 §6.1/§2.3: the only check that Options.HTTPVersion actually drives
+// http.Transport.Protocols the way normalize()/transportFor claim.
+func TestSend_ForcedHTTP1(t *testing.T) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	srv.EnableHTTP2 = true
+	srv.StartTLS()
+	defer srv.Close()
+	client := srv.Client()
+
+	t.Run("HTTPVersion 2", func(t *testing.T) {
+		resp := doForcedVersionSend(t, srv.URL, ptr("2"), client)
+		if resp.Proto != "HTTP/2.0" {
+			t.Fatalf("Proto = %q, want HTTP/2.0", resp.Proto)
+		}
+	})
+
+	t.Run("HTTPVersion 1.1", func(t *testing.T) {
+		resp := doForcedVersionSend(t, srv.URL, ptr("1.1"), client)
+		if resp.Proto != "HTTP/1.1" {
+			t.Fatalf("Proto = %q, want HTTP/1.1", resp.Proto)
+		}
+	})
+}
+
+// doForcedVersionSend routes through Send with SSLVerify off (srv.StartTLS's cert is
+// self-signed) — the test's whole point is HTTPVersion, so the transport cache's skipVerify slot
+// is exercised incidentally rather than tested on its own (CLAUDE.md: not worth a dedicated test).
+func doForcedVersionSend(t *testing.T, url string, version *string, _ *http.Client) Response {
+	t.Helper()
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: url},
+		Options{HTTPVersion: version, SSLVerify: ptr(false)})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	return resp
 }

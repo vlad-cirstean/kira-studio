@@ -199,7 +199,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 			t.Fatalf("resolvedURL = %q, want the reference recognisable as {{base%%20url}}", resolvedURL)
 		}
 
-		resp, err := httpclient.Send(context.Background(), httpclient.Request{Method: "GET", URL: resolvedURL})
+		resp, err := httpclient.Send(context.Background(), httpclient.Request{Method: "GET", URL: resolvedURL}, httpclient.Options{})
 		if err != nil {
 			t.Fatalf("Send: %v", err)
 		}

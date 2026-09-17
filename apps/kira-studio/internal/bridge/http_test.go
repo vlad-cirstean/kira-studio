@@ -418,7 +418,7 @@ func TestMaskSecrets_MasksURLEncodedBodyDespiteQueryEscape(t *testing.T) {
 			Mode:       "urlencoded",
 			URLEncoded: []httpclient.Field{{Name: "token", Value: secretValue}},
 		},
-	})
+	}, httpclient.Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestMaskSecrets_MasksPathEscapedSecret(t *testing.T) {
 	resp, err := httpclient.Send(context.Background(), httpclient.Request{
 		Method: "GET",
 		URL:    srv.URL + "/" + secretValue + "/orders",
-	})
+	}, httpclient.Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}

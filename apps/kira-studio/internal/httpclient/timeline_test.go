@@ -49,7 +49,7 @@ func threeHopChain(t *testing.T) (base string) {
 func TestTimeline_BucketsPerHop(t *testing.T) {
 	base := threeHopChain(t)
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: base + "/h0"})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: base + "/h0"}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestTimeline_BucketsPerHop(t *testing.T) {
 func TestTimeline_ReusedHopHasNoPhases(t *testing.T) {
 	base := threeHopChain(t)
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: base + "/h0"})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: base + "/h0"}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestTimeline_CrossHostHopHasOwnPhaseSet(t *testing.T) {
 	t.Cleanup(a.Close)
 	aURL := localhostURL(t, a)
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: aURL})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: aURL}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestTimeline_NoWaitWhenServerAnswersEarly(t *testing.T) {
 	resp, err := Send(context.Background(), Request{
 		Method: "POST", URL: srv.URL,
 		Body: Body{Mode: string(BodyRaw), Raw: oversized},
-	})
+	}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestTimeline_PerHopMethodAndHeaders(t *testing.T) {
 	t.Cleanup(srv.Close)
 	serverURL = srv.URL
 
-	resp, err := Send(context.Background(), Request{Method: "POST", URL: serverURL + "/a"})
+	resp, err := Send(context.Background(), Request{Method: "POST", URL: serverURL + "/a"}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestTimeline_HeaderCapTruncatesAndFlagsElision(t *testing.T) {
 	t.Cleanup(srv.Close)
 	serverURL = srv.URL
 
-	resp, err := Send(context.Background(), Request{Method: "GET", URL: serverURL + "/big"})
+	resp, err := Send(context.Background(), Request{Method: "GET", URL: serverURL + "/big"}, Options{})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -321,7 +321,7 @@ func TestTimeline_ConcurrentSendsDoNotRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			resp, err := Send(context.Background(), Request{Method: "GET", URL: base + "/h0"})
+			resp, err := Send(context.Background(), Request{Method: "GET", URL: base + "/h0"}, Options{})
 			if err != nil {
 				errs <- fmt.Errorf("Send: %w", err)
 				return
