@@ -542,7 +542,7 @@ test('Query console — Format after an undo reaches the editor even when the re
   const CONNECTION_SUMMARY = postgresConnectionSummary(
     CONNECTION_ID,
     'Format After Undo DB',
-    'violet',
+    'grey',
   );
   const FIXTURE = orderItemsFixture(CONNECTION_ID);
 
@@ -550,14 +550,14 @@ test('Query console — Format after an undo reaches the editor even when the re
     { channel: IPC.connectionsList, response: [] },
     {
       channel: IPC.connectionsCreate,
-      args: postgresCreateArgs('Format After Undo DB', 'violet'),
+      args: postgresCreateArgs('Format After Undo DB', 'grey'),
       response: CONNECTION_SUMMARY,
     },
     ...FIXTURE.control,
   ];
 
   const { window: page } = await relaunch({ control: CONTROL });
-  await connectAndExpandPostgres(page, 'Format After Undo DB', 'violet');
+  await connectAndExpandPostgres(page, 'Format After Undo DB', 'grey');
   await openConsoleFromMenu(page, ORDER_ITEMS_PATH);
   const view = page.locator('[data-testid="console-view"]');
   await expect(view).toBeVisible();
