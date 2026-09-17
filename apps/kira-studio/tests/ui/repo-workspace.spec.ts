@@ -1054,7 +1054,8 @@ test("the tab strip's + opens a terminal tab at the active worktree", async ({ r
   await page.locator('[data-testid="tab-strip-new"]').click();
   const menu = page.locator('[data-testid="context-menu"]');
   await expect(menu).toBeVisible();
-  await expect(menu.locator('[data-testid^="menu-item-"]')).toHaveCount(1);
+  // Terminal, Claude Code, Manage scripts… — no scripts configured in this test (P85 §6.1).
+  await expect(menu.locator('[data-testid^="menu-item-"]')).toHaveCount(3);
 
   await menu.locator('[data-testid="menu-item-new-terminal"]').click();
 
@@ -1087,6 +1088,86 @@ test("the tab strip's + opens a terminal tab at the active worktree", async ({ r
     exited: false,
   });
   await expect(page.locator('.xterm-rows')).toContainText('hello');
+});
+
+// P85 §6.1: same terminal tab, seeded with a command that runs on open — no real Claude Code
+// binary in this harness, just the launch wiring (RepoTerminalView.vue's own mount() forwards
+// tab.state.command to terminalOpen, terminal/session.go's own -c arg is Go-side, out of scope).
+test("the tab strip's + launches Claude Code with the claude command", async ({ relaunch }) => {
+  const { window: page, control } = await relaunch({ control: [...CONTROL, TERMINAL_OPEN_OK] });
+
+  await openGitModule(page);
+  await repoRow(page).click();
+
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  const menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-testid="menu-item-new-claude-code"]').click();
+
+  const terminalTab = tab(page, 'terminal');
+  await expect(terminalTab).toHaveCount(1);
+  await expect(terminalTab).toContainText('Claude Code');
+
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.terminalOpen &&
+            (e.args as { cwd?: string; command?: string } | undefined)?.cwd === REPO.root &&
+            (e.args as { cwd?: string; command?: string } | undefined)?.command === 'claude',
+        ),
+    )
+    .toBe(true);
+});
+
+// P85 §6.1/§6.4: one configured script joins Terminal/Claude Code in the dropdown, and its own
+// workingDir (not the active repo's root) becomes the launched terminal's cwd.
+test("the tab strip's + lists a configured script and launches it at its own working dir", async ({
+  relaunch,
+}) => {
+  const SCRIPT = {
+    id: 'script-1',
+    name: 'Dev server',
+    command: 'npm run dev',
+    workingDir: '/tmp/demo-repo/frontend',
+    color: 'green',
+    sortOrder: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+  const { window: page, control } = await relaunch({
+    control: [...CONTROL, TERMINAL_OPEN_OK, { channel: IPC.customScriptsList, response: [SCRIPT] }],
+  });
+
+  await openGitModule(page);
+  await repoRow(page).click();
+
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  const menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  // Terminal, Claude Code, Dev server, Manage scripts….
+  await expect(menu.locator('[data-testid^="menu-item-"]')).toHaveCount(4);
+
+  await menu.locator(`[data-testid="menu-item-${SCRIPT.id}"]`).click();
+
+  const terminalTab = tab(page, 'terminal');
+  await expect(terminalTab).toHaveCount(1);
+  await expect(terminalTab).toContainText('Dev server');
+
+  await expect
+    .poll(() =>
+      control
+        .log()
+        .some(
+          (e) =>
+            e.channel === IPC.terminalOpen &&
+            (e.args as { cwd?: string; command?: string } | undefined)?.cwd === SCRIPT.workingDir &&
+            (e.args as { cwd?: string; command?: string } | undefined)?.command === SCRIPT.command,
+        ),
+    )
+    .toBe(true);
 });
 
 // P83 §10.2/§11.2: a worktree row's own context menu (out of scope for P82 — nothing needed one
