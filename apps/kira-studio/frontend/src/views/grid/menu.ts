@@ -170,9 +170,8 @@ export function foreignKeyNavItems(
     .map((fk) => fkNavItem('go-to-referenced', fk, ctx));
 }
 
-// P67 §5.1: mirrors fkNavItem above one for one (same disabled predicate, same id convention) so
-// the cell menu's mirror action and the preview popover's own "Edit this record" can never
-// disagree about what's editable.
+// P67 §5.1: mirrors fkNavItem above one for one (same disabled predicate, same id convention).
+// P89: the only edit entry point for a referenced row — the preview popover dropped its own.
 function fkEditItem(entry: ForeignKeyMeta, ctx: FkNavContext): MenuItem {
   const label = qualifiedNameForPath(ctx.connectionId, entry.referencedPath);
   return {

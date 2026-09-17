@@ -7,12 +7,7 @@ import { computeFloatPosition, pointReference } from '../../theme/floatingPositi
 import { typeClassColor } from '../../theme/icons';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import { type FkPreviewState, fetchReferencedRow, type PreviewSignal } from './fkPreview';
-import {
-  editReferencedRow,
-  type FkNavContext,
-  foreignKeyValueFilter,
-  qualifiedNameForPath,
-} from './menu';
+import { type FkNavContext, foreignKeyValueFilter, qualifiedNameForPath } from './menu';
 
 // P67 §4.3: anchored the same way ContextMenu.vue's own top-level menu is — a virtual point
 // reference (theme/floatingPosition.ts's pointReference), NOT the nav button element. §1.1: that
@@ -111,11 +106,6 @@ function onOpenClick(): void {
   props.openInNewTab();
 }
 
-function onEditClick(): void {
-  emit('close');
-  void editReferencedRow(props.entry, props.ctx);
-}
-
 onMounted(() => {
   document.addEventListener('keydown', onKeydown, true);
   void position();
@@ -154,6 +144,12 @@ onUnmounted(() => {
         </span>
       </div>
 
+      <div class="fk-preview-actions">
+        <AppButton data-testid="fk-preview-open" icon="arrow-right" @click="onOpenClick">
+          Open in new tab
+        </AppButton>
+      </div>
+
       <div class="fk-preview-body">
         <div v-if="state.status === 'loading'" class="fk-preview-loading">
           <CodiconIcon name="loading" class="spin" :size="14" />
@@ -188,20 +184,6 @@ onUnmounted(() => {
           </tbody>
         </table>
       </div>
-
-      <div class="fk-preview-actions">
-        <AppButton data-testid="fk-preview-open" icon="arrow-right" @click="onOpenClick">
-          Open in new tab
-        </AppButton>
-        <AppButton
-          v-if="!(state.status === 'ready' && state.rows.length === 0)"
-          data-testid="fk-preview-edit"
-          icon="edit"
-          @click="onEditClick"
-        >
-          Edit this record
-        </AppButton>
-      </div>
     </div>
   </div>
 </template>
@@ -218,7 +200,6 @@ onUnmounted(() => {
   width: 320px;
   max-height: var(--kira-float-max-h, none);
   max-width: var(--kira-float-max-w, none);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -230,6 +211,7 @@ onUnmounted(() => {
   gap: var(--kira-s-2);
   padding: var(--kira-s-3);
   border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+  flex: 0 0 auto;
 }
 
 .fk-preview-title {
@@ -241,7 +223,11 @@ onUnmounted(() => {
 
 .fk-preview-body {
   padding: var(--kira-s-3);
-  min-height: 40px;
+  flex: 1 1 auto;
+  /* Load-bearing: without this a flex child refuses to shrink below its content height, and the
+     panel overflows its own max-height instead of scrolling here. */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .fk-preview-loading {
@@ -291,6 +277,7 @@ onUnmounted(() => {
   display: flex;
   gap: var(--kira-s-2);
   padding: var(--kira-s-3);
-  border-top: var(--kira-border-width) solid var(--kira-border-strong);
+  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
+  flex: 0 0 auto;
 }
 </style>

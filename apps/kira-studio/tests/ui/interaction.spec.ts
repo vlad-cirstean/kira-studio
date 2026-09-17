@@ -1626,9 +1626,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await rightClick(gridCell(page, 0, 'manager_id'));
   const fkMenuIds = await menuItemIds(page);
   expect(fkMenuIds.some((id) => id.startsWith('go-to-referenced-'))).toBe(true);
-  // P67 §7 case 6: the mirror "Edit referenced row" item, built from the same editReferencedRow/
-  // foreignKeyValueFilter the popover's own Edit action calls — the P7 D3 invariant, now for two
-  // actions.
+  // P67 §7 case 6 / P89: "Edit referenced row" — editReferencedRow's only entry point (the
+  // popover dropped its own, P89 §2).
   expect(fkMenuIds.some((id) => id.startsWith('edit-referenced-'))).toBe(true);
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
@@ -1646,15 +1645,17 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   expect(await cellText(page, 0, 'order_id')).toBe('1');
   expect(await cellText(page, 0, 'product_id')).toBe('1');
 
-  // P67 §7 case 3: "Edit this record" opens a new tab on the referenced table, lands the caret on
-  // its first non-primary-key column ('name' — 'id' is products' own primary key) and enters edit
+  // P67 §7 case 3 / P89: the cell menu's "Edit referenced row" item (the popover dropped its own
+  // "Edit this record" — P89 §2) opens a new tab on the referenced table, lands the caret on its
+  // first non-primary-key column ('name' — 'id' is products' own primary key) and enters edit
   // mode; typing into the dock stages into that NEW tab's own pending set — the *existing* edit
   // surface, never a second one.
   tabCount = await page.locator('[data-testid="tab"]').count();
-  await clickCellNav(page, 0, 'product_id');
-  await expect(fkPreview(page)).toBeVisible();
-  await fkPreview(page).locator('[data-testid="fk-preview-edit"]').click();
-  await expect(fkPreview(page)).toHaveCount(0);
+  await rightClick(gridCell(page, 0, 'product_id'));
+  const editMenuIds = await menuItemIds(page);
+  const editItemId = editMenuIds.find((id) => id.startsWith('edit-referenced-'));
+  expect(editItemId).toBeDefined();
+  await page.click(`[data-testid="menu-item-${editItemId}"]`);
   await expect(page.locator('[data-testid="tab"]')).toHaveCount(tabCount + 1);
   await expect(grid).toBeVisible();
   await expect(headerCell(page, 'price')).toBeVisible();
@@ -1696,8 +1697,8 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
 
   // =============================================================================================
   // P67 §7 case 4: no matching row. orders row 1's customer_id (2) filtered against customers
-  // comes back empty (an orphaned FK value, or the row deleted since the page loaded) — "Edit this
-  // record" is hidden, "Open in new tab" stays offered.
+  // comes back empty (an orphaned FK value, or the row deleted since the page loaded) — "Open in
+  // new tab" stays offered.
   // =============================================================================================
   const ordersRowAgain = await findRow(page, ORDERS_PATH);
   await ordersRowAgain.dblclick();
@@ -1708,7 +1709,6 @@ test('interaction completeness — grid menus, selection, copy/paste, shortcuts'
   await clickCellNav(page, 1, 'customer_id');
   await expect(fkPreview(page)).toBeVisible();
   await expect(fkPreview(page).locator('[data-testid="fk-preview-empty"]')).toBeVisible();
-  await expect(fkPreview(page).locator('[data-testid="fk-preview-edit"]')).toHaveCount(0);
   await expect(fkPreview(page).locator('[data-testid="fk-preview-open"]')).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(fkPreview(page)).toHaveCount(0);
