@@ -1393,6 +1393,43 @@ the app's own rendering engine, which is the part that was actually in question 
 centering, not layout/composition). No known open item — the fix is geometrically exact (0.0px
 residual), not a tuned approximation.
 
+## P89 result
+
+Landed per plan (`docs/v1.8/plans/P89-fk-preview-format-fix.md`), 3 commits (`b9933913`, `943105f2`,
+`99b83bbf`). Two unrelated bugs.
+
+**FK preview popover.** Reordered to header/actions/body flex layout — the body is now the only
+scroller (`.fk-preview-body`'s `flex: 1 1 auto; min-height: 0; overflow-y: auto`), so "Open in new
+tab" stays visible under the header regardless of row width. Deleted "Edit this record" outright:
+the popover called `editReferencedRow` directly with no emit/prop to unwire, and the cell context
+menu's "Edit referenced row" item (`menu.ts`'s `fkEditItem`) stays the sole edit entry point —
+confirmed still wired (`menu.ts:186`) before deleting. `tests/ui/interaction.spec.ts`'s P67 case 3
+now drives that cell-menu item; the vacuous `fk-preview-edit` count-0 assertion is gone.
+
+**Format regression, root cause confirmed as the plan predicted.** `ConsoleView.vue`'s `localDoc`
+is a `shallowRef`; Vue skips the dep trigger when an assigned value equals the ref's current one.
+After format-undo-format, the second Format's result is byte-identical to the first (still held by
+`localDoc`), so the assignment was a silent no-op — the store advanced but Monaco kept showing the
+user's unformatted text, and the *next* Format press compared the store's already-formatted text
+against itself and reported "already formatted" on a document the editor never held. Fixed by
+factoring `MonacoHost`'s `props.doc` watcher body into `applyExternalDoc`/`setDoc` (same
+`doc === model.getValue()` guard) and having `ConsoleView`'s `tab.state.text` watcher call it
+directly, moving `lastEmitted`'s update into that same watcher. `ConsoleSavedMenu.vue`'s `setText`
+call needed no separate patch — it goes through the same watcher. Also dropped the
+"(ClickHouse identifiers)" aside from the format note on every non-ClickHouse console.
+
+**Verification.** `bun run typecheck`/`lint`/`build` clean after each commit (one pre-existing
+`UncommittedChangesStrip.vue` lint info, untouched, same as P86/P88). New regression test
+(`console-format.spec.ts`, format→undo→format) confirmed failing against the pre-fix source
+(reverted the two source files, reran in isolation: `toMatch(/^SELECT\n/)` timed out, editor still
+showed the one-liner) and passing after — a real regression test, not just new coverage. Full
+`bun run test:ui` (291 tests, `ui`/webkit project): all pass, no other spec regressed. Manual
+screenshots against the real rendered app (mocked-IPC harness, `tests/ui/fixtures.ts`) confirm both
+fixes visually: the popover shows header → "Open in new tab" → body in that order with no "Edit
+this record" button; the format-undo-format-format sequence re-indents correctly on the second
+Format (not stuck one-line), and a third press with no edit shows the note with the ClickHouse
+aside correctly absent on this Postgres console.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
