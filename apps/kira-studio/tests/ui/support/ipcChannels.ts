@@ -188,6 +188,12 @@ export const IPC = {
   customScriptsUpdate: 'kira:customScripts:update',
   customScriptsRemove: 'kira:customScripts:remove',
 
+  // P86 §9.3/§12: the Claude Code settings section's own status, and the running-agent-sessions
+  // widget's boot-time hydrate.
+  agentHooksStatus: 'kira:agentHooks:status',
+  agentHooksSetEnabled: 'kira:agentHooks:setEnabled',
+  terminalAgentSessions: 'kira:agent:sessions:list',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
@@ -206,4 +212,11 @@ export const IPC = {
   // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape, EmitTo every
   // window (not one), driven by emitWailsEvent(page, IPC.customScriptsChanged, …) the same way.
   customScriptsChanged: 'kira:customScripts:changed',
+  // P86 §11/§8.4: every live Claude Code session across every window, and one hook firing for one
+  // tab — both Emit (not EmitTo), customScriptsChanged's own shape restated. Real wire channel
+  // strings verbatim (bridge/events.go's ChannelAgentSessions/ChannelAgentEvent), no
+  // FQN_SUFFIX_BY_IPC_KEY entry (push channels, never a bound call) — driven by
+  // emitWailsEvent(page, IPC.agentSessions/agentEvent, …), terminal's own precedent above.
+  agentSessions: 'kira:agent:sessions',
+  agentEvent: 'kira:agent:event',
 } as const;

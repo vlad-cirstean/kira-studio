@@ -186,6 +186,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   customScriptsCreate: 'CustomScriptsService.Create',
   customScriptsUpdate: 'CustomScriptsService.Update',
   customScriptsRemove: 'CustomScriptsService.Remove',
+
+  agentHooksStatus: 'AgentHooksService.Status',
+  agentHooksSetEnabled: 'AgentHooksService.SetEnabled',
+  terminalAgentSessions: 'TerminalService.AgentSessions',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -392,6 +396,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // Promise.all as hydrateCodeRepos() above, same reasoning — a spec that never configures a
   // script gets "no scripts yet", not a fixture miss.
   [IPC.customScriptsList]: '[]',
+  // P86: main.ts's bootstrap() joins hydrateAgentHooks()/initAgentSessions() to the same
+  // unconditional-every-boot Promise.all as hydrateCustomScripts() above, same reasoning — a spec
+  // that never configures hooks gets "off, nothing running" and "no sessions yet", not a fixture
+  // miss.
+  [IPC.agentHooksStatus]: JSON.stringify({ running: false, settingsPath: '', error: '' }),
+  [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
   // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
   // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
   // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard

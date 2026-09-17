@@ -1110,14 +1110,19 @@ test("the tab strip's + launches Claude Code with the claude command", async ({ 
 
   await expect
     .poll(() =>
-      control
-        .log()
-        .some(
-          (e) =>
-            e.channel === IPC.terminalOpen &&
-            (e.args as { cwd?: string; command?: string } | undefined)?.cwd === REPO.root &&
-            (e.args as { cwd?: string; command?: string } | undefined)?.command === 'claude',
-        ),
+      control.log().some(
+        (e) =>
+          e.channel === IPC.terminalOpen &&
+          (e.args as { cwd?: string; command?: string; launchKind?: string } | undefined)?.cwd ===
+            REPO.root &&
+          (e.args as { cwd?: string; command?: string; launchKind?: string } | undefined)
+            ?.command === 'claude' &&
+          // P86 §19.3 item 1: extends this same assertion rather than adding a case —
+          // launchKind is what tells a Claude Code launch apart from a shell one (§4), not the
+          // command string.
+          (e.args as { cwd?: string; command?: string; launchKind?: string } | undefined)
+            ?.launchKind === 'claude-code',
+      ),
     )
     .toBe(true);
 });
@@ -1304,4 +1309,76 @@ test('every repo row shows its checked-out branch, main worktree first', async (
   await expect(worktreeRows).toHaveCount(2);
   await expect(worktreeRows.first()).toHaveAttribute('data-worktree-path', REPO.repoId);
   await expect(worktreeRows.first().locator('.worktree-badge')).toHaveText('main');
+});
+
+// P86 §19.3 item 2/§14.1: absent with no agent running (StatusBar.vue's own "absent, not a zero
+// reading" rule — no tab, no terminal, no launch needed at all, since the widget's count is Go's
+// own app-wide broadcast, not derived from anything this window opened).
+test('the agent-sessions status-bar widget is absent with no session running, and shows the live count', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch();
+  const widget = page.locator('[data-testid="agent-sessions"]');
+  await expect(widget).toHaveCount(0);
+
+  await emitWailsEvent(page, IPC.agentSessions, {
+    sessions: [{ terminalId: 't1', cwd: REPO.root }],
+  });
+  await expect(widget).toBeVisible();
+  await expect(widget).toHaveText('1');
+
+  await emitWailsEvent(page, IPC.agentSessions, { sessions: [] });
+  await expect(widget).toHaveCount(0);
+});
+
+// P86 §19.3 item 3/§14.2: a Notification for a non-active Claude Code tab sets the attention dot;
+// activating the tab clears it (onClick is already where a tab becomes active).
+test('a Notification event marks a non-active Claude Code tab with the attention dot, cleared by activating it', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: [...CONTROL, TERMINAL_OPEN_OK] });
+
+  await openGitModule(page);
+  await repoRow(page).click();
+
+  // The Claude Code tab opens first, and is active until the second tab below steals focus.
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  let menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-testid="menu-item-new-claude-code"]').click();
+
+  const claudeTab = tab(page, 'terminal');
+  await expect(claudeTab).toHaveCount(1);
+  const claudeTerminalId = await claudeTab.getAttribute('data-tab-id');
+  expect(claudeTerminalId).not.toBeNull();
+
+  // A second, plain terminal — openTab's own "active: true" on the newly opened tab leaves the
+  // Claude Code tab above inactive, the precondition §14.2's dot rule needs.
+  await page.locator('[data-testid="tab-strip-new"]').click();
+  menu = page.locator('[data-testid="context-menu"]');
+  await expect(menu).toBeVisible();
+  await menu.locator('[data-testid="menu-item-new-terminal"]').click();
+
+  await expect(tab(page, 'terminal')).toHaveCount(2);
+  const claudeTabAfter = page.locator(`[data-testid="tab"][data-tab-id="${claudeTerminalId}"]`);
+  await expect(claudeTabAfter).toHaveAttribute('data-active', 'false');
+  await expect(claudeTabAfter).toHaveAttribute('data-attention', 'false');
+
+  await emitWailsEvent(page, IPC.agentEvent, {
+    terminalId: claudeTerminalId,
+    event: 'Notification',
+    sessionId: 's1',
+    cwd: REPO.root,
+    toolName: '',
+    toolUseId: '',
+    notificationType: 'permission',
+    message: 'May I run this?',
+    source: '',
+    reason: '',
+  });
+  await expect(claudeTabAfter).toHaveAttribute('data-attention', 'true');
+
+  await claudeTabAfter.click();
+  await expect(claudeTabAfter).toHaveAttribute('data-active', 'true');
+  await expect(claudeTabAfter).toHaveAttribute('data-attention', 'false');
 });
