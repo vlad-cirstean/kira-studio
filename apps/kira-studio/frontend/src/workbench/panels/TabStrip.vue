@@ -4,6 +4,7 @@ import { isRepoWorkspace, repoIdOfWorkspace } from '@shared/domain/workspace';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
+import { agentActivityFor } from '../../state/agentSessions';
 import { codeRepoRecord } from '../../state/coderepos';
 import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
 import { customScriptsState } from '../../state/customScripts';
@@ -31,6 +32,18 @@ import { wheelToHorizontal } from '../../wheelScroll';
 
 function isPinned(tab: TabRecord): boolean {
   return TAB_KINDS[tab.kind].pinned === true;
+}
+
+// P86 §14.2: a Claude Code tab whose activity is 'attention' and which is not the active tab
+// renders a dot — cleared by activating it (onClick is already where a tab becomes active, so
+// nothing extra is wired for that half).
+function isAttention(tab: TabRecord): boolean {
+  return (
+    !tab.active &&
+    tab.kind === 'terminal' &&
+    tab.state.launchKind === 'claude-code' &&
+    agentActivityFor(tab.id)?.phase === 'attention'
+  );
 }
 
 // P1 D4/C4: title/icon/rail all read the tab-kind registry now — TabStrip.vue no longer knows
@@ -322,6 +335,7 @@ function newTabMenuItems(): MenuItem[] {
           'is-dragging': dragId === tab.id,
           'is-preview': isPreview(tab.id),
           'is-incognito': isIncognito(tab.id),
+          'is-attention': isAttention(tab),
         }"
         data-testid="tab"
         :data-tab-id="tab.id"
@@ -330,6 +344,7 @@ function newTabMenuItems(): MenuItem[] {
         :data-preview="isPreview(tab.id)"
         data-pinned="false"
         :data-incognito="isIncognito(tab.id)"
+        :data-attention="isAttention(tab)"
         :data-color="colorFor(tab)"
         :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
         draggable="true"
@@ -499,6 +514,23 @@ function newTabMenuItems(): MenuItem[] {
 /* C5 §5.1: the preview-tab affordance — VS Code's own convention for "opened, not yet promoted". */
 .p-tab.is-preview .tab-title {
   font-style: italic;
+}
+
+/* P86 §14.2: a Claude Code session waiting on you, in a tab that is not the active one —
+   IconButton.vue's own .has-indicator::after dot, --kira-state-on's existing amber reused rather
+   than a new token for a single small badge. */
+.p-tab.is-attention {
+  position: relative;
+}
+.p-tab.is-attention::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--kira-state-on);
 }
 
 .tab-badge {

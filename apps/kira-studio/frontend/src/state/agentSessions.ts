@@ -1,4 +1,9 @@
-import type { AgentActivity, AgentSession, AgentSessionsEvent } from '@shared/domain/agent';
+import type {
+  AgentActivity,
+  AgentEvent,
+  AgentSession,
+  AgentSessionsEvent,
+} from '@shared/domain/agent';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
 
@@ -8,9 +13,9 @@ import { control } from '../bridge/control';
 // arbitrating between two same-window writers.
 export const agentSessionsState = reactive({
   sessions: [] as AgentSession[],
-  // Keyed by terminalId. §13's reducer (a later phase commit) is the only writer that ever adds
-  // an entry; this commit only prunes it, so the map stays empty until hooks are enabled and a
-  // session fires its first event.
+  // Keyed by terminalId. §13's reducer below is the only writer that ever adds an entry;
+  // applySessions only prunes it, so a killed tab's activity disappears even when SessionEnd
+  // never arrived (rule 5).
   activity: new Map<string, AgentActivity>(),
 });
 
@@ -24,13 +29,77 @@ function applySessions(event: AgentSessionsEvent): void {
   }
 }
 
-let unsubscribe: (() => void) | null = null;
+export const MAX_RUNNING_TOOLS = 64;
+
+function emptyActivity(sessionId: string | null): AgentActivity {
+  return { phase: 'idle', runningTools: [], toolName: null, message: null, sessionId };
+}
+
+// P86 §13: the one piece here with real interacting rules, fed by an out-of-order external
+// producer — each hook is its own `curl` process, so a PostToolUse can legitimately arrive before
+// its own PreToolUse. Pure: (prev, event) => next. The store applies it below; the unit test
+// (tests/unit/agent-activity-reducer.spec.ts) calls it directly.
+export function reduceAgentActivity(
+  prev: AgentActivity | undefined,
+  event: AgentEvent,
+): AgentActivity {
+  const base = prev ?? emptyActivity(event.sessionId || null);
+  switch (event.event) {
+    case 'SessionStart':
+      // Resets rather than merges — a user who exits `claude` and reruns it in the same tab
+      // starts clean.
+      return emptyActivity(event.sessionId || null);
+    case 'PreToolUse': {
+      const runningTools = base.runningTools.includes(event.toolUseId)
+        ? base.runningTools
+        : [...base.runningTools, event.toolUseId].slice(-MAX_RUNNING_TOOLS);
+      return { ...base, phase: 'working', runningTools, toolName: event.toolName };
+    }
+    case 'PostToolUse':
+      // Pairing is by tool_use_id, never a depth counter — a set is order-insensitive; a counter
+      // would go negative and strand the phase. An unmatched id is a no-op, not an error.
+      return { ...base, runningTools: base.runningTools.filter((id) => id !== event.toolUseId) };
+    case 'Notification':
+      // Does not clear runningTools — a permission prompt arrives *during* a tool call; losing
+      // the set here would leave the following PostToolUse unmatched too.
+      return { ...base, phase: 'attention', message: event.message || null };
+    case 'Stop':
+      // Clears everything, which is what heals a session that lost a PostToolUse to the
+      // listener's own bounds (internal/agenthooks/http.go §6.1).
+      return { ...base, phase: 'idle', runningTools: [], message: null };
+    default:
+      return base;
+  }
+}
+
+export function agentActivityFor(terminalId: string): AgentActivity | undefined {
+  return agentSessionsState.activity.get(terminalId);
+}
+
+// SessionEnd drops the entry outright rather than going through reduceAgentActivity — nothing in
+// AgentActivity's own shape can express "no entry", so the map write happens here.
+function applyEvent(event: AgentEvent): void {
+  if (event.event === 'SessionEnd') {
+    agentSessionsState.activity.delete(event.terminalId);
+    return;
+  }
+  agentSessionsState.activity.set(
+    event.terminalId,
+    reduceAgentActivity(agentSessionsState.activity.get(event.terminalId), event),
+  );
+}
+
+let unsubscribeSessions: (() => void) | null = null;
+let unsubscribeEvent: (() => void) | null = null;
 
 // main.ts's boot Promise.all: a window opened after every currently-live session already started
 // needs a snapshot, since ChannelAgentSessions only fires on change — dbmcp.ts's hydrateDbMcp
-// precedent.
+// precedent. onAgentEvent has no boot-time hydrate of its own: activity is runtime-only, and a
+// session already in progress simply renders with no activity until its next hook fires.
 export async function initAgentSessions(): Promise<void> {
   applySessions(await control.terminalAgentSessions());
-  unsubscribe?.();
-  unsubscribe = control.onAgentSessions(applySessions);
+  unsubscribeSessions?.();
+  unsubscribeEvent?.();
+  unsubscribeSessions = control.onAgentSessions(applySessions);
+  unsubscribeEvent = control.onAgentEvent(applyEvent);
 }

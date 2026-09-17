@@ -61,11 +61,45 @@ func (s *AgentHooksService) startLocked() error {
 	return nil
 }
 
-// onEvent is agenthooks.Options.OnEvent's own callback — a no-op until P86 commit 5 wires
-// ChannelAgentEvent through it (this commit only starts/stops the listener; nothing consumes an
-// event yet, exactly as §21's own commit ordering lays out: "3. opt in... 5. show what a session
-// is doing").
-func (s *AgentHooksService) onEvent(agenthooks.Event) {}
+// onEvent is agenthooks.Options.OnEvent's own callback — broadcasts every hook firing to every
+// window (§8.4: Emit, not EmitTo, since this has no window to address). The receiving window
+// filters by terminalId against tabs it owns; state/agentSessions.ts's reducer is the consumer.
+func (s *AgentHooksService) onEvent(ev agenthooks.Event) {
+	s.Deps.Events.Emit(ChannelAgentEvent, toWireAgentEvent(ev))
+}
+
+// AgentEventWire is agenthooks.Event's own wire projection — ChannelAgentEvent's payload, one hook
+// firing for one tab. Field-for-field identical to the domain type today, kept as its own wire
+// struct anyway (AgentSessionWire's own precedent, just above in terminal.go): the bridge layer's
+// wire contract stays decoupled from internal/agenthooks's own struct even where they currently
+// match.
+type AgentEventWire struct {
+	TerminalID       string `json:"terminalId"`
+	Event            string `json:"event"`
+	SessionID        string `json:"sessionId"`
+	Cwd              string `json:"cwd"`
+	ToolName         string `json:"toolName"`
+	ToolUseID        string `json:"toolUseId"`
+	NotificationType string `json:"notificationType"`
+	Message          string `json:"message"`
+	Source           string `json:"source"`
+	Reason           string `json:"reason"`
+}
+
+func toWireAgentEvent(ev agenthooks.Event) AgentEventWire {
+	return AgentEventWire{
+		TerminalID:       ev.TerminalID,
+		Event:            ev.Event,
+		SessionID:        ev.SessionID,
+		Cwd:              ev.Cwd,
+		ToolName:         ev.ToolName,
+		ToolUseID:        ev.ToolUseID,
+		NotificationType: ev.NotificationType,
+		Message:          ev.Message,
+		Source:           ev.Source,
+		Reason:           ev.Reason,
+	}
+}
 
 // stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
 func (s *AgentHooksService) stopLocked() {

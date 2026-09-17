@@ -27,7 +27,7 @@ import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
 import type { HeadState } from '@kira/git-ipc';
-import type { AgentSessionsEvent } from '@shared/domain/agent';
+import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type {
   ConnectionInput,
   ConnectionState,
@@ -592,6 +592,9 @@ const studioControl = {
     unwrap(TerminalService.AgentSessions()).then((r) => trust<AgentSessionsEvent>(r)),
   onAgentSessions: (cb: (event: AgentSessionsEvent) => void): (() => void) =>
     on(CHANNEL.agentSessions, cb),
+  // P86 §8.4: one hook firing for one tab — state/agentSessions.ts's reducer is the one
+  // subscriber, filtering by terminalId against tabs this window owns.
+  onAgentEvent: (cb: (event: AgentEvent) => void): (() => void) => on(CHANNEL.agentEvent, cb),
 
   // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
   // state/customScripts.ts, the one store that wraps these.

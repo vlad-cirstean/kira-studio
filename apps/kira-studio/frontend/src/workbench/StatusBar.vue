@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
-import { agentSessionsState } from '../state/agentSessions';
+import { agentActivityFor, agentSessionsState } from '../state/agentSessions';
 import { appMetricsState } from '../state/appMetrics';
 import { appUpdateState } from '../state/appUpdate';
 import { blameStatusState } from '../state/blameStatus';
@@ -103,11 +103,29 @@ function basename(path: string): string {
 
 const agentCount = computed(() => agentSessionsState.sessions.length);
 
-// One line per session, basename(cwd) only for now — activity text (§13's "waiting for you" /
-// "running <tool>" / "working" / "idle") is a later phase commit's own addition once
-// state/agentSessions.ts's reducer half exists; this window has no activity data to show yet.
+// §13's own activity text: 'waiting for you' (attention, plus the bounded message when present),
+// 'running <toolName>' (working with a tool), 'working' (working with none), 'idle', or null when
+// this window knows no activity for that session (hooks off, or another window's session) — the
+// tooltip line then falls back to basename(cwd) alone.
+function activityText(terminalId: string): string | null {
+  const activity = agentActivityFor(terminalId);
+  if (!activity) return null;
+  if (activity.phase === 'attention') {
+    return activity.message ? `waiting for you: ${activity.message}` : 'waiting for you';
+  }
+  if (activity.phase === 'working') {
+    return activity.toolName ? `running ${activity.toolName}` : 'working';
+  }
+  return 'idle';
+}
+
 const agentTooltip = computed(() =>
-  agentSessionsState.sessions.map((s) => basename(s.cwd)).join('\n'),
+  agentSessionsState.sessions
+    .map((s) => {
+      const text = activityText(s.terminalId);
+      return text ? `${basename(s.cwd)} — ${text}` : basename(s.cwd);
+    })
+    .join('\n'),
 );
 </script>
 

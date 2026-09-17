@@ -71,6 +71,11 @@ const (
 	// across every window, Emit'd (not EmitTo) whenever terminal.Registry.OnChange fires, so the
 	// status-bar widget in every window agrees on the same count.
 	ChannelAgentSessions = "kira:agent:sessions"
+	// ChannelAgentEvent is P86 §8.4's own per-hook broadcast — one Claude Code hook firing for one
+	// tab, Emit'd (not EmitTo, unlike ChannelTerminal) since AgentHooksService.onEvent has no
+	// window to address: a hook event is filtered by the receiving window against terminals it
+	// owns instead (state/agentSessions.ts's own reducer, keyed by terminalId).
+	ChannelAgentEvent = "kira:agent:event"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in
