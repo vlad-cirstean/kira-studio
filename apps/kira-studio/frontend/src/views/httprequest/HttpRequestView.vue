@@ -13,7 +13,7 @@ import {
   splitUrl,
   toSavedRequest,
 } from '@kira/api-core';
-import { type HttpMethod, httpMethodToken } from '@shared/domain/http';
+import { type HttpMethod, type HttpRequestPane, httpMethodToken } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
@@ -38,7 +38,9 @@ import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/ranges';
 import { registerCommand } from '../../shortcuts/commands';
+import { settingsState } from '../../state/settings';
 import { isIncognito, setIncognito } from '../../state/tabIncognito';
+import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
@@ -51,11 +53,14 @@ import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
+import CookiesPane from './CookiesPane.vue';
+import { cookiesRuntime, scheduleCookiesFetch } from './cookies';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
+import RequestSettingsPane from './RequestSettingsPane.vue';
 import ResponsePane from './ResponsePane.vue';
-import { resolveForExport, resolveTabState, runtime, send, stop } from './state';
+import { onSendCompleted, resolveForExport, resolveTabState, runtime, send, stop } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
@@ -282,6 +287,16 @@ function onStop(): void {
 const paramsCount = computed(() => parseQuery(splitUrl(props.tab.state.url).query).length);
 const headersCount = computed(() => props.tab.state.headers.filter((h) => h.enabled).length);
 
+// P90 §2.6: the Settings segment's own count badge — how many of the seven leaves this request
+// overrides (non-null).
+const settingsOverrideCount = computed(
+  () => Object.values(props.tab.state.settings).filter((v) => v !== null).length,
+);
+
+// P90 §3.1: the Cookies segment's own count badge — populated by cookies.ts's shared runtime, kept
+// fresh by the watcher below regardless of which pane is currently showing.
+const requestCookiesCount = computed(() => cookiesRuntime[props.tab.id]?.cookies.length ?? 0);
+
 // D12: a count badge per segment — SegmentedControl has no dedicated count slot, so it is baked
 // into the label text instead of widening that shared primitive for one caller.
 const REQUEST_PANE_OPTIONS = computed(() => [
@@ -300,9 +315,20 @@ const REQUEST_PANE_OPTIONS = computed(() => [
     label: bodyBadgeLabel(props.tab.state),
     testid: 'http-request-pane-body',
   },
+  {
+    value: 'settings' as const,
+    label:
+      settingsOverrideCount.value > 0 ? `Settings (${settingsOverrideCount.value})` : 'Settings',
+    testid: 'http-request-pane-settings',
+  },
+  {
+    value: 'cookies' as const,
+    label: requestCookiesCount.value > 0 ? `Cookies (${requestCookiesCount.value})` : 'Cookies',
+    testid: 'http-request-pane-cookies',
+  },
 ]);
 
-function setRequestPane(pane: 'params' | 'headers' | 'body'): void {
+function setRequestPane(pane: HttpRequestPane): void {
   patchHttpRequestTabState(props.tab.id, { requestPane: pane });
 }
 
@@ -318,12 +344,43 @@ const fieldFilterQuery = ref('');
 // P17 D20/item 8: the unified overview panel's own open flag — component-local, same "a lens, not
 // a setting" rule as fieldFilterOpen just above.
 const overviewOpen = ref(false);
+// P90 §2.6: rewritten as an explicit allow-list — the two new panes (Settings, Cookies) have no
+// rows to filter, and the old `!== 'body'` shorthand would otherwise leave the filter/descriptions
+// toggles on screen over them.
 const showFieldFilterToggle = computed(
   () =>
-    props.tab.state.requestPane !== 'body' ||
-    props.tab.state.bodyMode === 'urlencoded' ||
-    props.tab.state.bodyMode === 'formdata',
+    props.tab.state.requestPane === 'params' ||
+    props.tab.state.requestPane === 'headers' ||
+    (props.tab.state.requestPane === 'body' &&
+      (props.tab.state.bodyMode === 'urlencoded' || props.tab.state.bodyMode === 'formdata')),
 );
+
+// P90 §2.6: a warning chip beside the Send button while this request's *effective* sslVerify is
+// false — MessageStrip.vue is too heavy for the toolbar, so this reuses the incognito chip's own
+// inline shape above.
+const effectiveSslVerify = computed(
+  () => props.tab.state.settings.sslVerify ?? settingsState.api.sslVerify,
+);
+
+// P90 §3.1: keeps cookiesRuntime fresh for this tab's current URL — on mount, on the URL changing
+// (debounced), and after every send completes — but never while the effective cookie jar is off,
+// since a jar-off request has nothing to fetch (§3.1's own rule).
+const effectiveDisableCookieJar = computed(
+  () => props.tab.state.settings.disableCookieJar ?? settingsState.api.disableCookieJar,
+);
+watch(
+  () => props.tab.state.url,
+  (url) => {
+    if (effectiveDisableCookieJar.value) return;
+    scheduleCookiesFetch(props.tab.id, url);
+  },
+  { immediate: true },
+);
+const unsubscribeSendCompleted = onSendCompleted((tabId) => {
+  if (tabId !== props.tab.id || effectiveDisableCookieJar.value) return;
+  scheduleCookiesFetch(props.tab.id, props.tab.state.url);
+});
+onUnmounted(unsubscribeSendCompleted);
 function toggleFieldFilter(): void {
   fieldFilterOpen.value = !fieldFilterOpen.value;
   // D13's own rule: closing the row must restore every hidden row.
@@ -447,6 +504,15 @@ onUnmounted(() => {
             @enter="onSend"
           />
         </div>
+        <!-- P90 §2.6: same inline chip shape the incognito chip above (#badges) uses. -->
+        <span
+          v-if="!effectiveSslVerify"
+          class="p-chip warn"
+          data-testid="http-ssl-verify-off-chip"
+          v-tooltip="'Certificate verification is off for this request'"
+        >
+          <CodiconIcon name="unverified" />
+        </span>
         <AppButton
           icon="play"
           variant="primary"
@@ -570,6 +636,14 @@ onUnmounted(() => {
             :variables="variables"
             :filter-query="fieldFilterQuery"
             :show-descriptions="tab.state.fieldDescriptions"
+          />
+          <RequestSettingsPane v-else-if="tab.state.requestPane === 'settings'" :tab="tab" />
+          <CookiesPane
+            v-else-if="tab.state.requestPane === 'cookies'"
+            mode="request"
+            :tab-id="tab.id"
+            :url="tab.state.url"
+            :disable-cookie-jar="effectiveDisableCookieJar"
           />
           <RequestBodyPane
             v-else
