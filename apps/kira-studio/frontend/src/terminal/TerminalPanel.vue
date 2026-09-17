@@ -116,101 +116,103 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 </script>
 
 <template>
-  <PanelShell
-    :search="search"
-    :empty="empty"
-    :searchable="true"
-    @update:search="search = $event"
-  >
-    <template #title>
-      <span class="panel-title">Quick commands</span>
-    </template>
-    <template #actions>
-      <IconButton
-        icon="add"
-        aria-label="Add a quick command"
-        v-tooltip="'Add a quick command'"
-        data-testid="quick-command-add"
-        @click="openAddRow"
-      />
-      <IconButton
-        icon="settings-gear"
-        aria-label="Manage scripts"
-        v-tooltip="'Manage scripts…'"
-        data-testid="quick-commands-manage"
-        @click="openSettingsAt('Scripts')"
-      />
-    </template>
-    <template #body>
-      <div data-testid="terminal-panel" class="terminal-panel-body">
-        <div v-if="adding" class="quick-command-add" data-testid="quick-command-add-row">
-          <TextField
-            v-model="newName"
-            placeholder="Name"
-            size="md"
-            data-testid="quick-command-add-name"
-          />
-          <TextField
-            v-model="newCommand"
-            placeholder="Command"
-            size="md"
-            class="mono"
-            data-testid="quick-command-add-command"
-          />
-          <div class="quick-command-add-actions">
-            <AppButton kind="dialog" @click="cancelAdd">Cancel</AppButton>
-            <AppButton
-              kind="dialog"
-              variant="primary"
-              :disabled="!canAdd"
-              data-testid="quick-command-add-confirm"
-              @click="onAdd"
-              >Add</AppButton
-            >
-          </div>
-          <span v-if="addError" class="field-error">{{ addError }}</span>
-        </div>
-
-        <div
-          v-if="filteredRecords.length > 0"
-          class="quick-command-list"
-          data-testid="quick-command-list"
-        >
-          <div
-            v-for="script in filteredRecords"
-            :key="script.id"
-            class="quick-command-row"
-            :data-testid="`quick-command-${script.id}`"
-            @click="runScript(script)"
-            @contextmenu.prevent="onContextMenu($event, script)"
-          >
-            <span
-              v-if="script.color !== 'none'"
-              class="swatch"
-              :style="{ background: connColorVar(script.color) }"
+  <div data-testid="terminal-panel" class="terminal-panel">
+    <PanelShell
+      :search="search"
+      :empty="empty"
+      :searchable="true"
+      @update:search="search = $event"
+    >
+      <template #title>
+        <span class="panel-title">Quick commands</span>
+      </template>
+      <template #actions>
+        <IconButton
+          icon="add"
+          aria-label="Add a quick command"
+          v-tooltip="'Add a quick command'"
+          data-testid="quick-command-add"
+          @click="openAddRow"
+        />
+        <IconButton
+          icon="settings-gear"
+          aria-label="Manage scripts"
+          v-tooltip="'Manage scripts…'"
+          data-testid="quick-commands-manage"
+          @click="openSettingsAt('Scripts')"
+        />
+      </template>
+      <template #body>
+        <div class="terminal-panel-body">
+          <div v-if="adding" class="quick-command-add" data-testid="quick-command-add-row">
+            <TextField
+              v-model="newName"
+              placeholder="Name"
+              size="md"
+              data-testid="quick-command-add-name"
             />
-            <CodiconIcon v-else name="play" :size="13" class="run-icon" />
-            <div class="quick-command-text">
-              <span class="quick-command-name">{{ script.name }}</span>
-              <span class="quick-command-command">{{ script.command }}</span>
+            <TextField
+              v-model="newCommand"
+              placeholder="Command"
+              size="md"
+              class="mono"
+              data-testid="quick-command-add-command"
+            />
+            <div class="quick-command-add-actions">
+              <AppButton kind="dialog" @click="cancelAdd">Cancel</AppButton>
+              <AppButton
+                kind="dialog"
+                variant="primary"
+                :disabled="!canAdd"
+                data-testid="quick-command-add-confirm"
+                @click="onAdd"
+                >Add</AppButton
+              >
+            </div>
+            <span v-if="addError" class="field-error">{{ addError }}</span>
+          </div>
+
+          <div
+            v-if="filteredRecords.length > 0"
+            class="quick-command-list"
+            data-testid="quick-command-list"
+          >
+            <div
+              v-for="script in filteredRecords"
+              :key="script.id"
+              class="quick-command-row"
+              :data-testid="`quick-command-${script.id}`"
+              @click="runScript(script)"
+              @contextmenu.prevent="onContextMenu($event, script)"
+            >
+              <span
+                v-if="script.color !== 'none'"
+                class="swatch"
+                :style="{ background: connColorVar(script.color) }"
+              />
+              <CodiconIcon v-else name="play" :size="13" class="run-icon" />
+              <div class="quick-command-text">
+                <span class="quick-command-name">{{ script.name }}</span>
+                <span class="quick-command-command">{{ script.command }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </template>
-    <template #empty>
-      <EmptyState icon="terminal-bash" label="No quick commands">
-        <button
-          type="button"
-          class="p-dlgbtn primary"
-          data-testid="quick-command-empty-add"
-          @click="openAddRow"
-        >
-          Add a quick command
-        </button>
-      </EmptyState>
-    </template>
-  </PanelShell>
+      </template>
+      <template #empty>
+        <EmptyState icon="terminal-bash" label="No quick commands">
+          <button
+            type="button"
+            class="p-dlgbtn primary"
+            data-testid="quick-command-empty-add"
+            @click="openAddRow"
+          >
+            Add a quick command
+          </button>
+        </EmptyState>
+      </template>
+    </PanelShell>
+  </div>
 </template>
 
 <style scoped>
