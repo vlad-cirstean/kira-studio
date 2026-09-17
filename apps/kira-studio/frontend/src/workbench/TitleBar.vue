@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
 import { moduleOfWorkspace } from '@shared/domain/workspace';
+import { control } from '../bridge/control';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { settingsOpen } from '../state/settings';
 import { activateWorkspace, workspaceState } from '../state/workspace';
@@ -18,6 +19,14 @@ const MODE_ORDER: AppMode[] = ['studio', 'api', 'git', 'terminal'];
 // were" behaviour the repo tabs this replaces used to give for free.
 function onClick(mode: AppMode): void {
   activateWorkspace(mode === 'git' ? (workspaceState.lastRepoKey ?? 'git') : mode);
+}
+
+// P92 item 3: no toast channel in the title bar — a rejection (e.g. a `-tags server` build) is
+// logged, not surfaced.
+function onNewWindow(): void {
+  control.windowsOpenNew().catch((err: unknown) => {
+    console.error('new window', err);
+  });
 }
 </script>
 
@@ -51,6 +60,15 @@ function onClick(mode: AppMode): void {
          icons, not a colour-only trick) plus the muted colour when it's not — .is-on used to be a
          background tint alone, easy to miss against the bar's own colour). -->
     <div class="title-bar-actions">
+      <button
+        type="button"
+        class="title-action title-action--labelled"
+        data-testid="new-window"
+        @click="onNewWindow"
+      >
+        <CodiconIcon name="empty-window" :size="15" />
+        <span>New window</span>
+      </button>
       <button
         type="button"
         class="title-action"
@@ -210,6 +228,14 @@ function onClick(mode: AppMode): void {
 }
 .title-action:hover {
   background: var(--kira-hover);
+}
+/* P92 item 3: the one .title-action with a visible label, not just an icon — overrides the fixed
+   square (:width, above) back to content width. */
+.title-action--labelled {
+  width: auto;
+  padding: 0 var(--kira-s-2);
+  gap: var(--kira-s-2);
+  font-size: var(--kira-t-sm);
 }
 /* This app's own established "active" treatment — .p-tab.is-active's exact combination
    (primitives.css:372-376): a visible border, a background lift, full-brightness text/icon

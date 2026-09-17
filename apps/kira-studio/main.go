@@ -308,6 +308,11 @@ func main() {
 	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
 	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
 
+	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
+	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
+	// menu command already uses.
+	windowsSvc := &bridge.WindowsService{Deps: deps}
+
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
 	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
 	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
@@ -392,7 +397,7 @@ func main() {
 			application.NewService(&bridge.SettingsService{Deps: deps}),
 			application.NewService(&bridge.LayoutService{Deps: deps}),
 			application.NewService(&bridge.TabsService{Deps: deps}),
-			application.NewService(&bridge.WindowsService{Deps: deps}),
+			application.NewService(windowsSvc),
 			application.NewService(&bridge.ConnectionsService{Deps: deps}),
 			application.NewService(&bridge.MaskRulesService{Deps: deps}),
 			application.NewService(&bridge.TreeService{Deps: deps}),
@@ -628,6 +633,7 @@ func main() {
 		}
 		openWindow(rec)
 	}
+	windowsSvc.OpenNewWindow = openNewWindow
 
 	// reopenWindow is the Dock-reopen path (shell.AttachReopen only calls this when zero windows
 	// are live): bring back the highest-order stored workbench, or mint a fresh "main" one if

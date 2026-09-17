@@ -399,6 +399,8 @@ const studioControl = {
     ),
   windowsSetMode: (mode: AppMode): Promise<void> =>
     unwrap(WindowsService.SetMode({ windowKey, mode })),
+  // P92 item 3: the title bar's "New window" button.
+  windowsOpenNew: (): Promise<void> => unwrap(WindowsService.OpenNew()),
 
   // Both scoped to this page's own workbench (P8 D2/F6) — windowKey is read once, synchronously,
   // at module load (state/window.ts), before hydrateTabs() ever calls tabsList().

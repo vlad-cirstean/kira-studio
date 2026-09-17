@@ -15,6 +15,12 @@ import (
 // makes tests/e2e-real/multiwindow-real.spec.ts's own two-browser-page shape work at all.
 type WindowsService struct {
 	Deps appcore.Deps
+
+	// OpenNewWindow is main.go's own openNewWindow closure (the ⇧⌘N menu command's action),
+	// assigned after the service is constructed because that closure needs the application this
+	// service is registered on. nil in a `-tags server` build, where there is no native shell to
+	// open a window at all.
+	OpenNewWindow func()
 }
 
 type WindowsEnsureArgs struct {
@@ -56,5 +62,15 @@ func (s *WindowsService) SetMode(args WindowsSetModeArgs) error {
 	if err := s.Deps.Repos.Windows.SetMode(args.WindowKey, args.Mode); err != nil {
 		return ipcerr.Internal(err.Error())
 	}
+	return nil
+}
+
+// OpenNew is the title bar's "New window" button (P92 item 3) — the same action as the ⇧⌘N menu
+// command, reached from the renderer for the first time.
+func (s *WindowsService) OpenNew() error {
+	if s.OpenNewWindow == nil {
+		return ipcerr.BadRequest("windows: this build cannot open a window")
+	}
+	s.OpenNewWindow()
 	return nil
 }

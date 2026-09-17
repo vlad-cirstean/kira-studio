@@ -74,6 +74,7 @@ export const IPC = {
 
   windowsEnsure: 'kira:windows:ensure',
   windowsSetMode: 'kira:windows:set-mode',
+  windowsOpenNew: 'kira:windows:openNew',
 
   tabsList: 'kira:tabs:list',
   tabsSave: 'kira:tabs:save',

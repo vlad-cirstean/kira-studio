@@ -85,6 +85,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   httpClearCookies: 'HttpService.ClearCookies',
   windowsEnsure: 'WindowsService.Ensure',
   windowsSetMode: 'WindowsService.SetMode',
+  windowsOpenNew: 'WindowsService.OpenNew',
   tabsList: 'TabsService.List',
   tabsSave: 'TabsService.Save',
   queriesList: 'QueriesService.List',
