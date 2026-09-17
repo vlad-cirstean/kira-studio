@@ -19,6 +19,7 @@ import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
+import CookiesPane from './CookiesPane.vue';
 import { backToLatest, ensureHistoryFresh, historyRuntime } from './history';
 import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
@@ -72,6 +73,11 @@ const response = computed(() => viewing.value?.snapshot.response ?? rt.value?.re
 const hasHistory = computed(() => (historyRt.value?.entries?.length ?? 0) > 0);
 const historyCount = computed(() => historyRt.value?.entries?.length ?? 0);
 
+// P90 §3.2: sent + received, the Cookies segment's own count badge.
+const responseCookiesCount = computed(
+  () => (response.value?.sentCookies?.length ?? 0) + (response.value?.receivedCookies?.length ?? 0),
+);
+
 const RESPONSE_PANE_OPTIONS = [
   { value: 'body' as const, label: 'Body', testid: 'http-response-pane-body' },
   { value: 'headers' as const, label: 'Headers', testid: 'http-response-pane-headers' },
@@ -82,6 +88,18 @@ const RESPONSE_PANE_OPTIONS = [
   // P10 D11/F19: the fifth segment — where the time went, per hop.
   { value: 'timeline' as const, label: 'Timeline', testid: 'http-response-pane-timeline' },
 ];
+
+// P90 §3.2: the sixth segment, count-badged like REQUEST_PANE_OPTIONS's own Settings/Cookies
+// entries — a computed array rather than the plain literal list above, since the label carries a
+// count that changes with the response.
+const RESPONSE_PANE_OPTIONS_WITH_COOKIES = computed(() => [
+  ...RESPONSE_PANE_OPTIONS,
+  {
+    value: 'cookies' as const,
+    label: responseCookiesCount.value > 0 ? `Cookies (${responseCookiesCount.value})` : 'Cookies',
+    testid: 'http-response-pane-cookies',
+  },
+]);
 
 // P8 C1: HttpResponsePane, not an inline 'body' | 'headers' literal — the schema is the source of
 // truth for the pane vocabulary, so a widened schema (P8 adds 'history', P9 adds 'raw') can never
@@ -323,7 +341,7 @@ onUnmounted(() => {
       />
       <SegmentedControl
         :model-value="tab.state.responsePane"
-        :options="RESPONSE_PANE_OPTIONS"
+        :options="RESPONSE_PANE_OPTIONS_WITH_COOKIES"
         data-testid="http-response-pane-toggle"
         @update:model-value="setResponsePane"
       />
@@ -413,6 +431,7 @@ onUnmounted(() => {
       :response-highlights="rawResponseHighlights"
     />
     <TimelinePane v-else-if="tab.state.responsePane === 'timeline'" :tab="tab" />
+    <CookiesPane v-else-if="tab.state.responsePane === 'cookies'" mode="response" :response="response" />
     <div v-else class="response-body">
       <template v-if="response">
         <span
