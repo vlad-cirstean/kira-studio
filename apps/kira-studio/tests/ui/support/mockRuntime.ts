@@ -185,6 +185,7 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   terminalWrite: 'TerminalService.Write',
   terminalResize: 'TerminalService.Resize',
   terminalClose: 'TerminalService.Close',
+  terminalDefaultCwd: 'TerminalService.DefaultCwd',
 
   customScriptsList: 'CustomScriptsService.List',
   customScriptsCreate: 'CustomScriptsService.Create',
@@ -400,6 +401,11 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // Promise.all as hydrateCodeRepos() above, same reasoning — a spec that never configures a
   // script gets "no scripts yet", not a fixture miss.
   [IPC.customScriptsList]: '[]',
+  // P91: main.ts's bootstrap() joins hydrateTerminalDefaults() to the same unconditional-every-boot
+  // Promise.all, same reasoning — a spec that never cares about the Terminal module's own default
+  // cwd gets a plausible home directory, not a fixture miss. A spec that DOES care (terminal-
+  // module.spec.ts's own unscoped-launch case) still wins with its own snapshot.
+  [IPC.terminalDefaultCwd]: JSON.stringify({ path: '/home/test' }),
   // P86: main.ts's bootstrap() joins hydrateAgentHooks()/initAgentSessions() to the same
   // unconditional-every-boot Promise.all as hydrateCustomScripts() above, same reasoning — a spec
   // that never configures hooks gets "off, nothing running" and "no sessions yet", not a fixture

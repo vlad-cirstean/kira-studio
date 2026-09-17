@@ -24,6 +24,18 @@ export interface TerminalSession {
   shell: string;
 }
 
+// P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
+// resolved in Go (bridge/terminal.go's DefaultCwd) and hydrated once at boot, beside
+// hydrateCustomScripts (main.ts). '' means "not yet hydrated, or $HOME could not be resolved" —
+// every caller (TabStrip.vue's Terminal entry, TerminalStart.vue's button) disables its launch on
+// that value rather than falling back to some other path (§7.2).
+export const terminalDefaults = reactive({ cwd: '' });
+
+export async function hydrateTerminalDefaults(): Promise<void> {
+  const { path } = await control.terminalDefaultCwd();
+  terminalDefaults.cwd = path;
+}
+
 // reactive() on the Map itself (not a plain Map), for repo/state/worktrees.ts's own recorded
 // reason: the panel reads a key before any entry exists, and a plain Map makes that read
 // untracked.

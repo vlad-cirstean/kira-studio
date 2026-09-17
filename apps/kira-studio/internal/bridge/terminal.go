@@ -78,6 +78,24 @@ func TerminalAgentSessionsChanged(s *TerminalService) {
 	s.emitAgentSessions()
 }
 
+// TerminalDefaultCwdResult is DefaultCwd's own wire shape — Path is "" when $HOME can't be
+// resolved (P91 §7.1: a missing home directory must not fail boot).
+type TerminalDefaultCwdResult struct {
+	Path string `json:"path"`
+}
+
+// DefaultCwd is P91 §7's own read-only, argument-free call — the user's home directory, for the
+// Terminal module's unscoped launches (a repo-scoped terminal keeps using internal/gitsession's
+// own worktree-cwd resolution, untouched by this phase). Read-only, no arguments: nothing
+// renderer-controlled reaches the OS here.
+func (s *TerminalService) DefaultCwd() TerminalDefaultCwdResult {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return TerminalDefaultCwdResult{Path: ""}
+	}
+	return TerminalDefaultCwdResult{Path: home}
+}
+
 type TerminalOpenArgs struct {
 	TerminalID string `json:"terminalId"`
 	Cwd        string `json:"cwd"`

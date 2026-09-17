@@ -20,6 +20,7 @@ import { hydrateOps } from './state/ops';
 import { hydrateRepoMap } from './state/repomap';
 import { ensureWorkspaceShell } from './state/repoTabs';
 import { hydrateTabs } from './state/tabs';
+import { hydrateTerminalDefaults } from './state/terminals';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
 import { hydrateMode } from './state/mode';
@@ -304,6 +305,7 @@ async function bootstrap(): Promise<void> {
     loadMaskRuleCounts(),
     hydrateCodeRepos(),
     hydrateCustomScripts(),
+    hydrateTerminalDefaults(),
     hydrateGitClients(),
     hydrateRepoMap(),
     hydrateDbMcp(),

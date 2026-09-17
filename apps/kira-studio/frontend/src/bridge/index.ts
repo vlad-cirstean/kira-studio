@@ -552,6 +552,10 @@ const studioControl = {
     unwrap(CodeWorkspaceService.CancelSearch({ id })),
   onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
 
+  // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
+  // hydrated once at boot (state/terminals.ts's hydrateTerminalDefaults).
+  terminalDefaultCwd: (): Promise<{ path: string }> =>
+    unwrap(TerminalService.DefaultCwd()).then((r) => trust<{ path: string }>(r)),
   // P83 §3.2: the embedded terminal's own bound surface — terminalId is client-supplied (the tab
   // id) so state/terminals.ts subscribes to onTerminal before this call returns, and no output can
   // race the subscription. windowKey addresses ChannelTerminal at this window only, exactly like

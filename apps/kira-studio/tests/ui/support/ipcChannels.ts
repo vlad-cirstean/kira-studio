@@ -185,6 +185,8 @@ export const IPC = {
   terminalWrite: 'kira:terminal:write',
   terminalResize: 'kira:terminal:resize',
   terminalClose: 'kira:terminal:close',
+  // P91 §7: the Terminal module's own unscoped-launch default (the user's home directory).
+  terminalDefaultCwd: 'kira:terminal:defaultCwd',
 
   // P85 §9.2: the custom-scripts CRUD surface.
   customScriptsList: 'kira:customScripts:list',
