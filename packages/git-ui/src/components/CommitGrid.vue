@@ -582,16 +582,19 @@ function scheduleAncestryRebuild(): void {
   });
 }
 
-/** The row range that just gained lane layout (`GraphViewState.onChunkLayout`, W5) — rebuild the
- *  column set in case `laneCount` grew (the graph column's width formula depends on it), then
- *  invalidate exactly the rows that changed rather than the whole grid. */
-function handleChunkLayout(range: LayoutRange): void {
+/** A row range just gained lane layout (`GraphViewState.onChunkLayout`, W5) — rebuild the column
+ *  set in case `laneCount` grew, then invalidate.
+ *
+ *  P92 item 4: `invalidateRowHeights()`, not `invalidateRows(rows)` + `render()` — the latter
+ *  marks heights dirty but never rebuilds SlickGrid's row-position index (only `updateRowCount()`
+ *  does that), so an already-rendered row below one whose height just changed (a badge/PR
+ *  decoration) keeps its stale `translateY()` while the index moves on: two rows land in the same
+ *  band and their glyphs double up. `invalidateRowHeights()` is the library's own "index and rows
+ *  are both stale" entry point, so `_range` is unused now — kept for the callback signature. */
+function handleChunkLayout(_range: LayoutRange): void {
   if (!grid) return;
   if (props.graphView.laneCount.value !== lastRebuiltLaneCount) rebuildColumns();
-  const rows: number[] = [];
-  for (let row = range.from; row < range.to; row++) rows.push(row);
-  grid.invalidateRows(rows);
-  grid.render();
+  grid.invalidateRowHeights();
   if (!layoutCompleteMarked) {
     layoutCompleteMarked = true;
     performance.mark('kira:layout-complete');
@@ -876,8 +879,9 @@ watch(
 watch(
   () => props.graphView.loadedRows.value,
   () => {
-    grid?.updateRowCount();
-    grid?.render();
+    // P92 item 4: `invalidate()`, not `updateRowCount()` + `render()` — see `handleChunkLayout`'s
+    // own comment for the mechanism; `invalidate()` also repositions already-cached rows.
+    grid?.invalidate();
     // P79 fix (Functional MEDIUM): newly-loaded rows (`graph.loadMore`) can be ancestors of an
     // already-resolved PR tip — without this, they showed no badge until some unrelated PR
     // resolution happened to bump `pr.generation` again (`prByAncestry` desyncing from the
@@ -1163,7 +1167,10 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   position: absolute;
   border: 0;
   width: 100%;
-  background-color: transparent;
+  /* P92 item 4: opaque, not transparent — the canvas already paints this exact token underneath
+     (`.grid-canvas`, above), so nothing changes visually, but a repainted row now erases the band
+     it owns instead of compositing over whatever was there. */
+  background-color: var(--kv-panel-bg);
   /* G-UX D2 (item 1b): every row opens/toggles the detail pane on click — the whole row reads as
    *  clickable, not only `.kv-cell-date` (whose own `cursor: pointer` this cascades onto too,
    *  `cursor` being an inherited property; that per-cell rule is removed once item 8 relocates
