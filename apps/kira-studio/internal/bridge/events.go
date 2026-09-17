@@ -12,17 +12,17 @@ import (
 // are the Wails event names verbatim (P52 §7.1) — the renderer's subscribe mechanism changes, the
 // wire name does not.
 const (
-	ChannelOpenSettings           = "kira:open-settings"
-	ChannelNewConnection          = "kira:menu:new-connection"
-	ChannelNewRequest             = "kira:menu:new-request"
-	ChannelImportPostman          = "kira:menu:import-postman"
-	ChannelImportDataGrip         = "kira:menu:import-datagrip"
-	ChannelToggleProjectPanel     = "kira:menu:toggle-project-panel"
-	ChannelToggleOperationsPanel  = "kira:menu:toggle-operations-panel"
-	ChannelCommandPalette         = "kira:menu:command-palette"
+	ChannelOpenSettings          = "kira:open-settings"
+	ChannelNewConnection         = "kira:menu:new-connection"
+	ChannelNewRequest            = "kira:menu:new-request"
+	ChannelImportPostman         = "kira:menu:import-postman"
+	ChannelImportDataGrip        = "kira:menu:import-datagrip"
+	ChannelToggleProjectPanel    = "kira:menu:toggle-project-panel"
+	ChannelToggleOperationsPanel = "kira:menu:toggle-operations-panel"
+	ChannelCommandPalette        = "kira:menu:command-palette"
 	// ChannelQuickOpen is C9 D5's own channel — ⌘P's fuzzy file finder, the View menu item directly
 	// above Command Palette.
-	ChannelQuickOpen = "kira:menu:quick-open"
+	ChannelQuickOpen              = "kira:menu:quick-open"
 	ChannelTabNext                = "kira:menu:tab-next"
 	ChannelTabPrev                = "kira:menu:tab-prev"
 	ChannelTabClose               = "kira:menu:tab-close"
@@ -63,6 +63,10 @@ const (
 	// the one window that opened it, exactly like ChannelCodeSearch above (internal/bridge/
 	// terminal.go's own coalescer).
 	ChannelTerminal = "kira:terminal:data"
+	// ChannelCustomScriptsChanged is P85's own list-changed broadcast — CustomScriptsService's own
+	// Create/Update/Remove Emit (not EmitTo) the full list, ChannelConnectionsChanged's own shape,
+	// so every window's tab-strip dropdown stays in sync with a script added or removed elsewhere.
+	ChannelCustomScriptsChanged = "kira:customScripts:changed"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

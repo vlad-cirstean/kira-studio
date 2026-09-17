@@ -1,6 +1,7 @@
 import * as AppService from '@bindings/appservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
+import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as DataGripService from '@bindings/datagripservice.js';
 import * as DbMcpService from '@bindings/dbmcpservice.js';
 import * as EngineService from '@bindings/engineservice.js';
@@ -65,6 +66,7 @@ import type {
 } from '@shared/domain/repo';
 import type { RepoMapInstallResult, RepoMapStatus } from '@shared/domain/repomap';
 import type { ConnectionDdl } from '@shared/domain/schema';
+import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord } from '@shared/domain/tabs';
@@ -562,6 +564,18 @@ const studioControl = {
   terminalClose: (terminalId: string): Promise<void> =>
     unwrap(TerminalService.Close({ terminalId })),
   onTerminal: (cb: (event: TerminalEvent) => void): (() => void) => on(CHANNEL.terminal, cb),
+
+  // P85 §9.3: the Scripts settings section and the tab strip's own dropdown both go through
+  // state/customScripts.ts, the one store that wraps these.
+  customScriptsList: (): Promise<CustomScript[]> =>
+    unwrap(CustomScriptsService.List()).then((r) => trust<CustomScript[]>(r ?? [])),
+  customScriptsCreate: (fields: CustomScriptFields): Promise<CustomScript> =>
+    unwrap(CustomScriptsService.Create({ fields })).then((r) => trust<CustomScript>(r)),
+  customScriptsUpdate: (id: string, fields: CustomScriptFields): Promise<CustomScript> =>
+    unwrap(CustomScriptsService.Update({ id, fields })).then((r) => trust<CustomScript>(r)),
+  customScriptsRemove: (id: string): Promise<void> => unwrap(CustomScriptsService.Remove({ id })),
+  onCustomScriptsChanged: (cb: (scripts: CustomScript[]) => void): (() => void) =>
+    on(CHANNEL.customScriptsChanged, cb),
 };
 
 // P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39

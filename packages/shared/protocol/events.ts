@@ -45,6 +45,9 @@ export const CHANNEL = {
   // P83 §3.2: one terminal's coalesced output and its exit, delivered via EmitTo (one window
   // only) — codeSearch's own shape, restated for a byte payload.
   terminal: 'kira:terminal:data',
+  // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape (Emit, not EmitTo,
+  // so every window's tab-strip dropdown stays in sync).
+  customScriptsChanged: 'kira:customScripts:changed',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

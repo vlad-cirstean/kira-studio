@@ -182,6 +182,12 @@ export const IPC = {
   terminalResize: 'kira:terminal:resize',
   terminalClose: 'kira:terminal:close',
 
+  // P85 §9.2: the custom-scripts CRUD surface.
+  customScriptsList: 'kira:customScripts:list',
+  customScriptsCreate: 'kira:customScripts:create',
+  customScriptsUpdate: 'kira:customScripts:update',
+  customScriptsRemove: 'kira:customScripts:remove',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
@@ -197,4 +203,7 @@ export const IPC = {
   // never a bound call) — driven by emitWailsEvent(page, IPC.terminal, …), codeSearch's own
   // precedent above.
   terminal: 'kira:terminal:data',
+  // P85 §9.3: the custom-scripts list changed — connectionsChanged's own shape, EmitTo every
+  // window (not one), driven by emitWailsEvent(page, IPC.customScriptsChanged, …) the same way.
+  customScriptsChanged: 'kira:customScripts:changed',
 } as const;

@@ -407,6 +407,7 @@ func main() {
 			// lifecycle).
 			application.NewService(codeWorkspaceSvc),
 			application.NewService(terminalSvc),
+			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
 			application.NewService(&bridge.UpdateService{Checker: updateChecker, Browser: browserOpener}),
 			application.NewService(&bridge.GitHubService{Deps: deps, Browser: browserOpener}),
 			application.NewService(&bridge.LinkService{Browser: browserOpener}),

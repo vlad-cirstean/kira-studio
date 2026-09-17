@@ -10,6 +10,7 @@ import { initAppUpdate } from './state/appUpdate';
 import { initCacheStats } from './state/cacheStats';
 import { codeReposState, hydrateCodeRepos } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
+import { hydrateCustomScripts } from './state/customScripts';
 import { hydrateDbMcp, hydrateDbMcpApprovals } from './state/dbmcp';
 import { hydrateGitClients } from './state/gitClients';
 import { loadMaskRuleCounts } from './state/maskRules';
@@ -300,6 +301,7 @@ async function bootstrap(): Promise<void> {
     // (deleteRowTooltip's own standing rule: a permanently inert control is worse than no control).
     loadMaskRuleCounts(),
     hydrateCodeRepos(),
+    hydrateCustomScripts(),
     hydrateGitClients(),
     hydrateRepoMap(),
     hydrateDbMcp(),

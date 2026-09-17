@@ -181,6 +181,11 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   terminalWrite: 'TerminalService.Write',
   terminalResize: 'TerminalService.Resize',
   terminalClose: 'TerminalService.Close',
+
+  customScriptsList: 'CustomScriptsService.List',
+  customScriptsCreate: 'CustomScriptsService.Create',
+  customScriptsUpdate: 'CustomScriptsService.Update',
+  customScriptsRemove: 'CustomScriptsService.Remove',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -383,6 +388,10 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // P84 §13.4: GitPanel.vue's onMounted calls this unconditionally too, same reasoning as
   // codeWorkspaceRepoHeads just above — most specs never care which repository nests under which.
   [IPC.codeWorkspaceRepoWorktreeLinks]: '[]',
+  // P85: main.ts's bootstrap() joins hydrateCustomScripts() to the same unconditional-every-boot
+  // Promise.all as hydrateCodeRepos() above, same reasoning — a spec that never configures a
+  // script gets "no scripts yet", not a fixture miss.
+  [IPC.customScriptsList]: '[]',
   // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
   // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
   // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard
