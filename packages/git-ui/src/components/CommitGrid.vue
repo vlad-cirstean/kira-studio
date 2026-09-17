@@ -264,8 +264,21 @@ function stackInfoFor(branchName: string): { stacked: boolean; stale: boolean } 
   return undefined;
 }
 
+/** P92 item 2: the width the column model must sum to — SlickGrid's own viewport content box, not
+ *  the host's. `clientWidth` already excludes the vertical scrollbar's gutter; `host.clientWidth`
+ *  does not, and the difference is a permanent horizontal scrollbar (SlickGrid's own
+ *  `getCanvasWidth()` sums the column widths and writes that onto `.grid-canvas`, wider than the
+ *  viewport it scrolls in by exactly that gutter, plus up to 1px from `clientWidth`'s rounding
+ *  against the viewport's fractional `getBoundingClientRect()` measurement). Floored to match the
+ *  canvas's own whole-pixel sizing. `host` is the fallback for the one call before the grid exists
+ *  (`onMounted`'s own first `currentColumns()`). */
+function availableWidth(): number {
+  const viewport = grid?.getViewportNode();
+  return Math.floor(viewport?.clientWidth ?? host.value?.clientWidth ?? 0);
+}
+
 function currentColumns(): Column<CommitRecord>[] {
-  const hostWidth = host.value?.clientWidth ?? 0;
+  const hostWidth = availableWidth();
   const laneCount = props.graphView.laneCount.value;
   return buildColumns(
     { ...widths.value, laneCount, messageWidth: computeMessageWidth(hostWidth, laneCount) },
@@ -299,7 +312,7 @@ function updateHandlePositions(): void {
   // is not there would be a dead hit target, so this skips the computation entirely rather than
   // just leaving it unused.
   if (props.detailOpen) return;
-  const hostWidth = host.value?.clientWidth ?? 0;
+  const hostWidth = availableWidth();
   const laneCount = props.graphView.laneCount.value;
   handleLeftAuthor.value = graphColumnWidth(laneCount) + computeMessageWidth(hostWidth, laneCount);
   handleLeftDate.value = handleLeftAuthor.value + widths.value.author;
@@ -317,8 +330,8 @@ function updateHandlePositions(): void {
  *  `messageWidth`), so only `handleChunkLayout`'s call is gated. */
 let lastRebuiltLaneCount = -1;
 
-// Regression fix (post-P79-merge): the host width `rebuildColumns()` last actually ran against —
-// `-1` (never equals a real `clientWidth`) until the first call. `scheduleResize` below reads this
+// Regression fix (post-P79-merge): the width `rebuildColumns()` last actually ran against —
+// `-1` (never equals a real width) until the first call. `scheduleResize` below reads this
 // to skip a rebuild that would only repeat one some other caller (almost always the `detailOpen`
 // watcher, per this function's own "G-UX (item 9)" comment) already did against the same width a
 // moment earlier. Without it, closing the detail pane triggered TWO full `setColumns()` passes for
@@ -331,7 +344,8 @@ let lastRebuiltLaneCount = -1;
 // reading the grid's DOM — a test, `applyAccessibility`'s own focus restore — can catch a row
 // mid-teardown between the two passes and see a stale, zero-width cell. Deduplicating by width
 // closes that window by making the second pass a no-op instead of a second real rebuild.
-let lastRebuiltHostWidth = -1;
+// P92 item 2: reads `availableWidth()` now, not `host.clientWidth` — same dedupe, correct box.
+let lastRebuiltWidth = -1;
 
 function rebuildColumns(): void {
   // G-UX (item 9): resizeCanvas() BEFORE setColumns() — SlickGrid's own cached canvas width has
@@ -344,7 +358,7 @@ function rebuildColumns(): void {
   grid?.setColumns(currentColumns());
   updateHandlePositions();
   lastRebuiltLaneCount = props.graphView.laneCount.value;
-  lastRebuiltHostWidth = host.value?.clientWidth ?? 0;
+  lastRebuiltWidth = availableWidth();
 }
 
 function setColumnWidth(column: keyof ColumnWidths, next: number): void {
@@ -620,12 +634,12 @@ function scheduleResize(): void {
     // mount/resize — including one that happens to observe 0×0 before its real layout settles — so
     // gating on it here skips exactly the intended case and no other.
     if (!graphVisible.value) return;
-    // `lastRebuiltHostWidth`'s own doc comment (above `rebuildColumns`): skip a rebuild that would
+    // `lastRebuiltWidth`'s own doc comment (above `rebuildColumns`): skip a rebuild that would
     // only repeat one already done, synchronously, against this exact width — closing the detail
     // pane is the common case, but this covers any caller of `rebuildColumns()` racing this same
     // async callback for the same resize.
-    const width = host.value?.clientWidth ?? 0;
-    if (width === lastRebuiltHostWidth) return;
+    const width = availableWidth();
+    if (width === lastRebuiltWidth) return;
     grid?.resizeCanvas();
     rebuildColumns();
   });
