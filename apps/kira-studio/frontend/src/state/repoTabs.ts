@@ -1,14 +1,11 @@
-import type { PaletteColor } from '@shared/domain/color';
 import {
   asRepoDiffTab,
   asRepoFileTab,
   defaultRepoDiffTabState,
   defaultRepoFileTabState,
-  type TerminalLaunchKind,
 } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
-import { canonicalPath } from './coderepos';
 import { tabsForWorkspace } from './mode';
 import {
   activateTab,
@@ -20,7 +17,13 @@ import {
   removeFromPreviewCohort,
   tabsState,
 } from './tabs';
+import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
 import { openRepoWorkspace } from './workspace';
+
+// P91 §6: moved to state/terminalTabs.ts, which openTerminalTab below now shares with the
+// Terminal module's own (non-repo-scoped) opener — re-exported so no importer of this module
+// breaks.
+export type { TerminalLaunch };
 
 export interface OpenRepoFileOpts {
   preview: boolean;
@@ -208,43 +211,23 @@ export function openRepoReviewDiffTab(
   );
 }
 
-// P85 §5.3: what a non-plain launch (Claude Code, or a custom script) seeds a terminal tab with.
-// P86 §4: `kind` is the tab's own launchKind — always given explicitly by the one caller that
-// constructs a TerminalLaunch (TabStrip.vue), never left to infer from `command`.
-export interface TerminalLaunch {
-  command: string;
-  label: string;
-  color: PaletteColor;
-  kind: TerminalLaunchKind;
-}
-
 // P83 §10.3: opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
 // "+" (active workspace's root) and both GitPanel.vue row menus (a repo's root or a worktree's own
-// path) all funnel through this. `reuse: false` — a terminal is a session, not a document
-// (openConsoleTab's own reasoning, state/tabs.ts). openRepoWorkspace runs first: a tab must belong
-// to a workspace whose strip is on screen, and right-clicking a closed repository's row would
-// otherwise open an invisible tab. `launch`, when given (P85 §5.3), seeds the session's initial
-// command/title/rail colour — omitted, this is P83's own plain terminal, unchanged.
+// path) all funnel through this. openRepoWorkspace runs first: a tab must belong to a workspace
+// whose strip is on screen, and right-clicking a closed repository's row would otherwise open an
+// invisible tab. `launch`, when given (P85 §5.3), seeds the session's initial command/title/rail
+// colour — omitted, this is P83's own plain terminal, unchanged.
+//
+// P91 §6: delegates to state/terminalTabs.ts's openTerminalTab for the actual tab-open — this
+// function's own remaining job is exactly "which workspace does the tab belong to", the
+// openRepoWorkspace side effect that the Terminal module's own opener must NOT have.
 export function openRepoTerminalTab(
   codeRepoId: string,
   cwd: string,
   launch?: TerminalLaunch,
 ): OpenTabResult {
   openRepoWorkspace(codeRepoId);
-  return openTab(
-    'terminal',
-    null,
-    cwd,
-    () => ({
-      cwd: canonicalPath(cwd),
-      codeRepoId,
-      command: launch?.command ?? '',
-      label: launch?.label ?? '',
-      color: launch?.color ?? 'none',
-      launchKind: launch?.kind ?? 'shell',
-    }),
-    { reuse: false, workspaceId: repoWorkspaceKey(codeRepoId) },
-  );
+  return openTerminalTab({ workspaceId: repoWorkspaceKey(codeRepoId), cwd, codeRepoId, launch });
 }
 
 // C5 §6.1: creates repoId's own pinned graph tab if it has none, and activates it only when the

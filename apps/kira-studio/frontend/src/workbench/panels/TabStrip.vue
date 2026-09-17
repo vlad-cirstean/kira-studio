@@ -9,7 +9,7 @@ import { codeRepoRecord } from '../../state/coderepos';
 import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
 import { customScriptsState } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
-import { openRepoTerminalTab, type TerminalLaunch } from '../../state/repoTabs';
+import { openRepoTerminalTab } from '../../state/repoTabs';
 import { openSettingsAt } from '../../state/settings';
 import { isIncognito } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
@@ -25,6 +25,7 @@ import {
   promoteTab,
   tabsState,
 } from '../../state/tabs';
+import type { TerminalLaunch } from '../../state/terminalTabs';
 import { workspaceState } from '../../state/workspace';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
