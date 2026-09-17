@@ -1484,6 +1484,82 @@ GUI launch (`bun run dev`) was not attempted — this container has no display (
 and the Playwright `ui` project is this repo's own established substitute for a GUI-driven check in
 that setting.
 
+## P91 result
+
+Landed per plan (`docs/v1.8/plans/P91-terminal-module.md`), 8 commits (`e9bbf812`, `48e9e295`,
+`b8b5451e`, `1acc48de`, `df858d69`, `28d5a23b`, `39f89c26`). A fourth top-level module — Terminal —
+plus a self-caught testid fix folded in as its own small commit ahead of the test commit.
+
+**The module.** `AppMode` gained `'terminal'` (`mode.ts`), a fourth `MODES` entry with async
+`TerminalPanel.vue`/`TerminalStart.vue`, `MODE_ORDER` widened to place it last (OQ-1's own default),
+`validWindowModes` (Go) widened, and `tabs.ts`'s `hydrateTabs` hardened from an enumerated
+studio/api skip-list to `!isRepoWorkspace(key)` so a bare `'terminal'` workspace survives a session
+restore the same way `'studio'`/`'api'` already did.
+
+**The default working directory.** A one-line Go `DefaultCwd` (`os.UserHomeDir`, `''` on failure —
+never fails boot), bound and hydrated once at boot into `terminalDefaults.cwd`
+(`state/terminals.ts`), read by the Terminal module's own unscoped launches.
+
+**Opening a terminal outside a repo.** `state/terminalTabs.ts` is new: `openTerminalTab` factored
+out of `openRepoTerminalTab` so a terminal tab can open under a bare `'terminal'` workspace with no
+`openRepoWorkspace` side effect — `openRepoTerminalTab` now delegates to it. This split is what
+keeps a Terminal-module launch from silently jumping into Git (§6's own regression to prevent,
+pinned by test case 3 below).
+
+**The tab strip's "+".** `TabStrip.vue`'s wrapper unified from a `v-if`/`v-else` pair into one
+element whose testid switches on tab count, so the Terminal module's genuinely-empty initial state
+(no pinned graph tab, unlike a repo workspace) still shows the "+". A second menu builder,
+`terminalModuleMenuItems()`, deliberately omits Claude Code and per-script entries (§8.3 — the left
+panel already covers scripts, one click away) and lists `Terminal` plus one entry per known
+repository/worktree, each opening a scoped terminal that stays in the Terminal module's own
+workspace (OQ-3's own default: never redirecting into a matching repo's Git workspace).
+
+**The quick-command panel.** `TerminalPanel.vue` is a second *view* over P85's existing
+`custom_scripts` store (§10's reuse decision, not a second module-scoped list) — search, inline
+add, run-on-click, and a context menu (Run/Edit…/Remove) that deep-links "Edit…" to the Settings
+dialog's own Scripts section rather than re-implementing four fields in a 180-480px panel.
+
+**Self-caught fix, folded in ahead of the test commit (`28d5a23b`).** `data-testid="terminal-panel"`
+originally sat inside `PanelShell`'s `#body` slot, which only renders when non-empty — so on a fresh
+boot (zero custom scripts, the default), the testid never mounted, silently contradicting §17.2 case
+1's own requirement ("mounts `terminal-panel` with its empty state"). Caught while re-reading the
+plan's test spec before writing it, not by a failing test — moved the testid to an outer wrapper so
+it is present in both states.
+
+**Open questions, all shipped per the plan's own stated defaults, no deviation.** OQ-1: Terminal
+placed last in `MODE_ORDER`. OQ-2: the rail's own click-to-return behavior needed no special case —
+Terminal's own workspace has no `lastRepoKey`-style state to restore, so it already falls out of the
+existing generic path. OQ-3: every quick-command and scoped launch from the Terminal module always
+carries `workspaceId: 'terminal'`, never auto-redirecting into a matching repo's Git workspace.
+
+**Verification.** `go build`/`go vet`/`go test ./...` clean per commit and once at the end (66
+packages ok; one `internal/grpcclient` failure on the full run, confirmed a pre-existing flake by
+rerunning it alone 3/3 passing, and confirmed untouched by this phase's diff). `bun run
+typecheck`/`biome check .`/`scripts/check-tokens.sh`/`bun run build` clean after every commit (same
+two pre-existing `UncommittedChangesStrip.vue`/`RequestSettingsPane.vue` lint findings every prior
+phase in this chapter has recorded, both untouched by this phase). `git diff --stat` against the
+pre-phase commit confirms zero changes under `packages/git-ui/` or `apps/kira-studio-vscode/`.
+
+New `terminal-module.spec.ts` (§17.2's six cases, all passing): the module opens with its own empty
+panel/start; an unscoped terminal opens at the resolved home directory; a repo-scoped one opens at
+that repo's root without leaving the Terminal module (the `openRepoWorkspace` regression §6 exists
+to prevent); a quick command renders as both a panel row and a repo workspace's own "+" entry
+(pinning §10's reuse decision); running one opens a terminal at its own working dir; adding one
+calls `customScriptsCreate` with trimmed fields, Add staying disabled until both are filled.
+`mode-switch.spec.ts`/`repo-workspace.spec.ts` migrated to four mode tabs (§17.3).
+
+`bun run test:unit`: 1516 passed, 0 failed. Full `bun run test:ui` (`ui` + `ui-timing`, 307 tests):
+301 passed, 2 failed, 4 did not run (the suite's own early-exit after failures under
+`--project=ui --project=ui-timing`) — both failures confirmed pre-existing and unrelated by `git
+diff --stat` showing zero overlap with either failing file's own source, and by isolated reruns:
+`scroll-trace.spec.ts` passed cleanly alone (a load-timing flake, the same class P90's own 47
+Monaco-timeout failures were); `http-request-body.spec.ts`'s "every IPC call stays under 500 bytes"
+assertion fails deterministically even alone, but its own file and every file behind it are
+untouched by this phase — the likely cause is P90's own already-landed per-request Api-settings
+payload (7 new override leaves sent with every `httpSend`) having pushed a pre-existing, unrelated
+threshold stale, not a P91 regression. `bun run build:vscode`/`bun run test:webview`: clean, 45
+passed (expected — `apps/kira-studio-vscode/` untouched). No known open item.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
