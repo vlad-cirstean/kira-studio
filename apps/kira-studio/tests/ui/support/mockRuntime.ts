@@ -79,6 +79,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   opsRecent: 'OpsService.Recent',
   opsCancel: 'OpsService.Cancel',
   httpSend: 'HttpService.Send',
+  // P90 item 2's three cookie bound calls.
+  httpCookies: 'HttpService.Cookies',
+  httpDeleteCookie: 'HttpService.DeleteCookie',
+  httpClearCookies: 'HttpService.ClearCookies',
   windowsEnsure: 'WindowsService.Ensure',
   windowsSetMode: 'WindowsService.SetMode',
   tabsList: 'TabsService.List',

@@ -50,6 +50,9 @@ type HttpSendArgs struct {
 	// zero value). Suppresses the response-history Record call below and rides along on the op
 	// spec so the op log skips persisting this op too (adapterhost/host.go, oplog/wire.go).
 	Incognito bool `json:"incognito"`
+	// Options is P90 item 1: per-request overrides, every field nil for "inherit the global
+	// default". Resolved against the persisted settings below, never used as sent.
+	Options httpclient.Options `json:"options"`
 }
 
 // Send runs one HTTP request through Host.RunOp with ConnectionID: nil (D3, proven safe by F10 —
@@ -70,6 +73,15 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 	if args.TabID == "" {
 		return httpclient.Response{}, ipcerr.BadRequest("tabId is required")
 	}
+
+	// P90 §2.5: the globals are read once per send, from the same repo the Settings dialog writes
+	// — resolveSendOptions is the whole override rule, a per-request value wins, an absent one
+	// inherits the global.
+	settings, err := s.Deps.Repos.Settings.GetAll()
+	if err != nil {
+		return httpclient.Response{}, ipcerr.Internal(err.Error())
+	}
+	opts := resolveSendOptions(settings.Api, args.Options, args.Incognito)
 
 	tabID := args.TabID
 	spec := adapterhost.OpSpec{ConnectionID: nil, Kind: "http", OpID: args.OpID, TabID: &tabID, Incognito: args.Incognito}
@@ -97,7 +109,7 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 				URL:     url,
 				Headers: headers,
 				Body:    body,
-			})
+			}, opts)
 			if sendErr != nil {
 				// P10 D14/D15: a failed send's own Timeline (classifySendErr always attaches one,
 				// C2) carries the same resolved hop URLs a successful send's does, and mapHttpError
@@ -147,6 +159,65 @@ func (s *HttpService) Send(ctx context.Context, args HttpSendArgs) (httpclient.R
 	}
 	resp, _ := value.(httpclient.Response)
 	return resp, nil
+}
+
+// resolveSendOptions is P90's whole override rule: a per-request value wins, an absent one
+// inherits the global. Seven independent leaves, no interaction — which is exactly why this is
+// not a unit test (CLAUDE.md's bar).
+func resolveSendOptions(g model.ApiSettings, o httpclient.Options, incognito bool) httpclient.Options {
+	out := httpclient.Options{
+		HTTPVersion:      orGlobal(o.HTTPVersion, g.HTTPVersion),
+		RequestTimeoutMs: orGlobal(o.RequestTimeoutMs, g.RequestTimeoutMs),
+		MaxResponseMb:    orGlobal(o.MaxResponseMb, g.MaxResponseMb),
+		SSLVerify:        orGlobal(o.SSLVerify, g.SSLVerify),
+		FollowRedirects:  orGlobal(o.FollowRedirects, g.FollowRedirects),
+		MaxRedirects:     orGlobal(o.MaxRedirects, g.MaxRedirects),
+		DisableCookieJar: orGlobal(o.DisableCookieJar, g.DisableCookieJar),
+	}
+	out.Ephemeral = incognito
+	return out
+}
+
+func orGlobal[T any](override *T, global T) *T {
+	if override != nil {
+		return override
+	}
+	return &global
+}
+
+// HttpCookiesArgs addresses the Cookies tab's request-mode listing (P90 item 2) — what the shared
+// jar would send to URL right now.
+type HttpCookiesArgs struct {
+	URL string `json:"url"`
+}
+
+// HttpCookieDeleteArgs names one cookie to expire from the shared jar.
+type HttpCookieDeleteArgs struct {
+	URL  string `json:"url"`
+	Name string `json:"name"`
+}
+
+// Cookies/DeleteCookie/ClearCookies are P90 item 2's three thin bound methods. None of these go
+// through RunOp — they touch no connection, issue no network I/O, and have nothing to cancel or
+// log; SettingsService (above) is the precedent for a bound service that just reads.
+func (s *HttpService) Cookies(args HttpCookiesArgs) ([]httpclient.Cookie, error) {
+	cookies, err := httpclient.JarCookies(args.URL)
+	if err != nil {
+		return nil, mapHttpError(err)
+	}
+	return cookies, nil
+}
+
+func (s *HttpService) DeleteCookie(args HttpCookieDeleteArgs) ([]httpclient.Cookie, error) {
+	if err := httpclient.DeleteJarCookie(args.URL, args.Name); err != nil {
+		return nil, mapHttpError(err)
+	}
+	return s.Cookies(HttpCookiesArgs{URL: args.URL})
+}
+
+func (s *HttpService) ClearCookies() error {
+	httpclient.ClearJar()
+	return nil
 }
 
 // secretReplacer builds P9 D6's own strings.Replacer over every distinct secret span actually
@@ -258,6 +329,15 @@ func maskSecrets(resp *httpclient.Response, used []apivars.UsedSecret) {
 		resp.Redirects[i].URL = replacer.Replace(resp.Redirects[i].URL)
 	}
 	resp.FinalURL = replacer.Replace(resp.FinalURL)
+	// P90 §2.4b: a secret in a request is at least as likely to be a session token as a header
+	// value, and SentCookies/ReceivedCookies is a new copyable surface reaching kira.sqlite via
+	// ResponseHistory.Record.
+	for i := range resp.SentCookies {
+		resp.SentCookies[i].Value = replacer.Replace(resp.SentCookies[i].Value)
+	}
+	for i := range resp.ReceivedCookies {
+		resp.ReceivedCookies[i].Value = replacer.Replace(resp.ReceivedCookies[i].Value)
+	}
 }
 
 // maskSendErrTimeline is D14's reach into D15's own new failure channel: a failed send's Timeline

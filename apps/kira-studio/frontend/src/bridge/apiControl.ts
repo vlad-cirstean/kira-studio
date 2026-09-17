@@ -17,7 +17,13 @@ import type {
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
 import type { GrpcCallHistoryEntry, GrpcCallSnapshot } from '@shared/domain/grpc-history';
-import type { HttpBodyWire, HttpHeaderWire, HttpResponseWire } from '@shared/domain/http';
+import type {
+  HttpBodyWire,
+  HttpCookieWire,
+  HttpHeaderWire,
+  HttpRequestSettingsWire,
+  HttpResponseWire,
+} from '@shared/domain/http';
 import type {
   ResponseHistoryEntry,
   ResponseHistorySnapshot,
@@ -65,6 +71,9 @@ export const apiControl = {
   // and state.ts's send() only starts actually passing it in C4.
   // P71 §4: incognito mirrors itemId's own optional-on-the-TS-side shape — a missing field
   // decodes as Go's zero value (false) on the wire.
+  // P90: options carries the per-request overrides of the seven api settings leaves — state.ts's
+  // send() builds it from tab.state.settings with every null leaf dropped (buildSettingsWire), so
+  // Go's Options only ever sees the leaves this request actually overrides.
   httpSend: (args: {
     opId: string;
     tabId: string;
@@ -76,10 +85,24 @@ export const apiControl = {
     environmentId: string;
     itemId?: string;
     incognito?: boolean;
+    options?: HttpRequestSettingsWire;
   }): Promise<HttpResponseWire> =>
     unwrap(
-      HttpService.Send({ ...args, itemId: args.itemId ?? '', incognito: args.incognito ?? false }),
+      HttpService.Send({
+        ...args,
+        itemId: args.itemId ?? '',
+        incognito: args.incognito ?? false,
+        options: args.options ?? {},
+      }),
     ).then((r) => trust<HttpResponseWire>(r)),
+
+  // P90 item 2: the Cookies tab's three bound calls — none of these go through the op scheduler
+  // (HttpService.Cookies/DeleteCookie/ClearCookies, bridge/http.go), so no opId/tabId.
+  httpCookies: (url: string): Promise<HttpCookieWire[]> =>
+    unwrap(HttpService.Cookies({ url })).then((r) => trust<HttpCookieWire[]>(r ?? [])),
+  httpDeleteCookie: (url: string, name: string): Promise<HttpCookieWire[]> =>
+    unwrap(HttpService.DeleteCookie({ url, name })).then((r) => trust<HttpCookieWire[]>(r ?? [])),
+  httpClearCookies: (): Promise<void> => unwrap(HttpService.ClearCookies()),
 
   // P11 D3/D4: resolves a target's (or a .proto's) services and methods — reflection.Register's
   // own cache lives in Go (grpcclient's descriptorCache), never here; `reload` bypasses it (the

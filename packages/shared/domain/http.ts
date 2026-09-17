@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { type HttpVersion, httpVersionSchema } from './settings';
+
 // P2 D5: the wire shapes live in Go (`internal/httpclient`) and are mirrored, not re-validated,
 // here — `control.ts`'s `httpSend` `trust<T>()`s the bound call's result exactly as every other
 // bound call does. These types exist so the renderer has something to type against, not to guard
@@ -149,6 +151,22 @@ export interface HttpTimeline {
   totalMs: number;
 }
 
+// httpclient.Cookie — one cookie, sent or received (P90 item 2). expires is RFC3339 or '' for a
+// session cookie; sameSite is '', 'lax', 'strict' or 'none'. hop is the timeline hop index this
+// cookie was sent on or received from (0 for the first).
+export interface HttpCookieWire {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: string;
+  maxAge: number;
+  secure: boolean;
+  httpOnly: boolean;
+  sameSite: string;
+  hop: number;
+}
+
 // httpclient.Response — what comes back. `body`'s meaning depends on `bodyEncoding`: 'utf8' is the
 // text itself, 'base64' is the raw bytes so a binary response never gets corrupted round-tripping
 // through Go's `encoding/json` (D4).
@@ -175,6 +193,12 @@ export interface HttpResponseWire {
    *  valid with no fixture edit (§6.6); `TimelinePane.vue`'s own empty state (D13) is what a
    *  genuinely absent timeline renders as. */
   timeline?: HttpTimeline;
+  /** P90 item 2: what actually went out per hop (sentCookies) and every hop's own Set-Cookie
+   *  (receivedCookies) — both `omitempty` on the wire, so absent (not `[]`) whenever a send carried
+   *  no cookies either way. Kept on a response read back out of P8's history store, the same
+   *  posture `timeline` above takes. */
+  sentCookies?: HttpCookieWire[];
+  receivedCookies?: HttpCookieWire[];
 }
 
 // D6: the tab's own persisted headers table — `enabled` has no wire counterpart (a disabled
@@ -270,7 +294,16 @@ export const httpBinaryFileSchema = /*#__PURE__*/ z
   .default(null);
 export type HttpBinaryFileState = z.infer<typeof httpBinaryFileSchema>;
 
-export const httpRequestPaneSchema = /*#__PURE__*/ z.enum(['params', 'headers', 'body']);
+// P90 §2.6: 'settings' and 'cookies' are the sixth and seventh members — safe for the reason P8
+// D10/P9 D12/P10 D11 already verified three times over on the response enum below, and which
+// their own comments state: every previously-stored value is still a member.
+export const httpRequestPaneSchema = /*#__PURE__*/ z.enum([
+  'params',
+  'headers',
+  'body',
+  'settings',
+  'cookies',
+]);
 export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
 
 // P8 D10: 'history' is the third pane — F11 verified widening this enum cannot break a restored
@@ -278,17 +311,53 @@ export type HttpRequestPane = z.infer<typeof httpRequestPaneSchema>;
 // the identical reasoning — the naming collision with responseView's own 'raw' value below is
 // resolved by F19 (the two are never rendered at once), not by renaming either. P10 D11/F19:
 // 'timeline' is the fifth, safe by the same reasoning again.
+// P90 §2.6: 'cookies' is the sixth member, safe by the same reasoning as every widening above.
 export const httpResponsePaneSchema = /*#__PURE__*/ z.enum([
   'body',
   'headers',
   'history',
   'raw',
   'timeline',
+  'cookies',
 ]);
 export type HttpResponsePane = z.infer<typeof httpResponsePaneSchema>;
 
 export const httpResponseViewSchema = /*#__PURE__*/ z.enum(['pretty', 'raw']);
 export type HttpResponseView = z.infer<typeof httpResponseViewSchema>;
+
+// P90: one nullable twin per api settings leaf — null means "inherit the global default", which
+// is what a request that has never touched this panel carries. Not a sentinel string and not a
+// parallel `inherited` flag: `itemId` and `binaryFile` above already spell "absent" as null in
+// this same schema, and null is what the wire's own *T pointer decodes from. Bounds are
+// deliberately looser than apiSettingsSchema's own (min only, no max): a stored tab row is
+// normalised through this schema on restore and a value outside range must hydrate rather than
+// drop the whole tab (repos/tabs.go drops a row outright on a failed parse) — the range is
+// enforced elsewhere without data loss: the number inputs' min/max, and Go's Options.normalize(),
+// which clamps.
+export const httpRequestSettingsSchema = /*#__PURE__*/ z.object({
+  httpVersion: httpVersionSchema.nullable().default(null),
+  requestTimeoutMs: z.number().int().min(0).nullable().default(null),
+  maxResponseMb: z.number().int().min(0).nullable().default(null),
+  sslVerify: z.boolean().nullable().default(null),
+  followRedirects: z.boolean().nullable().default(null),
+  maxRedirects: z.number().int().min(0).nullable().default(null),
+  disableCookieJar: z.boolean().nullable().default(null),
+});
+export type HttpRequestSettingsState = z.infer<typeof httpRequestSettingsSchema>;
+
+// The wire shape sent to HttpService.Send's Options field (bridge/http.go) — optional keys, not
+// nullable ones: Go decodes an absent key to nil, and a present `null` to nil too, so either
+// serialises correctly, but optional keeps the payload smaller (only the overridden leaves ride
+// along, buildSettingsWire in state.ts is what drops the nulls).
+export interface HttpRequestSettingsWire {
+  httpVersion?: HttpVersion;
+  requestTimeoutMs?: number;
+  maxResponseMb?: number;
+  sslVerify?: boolean;
+  followRedirects?: boolean;
+  maxRedirects?: number;
+  disableCookieJar?: boolean;
+}
 
 // D6: every field carries `.default()` so a tab saved by an older version still restores once a
 // later phase widens `bodyMode` or adds a field — the same discipline `keyValueTabStateSchema`'s
@@ -334,6 +403,18 @@ const httpRequestTabStateShape = /*#__PURE__*/ z.object({
   // /v2/orders everywhere, and the alternative is teaching every title consumer about collections.
   itemId: z.string().nullable().default(null),
   name: z.string().default(''),
+  // P90: per-request overrides of the seven api settings leaves, every leaf null (inherit) on a
+  // request that has never touched the Settings panel. `.default({})` doesn't type-check against
+  // this pinned zod (§2.2's own hedge) — the seven-null literal is behaviourally identical.
+  settings: httpRequestSettingsSchema.default({
+    httpVersion: null,
+    requestTimeoutMs: null,
+    maxResponseMb: null,
+    sslVerify: null,
+    followRedirects: null,
+    maxRedirects: null,
+    disableCookieJar: null,
+  }),
   requestPane: httpRequestPaneSchema.default('params'),
   responsePane: httpResponsePaneSchema.default('body'),
   responseView: httpResponseViewSchema.default('pretty'),

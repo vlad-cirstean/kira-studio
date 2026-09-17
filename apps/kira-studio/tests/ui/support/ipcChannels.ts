@@ -67,6 +67,10 @@ export const IPC = {
   opsRecent: 'kira:ops:recent',
   opsCancel: 'kira:ops:cancel',
   httpSend: 'kira:http:send',
+  // P90 item 2's three cookie bound calls.
+  httpCookies: 'kira:http:cookies',
+  httpDeleteCookie: 'kira:http:cookies:delete',
+  httpClearCookies: 'kira:http:cookies:clear',
 
   windowsEnsure: 'kira:windows:ensure',
   windowsSetMode: 'kira:windows:set-mode',

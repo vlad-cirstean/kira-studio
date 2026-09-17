@@ -9,6 +9,8 @@ import {
 import type {
   HttpBodyWire,
   HttpMethod,
+  HttpRequestSettingsState,
+  HttpRequestSettingsWire,
   HttpRequestTabState,
   HttpResponseWire,
   HttpTimeline,
@@ -138,6 +140,30 @@ registerTabRuntimeCleanup((tabId) => {
   delete runtime[tabId];
 });
 
+// P90 §2.8: drops every null (inherit) leaf, so Go's Options only ever sees what this request
+// actually overrides — the assertion that makes an all-inherit request send `{}`, not a
+// seven-key payload of nulls.
+function buildSettingsWire(s: HttpRequestSettingsState): HttpRequestSettingsWire {
+  const out: HttpRequestSettingsWire = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (v !== null) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
+// P90 item 2: a tiny notifier so CookiesPane.vue's request mode can refetch after a send
+// completes without polling — HttpRequestViewRuntime is keyed by tab and CookiesPane already
+// knows its own tabId, so a plain listener set (mirroring noteSendRecorded's own call site) is
+// simpler than threading a per-tab event through the runtime store.
+const sendCompletedListeners = new Set<(tabId: string) => void>();
+export function onSendCompleted(cb: (tabId: string) => void): () => void {
+  sendCompletedListeners.add(cb);
+  return () => sendCompletedListeners.delete(cb);
+}
+function noteSendCompleted(tabId: string): void {
+  for (const cb of sendCompletedListeners) cb(tabId);
+}
+
 /** D3: one Send op, run through HttpService.Send → the existing op scheduler — mirrors
  *  console/state.ts's own run() (manual status/opId preamble, no beginOp/applyLoadFailure — D8:
  *  an HTTP failure never touches tabsState.hydrated, since there is no connection to reconnect).
@@ -181,6 +207,7 @@ export async function send(tabId: string): Promise<void> {
       // collectionId's own "possibly empty" shape above.
       itemId: tab.state.itemId ?? '',
       incognito: isIncognito(tabId),
+      options: buildSettingsWire(tab.state.settings),
     });
     if (rt.opId !== opId) return; // superseded by a newer send
     rt.status = 'idle';
@@ -189,6 +216,9 @@ export async function send(tabId: string): Promise<void> {
     // P8 D11: refetches the History pane's list when it's the one showing, otherwise just marks
     // it stale — a user who never opens the pane pays no IPC per send.
     noteSendRecorded(tabId);
+    // P90 item 2: lets a mounted CookiesPane (request mode) refetch so a Set-Cookie shows up
+    // without the user re-navigating.
+    noteSendCompleted(tabId);
   } catch (err) {
     if (rt.opId !== opId) return;
     rt.opId = null;
