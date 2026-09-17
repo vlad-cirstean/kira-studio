@@ -40,6 +40,24 @@ var clearAwsEnv = &testsupport.Principal{
 	},
 }
 
+// seedAmbientAwsEnv is clearAwsEnv's mirror: guarantees AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+// are ambiently present for one subtest (t.Setenv, auto-restored). The two cases below need
+// ambient credentials to exist somewhere in the environment for LoadDefaultConfig to find (a lone
+// URI key never becomes a static credential, config.go:45's both-or-nothing) — this sandbox's own
+// outbound proxy happens to inject placeholder AWS_* env, which is what let these pass in-sandbox,
+// but a GitHub Actions runner has no such proxy: both failed there with a real EC2-IMDS lookup
+// error instead of the ambient chain finding anything. Setting the env directly makes the case
+// pass on its own merits everywhere, not on an incidental sandbox side effect (LocalStack accepts
+// any nonempty static credentials unconditionally, P25 §2.3, so the exact values don't matter).
+var seedAmbientAwsEnv = &testsupport.Principal{
+	Name: "seed ambient AWS env",
+	Setup: func(t *testing.T, _ any) {
+		t.Helper()
+		t.Setenv("AWS_ACCESS_KEY_ID", testsupport.LocalStackStaticAccessKey)
+		t.Setenv("AWS_SECRET_ACCESS_KEY", testsupport.LocalStackStaticSecret)
+	},
+}
+
 func TestSqs_AuthMatrix(t *testing.T) {
 	testsupport.RequireMatrix(t)
 	f := testsupport.StartSqs(t)
@@ -51,13 +69,15 @@ func TestSqs_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 		},
 		{
-			Name: "uri mode, key only, no secret",
+			Name:      "uri mode, key only, no secret",
+			Principal: seedAmbientAwsEnv,
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.URI = testsupport.Strp("sqs://" + testsupport.LocalStackStaticAccessKey + "@" + testsupport.LocalStackRegion)
 				return c
 			},
 			// config.go:45's both-or-nothing: a lone key never becomes a static credential, so this
-			// connects via the ambient chain instead — pinned as known, not fixed by this phase.
+			// connects via the ambient chain instead — seedAmbientAwsEnv above guarantees that chain
+			// finds something regardless of the outer environment.
 			Expect: testsupport.Outcome{Succeed: true},
 		},
 		{
@@ -97,7 +117,8 @@ func TestSqs_AuthMatrix(t *testing.T) {
 			// IAM at any configuration this fixture can drive (P25 §2.3, measured twice), so there is
 			// no least-privilege principal to cross this with — the same reason this table has no
 			// auth-posture rows at all.
-			Name: "fields mode, region set, ambient credentials",
+			Name:      "fields mode, region set, ambient credentials",
+			Principal: seedAmbientAwsEnv,
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Mode = "fields"
 				c.Database = testsupport.Strp(testsupport.LocalStackRegion)

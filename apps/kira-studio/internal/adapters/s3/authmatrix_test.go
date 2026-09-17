@@ -32,6 +32,24 @@ var clearAwsEnv = &testsupport.Principal{
 	},
 }
 
+// seedAmbientAwsEnv is clearAwsEnv's mirror: guarantees AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY
+// are ambiently present for one subtest (t.Setenv, auto-restored). The two cases below need
+// ambient credentials to exist somewhere in the environment for LoadDefaultConfig to find (a lone
+// URI key never becomes a static credential, config.go:45's both-or-nothing) — this sandbox's own
+// outbound proxy happens to inject placeholder AWS_* env, which is what let these pass in-sandbox,
+// but a GitHub Actions runner has no such proxy: both failed there with a real EC2-IMDS lookup
+// error instead of the ambient chain finding anything. Setting the env directly makes the case
+// pass on its own merits everywhere, not on an incidental sandbox side effect (LocalStack accepts
+// any nonempty static credentials unconditionally, P25 §2.3, so the exact values don't matter).
+var seedAmbientAwsEnv = &testsupport.Principal{
+	Name: "seed ambient AWS env",
+	Setup: func(t *testing.T, _ any) {
+		t.Helper()
+		t.Setenv("AWS_ACCESS_KEY_ID", testsupport.LocalStackStaticAccessKey)
+		t.Setenv("AWS_SECRET_ACCESS_KEY", testsupport.LocalStackStaticSecret)
+	},
+}
+
 func TestS3_AuthMatrix(t *testing.T) {
 	testsupport.RequireMatrix(t)
 	f := testsupport.StartS3(t)
@@ -43,7 +61,8 @@ func TestS3_AuthMatrix(t *testing.T) {
 			Expect: testsupport.Outcome{Succeed: true},
 		},
 		{
-			Name: "uri mode, key only, no secret",
+			Name:      "uri mode, key only, no secret",
+			Principal: seedAmbientAwsEnv,
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.URI = testsupport.Strp("s3://" + testsupport.LocalStackStaticAccessKey + "@" + testsupport.LocalStackRegion)
 				return c
@@ -86,7 +105,8 @@ func TestS3_AuthMatrix(t *testing.T) {
 			// (Resolve, fields-mode arm) had never served a data-plane request before this. Relies on
 			// the sandbox's own ambient placeholder AWS_* env (CLAUDE.md), which LocalStack accepts
 			// unconditionally (P25 §2.3, measured) — no clearAwsEnv Principal here.
-			Name: "fields mode, region set, ambient credentials",
+			Name:      "fields mode, region set, ambient credentials",
+			Principal: seedAmbientAwsEnv,
 			Config: func(c model.ResolvedConnectionConfig) model.ResolvedConnectionConfig {
 				c.Mode = "fields"
 				c.Database = testsupport.Strp(testsupport.LocalStackRegion)
