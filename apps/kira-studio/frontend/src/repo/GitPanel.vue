@@ -34,7 +34,7 @@ import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
 import { refreshRepoHeads, repoHeadLabel } from './state/repoHeads';
 import { refreshRepoWorktreeLinks, worktreeParentId } from './state/repoLinks';
-import { repoSearchView, setRepoSearchView } from './state/search';
+import { repoPanelTab, repoSearchView, setRepoPanelTab, setRepoSearchView } from './state/search';
 import {
   collapseRepoWorktrees,
   isWorktreesExpanded,
@@ -64,7 +64,13 @@ const local = reactive({ repoSearch: '', fileSearch: '' });
 //
 // Bug fix (manual testing): only auto-switch to Files on a genuine no-repo -> repo transition
 // (oldId === ''). Switching between two already-open repos must leave the user's chosen tab alone.
-const tab = ref<'repos' | 'files'>('repos');
+//
+// P92 item 6: backed by state/search.ts's panelTab, not a local ref — hostHandlers.ts's
+// review.open needs to flip it from outside this component (§5.2's own external-caller note).
+const tab = computed({
+  get: () => repoPanelTab(),
+  set: (v: 'repos' | 'files' | 'review') => setRepoPanelTab(v),
+});
 watch(
   repoId,
   (id, oldId) => {
@@ -281,15 +287,15 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
 }
 
 // C7 D9: lives in repo/state/search.ts, not component state, so switching workspaces and back
-// does not reset it. C11 §5.3: 'review' joins files/search as this segment's third value.
+// does not reset it. P92 item 6: 'review' moved out to its own top-level `tab`, so this segment is
+// back to Files/Search only.
 const view = computed({
   get: () => repoSearchView(repoId.value),
-  set: (v: 'files' | 'search' | 'review') => setRepoSearchView(repoId.value, v),
+  set: (v: 'files' | 'search') => setRepoSearchView(repoId.value, v),
 });
 const viewOptions = [
   { value: 'files' as const, label: 'Files', testid: 'repo-view-files' },
   { value: 'search' as const, label: 'Search', testid: 'repo-view-search' },
-  { value: 'review' as const, label: 'Review', testid: 'repo-view-review' },
 ];
 
 // C11 §8.4/§5.3: this panel is one persistent component instance across every repo workspace
@@ -300,11 +306,11 @@ const viewOptions = [
 // between this SAME repo's Files/Search/Review segments never does, since the set entry it added
 // on first activation never goes away.
 const reviewActivatedRepoIds = reactive(new Set<string>());
-// A watcher, not the computed setter above, because setRepoSearchView also has a second caller
+// A watcher, not the computed setter above, because setRepoPanelTab also has a second caller
 // (hostHandlers.ts's review.open, via "Review branch changes") this component's own setter is
 // never in the call path for.
 watch(
-  view,
+  tab,
   (v) => {
     if (v !== 'review') return;
     reviewActivatedRepoIds.add(repoId.value);
@@ -345,16 +351,18 @@ onUnmounted(() => {
   <PanelShell
     :search="tab === 'repos' ? local.repoSearch : local.fileSearch"
     :empty="codeReposState.records.length === 0"
-    :searchable="true"
+    :searchable="tab !== 'review'"
     @update:search="tab === 'repos' ? (local.repoSearch = $event) : (local.fileSearch = $event)"
   >
     <template #title>
-      <!-- P84 §8.1/§9: replaces the old repo-name title — the two tabs already say what's open. -->
+      <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
+           P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
       <SegmentedControl
         v-model="tab"
         :options="[
-          { value: 'repos', label: 'Repositories', testid: 'git-panel-tab-repos' },
+          { value: 'repos', label: 'Repos', testid: 'git-panel-tab-repos' },
           { value: 'files', label: 'Files', testid: 'git-panel-tab-files' },
+          { value: 'review', label: 'Review', testid: 'git-panel-tab-review' },
         ]"
       />
     </template>
@@ -484,38 +492,40 @@ onUnmounted(() => {
         </section>
         <template v-else>
           <template v-if="repoId">
-            <div class="view-strip">
-              <SegmentedControl v-model="view" :options="viewOptions" />
-            </div>
-            <template v-if="view === 'files'">
-              <div
-                v-if="repoTreeError(repoId)"
-                class="p-strip note error-note"
-                data-testid="repo-tree-error"
-              >
-                {{ repoTreeError(repoId) }}
+            <template v-if="tab === 'files'">
+              <div class="view-strip">
+                <SegmentedControl v-model="view" :options="viewOptions" />
               </div>
-              <div
-                v-if="repoTreeTruncated(repoId)"
-                class="p-strip note"
-                data-testid="repo-tree-truncated"
-              >
-                Showing the first 200,000 files.
-              </div>
-              <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted is
-                   what calls ensureRepoTreeLoaded in the first place; gating on the state it sets
-                   would mean it never gets the chance to. Its own `rows` computed is empty until
-                   the load resolves, then updates reactively — no separate loading placeholder
-                   needed for a first open this fast. -->
-              <RepoFileTree class="repo-tree" :repo-id="repoId" :search="local.fileSearch" />
+              <template v-if="view === 'files'">
+                <div
+                  v-if="repoTreeError(repoId)"
+                  class="p-strip note error-note"
+                  data-testid="repo-tree-error"
+                >
+                  {{ repoTreeError(repoId) }}
+                </div>
+                <div
+                  v-if="repoTreeTruncated(repoId)"
+                  class="p-strip note"
+                  data-testid="repo-tree-truncated"
+                >
+                  Showing the first 200,000 files.
+                </div>
+                <!-- Always mounted, never gated on isRepoTreeLoaded — RepoFileTree's own onMounted
+                     is what calls ensureRepoTreeLoaded in the first place; gating on the state it
+                     sets would mean it never gets the chance to. Its own `rows` computed is empty
+                     until the load resolves, then updates reactively — no separate loading
+                     placeholder needed for a first open this fast. -->
+                <RepoFileTree class="repo-tree" :repo-id="repoId" :search="local.fileSearch" />
+              </template>
+              <RepoSearchView v-else-if="view === 'search'" class="repo-tree" :repo-id="repoId" />
             </template>
-            <RepoSearchView v-else-if="view === 'search'" class="repo-tree" :repo-id="repoId" />
             <!-- C11 §8.4: mounted once (reviewActivatedRepoIds), then only ever hidden/shown,
                  never destroyed, by a Files<->Review or Search<->Review switch within this same
-                 repo. -->
+                 repo. P92 item 6: gated on `tab`, Review's own top-level tab, not `view`. -->
             <RepoReviewView
               v-if="reviewActivatedRepoIds.has(repoId)"
-              v-show="view === 'review'"
+              v-show="tab === 'review'"
               :key="repoId"
               class="repo-tree"
               :repo-id="repoId"

@@ -1,5 +1,5 @@
 import type { CodeSearchEvent, FileMatches, SearchStats } from '@shared/domain/repo';
-import { markRaw, reactive } from 'vue';
+import { markRaw, reactive, ref } from 'vue';
 import { control } from '../../bridge/control';
 
 // C7 §7.2: the repository-wide search store — one entry per open repo workspace, the panel's
@@ -18,7 +18,7 @@ function defaultOptions(): RepoSearchOptions {
 }
 
 interface RepoSearchState {
-  view: 'files' | 'search' | 'review';
+  view: 'files' | 'search';
   query: string;
   options: RepoSearchOptions;
   searchId: string | null; // null when idle
@@ -65,12 +65,28 @@ function stateFor(repoId: string): RepoSearchState {
   return state;
 }
 
-export function repoSearchView(repoId: string): 'files' | 'search' | 'review' {
+export function repoSearchView(repoId: string): 'files' | 'search' {
   return byRepo.get(repoId)?.view ?? 'files';
 }
 
-export function setRepoSearchView(repoId: string, view: 'files' | 'search' | 'review'): void {
+export function setRepoSearchView(repoId: string, view: 'files' | 'search'): void {
   stateFor(repoId).view = view;
+}
+
+// P92 item 6: which of GitPanel.vue's three top-level tabs is showing. Flat, not per-repo keyed
+// like `view` above — GitPanel.vue is one persistent instance across every repo workspace (C11
+// §8.4's own note), so this is genuinely one value, not one per repoId. Lives here, not as a local
+// ref in GitPanel.vue, so hostHandlers.ts's review.open (the one external caller — "review" used
+// to be a value of `view`, which this same module already let it set) can still flip the visible
+// tab without an import cycle into workbench/*.
+const panelTab = ref<'repos' | 'files' | 'review'>('repos');
+
+export function repoPanelTab(): 'repos' | 'files' | 'review' {
+  return panelTab.value;
+}
+
+export function setRepoPanelTab(tab: 'repos' | 'files' | 'review'): void {
+  panelTab.value = tab;
 }
 
 export function repoSearchQuery(repoId: string): string {

@@ -35,7 +35,7 @@ import {
   openRepoReviewDiffTab,
 } from '../../state/repoTabs';
 import { activateTab } from '../../state/tabs';
-import { setRepoSearchView } from '../state/search';
+import { setRepoPanelTab } from '../state/search';
 import { loadReviewSession, pinnedGraphTabId, saveReviewSession } from './reviewSession';
 
 // C11 §8.2/§8.4 (S13): review.open's own cold-mount hand-off. The local event bus (S4) only
@@ -365,11 +365,12 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       return {};
     },
 
-    // C11 §8.2/§5.3: the panel webview's own entry point — reveal the review segment on this
-    // branch. `repo/state/search.ts` is the existing native precedent for "which segment of the
-    // panel is active" (Files/Search, C7 D9); `review` joins it as this phase's third value (S14
-    // builds the panel's own template branch for it). Always ensures the panel itself is visible —
-    // a collapsed panel showing "Review branch changes" doing nothing would be a worse experience
+    // C11 §8.2/§5.3: the panel webview's own entry point — reveal the review tab on this branch.
+    // `repo/state/search.ts` is the existing native precedent for "which segment of the panel is
+    // active" (Files/Search, C7 D9); P92 item 6 moved Review out to its own top-level `tab` there
+    // (repoPanelTab/setRepoPanelTab), flat rather than per-repo since GitPanel.vue is one
+    // persistent instance across every workspace. Always ensures the panel itself is visible — a
+    // collapsed panel showing "Review branch changes" doing nothing would be a worse experience
     // than the affordance not existing.
     'review.open': async ({ repoId: gitRepoId, branch }) => {
       const codeRepoId = codeRepoIdFor(gitRepoId);
@@ -377,7 +378,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
         throw new Error(`hostHandlers: review.open: unknown git repoId ${gitRepoId}`);
       }
       pendingReviewTargetByCodeRepoId.set(codeRepoId, { repoId: gitRepoId, branch });
-      setRepoSearchView(codeRepoId, 'review');
+      setRepoPanelTab('review');
       if (!layoutState.panel.project.visible) toggleProjectPanel();
       deps.emitLocal('review.target', { repoId: gitRepoId, branch });
       return {};

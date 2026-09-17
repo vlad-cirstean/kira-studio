@@ -131,9 +131,10 @@ test('bug 1 regression: opening a file and returning to the graph tab keeps the 
   await expect(connectionStateIn(page, 'repo-graph-host')).toHaveText('connected');
   await expect(page.locator('[data-testid="boot-error"]')).toHaveCount(0);
 
-  // The Review segment shares the same underlying client (a separate lease, §2.1) — it must mount
+  // The Review tab shares the same underlying client (a separate lease, §2.1) — it must mount
   // live too, not inherit whatever the graph tab's own mount/unmount did to the transport.
-  await page.locator('[data-testid="repo-view-review"]').click();
+  // P92 item 6: Review moved from the Files body's own segment to GitPanel's top-level tab row.
+  await page.locator('[data-testid="git-panel-tab-review"]').click();
   await expect(page.locator('[data-testid="repo-review-host"]')).toBeVisible();
   await expect(connectionStateIn(page, 'repo-review-host')).toHaveText('connected');
   await expect(page.locator('[data-testid="boot-error"]')).toHaveCount(0);

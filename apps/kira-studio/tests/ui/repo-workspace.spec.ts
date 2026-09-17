@@ -442,7 +442,8 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
 
   await openGitModule(page);
   await repoRow(page).click();
-  await page.locator('[data-testid="repo-view-review"]').click();
+  // P92 item 6: Review moved from the Files body's own segment to GitPanel's top-level tab row.
+  await page.locator('[data-testid="git-panel-tab-review"]').click();
 
   await expect(page.locator('[data-testid="repo-review-host"]')).toBeVisible();
   // The "no branch chosen yet" picker — ReviewView.vue's own branch selector — with a real branch
