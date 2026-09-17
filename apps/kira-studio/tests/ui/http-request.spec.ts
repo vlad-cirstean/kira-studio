@@ -510,3 +510,299 @@ test('Http request — an incognito tab sends with incognito:true and is never i
     expect(args.tabs.some((t) => t.id === tabId)).toBe(false);
   }
 });
+
+// P90 §6.3: turning off Inherit on one leaf in the Settings segment and changing it must reach
+// httpSend's own `options` carrying exactly that one leaf — buildSettingsWire drops every null
+// (still-inherited) leaf rather than sending all seven.
+test('Http request — a Settings-segment override reaches the wire as the one leaf that changed', async ({
+  relaunch,
+}) => {
+  const RESPONSE_BODY = '{"ok":true}';
+  const JSON_RESPONSE = {
+    status: 200,
+    statusText: 'OK',
+    proto: 'HTTP/1.1',
+    headers: [],
+    body: RESPONSE_BODY,
+    bodyEncoding: 'utf8',
+    bodyBytes: RESPONSE_BODY.length,
+    bodyTruncated: false,
+    elapsedMs: 5,
+    finalUrl: 'https://api.example.com/ping',
+    redirects: [],
+  };
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: JSON_RESPONSE }];
+  const { window: page, control } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewRequest(page);
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/ping');
+  await page.click('[data-testid="http-request-pane-settings"]');
+
+  // Unchecking Inherit stages the current global value (true) first — a no-op change on its own —
+  // then the checkbox itself flips it to false, the one leaf this request overrides.
+  await page.click('[data-testid="http-settings-followRedirects-inherit"]');
+  await page.click('[data-testid="http-settings-followRedirects"]');
+
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  const sendCalls = control.log().filter((e) => e.channel === IPC.httpSend);
+  expect(sendCalls).toHaveLength(1);
+  const args = sendCalls[0].args as { options: unknown };
+  expect(args.options).toEqual({ followRedirects: false });
+});
+
+// P90 §6.3: the override staged above is tab state — it must come back exactly as saved, with the
+// segment's own count badge reflecting it, with no further interaction.
+test('Http request — a Settings-segment override survives a tab restore', async ({ relaunch }) => {
+  const RESTORED_TAB = {
+    id: 'tab-settings-restore',
+    connectionId: null,
+    path: 'request',
+    kind: 'http-request',
+    order: 0,
+    active: true,
+    state: {
+      method: 'GET',
+      url: 'https://api.example.com/ping',
+      headers: [],
+      bodyMode: 'none',
+      body: '',
+      requestPane: 'settings',
+      responsePane: 'body',
+      responseView: 'pretty',
+      requestPaneHeight: 0,
+      settings: {
+        httpVersion: null,
+        requestTimeoutMs: null,
+        maxResponseMb: null,
+        sslVerify: null,
+        followRedirects: false,
+        maxRedirects: null,
+        disableCookieJar: null,
+      },
+    },
+  };
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.tabsList, response: [RESTORED_TAB] }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await expect(page.locator('[data-testid="http-request-pane-settings"]')).toContainText(
+    'Settings (1)',
+  );
+  await expect(
+    page.locator('[data-testid="http-settings-followRedirects-inherit"]'),
+  ).not.toBeChecked();
+  await expect(page.locator('[data-testid="http-settings-followRedirects"]')).not.toBeChecked();
+});
+
+// P90 §6.3: sent/received cookies from a mocked response, grouped and rendering their attributes.
+test('Http request — the response Cookies tab renders sent and received cookies', async ({
+  relaunch,
+}) => {
+  const JSON_RESPONSE = {
+    status: 200,
+    statusText: 'OK',
+    proto: 'HTTP/1.1',
+    headers: [],
+    body: '',
+    bodyEncoding: 'utf8',
+    bodyBytes: 0,
+    bodyTruncated: false,
+    elapsedMs: 5,
+    finalUrl: 'https://api.example.com/me',
+    redirects: [],
+    sentCookies: [
+      {
+        name: 'session',
+        value: 'abc123',
+        domain: '',
+        path: '',
+        expires: '',
+        maxAge: 0,
+        secure: false,
+        httpOnly: false,
+        sameSite: '',
+        hop: 0,
+      },
+    ],
+    receivedCookies: [
+      {
+        name: 'csrf',
+        value: 'xyz789',
+        domain: 'api.example.com',
+        path: '/',
+        expires: '',
+        maxAge: 0,
+        secure: true,
+        httpOnly: true,
+        sameSite: 'lax',
+        hop: 0,
+      },
+    ],
+  };
+  const CONTROL: ControlSnapshot[] = [{ channel: IPC.httpSend, response: JSON_RESPONSE }];
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  await openHttpModeAndNewRequest(page);
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/me');
+  await page.click('[data-testid="http-send"]');
+  await expect(page.locator('[data-testid="http-status"]')).toContainText('200');
+
+  await page.click('[data-testid="http-response-pane-cookies"]');
+  const cookies = page.locator('[data-testid="http-response-cookies"]');
+  await expect(cookies).toContainText('session');
+  await expect(cookies).toContainText('abc123');
+  await expect(cookies).toContainText('csrf');
+  await expect(cookies).toContainText('xyz789');
+  await expect(cookies).toContainText('HttpOnly');
+});
+
+// P90 §6.3: with disableCookieJar at its global default (true — the jar is off), the request
+// Cookies tab shows the jar-off empty state and never calls httpCookies.
+test('Http request — the request Cookies tab shows the jar-off state by default', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({ control: [] });
+
+  await openHttpModeAndNewRequest(page);
+  await page.fill('[data-testid="http-url"]', 'https://api.example.com/ping');
+  await page.click('[data-testid="http-request-pane-cookies"]');
+
+  await expect(page.locator('[data-testid="http-cookies-jar-off"]')).toBeVisible();
+  expect(control.log().some((e) => e.channel === IPC.httpCookies)).toBe(false);
+});
+
+// The overlay's own Range client rects give exact per-character line boundaries, with no font
+// metric hard-coded — reused both to size the fixture text (stay within the 4-row clamp) and to
+// drive the click assertion below.
+interface GrowMeasurement {
+  textareaHeight: number;
+  overlayHeight: number;
+  scrollHeight: number;
+  clientHeight: number;
+  lineStarts: number[];
+  lineCount: number;
+}
+
+function measureGrowField(wrap: Locator): Promise<GrowMeasurement> {
+  return wrap.evaluate((wrapEl) => {
+    const textarea = wrapEl.querySelector('textarea') as HTMLTextAreaElement;
+    const overlay = wrapEl.querySelector('.highlight-overlay') as HTMLElement;
+    const textareaRect = textarea.getBoundingClientRect();
+    const overlayRect = overlay.getBoundingClientRect();
+
+    const walker = document.createTreeWalker(overlay, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) textNodes.push(n as Text);
+    function locate(index: number): { node: Text; offset: number } {
+      let remaining = index;
+      for (const node of textNodes) {
+        if (remaining <= node.length) return { node, offset: remaining };
+        remaining -= node.length;
+      }
+      const last = textNodes[textNodes.length - 1];
+      return { node: last, offset: last.length };
+    }
+    const text = textarea.value;
+    const tops: number[] = [];
+    for (let i = 0; i < text.length; i++) {
+      const range = document.createRange();
+      const loc = locate(i);
+      const end = Math.min(loc.offset + 1, loc.node.length);
+      range.setStart(loc.node, loc.offset);
+      range.setEnd(loc.node, end);
+      const rect = range.getClientRects()[0];
+      tops.push(rect ? rect.top : Number.NaN);
+    }
+    const lineStarts = [0];
+    for (let i = 1; i < tops.length; i++) {
+      if (Math.abs(tops[i] - tops[i - 1]) > 1) lineStarts.push(i);
+    }
+
+    return {
+      textareaHeight: textareaRect.height,
+      overlayHeight: overlayRect.height,
+      scrollHeight: textarea.scrollHeight,
+      clientHeight: textarea.clientHeight,
+      lineStarts,
+      lineCount: lineStarts.length,
+    };
+  });
+}
+
+// P90 §4.5: the grow-field fix, the one assertion a browser is needed for. A textarea/overlay pair
+// must wrap on the same boundaries and occupy the same box (defect B), the textarea must not
+// scroll internally once its track has grown to fit (defect C), and a click near the end of the
+// visible 3rd line must place the caret in that line, not the 2nd (the reported symptom). Line
+// boundaries are read off the overlay's own Range client rects rather than assumed from a
+// character count, so this does not encode a font metric. Content stays within the field's own
+// 4-row clamp (grown incrementally, not a fixed length guessed from a font metric) — past the
+// clamp the textarea is *meant* to scroll internally (by design), which is a different case from
+// the bug this test guards (a box that scrolled before it finished growing, well under the clamp).
+test('Http request — a grow field wraps its textarea and overlay onto the same lines', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: [] });
+  await openHttpModeAndNewRequest(page);
+  await page.click('[data-testid="http-request-pane-headers"]');
+
+  const firstRow = page.locator('[data-testid="http-header-row"]').first();
+  await firstRow.locator('[data-testid="http-header-name"]').fill('X-Long');
+  const valueField = firstRow.locator('[data-testid="http-header-value"]');
+  const wrap = valueField.locator('xpath=..');
+
+  let length = 40;
+  await valueField.fill('x'.repeat(length));
+  await expect(wrap.locator('.highlight-overlay')).toBeVisible();
+  let measurement = await measureGrowField(wrap);
+  while (measurement.lineCount < 3 && length < 1000) {
+    length += 20;
+    await valueField.fill('x'.repeat(length));
+    measurement = await measureGrowField(wrap);
+  }
+
+  expect(measurement.lineCount).toBeGreaterThanOrEqual(3);
+  expect(measurement.lineCount).toBeLessThanOrEqual(4); // still inside the clamp — see comment above
+  // Defect B: same box.
+  expect(Math.abs(measurement.textareaHeight - measurement.overlayHeight)).toBeLessThanOrEqual(1);
+  // Defect C: the box grew to fit — no internal scroll left over.
+  expect(measurement.scrollHeight).toBeLessThanOrEqual(measurement.clientHeight);
+
+  // The reported symptom: click near the end of the visible 3rd line (overlay line index 2) and
+  // the caret must land within that line's own character range.
+  const line3Start = measurement.lineStarts[2];
+  const line4Start = measurement.lineStarts[3] as number | undefined;
+  const nearEndIndex = (line4Start ?? measurement.lineStarts[2] + 1) - 1;
+
+  const click = await wrap.evaluate((wrapEl, charIndex: number) => {
+    const overlay = wrapEl.querySelector('.highlight-overlay') as HTMLElement;
+    const walker = document.createTreeWalker(overlay, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) textNodes.push(n as Text);
+    let remaining = charIndex;
+    let node = textNodes[0];
+    let offset = 0;
+    for (const n of textNodes) {
+      if (remaining <= n.length) {
+        node = n;
+        offset = remaining;
+        break;
+      }
+      remaining -= n.length;
+    }
+    const range = document.createRange();
+    const end = Math.min(offset + 1, node.length);
+    range.setStart(node, offset);
+    range.setEnd(node, end);
+    const rect = range.getClientRects()[0];
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  }, nearEndIndex);
+
+  await page.mouse.click(click.x, click.y);
+
+  const selectionStart = await valueField.evaluate(
+    (el: HTMLTextAreaElement) => el.selectionStart ?? 0,
+  );
+  expect(selectionStart).toBeGreaterThanOrEqual(line3Start);
+  if (line4Start !== undefined) expect(selectionStart).toBeLessThan(line4Start);
+});

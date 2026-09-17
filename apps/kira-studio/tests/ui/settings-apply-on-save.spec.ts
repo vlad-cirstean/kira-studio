@@ -191,3 +191,19 @@ test('the font-family select is 26px, matching its own row (D6)', async ({ relau
     .evaluate((el) => (el as HTMLElement).offsetHeight);
   expect(height).toBe(26);
 });
+
+// P90 §6.3: the Api section round-trips through Save exactly like every other section — only the
+// leaf that actually changed reaches settingsSet.
+test('the Api section round-trips a single changed leaf through Save', async ({ relaunch }) => {
+  const { window: page, control } = await relaunch();
+  await openSettings(page);
+  await page.click('[data-testid="settings-section-Api"]');
+
+  await page.fill('[data-testid="settings-api-maxResponseMb"]', '10');
+  await page.click('[data-testid="settings-save"]');
+
+  await expect(dialog(page)).toHaveCount(0);
+  const calls = settingsSetCalls(control);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].args).toEqual({ patch: { api: { maxResponseMb: 10 } } });
+});
