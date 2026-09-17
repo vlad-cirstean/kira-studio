@@ -302,9 +302,16 @@ func main() {
 		OnRepoRenamed: func(id, name string) { bridge.RepoMapNotifyRepoRenamed(repoMapSvc, id, name) },
 	}
 
+	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
+	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
+	// leaf is already on).
+	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
+	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
+
 	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
 	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
-	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry()}
+	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
+	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
 
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
@@ -339,6 +346,7 @@ func main() {
 		connectionsSvc.Shutdown()
 		bridge.StopRepoMap(repoMapSvc)
 		bridge.StopDbMcp(dbMcpSvc)
+		bridge.StopAgentHooks(agentHooksSvc)
 		codeWorkspaceSvc.Shutdown()
 		terminalSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
@@ -401,6 +409,7 @@ func main() {
 			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
 			application.NewService(repoMapSvc),
 			application.NewService(dbMcpSvc),
+			application.NewService(agentHooksSvc),
 			// C5 §3.3/C6 §7: the native code-viewing workspace's own bound service — Discovery/
 			// Runner mirror gitrpc's own seam rather than reusing gitRegistry (this workspace
 			// needs one read-only runner and the resolved git.path, never gitsession's refcounted

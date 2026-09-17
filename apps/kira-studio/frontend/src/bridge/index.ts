@@ -1,3 +1,4 @@
+import * as AgentHooksService from '@bindings/agenthooksservice.js';
 import * as AppService from '@bindings/appservice.js';
 import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
@@ -367,6 +368,14 @@ const studioControl = {
     unwrap(DbMcpService.DenyQuery({ requestId })).then((r) => trust<DbMcpApprovalSnapshot>(r)),
   onDbMcpApprovalChanged: (cb: (snap: DbMcpApprovalSnapshot) => void): (() => void) =>
     on(CHANNEL.dbMcpApproval, cb),
+
+  // P86 §9.3: the Claude Code settings section's own status — AppInfo/UpdateStatus's own "just
+  // unwrap, no trust()" shape (a Go-shaped one-way read with no zod schema of its own), not
+  // DbMcpStatus's: this status carries no secret worth a documented widen-then-narrow, just a
+  // bool and a path.
+  agentHooksStatus: (): Promise<WailsModels.AgentHooksStatus> => unwrap(AgentHooksService.Status()),
+  agentHooksSetEnabled: (enabled: boolean): Promise<WailsModels.AgentHooksStatus> =>
+    unwrap(AgentHooksService.SetEnabled({ enabled })),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

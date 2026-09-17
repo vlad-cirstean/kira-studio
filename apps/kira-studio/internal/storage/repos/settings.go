@@ -68,6 +68,8 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "git.path", &result.Git.GitPath)
 	leaf(stored, "codeIntel.mcpServerEnabled", &result.CodeIntel.McpServerEnabled)
 	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
+	leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
+	leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
 	return result, nil
 }
 
@@ -173,6 +175,18 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	if dm := patch.DbMcp; dm != nil && dm.ServerEnabled != nil {
 		if err := upsertSettingsLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled); err != nil {
 			return model.Settings{}, err
+		}
+	}
+	if cc := patch.ClaudeCode; cc != nil {
+		if cc.HooksEnabled != nil {
+			if err := upsertSettingsLeaf(tx, "claudeCode.hooksEnabled", *cc.HooksEnabled); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if cc.HooksPromptDismissed != nil {
+			if err := upsertSettingsLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
+				return model.Settings{}, err
+			}
 		}
 	}
 

@@ -61,6 +61,16 @@ type DbMcpSettings struct {
 	ServerEnabled bool `json:"serverEnabled"`
 }
 
+// ClaudeCodeSettings mirrors DbMcpSettings' own shape (P86 §8.4/§9.2): HooksEnabled is read fresh
+// at every terminal launch, not cached anywhere (internal/bridge/agenthooks.go owns the actual
+// server start/stop side effect) — never an installer, never a one-time write. HooksPromptDismissed
+// is the first-run banner's own "don't ask again" leaf (§9.4), independent of HooksEnabled so
+// declining the prompt once doesn't reappear on every new Claude Code tab.
+type ClaudeCodeSettings struct {
+	HooksEnabled         bool `json:"hooksEnabled"`
+	HooksPromptDismissed bool `json:"hooksPromptDismissed"`
+}
+
 type Settings struct {
 	Appearance AppearanceSettings `json:"appearance"`
 	Data       DataSettings       `json:"data"`
@@ -69,6 +79,7 @@ type Settings struct {
 	Git        GitSettings        `json:"git"`
 	CodeIntel  CodeIntelSettings  `json:"codeIntel"`
 	DbMcp      DbMcpSettings      `json:"dbMcp"`
+	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
 }
 
 // DefaultSettings mirrors packages/shared/domain/settings.ts's defaultSettings verbatim.
@@ -97,8 +108,9 @@ func DefaultSettings() Settings {
 			FetchAutoIntervalMinutes: 0,
 			GitPath:                  "",
 		},
-		CodeIntel: CodeIntelSettings{McpServerEnabled: false},
-		DbMcp:     DbMcpSettings{ServerEnabled: false},
+		CodeIntel:  CodeIntelSettings{McpServerEnabled: false},
+		DbMcp:      DbMcpSettings{ServerEnabled: false},
+		ClaudeCode: ClaudeCodeSettings{HooksEnabled: false, HooksPromptDismissed: false},
 	}
 }
 
@@ -146,6 +158,12 @@ type DbMcpPatch struct {
 	ServerEnabled *bool `json:"serverEnabled,omitempty"`
 }
 
+// ClaudeCodePatch mirrors ClaudeCodeSettings' own `.partial()` shape (P86 §9.2).
+type ClaudeCodePatch struct {
+	HooksEnabled         *bool `json:"hooksEnabled,omitempty"`
+	HooksPromptDismissed *bool `json:"hooksPromptDismissed,omitempty"`
+}
+
 type SettingsPatch struct {
 	Appearance *AppearancePatch `json:"appearance,omitempty"`
 	Data       *DataPatch       `json:"data,omitempty"`
@@ -154,6 +172,7 @@ type SettingsPatch struct {
 	Git        *GitPatch        `json:"git,omitempty"`
 	CodeIntel  *CodeIntelPatch  `json:"codeIntel,omitempty"`
 	DbMcp      *DbMcpPatch      `json:"dbMcp,omitempty"`
+	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
 }
 
 // ValidRowDensity mirrors settings.ts's rowDensitySchema.

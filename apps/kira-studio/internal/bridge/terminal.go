@@ -3,11 +3,13 @@ package bridge
 import (
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/terminal"
@@ -21,6 +23,10 @@ import (
 type TerminalService struct {
 	Emit     appcore.Emitter
 	Registry *terminal.Registry
+	// AgentHooks is P86 §8.3's own optional collaborator — nil in any test that constructs
+	// TerminalService directly without it, in which case Open behaves exactly as P85 left it (no
+	// `--settings` flag, no extra env, ever).
+	AgentHooks *AgentHooksService
 }
 
 // Shutdown closes every live session — app teardown (main.go's teardown, beside
@@ -124,6 +130,23 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	}
 	agent := args.LaunchKind == launchKindClaudeCode
 
+	// P86 §8.3/§9.1: the setting is read at every launch — only a claude-code launch with the
+	// listener actually running gets the `--settings` flag and the three hook env vars; a plain
+	// terminal or a custom script gets neither, and hooks off leaves the command the literal
+	// `claude`, byte for byte (§2.1).
+	command, env := args.Command, []string(nil)
+	if agent && s.AgentHooks != nil {
+		if path, hookEnv, ok := s.AgentHooks.launchFor(args.TerminalID); ok {
+			quoted, err := agenthooks.ShellSingleQuote(path)
+			if err != nil {
+				slog.Warn("terminal: quote agent hooks settings path", "scope", "terminal", "err", err)
+			} else {
+				command += " --settings " + quoted
+				env = hookEnv
+			}
+		}
+	}
+
 	coalescer := newTerminalCoalescer(s.Emit, args.WindowKey, args.TerminalID)
 	sess, err := s.Registry.Open(terminal.OpenParams{
 		ID:        args.TerminalID,
@@ -131,7 +154,8 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 		Cwd:       args.Cwd,
 		Cols:      uint16(args.Cols),
 		Rows:      uint16(args.Rows),
-		Command:   args.Command,
+		Command:   command,
+		Env:       env,
 		Agent:     agent,
 		OnData:    coalescer.push,
 		OnExit: func(code int, exitErr error) {

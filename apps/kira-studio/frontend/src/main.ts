@@ -5,6 +5,7 @@ import App from './App.vue';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
+import { hydrateAgentHooks } from './state/agentHooks';
 import { initAppMetrics } from './state/appMetrics';
 import { initAppUpdate } from './state/appUpdate';
 import { initCacheStats } from './state/cacheStats';
@@ -306,6 +307,7 @@ async function bootstrap(): Promise<void> {
     hydrateRepoMap(),
     hydrateDbMcp(),
     hydrateDbMcpApprovals(),
+    hydrateAgentHooks(),
     hydrateOps(),
     hydrateTabs(),
   ]);

@@ -14,7 +14,8 @@ export const settingsOpen = ref(false);
 // state/ read, the direction this app's layering already permits. G12 D9's own reasoning for the
 // list is unchanged: 'Connected editors' and 'Code intelligence'/'Database MCP' each bypass
 // draft/Save for their own stated reason; 'Scripts' joins them for the same reason (§10.1: a CRUD
-// section, not a staged leaf).
+// section, not a staged leaf); P86 §9.3's 'Claude Code' joins them too, an instant on/off switch
+// exactly like 'Code intelligence'/'Database MCP'.
 export const sections = [
   'Appearance',
   'Data',
@@ -22,6 +23,7 @@ export const sections = [
   'Connected editors',
   'Git',
   'Scripts',
+  'Claude Code',
   'Code intelligence',
   'Database MCP',
   'Advanced',
@@ -68,6 +70,7 @@ function applySettings(settings: Settings): void {
   Object.assign(settingsState.git, settings.git);
   Object.assign(settingsState.codeIntel, settings.codeIntel);
   Object.assign(settingsState.dbMcp, settings.dbMcp);
+  Object.assign(settingsState.claudeCode, settings.claudeCode);
   applyAppearance();
 }
 

@@ -17,6 +17,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes, formatRelative } from '../format';
+import { agentHooksState, setAgentHooksEnabled } from '../state/agentHooks';
 import { cacheStatsState } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
 import { connectionsState, setConnectionMcpEnabled } from '../state/connections';
@@ -321,6 +322,18 @@ async function onInstallDbMcpClaudeCode(): Promise<void> {
     await installDbMcpClaudeCode();
   } finally {
     dbMcpInstalling.value = false;
+  }
+}
+
+// P86 §9.3: same instant-action posture as onToggleDbMcpEnabled — claudeCode.hooksEnabled both
+// persists and starts/stops the embedded hook listener in one call.
+const claudeCodeHooksToggling = ref(false);
+async function onToggleAgentHooksEnabled(enabled: boolean): Promise<void> {
+  claudeCodeHooksToggling.value = true;
+  try {
+    await setAgentHooksEnabled(enabled);
+  } finally {
+    claudeCodeHooksToggling.value = false;
   }
 }
 
@@ -1260,6 +1273,44 @@ async function onAddScript(): Promise<void> {
             <span v-if="scriptError" class="field-error" data-testid="custom-script-error">{{
               scriptError
             }}</span>
+          </template>
+
+          <template v-else-if="activeSection === 'Claude Code'">
+            <!-- P86 §9.3: instant-action only, same posture as Code intelligence/Database MCP —
+                 this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
+                 hook listener in one call, so it belongs on the action side of the draft/Save
+                 line, never mixed with it. -->
+            <label class="field checkbox">
+              <Checkbox
+                :model-value="settingsState.claudeCode.hooksEnabled"
+                :disabled="claudeCodeHooksToggling"
+                data-testid="settings-claude-code-hooks"
+                @update:model-value="onToggleAgentHooksEnabled"
+              />
+              <span>Report session activity to Kira Studio</span>
+              <span class="helper-text"
+                >A Claude Code tab launches with a `--settings` flag pointing at a file this app
+                owns — no project file is written. Turning this off affects only the next launch;
+                a session already running simply stops reporting.</span
+              >
+            </label>
+
+            <template v-if="settingsState.claudeCode.hooksEnabled">
+              <p
+                v-if="agentHooksState.status.error"
+                class="muted-note"
+                data-testid="claude-code-hooks-error"
+              >
+                {{ agentHooksState.status.error }}
+              </p>
+              <p
+                v-else-if="agentHooksState.status.running"
+                class="mono command-text"
+                data-testid="claude-code-hooks-path"
+              >
+                {{ agentHooksState.status.settingsPath }}
+              </p>
+            </template>
           </template>
 
           <template v-else-if="activeSection === 'Code intelligence'">

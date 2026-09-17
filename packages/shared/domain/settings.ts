@@ -121,6 +121,16 @@ export const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
 });
 export type DbMcpSettings = z.infer<typeof dbMcpSettingsSchema>;
 
+// P86 §9.2: mirrors dbMcpSettingsSchema exactly — hooksEnabled is read fresh at every Claude Code
+// launch (internal/bridge/agenthooks.go owns the actual listener start/stop side effect), never
+// cached. hooksPromptDismissed is the first-run banner's own "don't ask again" leaf (§9.4),
+// independent of hooksEnabled so declining the prompt once doesn't reappear on every new tab.
+export const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
+  hooksEnabled: z.boolean().default(false),
+  hooksPromptDismissed: z.boolean().default(false),
+});
+export type ClaudeCodeSettings = z.infer<typeof claudeCodeSettingsSchema>;
+
 // `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
 // row with no `data`/`cache`/`advanced`/`git`/`codeIntel` keys, and that row must still parse on
 // next launch.
@@ -140,6 +150,10 @@ export const settingsSchema = /*#__PURE__*/ z.object({
   }),
   codeIntel: codeIntelSettingsSchema.default({ mcpServerEnabled: false }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
+  claudeCode: claudeCodeSettingsSchema.default({
+    hooksEnabled: false,
+    hooksPromptDismissed: false,
+  }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 
@@ -151,6 +165,7 @@ export const settingsPatchSchema = /*#__PURE__*/ z.object({
   git: gitSettingsSchema.partial().optional(),
   codeIntel: codeIntelSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
+  claudeCode: claudeCodeSettingsSchema.partial().optional(),
 });
 export type SettingsPatch = z.infer<typeof settingsPatchSchema>;
 
@@ -185,5 +200,9 @@ export const defaultSettings: Settings = {
   },
   dbMcp: {
     serverEnabled: false,
+  },
+  claudeCode: {
+    hooksEnabled: false,
+    hooksPromptDismissed: false,
   },
 };
