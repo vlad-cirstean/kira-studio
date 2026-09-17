@@ -1,8 +1,51 @@
 <script setup lang="ts">
-// P91 §2: MainView.vue's fallback when the Terminal module has no active tab — a minimal shell for
-// now, filled in by §12 (an EmptyState with a "New terminal" launch button).
+import { terminalDefaults } from '../state/terminals';
+import { openTerminalTab } from '../state/terminalTabs';
+import CodiconIcon from '../theme/CodiconIcon.vue';
+import EmptyState from '../theme/primitives/EmptyState.vue';
+
+// P91 §12: MainView.vue's own fallback when the Terminal module has no active tab — the state a
+// fresh install always opens in. GitStart.vue verbatim in shape: an EmptyState with one primary
+// action, disabled while the resolved home directory (§7.2) isn't known yet.
+function onNewTerminal(): void {
+  if (terminalDefaults.cwd === '') return;
+  openTerminalTab({ workspaceId: 'terminal', cwd: terminalDefaults.cwd });
+}
 </script>
 
 <template>
-  <div data-testid="terminal-start"></div>
+  <div class="start" data-testid="terminal-start">
+    <div class="start-inner">
+      <EmptyState icon="terminal-bash" label="No terminal open">
+        <button
+          type="button"
+          class="p-dlgbtn primary"
+          data-testid="terminal-start-new"
+          :disabled="terminalDefaults.cwd === ''"
+          v-tooltip="terminalDefaults.cwd === '' ? 'Home directory unavailable' : undefined"
+          @click="onNewTerminal"
+        >
+          <span class="icon-box"><CodiconIcon name="terminal-bash" :size="13" /></span>
+          New terminal
+        </button>
+      </EmptyState>
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.start {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--kira-s-6);
+  overflow: auto;
+}
+
+.start-inner {
+  width: 420px;
+  max-width: 100%;
+}
+</style>

@@ -5,7 +5,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
 import { agentActivityFor } from '../../state/agentSessions';
-import { codeRepoRecord } from '../../state/coderepos';
+import { codeRepoRecord, codeReposState } from '../../state/coderepos';
 import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
 import { customScriptsState } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
@@ -25,7 +25,8 @@ import {
   promoteTab,
   tabsState,
 } from '../../state/tabs';
-import type { TerminalLaunch } from '../../state/terminalTabs';
+import { terminalDefaults } from '../../state/terminals';
+import { openTerminalTab, type TerminalLaunch } from '../../state/terminalTabs';
 import { workspaceState } from '../../state/workspace';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
@@ -217,11 +218,20 @@ function onDragEnd(): void {
 // regardless of where inside its 22px box the click landed.
 const newTabBtn = ref<HTMLButtonElement | null>(null);
 
+// P91 §8: the "+" now also shows with zero tabs in the Terminal module — a repo workspace always
+// has its pinned graph tab, so this gap never showed before a module whose normal initial state
+// is zero tabs existed.
+const showNewTab = computed(
+  () => isRepoWorkspace(workspaceState.active) || workspaceState.active === 'terminal',
+);
+
 function onNewTab(): void {
   const btn = newTabBtn.value;
   if (!btn) return;
   const rect = btn.getBoundingClientRect();
-  openContextMenuAt(rect.left, rect.bottom + 2, newTabMenuItems());
+  const items =
+    workspaceState.active === 'terminal' ? terminalModuleMenuItems() : newTabMenuItems();
+  openContextMenuAt(rect.left, rect.bottom + 2, items);
 }
 
 // P85 §6.4: every dropdown entry funnels through this — the active workspace's own repo, or the
@@ -288,10 +298,56 @@ function newTabMenuItems(): MenuItem[] {
   );
   return items;
 }
+
+// P91 §8: the Terminal module's own "+" menu — deliberately not newTabMenuItems above (§8.3): no
+// Claude Code entry (P85/P86's own surface, not asked for here) and no per-script entries (the
+// left panel is the quick-command surface, one click away and always visible while the module is
+// open — two identical launchers side by side is the outcome to avoid). `Terminal` opens an
+// unscoped session at the resolved home directory; one entry per known repository/worktree row
+// (§8.1) opens one scoped at its own root — both stay in the Terminal module's own workspace,
+// never opening a Git workspace as a side effect (§6's whole point).
+function terminalModuleMenuItems(): MenuItem[] {
+  const items: MenuItem[] = [
+    {
+      type: 'item',
+      id: 'new-terminal',
+      label: 'Terminal',
+      icon: 'terminal-bash',
+      disabled: terminalDefaults.cwd === '',
+      run: () => {
+        openTerminalTab({ workspaceId: 'terminal', cwd: terminalDefaults.cwd });
+      },
+    },
+  ];
+  if (codeReposState.records.length > 0) {
+    items.push({ type: 'separator' });
+    for (const repo of codeReposState.records) {
+      items.push({
+        type: 'item',
+        id: `repo-${repo.id}`,
+        label: repo.name,
+        hint: repo.root,
+        icon: 'repo',
+        run: () => {
+          openTerminalTab({ workspaceId: 'terminal', cwd: repo.root, codeRepoId: repo.id });
+        },
+      });
+    }
+  }
+  return items;
+}
 </script>
 
 <template>
-  <div v-if="tabs.length > 0" class="tab-strip-wrapper" data-testid="tab-strip-wrapper">
+  <!-- P91 §8: always one wrapper now (was `v-if="tabs.length > 0"` / `v-else` — two separate
+       elements) — the Terminal module's own normal initial state is zero tabs, which needs the
+       "+" (below) just as much as a populated strip does. `.tab-strip-pinned` already carries its
+       own `v-if`; `.tab-strip`'s scroller with no children is an inert flex child either way. -->
+  <div
+    class="tab-strip-wrapper"
+    :class="{ 'is-empty': tabs.length === 0 }"
+    :data-testid="tabs.length > 0 ? 'tab-strip-wrapper' : 'tab-strip-empty'"
+  >
     <!-- P72 §7: the pinned tab's own fixed leading slot — a sibling of `.tab-strip`, outside its
          `overflow-x: auto`, so it never scrolls away. Icon-only: the repo name moves to the
          tooltip/`aria-label` (`titleFor`), the chrome is one glyph. Never draggable (§6.1) and
@@ -392,15 +448,11 @@ function newTabMenuItems(): MenuItem[] {
         </span>
       </button>
     </div>
-    <!-- P83 §9.1: a third fixed child, after `.tab-strip`, mirroring `.tab-strip-pinned`'s own
-         leading-edge fix at the other end — flex-shrink: 0, outside the scroller's overflow-x, so
-         it never scrolls away. Repo-workspace only: every entry this dropdown will ever hold needs
-         a worktree directory, which Studio/Api workspaces have none of. -->
-    <div
-      v-if="isRepoWorkspace(workspaceState.active)"
-      class="tab-strip-actions"
-      data-testid="tab-strip-actions"
-    >
+    <!-- P83 §9.1/P91 §8: a third fixed child, after `.tab-strip`, mirroring `.tab-strip-pinned`'s
+         own leading-edge fix at the other end — flex-shrink: 0, outside the scroller's overflow-x,
+         so it never scrolls away. Repo-workspace or the Terminal module: every other workspace's
+         dropdown would have nowhere to launch a terminal at all. -->
+    <div v-if="showNewTab" class="tab-strip-actions" data-testid="tab-strip-actions">
       <button
         ref="newTabBtn"
         type="button"
@@ -415,10 +467,6 @@ function newTabMenuItems(): MenuItem[] {
       </button>
     </div>
   </div>
-  <!-- Empty.html: with no tab open the strip is not hidden — it keeps its height so the layout
-       does not jump the moment the first tab appears, but shows no label or action of its own
-       (MainView's own empty state already covers "what do I do now"). -->
-  <div v-else class="tab-strip-wrapper is-empty" data-testid="tab-strip-empty"></div>
 </template>
 
 <style scoped>
