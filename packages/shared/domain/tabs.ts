@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { paletteColorSchema } from './color';
 import { grpcRequestTabStateSchema } from './grpc';
 import { httpRequestTabStateSchema } from './http';
 import type { AppMode } from './mode';
@@ -318,10 +319,17 @@ export type RepoDiffTabState = z.infer<typeof repoDiffTabStateSchema>;
 // P83 §7.1: minimal on purpose — a terminal tab's whole content is a live process (never
 // persisted, §7.5), so state carries only what the tab's own title and dropResources path need
 // without a second lookup: cwd (the pty's own directory) and codeRepoId (which workspace this
-// terminal belongs to).
+// terminal belongs to). P85 adds three fields, each defaulted so an older record still parses
+// (terminal tabs are never persisted, but parseState runs on duplicateState's output too).
 export const terminalTabStateSchema = z.object({
   cwd: z.string(),
   codeRepoId: z.string(),
+  // P85: the command the shell runs at startup ($SHELL -l -i -c). '' is P83's plain login shell.
+  command: z.string().default(''),
+  // The tab's own title when set — a script's name, or 'Claude Code'. '' falls back to the cwd's
+  // basename, exactly as P83 titled every terminal.
+  label: z.string().default(''),
+  color: paletteColorSchema.default('none'),
 });
 export type TerminalTabState = z.infer<typeof terminalTabStateSchema>;
 

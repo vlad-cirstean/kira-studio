@@ -7,7 +7,7 @@ import { fileIconStyle } from '../../repo/fileIcon';
 import { codeRepoRecord } from '../../state/coderepos';
 import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
 import { tabsForWorkspace } from '../../state/mode';
-import { openRepoTerminalTab } from '../../state/repoTabs';
+import { openRepoTerminalTab, type TerminalLaunch } from '../../state/repoTabs';
 import { isIncognito } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
@@ -208,8 +208,18 @@ function onNewTab(): void {
   openContextMenuAt(rect.left, rect.bottom + 2, newTabMenuItems());
 }
 
-// One entry today. P84 adds "Claude Code", one item per configured script, and "Manage
-// scripts…" — appended here, with no change to this control.
+// P85 §6.4: every dropdown entry funnels through this — the active workspace's own repo, or the
+// script's own workingDir override (cwdOverride) when it has one (P85 §7).
+function launchInActiveWorkspace(launch?: TerminalLaunch, cwdOverride?: string): void {
+  const repoId = repoIdOfWorkspace(workspaceState.active);
+  const repo = repoId ? codeRepoRecord(repoId) : undefined;
+  if (!repoId || !repo) return;
+  openRepoTerminalTab(repoId, cwdOverride || repo.root, launch);
+}
+
+// P85 §6.1: Terminal and Claude Code (this app's own launch targets) sit together with no rule
+// between them; one item per configured script and "Manage scripts…" follow, appended in
+// state/customScripts.ts's own commit.
 function newTabMenuItems(): MenuItem[] {
   return [
     {
@@ -217,11 +227,15 @@ function newTabMenuItems(): MenuItem[] {
       id: 'new-terminal',
       label: 'Terminal',
       icon: 'terminal-bash',
-      run: () => {
-        const repoId = repoIdOfWorkspace(workspaceState.active);
-        const repo = repoId ? codeRepoRecord(repoId) : undefined;
-        if (repoId && repo) openRepoTerminalTab(repoId, repo.root);
-      },
+      run: () => launchInActiveWorkspace(),
+    },
+    {
+      type: 'item',
+      id: 'new-claude-code',
+      label: 'Claude Code',
+      icon: 'sparkle',
+      run: () =>
+        launchInActiveWorkspace({ command: 'claude', label: 'Claude Code', color: 'none' }),
     },
   ];
 }

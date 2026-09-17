@@ -61,6 +61,7 @@ async function mount(): Promise<void> {
       props.tab.state.cwd,
       dims.cols,
       dims.rows,
+      props.tab.state.command,
     );
   }
 

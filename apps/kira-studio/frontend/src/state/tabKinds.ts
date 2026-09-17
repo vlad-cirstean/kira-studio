@@ -466,18 +466,27 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     menuExtras: () => [],
     parseState: parseStateWith(repoDiffTabStateSchema),
   },
-  // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm.
+  // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm. P85
+  // §5.2: a launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.
   terminal: {
     mode: TAB_KIND_MODE.terminal,
-    // The cwd's basename, so two terminals at two worktrees read apart at a glance. Falls back to
-    // 'Terminal' for an empty cwd, which openRepoTerminalTab never produces.
-    title: (tab) => basename((tab as TerminalTabRecord).state.cwd) || 'Terminal',
+    title: (tab) => {
+      const s = (tab as TerminalTabRecord).state;
+      return s.label || basename(s.cwd) || 'Terminal';
+    },
     // 'terminal-bash', not 'terminal': the 'console' kind (a SQL console) already owns that glyph.
+    // The launch kind shows in the title and the rail colour, not a second icon vocabulary.
     icon: () => 'terminal-bash',
-    railColor: () => undefined,
-    defaultState: (): TerminalTabState => ({ cwd: '', codeRepoId: '' }),
-    // Copying the cwd means "Duplicate tab" on a terminal opens a second terminal at the same
-    // directory — which is what duplicating a terminal means, and needs no special case (§7.2).
+    railColor: (tab) => (tab as TerminalTabRecord).state.color,
+    defaultState: (): TerminalTabState => ({
+      cwd: '',
+      codeRepoId: '',
+      command: '',
+      label: '',
+      color: 'none',
+    }),
+    // Copying the cwd (and command/label/color) means "Duplicate tab" on a terminal opens a
+    // second session with the same launch — which needs no special case (§7.2/P85 §5.2).
     duplicateState: (tab: TerminalTabRecord): TerminalTabState => ({ ...tab.state }),
     // The one place a PTY dies on close — blind-called for every kind (dropPageStoresForTab), so
     // a non-terminal tab id is a registry miss here, not a branch.

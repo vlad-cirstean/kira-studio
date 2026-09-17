@@ -16,6 +16,7 @@ export interface TerminalSession {
   readonly tabId: string;
   readonly codeRepoId: string;
   readonly cwd: string; // absolute, already canonical (§8.1)
+  readonly command: string; // '' means a plain login shell (P83's own behaviour) — P85 §5.4
   status: 'starting' | 'running' | 'exited' | 'failed';
   exitCode: number | null;
   error: string | null;
@@ -106,6 +107,7 @@ export async function openTerminalSession(
   cwd: string,
   cols: number,
   rows: number,
+  command = '',
 ): Promise<void> {
   ensureSubscribed();
   const cwdCanonical = canonicalPath(cwd);
@@ -113,6 +115,7 @@ export async function openTerminalSession(
     tabId,
     codeRepoId,
     cwd: cwdCanonical,
+    command,
     status: 'starting',
     exitCode: null,
     error: null,
@@ -120,7 +123,7 @@ export async function openTerminalSession(
   });
 
   try {
-    const { shell } = await control.terminalOpen(tabId, cwdCanonical, cols, rows);
+    const { shell } = await control.terminalOpen(tabId, cwdCanonical, cols, rows, command);
     const sess = byTabId.get(tabId);
     if (sess) sess.shell = shell;
   } catch (err) {

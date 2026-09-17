@@ -1,3 +1,4 @@
+import type { PaletteColor } from '@shared/domain/color';
 import {
   asRepoDiffTab,
   asRepoFileTab,
@@ -206,18 +207,39 @@ export function openRepoReviewDiffTab(
   );
 }
 
+// P85 §5.3: what a non-plain launch (Claude Code, or a custom script) seeds a terminal tab with.
+export interface TerminalLaunch {
+  command: string;
+  label: string;
+  color: PaletteColor;
+}
+
 // P83 §10.3: opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip
 // "+" (active workspace's root) and both GitPanel.vue row menus (a repo's root or a worktree's own
 // path) all funnel through this. `reuse: false` — a terminal is a session, not a document
 // (openConsoleTab's own reasoning, state/tabs.ts). openRepoWorkspace runs first: a tab must belong
 // to a workspace whose strip is on screen, and right-clicking a closed repository's row would
-// otherwise open an invisible tab.
-export function openRepoTerminalTab(codeRepoId: string, cwd: string): OpenTabResult {
+// otherwise open an invisible tab. `launch`, when given (P85 §5.3), seeds the session's initial
+// command/title/rail colour — omitted, this is P83's own plain terminal, unchanged.
+export function openRepoTerminalTab(
+  codeRepoId: string,
+  cwd: string,
+  launch?: TerminalLaunch,
+): OpenTabResult {
   openRepoWorkspace(codeRepoId);
-  return openTab('terminal', null, cwd, () => ({ cwd: canonicalPath(cwd), codeRepoId }), {
-    reuse: false,
-    workspaceId: repoWorkspaceKey(codeRepoId),
-  });
+  return openTab(
+    'terminal',
+    null,
+    cwd,
+    () => ({
+      cwd: canonicalPath(cwd),
+      codeRepoId,
+      command: launch?.command ?? '',
+      label: launch?.label ?? '',
+      color: launch?.color ?? 'none',
+    }),
+    { reuse: false, workspaceId: repoWorkspaceKey(codeRepoId) },
+  );
 }
 
 // C5 §6.1: creates repoId's own pinned graph tab if it has none, and activates it only when the
