@@ -588,7 +588,11 @@ export function createPinnedRepoGraphTab(workspaceId: string): TabRecord {
   const record = {
     id,
     connectionId: null,
-    path: '',
+    // P92 item 8: a repo-graph tab has no file behind it, but `path` is a required column
+    // (model.TabRecord.Validate) and an empty one aborts the whole window's tab save, not just this
+    // row. The workspace key is this tab's real identity — stable, unique per workspace, and
+    // already what `title` resolves the repo name from.
+    path: workspaceId,
     kind: 'repo-graph',
     state: defaultRepoGraphTabState(),
     order: tabsState.tabs.length,
