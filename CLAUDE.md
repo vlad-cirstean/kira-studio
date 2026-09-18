@@ -65,6 +65,13 @@ duplicated here; this file only points at them.
 - **The loop per phase:** check for a plan, spawn an Opus subagent to write one if missing, spawn
   a Sonnet subagent (or several, only if genuinely parallelizable) to implement the whole phase, and
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
+- **A failing test gets fixed on the spot, pre-existing or not.** "Pre-existing" justifies skipping
+  root-cause investigation of whether *this phase* caused it, never skipping the fix itself. Confirm
+  it predates the phase (e.g. `git diff --stat` against the phase's start commit touches none of the
+  failing spec's files), then fix it in that same implementation pass and commit it — don't just note
+  it as pre-existing/unrelated and move on. Only exception: fixing it needs work genuinely outside
+  the phase's own scope (a different subsystem, a real design decision) — then it becomes its own
+  named follow-up phase in `SPEC.md`, not a line in a result section.
 - **Multiple passes/iterations/rounds means repeat the whole loop that many times**, not run it once
   and treat extras as optional. Each pass plans against the *current* tree (on top of everything the
   previous pass landed, never the pre-phase state) and gets its own file under the current
