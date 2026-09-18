@@ -144,60 +144,11 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 	}
 
 	pageSize := s.opts.PageSize
-	appended := 0
+	appended := s.drainPendingLocked(sink, pageSize)
 
-	for len(s.pending) > 0 && appended < pageSize {
-		sink(s.pending[0])
-		s.pending = s.pending[1:]
-		appended++
-		s.loadedCount++
-	}
-
-	// G16 D6/F5: the lookahead. A full page keeps reading until either one record parks in
-	// pending (so there is definitely more — exhaustedLocked() below is now false) or EOF is
-	// observed (so there is definitely not). Without this, a page that fills exactly at the
-	// walk's last record exits the loop with pending still empty and eof still false, so
-	// exhaustedLocked() is wrongly false until a further, empty ReadPage.
-	for !s.eof && (appended < pageSize || len(s.pending) == 0) {
-		chunk, readErr := s.readChunkLocked(ctx)
-		if len(chunk) > 0 {
-			recs, splitErr := s.splitter.Push(chunk)
-			if splitErr != nil {
-				return Outcome{}, splitErr
-			}
-			for _, rec := range recs {
-				cr, parseErr := porcelain.ParseLogRecord(rec)
-				if parseErr != nil {
-					return Outcome{}, parseErr
-				}
-				s.readCount++
-				if appended < pageSize {
-					sink(cr)
-					appended++
-					s.loadedCount++
-				} else {
-					s.pending = append(s.pending, cr)
-				}
-			}
-		}
-		if readErr != nil {
-			if errors.Is(readErr, io.EOF) {
-				if flushed := s.splitter.Flush(); len(flushed) > 0 {
-					return Outcome{}, fmt.Errorf("logsession: unterminated trailing record at EOF (%d bytes)", len(flushed))
-				}
-				res, waitErr := s.proc.Wait()
-				s.proc = nil
-				if waitErr != nil {
-					return Outcome{}, waitErr
-				}
-				if cerr := gitclient.Classify(ctx, s.currentArgs, res, nil); cerr != nil {
-					return Outcome{}, cerr
-				}
-				s.eof = true
-				break
-			}
-			return Outcome{}, readErr
-		}
+	appended, err := s.fillLocked(ctx, sink, pageSize, appended)
+	if err != nil {
+		return Outcome{}, err
 	}
 
 	if !s.eof {
@@ -205,6 +156,90 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 	}
 
 	return Outcome{Appended: appended, Exhausted: s.exhaustedLocked()}, nil
+}
+
+// drainPendingLocked delivers up to pageSize records already parsed but not yet delivered — queued
+// by a prior page's own lookahead read (F13) — and returns how many it appended. Caller holds mu.
+func (s *Session) drainPendingLocked(sink func(porcelain.CommitRecord), pageSize int) int {
+	appended := 0
+	for len(s.pending) > 0 && appended < pageSize {
+		sink(s.pending[0])
+		s.pending = s.pending[1:]
+		appended++
+		s.loadedCount++
+	}
+	return appended
+}
+
+// fillLocked is ReadPage's own read-until-page-full-or-EOF loop, continuing from appended already
+// delivered by drainPendingLocked. G16 D6/F5: the lookahead — it keeps reading until either one
+// record parks in pending (so there is definitely more — exhaustedLocked() is then false) or EOF is
+// observed (so there is definitely not). Without this, a page that fills exactly at the walk's last
+// record would exit with pending still empty and eof still false, leaving exhaustedLocked() wrongly
+// false until a further, empty ReadPage. Caller holds mu.
+func (s *Session) fillLocked(ctx context.Context, sink func(porcelain.CommitRecord), pageSize, appended int) (int, error) {
+	for !s.eof && (appended < pageSize || len(s.pending) == 0) {
+		chunk, readErr := s.readChunkLocked(ctx)
+		if len(chunk) > 0 {
+			var err error
+			appended, err = s.consumeChunkLocked(chunk, sink, pageSize, appended)
+			if err != nil {
+				return appended, err
+			}
+		}
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				if err := s.finishEOFLocked(ctx); err != nil {
+					return appended, err
+				}
+				break
+			}
+			return appended, readErr
+		}
+	}
+	return appended, nil
+}
+
+// consumeChunkLocked splits one raw chunk into records and delivers or queues each — fillLocked's
+// own per-chunk paging step. Caller holds mu.
+func (s *Session) consumeChunkLocked(chunk []byte, sink func(porcelain.CommitRecord), pageSize, appended int) (int, error) {
+	recs, splitErr := s.splitter.Push(chunk)
+	if splitErr != nil {
+		return appended, splitErr
+	}
+	for _, rec := range recs {
+		cr, parseErr := porcelain.ParseLogRecord(rec)
+		if parseErr != nil {
+			return appended, parseErr
+		}
+		s.readCount++
+		if appended < pageSize {
+			sink(cr)
+			appended++
+			s.loadedCount++
+		} else {
+			s.pending = append(s.pending, cr)
+		}
+	}
+	return appended, nil
+}
+
+// finishEOFLocked is fillLocked's own EOF tail: flush the splitter (any leftover bytes are a
+// protocol violation), reap the child, and classify its exit. Caller holds mu.
+func (s *Session) finishEOFLocked(ctx context.Context) error {
+	if flushed := s.splitter.Flush(); len(flushed) > 0 {
+		return fmt.Errorf("logsession: unterminated trailing record at EOF (%d bytes)", len(flushed))
+	}
+	res, waitErr := s.proc.Wait()
+	s.proc = nil
+	if waitErr != nil {
+		return waitErr
+	}
+	if cerr := gitclient.Classify(ctx, s.currentArgs, res, nil); cerr != nil {
+		return cerr
+	}
+	s.eof = true
+	return nil
 }
 
 // spawnOrResumeLocked starts the walk (readCount == 0) or resumes a reclaimed one (via --skip),
