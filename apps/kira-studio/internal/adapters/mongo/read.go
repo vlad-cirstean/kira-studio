@@ -49,16 +49,21 @@ type readReq struct {
 	Cursor     model.PageCursor
 }
 
-// readPage ports read.ts's readPage. D6: _id-keyset when the request is unsorted or sorted purely
-// by _id; skip/limit fallback for any other sort.
-func readPage(ctx context.Context, db *mongodriver.Database, collectionName string, req readReq, op *adapters.OpCtx) (page.DocumentPage, error) {
+// readSortPlan is readPage's sort/keyset eligibility resolution — the two directions (mongoDirection,
+// the sort's own; scanDirection, what the find() itself issues) diverge only for a "before" keyset
+// scan, which walks toward the boundary from the near side and is reversed back to display order
+// after fetching.
+type readSortPlan struct {
+	sortTerms     []model.SortTerm
+	idOnlySort    bool
+	wantsKeyset   bool
+	reverseRows   bool
+	scanDirection int
+}
+
+func resolveReadSortPlan(req readReq) (readSortPlan, error) {
 	if req.Sort != nil && req.Sort.Kind == "text" {
-		return page.DocumentPage{}, adapters.Unsupported("mongodb", "a free-text sort expression")
-	}
-	collection := db.Collection(collectionName)
-	baseFilter, err := ParseFilterObject(req.Filter)
-	if err != nil {
-		return page.DocumentPage{}, err
+		return readSortPlan{}, adapters.Unsupported("mongodb", "a free-text sort expression")
 	}
 	var sortTerms []model.SortTerm
 	if req.Sort != nil && req.Sort.Kind == "structured" {
@@ -70,19 +75,10 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 		direction = sortTerms[0].Direction
 	}
 	wantsKeyset := req.Cursor.Mode == "after" || req.Cursor.Mode == "before"
-
 	if wantsKeyset && !idOnlySort {
-		return page.DocumentPage{}, adapters.New(adapters.CodeUnsupported,
+		return readSortPlan{}, adapters.New(adapters.CodeUnsupported,
 			"keyset pagination is unavailable for this sort; the client must use an offset cursor", nil)
 	}
-
-	fingerprint := adapters.RequestFingerprint(struct {
-		Path     string          `json:"path"`
-		Filter   *string         `json:"filter"`
-		Sort     *model.SortSpec `json:"sort"`
-		PageSize int             `json:"pageSize"`
-	}{collectionName, req.Filter, req.Sort, req.PageSize})
-
 	reverseRows := req.Cursor.Mode == "before" && idOnlySort
 	mongoDirection := 1
 	if direction == "desc" {
@@ -92,35 +88,41 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	if reverseRows {
 		scanDirection = -mongoDirection
 	}
+	return readSortPlan{sortTerms, idOnlySort, wantsKeyset, reverseRows, scanDirection}, nil
+}
 
-	filter := baseFilter
-	if idOnlySort && wantsKeyset && req.Cursor.Mode != "offset" {
-		keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
-		if err != nil {
-			return page.DocumentPage{}, err
-		}
-		if len(keyValues) != 1 {
-			return page.DocumentPage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
-		}
-		boundaryID, err := ParseJSON5Literal(keyValues[0])
-		if err != nil {
-			return page.DocumentPage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
-		}
-		boundaryID = ResolveEJSONWrappers(boundaryID)
-		// The comparison operator tracks the scan's own direction, not which user-facing request
-		// ('after'/'before') caused it — a 'before' request already flips scanDirection (above) to
-		// scan toward the boundary from the near side, then reverses the result back to ascending
-		// display order below.
-		cmpOp := "$gt"
-		if scanDirection == -1 {
-			cmpOp = "$lt"
-		}
-		filter = mergeKeysetIDCondition(baseFilter, cmpOp, boundaryID)
+// buildKeysetFilter extends baseFilter with the _id keyset boundary decoded from the cursor token,
+// when the request actually wants one — the comparison operator tracks the scan's own direction
+// (plan.scanDirection), not which user-facing request ('after'/'before') caused it.
+func buildKeysetFilter(req readReq, plan readSortPlan, baseFilter bson.D, fingerprint string) (bson.D, error) {
+	if !(plan.idOnlySort && plan.wantsKeyset && req.Cursor.Mode != "offset") {
+		return baseFilter, nil
 	}
+	keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
+	if err != nil {
+		return nil, err
+	}
+	if len(keyValues) != 1 {
+		return nil, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+	}
+	boundaryID, err := ParseJSON5Literal(keyValues[0])
+	if err != nil {
+		return nil, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+	}
+	boundaryID = ResolveEJSONWrappers(boundaryID)
+	cmpOp := "$gt"
+	if plan.scanDirection == -1 {
+		cmpOp = "$lt"
+	}
+	return mergeKeysetIDCondition(baseFilter, cmpOp, boundaryID), nil
+}
 
+// buildFindOptions assembles find()'s own options — limit, projection, sort, skip — from req and
+// the already-resolved sort plan.
+func buildFindOptions(req readReq, plan readSortPlan, op *adapters.OpCtx) (*options.FindOptionsBuilder, error) {
 	limit, err := adapters.SafeInt(req.PageSize+1, "page size") // D24's +1 probe, mirroring the SQL adapters
 	if err != nil {
-		return page.DocumentPage{}, err
+		return nil, err
 	}
 	findOpts := options.Find().SetLimit(int64(limit)).SetComment(op.OpID)
 	// req.Projection is the generic ReadRequest field every adapter shares (Adapter rule 7's
@@ -136,11 +138,11 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 		}
 		findOpts.SetProjection(proj)
 	}
-	if idOnlySort {
-		findOpts.SetSort(bson.D{{Key: "_id", Value: scanDirection}})
-	} else if len(sortTerms) > 0 {
-		sortDoc := make(bson.D, len(sortTerms))
-		for i, t := range sortTerms {
+	if plan.idOnlySort {
+		findOpts.SetSort(bson.D{{Key: "_id", Value: plan.scanDirection}})
+	} else if len(plan.sortTerms) > 0 {
+		sortDoc := make(bson.D, len(plan.sortTerms))
+		for i, t := range plan.sortTerms {
 			d := 1
 			if t.Direction == "desc" {
 				d = -1
@@ -155,9 +157,141 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 	if req.Cursor.Mode == "offset" && req.Cursor.Offset > 0 {
 		offset, err := adapters.SafeInt(req.Cursor.Offset, "offset")
 		if err != nil {
-			return page.DocumentPage{}, err
+			return nil, err
 		}
 		findOpts.SetSkip(int64(offset))
+	}
+	return findOpts, nil
+}
+
+// buildKeysetTokens computes readPage's next/prev page tokens from the already-reversed
+// displayDocs — only meaningful under the _id-keyset strategy (plan.idOnlySort), nil/nil otherwise.
+func buildKeysetTokens(req readReq, plan readSortPlan, displayDocs []bson.Raw, probedExtra bool, fingerprint string) (nextToken, prevToken *string, err error) {
+	if !plan.idOnlySort || len(displayDocs) == 0 {
+		return nil, nil, nil
+	}
+	rowCount := len(displayDocs)
+	hasForward := probedExtra
+	if req.Cursor.Mode == "before" {
+		hasForward = true
+	}
+	var hasBackward bool
+	switch req.Cursor.Mode {
+	case "before":
+		hasBackward = probedExtra
+	case "after":
+		hasBackward = true
+	default:
+		hasBackward = req.Cursor.Offset > 0
+	}
+	if hasForward {
+		text, err := IDText(displayDocs[rowCount-1].Lookup("_id"))
+		if err != nil {
+			return nil, nil, mapError(err)
+		}
+		token := adapters.EncodePageToken([]string{text}, fingerprint)
+		nextToken = &token
+	}
+	if hasBackward {
+		text, err := IDText(displayDocs[0].Lookup("_id"))
+		if err != nil {
+			return nil, nil, mapError(err)
+		}
+		token := adapters.EncodePageToken([]string{text}, fingerprint)
+		prevToken = &token
+	}
+	return nextToken, prevToken, nil
+}
+
+// buildReadPage is readPage's reverse/probe/token tail: turns the fetched (pageSize+1-probed) docs
+// into a page.DocumentPage, including the _id-keyset next/prev tokens when idOnlySort applies.
+func buildReadPage(req readReq, plan readSortPlan, docs []bson.Raw, fingerprint string) (page.DocumentPage, error) {
+	probedExtra := len(docs) > req.PageSize
+	keptDocs := docs
+	if probedExtra {
+		keptDocs = docs[:req.PageSize]
+	}
+	displayDocs := keptDocs
+	if plan.reverseRows {
+		displayDocs = make([]bson.Raw, len(keptDocs))
+		for i, d := range keptDocs {
+			displayDocs[len(keptDocs)-1-i] = d
+		}
+	}
+	rowCount := len(displayDocs)
+
+	builder := page.NewDocumentPageBuilder(false)
+	for _, doc := range displayDocs {
+		idStr, err := IDText(doc.Lookup("_id"))
+		if err != nil {
+			return page.DocumentPage{}, mapError(err)
+		}
+		bodyStr, err := ejsonStringify(doc, true)
+		if err != nil {
+			return page.DocumentPage{}, mapError(err)
+		}
+		builder.Push(idStr, bodyStr)
+	}
+
+	strategy := "offset"
+	if plan.idOnlySort {
+		strategy = "keyset"
+	}
+	hasMore := false
+	if rowCount > 0 {
+		if req.Cursor.Mode == "before" {
+			hasMore = true
+		} else {
+			hasMore = probedExtra
+		}
+	}
+
+	nextToken, prevToken, err := buildKeysetTokens(req, plan, displayDocs, probedExtra, fingerprint)
+	if err != nil {
+		return page.DocumentPage{}, err
+	}
+
+	var offsetPtr *int
+	if req.Cursor.Mode == "offset" {
+		o := req.Cursor.Offset
+		offsetPtr = &o
+	}
+
+	position := page.PagePosition{
+		Offset: offsetPtr, PageSize: req.PageSize, HasMore: hasMore,
+		NextToken: nextToken, PrevToken: prevToken, Strategy: strategy,
+	}
+	return builder.Finish(position), nil
+}
+
+// readPage ports read.ts's readPage. D6: _id-keyset when the request is unsorted or sorted purely
+// by _id; skip/limit fallback for any other sort.
+func readPage(ctx context.Context, db *mongodriver.Database, collectionName string, req readReq, op *adapters.OpCtx) (page.DocumentPage, error) {
+	plan, err := resolveReadSortPlan(req)
+	if err != nil {
+		return page.DocumentPage{}, err
+	}
+	collection := db.Collection(collectionName)
+	baseFilter, err := ParseFilterObject(req.Filter)
+	if err != nil {
+		return page.DocumentPage{}, err
+	}
+
+	fingerprint := adapters.RequestFingerprint(struct {
+		Path     string          `json:"path"`
+		Filter   *string         `json:"filter"`
+		Sort     *model.SortSpec `json:"sort"`
+		PageSize int             `json:"pageSize"`
+	}{collectionName, req.Filter, req.Sort, req.PageSize})
+
+	filter, err := buildKeysetFilter(req, plan, baseFilter, fingerprint)
+	if err != nil {
+		return page.DocumentPage{}, err
+	}
+
+	findOpts, err := buildFindOptions(req, plan, op)
+	if err != nil {
+		return page.DocumentPage{}, err
 	}
 
 	filterText, err := ejsonStringify(filter, false)
@@ -189,90 +323,7 @@ func readPage(ctx context.Context, db *mongodriver.Database, collectionName stri
 		return page.DocumentPage{}, err
 	}
 
-	probedExtra := len(docs) > req.PageSize
-	keptDocs := docs
-	if probedExtra {
-		keptDocs = docs[:req.PageSize]
-	}
-	displayDocs := keptDocs
-	if reverseRows {
-		displayDocs = make([]bson.Raw, len(keptDocs))
-		for i, d := range keptDocs {
-			displayDocs[len(keptDocs)-1-i] = d
-		}
-	}
-	rowCount := len(displayDocs)
-
-	builder := page.NewDocumentPageBuilder(false)
-	for _, doc := range displayDocs {
-		idStr, err := IDText(doc.Lookup("_id"))
-		if err != nil {
-			return page.DocumentPage{}, mapError(err)
-		}
-		bodyStr, err := ejsonStringify(doc, true)
-		if err != nil {
-			return page.DocumentPage{}, mapError(err)
-		}
-		builder.Push(idStr, bodyStr)
-	}
-
-	strategy := "offset"
-	if idOnlySort {
-		strategy = "keyset"
-	}
-	hasMore := false
-	if rowCount > 0 {
-		if req.Cursor.Mode == "before" {
-			hasMore = true
-		} else {
-			hasMore = probedExtra
-		}
-	}
-
-	var nextToken, prevToken *string
-	if idOnlySort && rowCount > 0 {
-		hasForward := probedExtra
-		if req.Cursor.Mode == "before" {
-			hasForward = true
-		}
-		var hasBackward bool
-		switch req.Cursor.Mode {
-		case "before":
-			hasBackward = probedExtra
-		case "after":
-			hasBackward = true
-		default:
-			hasBackward = req.Cursor.Offset > 0
-		}
-		if hasForward {
-			text, err := IDText(displayDocs[rowCount-1].Lookup("_id"))
-			if err != nil {
-				return page.DocumentPage{}, mapError(err)
-			}
-			token := adapters.EncodePageToken([]string{text}, fingerprint)
-			nextToken = &token
-		}
-		if hasBackward {
-			text, err := IDText(displayDocs[0].Lookup("_id"))
-			if err != nil {
-				return page.DocumentPage{}, mapError(err)
-			}
-			token := adapters.EncodePageToken([]string{text}, fingerprint)
-			prevToken = &token
-		}
-	}
-
-	var offsetPtr *int
-	if req.Cursor.Mode == "offset" {
-		o := req.Cursor.Offset
-		offsetPtr = &o
-	}
-
-	position := page.PagePosition{
-		Offset: offsetPtr, PageSize: req.PageSize, HasMore: hasMore,
-		NextToken: nextToken, PrevToken: prevToken, Strategy: strategy,
-	}
-	return builder.Finish(position), nil
+	return buildReadPage(req, plan, docs, fingerprint)
 }
 
 // lookupField returns d's value for key, and whether the key was present.

@@ -83,6 +83,90 @@ func preview(plan model.MutationPlan) ([]string, error) {
 	return out, nil
 }
 
+// applyUpdate is mutateDB's "update" arm: a whole-document replaceOne keyed by _id, driven by the
+// $document sentinel both it and applyInsert share.
+func applyUpdate(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp) (int, error) {
+	id, err := parseIdKey(rowOp.Key)
+	if err != nil {
+		return 0, err
+	}
+	bodyText, ok := rowOp.Changes.Get(documentSentinel)
+	if !ok || bodyText == nil {
+		return 0, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document replacement", nil)
+	}
+	parsed, err := ParseDocumentLiteral(*bodyText)
+	if err != nil {
+		return 0, err
+	}
+	replacement := setField(parsed, "_id", id)
+	matchedCount, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (int64, error) {
+		result, err := collection.ReplaceOne(qctx, bson.D{{Key: "_id", Value: id}}, replacement, options.Replace().SetComment(op.OpID))
+		if err != nil {
+			return 0, mapError(err)
+		}
+		return result.MatchedCount, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if matchedCount != 1 {
+		return 0, adapters.New(adapters.CodeQuery,
+			"expected update to affect exactly one document, matched "+strconv.FormatInt(matchedCount, 10), nil)
+	}
+	return int(matchedCount), nil
+}
+
+// applyDelete is mutateDB's "delete" arm.
+func applyDelete(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp) (int, error) {
+	id, err := parseIdKey(rowOp.Key)
+	if err != nil {
+		return 0, err
+	}
+	deletedCount, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (int64, error) {
+		result, err := collection.DeleteOne(qctx, bson.D{{Key: "_id", Value: id}}, options.DeleteOne().SetComment(op.OpID))
+		if err != nil {
+			return 0, mapError(err)
+		}
+		return result.DeletedCount, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if deletedCount != 1 {
+		return 0, adapters.New(adapters.CodeQuery,
+			"expected delete to affect exactly one document, deleted "+strconv.FormatInt(deletedCount, 10), nil)
+	}
+	return int(deletedCount), nil
+}
+
+// applyInsert is mutateDB's default (insert) arm: the same $document sentinel the update branch
+// uses, holding the new document's full EJSON body rather than a replacement for an existing one —
+// no key to parse, since InsertOne assigns a fresh ObjectID when the body omits _id.
+func applyInsert(ctx context.Context, collection *mongodriver.Collection, op *adapters.OpCtx, rowOp model.MutationRowOp) (int, error) {
+	bodyText, ok := rowOp.Values.Get(documentSentinel)
+	if !ok || bodyText == nil {
+		return 0, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document body", nil)
+	}
+	parsed, err := ParseDocumentLiteral(*bodyText)
+	if err != nil {
+		return 0, err
+	}
+	acknowledged, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (bool, error) {
+		result, err := collection.InsertOne(qctx, parsed, options.InsertOne().SetComment(op.OpID))
+		if err != nil {
+			return false, mapError(err)
+		}
+		return result.Acknowledged, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	if !acknowledged {
+		return 0, adapters.New(adapters.CodeQuery, "insert was not acknowledged by the server", nil)
+	}
+	return 1, nil
+}
+
 // mutateDB ports mutate.ts's mutate.
 func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
 	// §8.12's standard: enforced here, not only greyed out in the UI.
@@ -114,84 +198,20 @@ func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx,
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return model.MutationResult{}, err
 		}
+		var affected int
+		var err error
 		switch rowOp.Kind {
 		case "update":
-			id, err := parseIdKey(rowOp.Key)
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			bodyText, ok := rowOp.Changes.Get(documentSentinel)
-			if !ok || bodyText == nil {
-				return model.MutationResult{}, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document replacement", nil)
-			}
-			parsed, err := ParseDocumentLiteral(*bodyText)
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			replacement := setField(parsed, "_id", id)
-			matchedCount, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (int64, error) {
-				result, err := collection.ReplaceOne(qctx, bson.D{{Key: "_id", Value: id}}, replacement, options.Replace().SetComment(op.OpID))
-				if err != nil {
-					return 0, mapError(err)
-				}
-				return result.MatchedCount, nil
-			})
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			if matchedCount != 1 {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery,
-					"expected update to affect exactly one document, matched "+strconv.FormatInt(matchedCount, 10), nil)
-			}
-			affectedRows += int(matchedCount)
-
+			affected, err = applyUpdate(ctx, collection, op, rowOp)
 		case "delete":
-			id, err := parseIdKey(rowOp.Key)
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			deletedCount, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (int64, error) {
-				result, err := collection.DeleteOne(qctx, bson.D{{Key: "_id", Value: id}}, options.DeleteOne().SetComment(op.OpID))
-				if err != nil {
-					return 0, mapError(err)
-				}
-				return result.DeletedCount, nil
-			})
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			if deletedCount != 1 {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery,
-					"expected delete to affect exactly one document, deleted "+strconv.FormatInt(deletedCount, 10), nil)
-			}
-			affectedRows += int(deletedCount)
-
-		default: // insert: the same $document sentinel the update branch uses, holding the new
-			// document's full EJSON body rather than a replacement for an existing one — no key
-			// to parse, since InsertOne assigns a fresh ObjectID when the body omits _id.
-			bodyText, ok := rowOp.Values.Get(documentSentinel)
-			if !ok || bodyText == nil {
-				return model.MutationResult{}, adapters.New(adapters.CodeUnsupported, "document mutation requires a $document body", nil)
-			}
-			parsed, err := ParseDocumentLiteral(*bodyText)
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			acknowledged, err := adapters.RunWithAbortRace(ctx, func() {}, func(qctx context.Context) (bool, error) {
-				result, err := collection.InsertOne(qctx, parsed, options.InsertOne().SetComment(op.OpID))
-				if err != nil {
-					return false, mapError(err)
-				}
-				return result.Acknowledged, nil
-			})
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			if !acknowledged {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery, "insert was not acknowledged by the server", nil)
-			}
-			affectedRows++
+			affected, err = applyDelete(ctx, collection, op, rowOp)
+		default: // insert
+			affected, err = applyInsert(ctx, collection, op, rowOp)
 		}
+		if err != nil {
+			return model.MutationResult{}, err
+		}
+		affectedRows += affected
 	}
 
 	return model.MutationResult{AffectedRows: affectedRows}, nil

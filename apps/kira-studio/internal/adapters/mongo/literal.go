@@ -81,6 +81,87 @@ func jsonQuoteString(s string) string {
 	return strings.TrimRight(buf.String(), "\n")
 }
 
+// skipInsignificant consumes one run of whitespace, a `//` line comment, or a `/* */` block
+// comment starting at runes[i], returning the index past it and true — or (i, false) when none of
+// the three starts there. A trailing, unterminated `/*` walks off the end and is ignored, not
+// rejected, matching literal.ts:46 (the final `+2` runs regardless of whether a closer was found).
+func skipInsignificant(runes []rune, i int) (next int, matched bool) {
+	n := len(runes)
+	c := runes[i]
+	switch {
+	case unicode.IsSpace(c):
+		return i + 1, true
+	case c == '/' && i+1 < n && runes[i+1] == '/':
+		for i < n && runes[i] != '\n' {
+			i++
+		}
+		return i, true
+	case c == '/' && i+1 < n && runes[i+1] == '*':
+		j := i + 2
+		for j < n && !(runes[j] == '*' && j+1 < n && runes[j+1] == '/') {
+			j++
+		}
+		return j + 2, true
+	default:
+		return i, false
+	}
+}
+
+// scanStringToken consumes a `'...'`/`"..."` literal starting at runes[i], resolving \uXXXX and
+// the fixed escapes map inline — an unrecognised escape yields the escaped character itself
+// (`ESCAPES[esc] ?? esc`, literal.ts:66).
+func scanStringToken(runes []rune, i int) (token, int, error) {
+	n := len(runes)
+	quote := runes[i]
+	j := i + 1
+	var sb strings.Builder
+	for j < n && runes[j] != quote {
+		if runes[j] == '\\' && j+1 < n {
+			esc := runes[j+1]
+			if esc == 'u' && j+5 < n {
+				hex := string(runes[j+2 : j+6])
+				code, err := strconv.ParseInt(hex, 16, 32)
+				if err == nil {
+					sb.WriteRune(rune(code))
+				}
+				j += 6
+				continue
+			}
+			if r, ok := escapes[esc]; ok {
+				sb.WriteRune(r)
+			} else {
+				sb.WriteRune(esc)
+			}
+			j += 2
+			continue
+		}
+		sb.WriteRune(runes[j])
+		j++
+	}
+	if j >= n {
+		return token{}, i, adapters.New(adapters.CodeQuery, "unterminated string literal", nil)
+	}
+	return token{tokString, sb.String(), i}, j + 1, nil
+}
+
+func scanNumberToken(runes []rune, i int) (token, int) {
+	n := len(runes)
+	j := i + 1
+	for j < n && isNumberRune(runes[j]) {
+		j++
+	}
+	return token{tokNumber, string(runes[i:j]), i}, j
+}
+
+func scanIdentToken(runes []rune, i int) (token, int) {
+	n := len(runes)
+	j := i + 1
+	for j < n && isIdentPart(runes[j]) {
+		j++
+	}
+	return token{tokIdent, string(runes[i:j]), i}, j
+}
+
 func tokenize(text string) ([]token, error) {
 	runes := []rune(text)
 	n := len(runes)
@@ -88,24 +169,8 @@ func tokenize(text string) ([]token, error) {
 	i := 0
 	for i < n {
 		c := runes[i]
-		if unicode.IsSpace(c) {
-			i++
-			continue
-		}
-		if c == '/' && i+1 < n && runes[i+1] == '/' {
-			for i < n && runes[i] != '\n' {
-				i++
-			}
-			continue
-		}
-		if c == '/' && i+1 < n && runes[i+1] == '*' {
-			i += 2
-			// Walks off the end when unterminated, exactly like literal.ts:46 — a trailing `/*`
-			// with no closer is ignored, not rejected, and the `i += 2` below runs regardless.
-			for i < n && !(runes[i] == '*' && i+1 < n && runes[i+1] == '/') {
-				i++
-			}
-			i += 2
+		if next, matched := skipInsignificant(runes, i); matched {
+			i = next
 			continue
 		}
 		if strings.ContainsRune(punctChars, c) {
@@ -114,57 +179,24 @@ func tokenize(text string) ([]token, error) {
 			continue
 		}
 		if c == '"' || c == '\'' {
-			quote := c
-			j := i + 1
-			var sb strings.Builder
-			for j < n && runes[j] != quote {
-				if runes[j] == '\\' && j+1 < n {
-					esc := runes[j+1]
-					if esc == 'u' && j+5 < n {
-						hex := string(runes[j+2 : j+6])
-						code, err := strconv.ParseInt(hex, 16, 32)
-						if err == nil {
-							sb.WriteRune(rune(code))
-						}
-						j += 6
-						continue
-					}
-					if r, ok := escapes[esc]; ok {
-						sb.WriteRune(r)
-					} else {
-						// An unknown escape yields the escaped character itself
-						// (`ESCAPES[esc] ?? esc`, literal.ts:66).
-						sb.WriteRune(esc)
-					}
-					j += 2
-					continue
-				}
-				sb.WriteRune(runes[j])
-				j++
+			tok, next, err := scanStringToken(runes, i)
+			if err != nil {
+				return nil, err
 			}
-			if j >= n {
-				return nil, adapters.New(adapters.CodeQuery, "unterminated string literal", nil)
-			}
-			tokens = append(tokens, token{tokString, sb.String(), i})
-			i = j + 1
+			tokens = append(tokens, tok)
+			i = next
 			continue
 		}
 		if isDigit(c) || (c == '-' && i+1 < n && isDigit(runes[i+1])) {
-			j := i + 1
-			for j < n && isNumberRune(runes[j]) {
-				j++
-			}
-			tokens = append(tokens, token{tokNumber, string(runes[i:j]), i})
-			i = j
+			tok, next := scanNumberToken(runes, i)
+			tokens = append(tokens, tok)
+			i = next
 			continue
 		}
 		if isIdentStart(c) {
-			j := i + 1
-			for j < n && isIdentPart(runes[j]) {
-				j++
-			}
-			tokens = append(tokens, token{tokIdent, string(runes[i:j]), i})
-			i = j
+			tok, next := scanIdentToken(runes, i)
+			tokens = append(tokens, tok)
+			i = next
 			continue
 		}
 		return nil, adapters.New(adapters.CodeQuery,
