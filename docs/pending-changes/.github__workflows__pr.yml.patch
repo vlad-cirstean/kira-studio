@@ -1,0 +1,29 @@
+# P94 §6 — adds golangci-lint (lint:go) and knip (lint:dead) to the checks job; apply with
+# `git apply docs/pending-changes/.github__workflows__pr.yml.patch` then delete this file.
+diff --git a/.github/workflows/pr.yml b/.github/workflows/pr.yml
+index 02dc277..2d58b04 100644
+--- a/.github/workflows/pr.yml
++++ b/.github/workflows/pr.yml
+@@ -18,7 +18,7 @@ jobs:
+   checks:
+     name: checks (macOS)
+     runs-on: macos-15
+-    timeout-minutes: 15
++    timeout-minutes: 20
+     steps:
+       - uses: actions/checkout@v7
+       - uses: oven-sh/setup-bun@v2
+@@ -50,6 +50,13 @@ jobs:
+       - run: bun run lint
+       - run: bun run typecheck
+       - run: bun run build
++      - name: Cache golangci-lint binary (P94 — keyed on the install script, which pins the version, and go.mod, which pins the toolchain it's built against; built from source since neither the prebuilt binary nor golangci/golangci-lint-action tolerate this repo's go.mod toolchain pin, docs/DEV_ENVIRONMENT.md)
++        uses: actions/cache@v4
++        with:
++          path: ~/go/bin/golangci-lint
++          key: golangci-lint-${{ runner.os }}-${{ hashFiles('scripts/install-golangci-lint.sh', 'go.mod') }}
++      - run: bun run lint:go
++      - run: bun run lint:dead
+       - name: Go compile check, every package (darwin build-tag breaks caught here even though the test run below is scoped)
+         run: go build ./...
+       - name: Go unit tests, darwin-relevant packages only (v1.4 P1 — container-tests already runs the full ./... on Linux with Docker, covering every non-container case here too, so a macOS-only full run was pure duplication; these five have real darwin&&cgo test/implementation files — secrets, metrics, localauth, gitclient, datagrip)
