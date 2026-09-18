@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { CommitStore } from '../store/commitStore.ts';
-import { buildRowPlan, type TipRef } from './rowPlan.ts';
+import { buildRowPlan, identityRowPlan, projectLayoutInput, type TipRef } from './rowPlan.ts';
 
 /**
  * P93 §8.1: `rowPlan.ts` clears `CLAUDE.md`'s unit-test bar on its own — priority propagation and
@@ -119,5 +119,63 @@ describe('buildRowPlan — assignment and ordering', () => {
     });
     expect(plan.length).toBe(store.rowCount);
     for (let d = 0; d < plan.length; d++) expect(plan.entryAt(d).kind).toBe('commit');
+  });
+});
+
+describe('projectLayoutInput', () => {
+  /** `main` (tip row 0): 0 -> 1 -> 7 (row 7 the shared root). `feature` (tip row 2): 2 -> 3 -> 4
+   *  -> 5 -> 6 -> 7 — row 6, feature's own oldest, forks off row 7, which display-order places
+   *  *earlier* (group 0 beats group 1) — the one upward link in this fixture, at row 6. */
+  function records() {
+    return [
+      commit(0, [1]),
+      commit(1, [7]),
+      commit(2, [3]),
+      commit(3, [4]),
+      commit(4, [5]),
+      commit(5, [6]),
+      commit(6, [7]),
+      commit(7, []),
+    ];
+  }
+  function tips(): TipRef[] {
+    return [tip(0, 'main'), tip(2, 'feature', 'feature/x')];
+  }
+
+  test('every projected link points strictly down, and the fork row reports its target', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const plan = buildRowPlan(store, tips(), noOptions);
+    const input = projectLayoutInput(plan, store.layoutInput(0, store.rowCount));
+
+    expect(input.from).toBe(0);
+    expect(input.to).toBe(plan.length);
+    for (let d = 0; d < plan.length; d++) {
+      const start = input.parentOffsets[d];
+      const end = input.parentOffsets[d + 1];
+      for (let slot = start; slot < end; slot++) {
+        expect(input.parentRows[slot]).toBeGreaterThan(d);
+      }
+    }
+    // Row 6's parent (row 7) lands in the higher-priority group, earlier in display order —
+    // dropped from the CSR and surfaced as this row's fork stub instead.
+    const forkDisplayRow = plan.displayRowOf(6);
+    const targetDisplayRow = plan.displayRowOf(7);
+    expect(plan.forkParentOf(forkDisplayRow)).toBe(targetDisplayRow);
+    const start = input.parentOffsets[forkDisplayRow];
+    const end = input.parentOffsets[forkDisplayRow + 1];
+    expect(Array.from(input.parentRows.subarray(start, end))).not.toContain(targetDisplayRow);
+  });
+
+  test('the identity plan projects every link unchanged (downward only)', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const base = store.layoutInput(0, store.rowCount);
+    const plan = identityRowPlan(store.rowCount);
+    const input = projectLayoutInput(plan, base);
+
+    expect(Array.from(input.parentOffsets)).toEqual(Array.from(base.parentOffsets));
+    expect(Array.from(input.parentRows)).toEqual(Array.from(base.parentRows));
+    for (let d = 0; d < plan.length; d++) expect(plan.forkParentOf(d)).toBe(-1);
   });
 });
