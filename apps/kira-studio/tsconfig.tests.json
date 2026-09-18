@@ -8,8 +8,19 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "types": ["node"],
+    // P92 item 5: `graphStreamFixture.ts` imports the real `@kira/git-ipc` codec (CLAUDE.md's
+    // library-over-hand-roll rule) rather than hand-rolling a second FlatBuffers encoder — these
+    // two mirror that package's own tsconfig.json exactly (`allowImportingTsExtensions` for its
+    // internal `.ts`-suffixed imports, `lib: ["ESNext"]` for `Uint8Array.prototype.toBase64`/
+    // `fromBase64`), widened to keep DOM (implicit before this file set `lib` at all) rather than
+    // narrowed to git-ipc's own Bun-only list, since every other file under this project's own
+    // `include` still needs it.
+    "allowImportingTsExtensions": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
-      "@shared/*": ["../../packages/shared/*"]
+      "@shared/*": ["../../packages/shared/*"],
+      "@kira/git-ipc": ["../../packages/git-ipc/src/index.ts"],
+      "@kira/git-ipc/codec": ["../../packages/git-ipc/src/codec.ts"]
     }
   },
   "include": [

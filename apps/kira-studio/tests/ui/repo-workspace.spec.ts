@@ -2,6 +2,7 @@ import { defaultSettings } from '@shared/domain/settings';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { installGitStreamMock } from './support/gitStreamMock';
+import { buildGraphStreamChunk, buildOneCommitChunk } from './support/graphStreamFixture';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -451,6 +452,42 @@ test('a repo workspace: switching the panel to Review mounts the review sidebar'
   const picker = page.locator('[data-testid="review-no-branch"]');
   await expect(picker).toBeVisible();
   await expect(picker.getByText('main', { exact: true })).toBeVisible();
+});
+
+// P92 item 6: Review moved from a third value of the Files body's own Files/Search segment to a
+// top-level tab alongside Repos/Files, so all three read as peers — this asserts that structure
+// directly (labels, order, and that the Files body's own inner strip is back down to two
+// segments) rather than only the "Review mounts the review sidebar" behaviour the test above
+// already covers.
+test('a repo workspace: the panel has three top-level tabs (Repos/Files/Review), and the Files tab keeps its own two-segment Files/Search strip', async ({
+  relaunch,
+}) => {
+  const { window: page } = await relaunch({ control: CONTROL });
+  await installGitStreamMock(page, REPO.repoId);
+
+  await openGitModule(page);
+  await repoRow(page).click();
+
+  const topTabs = page.locator(
+    '[data-testid="git-panel-tab-repos"], [data-testid="git-panel-tab-files"], [data-testid="git-panel-tab-review"]',
+  );
+  await expect(topTabs).toHaveCount(3);
+  const labels = await topTabs.allTextContents();
+  expect(labels).toEqual(['Repos', 'Files', 'Review']);
+
+  // Files tab: its own inner strip is Files/Search only — Review is no longer one of its values.
+  await page.locator('[data-testid="git-panel-tab-files"]').click();
+  await expect(page.locator('[data-testid="git-panel-tab-files"]')).toHaveClass(/on/);
+  const innerStrip = page.locator(
+    '[data-testid="repo-view-files"], [data-testid="repo-view-search"]',
+  );
+  await expect(innerStrip).toHaveCount(2);
+  expect(await innerStrip.allTextContents()).toEqual(['Files', 'Search']);
+
+  // Review shows the real ReviewView.vue bundle, not an empty container.
+  await page.locator('[data-testid="git-panel-tab-review"]').click();
+  await expect(page.locator('[data-testid="repo-review-host"]')).toBeVisible();
+  await expect(page.locator('[data-testid="repo-view-files"]')).toHaveCount(0);
 });
 
 // P62 §9: deliberately shallow, matching C11's own call for the review sidebar above — tests/ui/
@@ -1383,4 +1420,93 @@ test('a Notification event marks a non-active Claude Code tab with the attention
   await claudeTabAfter.click();
   await expect(claudeTabAfter).toHaveAttribute('data-active', 'true');
   await expect(claudeTabAfter).toHaveAttribute('data-attention', 'false');
+});
+
+// P92 item 5: "Open all changes" (CommitMeta.vue) on a multi-file commit opens exactly one
+// repo-multi-diff tab, not one repo-diff tab per file — hostHandlers.ts's own 'editor
+// .openAllChanges' handler, driven end to end through a real graph.stream chunk (§10's own
+// known-gap note: no prior UI test has driven this method through gitStreamMock.ts — see
+// graphStreamFixture.ts's own doc comment for why this needs real FlatBuffers encoding, not a
+// hand-rolled one). `file.read` is deliberately left unanswered: RepoMultiDiffView.vue's own
+// section headers (`.path`/`.path-dir`) render from the tab's own file list unconditionally, with
+// no dependency on a section's diff editor ever finishing its load (RepoMultiDiffView.vue's own
+// template) — that's what this test asserts, not diff content.
+test('a repo workspace: "Open all changes" on a commit opens one multi-diff tab listing every changed path', async ({
+  relaunch,
+}) => {
+  const SHA = 'a'.repeat(40);
+  const { window: page } = await relaunch({ control: CONTROL });
+
+  const commitDetail = {
+    sha: SHA,
+    parents: [],
+    author: { name: 'Ada Lovelace', email: 'ada@example.com', timestamp: 1_700_000_000 },
+    committer: { name: 'Ada Lovelace', email: 'ada@example.com', timestamp: 1_700_000_000 },
+    subject: 'Change two files',
+    body: '',
+    trailers: [],
+    signature: { status: 'N', signer: '' },
+    decoration: [],
+    parentIndex: 0,
+    files: [
+      {
+        kind: 'modified',
+        path: 'a.ts',
+        originalPath: undefined,
+        similarity: undefined,
+        additions: 1,
+        deletions: 1,
+        isBinary: false,
+      },
+      {
+        kind: 'modified',
+        path: 'b.ts',
+        originalPath: undefined,
+        similarity: undefined,
+        additions: 2,
+        deletions: 0,
+        isBinary: false,
+      },
+    ],
+  };
+
+  await installGitStreamMock(
+    page,
+    REPO.repoId,
+    {
+      'repo.open': {
+        kind: 'ok',
+        repo: {
+          repoId: REPO.repoId,
+          root: REPO.root,
+          gitDir: `${REPO.root}/.git`,
+          commonDir: `${REPO.root}/.git`,
+          isBare: false,
+          isLinkedWorktree: false,
+          head: { kind: 'branch', name: 'main' },
+        },
+      },
+      'commit.detail': commitDetail,
+    },
+    [buildGraphStreamChunk(REPO.repoId, 0, buildOneCommitChunk(SHA, 'Change two files'))],
+  );
+
+  await openGitModule(page);
+  await repoRow(page).click();
+  await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
+
+  const row = page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]');
+  await expect(row).toBeVisible();
+  await row.click();
+  const openAllChanges = page.locator('[data-testid="open-all-changes-button"]');
+  await expect(openAllChanges).toBeVisible();
+
+  await expect(tab(page, 'repo-multi-diff')).toHaveCount(0);
+  await openAllChanges.click();
+  await expect(tab(page, 'repo-multi-diff')).toHaveCount(1);
+
+  const multiDiffView = page.locator('[data-testid="repo-multi-diff-view"]');
+  await expect(multiDiffView).toBeVisible();
+  const paths = await multiDiffView.locator('.path-dir').allTextContents();
+  expect(paths).toEqual(['a.ts', 'b.ts']);
 });

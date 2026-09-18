@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import type { GraphStreamChunkFixture } from './graphStreamFixture';
 
 // repo/git/transport.ts speaks the native git JSON-RPC protocol (@kira/git-ipc's rpc.ts) over a
 // Wails Stream — an entirely different wire (and mocking mechanism, `window._wails.streamFactory`)
@@ -31,9 +32,24 @@ export async function installGitStreamMock(
   page: Page,
   gitRepoId: string,
   extraResults?: Record<string, unknown>,
+  // P92 item 5: pre-encoded `graph.stream` chunks, built by `graphStreamFixture.ts`'s
+  // `buildGraphStreamChunk` — real `commit.detail`/`file.read` stay on `extraResults` (plain
+  // req/res), only `graph.stream`'s own streamed, binary-carrying shape needs this separate path.
+  // Delivered in order on any `graph.stream` open, then an `end` frame; still additive like
+  // `extraResults` — a caller that omits this keeps hanging on `graph.stream` exactly as before
+  // (§10's own known-gap note).
+  graphStreamChunks?: readonly GraphStreamChunkFixture[],
 ): Promise<void> {
   await page.evaluate(
-    ({ repoId, extraResults }: { repoId: string; extraResults?: Record<string, unknown> }) => {
+    ({
+      repoId,
+      extraResults,
+      graphStreamChunks,
+    }: {
+      repoId: string;
+      extraResults?: Record<string, unknown>;
+      graphStreamChunks?: readonly GraphStreamChunkFixture[];
+    }) => {
       const w =
         (window as unknown as { _wails?: { streamFactory?: (name: string) => unknown } })._wails ??
         {};
@@ -58,6 +74,46 @@ export async function installGitStreamMock(
       function deliver(socket: MockSocket, envelope: unknown): void {
         const bytes = new TextEncoder().encode(JSON.stringify(envelope));
         setTimeout(() => socket.onmessage?.({ data: bytes.buffer }), 0);
+      }
+
+      // P92 item 5: `blobFrame.ts`'s own layout, assembled here rather than decoded — the real
+      // client never sends a blob (that file's own doc comment), so no encoder exists there to
+      // reuse. `id`/`version` are only known at this point (the request's own runtime fields),
+      // which is why `graphStreamFixture.ts` hands over `meta`/`blob` separately instead of a
+      // whole pre-built frame.
+      function deliverGraphStreamChunk(
+        socket: MockSocket,
+        version: number,
+        id: number,
+        chunk: GraphStreamChunkFixture,
+      ): void {
+        const blobBytes = Uint8Array.from(atob(chunk.blob), (c) => c.charCodeAt(0));
+        const header = {
+          version,
+          body: {
+            t: 'chunk',
+            id,
+            seq: chunk.meta.seq,
+            chunk: {
+              repoId: chunk.meta.repoId,
+              seq: chunk.meta.seq,
+              from: chunk.meta.from,
+              to: chunk.meta.to,
+              source: chunk.meta.source,
+              remaining: chunk.meta.remaining,
+              exhausted: chunk.meta.exhausted,
+              commits: { $fb: chunk.meta.commitsFb, d: { $blob: true } },
+            },
+          },
+        };
+        const headerBytes = new TextEncoder().encode(JSON.stringify(header));
+        const out = new Uint8Array(1 + 4 + headerBytes.byteLength + blobBytes.byteLength);
+        const view = new DataView(out.buffer);
+        out[0] = 0x00;
+        view.setUint32(1, headerBytes.byteLength, false);
+        out.set(headerBytes, 5);
+        out.set(blobBytes, 5 + headerBytes.byteLength);
+        setTimeout(() => socket.onmessage?.({ data: out.buffer }), 0);
       }
 
       function createGitMockSocket(): MockSocket {
@@ -87,6 +143,19 @@ export async function installGitStreamMock(
               return;
             }
             const frame = envelope.body;
+            if (frame?.id === undefined) return;
+            // `graph.stream` opens as `t: 'open'`, not `t: 'req'` — a real unary call's frame
+            // shape (rpc.ts's own `Frame` union). Only handled when a caller actually supplied
+            // chunks; otherwise this falls through to the `!== 'req'` guard below and hangs,
+            // same as every other unlisted method here.
+            if (frame.t === 'open' && frame.method === 'graph.stream' && graphStreamChunks) {
+              const id = frame.id;
+              for (const chunk of graphStreamChunks) {
+                deliverGraphStreamChunk(socket, envelope.version, id, chunk);
+              }
+              deliver(socket, { version: envelope.version, body: { t: 'end', id } });
+              return;
+            }
             if (frame?.t !== 'req' || frame.id === undefined) return;
             // @kira/git-ipc's rpc.ts frame union: {t:'res', id, ok:true, result}.
             const resultByMethod: Record<string, unknown> = {
@@ -142,6 +211,6 @@ export async function installGitStreamMock(
       w.streamFactory = (name: string) =>
         name === 'git' ? createGitMockSocket() : existingFactory?.(name);
     },
-    { repoId: gitRepoId, extraResults },
+    { repoId: gitRepoId, extraResults, graphStreamChunks },
   );
 }

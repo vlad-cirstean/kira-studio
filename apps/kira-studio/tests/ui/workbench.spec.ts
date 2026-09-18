@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { IPC } from './support/ipcChannels';
 
 // Ported from tests/e2e/workbench.spec.ts (P57 D16). Five of its seven scenarios asserted real
 // persistence across a relaunch (panel visibility, settings appearance/Advanced sections, word
@@ -51,4 +52,28 @@ test("the scrollbar corner is not left at Chromium's opaque-white default (P42 F
     () => getComputedStyle(document.documentElement, '::-webkit-scrollbar-corner').backgroundColor,
   );
   expect(corner).not.toBe('rgb(255, 255, 255)');
+});
+
+// P92 item 3: the title bar's own action button for shell.BuildMenu's ItemNewWindow, previously
+// reachable only from the native menu — nothing in the renderer could reach it before.
+test('the title bar has a New window button, before the project-panel toggle, that calls WindowsService.OpenNew once per click', async ({
+  relaunch,
+}) => {
+  const { window, control } = await relaunch({
+    control: [{ channel: IPC.windowsOpenNew, response: null }],
+  });
+  const newWindow = window.locator('[data-testid="new-window"]');
+  await expect(newWindow).toBeVisible();
+  await expect(newWindow).toContainText('New window');
+
+  // DOM order: New window before the project-panel toggle (both in `.title-bar-actions`).
+  const testIds = await window
+    .locator('[data-testid="new-window"], [data-testid="toggle-project-panel"]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
+  expect(testIds).toEqual(['new-window', 'toggle-project-panel']);
+
+  const openNewCalls = () => control.log().filter((e) => e.channel === IPC.windowsOpenNew);
+  expect(openNewCalls()).toHaveLength(0);
+  await newWindow.click();
+  await expect.poll(() => openNewCalls().length).toBe(1);
 });
