@@ -73,45 +73,80 @@ type readReq struct {
 	Cursor     model.PageCursor
 }
 
-// readPage is read.ts's readPage — the densest function in the package.
-func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
-	projectedColumns, err := adapters.ResolveProjection(target.Columns, req.Projection)
+// buildKeysetWhere extends whereSQL with the keyset boundary predicate decoded from the cursor
+// token, when the request actually wants one. addParam is the caller's own $N param accumulator.
+func buildKeysetWhere(req readReq, order adapters.EffectiveOrder, fingerprint, whereSQL string, addParam func(any) int) (string, error) {
+	keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
 	if err != nil {
-		return page.TabularPage{}, err
+		return "", err
 	}
-	var tiebreaker []string
-	if target.PrimaryKey != nil {
-		tiebreaker = target.PrimaryKey
-	} else if len(target.UniqueKeys) > 0 {
-		tiebreaker = target.UniqueKeys[0]
+	if len(keyValues) != len(order.KeysetColumns) {
+		return "", adapters.New(adapters.CodeQuery, "page token key length does not match the sort key", nil)
 	}
-	order, err := adapters.ComputeEffectiveOrder(req.Sort, target.Columns, tiebreaker)
-	if err != nil {
-		return page.TabularPage{}, err
-	}
-	isTextSort := req.Sort != nil && req.Sort.Kind == "text"
-	wantsKeyset := req.Cursor.Mode == "after" || req.Cursor.Mode == "before"
-	if err := adapters.AssertKeysetSupported(wantsKeyset, isTextSort, order.KeysetEligible); err != nil {
-		return page.TabularPage{}, err
-	}
-
-	// The tiebreaker's columns must be fetched even when the caller did not project them — a
-	// page/prev token needs their values regardless of what the grid displays.
-	fetch, err := adapters.ResolveFetchColumns(projectedColumns, target.Columns, order, nil)
-	if err != nil {
-		return page.TabularPage{}, err
-	}
-
-	columns := make([]page.ColumnDescriptor, len(projectedColumns))
-	for i, c := range projectedColumns {
-		columns[i] = page.ColumnDescriptor{
-			Name: c.Name, DataType: c.DataType, TypeClass: typeClassFor(c.DataType),
-			Nullable: c.Nullable, IsPrimaryKey: c.IsPrimaryKey,
-			// P36 D28: not detected here yet (definition.go's own attgenerated is the only place
-			// this adapter currently reads it) — false rather than a guess.
-			Generated: false,
+	firstIndex := 0
+	for i, v := range keyValues {
+		idx := addParam(v)
+		if i == 0 {
+			firstIndex = idx
 		}
 	}
+	quotedKeyColumns := make([]string, len(order.KeysetColumns))
+	for i, c := range order.KeysetColumns {
+		quotedKeyColumns[i] = quoteIdent(c)
+	}
+	predicate := adapters.BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, firstIndex, dollarPlaceholder)
+	if whereSQL != "" {
+		return whereSQL + " AND " + predicate, nil
+	}
+	return "WHERE " + predicate, nil
+}
+
+// buildPageSQL assembles the final SELECT text: SELECT/FROM, the (already keyset-extended) WHERE,
+// ORDER BY and LIMIT/OFFSET, in that order.
+func buildPageSQL(relationSQL, selectList, whereSQL, orderBySQL string, req readReq, addParam func(any) int) string {
+	offsetSQL := ""
+	if req.Cursor.Mode == "offset" {
+		idx := addParam(req.Cursor.Offset)
+		offsetSQL = " OFFSET " + dollarPlaceholder(idx)
+	}
+	// D24: fetch pageSize + 1 to compute hasMore without a count.
+	limitIdx := addParam(req.PageSize + 1)
+
+	sqlParts := []string{"SELECT " + selectList, "FROM " + relationSQL}
+	if whereSQL != "" {
+		sqlParts = append(sqlParts, whereSQL)
+	}
+	if orderBySQL != "" {
+		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
+	}
+	sqlParts = append(sqlParts, "LIMIT "+dollarPlaceholder(limitIdx)+offsetSQL)
+	return strings.Join(sqlParts, "\n")
+}
+
+// readPage is read.ts's readPage — the densest function in the package.
+func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
+	plan, err := adapters.PlanRelationalPage(adapters.RelationalPageArgs{
+		Columns: target.Columns, Projection: req.Projection,
+		PrimaryKey: target.PrimaryKey, UniqueKeys: target.UniqueKeys,
+		Sort: req.Sort, CursorMode: req.Cursor.Mode,
+		TypeClassFor: typeClassFor,
+		// P36 D28: not detected here yet (definition.go's own attgenerated is the only place this
+		// adapter currently reads it) — false rather than a guess.
+		GeneratedFor: func(string) bool { return false },
+		QuoteIdent:   quoteIdent,
+		Fingerprint: struct {
+			Path       QualifiedName   `json:"path"`
+			Projection []string        `json:"projection"`
+			Filter     *string         `json:"filter"`
+			Sort       *model.SortSpec `json:"sort"`
+			PageSize   int             `json:"pageSize"`
+		}{target.QualifiedName, req.Projection, req.Filter, req.Sort, req.PageSize},
+	})
+	if err != nil {
+		return page.TabularPage{}, err
+	}
+	projectedColumns, order, fetch := plan.ProjectedColumns, plan.Order, plan.Fetch
+	columns := plan.Columns
 
 	relationSQL := quoteIdent(target.QualifiedName.Schema) + "." + quoteIdent(target.QualifiedName.Relation)
 	selectNames := make([]string, len(fetch.Columns))
@@ -127,62 +162,14 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 	}
 
 	whereSQL := adapters.WhereClause(req.Filter)
-
-	fingerprint := adapters.RequestFingerprint(struct {
-		Path       QualifiedName   `json:"path"`
-		Projection []string        `json:"projection"`
-		Filter     *string         `json:"filter"`
-		Sort       *model.SortSpec `json:"sort"`
-		PageSize   int             `json:"pageSize"`
-	}{target.QualifiedName, req.Projection, req.Filter, req.Sort, req.PageSize})
-
-	// "before" flips every direction in the ORDER BY so the scan grabs the rows immediately
-	// preceding the boundary; the page is reversed back to display order after fetching (D7).
-	reverseRows := req.Cursor.Mode == "before" && order.KeysetEligible
-	orderBySQL := adapters.BuildScanOrderBy(req.Sort, order, reverseRows, quoteIdent)
-
-	if wantsKeyset && req.Cursor.Mode != "offset" {
-		keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
+	if plan.WantsKeyset {
+		whereSQL, err = buildKeysetWhere(req, order, plan.Fingerprint, whereSQL, addParam)
 		if err != nil {
 			return page.TabularPage{}, err
 		}
-		if len(keyValues) != len(order.KeysetColumns) {
-			return page.TabularPage{}, adapters.New(adapters.CodeQuery, "page token key length does not match the sort key", nil)
-		}
-		firstIndex := len(params) + 1
-		for _, v := range keyValues {
-			addParam(v)
-		}
-		quotedKeyColumns := make([]string, len(order.KeysetColumns))
-		for i, c := range order.KeysetColumns {
-			quotedKeyColumns[i] = quoteIdent(c)
-		}
-		predicate := adapters.BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, firstIndex, dollarPlaceholder)
-		if whereSQL != "" {
-			whereSQL += " AND " + predicate
-		} else {
-			whereSQL = "WHERE " + predicate
-		}
 	}
 
-	offsetSQL := ""
-	if req.Cursor.Mode == "offset" {
-		idx := addParam(req.Cursor.Offset)
-		offsetSQL = " OFFSET " + dollarPlaceholder(idx)
-	}
-
-	// D24: fetch pageSize + 1 to compute hasMore without a count.
-	limitIdx := addParam(req.PageSize + 1)
-
-	sqlParts := []string{"SELECT " + selectList, "FROM " + relationSQL}
-	if whereSQL != "" {
-		sqlParts = append(sqlParts, whereSQL)
-	}
-	if orderBySQL != "" {
-		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
-	}
-	sqlParts = append(sqlParts, "LIMIT "+dollarPlaceholder(limitIdx)+offsetSQL)
-	sql := strings.Join(sqlParts, "\n")
+	sql := buildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, addParam)
 
 	// Streamed straight into the builder (P2 R1) rather than materialized into a [][]*string and
 	// transposed afterward: BuildKeysetPosition's CellAt is only ever called for the first and last
@@ -229,7 +216,7 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 		return page.TabularPage{}, err
 	}
 
-	if reverseRows {
+	if plan.ReverseRows {
 		builder.Reverse()
 		firstRow, lastRow = lastRow, firstRow
 	}
@@ -241,7 +228,7 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 	position, err := adapters.BuildKeysetPosition(adapters.KeysetPositionArgs{
 		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: displayRowCount,
 		ProbedExtra: probedExtra, Order: order, KeysetColumnIdx: fetch.KeysetColumnIdx,
-		Fingerprint: fingerprint,
+		Fingerprint: plan.Fingerprint,
 		CellAt: func(row, col int) *string {
 			if row == 0 {
 				return firstRow[col]

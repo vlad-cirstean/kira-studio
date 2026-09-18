@@ -85,52 +85,15 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 	}
 
 	qualifiedName := target.QualifiedName.Schema + "." + target.QualifiedName.Relation
-	for _, rowOp := range plan.Ops {
-		switch rowOp.Kind {
-		case "update":
-			if err := adapters.AssertColumnsKnown(target.Columns, append(rowOp.Key.Names(), rowOp.Changes.Names()...)); err != nil {
-				return model.MutationResult{}, err
-			}
-			if err := adapters.AssertKeyIsPrimaryKey(target.PrimaryKey, rowOp.Key, qualifiedName); err != nil {
-				return model.MutationResult{}, err
-			}
-		case "delete":
-			if err := adapters.AssertColumnsKnown(target.Columns, rowOp.Key.Names()); err != nil {
-				return model.MutationResult{}, err
-			}
-			if err := adapters.AssertKeyIsPrimaryKey(target.PrimaryKey, rowOp.Key, qualifiedName); err != nil {
-				return model.MutationResult{}, err
-			}
-		default: // "insert"
-			if err := adapters.AssertColumnsKnown(target.Columns, rowOp.Values.Names()); err != nil {
-				return model.MutationResult{}, err
-			}
-		}
+	if err := adapters.ValidateMutationOps(plan.Ops, target.Columns, target.PrimaryKey, qualifiedName); err != nil {
+		return model.MutationResult{}, err
 	}
 
 	paramRenderer := adapters.NewParamRenderer(dollarPlaceholder, binaryColumnsOf(target.Columns))
-
 	ordered := adapters.OrderedOps(plan.Ops)
-	type compiledOp struct {
-		sql    string
-		params []any
-		kind   string
-	}
-	compiled := make([]compiledOp, len(ordered))
-	previewParts := make([]string, len(ordered))
-	for i, rowOp := range ordered {
-		var params []any
-		sql, err := adapters.RenderRowOp(relationSQL, rowOp, paramRenderer, &params, quoteIdent)
-		if err != nil {
-			return model.MutationResult{}, err
-		}
-		compiled[i] = compiledOp{sql: sql, params: params, kind: rowOp.Kind}
-		var literalParams []any
-		previewPart, err := adapters.RenderRowOp(relationSQL, rowOp, literalRenderer, &literalParams, quoteIdent)
-		if err != nil {
-			return model.MutationResult{}, err
-		}
-		previewParts[i] = previewPart
+	compiled, previewParts, err := adapters.CompileMutationOps(relationSQL, ordered, paramRenderer, literalRenderer, quoteIdent)
+	if err != nil {
+		return model.MutationResult{}, err
 	}
 	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
 	op.SetCommand(joinSemicolons(previewParts))
@@ -160,11 +123,11 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 	}()
 	var affectedRows int64
 	for _, c := range compiled {
-		rowCount, err := execCommand(c.sql, c.params)
+		rowCount, err := execCommand(c.SQL, c.Params)
 		if err != nil {
 			return model.MutationResult{}, err
 		}
-		if err := adapters.AssertAffectedExactlyOne(c.kind, rowCount); err != nil {
+		if err := adapters.AssertAffectedExactlyOne(c.Kind, rowCount); err != nil {
 			return model.MutationResult{}, err
 		}
 		affectedRows += rowCount
