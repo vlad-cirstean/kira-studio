@@ -1343,6 +1343,88 @@ task constraint every phase in this chapter has already recorded (P83 §17.4, re
 result). OQ-2 (curl shim vs. re-invoking the app binary) and OQ-6's exact truncation length stay
 open as the plan itself left them — reversible with a measurement, not treated as settled here.
 
+## P87 result
+
+Landed per plan (`docs/v1.8/plans/P87-titlebar-keep-awake.md`), 8 commits (`28dd53d0`, `361c25db`,
+`3481df37`, `7ba213e8`, `9e59acbb`, `d17b9c14`, `89c07bff`, `31fc26eb`) — the plan's own 7-commit
+order-of-work plus one added `docs/ARCHITECTURE.md` commit at the end.
+
+**Backend (`28dd53d0`).** `internal/keepawake`: a `Controller` holding a *set* of named reasons
+(`ReasonManual`/`ReasonAgent`), not a refcount — acquires only on empty→non-empty, releases only on
+non-empty→empty, so either source re-asserting a level it already holds is a no-op, not a bug.
+`NewPlatformDriver()` switches on `runtime.GOOS` (no build tags, mirroring
+`internal/gitclient.NewPlatformLocator`) — `noopDriver` everywhere but darwin, where
+`caffeinateDriver` spawns/kills `caffeinate -i -s -w <pid>`. Self-heal: the reaper goroutine's async
+loss callback flips internal state false; the *next* `Set`/`Rearm` call (any reason) recomputes and
+re-acquires — no timer/backoff loop. Resume detection: `shell.AttachSystemWake`, modeled directly on
+the existing `AttachReopen`, registers `events.Mac.ApplicationDidWake`.
+
+**Settings + bridge (`361c25db`, `3481df37`).** New leaf `claudeCode.keepAwakeWithAgents`, default
+`false`, through all three layers (`packages/shared/domain/settings.ts`,
+`internal/storage/model/settings.go`, `internal/storage/repos/settings.go`). `bridge/keepawake.go`'s
+`KeepAwakeService` composes the two independent sources — the titlebar button's own manual state and
+the agent-aware setting gated on `AgentSessions()`'s running count — onto the one `Controller`, and
+broadcasts every change on a new `ChannelKeepAwake` (via `Emit`, never persisted across relaunch).
+
+**Frontend (`7ba213e8`, `9e59acbb`, `d17b9c14`).** `state/keepAwake.ts` hydrates and subscribes,
+mirroring the existing `agentHooks.ts`/`agentSessions.ts` pattern. `TitleBar.vue`'s action row
+reordered: Connections, Operations, Settings, keep-awake (new, coffee-cup icon, `.is-on`/
+`aria-pressed` on the two states, single click, no dropdown), New window — moved from leftmost to
+rightmost, per this row's own updated design. `SettingsDialog.vue` gained the agent-aware checkbox
+beside the existing hooks toggle in the Claude Code section.
+
+**Tests.** `internal/keepawake` — a `fakeDriver` that fails the test on a double-acquire or a
+premature release, a `-race` concurrent test, an argv golden test (`caffeinateArgv`), and a
+process-lifecycle test polling for `ESRCH` (`processAlive`/`waitUntil`, reused from
+`preconnect/supervisor_test.go`'s own precedent) rather than asserting on the first check, since this
+sandbox's minimal init reaps slowly. `pmset -g assertions` verification is explicitly not faked —
+documented as a manual macOS-only step, per the plan's own instruction. `workbench.spec.ts`'s
+existing New-window test updated for the new DOM order and title; two new cases cover the titlebar
+button's click-to-`SetManual` toggle and a `ChannelKeepAwake` broadcast turning it on with no click.
+`settings-claude-code.spec.ts` gained one case for the agent-aware checkbox's default-off state and
+its click-to-`SetAgentAware` call.
+
+**Deviations from the plan, each small and locally justified.** (1) Added
+`Controller.Supported() bool`, a thin forward to the driver's own `Supported()` — the plan's §2.1
+method list doesn't name it, but `bridge/keepawake.go` needs it to report `supported: false` on
+non-darwin without reaching into the driver directly. (2) §7.2's `bridge/index.ts` TS wrapper edits
+landed in the bindings-regeneration commit (`3481df37`) rather than the later frontend-state commit
+— §7.2's own text says bindings regenerate "in the same commit," and this keeps `state/keepAwake.ts`
+(commit 4) able to call `control.keepAwakeStatus()` etc. from the moment it's written, never against
+a half-wired bridge. (3) `recomputeAgent()` collapsed from two near-duplicate functions the plan
+sketched (`recomputeAgent(enabled bool)` / `recomputeAgentFromCount(enabled bool, count int)`) into
+one that always re-reads `Deps.Repos.Settings.GetAll()` fresh — simpler, and matches the plan's own
+text more literally than the two-function split did.
+
+**Verification.** `go build`/`go vet`/`go test ./...` clean (no `FAIL`, no flake this run —
+`internal/grpcclient`'s historically-flaky reflection test passed clean). `go test
+./internal/keepawake/... -race -v`: 11/11. `internal/storage`/root-level layering test confirmed
+covering the new package (`TestDomainPackagesDoNotImportBridge/internal/keepawake`). Darwin
+cross-compile of `internal/keepawake` alone (`GOOS=darwin GOARCH=arm64 CGO_ENABLED=0`) clean for both
+`build` and `vet` — the whole-`main`-package darwin cross-compile itself still fails deep inside
+Wails' own cgo-dependent darwin backend, a pre-existing constraint this sandbox has never been able
+to satisfy (`docs/DEV_ENVIRONMENT.md`), not something this phase introduced. `bun run
+typecheck`/`biome check .`/`scripts/check-tokens.sh` clean (the same two pre-existing
+`UncommittedChangesStrip.vue`/`RequestSettingsPane.vue` findings every prior phase in this chapter
+has recorded, both untouched by this phase). `bun run build` (desktop) succeeds. `bun run
+test:unit`: 1517 passed, 0 failed (unchanged from P92's own count — no new frontend unit tests
+needed, per the plan's own "below the bar" callouts). Full `bun run test:ui` (`ui`+`ui-timing`, 313
+tests): 306 passed, 3 failed, 4 did not run (the `ui-timing` project's own dependency-skip once `ui`
+carries a failure, the same shape P91's own result section recorded). All 3 failures confirmed
+pre-existing and unrelated: `git diff --stat` since `689249ec` touches none of the three failing
+spec files, and each is independently documented in an earlier phase's own result section —
+`http-request-body.spec.ts`'s 500-byte-payload threshold flake (P91), `sql-schema.spec.ts`'s stray
+`.suggest-widget.visible` no-completion case (P92), and `repo-workspace.spec.ts`'s "search streams
+results out of order" case (P91). Every P87-specific case (`workbench.spec.ts`'s three,
+`settings-claude-code.spec.ts`'s one) passed, confirmed again in an isolated targeted run of both
+files alone (9/9). `git diff --stat` against `689249ec` confirms `apps/kira-studio-vscode/` is
+untouched — out of scope for this phase.
+
+**Known gap, stated per the plan's own bar, not claimed.** `pmset -g assertions` verification that a
+live `caffeinate` process actually registers a `PreventUserIdleSystemSleep` assertion is a manual,
+macOS-only step this sandbox (Linux, no display) cannot run — documented as such in the plan, not
+faked with a mocked driver. No other known open item.
+
 ## P88 result
 
 Implemented directly, no plan doc (explicit instruction for this phase). One commit
