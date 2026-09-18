@@ -29,7 +29,13 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "performance": {
+        "noAccumulatingSpread": "error",
+        "noDelete": "error",
+        "noDynamicNamespaceImportAccess": "error",
+        "noReExportAll": "error"
+      }
     }
   },
   "javascript": {

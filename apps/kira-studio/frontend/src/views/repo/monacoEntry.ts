@@ -15,7 +15,44 @@
 // every `languages/features/*` and `languages/definitions/*` import) — so this uses that bundle
 // wholesale rather than hand-picking find/hover/folding/bracketMatching/links/wordHighlighter
 // individually and risking a missed transitive dependency.
-export * from 'monaco-editor/editor/editor.api.js';
+
+export type {
+  CancellationToken,
+  Environment,
+  IDisposable,
+  IEvent,
+  IKeyboardEvent,
+  IMarkdownString,
+  IMouseEvent,
+  IPosition,
+  IRange,
+  IScrollEvent,
+  ISelection,
+  ITrustedTypePolicy,
+  ITrustedTypePolicyOptions,
+  MarkdownStringTrustedOptions,
+  Thenable,
+  UriComponents,
+} from 'monaco-editor/editor/editor.api.js';
+export {
+  CancellationTokenSource,
+  Emitter,
+  editor,
+  KeyCode,
+  KeyMod,
+  languages,
+  MarkerSeverity,
+  MarkerTag,
+  Position,
+  Range,
+  Selection,
+  SelectionDirection,
+  Token,
+  Uri,
+  // `worker` is declared in this module's own .d.ts but not actually bound in its esm .js (grep
+  // confirms editor.api.js's own `export` statement omits it) — matching that mismatch exactly,
+  // not adding a value export the runtime module doesn't provide.
+} from 'monaco-editor/editor/editor.api.js';
 
 import { languages } from 'monaco-editor/editor/editor.api.js';
 import 'monaco-editor/features/register.all.js';

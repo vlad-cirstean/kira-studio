@@ -60,7 +60,13 @@ describe('state/schemaColumns.ts — effectiveSchema (P22c D4/D6)', () => {
   });
 
   test('both empty yields the empty schema', () => {
-    delete schemaColumnsState.byContainer['conn-both-empty|database:app/schema:pub'];
+    // Reflect.deleteProperty over `delete`: same removal, without the operator's deopt
+    // (lint/performance/noDelete) and without an undefined assignment fighting the Record's
+    // non-optional value type.
+    Reflect.deleteProperty(
+      schemaColumnsState.byContainer,
+      'conn-both-empty|database:app/schema:pub',
+    );
     const schema = effectiveSchema('conn-both-empty', 'database:app/schema:pub', EMPTY_DOCUMENT);
     expect(schema.tables).toEqual([]);
   });

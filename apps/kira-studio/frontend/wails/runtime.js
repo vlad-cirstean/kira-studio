@@ -18,4 +18,31 @@
 //
 // The production build never reaches this file at all: vite.config.ts marks /wails/* external, so
 // the built bundle keeps the literal import for Wails to satisfy at runtime.
-export * from '@wailsio/runtime';
+export {
+  Android,
+  Application,
+  Browser,
+  Call,
+  CancelError,
+  CancellablePromise,
+  CancelledRejectionError,
+  Clipboard,
+  Create,
+  clientId,
+  Dialogs,
+  Events,
+  Flags,
+  getTransport,
+  IOS,
+  JSONStream,
+  loadOptionalScript,
+  objectNames,
+  Screens,
+  Stream,
+  System,
+  setTransport,
+  Updater,
+  WailsSocket,
+  Window,
+  WML,
+} from '@wailsio/runtime';

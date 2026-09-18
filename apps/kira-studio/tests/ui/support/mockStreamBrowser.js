@@ -99,9 +99,11 @@
     var rest;
     if (payload && typeof payload === 'object') {
       rest = Object.assign({}, payload);
-      delete rest.opId;
-      delete rest.tabId;
-      if (rest.refresh === false) delete rest.refresh;
+      // JSON.stringify below drops undefined-valued keys same as it would a missing key, so
+      // this keeps matchKey's own normalisation without the `delete` operator's deopt.
+      rest.opId = undefined;
+      rest.tabId = undefined;
+      if (rest.refresh === false) rest.refresh = undefined;
       return `${op}:${JSON.stringify(rest)}`;
     }
     return `${op}:${JSON.stringify(payload)}`;
