@@ -328,165 +328,246 @@ func canonicalizeJSONTextEntries(arr []any) {
 func MaskContinuationTokens(v any) {
 	switch t := v.(type) {
 	case map[string]any:
-		// kadm.DescribedGroup carries no Type field and no PartitionAssignor field, so
-		// kafka/definition.go's own Go port drops these two rows entirely (P58e E13, its own
-		// comment: "the group section drops from seven rows to five") rather than reproducing the
-		// deleted TypeScript engine's definition.ts one for one. That is a permanent adapter
-		// capability difference from a much earlier phase, not a P58f-port non-determinism — it is
-		// reconciled here, at comparison time, rather than papered over, so every committed
-		// fixture's own extra rows/JSON keys are dropped from both sides identically before
-		// diffing (a real name/value divergence in what remains still produces a diff). Both the
-		// parsed statements doc (reached via canonicalizeJSONTextEntries below) and the "Group"
-		// section's structured rows carry the same two fields, so both need the same drop.
-		if _, hasCoordinator := t["coordinator"]; hasCoordinator {
-			if _, hasState := t["state"]; hasState {
-				delete(t, "type")
-				delete(t, "partitionAssignor")
-			}
-		}
-		if title, _ := t["title"].(string); title == "Group" {
-			if rows, ok := t["rows"].([]any); ok {
-				kept := rows[:0]
-				for _, r := range rows {
-					if rm, ok := r.(map[string]any); ok {
-						if name, _ := rm["name"].(string); name == "type" || name == "partitionAssignor" {
-							continue
-						}
-					}
-					kept = append(kept, r)
-				}
-				t["rows"] = kept
-			}
-		}
-		// Three more DefinitionSectionRow names from kafka's own Group section, first surfaced by
-		// this exact comparison (P58f-port-time findings, not run-to-run non-determinism — franz-
-		// go's kadm client and the deleted TypeScript engine's own kafkajs binding simply report
-		// this admin-created, never-joined consumer group's own metadata differently):
-		//   - "coordinator": the same real, volatile broker address as the nested object below.
-		//   - "state": kadm reports the Kafka wire protocol's own state name verbatim ("Empty");
-		//     the deleted engine's definition.ts translated a raw numeric state code through its
-		//     own lookup table, landing on "EMPTY" (kafka/definition.go's own comment: "State is
-		//     already a string on this client" — that client-side translation is exactly what
-		//     stopped being necessary). Case-normalized rather than replaced outright, so a
-		//     genuine state change (Empty -> Dead) still produces a diff.
-		//   - "protocolType": blank ("—" once orEmDash runs) for a group whose only membership is
-		//     admin-committed offsets, no consumer ever having joined and negotiated a protocol —
-		//     kafkajs's own binding reported a "simple" default label for this same case where
-		//     kadm's DescribedGroup.ProtocolType comes back empty. A cosmetic default, not
-		//     comparable, so masked wholesale like coordinator.
-		if name, _ := t["name"].(string); name != "" {
-			switch name {
-			case "coordinator":
-				if _, hasValue := t["value"]; hasValue {
-					t["value"] = coordinatorPlaceholder
-				}
-			case "state":
-				if s, ok := t["value"].(string); ok {
-					t["value"] = strings.ToUpper(s)
-				}
-			case "protocolType":
-				if _, hasValue := t["value"]; hasValue {
-					t["value"] = protocolTypePlaceholder
-				}
-			}
-		}
-		// A kafka topic's own ObjectDefinition (see configSectionMaskedPlaceholder's own doc
-		// comment for the P58e E11 attribution): the Configuration section's rows, and the
-		// definition's own notes (a permanent "could not be read" note pre-E11, empty post-E11),
-		// are masked wholesale rather than compared row for row against a fixture captured before
-		// the capability existed.
-		if kind, _ := t["kind"].(string); kind == "topic" {
-			if sections, ok := t["sections"].([]any); ok {
-				for _, s := range sections {
-					if sm, ok := s.(map[string]any); ok {
-						if title, _ := sm["title"].(string); title == "Configuration" {
-							sm["rows"] = []any{configSectionMaskedPlaceholder}
-						}
-					}
-				}
-			}
-			if _, hasNotes := t["notes"]; hasNotes {
-				t["notes"] = []any{}
-			}
-		}
-		// The same topic definition's own statements doc, once canonicalizeJSONTextEntries below
-		// parses it — {partitions, config} is kafka's own shape (kafka/definition.go's doc struct).
-		if _, hasPartitions := t["partitions"]; hasPartitions {
-			if _, hasConfig := t["config"]; hasConfig {
-				t["config"] = []any{configSectionMaskedPlaceholder}
-			}
-		}
+		applyStructuralMasks(t)
 		for k, val := range t {
-			switch {
-			case (k == "nextToken" || k == "prevToken") && val != nil:
-				t[k] = continuationTokenPlaceholder
-			case k == "serverVersion" && val != nil:
-				t[k] = serverVersionPlaceholder
-			case k == "endpoint" && val != nil:
-				t[k] = endpointPlaceholder
-			case k == "refresh" && val == false:
-				// P58f-port-time finding: the deleted TypeScript engine's ENGINE_OP.definition/
-				// describe wire shape never modeled a refresh flag at all (it was purely
-				// harness.ts's own local cache-bypass, never sent over the wire) — the committed
-				// clickhouse fixture's treeDefinition args reflect that, carrying no "refresh" key.
-				// The real bridge.TreeDescribeArgs this port drives does model it, correctly, since
-				// tree.Service.Definition genuinely takes a refresh argument today (P55's own
-				// redesign, unrelated to this port). Every committed scenario only ever passes
-				// refresh=false, so dropping a false-valued key from both sides before comparing
-				// can never hide a true-valued divergence.
-				delete(t, k)
-			case k == "coordinator" && val != nil:
-				// The nested {host, port} object inside a kafka group definition's own JSON
-				// statements text (reached once canonicalizeJSONTextEntries below parses it) —
-				// same real, volatile broker address as the structured row above, masked the same
-				// way rather than compared.
-				if _, ok := val.(map[string]any); ok {
-					t[k] = map[string]any{"host": "fixture-broker-host", "port": float64(0)}
-				} else {
-					MaskContinuationTokens(val)
-				}
-			case k == "state" && val != nil:
-				// The statements-doc counterpart of the "state" row handled above.
-				if s, ok := val.(string); ok {
-					t[k] = strings.ToUpper(s)
-				}
-			case k == "protocolType" && val != nil:
-				// The statements-doc counterpart of the "protocolType" row handled above.
-				t[k] = protocolTypePlaceholder
-			case k == "offsets" && val != nil:
-				// kafka/definition.go's own groupOffsetDoc struct (unlike its groupMemberDoc
-				// sibling) carries only Name/Value, no Detail field — the deleted TypeScript
-				// engine's own JSON doc included a null "detail" alongside every offset entry.
-				// Structured DefinitionSectionRows on both sides already carry Detail:null; this
-				// normalizes the nested JSON doc's own shape to match before comparing, since an
-				// absent key and a null-valued key mean the same thing here.
-				if arr, ok := val.([]any); ok {
-					for _, item := range arr {
-						if m, ok := item.(map[string]any); ok {
-							if _, hasDetail := m["detail"]; !hasDetail {
-								m["detail"] = nil
-							}
-						}
-					}
-				}
-				MaskContinuationTokens(val)
-			case (k == "attrs" || k == "headers" || k == "statements") && val != nil:
-				if arr, ok := val.([]any); ok {
-					canonicalizeJSONTextEntries(arr)
-				}
-			case k == "nodes":
-				MaskContinuationTokens(val)
-				if nodes, ok := val.([]any); ok {
-					sortByNameField(nodes)
-				}
-			default:
-				MaskContinuationTokens(val)
+			if rule, ok := keyMaskRules[k]; ok {
+				rule(t, k, val)
+				continue
 			}
+			MaskContinuationTokens(val)
 		}
 	case []any:
 		for _, item := range t {
 			MaskContinuationTokens(item)
 		}
+	}
+}
+
+// applyStructuralMasks runs MaskContinuationTokens' own cross-field rules on one map — each keys
+// off more than one field together (or a field's own value, not just its name), so none of them
+// fit the {key, mask} shape keyMaskRules below is built from. Same rules, same order as the
+// single switch this map arm used to open with, split across three group-specific helpers only to
+// stay under one function's own complexity budget.
+func applyStructuralMasks(t map[string]any) {
+	dropGroupTypeFields(t)
+	maskGroupRowByName(t)
+	maskTopicSections(t)
+}
+
+// dropGroupTypeFields drops kadm.DescribedGroup's own Type/PartitionAssignor fields — from a
+// statements doc's top-level keys and from a "Group" section's own structured rows alike — since
+// kafka/definition.go's Go port drops these two rows entirely (P58e E13, its own comment: "the
+// group section drops from seven rows to five") rather than reproducing the deleted TypeScript
+// engine's definition.ts one for one. That is a permanent adapter capability difference from a
+// much earlier phase, not a P58f-port non-determinism — it is reconciled here, at comparison
+// time, rather than papered over, so every committed fixture's own extra rows/JSON keys are
+// dropped from both sides identically before diffing (a real name/value divergence in what
+// remains still produces a diff).
+func dropGroupTypeFields(t map[string]any) {
+	if _, hasCoordinator := t["coordinator"]; hasCoordinator {
+		if _, hasState := t["state"]; hasState {
+			delete(t, "type")
+			delete(t, "partitionAssignor")
+		}
+	}
+	if title, _ := t["title"].(string); title == "Group" {
+		if rows, ok := t["rows"].([]any); ok {
+			kept := rows[:0]
+			for _, r := range rows {
+				if rm, ok := r.(map[string]any); ok {
+					if name, _ := rm["name"].(string); name == "type" || name == "partitionAssignor" {
+						continue
+					}
+				}
+				kept = append(kept, r)
+			}
+			t["rows"] = kept
+		}
+	}
+}
+
+// maskGroupRowByName masks one DefinitionSectionRow by its own "name" field — three more names
+// from kafka's own Group section, first surfaced by this exact comparison (P58f-port-time
+// findings, not run-to-run non-determinism — franz-go's kadm client and the deleted TypeScript
+// engine's own kafkajs binding simply report this admin-created, never-joined consumer group's
+// own metadata differently):
+//   - "coordinator": the same real, volatile broker address as the nested object below.
+//   - "state": kadm reports the Kafka wire protocol's own state name verbatim ("Empty"); the
+//     deleted engine's definition.ts translated a raw numeric state code through its own lookup
+//     table, landing on "EMPTY" (kafka/definition.go's own comment: "State is already a string on
+//     this client" — that client-side translation is exactly what stopped being necessary).
+//     Case-normalized rather than replaced outright, so a genuine state change (Empty -> Dead)
+//     still produces a diff.
+//   - "protocolType": blank ("—" once orEmDash runs) for a group whose only membership is
+//     admin-committed offsets, no consumer ever having joined and negotiated a protocol —
+//     kafkajs's own binding reported a "simple" default label for this same case where kadm's
+//     DescribedGroup.ProtocolType comes back empty. A cosmetic default, not comparable, so masked
+//     wholesale like coordinator.
+func maskGroupRowByName(t map[string]any) {
+	name, _ := t["name"].(string)
+	if name == "" {
+		return
+	}
+	switch name {
+	case "coordinator":
+		if _, hasValue := t["value"]; hasValue {
+			t["value"] = coordinatorPlaceholder
+		}
+	case "state":
+		if s, ok := t["value"].(string); ok {
+			t["value"] = strings.ToUpper(s)
+		}
+	case "protocolType":
+		if _, hasValue := t["value"]; hasValue {
+			t["value"] = protocolTypePlaceholder
+		}
+	}
+}
+
+// maskTopicSections masks a kafka topic's own ObjectDefinition (see configSectionMaskedPlaceholder's
+// own doc comment for the P58e E11 attribution): the Configuration section's rows, the definition's
+// own notes (a permanent "could not be read" note pre-E11, empty post-E11), and — once
+// canonicalizeJSONTextEntries below parses the same topic's own statements doc —
+// {partitions, config}'s config field (kafka/definition.go's own doc struct), are all masked
+// wholesale rather than compared row for row against a fixture captured before the capability
+// existed.
+func maskTopicSections(t map[string]any) {
+	if kind, _ := t["kind"].(string); kind == "topic" {
+		if sections, ok := t["sections"].([]any); ok {
+			for _, s := range sections {
+				if sm, ok := s.(map[string]any); ok {
+					if title, _ := sm["title"].(string); title == "Configuration" {
+						sm["rows"] = []any{configSectionMaskedPlaceholder}
+					}
+				}
+			}
+		}
+		if _, hasNotes := t["notes"]; hasNotes {
+			t["notes"] = []any{}
+		}
+	}
+	if _, hasPartitions := t["partitions"]; hasPartitions {
+		if _, hasConfig := t["config"]; hasConfig {
+			t["config"] = []any{configSectionMaskedPlaceholder}
+		}
+	}
+}
+
+// maskRule is one field-name-keyed rule from MaskContinuationTokens' own per-key switch, moved
+// into keyMaskRules below — given the map and the key/value pair currently being visited, mutate
+// t exactly as that switch's matching case used to.
+type maskRule func(t map[string]any, k string, val any)
+
+// maskWithPlaceholder builds the common shape: replace a non-nil value with a fixed placeholder,
+// leave a nil value untouched (matching every switch case that guarded on "&& val != nil").
+func maskWithPlaceholder(placeholder string) maskRule {
+	return func(t map[string]any, k string, _ any) {
+		if t[k] != nil {
+			t[k] = placeholder
+		}
+	}
+}
+
+// keyMaskRules is MaskContinuationTokens' own field-name switch, one entry per key it treats
+// specially — same key set, same per-key action, in a table instead of a switch so the recursive
+// walk that drives it stays short. A key with no entry here gets the same fallback the original
+// switch's own default case ran: recurse into val.
+//
+// Built in init(), not as a var initializer directly, because several rules below call
+// MaskContinuationTokens itself — a direct initializer expression referencing it creates a
+// package-init dependency cycle (MaskContinuationTokens also reads keyMaskRules), even though
+// nothing here actually needs keyMaskRules populated until MaskContinuationTokens first runs,
+// always after init() has finished.
+var keyMaskRules map[string]maskRule
+
+func init() {
+	keyMaskRules = map[string]maskRule{
+		"nextToken":     maskWithPlaceholder(continuationTokenPlaceholder),
+		"prevToken":     maskWithPlaceholder(continuationTokenPlaceholder),
+		"serverVersion": maskWithPlaceholder(serverVersionPlaceholder),
+		"endpoint":      maskWithPlaceholder(endpointPlaceholder),
+		// The statements-doc counterpart of the "protocolType" row applyStructuralMasks handles above.
+		"protocolType": maskWithPlaceholder(protocolTypePlaceholder),
+		"refresh": func(t map[string]any, k string, val any) {
+			// P58f-port-time finding: the deleted TypeScript engine's ENGINE_OP.definition/describe
+			// wire shape never modeled a refresh flag at all (it was purely harness.ts's own local
+			// cache-bypass, never sent over the wire) — the committed clickhouse fixture's
+			// treeDefinition args reflect that, carrying no "refresh" key. The real
+			// bridge.TreeDescribeArgs this port drives does model it, correctly, since
+			// tree.Service.Definition genuinely takes a refresh argument today (P55's own redesign,
+			// unrelated to this port). Every committed scenario only ever passes refresh=false, so
+			// dropping a false-valued key from both sides before comparing can never hide a
+			// true-valued divergence.
+			if val == false {
+				delete(t, k)
+				return
+			}
+			MaskContinuationTokens(val)
+		},
+		"coordinator": func(t map[string]any, k string, val any) {
+			if val == nil {
+				return
+			}
+			// The nested {host, port} object inside a kafka group definition's own JSON statements
+			// text (reached once canonicalizeJSONTextEntries below parses it) — same real, volatile
+			// broker address as the structured row applyStructuralMasks handles above, masked the
+			// same way rather than compared.
+			if _, ok := val.(map[string]any); ok {
+				t[k] = map[string]any{"host": "fixture-broker-host", "port": float64(0)}
+				return
+			}
+			MaskContinuationTokens(val)
+		},
+		"state": func(t map[string]any, k string, val any) {
+			if val == nil {
+				return
+			}
+			// The statements-doc counterpart of the "state" row applyStructuralMasks handles above.
+			if s, ok := val.(string); ok {
+				t[k] = strings.ToUpper(s)
+			}
+		},
+		"offsets": func(t map[string]any, k string, val any) {
+			if val == nil {
+				return
+			}
+			// kafka/definition.go's own groupOffsetDoc struct (unlike its groupMemberDoc sibling)
+			// carries only Name/Value, no Detail field — the deleted TypeScript engine's own JSON doc
+			// included a null "detail" alongside every offset entry. Structured DefinitionSectionRows
+			// on both sides already carry Detail:null; this normalizes the nested JSON doc's own
+			// shape to match before comparing, since an absent key and a null-valued key mean the
+			// same thing here.
+			if arr, ok := val.([]any); ok {
+				for _, item := range arr {
+					if m, ok := item.(map[string]any); ok {
+						if _, hasDetail := m["detail"]; !hasDetail {
+							m["detail"] = nil
+						}
+					}
+				}
+			}
+			MaskContinuationTokens(val)
+		},
+		"attrs":      maskJSONTextEntries,
+		"headers":    maskJSONTextEntries,
+		"statements": maskJSONTextEntries,
+		"nodes": func(t map[string]any, k string, val any) {
+			MaskContinuationTokens(val)
+			if nodes, ok := val.([]any); ok {
+				sortByNameField(nodes)
+			}
+		},
+	}
+}
+
+// maskJSONTextEntries is the shared rule for "attrs"/"headers"/"statements": each is an array of
+// JSON-text entries canonicalizeJSONTextEntries parses and masks in place.
+func maskJSONTextEntries(_ map[string]any, _ string, val any) {
+	if val == nil {
+		return
+	}
+	if arr, ok := val.([]any); ok {
+		canonicalizeJSONTextEntries(arr)
 	}
 }
 
