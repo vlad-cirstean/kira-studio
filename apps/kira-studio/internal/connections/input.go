@@ -39,6 +39,20 @@ type Input struct {
 // Validate ports connectionInputSchema's superRefine plus the field constraints zod enforced by
 // shape (P52 §4.2: "an explicit guard at the top of the method, returning E_BAD_REQUEST").
 func (in Input) Validate() error {
+	if err := in.validateIdentity(); err != nil {
+		return err
+	}
+	if err := in.validateLimits(); err != nil {
+		return err
+	}
+	if err := in.validateMcp(); err != nil {
+		return err
+	}
+	return in.validateMode()
+}
+
+// validateIdentity checks name/kind/color/mode — the connection's own identity fields.
+func (in Input) validateIdentity() error {
 	name := strings.TrimSpace(in.Name)
 	if name == "" || len(name) > maxNameLength {
 		return ipcerr.BadRequest("name must be 1-120 characters")
@@ -52,6 +66,11 @@ func (in Input) Validate() error {
 	if !model.ValidConnectionMode(in.Mode) {
 		return ipcerr.BadRequest("invalid connection mode")
 	}
+	return nil
+}
+
+// validateLimits checks port/preconnect/throttlePerSec — the bounded numeric/length fields.
+func (in Input) validateLimits() error {
 	if in.Port != nil && (*in.Port < 1 || *in.Port > 65535) {
 		return ipcerr.BadRequest("port must be between 1 and 65535")
 	}
@@ -68,6 +87,11 @@ func (in Input) Validate() error {
 		(in.ThrottlePerSec < throttlePerSecMin || in.ThrottlePerSec > throttlePerSecMax) {
 		return ipcerr.BadRequest("throttlePerSec must be 0, or between 0.01 and 1000")
 	}
+	return nil
+}
+
+// validateMcp checks the MCP permission modes and description length.
+func (in Input) validateMcp() error {
 	if !model.ValidMcpPermissionMode(in.McpReadMode) ||
 		!model.ValidMcpPermissionMode(in.McpWriteMode) ||
 		!model.ValidMcpPermissionMode(in.McpDdlMode) {
@@ -76,7 +100,12 @@ func (in Input) Validate() error {
 	if len(in.McpDescription) > 1000 {
 		return ipcerr.BadRequest("mcpDescription must be at most 1000 characters")
 	}
+	return nil
+}
 
+// validateMode checks the fields-vs-URI shape: fields mode requires a database file (fileKinds) or
+// host/port (unless an AWS-style kind), URI mode requires a non-empty URI.
+func (in Input) validateMode() error {
 	if in.Mode == "fields" {
 		if fileKinds[in.Kind] {
 			path := ""
@@ -102,7 +131,6 @@ func (in Input) Validate() error {
 			return ipcerr.BadRequest("A connection URI is required.")
 		}
 	}
-
 	return nil
 }
 
