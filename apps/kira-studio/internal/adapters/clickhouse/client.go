@@ -53,68 +53,90 @@ type resolvedTarget struct {
 	password string
 }
 
-// resolveTarget is client.ts's own — D12: sslmode's only real distinction here is http vs https;
-// require/verify-full both just mean "speak https", the same collapsed distinction client.ts's own
-// comment already committed to for this driver.
+// targetFromURI is resolveTarget's own URI-parse branch (cfg.Mode == "uri"): host/port/database/
+// username/password out of a parsed connection URI.
+func targetFromURI(rawURI string) (host, database, username, password *string, port *int, err error) {
+	u, err := url.Parse(rawURI)
+	if err != nil {
+		return nil, nil, nil, nil, nil, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
+	}
+	h := u.Hostname()
+	host = &h
+	if p := u.Port(); p != "" {
+		if n, perr := parsePort(p); perr == nil {
+			port = &n
+		}
+	}
+	d := u.Path
+	if len(d) > 0 && d[0] == '/' {
+		d = d[1:]
+	}
+	if d != "" {
+		database = &d
+	}
+	if u.User != nil {
+		un := u.User.Username()
+		username = &un
+		if pw, ok := u.User.Password(); ok {
+			password = &pw
+		}
+	}
+	return host, database, username, password, port, nil
+}
+
+// targetFromFields is resolveTarget's own fields-mode branch: cfg's Host/Port/Database/Username/
+// Password fields, passed straight through.
+func targetFromFields(cfg model.ResolvedConnectionConfig) (host, database, username, password *string, port *int) {
+	return cfg.Host, cfg.Database, cfg.Username, cfg.Password, cfg.Port
+}
+
+// resolveScheme is resolveTarget's own sslmode switch — D12: sslmode's only real distinction here
+// is http vs https; require/verify-full/prefer all just mean "speak https", the same collapsed
+// distinction client.ts's own comment already committed to for this driver.
+func resolveScheme(options map[string]any) (string, error) {
+	sslmode, ok := options["sslmode"].(string)
+	if !ok || sslmode == "" || sslmode == "disable" {
+		return "http", nil
+	}
+	switch sslmode {
+	// P21 round 2 architecture/security finding 3: `prefer` is a valid, documented value for
+	// every other engine (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse rejecting it
+	// was the one adapter out of step, and since Options only ever comes from a connection
+	// string's own query parameters (there is no fields-mode sslmode UI), a user carrying one
+	// connection-string style across engines hit this immediately. ClickHouse has no
+	// plaintext-with-opportunistic-upgrade transport, so `prefer` means the same as `require`
+	// here, same as it already does for postgres/mysqlfamily.
+	case "require", "prefer", "verify-full":
+		return "https", nil
+	default:
+		// An unrecognized sslmode must fail loudly rather than silently fall back to a
+		// plaintext connection — a typo here would otherwise send credentials and data
+		// unencrypted while the user believes TLS is configured.
+		return "", adapters.New(adapters.CodeConnect, "clickhouse: unknown sslmode \""+sslmode+"\"", nil)
+	}
+}
+
+// resolveTarget is client.ts's own.
 func resolveTarget(cfg model.ResolvedConnectionConfig, log func(level, message string)) (resolvedTarget, error) {
 	var host, database, username, password *string
 	var port *int
+	var err error
 
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
-		u, err := url.Parse(*cfg.URI)
+		host, database, username, password, port, err = targetFromURI(*cfg.URI)
 		if err != nil {
-			return resolvedTarget{}, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
-		}
-		h := u.Hostname()
-		host = &h
-		if p := u.Port(); p != "" {
-			if n, perr := parsePort(p); perr == nil {
-				port = &n
-			}
-		}
-		d := u.Path
-		if len(d) > 0 && d[0] == '/' {
-			d = d[1:]
-		}
-		if d != "" {
-			database = &d
-		}
-		if u.User != nil {
-			un := u.User.Username()
-			username = &un
-			if pw, ok := u.User.Password(); ok {
-				password = &pw
-			}
+			return resolvedTarget{}, err
 		}
 	} else {
-		host = cfg.Host
-		port = cfg.Port
-		database = cfg.Database
-		username = cfg.Username
-		password = cfg.Password
+		host, database, username, password, port = targetFromFields(cfg)
 	}
 	if host == nil || *host == "" {
 		return resolvedTarget{}, adapters.New(adapters.CodeConnect, "no host was given", nil)
 	}
 
-	scheme := "http"
-	if sslmode, ok := cfg.Options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
-		switch sslmode {
-		// P21 round 2 architecture/security finding 3: `prefer` is a valid, documented value for
-		// every other engine (postgres/mysqlfamily/redis/mongo/kafka) — ClickHouse rejecting it
-		// was the one adapter out of step, and since Options only ever comes from a connection
-		// string's own query parameters (there is no fields-mode sslmode UI), a user carrying one
-		// connection-string style across engines hit this immediately. ClickHouse has no
-		// plaintext-with-opportunistic-upgrade transport, so `prefer` means the same as `require`
-		// here, same as it already does for postgres/mysqlfamily.
-		case "require", "prefer", "verify-full":
-			scheme = "https"
-		default:
-			// An unrecognized sslmode must fail loudly rather than silently fall back to a
-			// plaintext connection — a typo here would otherwise send credentials and data
-			// unencrypted while the user believes TLS is configured.
-			return resolvedTarget{}, adapters.New(adapters.CodeConnect, "clickhouse: unknown sslmode \""+sslmode+"\"", nil)
-		}
+	scheme, err := resolveScheme(cfg.Options)
+	if err != nil {
+		return resolvedTarget{}, err
 	}
 
 	target := resolvedTarget{scheme: scheme, host: *host, port: 8123, database: "default"}
