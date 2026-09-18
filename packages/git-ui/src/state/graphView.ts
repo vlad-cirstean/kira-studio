@@ -455,9 +455,20 @@ export class GraphViewState {
 
   /** `App.vue`'s own entry point after `#order.setTips`/`.toggleGroup`/`.setCollapseEnabled` —
    *  the "a collapse toggle, a refs/HEAD change" triggers §5.1 names beside a page landing. A
-   *  no-op when this instance has no `#order` attached. */
+   *  no-op when this instance has no `#order` attached.
+   *
+   *  Notifies `#layoutListeners` itself, covering the whole display-row range — unlike
+   *  `#applyChunk`, which notifies for the one range its own caller already has in hand, nothing
+   *  here already knows "what changed" (a full relayout can move any row), and every row's own
+   *  graph column reads through the same `layout`/`plan` pair regardless. Without this,
+   *  `CommitGrid.vue`'s `plan` watcher fires `grid.invalidate()` before `#rebuildLayout`'s own
+   *  `await` resolves (a Vue watcher is a microtask, the layout worker round trip is not) and
+   *  paints against the *previous* `layout` state; nothing else was watching `laneCount`/`layout`
+   *  themselves to repaint once the real one landed. */
   async rebuildOrder(): Promise<void> {
     await this.#rebuildLayout();
+    const to = this.plan.value.length;
+    for (const listener of this.#layoutListeners) listener({ from: 0, to });
   }
 
   async #applyChunk(chunk: StreamChunkOf<'graph.stream'>): Promise<void> {
