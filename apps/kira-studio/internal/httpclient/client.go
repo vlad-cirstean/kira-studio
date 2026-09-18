@@ -250,83 +250,15 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 	}
 	sendCtx = context.WithValue(sendCtx, redirectHeaderNamesCtxKey{}, userHeaderNames)
 
-	// P3 D7: a formdata body's boundary is resolved before buildBody runs, not after — a user-
-	// typed multipart/form-data Content-Type carrying its own boundary parameter must drive the
-	// actual multipart framing (the header and the body have to agree), and every other case mints
-	// one here so the Content-Type guard below always knows exactly which boundary was used.
-	userContentType, hasUserContentType := headerValue(req.Headers, "Content-Type")
-	formBoundary := ""
-	if req.Body.Mode == string(BodyFormData) {
-		if hasUserContentType {
-			if mt, params, mErr := mime.ParseMediaType(userContentType); mErr == nil && mt == "multipart/form-data" {
-				formBoundary = params["boundary"]
-			}
-		}
-		if formBoundary == "" {
-			formBoundary = mintBoundary()
-		}
-	}
-
-	bodyReader, getBody, length, defaultContentType, err := buildBody(req.Body, formBoundary)
+	httpReq, formBoundary, defaultContentType, err := prepareRequest(sendCtx, req, u)
 	if err != nil {
 		return Response{}, err
 	}
-
-	httpReq, err := http.NewRequestWithContext(sendCtx, req.Method, u.String(), nil)
-	if err != nil {
-		if bodyReader != nil {
-			_ = bodyReader.Close()
-		}
-		return Response{}, newError(CodeBadRequest, "could not build request: "+err.Error(), err)
-	}
-	// F4/F5: assigned explicitly rather than left to NewRequestWithContext's own auto-detection,
-	// which only recognises *strings.Reader/*bytes.Reader/*bytes.Buffer — every streamed mode
-	// (formdata, file) would otherwise get neither a working GetBody nor a known ContentLength.
-	if bodyReader != nil {
-		httpReq.Body = bodyReader
-		httpReq.GetBody = getBody
-		httpReq.ContentLength = length
-	}
-
-	// F20a: net/http silently ignores Header.Set("Host", …) — it writes req.Host/req.URL.Host
-	// instead, so a user-typed Host: header must be assigned there explicitly or it does nothing.
-	hasUserAgent := false
-	for _, h := range req.Headers {
-		if strings.EqualFold(h.Name, "Host") {
-			httpReq.Host = h.Value
-			continue
-		}
-		if strings.EqualFold(h.Name, "User-Agent") {
-			hasUserAgent = true
-		}
-		httpReq.Header.Add(h.Name, h.Value)
-	}
-	if !hasUserAgent {
-		// Go's default "Go-http-client/1.1" misrepresents the app; overridable by the user (D4).
-		httpReq.Header.Set("User-Agent", "Kira Studio/"+buildinfo.Version)
-	}
+	applyHeaders(httpReq, req, formBoundary, defaultContentType)
 	// F20b: the transport auto-adds Accept-Encoding: gzip and transparently decompresses only
 	// when the caller didn't set that header itself. We never set it here, so a user-supplied
 	// Accept-Encoding above is passed through untouched and the response is reported as-received
 	// — no explicit "detect and skip decoding" branch is needed on top of that default.
-
-	// P3 D7: Content-Type is a default applied only when the user set none — matching Postman's
-	// own "if you manually select a Content-Type header, that value takes precedence" (F3). The one
-	// exception: a user-typed bare "multipart/form-data" (no boundary) can never be right, since the
-	// boundary is minted here and unknowable to the user, so the boundary this send actually used
-	// is appended to their value instead of left to silently mismatch the body.
-	switch {
-	case !hasUserContentType:
-		if defaultContentType != "" {
-			httpReq.Header.Set("Content-Type", defaultContentType)
-		}
-	case req.Body.Mode == string(BodyFormData):
-		if mt, params, mErr := mime.ParseMediaType(userContentType); mErr == nil && mt == "multipart/form-data" {
-			if _, ok := params["boundary"]; !ok {
-				httpReq.Header.Set("Content-Type", userContentType+"; boundary="+formBoundary)
-			}
-		}
-	}
 
 	// P9 D2/F7: dumped from the request the transport is about to write, with body=false — F8
 	// measured that this is safe for a non-rewindable streaming body and that body=true would
@@ -355,18 +287,9 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 	}
 	defer resp.Body.Close()
 
-	var reader io.Reader = resp.Body
-	if r.maxResponseBytes > 0 {
-		reader = io.LimitReader(resp.Body, r.maxResponseBytes+1)
-	}
-	data, readErr := io.ReadAll(reader)
+	data, truncated, readErr := readResponseBody(resp, r.maxResponseBytes)
 	if readErr != nil {
 		return Response{}, classifySendErr(sendCtx, readErr, tl.finishFailed(time.Now(), readErr.Error()))
-	}
-	truncated := false
-	if r.maxResponseBytes > 0 && int64(len(data)) > r.maxResponseBytes {
-		data = data[:r.maxResponseBytes]
-		truncated = true
 	}
 	// now is also P10 D5's own "the hop's end" instant for the final hop's download phase — the
 	// same instant elapsed is computed from, so download for the final hop is genuinely "how long
@@ -407,6 +330,107 @@ func Send(ctx context.Context, req Request, opts Options) (Response, error) {
 		SentCookies:     tl.sentCookies(),
 		ReceivedCookies: tl.receivedCookiesSnapshot(),
 	}, nil
+}
+
+// prepareRequest resolves the multipart boundary (if any), builds the request body, and constructs
+// the *http.Request through F4/F5's own body/GetBody/ContentLength assignment. P3 D7: a formdata
+// body's boundary is resolved before buildBody runs, not after — a user-typed multipart/form-data
+// Content-Type carrying its own boundary parameter must drive the actual multipart framing, and
+// every other case mints one here. formBoundary and defaultContentType are returned for
+// applyHeaders (and, for formBoundary, buildWireExchange later) to reuse without recomputing them.
+func prepareRequest(sendCtx context.Context, req Request, u *url.URL) (httpReq *http.Request, formBoundary, defaultContentType string, err error) {
+	userContentType, hasUserContentType := headerValue(req.Headers, "Content-Type")
+	if req.Body.Mode == string(BodyFormData) {
+		if hasUserContentType {
+			if mt, params, mErr := mime.ParseMediaType(userContentType); mErr == nil && mt == "multipart/form-data" {
+				formBoundary = params["boundary"]
+			}
+		}
+		if formBoundary == "" {
+			formBoundary = mintBoundary()
+		}
+	}
+
+	bodyReader, getBody, length, defaultContentType, err := buildBody(req.Body, formBoundary)
+	if err != nil {
+		return nil, formBoundary, "", err
+	}
+
+	httpReq, err = http.NewRequestWithContext(sendCtx, req.Method, u.String(), nil)
+	if err != nil {
+		if bodyReader != nil {
+			_ = bodyReader.Close()
+		}
+		return nil, formBoundary, defaultContentType, newError(CodeBadRequest, "could not build request: "+err.Error(), err)
+	}
+	// F4/F5: assigned explicitly rather than left to NewRequestWithContext's own auto-detection,
+	// which only recognises *strings.Reader/*bytes.Reader/*bytes.Buffer — every streamed mode
+	// (formdata, file) would otherwise get neither a working GetBody nor a known ContentLength.
+	if bodyReader != nil {
+		httpReq.Body = bodyReader
+		httpReq.GetBody = getBody
+		httpReq.ContentLength = length
+	}
+	return httpReq, formBoundary, defaultContentType, nil
+}
+
+// applyHeaders is F20a/P3 D7's own header-assignment pass: Host/User-Agent special-cased, every
+// other header copied through, then Content-Type defaulted only when the user set none.
+func applyHeaders(httpReq *http.Request, req Request, formBoundary, defaultContentType string) {
+	// F20a: net/http silently ignores Header.Set("Host", …) — it writes req.Host/req.URL.Host
+	// instead, so a user-typed Host: header must be assigned there explicitly or it does nothing.
+	hasUserAgent := false
+	for _, h := range req.Headers {
+		if strings.EqualFold(h.Name, "Host") {
+			httpReq.Host = h.Value
+			continue
+		}
+		if strings.EqualFold(h.Name, "User-Agent") {
+			hasUserAgent = true
+		}
+		httpReq.Header.Add(h.Name, h.Value)
+	}
+	if !hasUserAgent {
+		// Go's default "Go-http-client/1.1" misrepresents the app; overridable by the user (D4).
+		httpReq.Header.Set("User-Agent", "Kira Studio/"+buildinfo.Version)
+	}
+
+	// P3 D7: Content-Type is a default applied only when the user set none — matching Postman's
+	// own "if you manually select a Content-Type header, that value takes precedence" (F3). The one
+	// exception: a user-typed bare "multipart/form-data" (no boundary) can never be right, since the
+	// boundary is minted here and unknowable to the user, so the boundary this send actually used
+	// is appended to their value instead of left to silently mismatch the body.
+	userContentType, hasUserContentType := headerValue(req.Headers, "Content-Type")
+	switch {
+	case !hasUserContentType:
+		if defaultContentType != "" {
+			httpReq.Header.Set("Content-Type", defaultContentType)
+		}
+	case req.Body.Mode == string(BodyFormData):
+		if mt, params, mErr := mime.ParseMediaType(userContentType); mErr == nil && mt == "multipart/form-data" {
+			if _, ok := params["boundary"]; !ok {
+				httpReq.Header.Set("Content-Type", userContentType+"; boundary="+formBoundary)
+			}
+		}
+	}
+}
+
+// readResponseBody reads the response body, capped at maxResponseBytes (D4's own cap; <= 0 means
+// unbounded) and reporting whether it truncated.
+func readResponseBody(resp *http.Response, maxResponseBytes int64) (data []byte, truncated bool, err error) {
+	var reader io.Reader = resp.Body
+	if maxResponseBytes > 0 {
+		reader = io.LimitReader(resp.Body, maxResponseBytes+1)
+	}
+	data, err = io.ReadAll(reader)
+	if err != nil {
+		return nil, false, err
+	}
+	if maxResponseBytes > 0 && int64(len(data)) > maxResponseBytes {
+		data = data[:maxResponseBytes]
+		truncated = true
+	}
+	return data, truncated, nil
 }
 
 // buildWireExchange assembles P9 D2's rendering from what Send already computed — never fatal
