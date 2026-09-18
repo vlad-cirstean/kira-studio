@@ -55,6 +55,13 @@ export interface RowSlice {
    *  already does for the row-bold indicator (`isHeadDecoration`, below), never a second
    *  heuristic. Drives `planNode`'s own HEAD ring; does not affect `nodeKind`. */
   readonly isHead: boolean;
+  /** P93 §2/§6.2: this row's own upward link — its parent sits ABOVE it, in an earlier branch
+   *  group, so it is deliberately not a lane (a lane per branch from its merge base down to its
+   *  block blows past `GEOMETRY.maxLanes` on any repo with a dozen branches). Drawn as a short
+   *  dashed run in this row's own lane, in the PARENT's lane colour, ending at the row's node.
+   *  `undefined` for every row whose parents are all below it, which is every row of the
+   *  checked-out group. */
+  readonly forkStub: { readonly color: number } | undefined;
 }
 
 /** `dataContext.decoration.some(...)` — the single source for "is this row a stash", shared with
@@ -174,6 +181,9 @@ export function edgeCommand(
 export interface EdgePathPlan {
   readonly color: number;
   readonly d: string;
+  /** P93 §6.2: the fork stub's own dashing — the same literal `planNode`'s dashed stash ring
+   *  already uses (`buildPathElement` below). `undefined`/`false` for every ordinary edge path. */
+  readonly dashed?: boolean;
 }
 
 /** §5.3's first decision: "one `<path>` per lane colour present in the row, not one per segment"
@@ -196,6 +206,20 @@ export function planEdgePaths(
     else commandsByColor.set(segment.color, [command]);
   }
   return Array.from(commandsByColor, ([color, commands]) => ({ color, d: commands.join(' ') }));
+}
+
+/** P93 §6.2: one stub per row (the plan already reduced several upward links to the nearest one,
+ *  `RowPlan.forkParentOf`'s own doc comment) — a dashed run from the row's own top edge down to
+ *  its node, in the row's own lane, in the PARENT's colour. `undefined` when this row has no
+ *  upward link or no lane yet (mirrors `planNode`'s own `slice.lane === undefined` guard). */
+export function planForkStub(slice: RowSlice, nodeCenterY: number): EdgePathPlan | undefined {
+  if (slice.forkStub === undefined || slice.lane === undefined) return undefined;
+  const x = laneX(slice.lane);
+  return {
+    color: slice.forkStub.color,
+    d: `M${fmt(x)},${fmt(-GEOMETRY.overdraw)} V${fmt(nodeCenterY)}`,
+    dashed: true,
+  };
 }
 
 export interface NodeShapePlan {
@@ -311,6 +335,9 @@ function buildPathElement(plan: EdgePathPlan): SVGPathElement {
   // beats a presentation attribute, so only an inline style reliably makes this a line, not a
   // filled shape auto-closed at its own start/end point.
   path.style.fill = 'none';
+  if (plan.dashed) {
+    path.setAttribute('stroke-dasharray', `${GEOMETRY.strokeWidth} ${GEOMETRY.strokeWidth}`);
+  }
   return path;
 }
 
@@ -388,6 +415,10 @@ export function buildRowSvg(
   for (const plan of nodes) if (plan.isHeadHalo) svg.appendChild(buildNodeElement(plan));
   for (const plan of planEdgePaths(slice, rowHeight, nodeCenterY))
     svg.appendChild(buildPathElement(plan));
+  // P93 §6.2: the fork stub draws under the nodes, same as every other edge path — only ever
+  // one, so no need for planEdgePaths' per-colour grouping.
+  const stub = planForkStub(slice, nodeCenterY);
+  if (stub) svg.appendChild(buildPathElement(stub));
   for (const plan of nodes) if (!plan.isHeadHalo) svg.appendChild(buildNodeElement(plan));
 
   return svg;

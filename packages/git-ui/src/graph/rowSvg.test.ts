@@ -2,7 +2,14 @@ import { describe, expect, test } from 'bun:test';
 import { EDGE_KIND_MERGE_IN, EDGE_KIND_STRAIGHT } from '@kira/git-core';
 import { GEOMETRY } from './geometry.ts';
 import type { EdgeSegment } from './layoutStore.ts';
-import { edgeCommand, isHeadDecoration, laneX, planNode, type RowSlice } from './rowSvg.ts';
+import {
+  edgeCommand,
+  isHeadDecoration,
+  laneX,
+  planForkStub,
+  planNode,
+  type RowSlice,
+} from './rowSvg.ts';
 
 function baseSlice(overrides: Partial<RowSlice> = {}): RowSlice {
   return {
@@ -14,6 +21,7 @@ function baseSlice(overrides: Partial<RowSlice> = {}): RowSlice {
     segments: [],
     segmentCount: 0,
     isHead: false,
+    forkStub: undefined,
     ...overrides,
   };
 }
@@ -150,5 +158,26 @@ describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
     const d = edgeCommand(segment, 3, rowHeight, nodeCenterY);
     expect(d).not.toContain('C'); // same lane, no bend needed either way
     expect(d.startsWith(`M${laneX(0)},${nodeCenterY}`)).toBe(true);
+  });
+});
+
+// P93 §6.2/§8.2: "a stub's d runs from the row top to the node and carries dashed".
+describe('planForkStub — P93 §6.2', () => {
+  test('undefined when the row has no upward link', () => {
+    expect(planForkStub(baseSlice(), 16)).toBeUndefined();
+  });
+
+  test('undefined when the row has no lane yet, even with an upward link', () => {
+    const slice = baseSlice({ lane: undefined, forkStub: { color: 2 } });
+    expect(planForkStub(slice, 16)).toBeUndefined();
+  });
+
+  test('a dashed run from the row top to the node, in the parent lane colour', () => {
+    const slice = baseSlice({ lane: 1, forkStub: { color: 2 } });
+    const plan = planForkStub(slice, 16);
+    expect(plan?.dashed).toBe(true);
+    expect(plan?.color).toBe(2);
+    expect(plan?.d.startsWith(`M${laneX(1)},${-GEOMETRY.overdraw}`)).toBe(true);
+    expect(plan?.d.endsWith('V16')).toBe(true);
   });
 });

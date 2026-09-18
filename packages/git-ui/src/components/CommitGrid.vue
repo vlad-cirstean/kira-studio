@@ -21,6 +21,7 @@ import { SlickGrid } from 'slickgrid';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { graphColumnWidth } from '../graph/geometry.ts';
 import { createGraphFormatter } from '../graph/graphColumn.ts';
+import { laneAt } from '../graph/hitTest.ts';
 import { useGraphVisible } from '../graphVisibility.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
 import type { PrState } from '../state/pr.ts';
@@ -29,7 +30,7 @@ import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
-import { buildColumns, createCommitDataView } from './columns.ts';
+import { buildColumns, createCommitDataView, GRAPH_COLUMN_ID } from './columns.ts';
 import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
 
@@ -472,6 +473,32 @@ function openMenuFromKeyboard(row: number): void {
   emit('contextMenu', { row, x: rect?.left ?? 0, y: rect?.bottom ?? 0 });
 }
 
+/** P93 §6.2: "clicking a stub scrolls to its parent row" — `hitTest.ts`'s `laneAt` already answers
+ *  which lane a click landed in; the stub is drawn in this row's own lane (`readSlice`'s own doc
+ *  comment), so the test is "this row has an upward link, and the click landed in its lane".
+ *  Reuses `moveSelection`'s own select-and-scroll shape (the same "jump to a row" semantics
+ *  `App.vue`'s search-reveal path already uses) rather than duplicating it — a stub click does not
+ *  toggle the detail pane, matching keyboard navigation rather than an ordinary row click. Returns
+ *  whether it claimed the click, so `onClick`'s own handler knows not to fall through to
+ *  `handleClick`. */
+function handleForkStubClick(
+  displayRow: number,
+  cell: number,
+  event: MouseEvent | undefined,
+): boolean {
+  if (!grid || !event) return false;
+  const columns = grid.getColumns();
+  if (columns[cell]?.id !== GRAPH_COLUMN_ID) return false;
+  const parentDisplayRow = plan().forkParentOf(displayRow);
+  if (parentDisplayRow < 0) return false;
+  const cellNode = grid.getCellNode(displayRow, cell);
+  if (!cellNode) return false;
+  const offsetX = event.clientX - cellNode.getBoundingClientRect().left;
+  if (laneAt(offsetX) !== props.graphView.layout.laneOf(displayRow)) return false;
+  moveSelection(parentDisplayRow);
+  return true;
+}
+
 function pageSize(): number {
   if (!grid) return 1;
   const { top, bottom } = grid.getViewport();
@@ -844,9 +871,14 @@ onMounted(() => {
   applyAccessibility({ startRow: initialRange.top, endRow: initialRange.bottom });
 
   instance.onClick.subscribe((event, args) => {
-    const prNumber = prNumberFromClick(event.getNativeEvent<MouseEvent>());
-    if (prNumber !== undefined) emit('openPullRequest', prNumber);
-    else handleClick(args.row);
+    const nativeEvent = event.getNativeEvent<MouseEvent>();
+    const prNumber = prNumberFromClick(nativeEvent);
+    if (prNumber !== undefined) {
+      emit('openPullRequest', prNumber);
+      return;
+    }
+    if (handleForkStubClick(args.row, args.cell, nativeEvent)) return;
+    handleClick(args.row);
   });
   instance.onScroll.subscribe(() => {
     if (scrollRaf !== 0) return;
