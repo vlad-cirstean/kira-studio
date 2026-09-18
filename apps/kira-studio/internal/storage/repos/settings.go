@@ -82,6 +82,189 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	return result, nil
 }
 
+func upsertAppearanceSection(tx *sql.Tx, a *model.AppearancePatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.FontFamily != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.fontFamily", *a.FontFamily); err != nil {
+			return err
+		}
+	}
+	if a.FontSize != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.fontSize", *a.FontSize); err != nil {
+			return err
+		}
+	}
+	if a.RowDensity != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.rowDensity", *a.RowDensity); err != nil {
+			return err
+		}
+	}
+	if a.WordWrap != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.wordWrap", *a.WordWrap); err != nil {
+			return err
+		}
+	}
+	if a.RowColoring != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.rowColoring", *a.RowColoring); err != nil {
+			return err
+		}
+	}
+	if a.InlineBlame != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.inlineBlame", *a.InlineBlame); err != nil {
+			return err
+		}
+	}
+	if a.DateFormat != nil {
+		if err := upsertSettingsLeaf(tx, "appearance.dateFormat", *a.DateFormat); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func upsertDataSection(tx *sql.Tx, d *model.DataPatch) error {
+	if d == nil || d.DefaultPageSize == nil {
+		return nil
+	}
+	return upsertSettingsLeaf(tx, "data.defaultPageSize", *d.DefaultPageSize)
+}
+
+func upsertCacheSection(tx *sql.Tx, c *model.CachePatch) error {
+	if c == nil || c.L2BudgetMb == nil {
+		return nil
+	}
+	return upsertSettingsLeaf(tx, "cache.l2BudgetMb", *c.L2BudgetMb)
+}
+
+func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.OpLogRetentionDays != nil {
+		if err := upsertSettingsLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
+			return err
+		}
+	}
+	if a.ExpensiveQueryRows != nil {
+		if err := upsertSettingsLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
+			return err
+		}
+	}
+	if a.GitLogLevel != nil {
+		if err := upsertSettingsLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func upsertGitSection(tx *sql.Tx, g *model.GitPatch) error {
+	if g == nil {
+		return nil
+	}
+	if g.ProtectedBranches != nil {
+		if err := upsertSettingsLeaf(tx, "git.protectedBranches", *g.ProtectedBranches); err != nil {
+			return err
+		}
+	}
+	if g.FetchAutoIntervalMinutes != nil {
+		if err := upsertSettingsLeaf(tx, "git.fetchAutoIntervalMinutes", *g.FetchAutoIntervalMinutes); err != nil {
+			return err
+		}
+	}
+	if g.GitPath != nil {
+		if err := upsertSettingsLeaf(tx, "git.path", *g.GitPath); err != nil {
+			return err
+		}
+	}
+	if g.GraphFontSize != nil {
+		if err := upsertSettingsLeaf(tx, "git.graphFontSize", *g.GraphFontSize); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func upsertApiSection(tx *sql.Tx, a *model.ApiPatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.HTTPVersion != nil {
+		if err := upsertSettingsLeaf(tx, "api.httpVersion", *a.HTTPVersion); err != nil {
+			return err
+		}
+	}
+	if a.RequestTimeoutMs != nil {
+		if err := upsertSettingsLeaf(tx, "api.requestTimeoutMs", *a.RequestTimeoutMs); err != nil {
+			return err
+		}
+	}
+	if a.MaxResponseMb != nil {
+		if err := upsertSettingsLeaf(tx, "api.maxResponseMb", *a.MaxResponseMb); err != nil {
+			return err
+		}
+	}
+	if a.SSLVerify != nil {
+		if err := upsertSettingsLeaf(tx, "api.sslVerify", *a.SSLVerify); err != nil {
+			return err
+		}
+	}
+	if a.FollowRedirects != nil {
+		if err := upsertSettingsLeaf(tx, "api.followRedirects", *a.FollowRedirects); err != nil {
+			return err
+		}
+	}
+	if a.MaxRedirects != nil {
+		if err := upsertSettingsLeaf(tx, "api.maxRedirects", *a.MaxRedirects); err != nil {
+			return err
+		}
+	}
+	if a.DisableCookieJar != nil {
+		if err := upsertSettingsLeaf(tx, "api.disableCookieJar", *a.DisableCookieJar); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func upsertCodeIntelSection(tx *sql.Tx, ci *model.CodeIntelPatch) error {
+	if ci == nil || ci.McpServerEnabled == nil {
+		return nil
+	}
+	return upsertSettingsLeaf(tx, "codeIntel.mcpServerEnabled", *ci.McpServerEnabled)
+}
+
+func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
+	if dm == nil || dm.ServerEnabled == nil {
+		return nil
+	}
+	return upsertSettingsLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled)
+}
+
+func upsertClaudeCodeSection(tx *sql.Tx, cc *model.ClaudeCodePatch) error {
+	if cc == nil {
+		return nil
+	}
+	if cc.HooksEnabled != nil {
+		if err := upsertSettingsLeaf(tx, "claudeCode.hooksEnabled", *cc.HooksEnabled); err != nil {
+			return err
+		}
+	}
+	if cc.HooksPromptDismissed != nil {
+		if err := upsertSettingsLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
+			return err
+		}
+	}
+	if cc.KeepAwakeWithAgents != nil {
+		if err := upsertSettingsLeaf(tx, "claudeCode.keepAwakeWithAgents", *cc.KeepAwakeWithAgents); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Set validates the patch, writes only the leaves the caller actually patched in one transaction
 // (D15 — a full rewrite would touch eleven unrelated rows), and returns GetAll() afterwards.
 func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
@@ -95,155 +278,32 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	if a := patch.Appearance; a != nil {
-		if a.FontFamily != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.fontFamily", *a.FontFamily); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.FontSize != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.fontSize", *a.FontSize); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.RowDensity != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.rowDensity", *a.RowDensity); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.WordWrap != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.wordWrap", *a.WordWrap); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.RowColoring != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.rowColoring", *a.RowColoring); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.InlineBlame != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.inlineBlame", *a.InlineBlame); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.DateFormat != nil {
-			if err := upsertSettingsLeaf(tx, "appearance.dateFormat", *a.DateFormat); err != nil {
-				return model.Settings{}, err
-			}
-		}
+	if err := upsertAppearanceSection(tx, patch.Appearance); err != nil {
+		return model.Settings{}, err
 	}
-	if d := patch.Data; d != nil && d.DefaultPageSize != nil {
-		if err := upsertSettingsLeaf(tx, "data.defaultPageSize", *d.DefaultPageSize); err != nil {
-			return model.Settings{}, err
-		}
+	if err := upsertDataSection(tx, patch.Data); err != nil {
+		return model.Settings{}, err
 	}
-	if c := patch.Cache; c != nil && c.L2BudgetMb != nil {
-		if err := upsertSettingsLeaf(tx, "cache.l2BudgetMb", *c.L2BudgetMb); err != nil {
-			return model.Settings{}, err
-		}
+	if err := upsertCacheSection(tx, patch.Cache); err != nil {
+		return model.Settings{}, err
 	}
-	if a := patch.Advanced; a != nil {
-		if a.OpLogRetentionDays != nil {
-			if err := upsertSettingsLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.ExpensiveQueryRows != nil {
-			if err := upsertSettingsLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.GitLogLevel != nil {
-			if err := upsertSettingsLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
-				return model.Settings{}, err
-			}
-		}
+	if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
+		return model.Settings{}, err
 	}
-	if g := patch.Git; g != nil {
-		if g.ProtectedBranches != nil {
-			if err := upsertSettingsLeaf(tx, "git.protectedBranches", *g.ProtectedBranches); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if g.FetchAutoIntervalMinutes != nil {
-			if err := upsertSettingsLeaf(tx, "git.fetchAutoIntervalMinutes", *g.FetchAutoIntervalMinutes); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if g.GitPath != nil {
-			if err := upsertSettingsLeaf(tx, "git.path", *g.GitPath); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if g.GraphFontSize != nil {
-			if err := upsertSettingsLeaf(tx, "git.graphFontSize", *g.GraphFontSize); err != nil {
-				return model.Settings{}, err
-			}
-		}
+	if err := upsertGitSection(tx, patch.Git); err != nil {
+		return model.Settings{}, err
 	}
-	if a := patch.Api; a != nil {
-		if a.HTTPVersion != nil {
-			if err := upsertSettingsLeaf(tx, "api.httpVersion", *a.HTTPVersion); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.RequestTimeoutMs != nil {
-			if err := upsertSettingsLeaf(tx, "api.requestTimeoutMs", *a.RequestTimeoutMs); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.MaxResponseMb != nil {
-			if err := upsertSettingsLeaf(tx, "api.maxResponseMb", *a.MaxResponseMb); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.SSLVerify != nil {
-			if err := upsertSettingsLeaf(tx, "api.sslVerify", *a.SSLVerify); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.FollowRedirects != nil {
-			if err := upsertSettingsLeaf(tx, "api.followRedirects", *a.FollowRedirects); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.MaxRedirects != nil {
-			if err := upsertSettingsLeaf(tx, "api.maxRedirects", *a.MaxRedirects); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if a.DisableCookieJar != nil {
-			if err := upsertSettingsLeaf(tx, "api.disableCookieJar", *a.DisableCookieJar); err != nil {
-				return model.Settings{}, err
-			}
-		}
+	if err := upsertApiSection(tx, patch.Api); err != nil {
+		return model.Settings{}, err
 	}
-	if ci := patch.CodeIntel; ci != nil && ci.McpServerEnabled != nil {
-		if err := upsertSettingsLeaf(tx, "codeIntel.mcpServerEnabled", *ci.McpServerEnabled); err != nil {
-			return model.Settings{}, err
-		}
+	if err := upsertCodeIntelSection(tx, patch.CodeIntel); err != nil {
+		return model.Settings{}, err
 	}
-	if dm := patch.DbMcp; dm != nil && dm.ServerEnabled != nil {
-		if err := upsertSettingsLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled); err != nil {
-			return model.Settings{}, err
-		}
+	if err := upsertDbMcpSection(tx, patch.DbMcp); err != nil {
+		return model.Settings{}, err
 	}
-	if cc := patch.ClaudeCode; cc != nil {
-		if cc.HooksEnabled != nil {
-			if err := upsertSettingsLeaf(tx, "claudeCode.hooksEnabled", *cc.HooksEnabled); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if cc.HooksPromptDismissed != nil {
-			if err := upsertSettingsLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
-				return model.Settings{}, err
-			}
-		}
-		if cc.KeepAwakeWithAgents != nil {
-			if err := upsertSettingsLeaf(tx, "claudeCode.keepAwakeWithAgents", *cc.KeepAwakeWithAgents); err != nil {
-				return model.Settings{}, err
-			}
-		}
+	if err := upsertClaudeCodeSection(tx, patch.ClaudeCode); err != nil {
+		return model.Settings{}, err
 	}
 
 	if err := tx.Commit(); err != nil {

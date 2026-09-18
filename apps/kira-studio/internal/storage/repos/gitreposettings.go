@@ -95,53 +95,29 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	if patch.GraphPageSize != nil {
-		if err := r.upsert(tx, repoID, "graphPageSize", *patch.GraphPageSize); err != nil {
-			return model.GitRepoSettings{}, err
-		}
+	// Every leaf here is the same three statements (has a value? upsert it), so one table plus
+	// one loop replaces what used to be ten near-identical if-blocks.
+	leaves := []struct {
+		key   string
+		has   bool
+		value any
+	}{
+		{"graphPageSize", patch.GraphPageSize != nil, derefAny(patch.GraphPageSize)},
+		{"graphScope", patch.GraphScope != nil, derefAny(patch.GraphScope)},
+		{"stashShowInGraph", patch.StashShowInGraph != nil, derefAny(patch.StashShowInGraph)},
+		{"stashIncludeUntracked", patch.StashIncludeUntracked != nil, derefAny(patch.StashIncludeUntracked)},
+		{"reviewBaseCandidates", patch.ReviewBaseCandidates != nil, derefAny(patch.ReviewBaseCandidates)},
+		{"pullStrategy", patch.PullStrategy != nil, derefAny(patch.PullStrategy)},
+		{logLevelSettingKey, patch.LogLevel != nil, derefAny(patch.LogLevel)},
+		{"githubEnabled", patch.GithubEnabled != nil, derefAny(patch.GithubEnabled)},
+		{worktreePrepareScriptKey, patch.WorktreePrepareScript != nil, derefAny(patch.WorktreePrepareScript)},
+		{worktreeBasePathKey, patch.WorktreeBasePath != nil, derefAny(patch.WorktreeBasePath)},
 	}
-	if patch.GraphScope != nil {
-		if err := r.upsert(tx, repoID, "graphScope", *patch.GraphScope); err != nil {
-			return model.GitRepoSettings{}, err
+	for _, l := range leaves {
+		if !l.has {
+			continue
 		}
-	}
-	if patch.StashShowInGraph != nil {
-		if err := r.upsert(tx, repoID, "stashShowInGraph", *patch.StashShowInGraph); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.StashIncludeUntracked != nil {
-		if err := r.upsert(tx, repoID, "stashIncludeUntracked", *patch.StashIncludeUntracked); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.ReviewBaseCandidates != nil {
-		if err := r.upsert(tx, repoID, "reviewBaseCandidates", *patch.ReviewBaseCandidates); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.PullStrategy != nil {
-		if err := r.upsert(tx, repoID, "pullStrategy", *patch.PullStrategy); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.LogLevel != nil {
-		if err := r.upsert(tx, repoID, logLevelSettingKey, *patch.LogLevel); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.GithubEnabled != nil {
-		if err := r.upsert(tx, repoID, "githubEnabled", *patch.GithubEnabled); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.WorktreePrepareScript != nil {
-		if err := r.upsert(tx, repoID, worktreePrepareScriptKey, *patch.WorktreePrepareScript); err != nil {
-			return model.GitRepoSettings{}, err
-		}
-	}
-	if patch.WorktreeBasePath != nil {
-		if err := r.upsert(tx, repoID, worktreeBasePathKey, *patch.WorktreeBasePath); err != nil {
+		if err := r.upsert(tx, repoID, l.key, l.value); err != nil {
 			return model.GitRepoSettings{}, err
 		}
 	}
@@ -150,6 +126,15 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		return model.GitRepoSettings{}, fmt.Errorf("repos/gitreposettings: commit: %w", err)
 	}
 	return r.Get(repoID)
+}
+
+// derefAny dereferences a possibly-nil pointer for the leaves table above — nil stays nil rather
+// than panicking, since the table always guards on `has` before a value is actually used.
+func derefAny[T any](p *T) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 func (r *GitRepoSettingsRepo) upsert(tx *sql.Tx, repoID, key string, value any) error {

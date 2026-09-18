@@ -270,54 +270,105 @@ var (
 	validMaxRedirects     = InRange(0, 100)
 )
 
+// validateAppearanceSection mirrors upsertAppearanceSection's section (repos/settings.go) — same
+// leaf list, so the two stay in step as one commit.
+func validateAppearanceSection(a *AppearancePatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.RowDensity != nil && !ValidRowDensity(*a.RowDensity) {
+		return fmt.Errorf("model: appearance.rowDensity: invalid value %q", *a.RowDensity)
+	}
+	if a.DateFormat != nil && !ValidDateFormat(*a.DateFormat) {
+		return fmt.Errorf("model: appearance.dateFormat: invalid value %q", *a.DateFormat)
+	}
+	return nil
+}
+
+func validateDataSection(d *DataPatch) error {
+	if d != nil && d.DefaultPageSize != nil && !ValidPageSize(*d.DefaultPageSize) {
+		return fmt.Errorf("model: data.defaultPageSize: invalid value %d", *d.DefaultPageSize)
+	}
+	return nil
+}
+
+func validateCacheSection(c *CachePatch) error {
+	if c != nil && c.L2BudgetMb != nil && !validL2BudgetMb(*c.L2BudgetMb) {
+		return fmt.Errorf("model: cache.l2BudgetMb: out of range value %d", *c.L2BudgetMb)
+	}
+	return nil
+}
+
+func validateAdvancedSection(a *AdvancedPatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.OpLogRetentionDays != nil && !validOpLogRetentionDays(*a.OpLogRetentionDays) {
+		return fmt.Errorf("model: advanced.opLogRetentionDays: out of range value %d", *a.OpLogRetentionDays)
+	}
+	if a.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*a.ExpensiveQueryRows) {
+		return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *a.ExpensiveQueryRows)
+	}
+	if a.GitLogLevel != nil && !ValidLogLevel(*a.GitLogLevel) {
+		return fmt.Errorf("model: advanced.gitLogLevel: invalid value %q", *a.GitLogLevel)
+	}
+	return nil
+}
+
+func validateGitSection(g *GitPatch) error {
+	if g == nil {
+		return nil
+	}
+	if g.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*g.FetchAutoIntervalMinutes) {
+		return fmt.Errorf("model: git.fetchAutoIntervalMinutes: out of range value %d", *g.FetchAutoIntervalMinutes)
+	}
+	if g.GraphFontSize != nil && !validGraphFontSize(*g.GraphFontSize) {
+		return fmt.Errorf("model: git.graphFontSize: out of range value %d", *g.GraphFontSize)
+	}
+	return nil
+}
+
+func validateApiSection(a *ApiPatch) error {
+	if a == nil {
+		return nil
+	}
+	if a.HTTPVersion != nil && !ValidHTTPVersion(*a.HTTPVersion) {
+		return fmt.Errorf("model: api.httpVersion: invalid value %q", *a.HTTPVersion)
+	}
+	if a.RequestTimeoutMs != nil && !validRequestTimeoutMs(*a.RequestTimeoutMs) {
+		return fmt.Errorf("model: api.requestTimeoutMs: out of range value %d", *a.RequestTimeoutMs)
+	}
+	if a.MaxResponseMb != nil && !validMaxResponseMb(*a.MaxResponseMb) {
+		return fmt.Errorf("model: api.maxResponseMb: out of range value %d", *a.MaxResponseMb)
+	}
+	if a.MaxRedirects != nil && !validMaxRedirects(*a.MaxRedirects) {
+		return fmt.Errorf("model: api.maxRedirects: out of range value %d", *a.MaxRedirects)
+	}
+	return nil
+}
+
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
 // the offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema
-// either, so they are accepted as-is.
+// either, so they are accepted as-is. CodeIntel/DbMcp/ClaudeCode have no bounds either and so no
+// validateX of their own.
 func (p SettingsPatch) Validate() error {
-	if p.Appearance != nil {
-		if p.Appearance.RowDensity != nil && !ValidRowDensity(*p.Appearance.RowDensity) {
-			return fmt.Errorf("model: appearance.rowDensity: invalid value %q", *p.Appearance.RowDensity)
-		}
-		if p.Appearance.DateFormat != nil && !ValidDateFormat(*p.Appearance.DateFormat) {
-			return fmt.Errorf("model: appearance.dateFormat: invalid value %q", *p.Appearance.DateFormat)
-		}
+	if err := validateAppearanceSection(p.Appearance); err != nil {
+		return err
 	}
-	if p.Data != nil && p.Data.DefaultPageSize != nil && !ValidPageSize(*p.Data.DefaultPageSize) {
-		return fmt.Errorf("model: data.defaultPageSize: invalid value %d", *p.Data.DefaultPageSize)
+	if err := validateDataSection(p.Data); err != nil {
+		return err
 	}
-	if p.Cache != nil && p.Cache.L2BudgetMb != nil && !validL2BudgetMb(*p.Cache.L2BudgetMb) {
-		return fmt.Errorf("model: cache.l2BudgetMb: out of range value %d", *p.Cache.L2BudgetMb)
+	if err := validateCacheSection(p.Cache); err != nil {
+		return err
 	}
-	if p.Advanced != nil {
-		if p.Advanced.OpLogRetentionDays != nil && !validOpLogRetentionDays(*p.Advanced.OpLogRetentionDays) {
-			return fmt.Errorf("model: advanced.opLogRetentionDays: out of range value %d", *p.Advanced.OpLogRetentionDays)
-		}
-		if p.Advanced.ExpensiveQueryRows != nil && !validExpensiveQueryRows(*p.Advanced.ExpensiveQueryRows) {
-			return fmt.Errorf("model: advanced.expensiveQueryRows: out of range value %d", *p.Advanced.ExpensiveQueryRows)
-		}
-		if p.Advanced.GitLogLevel != nil && !ValidLogLevel(*p.Advanced.GitLogLevel) {
-			return fmt.Errorf("model: advanced.gitLogLevel: invalid value %q", *p.Advanced.GitLogLevel)
-		}
+	if err := validateAdvancedSection(p.Advanced); err != nil {
+		return err
 	}
-	if p.Git != nil && p.Git.FetchAutoIntervalMinutes != nil && !validFetchAutoIntervalMinutes(*p.Git.FetchAutoIntervalMinutes) {
-		return fmt.Errorf("model: git.fetchAutoIntervalMinutes: out of range value %d", *p.Git.FetchAutoIntervalMinutes)
+	if err := validateGitSection(p.Git); err != nil {
+		return err
 	}
-	if p.Git != nil && p.Git.GraphFontSize != nil && !validGraphFontSize(*p.Git.GraphFontSize) {
-		return fmt.Errorf("model: git.graphFontSize: out of range value %d", *p.Git.GraphFontSize)
-	}
-	if a := p.Api; a != nil {
-		if a.HTTPVersion != nil && !ValidHTTPVersion(*a.HTTPVersion) {
-			return fmt.Errorf("model: api.httpVersion: invalid value %q", *a.HTTPVersion)
-		}
-		if a.RequestTimeoutMs != nil && !validRequestTimeoutMs(*a.RequestTimeoutMs) {
-			return fmt.Errorf("model: api.requestTimeoutMs: out of range value %d", *a.RequestTimeoutMs)
-		}
-		if a.MaxResponseMb != nil && !validMaxResponseMb(*a.MaxResponseMb) {
-			return fmt.Errorf("model: api.maxResponseMb: out of range value %d", *a.MaxResponseMb)
-		}
-		if a.MaxRedirects != nil && !validMaxRedirects(*a.MaxRedirects) {
-			return fmt.Errorf("model: api.maxRedirects: out of range value %d", *a.MaxRedirects)
-		}
+	if err := validateApiSection(p.Api); err != nil {
+		return err
 	}
 	return nil
 }
