@@ -128,123 +128,14 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 	}()
 
 	return Handlers{
+		// Shape (b): the switch this used to be was itself the whole gocyclo score (one arm per
+		// RPC method) — requestHandlers turns "which method" into a lookup instead of a branch.
 		Request: func(ctx context.Context, method string, params json.RawMessage) (any, error) {
-			switch method {
-			case "app.init":
-				return r.handleAppInit(ctx), nil
-			case "repo.open":
-				return r.handleRepoOpen(ctx, c, params)
-			case "repo.close":
-				return handleRepoClose(c, params)
-			case "graph.status":
-				return r.handleGraphStatus(ctx, c, params)
-			case "graph.loadMore":
-				return r.handleGraphLoadMore(ctx, c, params)
-			case "graph.refresh":
-				return r.handleGraphRefresh(ctx, c, params)
-			case "commit.detail":
-				return r.handleCommitDetail(ctx, c, params)
-			case "commit.fileDiff":
-				return r.handleCommitFileDiff(ctx, c, params)
-			case "file.read":
-				return r.handleFileRead(ctx, c, params)
-			case "file.goToTarget":
-				return r.handleFileGoToTarget(ctx, c, params)
-			case "blame.line":
-				return r.handleBlameLine(ctx, c, params)
-			case "working.detail":
-				return r.handleWorkingDetail(ctx, c, params)
-			case "refs.list":
-				return r.handleRefsList(ctx, c, params)
-			case "status.get":
-				return r.handleStatusGet(ctx, c, params)
-			case "preflight.checkout":
-				return r.handlePreflightCheckout(ctx, c, params)
-			case "preflight.revert":
-				return r.handlePreflightRevert(ctx, c, params)
-			case "preflight.reset":
-				return r.handlePreflightReset(ctx, c, params)
-			case "preflight.cherryPick":
-				return r.handlePreflightCherryPick(ctx, c, params)
-			case "stash.list":
-				return r.handleStashList(ctx, c, params)
-			case "stash.show":
-				return r.handleStashShow(ctx, c, params)
-			case "preflight.stashPop":
-				return r.handlePreflightStashPop(ctx, c, params)
-			case "preflight.stashBranch":
-				return r.handlePreflightStashBranch(ctx, c, params)
-			case "globalStash.list":
-				return r.handleGlobalStashList(ctx, c, params)
-			case "op.run":
-				return r.handleOpRun(ctx, c, params)
-			case "undo.peek":
-				return r.handleUndoPeek(ctx, c, params)
-			case "undo.run":
-				return r.handleUndoRun(ctx, c, params)
-			case "review.resolveBase":
-				return r.handleReviewResolveBase(ctx, c, params)
-			case "remote.pullPreflight":
-				return r.handleRemotePullPreflight(ctx, c, params)
-			case "remote.pushPreflight":
-				return r.handleRemotePushPreflight(ctx, c, params)
-			case "remote.run":
-				return r.handleRemoteRun(ctx, c, params)
-			case "remote.cancel":
-				return r.handleRemoteCancel(ctx, c, params)
-			case "credential.provide":
-				return r.handleCredentialProvide(ctx, c, params)
-			case "review.files":
-				return r.handleReviewFiles(ctx, c, params)
-			case "review.fileDiff":
-				return r.handleReviewFileDiff(ctx, c, params)
-			case "review.mark":
-				return r.handleReviewMark(ctx, c, params)
-			case "review.comment.add":
-				return r.handleReviewCommentAdd(ctx, c, params)
-			case "review.comment.list":
-				return r.handleReviewCommentList(ctx, c, params)
-			case "review.comment.remove":
-				return r.handleReviewCommentRemove(ctx, c, params)
-			case "review.comment.clear":
-				return r.handleReviewCommentClear(ctx, c, params)
-			case "review.comment.export":
-				return r.handleReviewCommentExport(ctx, c, params)
-			case "repoSettings.get":
-				return r.handleRepoSettingsGet(ctx, c, params)
-			case "repoSettings.set":
-				return r.handleRepoSettingsSet(ctx, c, params)
-			case "settings.setGitPath":
-				return r.handleSettingsSetGitPath(ctx, params)
-			case "search.run":
-				return r.handleSearchRun(ctx, c, params)
-			case "commit.resolvePr":
-				return r.handleCommitResolvePr(ctx, c, params)
-			case "branch.resolvePr":
-				return r.handleBranchResolvePr(ctx, c, params)
-			case "pr.browserUrl":
-				return r.handlePrBrowserUrl(ctx, c, params)
-			case "worktree.list":
-				return r.handleWorktreeList(ctx, c, params)
-			case "preflight.worktreeAdd":
-				return r.handlePreflightWorktreeAdd(ctx, c, params)
-			case "preflight.worktreeRemove":
-				return r.handlePreflightWorktreeRemove(ctx, c, params)
-			case "worktree.prepare":
-				return r.handleWorktreePrepare(ctx, c, params)
-			case "worktree.cancelPrepare":
-				return r.handleWorktreeCancelPrepare(ctx, c, params)
-			case "stack.list":
-				return r.handleStackList(ctx, c, params)
-			case "preflight.restack":
-				return r.handlePreflightRestack(ctx, c, params)
-			case "stack.restack":
-				return r.handleStackRestack(ctx, c, params)
-			case "stack.cancelRestack":
-				return r.handleStackCancelRestack(ctx, c, params)
-			default:
+			h, ok := requestHandlers[method]
+			if !ok {
 				return nil, ipcerr.New("E_UNKNOWN_METHOD", "gitrpc: unknown method "+method)
 			}
+			return h(r, ctx, c, params)
 		},
 		Stream: func(ctx context.Context, method string, params json.RawMessage, emit func(payload any, blob []byte) error) error {
 			switch method {
@@ -255,6 +146,184 @@ func (r *Router) ForConn(c *gitsession.Conn) Handlers {
 			}
 		},
 	}
+}
+
+// requestHandler is one requestHandlers entry's own shape — uniform across every RPC method even
+// though the underlying handleXxx methods are not (handleAppInit takes no c/params,
+// handleSettingsSetGitPath takes no c, handleRepoClose is a package func rather than a method) —
+// each entry adapts its own handler to this one signature.
+type requestHandler func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error)
+
+// requestHandlers is ForConn's own dispatch table: one entry per RPC method Request accepts.
+var requestHandlers = map[string]requestHandler{
+	"app.init": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleAppInit(ctx), nil
+	},
+	"repo.open": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRepoOpen(ctx, c, params)
+	},
+	"repo.close": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return handleRepoClose(c, params)
+	},
+	"graph.status": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGraphStatus(ctx, c, params)
+	},
+	"graph.loadMore": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGraphLoadMore(ctx, c, params)
+	},
+	"graph.refresh": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGraphRefresh(ctx, c, params)
+	},
+	"commit.detail": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleCommitDetail(ctx, c, params)
+	},
+	"commit.fileDiff": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleCommitFileDiff(ctx, c, params)
+	},
+	"file.read": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleFileRead(ctx, c, params)
+	},
+	"file.goToTarget": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleFileGoToTarget(ctx, c, params)
+	},
+	"blame.line": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleBlameLine(ctx, c, params)
+	},
+	"working.detail": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleWorkingDetail(ctx, c, params)
+	},
+	"refs.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRefsList(ctx, c, params)
+	},
+	"status.get": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleStatusGet(ctx, c, params)
+	},
+	"preflight.checkout": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightCheckout(ctx, c, params)
+	},
+	"preflight.revert": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightRevert(ctx, c, params)
+	},
+	"preflight.reset": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightReset(ctx, c, params)
+	},
+	"preflight.cherryPick": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightCherryPick(ctx, c, params)
+	},
+	"stash.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleStashList(ctx, c, params)
+	},
+	"stash.show": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleStashShow(ctx, c, params)
+	},
+	"preflight.stashPop": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightStashPop(ctx, c, params)
+	},
+	"preflight.stashBranch": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightStashBranch(ctx, c, params)
+	},
+	"globalStash.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleGlobalStashList(ctx, c, params)
+	},
+	"op.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleOpRun(ctx, c, params)
+	},
+	"undo.peek": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleUndoPeek(ctx, c, params)
+	},
+	"undo.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleUndoRun(ctx, c, params)
+	},
+	"review.resolveBase": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewResolveBase(ctx, c, params)
+	},
+	"remote.pullPreflight": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRemotePullPreflight(ctx, c, params)
+	},
+	"remote.pushPreflight": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRemotePushPreflight(ctx, c, params)
+	},
+	"remote.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRemoteRun(ctx, c, params)
+	},
+	"remote.cancel": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRemoteCancel(ctx, c, params)
+	},
+	"credential.provide": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleCredentialProvide(ctx, c, params)
+	},
+	"review.files": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewFiles(ctx, c, params)
+	},
+	"review.fileDiff": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewFileDiff(ctx, c, params)
+	},
+	"review.mark": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewMark(ctx, c, params)
+	},
+	"review.comment.add": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentAdd(ctx, c, params)
+	},
+	"review.comment.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentList(ctx, c, params)
+	},
+	"review.comment.remove": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentRemove(ctx, c, params)
+	},
+	"review.comment.clear": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentClear(ctx, c, params)
+	},
+	"review.comment.export": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleReviewCommentExport(ctx, c, params)
+	},
+	"repoSettings.get": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRepoSettingsGet(ctx, c, params)
+	},
+	"repoSettings.set": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleRepoSettingsSet(ctx, c, params)
+	},
+	"settings.setGitPath": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleSettingsSetGitPath(ctx, params)
+	},
+	"search.run": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleSearchRun(ctx, c, params)
+	},
+	"commit.resolvePr": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleCommitResolvePr(ctx, c, params)
+	},
+	"branch.resolvePr": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleBranchResolvePr(ctx, c, params)
+	},
+	"pr.browserUrl": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePrBrowserUrl(ctx, c, params)
+	},
+	"worktree.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleWorktreeList(ctx, c, params)
+	},
+	"preflight.worktreeAdd": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightWorktreeAdd(ctx, c, params)
+	},
+	"preflight.worktreeRemove": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightWorktreeRemove(ctx, c, params)
+	},
+	"worktree.prepare": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleWorktreePrepare(ctx, c, params)
+	},
+	"worktree.cancelPrepare": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleWorktreeCancelPrepare(ctx, c, params)
+	},
+	"stack.list": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleStackList(ctx, c, params)
+	},
+	"preflight.restack": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handlePreflightRestack(ctx, c, params)
+	},
+	"stack.restack": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleStackRestack(ctx, c, params)
+	},
+	"stack.cancelRestack": func(r *Router, ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
+		return r.handleStackCancelRestack(ctx, c, params)
+	},
 }
 
 func (r *Router) handleAppInit(ctx context.Context) AppInitResult {

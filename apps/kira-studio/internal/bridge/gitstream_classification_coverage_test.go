@@ -29,25 +29,29 @@ import (
 // resolved that by admitting every preflight onto allowedMethods, alongside the write it stages, so
 // there is no longer a separate "must stay refused" preflight table for this test to fold in.
 //
-// ForConn's dispatch table is a plain `switch method { case "...": ... }` inside a func literal,
-// not a data structure reflection can enumerate — so this derives the REAL case set the only way
-// available short of a go/analysis pass: parses every non-test .go file under internal/gitrpc/ (not
-// one hard-coded file — a dispatch switch that moves to, or is added in, a different file in that
-// package must still be found) and walks every switch statement whose tag is the identifier
-// `method`, collecting every case's string literal(s). Ignores the `default` clause (its
-// CaseClause.List is nil) and any switch with a different tag (there is only one shape of dispatch
-// switch in this package today, but the walk does not assume that).
+// ForConn dispatches over two shapes: Stream is still a plain `switch method { case "...": ... }`
+// inside a func literal; Request (P94 pass 2, gocyclo) moved to a `map[string]requestHandler{...}`
+// table instead, since the switch alone was the whole complexity score. Neither is a data structure
+// reflection can enumerate on its own, so this derives the REAL case set the only way available
+// short of a go/analysis pass: parses every non-test .go file under internal/gitrpc/ (not one
+// hard-coded file — a dispatch switch or table that moves to, or is added in, a different file in
+// that package must still be found) and walks both shapes — every switch statement whose tag is the
+// identifier `method` (collecting every case's string literal(s); ignores the `default` clause,
+// whose CaseClause.List is nil, and any switch with a different tag) and every
+// `map[string]XxxHandler{...}` composite literal (collecting every string key) — since a table
+// keyed by anything else in this package is not a method dispatch table.
 func TestGitrpcDispatch_EveryMethodIsClassified(t *testing.T) {
 	dispatched := dispatchedGitrpcMethods(t)
-	// A floor, not just "> 0": both switches this walk finds today live in handlers.go, so a change
-	// that moves or adds one to a different file in the package would still leave len(dispatched) >
-	// 0 (the other switch alone) — silently finding FEWER methods, with every one of a moved/added
-	// switch's own methods then unclassified with zero test signal, exactly the gap this test exists
-	// to close. 50 sits comfortably under the ~55 methods Router.ForConn dispatches today (gitstream.go's
-	// own doc comment), so a genuine drop below it fails loudly instead of passing vacuously.
+	// A floor, not just "> 0": both the Stream switch and the Request map table this walk finds
+	// today live in handlers.go, so a change that moves or adds one to a different file in the
+	// package would still leave len(dispatched) > 0 (the other shape alone) — silently finding
+	// FEWER methods, with every one of a moved/added switch's or table's own methods then
+	// unclassified with zero test signal, exactly the gap this test exists to close. 50 sits
+	// comfortably under the ~55 methods Router.ForConn dispatches today (gitstream.go's own doc
+	// comment), so a genuine drop below it fails loudly instead of passing vacuously.
 	const minDispatchedMethods = 50
 	if len(dispatched) < minDispatchedMethods {
-		t.Fatalf("derived only %d dispatched methods from every .go file in internal/gitrpc/ -- want at least %d; the AST walk is almost certainly missing a switch (moved/renamed file, changed tag name), not the source suddenly shrinking", len(dispatched), minDispatchedMethods)
+		t.Fatalf("derived only %d dispatched methods from every .go file in internal/gitrpc/ -- want at least %d; the AST walk is almost certainly missing a switch or map table (moved/renamed file, changed tag/type name), not the source suddenly shrinking", len(dispatched), minDispatchedMethods)
 	}
 
 	classified := map[string]bool{}
@@ -170,8 +174,9 @@ func TestRepoSettingsSetTouchesRestrictedField_CoversEveryPatchField(t *testing.
 
 // dispatchedGitrpcMethods parses every non-test .go file directly under internal/gitrpc/ (a sibling
 // package under the same module, read as source text rather than imported — nothing here depends on
-// gitrpc's own build) and returns every string literal case label from every `switch method { ... }`
-// statement found in any of them — not just handlers.go, so a dispatch switch that moves to, or is
+// gitrpc's own build) and returns every string literal label found in either dispatch shape: every
+// case of a `switch method { ... }` statement, and every key of a `map[string]XxxHandler{...}`
+// composite literal — not just handlers.go, so a dispatch switch or table that moves to, or is
 // added in, a different file in that package is still found (Group 4, P68 review: the original
 // single-file walk silently found fewer methods on such a move, with the guard below (len == 0)
 // never catching it since the file it *did* still hold onto still had at least one switch).
@@ -197,27 +202,54 @@ func dispatchedGitrpcMethods(t *testing.T) []string {
 			t.Fatalf("parse %s: %v", path, err)
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
-			sw, ok := n.(*ast.SwitchStmt)
-			if !ok {
-				return true
-			}
-			tag, ok := sw.Tag.(*ast.Ident)
-			if !ok || tag.Name != "method" {
-				return true
-			}
-			for _, stmt := range sw.Body.List {
-				clause, ok := stmt.(*ast.CaseClause)
-				if !ok {
-					continue
+			switch node := n.(type) {
+			case *ast.SwitchStmt:
+				tag, ok := node.Tag.(*ast.Ident)
+				if !ok || tag.Name != "method" {
+					return true
 				}
-				for _, expr := range clause.List { // nil (skipped entirely) for `default:`
-					lit, ok := expr.(*ast.BasicLit)
+				for _, stmt := range node.Body.List {
+					clause, ok := stmt.(*ast.CaseClause)
+					if !ok {
+						continue
+					}
+					for _, expr := range clause.List { // nil (skipped entirely) for `default:`
+						lit, ok := expr.(*ast.BasicLit)
+						if !ok || lit.Kind != token.STRING {
+							continue
+						}
+						value, err := strconv.Unquote(lit.Value)
+						if err != nil {
+							t.Fatalf("unquote case label %s in %s: %v", lit.Value, path, err)
+						}
+						methods = append(methods, value)
+					}
+				}
+			case *ast.CompositeLit:
+				mt, ok := node.Type.(*ast.MapType)
+				if !ok {
+					return true
+				}
+				keyIdent, ok := mt.Key.(*ast.Ident)
+				if !ok || keyIdent.Name != "string" {
+					return true
+				}
+				valIdent, ok := mt.Value.(*ast.Ident)
+				if !ok || !strings.HasSuffix(valIdent.Name, "Handler") {
+					return true
+				}
+				for _, elt := range node.Elts {
+					kv, ok := elt.(*ast.KeyValueExpr)
+					if !ok {
+						continue
+					}
+					lit, ok := kv.Key.(*ast.BasicLit)
 					if !ok || lit.Kind != token.STRING {
 						continue
 					}
 					value, err := strconv.Unquote(lit.Value)
 					if err != nil {
-						t.Fatalf("unquote case label %s in %s: %v", lit.Value, path, err)
+						t.Fatalf("unquote map key %s in %s: %v", lit.Value, path, err)
 					}
 					methods = append(methods, value)
 				}
