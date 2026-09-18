@@ -56,6 +56,38 @@ test('clicking the toggle calls agentHooksSetEnabled with {enabled: true}, and a
   await expect(dialog(page).locator('[data-testid="claude-code-hooks-error"]')).toHaveCount(0);
 });
 
+// P87 §10.3: the agent-aware keep-awake leaf, beside the hooks toggle in the same section.
+test('the keep-awake setting is unchecked by default, and clicking it calls SetAgentAware with {enabled: true}', async ({
+  relaunch,
+}) => {
+  const { window: page, control } = await relaunch({
+    control: [
+      {
+        channel: IPC.keepAwakeSetAgentAware,
+        response: { manual: false, supported: true, error: '' },
+      },
+    ],
+  });
+  await openSettings(page);
+  await page.click('[data-testid="settings-section-Claude Code"]');
+
+  await expect(
+    dialog(page).locator('[data-testid="settings-claude-code-keep-awake"]'),
+  ).not.toBeChecked();
+
+  await page.click('[data-testid="settings-claude-code-keep-awake"]');
+
+  await expect
+    .poll(() => control.log().some((entry) => entry.channel === IPC.keepAwakeSetAgentAware))
+    .toBe(true);
+  const call = control.log().find((entry) => entry.channel === IPC.keepAwakeSetAgentAware);
+  expect(call?.args).toEqual({ enabled: true });
+
+  await expect(
+    dialog(page).locator('[data-testid="settings-claude-code-keep-awake"]'),
+  ).toBeChecked();
+});
+
 test('a start failure (e.g. curl not found) shows the error, not a path', async ({ relaunch }) => {
   const { window: page } = await relaunch({
     control: [
