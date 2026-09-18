@@ -99,61 +99,18 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	deadline := time.Now().Add(budget)
 
 	for {
-		chunk, readErr := readScanChunk(ctx, proc)
-		if len(chunk) > 0 {
-			recs, splitErr := splitter.Push(chunk)
-			if splitErr != nil {
-				_ = proc.Close()
-				return Result{}, splitErr
-			}
-			for _, rec := range recs {
-				result.Scanned++
-				cr, perr := porcelain.ParseScanRecord(rec)
-				if perr != nil {
-					_ = proc.Close()
-					return Result{}, perr
-				}
-				fields := opts.Matcher.MatchFields(CommitFields{
-					SHA: cr.SHA, Subject: cr.Subject, Body: cr.Body,
-					AuthorName: cr.Author.Name, AuthorEmail: cr.Author.Email,
-					CommitterName: cr.Committer.Name, CommitterEmail: cr.Committer.Email,
-				})
-				if len(fields) > 0 {
-					result.Total++
-					if len(result.Hits) < limit {
-						result.Hits = append(result.Hits, Hit{
-							SHA: cr.SHA, Subject: cr.Subject,
-							AuthorName: cr.Author.Name, AuthorEmail: cr.Author.Email,
-							AuthorTime: cr.Author.Timestamp, Fields: fields,
-						})
-					}
-				}
-				// Every 1024 records — a power-of-two boundary so the check itself is not the
-				// cost — test the deadline. The scan still stops running rather than continuing
-				// to git's own end: unlike the exact-Total-past-Limit rule, a time-boxed scan
-				// genuinely has not seen the rest of the walk.
-				if result.Scanned%1024 == 0 && time.Now().After(deadline) {
-					result.Complete = false
-					result.Truncated = result.Total > len(result.Hits)
-					_ = proc.Close()
-					return result, nil
-				}
-			}
+		cont, roundErr := scanRound(ctx, proc, splitter, opts, limit, deadline, &result)
+		if roundErr != nil {
+			return Result{}, roundErr
 		}
-		if readErr != nil {
-			if errors.Is(readErr, io.EOF) {
-				break
-			}
-			if ctx.Err() != nil {
-				// A caller cancellation (supersede, or the connection tearing down) — classified
-				// the same way every other read in this app is (gitclient.Classify), so a
-				// generic error-mapping layer sees the same Cancelled kind regardless of which
-				// package produced it. readScanChunk has already killed the child.
-				return Result{}, gitclient.Classify(ctx, opts.Args, gitclient.Result{}, readErr)
-			}
-			_ = proc.Close()
-			return Result{}, readErr
+		if !cont {
+			break
 		}
+	}
+	if !result.Complete {
+		// scanRound already closed proc and set Truncated before reporting "stop" this way —
+		// the only path that leaves Complete false.
+		return result, nil
 	}
 
 	if flushed := splitter.Flush(); len(flushed) > 0 {
@@ -166,6 +123,71 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	}
 	result.Truncated = result.Total > len(result.Hits)
 	return result, nil
+}
+
+// scanRound is Scan's own loop body — one read of proc's stdout, split into records, each matched
+// and folded into result. Returns whether Scan's loop should read another chunk: false on a clean
+// EOF, a read/split/parse error (returned alongside), or the scan running past deadline (checked
+// every 1024 scanned records, same as the unextracted loop) — that last case leaves result.Complete
+// false, which the caller uses to skip the post-loop flush/Wait and return result immediately, byte
+// for byte as the original inline loop did.
+func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, opts Options, limit int, deadline time.Time, result *Result) (bool, error) {
+	chunk, readErr := readScanChunk(ctx, proc)
+	if len(chunk) > 0 {
+		recs, splitErr := splitter.Push(chunk)
+		if splitErr != nil {
+			_ = proc.Close()
+			return false, splitErr
+		}
+		for _, rec := range recs {
+			result.Scanned++
+			cr, perr := porcelain.ParseScanRecord(rec)
+			if perr != nil {
+				_ = proc.Close()
+				return false, perr
+			}
+			fields := opts.Matcher.MatchFields(CommitFields{
+				SHA: cr.SHA, Subject: cr.Subject, Body: cr.Body,
+				AuthorName: cr.Author.Name, AuthorEmail: cr.Author.Email,
+				CommitterName: cr.Committer.Name, CommitterEmail: cr.Committer.Email,
+			})
+			if len(fields) > 0 {
+				result.Total++
+				if len(result.Hits) < limit {
+					result.Hits = append(result.Hits, Hit{
+						SHA: cr.SHA, Subject: cr.Subject,
+						AuthorName: cr.Author.Name, AuthorEmail: cr.Author.Email,
+						AuthorTime: cr.Author.Timestamp, Fields: fields,
+					})
+				}
+			}
+			// Every 1024 records — a power-of-two boundary so the check itself is not the
+			// cost — test the deadline. The scan still stops running rather than continuing
+			// to git's own end: unlike the exact-Total-past-Limit rule, a time-boxed scan
+			// genuinely has not seen the rest of the walk.
+			if result.Scanned%1024 == 0 && time.Now().After(deadline) {
+				result.Complete = false
+				result.Truncated = result.Total > len(result.Hits)
+				_ = proc.Close()
+				return false, nil
+			}
+		}
+	}
+	if readErr != nil {
+		if errors.Is(readErr, io.EOF) {
+			return false, nil
+		}
+		if ctx.Err() != nil {
+			// A caller cancellation (supersede, or the connection tearing down) — classified
+			// the same way every other read in this app is (gitclient.Classify), so a
+			// generic error-mapping layer sees the same Cancelled kind regardless of which
+			// package produced it. readScanChunk has already killed the child.
+			return false, gitclient.Classify(ctx, opts.Args, gitclient.Result{}, readErr)
+		}
+		_ = proc.Close()
+		return false, readErr
+	}
+	return true, nil
 }
 
 // readScanChunk reads one raw chunk off proc's stdout, cancellable by ctx — mirrors

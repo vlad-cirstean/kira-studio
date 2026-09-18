@@ -28,117 +28,147 @@ func translate(pattern string) (string, error) {
 	n := len(pattern)
 	for i < n {
 		c := pattern[i]
+		var err error
 		switch {
 		case c == '\\':
-			if i+1 >= n {
-				// A trailing lone backslash is not valid regex syntax in either dialect — pass it
-				// through and let regexp.Compile reject it as ErrInvalidPattern.
-				out.WriteByte(c)
-				i++
-				continue
-			}
-			next := pattern[i+1]
-			switch {
-			case !inClass && next >= '1' && next <= '9':
-				return "", ErrUnsupportedPattern // \1-\9: a numbered backreference.
-			case !inClass && next == 'k' && i+2 < n && pattern[i+2] == '<':
-				return "", ErrUnsupportedPattern // \k<name>: a named backreference.
-			case next == 's':
-				if inClass {
-					out.WriteString(jsWhitespaceClassMembers)
-				} else {
-					out.WriteString("[" + jsWhitespaceClassMembers + "]")
-				}
-				i += 2
-			case next == 'S':
-				if inClass {
-					// Documented gap (§10.3/doc.go): negating a sub-portion of an already-open
-					// class is not expressible by insertion the way \s's own member list is, so
-					// this falls back to RE2's native (ASCII-only) \S rather than a true negation
-					// of jsWhitespaceClassMembers. `[\S]` in a user's own pattern is rare; the
-					// out-of-class form immediately below stays exact.
-					out.WriteString(`\S`)
-				} else {
-					out.WriteString("[^" + jsWhitespaceClassMembers + "]")
-				}
-				i += 2
-			case next == 'p':
-				out.WriteByte('p') // identity escape without the `u` flag (D4 table), not a class.
-				i += 2
-			case next == 'P':
-				out.WriteByte('P')
-				i += 2
-			case next == 'u':
-				if seq, consumed, ok := translateUnicodeEscape(pattern[i:]); ok {
-					out.WriteString(seq)
-					i += consumed
-				} else {
-					out.WriteByte('u') // malformed \u -> identity escape, JS's own Annex B rule.
-					i += 2
-				}
-			case next == 'c':
-				if seq, consumed, ok := translateControlEscape(pattern[i:]); ok {
-					out.WriteString(seq)
-					i += consumed
-				} else {
-					out.WriteByte('c')
-					i += 2
-				}
-			case next == '0':
-				// \0 not followed by a digit -> \x{00} (D4 table). A \0 that IS followed by a
-				// digit is JS's own legacy octal-escape corner (Annex B, essentially never typed
-				// into a search box) — folded into the same NUL rewrite here, documented as a
-				// deliberate simplification rather than a full octal-escape port.
-				out.WriteString(`\x{00}`)
-				i += 2
-			case strings.IndexByte(passthroughEscapeChars, next) >= 0:
-				out.WriteByte('\\')
-				out.WriteByte(next)
-				i += 2
-			default:
-				// Unknown identity escape -> literal (D4 table's last row) — also the fallback
-				// for a bare \k not followed by '<', which is just the letter k after all.
-				r, size := utf8.DecodeRuneInString(pattern[i+1:])
-				out.WriteRune(r)
-				i += 1 + size
-			}
+			i, err = translateEscape(&out, pattern, i, inClass)
 		case !inClass && c == '.':
-			out.WriteString(`[^\n\r\x{2028}\x{2029}]`)
-			i++
+			i = translateDot(&out, i)
 		case !inClass && c == '(':
-			if isLookaroundAt(pattern, i) {
-				return "", ErrUnsupportedPattern
-			}
-			out.WriteByte(c)
-			i++
+			i, err = translateOpenParen(&out, pattern, i)
 		case c == '[':
-			out.WriteByte(c)
-			i++
-			if !inClass {
-				inClass = true
-				// A leading '^' (negation) and/or an immediately-following ']' are both literal-
-				// position conventions every regex dialect shares — copy them through without
-				// re-triggering class-entry logic.
-				if i < n && pattern[i] == '^' {
-					out.WriteByte('^')
-					i++
-				}
-				if i < n && pattern[i] == ']' {
-					out.WriteByte(']')
-					i++
-				}
-			}
+			i, inClass = translateOpenClass(&out, pattern, i, inClass)
 		case c == ']':
-			inClass = false
-			out.WriteByte(c)
-			i++
+			i, inClass = translateCloseClass(&out, i)
 		default:
-			r, size := utf8.DecodeRuneInString(pattern[i:])
-			out.WriteRune(r)
-			i += size
+			i = translateLiteralRune(&out, pattern, i)
+		}
+		if err != nil {
+			return "", err
 		}
 	}
 	return out.String(), nil
+}
+
+// translateEscape is translate's own backslash arm — one JS escape mapped to its RE2 form (D4's
+// table) per case, or rejected outright for the two constructs RE2 cannot express (\1-\9,
+// \k<name>).
+func translateEscape(out *strings.Builder, pattern string, i int, inClass bool) (int, error) {
+	n := len(pattern)
+	if i+1 >= n {
+		// A trailing lone backslash is not valid regex syntax in either dialect — pass it
+		// through and let regexp.Compile reject it as ErrInvalidPattern.
+		out.WriteByte(pattern[i])
+		return i + 1, nil
+	}
+	next := pattern[i+1]
+	switch {
+	case !inClass && next >= '1' && next <= '9':
+		return 0, ErrUnsupportedPattern // \1-\9: a numbered backreference.
+	case !inClass && next == 'k' && i+2 < n && pattern[i+2] == '<':
+		return 0, ErrUnsupportedPattern // \k<name>: a named backreference.
+	case next == 's':
+		if inClass {
+			out.WriteString(jsWhitespaceClassMembers)
+		} else {
+			out.WriteString("[" + jsWhitespaceClassMembers + "]")
+		}
+		return i + 2, nil
+	case next == 'S':
+		if inClass {
+			// Documented gap (§10.3/doc.go): negating a sub-portion of an already-open
+			// class is not expressible by insertion the way \s's own member list is, so
+			// this falls back to RE2's native (ASCII-only) \S rather than a true negation
+			// of jsWhitespaceClassMembers. `[\S]` in a user's own pattern is rare; the
+			// out-of-class form immediately below stays exact.
+			out.WriteString(`\S`)
+		} else {
+			out.WriteString("[^" + jsWhitespaceClassMembers + "]")
+		}
+		return i + 2, nil
+	case next == 'p':
+		out.WriteByte('p') // identity escape without the `u` flag (D4 table), not a class.
+		return i + 2, nil
+	case next == 'P':
+		out.WriteByte('P')
+		return i + 2, nil
+	case next == 'u':
+		if seq, consumed, ok := translateUnicodeEscape(pattern[i:]); ok {
+			out.WriteString(seq)
+			return i + consumed, nil
+		}
+		out.WriteByte('u') // malformed \u -> identity escape, JS's own Annex B rule.
+		return i + 2, nil
+	case next == 'c':
+		if seq, consumed, ok := translateControlEscape(pattern[i:]); ok {
+			out.WriteString(seq)
+			return i + consumed, nil
+		}
+		out.WriteByte('c')
+		return i + 2, nil
+	case next == '0':
+		// \0 not followed by a digit -> \x{00} (D4 table). A \0 that IS followed by a
+		// digit is JS's own legacy octal-escape corner (Annex B, essentially never typed
+		// into a search box) — folded into the same NUL rewrite here, documented as a
+		// deliberate simplification rather than a full octal-escape port.
+		out.WriteString(`\x{00}`)
+		return i + 2, nil
+	case strings.IndexByte(passthroughEscapeChars, next) >= 0:
+		out.WriteByte('\\')
+		out.WriteByte(next)
+		return i + 2, nil
+	default:
+		// Unknown identity escape -> literal (D4 table's last row) — also the fallback
+		// for a bare \k not followed by '<', which is just the letter k after all.
+		r, size := utf8.DecodeRuneInString(pattern[i+1:])
+		out.WriteRune(r)
+		return i + 1 + size, nil
+	}
+}
+
+func translateDot(out *strings.Builder, i int) int {
+	out.WriteString(`[^\n\r\x{2028}\x{2029}]`)
+	return i + 1
+}
+
+func translateOpenParen(out *strings.Builder, pattern string, i int) (int, error) {
+	if isLookaroundAt(pattern, i) {
+		return 0, ErrUnsupportedPattern
+	}
+	out.WriteByte(pattern[i])
+	return i + 1, nil
+}
+
+// translateOpenClass writes '[' through and, on entry into a not-already-open class, also copies
+// through a leading '^' (negation) and/or an immediately-following ']' — both literal-position
+// conventions every regex dialect shares — without re-triggering class-entry logic for them.
+func translateOpenClass(out *strings.Builder, pattern string, i int, inClass bool) (int, bool) {
+	n := len(pattern)
+	out.WriteByte(pattern[i])
+	i++
+	if !inClass {
+		inClass = true
+		if i < n && pattern[i] == '^' {
+			out.WriteByte('^')
+			i++
+		}
+		if i < n && pattern[i] == ']' {
+			out.WriteByte(']')
+			i++
+		}
+	}
+	return i, inClass
+}
+
+func translateCloseClass(out *strings.Builder, i int) (int, bool) {
+	out.WriteByte(']')
+	return i + 1, false
+}
+
+func translateLiteralRune(out *strings.Builder, pattern string, i int) int {
+	r, size := utf8.DecodeRuneInString(pattern[i:])
+	out.WriteRune(r)
+	return i + size
 }
 
 // isLookaroundAt reports whether pattern[i:] begins one of the four lookaround forms — checked
