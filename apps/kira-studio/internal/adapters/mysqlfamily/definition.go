@@ -13,14 +13,19 @@ var constraintTypeName = map[string]string{
 	"PRIMARY KEY": "primaryKey", "UNIQUE": "unique", "FOREIGN KEY": "foreignKey", "CHECK": "check",
 }
 
-// listConstraints is definition.ts's listConstraints. MariaDB/MySQL have no
-// pg_get_constraintdef-style builtin (P19 D11) — the key-column list and the FK's referenced
-// table/columns are composed from information_schema itself.
-func listConstraints(ctx context.Context, exec queryExec, database, table string) ([]model.ConstraintMeta, error) {
-	type constraintRow struct {
-		name, ctype string
-		checkClause *string
-	}
+type constraintRow struct {
+	name, ctype string
+	checkClause *string
+}
+
+type keyColumnRow struct {
+	name, col        string
+	refTable, refCol *string
+}
+
+// fetchConstraintRows is listConstraints's first query: the table's own constraints and, for a
+// CHECK constraint, its clause text.
+func fetchConstraintRows(ctx context.Context, exec queryExec, database, table string) ([]constraintRow, error) {
 	var constraints []constraintRow
 	err := exec(ctx, `SELECT tc.CONSTRAINT_NAME AS name, tc.CONSTRAINT_TYPE AS type, cc.CHECK_CLAUSE AS check_clause
 	 FROM information_schema.TABLE_CONSTRAINTS tc
@@ -36,19 +41,14 @@ func listConstraints(ctx context.Context, exec queryExec, database, table string
 		constraints = append(constraints, r)
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	if len(constraints) == 0 {
-		return nil, nil
-	}
+	return constraints, err
+}
 
-	type keyColumnRow struct {
-		name, col        string
-		refTable, refCol *string
-	}
+// fetchKeyColumnRows is listConstraints's second query: each key-bearing constraint's columns
+// (and, for a foreign key, the referenced table/columns).
+func fetchKeyColumnRows(ctx context.Context, exec queryExec, database, table string) ([]keyColumnRow, error) {
 	var keyColumns []keyColumnRow
-	err = exec(ctx, `SELECT CONSTRAINT_NAME AS name, COLUMN_NAME AS col,
+	err := exec(ctx, `SELECT CONSTRAINT_NAME AS name, COLUMN_NAME AS col,
 	        REFERENCED_TABLE_NAME AS ref_table, REFERENCED_COLUMN_NAME AS ref_col
 	 FROM information_schema.KEY_COLUMN_USAGE
 	 WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
@@ -60,6 +60,61 @@ func listConstraints(ctx context.Context, exec queryExec, database, table string
 		keyColumns = append(keyColumns, r)
 		return nil
 	})
+	return keyColumns, err
+}
+
+// constraintMetaFor composes one constraint's ConstraintMeta from its row and its (possibly
+// empty) key columns — a CHECK constraint's clause text, else a column list, plus a foreign key's
+// REFERENCES clause.
+func constraintMetaFor(c constraintRow, cols []keyColumnRow) model.ConstraintMeta {
+	typ, ok := constraintTypeName[c.ctype]
+	if !ok {
+		typ = "check"
+	}
+	if typ == "check" {
+		def := ""
+		if c.checkClause != nil {
+			def = *c.checkClause
+		}
+		return model.ConstraintMeta{Name: c.name, Type: typ, Definition: def}
+	}
+	colNames := make([]string, len(cols))
+	for j, r := range cols {
+		colNames[j] = r.col
+	}
+	columnList := "(" + joinComma(colNames) + ")"
+	if typ != "foreignKey" {
+		return model.ConstraintMeta{Name: c.name, Type: typ, Definition: columnList}
+	}
+	refTable := ""
+	if len(cols) > 0 && cols[0].refTable != nil {
+		refTable = *cols[0].refTable
+	}
+	refCols := make([]string, len(cols))
+	for j, r := range cols {
+		if r.refCol != nil {
+			refCols[j] = *r.refCol
+		}
+	}
+	return model.ConstraintMeta{
+		Name: c.name, Type: typ,
+		Definition: columnList + " REFERENCES " + refTable + " (" + joinComma(refCols) + ")",
+	}
+}
+
+// listConstraints is definition.ts's listConstraints. MariaDB/MySQL have no
+// pg_get_constraintdef-style builtin (P19 D11) — the key-column list and the FK's referenced
+// table/columns are composed from information_schema itself.
+func listConstraints(ctx context.Context, exec queryExec, database, table string) ([]model.ConstraintMeta, error) {
+	constraints, err := fetchConstraintRows(ctx, exec, database, table)
+	if err != nil {
+		return nil, err
+	}
+	if len(constraints) == 0 {
+		return nil, nil
+	}
+
+	keyColumns, err := fetchKeyColumnRows(ctx, exec, database, table)
 	if err != nil {
 		return nil, err
 	}
@@ -70,42 +125,7 @@ func listConstraints(ctx context.Context, exec queryExec, database, table string
 
 	metas := make([]model.ConstraintMeta, len(constraints))
 	for i, c := range constraints {
-		typ, ok := constraintTypeName[c.ctype]
-		if !ok {
-			typ = "check"
-		}
-		if typ == "check" {
-			def := ""
-			if c.checkClause != nil {
-				def = *c.checkClause
-			}
-			metas[i] = model.ConstraintMeta{Name: c.name, Type: typ, Definition: def}
-			continue
-		}
-		cols := columnsByConstraint[c.name]
-		colNames := make([]string, len(cols))
-		for j, r := range cols {
-			colNames[j] = r.col
-		}
-		columnList := "(" + joinComma(colNames) + ")"
-		if typ == "foreignKey" {
-			refTable := ""
-			if len(cols) > 0 && cols[0].refTable != nil {
-				refTable = *cols[0].refTable
-			}
-			refCols := make([]string, len(cols))
-			for j, r := range cols {
-				if r.refCol != nil {
-					refCols[j] = *r.refCol
-				}
-			}
-			metas[i] = model.ConstraintMeta{
-				Name: c.name, Type: typ,
-				Definition: columnList + " REFERENCES " + refTable + " (" + joinComma(refCols) + ")",
-			}
-			continue
-		}
-		metas[i] = model.ConstraintMeta{Name: c.name, Type: typ, Definition: columnList}
+		metas[i] = constraintMetaFor(c, columnsByConstraint[c.name])
 	}
 	return metas, nil
 }

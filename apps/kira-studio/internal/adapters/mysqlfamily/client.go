@@ -24,10 +24,9 @@ const (
 	primaryKey = "\x00primary"
 )
 
-// BuildConfig is client.ts's buildConnectionOptions. database overrides cfg's own database when
-// non-empty (a side database Get() call).
-func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Profile, log LogFunc) (*mysql.Config, error) {
-	mc := mysql.NewConfig()
+// applyFixedDefaults sets BuildConfig's fixed field block — every option that never varies by
+// connection config.
+func applyFixedDefaults(mc *mysql.Config) {
 	mc.Net = "tcp"
 	// B2: the text protocol, matching pgx.QueryExecModeSimpleProtocol's own reasoning — the driver
 	// hands back the server's own bytes, not a re-typed Go value.
@@ -46,113 +45,152 @@ func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Pr
 	// B23: the Go analogue of connectAttributes: { program_name: 'kira-studio' }.
 	mc.ConnectionAttributes = "program_name:kira-studio"
 	mc.Timeout = connectTimeout
+}
 
-	// options is what the sslmode switch below reads from. In fields mode it's exactly cfg.Options
-	// (populated by the renderer). In URI mode we start from cfg.Options too (for parity, though the
-	// renderer only populates it on a fields<->URI flip) and layer in the URI's own query string —
-	// but only the keys this adapter actually understands, translated into real config, never handed
-	// to the driver as literal session-variable text (see below).
+// applyURIOptions fills mc's address/credentials from the connection URI and layers its own known
+// query keys into options — never handed to the driver as literal session-variable text (see
+// below).
+func applyURIOptions(mc *mysql.Config, options map[string]any, uri string, log LogFunc) error {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
+	}
+	mc.Addr = parsed.Host
+	if mc.Addr == "" {
+		mc.Addr = "127.0.0.1:3306"
+	} else if parsed.Port() == "" {
+		mc.Addr += ":3306"
+	}
+	if u := parsed.User; u != nil {
+		mc.User = u.Username()
+		if pw, ok := u.Password(); ok {
+			mc.Passwd = pw
+		}
+	}
+	mc.DBName = strings.TrimPrefix(parsed.Path, "/")
+	// The driver's own Params field is not a bag of DSN options: go-sql-driver concatenates every
+	// entry into a literal `SET <k> = <v>, ...` and executes it verbatim at connect time
+	// (handleParams). Splicing an arbitrary URI query string into that would both break the only
+	// documented TLS path for these two engines (?sslmode=... would try `SET sslmode = ...` and
+	// fail with "Unknown system variable") and run unescaped user text as SQL. So only translate
+	// known keys into real config; everything else is dropped with a warn log rather than
+	// forwarded to the driver.
+	for key, values := range parsed.Query() {
+		if len(values) == 0 {
+			continue
+		}
+		switch key {
+		case "sslmode":
+			options["sslmode"] = values[0]
+		default:
+			if log != nil {
+				log("warn", "mysql-family: ignoring unrecognized connection URI option \""+key+"\"")
+			}
+		}
+	}
+	return nil
+}
+
+// applyFieldsOptions fills mc's address/credentials from cfg's discrete fields form.
+func applyFieldsOptions(mc *mysql.Config, cfg model.ResolvedConnectionConfig) {
+	host := ""
+	if cfg.Host != nil {
+		host = *cfg.Host
+	}
+	port := 3306
+	if cfg.Port != nil {
+		port = *cfg.Port
+	}
+	mc.Addr = host + ":" + strconv.Itoa(port)
+	if cfg.Username != nil {
+		mc.User = *cfg.Username
+	}
+	if cfg.Password != nil {
+		mc.Passwd = *cfg.Password
+	}
+	if cfg.Database != nil {
+		mc.DBName = *cfg.Database
+	}
+}
+
+// resolveOptions fills mc's address/credentials from either the URI or the fields form and
+// returns the options map the sslmode switch below reads from — cfg.Options plus, in URI mode,
+// whatever known keys the URI's own query string names.
+func resolveOptions(mc *mysql.Config, cfg model.ResolvedConnectionConfig, database string, log LogFunc) (map[string]any, error) {
+	// options is what applyTLS reads from. In fields mode it's exactly cfg.Options (populated by
+	// the renderer). In URI mode we start from cfg.Options too (for parity, though the renderer
+	// only populates it on a fields<->URI flip) and layer in the URI's own query string.
 	options := map[string]any{}
 	for k, v := range cfg.Options {
 		options[k] = v
 	}
 
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
-		parsed, err := url.Parse(*cfg.URI)
-		if err != nil {
-			return nil, adapters.New(adapters.CodeConnect, "could not parse the connection URI", err)
-		}
-		mc.Addr = parsed.Host
-		if mc.Addr == "" {
-			mc.Addr = "127.0.0.1:3306"
-		} else if parsed.Port() == "" {
-			mc.Addr += ":3306"
-		}
-		if u := parsed.User; u != nil {
-			mc.User = u.Username()
-			if pw, ok := u.Password(); ok {
-				mc.Passwd = pw
-			}
-		}
-		mc.DBName = strings.TrimPrefix(parsed.Path, "/")
-		// The driver's own Params field is not a bag of DSN options: go-sql-driver concatenates
-		// every entry into a literal `SET <k> = <v>, ...` and executes it verbatim at connect time
-		// (handleParams). Splicing an arbitrary URI query string into that would both break the
-		// only documented TLS path for these two engines (?sslmode=... would try `SET sslmode =
-		// ...` and fail with "Unknown system variable") and run unescaped user text as SQL. So only
-		// translate known keys into real config; everything else is dropped with a warn log rather
-		// than forwarded to the driver.
-		for key, values := range parsed.Query() {
-			if len(values) == 0 {
-				continue
-			}
-			switch key {
-			case "sslmode":
-				options["sslmode"] = values[0]
-			default:
-				if log != nil {
-					log("warn", "mysql-family: ignoring unrecognized connection URI option \""+key+"\"")
-				}
-			}
+		if err := applyURIOptions(mc, options, *cfg.URI, log); err != nil {
+			return nil, err
 		}
 	} else {
-		host := ""
-		if cfg.Host != nil {
-			host = *cfg.Host
-		}
-		port := 3306
-		if cfg.Port != nil {
-			port = *cfg.Port
-		}
-		mc.Addr = host + ":" + strconv.Itoa(port)
-		if cfg.Username != nil {
-			mc.User = *cfg.Username
-		}
-		if cfg.Password != nil {
-			mc.Passwd = *cfg.Password
-		}
-		if cfg.Database != nil {
-			mc.DBName = *cfg.Database
-		}
+		applyFieldsOptions(mc, cfg)
 	}
 	if database != "" {
 		mc.DBName = database
 	}
+	return options, nil
+}
 
-	if sslmode, ok := options["sslmode"].(string); ok && sslmode != "" && sslmode != "disable" {
-		switch sslmode {
-		case "require", "prefer":
-			// P21 round 2 architecture/security finding 8: this used to register under
-			// "kira-"+cfg.ID — a fresh entry in go-sql-driver's process-global TLS config
-			// registry (mysql.RegisterTLSConfig) for every connection id, never deregistered on
-			// disconnect or delete, so entries accumulated for the process's whole lifetime keyed
-			// by ids that might no longer exist. The tls.Config for "require"/"prefer" is
-			// identical for every connection that uses it (InsecureSkipVerify, nothing
-			// host-specific), so registering it once under one fixed, shared name makes every
-			// such BuildConfig call idempotent instead of leaking a new entry per connection.
-			const tlsName = "kira-mysql-insecure-skip-verify"
-			if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{InsecureSkipVerify: true}); err != nil { //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
-				return nil, err
-			}
-			mc.TLSConfig = tlsName
-		case "verify-full":
-			// Same reasoning, keyed on the effective ServerName instead of the connection id:
-			// every connection to the same host reuses one registration, so the registry's size
-			// is bounded by the number of distinct hosts this process has ever connected to
-			// (typically small and stable), not by how many connection records the user has
-			// created and deleted over the app's lifetime.
-			serverName := parseHost(mc.Addr)
-			tlsName := "kira-mysql-verify-full:" + serverName
-			if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{ServerName: serverName}); err != nil {
-				return nil, err
-			}
-			mc.TLSConfig = tlsName
-		default:
-			// An unrecognized sslmode must fail loudly rather than silently fall back to a
-			// plaintext connection — a typo here would otherwise send credentials and data
-			// unencrypted while the user believes TLS is configured.
-			return nil, adapters.New(adapters.CodeConnect, "mysql-family: unknown sslmode \""+sslmode+"\"", nil)
+// applyTLS sets mc.TLSConfig from options' sslmode, registering a shared, idempotent TLS config
+// under a fixed name per mode (P21 round 2 architecture/security finding 8: never a fresh registry
+// entry per connection id, which would never be deregistered).
+func applyTLS(mc *mysql.Config, options map[string]any) error {
+	sslmode, ok := options["sslmode"].(string)
+	if !ok || sslmode == "" || sslmode == "disable" {
+		return nil
+	}
+	switch sslmode {
+	case "require", "prefer":
+		// The tls.Config for "require"/"prefer" is identical for every connection that uses it
+		// (InsecureSkipVerify, nothing host-specific), so registering it once under one fixed,
+		// shared name makes every such BuildConfig call idempotent instead of leaking a new entry
+		// per connection.
+		const tlsName = "kira-mysql-insecure-skip-verify"
+		if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{InsecureSkipVerify: true}); err != nil { //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
+			return err
 		}
+		mc.TLSConfig = tlsName
+	case "verify-full":
+		// Same reasoning, keyed on the effective ServerName instead of the connection id: every
+		// connection to the same host reuses one registration, so the registry's size is bounded
+		// by the number of distinct hosts this process has ever connected to (typically small and
+		// stable), not by how many connection records the user has created and deleted over the
+		// app's lifetime.
+		serverName := parseHost(mc.Addr)
+		tlsName := "kira-mysql-verify-full:" + serverName
+		if err := mysql.RegisterTLSConfig(tlsName, &tls.Config{ServerName: serverName}); err != nil {
+			return err
+		}
+		mc.TLSConfig = tlsName
+	default:
+		// An unrecognized sslmode must fail loudly rather than silently fall back to a plaintext
+		// connection — a typo here would otherwise send credentials and data unencrypted while the
+		// user believes TLS is configured.
+		return adapters.New(adapters.CodeConnect, "mysql-family: unknown sslmode \""+sslmode+"\"", nil)
+	}
+	return nil
+}
+
+// BuildConfig is client.ts's buildConnectionOptions. database overrides cfg's own database when
+// non-empty (a side database Get() call).
+func BuildConfig(cfg model.ResolvedConnectionConfig, database string, profile Profile, log LogFunc) (*mysql.Config, error) {
+	mc := mysql.NewConfig()
+	applyFixedDefaults(mc)
+
+	options, err := resolveOptions(mc, cfg, database, log)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := applyTLS(mc, options); err != nil {
+		return nil, err
 	}
 
 	profile.ApplyEngineOptions(mc, cfg, log)
