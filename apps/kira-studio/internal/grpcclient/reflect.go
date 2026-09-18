@@ -200,45 +200,11 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 		return nil, Transport(err.Error())
 	}
 
-	reg := new(protoregistry.Files)
-	known := map[string]*descriptorpb.FileDescriptorProto{}
-	linked := map[string]bool{}
-
-	var link func(path string) error
-	link = func(path string) error {
-		if linked[path] {
-			return nil
-		}
-		raw, ok := known[path]
-		if !ok {
-			protos, err := transport.fetch(byFilename, path)
-			if err != nil {
-				return err
-			}
-			if err := absorb(known, protos); err != nil {
-				return err
-			}
-			raw, ok = known[path]
-			if !ok {
-				return fmt.Errorf("grpcclient: reflection: server did not return %s", path)
-			}
-		}
-		for _, dep := range raw.GetDependency() {
-			if err := link(dep); err != nil {
-				return err
-			}
-		}
-		fd, err := protodesc.NewFile(raw, reg)
-		if err != nil {
-			return fmt.Errorf("linking %s: %w", path, err)
-		}
-		if err := reg.RegisterFile(fd); err != nil {
-			// F14: this is a private registry (never GlobalFiles), so a duplicate returns an
-			// error rather than panicking.
-			return fmt.Errorf("registering %s: %w", path, err)
-		}
-		linked[path] = true
-		return nil
+	l := &linker{
+		transport: transport,
+		reg:       new(protoregistry.Files),
+		known:     map[string]*descriptorpb.FileDescriptorProto{},
+		linked:    map[string]bool{},
 	}
 
 	for _, svc := range services {
@@ -246,17 +212,63 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 		if err != nil {
 			return nil, Transport(err.Error())
 		}
-		if err := absorb(known, protos); err != nil {
+		if err := absorb(l.known, protos); err != nil {
 			return nil, SchemaError(err.Error())
 		}
 	}
-	for path := range known {
-		if err := link(path); err != nil {
+	for path := range l.known {
+		if err := l.link(path); err != nil {
 			return nil, SchemaError(err.Error())
 		}
 	}
 
-	return &resolved{files: reg, mode: mode}, nil
+	return &resolved{files: l.reg, mode: mode}, nil
+}
+
+// linker resolves one file's own dependency closure into reg — resolveReflection's own recursive
+// link step, a method rather than an inline closure so the recursion has a receiver to call
+// through.
+type linker struct {
+	transport reflectionTransport
+	reg       *protoregistry.Files
+	known     map[string]*descriptorpb.FileDescriptorProto
+	linked    map[string]bool
+}
+
+func (l *linker) link(path string) error {
+	if l.linked[path] {
+		return nil
+	}
+	raw, ok := l.known[path]
+	if !ok {
+		protos, err := l.transport.fetch(byFilename, path)
+		if err != nil {
+			return err
+		}
+		if err := absorb(l.known, protos); err != nil {
+			return err
+		}
+		raw, ok = l.known[path]
+		if !ok {
+			return fmt.Errorf("grpcclient: reflection: server did not return %s", path)
+		}
+	}
+	for _, dep := range raw.GetDependency() {
+		if err := l.link(dep); err != nil {
+			return err
+		}
+	}
+	fd, err := protodesc.NewFile(raw, l.reg)
+	if err != nil {
+		return fmt.Errorf("linking %s: %w", path, err)
+	}
+	if err := l.reg.RegisterFile(fd); err != nil {
+		// F14: this is a private registry (never GlobalFiles), so a duplicate returns an
+		// error rather than panicking.
+		return fmt.Errorf("registering %s: %w", path, err)
+	}
+	l.linked[path] = true
+	return nil
 }
 
 // negotiateAndListServices tries v1 first — opening the stream and sending ListServices — and

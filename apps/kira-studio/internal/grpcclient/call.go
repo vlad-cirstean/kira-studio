@@ -169,46 +169,69 @@ func ServerStream(ctx context.Context, req CallRequest, onMessage func(Message))
 		return CallResult{}, BadRequest(req.FullMethod + " is not a server-streaming method")
 	}
 
-	conn, err := dialConn(req.Target, req.TLS)
+	conn, stream, callCtx, err := openStream(ctx, req, method)
+	if conn != nil {
+		defer conn.Close()
+	}
 	if err != nil {
 		return CallResult{}, err
 	}
-	defer conn.Close()
 
-	callCtx, err := withMetadata(ctx, req.Metadata)
+	return recvLoop(callCtx, stream, method, onMessage)
+}
+
+// openStream is ServerStream's own connect/send phase: dial, attach metadata, unmarshal the
+// request, open the stream, send the one request message, and half-close. conn is returned
+// whenever dial itself succeeded, even on a later error — the caller defers its Close once non-nil
+// regardless, the same single defer conn.Close() this replaces used to cover every later failure.
+func openStream(ctx context.Context, req CallRequest, method protoreflect.MethodDescriptor) (conn *grpc.ClientConn, stream grpc.ClientStream, callCtx context.Context, err error) {
+	conn, err = dialConn(req.Target, req.TLS)
 	if err != nil {
-		return CallResult{}, err
+		return nil, nil, nil, err
+	}
+
+	callCtx, err = withMetadata(ctx, req.Metadata)
+	if err != nil {
+		return conn, nil, nil, err
 	}
 
 	in := dynamicpb.NewMessage(method.Input())
-	if err := unmarshalRequestJSON(req.MessageJSON, in); err != nil {
-		return CallResult{}, err
+	if err = unmarshalRequestJSON(req.MessageJSON, in); err != nil {
+		return conn, nil, nil, err
 	}
 
 	desc := &grpc.StreamDesc{StreamName: string(method.Name()), ServerStreams: true}
-	stream, err := conn.NewStream(callCtx, desc, grpcPath(method), grpc.MaxCallRecvMsgSize(maxRecvMsgSize))
+	stream, err = conn.NewStream(callCtx, desc, grpcPath(method), grpc.MaxCallRecvMsgSize(maxRecvMsgSize))
 	if err != nil {
 		_, _, asError := terminalOutcome(callCtx, err)
 		if asError != nil {
-			return CallResult{}, asError
+			return conn, nil, callCtx, asError
 		}
-		return CallResult{}, Transport(err.Error())
+		return conn, nil, callCtx, Transport(err.Error())
 	}
-	if err := stream.SendMsg(in); err != nil {
+	if err = stream.SendMsg(in); err != nil {
 		_, _, asError := terminalOutcome(callCtx, err)
 		if asError != nil {
-			return CallResult{}, asError
+			return conn, nil, callCtx, asError
 		}
-		return CallResult{}, Transport(err.Error())
+		return conn, nil, callCtx, Transport(err.Error())
 	}
-	if err := stream.CloseSend(); err != nil {
+	if err = stream.CloseSend(); err != nil {
 		_, _, asError := terminalOutcome(callCtx, err)
 		if asError != nil {
-			return CallResult{}, asError
+			return conn, nil, callCtx, asError
 		}
-		return CallResult{}, Transport(err.Error())
+		return conn, nil, callCtx, Transport(err.Error())
 	}
+	return conn, stream, callCtx, nil
+}
 
+// recvLoop is ServerStream's own receive loop: read one message at a time, deliver it via
+// onMessage, and accumulate Messages/count/bytes for the terminal result — on every return path,
+// including an error, so a caller can still see what actually arrived (F8: the messages already
+// delivered to onMessage stay delivered, and either the returned *Error's Partial field or the
+// returned CallResult itself carries the true counts).
+func recvLoop(callCtx context.Context, stream grpc.ClientStream, method protoreflect.MethodDescriptor, onMessage func(Message)) (CallResult, error) {
 	start := time.Now()
 	var count, totalBytes int
 	var header metadata.MD
