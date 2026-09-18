@@ -247,49 +247,37 @@ func runesEqual(a, b []rune) bool {
 func StripSQLComments(s string) string {
 	r := []rune(s)
 	var out strings.Builder
-	depth := 0
-	execComment := false
+	st := commentScanState{}
 	for i := 0; i < len(r); {
 		switch {
-		case depth == 0 && (r[i] == '\'' || r[i] == '"' || r[i] == '`'):
-			end := scanQuote(r, i)
-			out.WriteString(string(r[i:end]))
-			i = end
-		case depth == 0 && r[i] == '$':
-			if end := scanDollarQuote(r, i); end >= 0 {
-				out.WriteString(string(r[i:end]))
-				i = end
-			} else {
-				out.WriteRune(r[i])
-				i++
-			}
-		case depth == 0 && r[i] == '-' && i+1 < len(r) && r[i+1] == '-':
-			for i < len(r) && r[i] != '\n' {
-				i++
-			}
-			out.WriteByte(' ')
-		case execComment && depth == 0 && r[i] == '*' && i+1 < len(r) && r[i+1] == '/':
-			execComment = false
-			i += 2
-			out.WriteByte(' ')
-		case r[i] == '/' && i+1 < len(r) && r[i+1] == '*':
-			if depth == 0 && !execComment {
-				if markerLen := execCommentMarkerLen(r, i); markerLen > 0 {
-					execComment = true
-					i += markerLen
-					out.WriteByte(' ')
-					break
-				}
-			}
-			depth++
-			i += 2
-		case depth > 0 && r[i] == '*' && i+1 < len(r) && r[i+1] == '/':
-			depth--
-			i += 2
-			if depth == 0 {
-				out.WriteByte(' ')
-			}
-		case depth > 0:
+		case st.depth == 0 && isQuoteStart(r[i]):
+			next, chunk := scanQuoteArm(r, i)
+			out.WriteString(chunk)
+			i = next
+		case st.depth == 0 && r[i] == '$':
+			next, chunk := scanDollarArm(r, i)
+			out.WriteString(chunk)
+			i = next
+		case st.depth == 0 && startsLineComment(r, i):
+			next, chunk := scanLineCommentArm(r, i)
+			out.WriteString(chunk)
+			i = next
+		case st.execComment && st.depth == 0 && startsBlockCommentClose(r, i):
+			next, chunk := scanExecCommentCloseArm(i)
+			out.WriteString(chunk)
+			i = next
+			st.execComment = false
+		case startsBlockCommentOpen(r, i):
+			next, chunk, next2 := scanBlockCommentOpenArm(r, i, st)
+			out.WriteString(chunk)
+			i = next
+			st = next2
+		case st.depth > 0 && startsBlockCommentClose(r, i):
+			next, chunk, newDepth := scanBlockCommentCloseArm(i, st.depth)
+			out.WriteString(chunk)
+			i = next
+			st.depth = newDepth
+		case st.depth > 0:
 			i++
 		default:
 			out.WriteRune(r[i])
@@ -297,6 +285,77 @@ func StripSQLComments(s string) string {
 		}
 	}
 	return out.String()
+}
+
+// commentScanState is StripSQLComments's threaded state: block-comment nesting depth and whether
+// the scanner is inside a MySQL/MariaDB executable comment (`/*! ... */`).
+type commentScanState struct {
+	depth       int
+	execComment bool
+}
+
+func isQuoteStart(c rune) bool { return c == '\'' || c == '"' || c == '`' }
+
+func startsLineComment(r []rune, i int) bool {
+	return r[i] == '-' && i+1 < len(r) && r[i+1] == '-'
+}
+
+func startsBlockCommentOpen(r []rune, i int) bool {
+	return r[i] == '/' && i+1 < len(r) && r[i+1] == '*'
+}
+
+func startsBlockCommentClose(r []rune, i int) bool {
+	return r[i] == '*' && i+1 < len(r) && r[i+1] == '/'
+}
+
+// scanQuoteArm handles a quoted run opened at r[i] — StripSQLComments's quote-aware pass-through.
+func scanQuoteArm(r []rune, i int) (next int, chunk string) {
+	end := scanQuote(r, i)
+	return end, string(r[i:end])
+}
+
+// scanDollarArm handles a `$` at r[i]: a Postgres dollar-quoted string, or an ordinary `$` when it
+// doesn't open one.
+func scanDollarArm(r []rune, i int) (next int, chunk string) {
+	if end := scanDollarQuote(r, i); end >= 0 {
+		return end, string(r[i:end])
+	}
+	return i + 1, string(r[i])
+}
+
+// scanLineCommentArm consumes a `--` line comment to end of line, replaced by a single space.
+func scanLineCommentArm(r []rune, i int) (next int, chunk string) {
+	j := i
+	for j < len(r) && r[j] != '\n' {
+		j++
+	}
+	return j, " "
+}
+
+// scanExecCommentCloseArm closes an open MySQL/MariaDB executable comment at r[i] ("*/").
+func scanExecCommentCloseArm(i int) (next int, chunk string) {
+	return i + 2, " "
+}
+
+// scanBlockCommentOpenArm handles "/*" at r[i]: either the start of a MySQL/MariaDB executable
+// comment (only recognised at depth 0, outside any other exec comment), or an ordinary block
+// comment open, which increments nesting depth at any depth.
+func scanBlockCommentOpenArm(r []rune, i int, st commentScanState) (next int, chunk string, out commentScanState) {
+	if st.depth == 0 && !st.execComment {
+		if markerLen := execCommentMarkerLen(r, i); markerLen > 0 {
+			return i + markerLen, " ", commentScanState{depth: st.depth, execComment: true}
+		}
+	}
+	return i + 2, "", commentScanState{depth: st.depth + 1, execComment: st.execComment}
+}
+
+// scanBlockCommentCloseArm handles "*/" at r[i] while inside a nested block comment (depth > 0).
+func scanBlockCommentCloseArm(i int, depth int) (next int, chunk string, newDepth int) {
+	newDepth = depth - 1
+	if newDepth == 0 {
+		return i + 2, " ", newDepth
+	}
+	return i + 2, "", newDepth
 }
 
 // execCommentMarkerLen reports the rune length of a MySQL/MariaDB executable-comment opening

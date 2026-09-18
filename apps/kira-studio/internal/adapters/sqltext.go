@@ -439,6 +439,60 @@ type KeysetPositionArgs struct {
 	CellAt          func(row, col int) *string
 }
 
+// keysetValueAt reads the keyset tiebreaker values for one displayed row, erroring if any
+// tiebreaker column came back NULL — a keyset token cannot be built from a NULL component.
+func keysetValueAt(args KeysetPositionArgs, row int) ([]string, error) {
+	values := make([]string, len(args.Order.KeysetColumns))
+	for i, name := range args.Order.KeysetColumns {
+		idx, ok := args.KeysetColumnIdx[name]
+		var v *string
+		if ok && idx >= 0 {
+			v = args.CellAt(row, idx)
+		}
+		if v == nil {
+			return nil, New(CodeQuery, fmt.Sprintf("keyset tiebreaker column %q was NULL", name), nil)
+		}
+		values[i] = *v
+	}
+	return values, nil
+}
+
+// nextPrevTokens builds the next/prev keyset tokens for a keyset-eligible, non-empty page,
+// following the same forward/backward availability rule per cursor mode BuildKeysetPosition always
+// used.
+func nextPrevTokens(args KeysetPositionArgs, rowCount int) (nextToken, prevToken *string, err error) {
+	hasForward := args.ProbedExtra
+	if args.Cursor.Mode == "before" {
+		hasForward = true
+	}
+	var hasBackward bool
+	switch args.Cursor.Mode {
+	case "before":
+		hasBackward = args.ProbedExtra
+	case "after":
+		hasBackward = true
+	default:
+		hasBackward = args.Cursor.Offset > 0
+	}
+	if hasForward {
+		values, err := keysetValueAt(args, rowCount-1)
+		if err != nil {
+			return nil, nil, err
+		}
+		token := EncodePageToken(values, args.Fingerprint)
+		nextToken = &token
+	}
+	if hasBackward {
+		values, err := keysetValueAt(args, 0)
+		if err != nil {
+			return nil, nil, err
+		}
+		token := EncodePageToken(values, args.Fingerprint)
+		prevToken = &token
+	}
+	return nextToken, prevToken, nil
+}
+
 // BuildKeysetPosition ports sql-text.ts's buildKeysetPosition — D7's whole forward-and-backward
 // token rule.
 func BuildKeysetPosition(args KeysetPositionArgs) (page.PagePosition, error) {
@@ -458,52 +512,12 @@ func BuildKeysetPosition(args KeysetPositionArgs) (page.PagePosition, error) {
 		}
 	}
 
-	keysetValuesOf := func(row int) ([]string, error) {
-		values := make([]string, len(args.Order.KeysetColumns))
-		for i, name := range args.Order.KeysetColumns {
-			idx, ok := args.KeysetColumnIdx[name]
-			var v *string
-			if ok && idx >= 0 {
-				v = args.CellAt(row, idx)
-			}
-			if v == nil {
-				return nil, New(CodeQuery, fmt.Sprintf("keyset tiebreaker column %q was NULL", name), nil)
-			}
-			values[i] = *v
-		}
-		return values, nil
-	}
-
 	var nextToken, prevToken *string
 	if args.Order.KeysetEligible && rowCount > 0 {
-		hasForward := args.ProbedExtra
-		if args.Cursor.Mode == "before" {
-			hasForward = true
-		}
-		var hasBackward bool
-		switch args.Cursor.Mode {
-		case "before":
-			hasBackward = args.ProbedExtra
-		case "after":
-			hasBackward = true
-		default:
-			hasBackward = args.Cursor.Offset > 0
-		}
-		if hasForward {
-			values, err := keysetValuesOf(rowCount - 1)
-			if err != nil {
-				return page.PagePosition{}, err
-			}
-			token := EncodePageToken(values, args.Fingerprint)
-			nextToken = &token
-		}
-		if hasBackward {
-			values, err := keysetValuesOf(0)
-			if err != nil {
-				return page.PagePosition{}, err
-			}
-			token := EncodePageToken(values, args.Fingerprint)
-			prevToken = &token
+		var err error
+		nextToken, prevToken, err = nextPrevTokens(args, rowCount)
+		if err != nil {
+			return page.PagePosition{}, err
 		}
 	}
 

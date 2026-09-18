@@ -199,6 +199,67 @@ func RenderRowOp(relationSQL string, op model.MutationRowOp, render ValueRendere
 	}
 }
 
+// ValidateMutationOps ports the per-op validation loop postgres/mysqlfamily/sqlite's mutate() each
+// wrote out verbatim: an update or delete's key must name exactly the primary key, and every
+// touched column must be known to the catalog. qualifiedName is the already-built display string
+// each adapter spells its own way.
+func ValidateMutationOps(ops []model.MutationRowOp, columns []model.ColumnMeta, primaryKey []string, qualifiedName string) error {
+	for _, rowOp := range ops {
+		switch rowOp.Kind {
+		case "update":
+			if err := AssertColumnsKnown(columns, append(rowOp.Key.Names(), rowOp.Changes.Names()...)); err != nil {
+				return err
+			}
+			if err := AssertKeyIsPrimaryKey(primaryKey, rowOp.Key, qualifiedName); err != nil {
+				return err
+			}
+		case "delete":
+			if err := AssertColumnsKnown(columns, rowOp.Key.Names()); err != nil {
+				return err
+			}
+			if err := AssertKeyIsPrimaryKey(primaryKey, rowOp.Key, qualifiedName); err != nil {
+				return err
+			}
+		default: // "insert"
+			if err := AssertColumnsKnown(columns, rowOp.Values.Names()); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// CompiledOp is one ordered mutation op rendered for execution: the SQL text, its bound params
+// (already dialect-placeholdered by paramRenderer) and the op's kind (for AssertAffectedExactlyOne).
+type CompiledOp struct {
+	SQL    string
+	Params []any
+	Kind   string
+}
+
+// CompileMutationOps ports the render loop postgres/mysqlfamily/sqlite's mutate() each wrote out
+// verbatim: one executable statement (via paramRenderer) and one literal preview statement (via
+// literalRenderer) per ordered op.
+func CompileMutationOps(relationSQL string, ordered []model.MutationRowOp, paramRenderer, literalRenderer ValueRenderer, quote func(string) string) (compiled []CompiledOp, previewParts []string, err error) {
+	compiled = make([]CompiledOp, len(ordered))
+	previewParts = make([]string, len(ordered))
+	for i, rowOp := range ordered {
+		var params []any
+		sql, err := RenderRowOp(relationSQL, rowOp, paramRenderer, &params, quote)
+		if err != nil {
+			return nil, nil, err
+		}
+		compiled[i] = CompiledOp{SQL: sql, Params: params, Kind: rowOp.Kind}
+		var literalParams []any
+		previewPart, err := RenderRowOp(relationSQL, rowOp, literalRenderer, &literalParams, quote)
+		if err != nil {
+			return nil, nil, err
+		}
+		previewParts[i] = previewPart
+	}
+	return compiled, previewParts, nil
+}
+
 // ResolveDatabaseTablePath ports sql-mutate.ts's resolveDatabaseTablePath — the two-segment
 // database/table path check clickhouse/mysql-family/sqlite's mutate.ts each wrote out; postgres
 // keeps its own three-segment resolveTablePath. Ported here in M1 because P58b's three adapters
