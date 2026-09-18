@@ -103,6 +103,174 @@ function buildPackedChunk(): PackedCommitChunk {
   return buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 0);
 }
 
+// P93 §8.3: a multi-branch fixture — main (HEAD, 3 commits) plus two feature branches forked at
+// different depths off it, one long enough to collapse (n > MIN_COLLAPSIBLE = 3), one not. Store
+// rows arrive in an order that satisfies rowPlan.ts's own topo-order precondition (a parent's row
+// index is always strictly greater than its child's) without matching DISPLAY order at all — the
+// same "arrival order is topological, display order is a permutation of it" gap P93 §2 exists to
+// cross:
+//
+//   row  branch          parent (by row)
+//   0    feature-newer   1   (tip, F0)
+//   1    feature-newer   2   (F1 — hidden once collapsed)
+//   2    feature-newer   3   (F2 — hidden once collapsed)
+//   3    feature-newer   4   (F3 — hidden once collapsed)
+//   4    feature-newer   8   (oldest own commit, F4 — forks off M1)
+//   5    feature-older   6   (tip, G0)
+//   6    feature-older   9   (oldest own commit, G1 — forks off M2)
+//   7    main (HEAD)     8   (tip, M0)
+//   8    main             9   (M1)
+//   9    main             -   (root, M2)
+//
+// feature-newer has 5 own commits, so it collapses by default to tip/placeholder/oldest
+// (hiddenCount 3: F1/F2/F3); feature-older has 2, so it always renders in full. feature-newer's
+// own ref committerDate is later than feature-older's, so it sorts first among the two (§3.2).
+function branchOrderSha(row: number): string {
+  return (row + 1).toString(16).padStart(2, '0').repeat(20);
+}
+
+export const BRANCH_ORDER_ROW_COUNT = 10;
+export const BRANCH_ORDER_SHAS = {
+  featureNewerTip: branchOrderSha(0),
+  featureNewerOldest: branchOrderSha(4),
+  featureOlderTip: branchOrderSha(5),
+  featureOlderOldest: branchOrderSha(6),
+  mainTip: branchOrderSha(7),
+  mainRoot: branchOrderSha(9),
+} as const;
+export const FEATURE_NEWER_SHORT_NAME = 'feature-newer';
+export const FEATURE_OLDER_SHORT_NAME = 'feature-older';
+export const FEATURE_NEWER_HIDDEN_COUNT = 3; // F1, F2, F3 — hidden inside the placeholder
+
+const BRANCH_ORDER_SUBJECTS = [
+  'feature-newer tip (F0)',
+  'feature-newer F1',
+  'feature-newer F2',
+  'feature-newer F3',
+  'feature-newer oldest (F4)',
+  'feature-older tip (G0)',
+  'feature-older oldest (G1)',
+  'main tip (M0)',
+  'main M1',
+  'main root (M2)',
+] as const;
+
+/** Row `i`'s own parent, by row — `undefined` for the root (`M2`, row 9). Matches this file's
+ *  own doc comment table above exactly. */
+const BRANCH_ORDER_PARENT_ROW: readonly (number | undefined)[] = [
+  1,
+  2,
+  3,
+  4,
+  8,
+  6,
+  9,
+  8,
+  9,
+  undefined,
+];
+
+function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+}
+
+/** The whole multi-branch fixture as one `PackedCommitChunk` — every parent link resolves within
+ *  this single chunk (`CommitStore.appendPacked`'s own pending-parent pass, run once the whole
+ *  chunk's shas are in the table, resolves a later-row parent same as an already-loaded one), so
+ *  no second chunk is needed the way `streamTwoChunksThenEnd` above needs one for its own,
+ *  unrelated reason (two independent lane-0 roots). */
+function buildBranchOrderChunk(): PackedCommitChunk {
+  const rowCount = BRANCH_ORDER_SUBJECTS.length;
+
+  const shaBytes = Buffer.concat(
+    Array.from({ length: rowCount }, (_, row) => Buffer.from(branchOrderSha(row), 'hex')),
+  );
+
+  const parentOffsets: number[] = [0];
+  const parentShaBuffers: Buffer[] = [];
+  for (let row = 0; row < rowCount; row++) {
+    const parentRow = BRANCH_ORDER_PARENT_ROW[row];
+    if (parentRow !== undefined) {
+      parentShaBuffers.push(Buffer.from(branchOrderSha(parentRow), 'hex'));
+    }
+    parentOffsets.push(parentShaBuffers.length);
+  }
+  const parentShaBytes = Buffer.concat(parentShaBuffers);
+
+  const identityIds = new Uint32Array(rowCount * 4);
+  const times = new Uint32Array(rowCount * 2);
+  for (let row = 0; row < rowCount; row++) {
+    identityIds.set([0, 1, 0, 1], row * 4);
+    times.set([WIDEST_SAMPLE_TIMESTAMP, WIDEST_SAMPLE_TIMESTAMP], row * 2);
+  }
+
+  const subjectBuffers = BRANCH_ORDER_SUBJECTS.map((s) => Buffer.from(s, 'utf8'));
+  const subjectBytes = Buffer.concat(subjectBuffers);
+  const subjectOffsets = new Uint32Array(rowCount + 1);
+  let cursor = 0;
+  for (let row = 0; row < rowCount; row++) {
+    subjectOffsets[row] = cursor;
+    cursor += subjectBuffers[row].byteLength;
+  }
+  subjectOffsets[rowCount] = cursor;
+
+  return {
+    from: 0,
+    to: rowCount,
+    shaWidthBytes: 20,
+    shas: toArrayBuffer(shaBytes),
+    parentOffsets: Uint32Array.from(parentOffsets).buffer,
+    parentShas: toArrayBuffer(parentShaBytes),
+    identityIds: identityIds.buffer,
+    times: times.buffer,
+    subjectBytes: toArrayBuffer(subjectBytes),
+    subjectOffsets: subjectOffsets.buffer,
+    dictionaryBase: 0,
+    dictionary: ['Fake Author', 'fake@example.com'],
+    decorations: [],
+  };
+}
+
+const BRANCH_ORDER_COMMITTER_DATE_NEWER = WIDEST_SAMPLE_TIMESTAMP + 2000;
+const BRANCH_ORDER_COMMITTER_DATE_OLDER = WIDEST_SAMPLE_TIMESTAMP + 1000;
+
+/** `refs.list`'s own answer for the `'branchOrder'` stream mode — `main` (HEAD), plus the two
+ *  feature branches at distinct `committerDate`s (§3.2's own ordering key) so `App.vue`'s
+ *  `buildGraphTips` sorts feature-newer ahead of feature-older, newest tip first. Unconditional
+ *  (see `buildFakeGraphHostInitScript`'s own dispatch: gated on `FIXTURES.refsList` being present
+ *  at all, not on `withPickerData` — `RefsState.setRepoId` always requests `refs.list` on repo
+ *  open, `withPickerData`'s own four other lists notwithstanding). */
+function branchOrderRefsList(id: number): unknown {
+  return wrap({
+    t: 'res',
+    id,
+    ok: true,
+    result: {
+      branches: [
+        pickerRef({
+          shortName: 'main',
+          objectId: BRANCH_ORDER_SHAS.mainTip,
+          isHead: true,
+          committerDate: WIDEST_SAMPLE_TIMESTAMP,
+        }),
+        pickerRef({
+          shortName: FEATURE_NEWER_SHORT_NAME,
+          objectId: BRANCH_ORDER_SHAS.featureNewerTip,
+          committerDate: BRANCH_ORDER_COMMITTER_DATE_NEWER,
+        }),
+        pickerRef({
+          shortName: FEATURE_OLDER_SHORT_NAME,
+          objectId: BRANCH_ORDER_SHAS.featureOlderTip,
+          committerDate: BRANCH_ORDER_COMMITTER_DATE_OLDER,
+        }),
+      ],
+      remoteBranches: [],
+      tags: [],
+      head: { kind: 'branch', name: 'main' },
+    },
+  });
+}
+
 // P77 §17.2: `branch-picker.spec.ts`'s own seed data for the five picker-tab requests
 // (`refs.list`/`stash.list`/`globalStash.list`/`worktree.list`/`stack.list`) — one row per tab,
 // with `feature-auth`/`auth work` both matching a `"auth"` query so that spec's own cross-tab
@@ -150,10 +318,12 @@ function buildResponses(): {
   streamOneDecoratedOneNot: (id: number) => readonly [unknown, unknown, unknown];
   streamManyRows: (id: number) => readonly unknown[];
   streamTwoChunksSecondDecorated: (id: number) => readonly [unknown, unknown, unknown];
+  streamBranchOrder: (id: number) => readonly [unknown, unknown];
   graphRefresh: (id: number) => unknown;
   graphStatus: (id: number) => unknown;
   repoChanged: (kind: 'refsChanged' | 'worktreeChanged', repoId: string) => unknown;
   refsList: (id: number) => unknown;
+  branchOrderRefsList: (id: number) => unknown;
   stashList: (id: number) => unknown;
   globalStashList: (id: number) => unknown;
   worktreeList: (id: number) => unknown;
@@ -345,6 +515,22 @@ function buildResponses(): {
         wrap({ t: 'end', id }),
       ] as const;
     },
+    // P93 §8.3: the multi-branch fixture (`buildBranchOrderChunk` above) as one `graph.stream`
+    // chunk — every parent link resolves within it, so (unlike `twoChunksSameLane`) one chunk is
+    // enough.
+    streamBranchOrder: (id) => {
+      const chunk = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 0,
+        from: 0,
+        to: BRANCH_ORDER_ROW_COUNT,
+        source: 'git',
+        remaining: 0,
+        exhausted: true,
+        commits: buildBranchOrderChunk(),
+      });
+      return [wrap({ t: 'chunk', id, chunk }), wrap({ t: 'end', id })] as const;
+    },
     // G-UX D10: `GraphViewState.refresh()`'s own `graph.refresh` request — `#runLoad`'s resync
     // then re-opens `graph.stream` from the current `loadedRows` (already answered generically by
     // `streamChunkThenEnd` above, reused verbatim: its `from: 0` on an already-1-row store is
@@ -380,6 +566,7 @@ function buildResponses(): {
           head: { kind: 'branch', name: 'main' },
         },
       }),
+    branchOrderRefsList,
     stashList: (id) =>
       wrap({
         t: 'res',
@@ -477,7 +664,11 @@ function buildResponses(): {
  * two rows' own real, rendered heights and node positions directly. `'manyRows'` (P92 item 2)
  * streams `MANY_ROWS_COUNT` one-row chunks immediately, all synchronous — enough rows to give the
  * grid host a real vertical scrollbar, the one condition that reproduces the "column widths
- * summed to host width, not the narrower viewport width a scrollbar leaves" bug.
+ * summed to host width, not the narrower viewport width a scrollbar leaves" bug. `'branchOrder'`
+ * (P93 §8.3) streams the multi-branch fixture (`buildBranchOrderChunk` — `main` plus two feature
+ * branches forked at different depths) as one chunk, and also answers `refs.list` (unconditionally
+ * — see `data.refsList`'s own comment below) with those three branches' real `committerDate`s, so
+ * `App.vue`'s branch ordering has real ref data to sort by.
  *
  * `options.withPickerData` (P77 §17.2): additive, the same shape `streamMode` already set —
  * every existing caller keeps hanging on `refs.list`/`stash.list`/`globalStash.list`/
@@ -492,7 +683,8 @@ export function buildFakeGraphHostInitScript(options?: {
     | 'twoChunksSameLane'
     | 'oneDecoratedOneNot'
     | 'manyRows'
-    | 'twoChunksSecondDecorated';
+    | 'twoChunksSecondDecorated'
+    | 'branchOrder';
   readonly withPickerData?: boolean;
 }): string {
   const responses = buildResponses();
@@ -511,7 +703,9 @@ export function buildFakeGraphHostInitScript(options?: {
             ? responses.streamManyRows(0)
             : streamMode === 'twoChunksSecondDecorated'
               ? responses.streamTwoChunksSecondDecorated(0)
-              : responses.streamChunkThenEnd(0),
+              : streamMode === 'branchOrder'
+                ? responses.streamBranchOrder(0)
+                : responses.streamChunkThenEnd(0),
     graphRefresh: responses.graphRefresh(0),
     graphStatus: responses.graphStatus(0),
     repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
@@ -536,6 +730,10 @@ export function buildFakeGraphHostInitScript(options?: {
           stackList: responses.stackList(0),
         }
       : {}),
+    // P93 §8.3: `refs.list` always fires on `repo.open` (`RefsState.setRepoId`, unconditional —
+    // not gated on `withPickerData`'s own picker-tab concept), and `App.vue`'s own branch-ordering
+    // needs its real branches/committerDates, not the two-branch picker seed above.
+    ...(streamMode === 'branchOrder' ? { refsList: responses.branchOrderRefsList(0) } : {}),
   };
   const fixtureJson = JSON.stringify(data);
 
@@ -637,7 +835,10 @@ export function buildFakeGraphHostInitScript(options?: {
             dispatch(withId(FIXTURES.graphStatus, body.id));
             return;
           }
-          if (WITH_PICKER_DATA && body.t === 'req' && body.method === 'refs.list') {
+          // FIXTURES.refsList is set either by withPickerData (the five-tab picker seed) or by
+          // streamMode === 'branchOrder' (P93 §8.3's own branches) — refs.list fires unconditionally
+          // on repo.open (RefsState.setRepoId), so gate on the fixture's presence, not WITH_PICKER_DATA.
+          if (FIXTURES.refsList && body.t === 'req' && body.method === 'refs.list') {
             dispatch(withId(FIXTURES.refsList, body.id));
             return;
           }
