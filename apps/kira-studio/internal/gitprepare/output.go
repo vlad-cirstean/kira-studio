@@ -85,43 +85,51 @@ func stripANSI(s string) string {
 	b.Grow(len(s))
 	for i := 0; i < len(s); {
 		if s[i] == 0x1b && i+1 < len(s) && (s[i+1] == '[' || s[i+1] == ']') {
+			var next int
 			if s[i+1] == '[' {
-				j := i + 2
-				for j < len(s) && !(s[j] >= 0x40 && s[j] <= 0x7e) {
-					j++
-				}
-				if j >= len(s) {
-					break // unterminated — drop the rest.
-				}
-				i = j + 1
-				continue
+				next = consumeCSI(s, i)
+			} else {
+				next = consumeOSC(s, i)
 			}
-			// OSC.
-			j := i + 2
-			terminated := false
-			for j < len(s) {
-				if s[j] == 0x07 {
-					j++
-					terminated = true
-					break
-				}
-				if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
-					j += 2
-					terminated = true
-					break
-				}
-				j++
-			}
-			if !terminated {
+			if next < 0 {
 				break // unterminated — drop the rest.
 			}
-			i = j
+			i = next
 			continue
 		}
 		b.WriteByte(s[i])
 		i++
 	}
 	return b.String()
+}
+
+// consumeCSI returns the index just past one ANSI CSI sequence ("\x1b[" ... a final byte in
+// 0x40-0x7e) starting at s[i], or -1 if it runs off the end of s unterminated.
+func consumeCSI(s string, i int) int {
+	j := i + 2
+	for j < len(s) && !(s[j] >= 0x40 && s[j] <= 0x7e) {
+		j++
+	}
+	if j >= len(s) {
+		return -1
+	}
+	return j + 1
+}
+
+// consumeOSC returns the index just past one ANSI OSC sequence ("\x1b]" ... terminated by BEL or
+// "\x1b\\") starting at s[i], or -1 if it runs off the end of s unterminated.
+func consumeOSC(s string, i int) int {
+	j := i + 2
+	for j < len(s) {
+		if s[j] == 0x07 {
+			return j + 1
+		}
+		if s[j] == 0x1b && j+1 < len(s) && s[j+1] == '\\' {
+			return j + 2
+		}
+		j++
+	}
+	return -1
 }
 
 // outputCollector accumulates a running process's stdout/stderr into a bounded, sanitized final
