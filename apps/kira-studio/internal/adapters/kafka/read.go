@@ -130,67 +130,37 @@ func position(windows []partitionWindow, hasMore bool, fingerprint string, pageS
 	return page.PagePosition{Offset: nil, PageSize: pageSize, HasMore: hasMore, NextToken: nextToken, PrevToken: nil, Strategy: "offsetWindow"}
 }
 
-// freshWindows is read.ts's freshWindows (:76-143), only ever consulted for a fresh browse — a
-// token-continued page's windows were already resolved once, and re-applying the filter there
-// would just be wrong once the user has paged partway through.
-func freshWindows(ctx context.Context, adm *kadm.Client, topic string, rawFilter *string) ([]partitionWindow, error) {
-	// P58e E12: a nonexistent topic surfaces inside ListedOffsets' own per-partition Err, not as a
-	// returned error — checking .Error() after each call is what turns it into E_QUERY instead of
-	// a silently empty window set.
-	starts, err := adm.ListStartOffsets(ctx, topic)
-	if err != nil {
-		return nil, mapError(err)
+// filterPartitions is freshWindows' own partition-filter block: "any of these partitions" — a
+// union, not an intersection.
+func filterPartitions(partitions []int32, filter kafkaStreamFilter, topic string) ([]int32, error) {
+	if len(filter.Partitions) == 0 {
+		return partitions, nil
 	}
-	if err := starts.Error(); err != nil {
-		return nil, mapError(err)
+	wanted := make(map[int32]bool, len(filter.Partitions))
+	for _, p := range filter.Partitions {
+		wanted[p] = true
 	}
-	ends, err := adm.ListEndOffsets(ctx, topic)
-	if err != nil {
-		return nil, mapError(err)
-	}
-	if err := ends.Error(); err != nil {
-		return nil, mapError(err)
-	}
-	if err := adapters.CheckCancelled(ctx); err != nil {
-		return nil, err
-	}
-
-	filter, err := parseStreamFilter(rawFilter)
-	if err != nil {
-		return nil, adapters.New(adapters.CodeQuery, "malformed stream filter", err)
-	}
-
-	endsByPartition := ends[topic]
-	startsByPartition := starts[topic]
-	partitions := make([]int32, 0, len(endsByPartition))
-	for p := range endsByPartition {
-		partitions = append(partitions, p)
-	}
-	sort.Slice(partitions, func(i, j int) bool { return partitions[i] < partitions[j] })
-
-	if len(filter.Partitions) > 0 {
-		// "any of these partitions" — a union, not an intersection.
-		wanted := make(map[int32]bool, len(filter.Partitions))
-		for _, p := range filter.Partitions {
-			wanted[p] = true
+	selected := make([]int32, 0, len(partitions))
+	for _, p := range partitions {
+		if wanted[p] {
+			selected = append(selected, p)
 		}
-		selected := make([]int32, 0, len(partitions))
-		for _, p := range partitions {
-			if wanted[p] {
-				selected = append(selected, p)
-			}
-		}
-		if len(selected) == 0 {
-			names := make([]string, len(filter.Partitions))
-			for i, p := range filter.Partitions {
-				names[i] = strconv.FormatInt(int64(p), 10)
-			}
-			return nil, adapters.New(adapters.CodeQuery,
-				fmt.Sprintf("topic %s has no partition(s) %s", topic, strings.Join(names, ", ")), nil)
-		}
-		partitions = selected
 	}
+	if len(selected) == 0 {
+		names := make([]string, len(filter.Partitions))
+		for i, p := range filter.Partitions {
+			names[i] = strconv.FormatInt(int64(p), 10)
+		}
+		return nil, adapters.New(adapters.CodeQuery,
+			fmt.Sprintf("topic %s has no partition(s) %s", topic, strings.Join(names, ", ")), nil)
+	}
+	return selected, nil
+}
 
+// resolveStartOffsets is freshWindows' own switch on filter.TimestampMs/filter.Offset: each
+// partition's starting offset defaults to startsByPartition's own, adjusted per the filter when
+// one applies.
+func resolveStartOffsets(ctx context.Context, adm *kadm.Client, topic string, partitions []int32, startsByPartition, endsByPartition map[int32]kadm.ListedOffset, filter kafkaStreamFilter) (map[int32]int64, error) {
 	start := make(map[int32]int64, len(partitions))
 	for _, p := range partitions {
 		start[p] = startsByPartition[p].Offset
@@ -234,6 +204,56 @@ func freshWindows(ctx context.Context, adm *kadm.Client, topic string, rawFilter
 			start[p] = clamped
 		}
 	}
+	return start, nil
+}
+
+// freshWindows is read.ts's freshWindows (:76-143), only ever consulted for a fresh browse — a
+// token-continued page's windows were already resolved once, and re-applying the filter there
+// would just be wrong once the user has paged partway through.
+func freshWindows(ctx context.Context, adm *kadm.Client, topic string, rawFilter *string) ([]partitionWindow, error) {
+	// P58e E12: a nonexistent topic surfaces inside ListedOffsets' own per-partition Err, not as a
+	// returned error — checking .Error() after each call is what turns it into E_QUERY instead of
+	// a silently empty window set.
+	starts, err := adm.ListStartOffsets(ctx, topic)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	if err := starts.Error(); err != nil {
+		return nil, mapError(err)
+	}
+	ends, err := adm.ListEndOffsets(ctx, topic)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	if err := ends.Error(); err != nil {
+		return nil, mapError(err)
+	}
+	if err := adapters.CheckCancelled(ctx); err != nil {
+		return nil, err
+	}
+
+	filter, err := parseStreamFilter(rawFilter)
+	if err != nil {
+		return nil, adapters.New(adapters.CodeQuery, "malformed stream filter", err)
+	}
+
+	endsByPartition := ends[topic]
+	startsByPartition := starts[topic]
+	partitions := make([]int32, 0, len(endsByPartition))
+	for p := range endsByPartition {
+		partitions = append(partitions, p)
+	}
+	sort.Slice(partitions, func(i, j int) bool { return partitions[i] < partitions[j] })
+
+	partitions, err = filterPartitions(partitions, filter, topic)
+	if err != nil {
+		return nil, err
+	}
+
+	start, err := resolveStartOffsets(ctx, adm, topic, partitions, startsByPartition, endsByPartition, filter)
+	if err != nil {
+		return nil, err
+	}
 
 	windows := make([]partitionWindow, len(partitions))
 	for i, p := range partitions {
@@ -269,6 +289,168 @@ func advanceWindows(windows []partitionWindow, touched map[int32]int64, pageCapp
 	}
 }
 
+// prepareWindows resolves readTopic's starting windows — decoded from an "after" cursor's page
+// token, or freshly computed via freshWindows for a fresh browse — and remaining, the subset of
+// those windows that still have data left ([Next, End) non-empty).
+func prepareWindows(ctx context.Context, adm *kadm.Client, topic string, req adapters.ReadRequest, fingerprint string) (windows, remaining []partitionWindow, err error) {
+	if req.Cursor.Mode == "after" {
+		keys, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(keys) != 1 {
+			return nil, nil, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+		}
+		if err := json.Unmarshal([]byte(keys[0]), &windows); err != nil {
+			return nil, nil, adapters.New(adapters.CodeQuery, "malformed page token", err)
+		}
+	} else {
+		w, err := freshWindows(ctx, adm, topic, req.Filter)
+		if err != nil {
+			return nil, nil, err
+		}
+		windows = w
+	}
+
+	for _, w := range windows {
+		if w.Next < w.End {
+			remaining = append(remaining, w)
+		}
+	}
+	return windows, remaining, nil
+}
+
+// openBrowseClient builds readTopic's own ephemeral browse client (P58e E5): a
+// kgo.ConsumePartitions client anchored at each remaining window's own Next offset — never
+// kgo.ConsumeTopics or kgo.ConsumerGroup, which is what makes the no-group promise (P10 D6)
+// structural rather than disciplinary.
+func openBrowseClient(baseOpts []kgo.Opt, topic string, remaining []partitionWindow) (*kgo.Client, error) {
+	partitionOffsets := make(map[int32]kgo.Offset, len(remaining))
+	for _, w := range remaining {
+		partitionOffsets[w.Partition] = kgo.NewOffset().At(w.Next)
+	}
+	browseOpts := append(append([]kgo.Opt{}, baseOpts...),
+		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: partitionOffsets}),
+		kgo.FetchMaxWait(pollTimeout))
+	browse, err := kgo.NewClient(browseOpts...)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return browse, nil
+}
+
+// pollRoundResult is pollRound's own verdict on what readTopic's poll loop should do next: keep
+// polling, or stop — and if it stopped because MAX_EMPTY_POLLS was reached, readTopic still has to
+// set exhaustedByEmptyPolls itself (pollRoundExhausted only reports the fact; the latch it drives
+// stays in readTopic, per P21 round 3 finding 3 — see readTopic's own comment).
+type pollRoundResult int
+
+const (
+	pollRoundContinue pollRoundResult = iota
+	pollRoundStop
+	pollRoundExhausted
+)
+
+// pollRound runs one PollRecords round of readTopic's browse loop: polls under a per-round bound
+// (see readTopic's own comment on why), classifies the outcome, and — for a successful poll —
+// pushes whatever new rows it delivered into builder and applies P43 iter2 F19/D26's advanceWindows
+// clamp. emptyPolls is the running MAX_EMPTY_POLLS counter, carried across rounds by the caller.
+// collected is passed and returned by value rather than by pointer so the caller's own loop
+// condition (`collected < req.PageSize`) always reads a value it assigned itself.
+func pollRound(ctx context.Context, browse *kgo.Client, windows []partitionWindow, cursor map[int32]*partitionWindow, builder *page.StreamPageBuilder, req adapters.ReadRequest, collected int, emptyPolls *int) (int, pollRoundResult, error) {
+	// A per-round bound, not the raw op ctx — see readTopic's own comment. Mirrors read.ts's own
+	// consumer.setDefaultConsumeTimeout(POLL_TIMEOUT_MS).
+	roundCtx, cancel := context.WithTimeout(ctx, pollTimeout)
+	fetches := browse.PollRecords(roundCtx, req.PageSize-collected)
+	cancel()
+
+	if err := fetches.Err(); err != nil {
+		if ctx.Err() != nil {
+			// The op's own context is what ended this, not the round's bound (P58e E3).
+			return collected, pollRoundStop, adapters.New(adapters.CodeCancelled, "operation was cancelled", ctx.Err())
+		}
+		if errors.Is(err, kgo.ErrClientClosed) {
+			return collected, pollRoundStop, nil // the browse client's own teardown racing this poll
+		}
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			// Just this round's own bound expiring with genuinely nothing to report (KF-3) —
+			// indistinguishable from a slow broker, so it counts toward MAX_EMPTY_POLLS rather
+			// than failing the op.
+			*emptyPolls++
+			if *emptyPolls >= maxEmptyPolls {
+				return collected, pollRoundExhausted, nil
+			}
+			return collected, pollRoundContinue, nil
+		}
+		return collected, pollRoundStop, mapError(err)
+	}
+
+	touched := make(map[int32]int64)
+	fetches.EachPartition(func(fp kgo.FetchTopicPartition) {
+		touched[fp.Partition] = fp.HighWatermark
+	})
+
+	if fetches.NumRecords() == 0 {
+		*emptyPolls++
+	} else {
+		*emptyPolls = 0
+		for _, rec := range fetches.Records() {
+			if collected >= req.PageSize {
+				break
+			}
+			w, ok := cursor[rec.Partition]
+			if !ok || rec.Offset < w.Next || rec.Offset >= w.End {
+				continue
+			}
+			row, err := buildStreamRow(rec)
+			if err != nil {
+				return collected, pollRoundStop, mapError(err)
+			}
+			builder.Push(row)
+			collected++
+			w.Next = rec.Offset + 1
+		}
+	}
+
+	advanceWindows(windows, touched, collected >= req.PageSize)
+
+	if fetches.NumRecords() == 0 && *emptyPolls >= maxEmptyPolls {
+		return collected, pollRoundExhausted, nil
+	}
+	return collected, pollRoundContinue, nil
+}
+
+// buildPartitionCursor indexes windows by partition for readTopic's poll loop to update in place
+// as each partition's Next offset advances.
+func buildPartitionCursor(windows []partitionWindow) map[int32]*partitionWindow {
+	cursor := make(map[int32]*partitionWindow, len(windows))
+	for i := range windows {
+		cursor[windows[i].Partition] = &windows[i]
+	}
+	return cursor
+}
+
+// windowsHaveMore reports whether any window still has data left ([Next, End) non-empty).
+func windowsHaveMore(windows []partitionWindow) bool {
+	for _, w := range windows {
+		if w.Next < w.End {
+			return true
+		}
+	}
+	return false
+}
+
+// clampExhaustedWindows sets every window still short of its frozen End to End — the mechanical
+// half of P21 round 3 finding 3's fix; readTopic itself keeps the exhaustedByEmptyPolls decision of
+// *when* to call this.
+func clampExhaustedWindows(windows []partitionWindow) {
+	for i := range windows {
+		if windows[i].Next < windows[i].End {
+			windows[i].Next = windows[i].End
+		}
+	}
+}
+
 // readTopic is read.ts's readTopic (:193-319). P58e E5: the browse client is a fresh, ephemeral
 // kgo.Client per call, built from the adapter's own baseOpts plus kgo.ConsumePartitions at exact
 // offsets — never kgo.ConsumeTopics or kgo.ConsumerGroup, which is what makes the no-group promise
@@ -287,31 +469,9 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 	}
 	fingerprint := adapters.RequestFingerprint(readFingerprintParts{Topic: topic, PageSize: req.PageSize, Filter: req.Filter})
 
-	var windows []partitionWindow
-	if req.Cursor.Mode == "after" {
-		keys, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
-		if err != nil {
-			return page.StreamPage{}, err
-		}
-		if len(keys) != 1 {
-			return page.StreamPage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
-		}
-		if err := json.Unmarshal([]byte(keys[0]), &windows); err != nil {
-			return page.StreamPage{}, adapters.New(adapters.CodeQuery, "malformed page token", err)
-		}
-	} else {
-		w, err := freshWindows(ctx, adm, topic, req.Filter)
-		if err != nil {
-			return page.StreamPage{}, err
-		}
-		windows = w
-	}
-
-	var remaining []partitionWindow
-	for _, w := range windows {
-		if w.Next < w.End {
-			remaining = append(remaining, w)
-		}
+	windows, remaining, err := prepareWindows(ctx, adm, topic, req, fingerprint)
+	if err != nil {
+		return page.StreamPage{}, err
 	}
 	if len(remaining) == 0 {
 		// No client is ever constructed (read.ts:212-215).
@@ -324,32 +484,13 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 
 	op.SetCommand(fmt.Sprintf("browse %s (%d partition(s) of %d)", topic, len(remaining), len(windows)))
 
-	partitionOffsets := make(map[int32]kgo.Offset, len(remaining))
-	for _, w := range remaining {
-		partitionOffsets[w.Partition] = kgo.NewOffset().At(w.Next)
-	}
-	browseOpts := append(append([]kgo.Opt{}, baseOpts...),
-		kgo.ConsumePartitions(map[string]map[int32]kgo.Offset{topic: partitionOffsets}),
-		kgo.FetchMaxWait(pollTimeout))
-	browse, err := kgo.NewClient(browseOpts...)
+	browse, err := openBrowseClient(baseOpts, topic, remaining)
 	if err != nil {
-		return page.StreamPage{}, mapError(err)
+		return page.StreamPage{}, err
 	}
 	defer browse.Close()
 
-	cursor := make(map[int32]*partitionWindow, len(windows))
-	for i := range windows {
-		cursor[windows[i].Partition] = &windows[i]
-	}
-
-	allDone := func() bool {
-		for _, w := range cursor {
-			if w.Next < w.End {
-				return false
-			}
-		}
-		return true
-	}
+	cursor := buildPartitionCursor(windows)
 
 	builder := page.NewStreamPageBuilder(nil)
 	collected := 0
@@ -370,71 +511,23 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 	// whether any round ever reported a fresh watermark.
 	exhaustedByEmptyPolls := false
 
-	for collected < req.PageSize && !allDone() {
+pollLoop:
+	for collected < req.PageSize && windowsHaveMore(windows) {
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return page.StreamPage{}, err
 		}
 
-		// A per-round bound, not the raw op ctx — see the func comment. Mirrors read.ts's own
-		// consumer.setDefaultConsumeTimeout(POLL_TIMEOUT_MS).
-		roundCtx, cancel := context.WithTimeout(ctx, pollTimeout)
-		fetches := browse.PollRecords(roundCtx, req.PageSize-collected)
-		cancel()
-
-		if err := fetches.Err(); err != nil {
-			if ctx.Err() != nil {
-				// The op's own context is what ended this, not the round's bound (P58e E3).
-				return page.StreamPage{}, adapters.New(adapters.CodeCancelled, "operation was cancelled", ctx.Err())
-			}
-			if errors.Is(err, kgo.ErrClientClosed) {
-				break // the browse client's own teardown racing this poll — loop end, not an error
-			}
-			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				// Just this round's own bound expiring with genuinely nothing to report (KF-3) —
-				// indistinguishable from a slow broker, so it counts toward MAX_EMPTY_POLLS rather
-				// than failing the op.
-				emptyPolls++
-				if emptyPolls >= maxEmptyPolls {
-					exhaustedByEmptyPolls = true
-					break
-				}
-				continue
-			}
-			return page.StreamPage{}, mapError(err)
+		newCollected, result, roundErr := pollRound(ctx, browse, windows, cursor, builder, req, collected, &emptyPolls)
+		collected = newCollected
+		if roundErr != nil {
+			return page.StreamPage{}, roundErr
 		}
-
-		touched := make(map[int32]int64)
-		fetches.EachPartition(func(fp kgo.FetchTopicPartition) {
-			touched[fp.Partition] = fp.HighWatermark
-		})
-
-		if fetches.NumRecords() == 0 {
-			emptyPolls++
-		} else {
-			emptyPolls = 0
-			for _, rec := range fetches.Records() {
-				if collected >= req.PageSize {
-					break
-				}
-				w, ok := cursor[rec.Partition]
-				if !ok || rec.Offset < w.Next || rec.Offset >= w.End {
-					continue
-				}
-				row, err := buildStreamRow(rec)
-				if err != nil {
-					return page.StreamPage{}, mapError(err)
-				}
-				builder.Push(row)
-				collected++
-				w.Next = rec.Offset + 1
-			}
-		}
-
-		advanceWindows(windows, touched, collected >= req.PageSize)
-
-		if fetches.NumRecords() == 0 && emptyPolls >= maxEmptyPolls {
+		switch result {
+		case pollRoundStop:
+			break pollLoop // the browse client's own teardown racing this poll — loop end, not an error
+		case pollRoundExhausted:
 			exhaustedByEmptyPolls = true
-			break
+			break pollLoop
 		}
 	}
 
@@ -450,20 +543,10 @@ func readTopic(ctx context.Context, adm *kadm.Client, baseOpts []kgo.Opt, topic 
 	// exhausted; clamping here (rather than leaving hasMore latched true) is what stops Next from
 	// returning an empty page forever.
 	if exhaustedByEmptyPolls {
-		for i := range windows {
-			if windows[i].Next < windows[i].End {
-				windows[i].Next = windows[i].End
-			}
-		}
+		clampExhaustedWindows(windows)
 	}
 
-	hasMore := false
-	for _, w := range windows {
-		if w.Next < w.End {
-			hasMore = true
-			break
-		}
-	}
+	hasMore := windowsHaveMore(windows)
 	return builder.Finish(position(windows, hasMore, fingerprint, req.PageSize)), nil
 }
 
