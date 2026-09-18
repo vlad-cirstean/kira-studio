@@ -34,6 +34,16 @@ export const FAKE_SUBJECT = 'Add the graph column fixture';
 export const FAKE_SHA_2 = '3333333333333333333333333333333333333333';
 export const FAKE_SUBJECT_2 = 'A second, same-lane commit';
 export const OTHER_REPO_ID = '/fake/other-repo';
+// P92 item 2's own regression fixture: enough rows to overflow the grid host vertically, so a
+// real vertical scrollbar takes layout width — the one condition that reproduces the bogus
+// horizontal-scrollbar bug (column widths summed to host.clientWidth, not the narrower
+// viewport.clientWidth a vertical scrollbar leaves behind). SlickGrid only renders rows within (or
+// just past) its own viewport, so a big count costs this fixture nothing at boot — 300 rows
+// comfortably overflows this suite's default 720px viewport at any plausible row height.
+const MANY_ROWS_COUNT = 300;
+function manyRowsSha(row: number): string {
+  return `aa${row.toString(16).padStart(8, '0')}`.padEnd(40, '0');
+}
 /** `dateFormat.ts`'s own `WIDEST_SAMPLE_TIMESTAMP` (`Date.UTC(2024, 11, 30, 22, 48)`) — kept as a
  *  literal here rather than imported, since that constant is not exported (nothing outside that
  *  module has ever needed the raw timestamp before now) and this fixture lives outside `packages/
@@ -138,6 +148,8 @@ function buildResponses(): {
   streamChunkThenEnd: (id: number) => readonly [unknown, unknown];
   streamTwoChunksThenEnd: (id: number) => readonly [unknown, unknown, unknown];
   streamOneDecoratedOneNot: (id: number) => readonly [unknown, unknown, unknown];
+  streamManyRows: (id: number) => readonly unknown[];
+  streamTwoChunksSecondDecorated: (id: number) => readonly [unknown, unknown, unknown];
   graphRefresh: (id: number) => unknown;
   graphStatus: (id: number) => unknown;
   repoChanged: (kind: 'refsChanged' | 'worktreeChanged', repoId: string) => unknown;
@@ -243,6 +255,68 @@ function buildResponses(): {
     // `graph-columns.spec.ts` can assert the two rows' real, rendered heights differ and that
     // each row's own graph-column node sits on its own subject line, not the row's midpoint.
     streamOneDecoratedOneNot: (id) => {
+      const chunk1 = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 0,
+        from: 0,
+        to: 1,
+        source: 'git',
+        remaining: 1,
+        exhausted: false,
+        commits: buildPackedChunkAt(FAKE_SHA, FAKE_SUBJECT, 0),
+      });
+      const chunk2 = encodeStreamPayload('graph.stream', {
+        repoId: FAKE_REPO_ID,
+        seq: 1,
+        from: 1,
+        to: 2,
+        source: 'git',
+        remaining: 0,
+        exhausted: true,
+        commits: buildPackedChunkAt(FAKE_SHA_2, FAKE_SUBJECT_2, 1, [], 2, [
+          { kind: 'tag', name: 'v1' },
+        ]),
+      });
+      return [
+        wrap({ t: 'chunk', id, chunk: chunk1 }),
+        wrap({ t: 'chunk', id, chunk: chunk2 }),
+        wrap({ t: 'end', id }),
+      ] as const;
+    },
+    // P92 item 2: MANY_ROWS_COUNT one-row chunks, dispatched back to back (no pause point needed
+    // — the bug this reproduces is a layout fact about the settled grid, not a streaming-pacing
+    // one) — row 0 declares the two identity strings, every row after reuses them via
+    // `dictionaryBase: 2, dictionary: []`, the same convention `streamTwoChunksThenEnd` above
+    // already establishes for a second chunk in one stream.
+    streamManyRows: (id) => {
+      const chunks = Array.from({ length: MANY_ROWS_COUNT }, (_, row) =>
+        wrap({
+          t: 'chunk',
+          id,
+          chunk: encodeStreamPayload('graph.stream', {
+            repoId: FAKE_REPO_ID,
+            seq: row,
+            from: row,
+            to: row + 1,
+            source: 'git',
+            remaining: MANY_ROWS_COUNT - 1 - row,
+            exhausted: row === MANY_ROWS_COUNT - 1,
+            commits:
+              row === 0
+                ? buildPackedChunkAt(manyRowsSha(0), `Row ${0}`, 0)
+                : buildPackedChunkAt(manyRowsSha(row), `Row ${row}`, row, [], 2),
+          }),
+        }),
+      );
+      return [...chunks, wrap({ t: 'end', id })] as const;
+    },
+    // P92 item 4: `twoChunksSameLane`'s own pause point (chunk 2 held back until the test calls
+    // `window.__releaseSecondGraphChunk()`), but chunk 2 carries `streamOneDecoratedOneNot`'s own
+    // tag decoration — a row's height growing strictly AFTER SlickGrid has already rendered row 0
+    // is the exact shape the row-overlap bug (§3) needs: a decoration landing at boot (this
+    // fixture's other two decorated modes) never gives a "before" render to compare positions
+    // against.
+    streamTwoChunksSecondDecorated: (id) => {
       const chunk1 = encodeStreamPayload('graph.stream', {
         repoId: FAKE_REPO_ID,
         seq: 0,
@@ -400,7 +474,10 @@ function buildResponses(): {
  * async boundary a test could otherwise observe between them). `'oneDecoratedOneNot'` (P7, item 1)
  * streams both `FAKE_SHA`/`FAKE_SHA_2` immediately, one after the other with no pause point —
  * `FAKE_SHA` undecorated, `FAKE_SHA_2` carrying a real tag decoration — so a spec can compare the
- * two rows' own real, rendered heights and node positions directly.
+ * two rows' own real, rendered heights and node positions directly. `'manyRows'` (P92 item 2)
+ * streams `MANY_ROWS_COUNT` one-row chunks immediately, all synchronous — enough rows to give the
+ * grid host a real vertical scrollbar, the one condition that reproduces the "column widths
+ * summed to host width, not the narrower viewport width a scrollbar leaves" bug.
  *
  * `options.withPickerData` (P77 §17.2): additive, the same shape `streamMode` already set —
  * every existing caller keeps hanging on `refs.list`/`stash.list`/`globalStash.list`/
@@ -410,7 +487,12 @@ function buildResponses(): {
  * `branch-picker.spec.ts` to see anything but empty tabs.
  */
 export function buildFakeGraphHostInitScript(options?: {
-  readonly streamMode?: 'oneChunk' | 'twoChunksSameLane' | 'oneDecoratedOneNot';
+  readonly streamMode?:
+    | 'oneChunk'
+    | 'twoChunksSameLane'
+    | 'oneDecoratedOneNot'
+    | 'manyRows'
+    | 'twoChunksSecondDecorated';
   readonly withPickerData?: boolean;
 }): string {
   const responses = buildResponses();
@@ -425,7 +507,11 @@ export function buildFakeGraphHostInitScript(options?: {
         ? responses.streamTwoChunksThenEnd(0)
         : streamMode === 'oneDecoratedOneNot'
           ? responses.streamOneDecoratedOneNot(0)
-          : responses.streamChunkThenEnd(0),
+          : streamMode === 'manyRows'
+            ? responses.streamManyRows(0)
+            : streamMode === 'twoChunksSecondDecorated'
+              ? responses.streamTwoChunksSecondDecorated(0)
+              : responses.streamChunkThenEnd(0),
     graphRefresh: responses.graphRefresh(0),
     graphStatus: responses.graphStatus(0),
     repoChangedRefs: responses.repoChanged('refsChanged', FAKE_REPO_ID),
@@ -517,7 +603,7 @@ export function buildFakeGraphHostInitScript(options?: {
             return;
           }
           if (body.t === 'open' && body.method === 'graph.stream') {
-            if (STREAM_MODE === 'twoChunksSameLane') {
+            if (STREAM_MODE === 'twoChunksSameLane' || STREAM_MODE === 'twoChunksSecondDecorated') {
               const [chunk1Envelope, chunk2Envelope, endEnvelope] = FIXTURES.stream;
               dispatch(withId(chunk1Envelope, body.id));
               window.__releaseSecondGraphChunk = () => {
@@ -531,6 +617,10 @@ export function buildFakeGraphHostInitScript(options?: {
               dispatch(withId(chunk1Envelope, body.id));
               dispatch(withId(chunk2Envelope, body.id));
               dispatch(withId(endEnvelope, body.id));
+              return;
+            }
+            if (STREAM_MODE === 'manyRows') {
+              for (const envelope of FIXTURES.stream) dispatch(withId(envelope, body.id));
               return;
             }
             const [chunkEnvelope, endEnvelope] = FIXTURES.stream;

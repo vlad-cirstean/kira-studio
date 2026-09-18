@@ -408,4 +408,207 @@ test.describe('graph grid columns', () => {
       expect(stillMarked).toBe(4);
     });
   });
+
+  // P92 §12.2 item 1: the graph column's own drag handle — previously only author/date had one,
+  // so this was the one column whose width a user could never control, and the one that grew on
+  // its own with branch count.
+  test.describe('graph column resize (item 1)', () => {
+    function cellRect(
+      page: import('@playwright/test').Page,
+      cellClass: string,
+    ): Promise<{ width: number; right: number }> {
+      return page.evaluate((cls) => {
+        const cell = document
+          .querySelector(`[data-testid="commit-grid"] .slick-row[data-row="0"] .${cls}`)
+          ?.closest('.slick-cell');
+        if (!cell) throw new Error(`${cls}: no ancestor .slick-cell`);
+        const rect = cell.getBoundingClientRect();
+        return { width: rect.width, right: rect.right };
+      }, cellClass);
+    }
+
+    test('a resize handle exists for the graph column, defaults to <=95px', async ({ page }) => {
+      await bootGraph(page);
+      const handle = page.locator('[aria-label="Resize graph column"]');
+      await expect(handle).toBeVisible();
+
+      const graph = await cellRect(page, 'kv-cell-graph');
+      expect(graph.width).toBeLessThanOrEqual(95);
+    });
+
+    // Starts by widening (ArrowRight) rather than narrowing straight away — this fixture's own
+    // one-lane seed (30px) sits below the shared 40px resize floor, so the first press or two
+    // would only clamp back up to the floor rather than move linearly. Four widens land solidly
+    // above the floor; the two narrows that follow are then unambiguous.
+    test('dragging the handle narrows the graph column and widens the message column by the same amount, with every graph svg staying inside its own cell', async ({
+      page,
+    }) => {
+      await bootGraph(page);
+      const handle = page.locator('[aria-label="Resize graph column"]');
+      await handle.focus();
+      for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
+
+      const wideGraph = await cellRect(page, 'kv-cell-graph');
+      const wideMessage = await cellRect(page, 'kv-cell-message');
+
+      await page.keyboard.press('ArrowLeft');
+      await page.keyboard.press('ArrowLeft');
+
+      const narrowGraph = await cellRect(page, 'kv-cell-graph');
+      const narrowMessage = await cellRect(page, 'kv-cell-message');
+
+      const narrowedBy = wideGraph.width - narrowGraph.width;
+      expect(narrowedBy).toBeGreaterThan(0);
+      // A couple of px of slack for rounding — §1's own arithmetic (messageWidth = hostWidth -
+      // graph - reserved) means the message column gains back exactly what the graph column gave up.
+      expect(Math.abs(narrowMessage.width - wideMessage.width - narrowedBy)).toBeLessThanOrEqual(2);
+
+      // The regression this guards: the svg used to size itself from laneCount, not the column's
+      // actual (now user-set) width, so a narrowed column could leave its svg bleeding into the
+      // message column next to it.
+      const svgFits = await page.evaluate(() => {
+        const svgs = Array.from(
+          document.querySelectorAll('[data-testid="commit-grid"] .kv-graph-svg'),
+        );
+        return (
+          svgs.length > 0 &&
+          svgs.every((svg) => {
+            const cell = svg.closest('.slick-cell');
+            return (
+              cell !== null &&
+              svg.getBoundingClientRect().right <= cell.getBoundingClientRect().right + 1
+            );
+          })
+        );
+      });
+      expect(svgFits).toBe(true);
+    });
+  });
+
+  // P92 §12.2 item 2: column widths used to sum to exactly host.clientWidth, but SlickGrid lays
+  // its canvas out against the viewport's own content box (narrower once a vertical scrollbar
+  // takes layout space) — producing a permanent bogus horizontal scrollbar. Needs enough rows for
+  // a real vertical scrollbar to appear; `fakeGraphHost.ts`'s other fixtures (one or two rows)
+  // cannot reproduce it.
+  test.describe('viewport sizing (item 2)', () => {
+    test('the grid never grows a horizontal scrollbar once a vertical one appears, at the default width and after toggling the detail pane', async ({
+      page,
+    }) => {
+      await page.addInitScript(buildFakeGraphHostInitScript({ streamMode: 'manyRows' }));
+      await page.goto(`${server.url}/graph`);
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]'),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+
+      const viewport = page.locator('[data-testid="commit-grid"] .slick-viewport').first();
+      // Lane layout runs off the main thread (`layoutClient.ts`), so `loadedRows` — and the
+      // canvas height SlickGrid sizes from it — settles asynchronously after all 300 chunks have
+      // been dispatched, not synchronously with them. Sanity: this fixture's whole point is a
+      // real vertical scrollbar — without one, the assertion below would pass trivially and catch
+      // nothing.
+      await expect
+        .poll(() => viewport.evaluate((el) => el.scrollHeight > el.clientHeight), {
+          timeout: 5000,
+        })
+        .toBe(true);
+
+      const overflowAtDefault = await viewport.evaluate((el) => el.scrollWidth - el.clientWidth);
+      expect(overflowAtDefault).toBeLessThanOrEqual(0);
+
+      // A rebuild trigger (compact <-> full column set) is the other moment this regression could
+      // reappear, not just first mount.
+      await page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]').click();
+      await expect(page.locator('[data-testid="detail-region"]')).toBeVisible();
+      await page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]').click();
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+
+      const overflowAfterToggle = await viewport.evaluate((el) => el.scrollWidth - el.clientWidth);
+      expect(overflowAfterToggle).toBeLessThanOrEqual(0);
+    });
+  });
+
+  // P92 §12.2 item 4: SlickGrid's row-position index only rebuilds inside updateRowCount() — a
+  // row whose height flipped after it was already rendered (a badge landing after first paint)
+  // left every row below it at a stale transform, painting two rows into one band.
+  test.describe('row reposition after a height change (item 4)', () => {
+    test('a row whose height grows after first render repositions every row below it, with no overlap', async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        buildFakeGraphHostInitScript({ streamMode: 'twoChunksSecondDecorated' }),
+      );
+      await page.goto(`${server.url}/graph`);
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="0"]'),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+
+      await page.evaluate(() =>
+        (window as { __releaseSecondGraphChunk?: () => void }).__releaseSecondGraphChunk?.(),
+      );
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="1"]'),
+      ).toBeVisible();
+
+      const rows = await page.evaluate(() => {
+        const nodes = Array.from(
+          document.querySelectorAll('[data-testid="commit-grid"] .slick-row'),
+        );
+        return nodes
+          .map((el) => {
+            const rect = el.getBoundingClientRect();
+            return { row: Number(el.getAttribute('data-row')), top: rect.top, bottom: rect.bottom };
+          })
+          .sort((a, b) => a.row - b.row);
+      });
+
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      for (let i = 1; i < rows.length; i++) {
+        expect(rows[i].top).toBeGreaterThan(rows[i - 1].top);
+        // No overlap — the previous row's own bottom edge is at or before the next row's top,
+        // with a hairline of slack for sub-pixel rounding.
+        expect(rows[i].top).toBeGreaterThanOrEqual(rows[i - 1].bottom - 1);
+      }
+    });
+  });
+
+  // P92 §12.2 item 10: every badge kind used to paint an opaque background — now an outline only,
+  // the label/icon staying the theme's own --kv-badge-fg token.
+  test.describe('ref/tag badges render as outlines (item 10)', () => {
+    test("a tag badge's background is transparent, its border carries the colour, and its icon matches the badge's own text colour", async ({
+      page,
+    }) => {
+      await page.addInitScript(buildFakeGraphHostInitScript({ streamMode: 'oneDecoratedOneNot' }));
+      await page.goto(`${server.url}/graph`);
+      await expect(
+        page.locator('[data-testid="commit-grid"] .slick-row[data-row="1"]'),
+      ).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('[data-testid="detail-region"]')).toHaveCount(0);
+
+      const badge = page
+        .locator('[data-testid="commit-grid"] .slick-row[data-row="1"] .kv-badge-tag')
+        .first();
+      await expect(badge).toBeVisible();
+
+      const { backgroundColor, borderColor, badgeColor, iconColor } = await badge.evaluate((el) => {
+        const style = getComputedStyle(el);
+        const icon = el.querySelector('.kv-badge-icon');
+        if (!icon) throw new Error('.kv-badge-tag has no .kv-badge-icon child');
+        return {
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
+          badgeColor: style.color,
+          iconColor: getComputedStyle(icon).color,
+        };
+      });
+
+      expect(backgroundColor).toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
+      expect(borderColor).not.toMatch(/^(rgba\(0,\s*0,\s*0,\s*0\)|transparent)$/);
+      expect(iconColor).toBe(badgeColor);
+    });
+  });
 });
