@@ -102,46 +102,14 @@ func ParseProject(dir string) (*Project, error) {
 		return nil, err
 	}
 
-	sharedData, err := readBoundedXML(filepath.Join(ideaDir, "dataSources.xml"))
+	shared, err := readSharedDoc(ideaDir)
 	if err != nil {
 		return nil, err
 	}
-	if sharedData == nil {
-		return nil, fmt.Errorf("datagrip: %s has no dataSources.xml", ideaDir)
-	}
-	var shared xmlSharedDoc
-	if err := xml.Unmarshal(sharedData, &shared); err != nil {
-		return nil, fmt.Errorf("datagrip: dataSources.xml is not valid XML: %w", err)
-	}
 
-	localData, err := readBoundedXML(filepath.Join(ideaDir, "dataSources.local.xml"))
+	localByUUID, createdIn, err := readLocalDoc(ideaDir)
 	if err != nil {
 		return nil, err
-	}
-	var local *xmlLocalDoc
-	if localData != nil {
-		local = &xmlLocalDoc{}
-		if err := xml.Unmarshal(localData, local); err != nil {
-			return nil, fmt.Errorf("datagrip: dataSources.local.xml is not valid XML: %w", err)
-		}
-	}
-
-	localByUUID := map[string]xmlLocalSource{}
-	createdIn := ""
-	if local != nil {
-		for _, c := range local.Components {
-			if c.Name != "dataSourceStorageLocal" {
-				continue
-			}
-			if c.CreatedIn != "" {
-				createdIn = c.CreatedIn
-			}
-			for _, ds := range c.DataSources {
-				if ds.UUID != "" {
-					localByUUID[ds.UUID] = ds
-				}
-			}
-		}
 	}
 
 	// Dir is always ideaDir's own parent, never the raw dir the caller passed in: resolveIdeaDir
@@ -151,26 +119,83 @@ func ParseProject(dir string) (*Project, error) {
 	// to the .idea folder itself for a .idea-direct pick — e.g. "<project>/.idea/db.sqlite" instead
 	// of "<project>/db.sqlite" for a relative SQLite path.
 	project := &Project{Dir: filepath.Dir(ideaDir), CreatedIn: createdIn}
+	project.DataSources = dataSourcesFrom(shared, localByUUID)
+	return project, nil
+}
+
+// readSharedDoc reads and parses dataSources.xml (F1, always required).
+func readSharedDoc(ideaDir string) (xmlSharedDoc, error) {
+	sharedData, err := readBoundedXML(filepath.Join(ideaDir, "dataSources.xml"))
+	if err != nil {
+		return xmlSharedDoc{}, err
+	}
+	if sharedData == nil {
+		return xmlSharedDoc{}, fmt.Errorf("datagrip: %s has no dataSources.xml", ideaDir)
+	}
+	var shared xmlSharedDoc
+	if err := xml.Unmarshal(sharedData, &shared); err != nil {
+		return xmlSharedDoc{}, fmt.Errorf("datagrip: dataSources.xml is not valid XML: %w", err)
+	}
+	return shared, nil
+}
+
+// readLocalDoc reads and parses dataSources.local.xml (F2, optional), returning the per-uuid
+// correlation map and the project's own createdIn — both zero-valued (an empty, non-nil map and
+// "") when the file is absent.
+func readLocalDoc(ideaDir string) (map[string]xmlLocalSource, string, error) {
+	localData, err := readBoundedXML(filepath.Join(ideaDir, "dataSources.local.xml"))
+	if err != nil {
+		return nil, "", err
+	}
+	localByUUID := map[string]xmlLocalSource{}
+	if localData == nil {
+		return localByUUID, "", nil
+	}
+	var local xmlLocalDoc
+	if err := xml.Unmarshal(localData, &local); err != nil {
+		return nil, "", fmt.Errorf("datagrip: dataSources.local.xml is not valid XML: %w", err)
+	}
+	createdIn := ""
+	for _, c := range local.Components {
+		if c.Name != "dataSourceStorageLocal" {
+			continue
+		}
+		if c.CreatedIn != "" {
+			createdIn = c.CreatedIn
+		}
+		for _, ds := range c.DataSources {
+			if ds.UUID != "" {
+				localByUUID[ds.UUID] = ds
+			}
+		}
+	}
+	return localByUUID, createdIn, nil
+}
+
+// dataSourcesFrom correlates shared's own <data-source> entries, in document order, against
+// localByUUID (F2's per-uuid overlay).
+func dataSourcesFrom(shared xmlSharedDoc, localByUUID map[string]xmlLocalSource) []DataSource {
+	var out []DataSource
 	for _, c := range shared.Components {
 		if c.Name != "DataSourceManagerImpl" && c.Name != "dataSourceStorage" {
 			continue
 		}
 		for _, ds := range c.DataSources {
-			out := DataSource{
+			one := DataSource{
 				UUID: ds.UUID, Name: ds.Name, DriverRef: ds.DriverRef,
 				JDBCURL: ds.JDBCURL, ConfiguredByURL: ds.ConfiguredByURL,
 			}
 			if l, ok := localByUUID[ds.UUID]; ok {
-				out.HasLocal = true
-				out.Username = l.UserName
-				out.SecretStorage = l.SecretStorage
-				out.DBMS = l.DatabaseInfo.DBMS
-				out.SSHEnabled = l.SSHProperties != nil && l.SSHProperties.Enabled
+				one.HasLocal = true
+				one.Username = l.UserName
+				one.SecretStorage = l.SecretStorage
+				one.DBMS = l.DatabaseInfo.DBMS
+				one.SSHEnabled = l.SSHProperties != nil && l.SSHProperties.Enabled
 			}
-			project.DataSources = append(project.DataSources, out)
+			out = append(out, one)
 		}
 	}
-	return project, nil
+	return out
 }
 
 // resolveIdeaDir implements D13's "accepts either a project folder or its .idea folder directly".
