@@ -90,7 +90,6 @@ func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnec
 	deps := adapters.Deps{Log: func(level, message string) {}}
 
 	for _, c := range cases {
-		c := c
 		t.Run(c.Name, func(t *testing.T) {
 			if c.Principal != nil {
 				c.Principal.Setup(t, fixture)
@@ -187,7 +186,6 @@ func passwordFromURI(uri *string) string {
 func RunScenarios(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig, scenarios ...Scenario) {
 	t.Helper()
 	for _, s := range scenarios {
-		s := s
 		if s.Requires != nil && !s.Requires(a.Caps()) {
 			continue
 		}

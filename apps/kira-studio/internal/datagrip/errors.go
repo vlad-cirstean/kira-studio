@@ -39,6 +39,9 @@ func (e *RefusalError) Error() string { return e.Message }
 // errPasswordNotFound is D12's last bullet and case 18/19: a clean miss (a readable store with no
 // entry for this uuid, or an entry whose password is the empty string) — distinguishable from
 // every decode/decrypt failure above it, which all report ReasonCredentialStoreUnsupported instead.
+// Consumed only by keychain_darwin.go (darwin && cgo) — invisible to a default-target lint run.
+//
+//nolint:unused // build-tag-only consumer, see above
 var errPasswordNotFound = &RefusalError{
 	Code:    ReasonPasswordNotFound,
 	Message: "no password is stored for this data source",

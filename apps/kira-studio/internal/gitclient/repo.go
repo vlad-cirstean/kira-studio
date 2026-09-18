@@ -150,16 +150,6 @@ func (r *Repo) Read(ctx context.Context, fn func(ctx context.Context) error) err
 	return fn(ctx)
 }
 
-// run is repo.go's own one convenience over Runner.Run + Classify, used by Identify() below and
-// available to any later phase's Repo-scoped command.
-func (r *Repo) run(ctx context.Context, spec Spec) (Result, error) {
-	res, err := Run(ctx, r.runner, r.gitPath, spec)
-	if cerr := Classify(ctx, spec.Args, res, err); cerr != nil {
-		return res, cerr
-	}
-	return res, nil
-}
-
 // WorktreeIdentity answers dir's absolute git dir and common dir — the two rev-parse lines a
 // linked worktree is told apart by (gitDir != commonDir), NFC-canonicalized the same way
 // Identify canonicalizes them (G27 D5a).

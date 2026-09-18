@@ -18,11 +18,6 @@ func (c *fakeConn) Send(frame []byte) error {
 }
 func (c *fakeConn) Receive() ([]byte, error) { select {} }
 
-func newTestSession() (*Session, *fakeConn) {
-	conn := newFakeConn()
-	return newSession(conn), conn
-}
-
 // enqueue reports ErrStreamFull once both the frame-count and byte bounds are exhausted.
 func TestSession_Enqueue_ReportsStreamFullOnceQueueSaturated(t *testing.T) {
 	conn := &blockingConn{}

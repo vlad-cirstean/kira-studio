@@ -3,20 +3,12 @@
 package datagrip
 
 import (
-	"fmt"
 	"runtime"
 )
 
 // keychainSupported lets Scan (D9) classify a row's passwordOutlook without ever calling the
 // query below — a compile-time platform fact, not an I/O probe.
 const keychainSupported = false
-
-// serviceNameForDataSource is F4's generateServiceName("DB", uuid) — kept identical on every
-// platform (it is pure string formatting, not a keychain call) so configdir/kdbx code can build
-// the same service name regardless of which keychain_*.go file is compiled in.
-func serviceNameForDataSource(uuid string) string {
-	return fmt.Sprintf("IntelliJ Platform DB — %s", uuid)
-}
 
 // readKeychainPassword has no implementation outside darwin+cgo (D1): the Linux default backend
 // is the freedesktop Secret Service over libsecret, which needs cgo — this repo's Go is

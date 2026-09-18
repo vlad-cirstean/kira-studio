@@ -16,8 +16,6 @@ import (
 	"github.com/fsnotify/fsevents"
 )
 
-const watcherBackend = "fsevents"
-
 // droppedFlags mean "something changed and we don't know what" — coalesced beyond recognition,
 // dropped in the kernel or in our own client buffer, or the watched root itself moved or was
 // deleted. Mapped to rawEvent.Rescan, which the shared run loop (watch.go) treats identically to

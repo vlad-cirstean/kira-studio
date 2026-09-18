@@ -13,10 +13,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// watcherBackend names the OS event source this build uses (mirrors gitclient/watcher_fsnotify.go's
-// own const), logged once per watcher so an unexpected fallback on a darwin build says so out loud.
-const watcherBackend = "fsnotify"
-
 // fsnotifyBackend is the event source for every non-darwin build, and for a darwin build compiled
 // with CGO_ENABLED=0. fsnotify has no recursive watch, so this backend adds exactly the
 // directories that contain enumerated files (§7.1) rather than walking the whole worktree —

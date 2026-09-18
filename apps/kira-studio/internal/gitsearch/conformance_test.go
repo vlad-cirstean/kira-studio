@@ -95,7 +95,6 @@ func TestConformanceCorpus_AgreesWithCompileAndMatchFields(t *testing.T) {
 	t.Parallel()
 	corpus := loadCorpus(t)
 	for _, row := range corpus.Rows {
-		row := row
 		t.Run(row.Name, func(t *testing.T) {
 			m, err := Compile(toQuery(row.Query))
 			if !row.Expect.Supported {

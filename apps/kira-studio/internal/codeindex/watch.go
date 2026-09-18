@@ -37,8 +37,7 @@ type backend interface {
 }
 
 // newBackend is implemented once per platform: watch_fsevents_darwin.go (darwin && cgo) and
-// watch_fsnotify.go (!darwin || !cgo). watcherBackend, a const naming which is active, is declared
-// alongside each implementation.
+// watch_fsnotify.go (!darwin || !cgo).
 
 // Watcher drives one Index's own worktree watcher (§7.1): a saved file reparses just that file
 // (§7.2's derived-edit incremental path), and a Rescan (dropped/overflowed backend events) or a

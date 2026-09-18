@@ -64,7 +64,7 @@ func TestResolveAgainstTheSharedCorpus(t *testing.T) {
 			}
 			for i, ref := range result.Refs {
 				want := c.Refs[i]
-				if string(ref.Name) != want.Name || string(ref.Kind) != want.Kind {
+				if ref.Name != want.Name || string(ref.Kind) != want.Kind {
 					t.Errorf("Refs[%d] = {%s %s}, want {%s %s}", i, ref.Name, ref.Kind, want.Name, want.Kind)
 				}
 				// P17 D4: Pipeline is nil (omitted from the JSON) for every case that predates the

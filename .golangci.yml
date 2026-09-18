@@ -7,8 +7,12 @@ linters:
   default: none
   enable:
     - bodyclose      # perf/leak: an unclosed HTTP body holds a connection. 0 findings — keeps it so.
+    - copyloopvar    # Go 1.22+ made the loop-var copy redundant. 5.
     - govet          # already run standalone; free here, and catches the same set.
+    - ineffassign    # dead stores — dead code, statement level. 1.
     - makezero       # make([]T, n) then append. 0 findings — keeps it so.
+    - unconvert      # redundant conversions. 1.
+    - unused         # SPEC's Go dead-code answer, staticcheck-based. 11.
   exclusions:
     generated: lax
 

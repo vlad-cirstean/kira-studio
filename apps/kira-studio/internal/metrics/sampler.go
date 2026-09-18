@@ -398,6 +398,9 @@ func gopsutilProbe(pid int32) (procSample, bool) {
 // on darwin) — probe_darwin.go's EPERM-fallback identity tag, kept separate from gopsutilProbe so
 // that fallback isn't tied to gopsutil's own unchecked-return MemoryInfo/Times reads (the exact
 // pattern F2 flags as a bug) when all it actually needs is the creation timestamp.
+// Consumed only by probe_darwin.go (darwin && cgo) — invisible to a default-target lint run.
+//
+//nolint:unused // build-tag-only consumer, see above
 func gopsutilCreateTime(pid int32) (int64, bool) {
 	p, err := process.NewProcess(pid)
 	if err != nil {

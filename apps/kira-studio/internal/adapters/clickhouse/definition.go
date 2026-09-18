@@ -66,8 +66,6 @@ func formatThousands(n int64) string {
 	return neg + string(out)
 }
 
-var definitionSupportedKinds = map[string]bool{"table": true, "view": true, "matview": true}
-
 // buildDefinition is definition.ts's own.
 func buildDefinition(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx, track TrackQuery, segments []model.PathSegment, schema string, kind, name string) (model.ObjectDefinition, error) {
 	target, err := getReadTarget(ctx, h, queryID, op, track, schema, name)

@@ -360,10 +360,6 @@ func (inst *repoInstance) sourceForSites(ctx context.Context, omit bool, sites [
 // maxLines; whichever binds first cuts the body.
 const symbolSourceMaxBytes = 64 * 1024
 
-// docCommentLookbackCap bounds how many lines readSymbolRows will ever consider for the
-// doc-comment walk (P64 §3.4) — the "40 lines" half of that walk's own stop condition.
-const docCommentLookbackCap = 40
-
 // docCommentPrefixes is P64 §3.4's own comment-prefix heuristic: a line immediately preceding a
 // declaration, trimmed, starting with any of these is presumed part of its doc comment. §13's own
 // accepted false positive: a trailing comment belonging to the *previous* declaration is picked up

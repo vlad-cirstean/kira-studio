@@ -43,23 +43,6 @@ func initTwoFixtureRepos(t *testing.T) (repoA, repoB string) {
 	return initFixtureRepo(t), initFixtureRepo(t)
 }
 
-// waitFor polls cond every 5ms until it reports true or timeout elapses, failing the test if it
-// never does -- used wherever a matrix test needs to wait for asynchronous teardown (D8) rather
-// than assume it has already happened by the time control returns.
-func waitFor(t *testing.T, timeout time.Duration, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	if !cond() {
-		t.Fatal("condition never became true within the deadline")
-	}
-}
-
 // assertNoGoroutineGrowth is D10's own scoped containment check, in place of goleak (declined:
 // goleak's package-scoped model would sit on top of this package's 70+ existing tests that spawn
 // real git/fsnotify/SQLite, needing a hand-maintained ignore list that only rots). It records

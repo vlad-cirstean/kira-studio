@@ -176,7 +176,6 @@ func (s *CodeWorkspaceService) RepoHeads(ctx context.Context, args CodeRepoHeads
 	var g errgroup.Group
 	g.SetLimit(repoHeadsConcurrency)
 	for i, repo := range repos {
-		i, repo := i, repo
 		results[i] = CodeRepoHead{ID: repo.ID}
 		if repo.Root == "" {
 			continue // a bare repository (§12.2) has no worktree, so no HEAD to show
@@ -244,7 +243,6 @@ func (s *CodeWorkspaceService) RepoWorktreeLinks(ctx context.Context) ([]CodeRep
 	var g errgroup.Group
 	g.SetLimit(repoHeadsConcurrency)
 	for i, repo := range repos {
-		i, repo := i, repo
 		if repo.Root == "" {
 			continue // a bare repository (RepoHeads' own guard, :180) has no worktree; belt-and-braces
 		}

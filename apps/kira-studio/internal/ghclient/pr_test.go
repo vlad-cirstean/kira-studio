@@ -184,7 +184,7 @@ func TestOpenPulls_ArgvGoldenAndEarlyStop(t *testing.T) {
 // back full (100 elements) — a runner that always returns exactly per_page rows would otherwise
 // paginate forever.
 func TestOpenPulls_StopsAtMaxSnapshotPages(t *testing.T) {
-	full := make([]byte, 0)
+	var full []byte
 	{
 		// A 100-element array — content does not matter, only its length (>= per_page).
 		buf := []byte("[")

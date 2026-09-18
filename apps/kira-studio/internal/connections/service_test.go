@@ -125,18 +125,6 @@ func (f *fakeAuthorizer) Authorize(reason string, confirmed bool) (localauth.Out
 	return f.outcome, f.err
 }
 
-func (f *fakeAuthorizer) setOutcome(outcome localauth.Outcome, err error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.outcome, f.err = outcome, err
-}
-
-func (f *fakeAuthorizer) callCount() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.calls
-}
-
 // harness wires a real SQLite db (through the real migrations), a real available cipher (the
 // Linux KIRA_INSECURE_SECRETS fallback), a fakeBackend, a fakeAuthorizer, and a real preconnect
 // supervisor behind one connections.Service.
