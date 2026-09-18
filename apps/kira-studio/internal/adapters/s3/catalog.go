@@ -119,13 +119,13 @@ func listPrefixChildren(ctx context.Context, client prefixLister, bucket string,
 
 	sort.Slice(prefixNodes, func(i, j int) bool { return prefixNodes[i].Name < prefixNodes[j].Name })
 	sort.Slice(objectNodes, func(i, j int) bool { return objectNodes[i].Name < objectNodes[j].Name })
-	nodes := append(prefixNodes, objectNodes...)
+	prefixNodes = append(prefixNodes, objectNodes...)
 
 	// P43 iter2 F16/D21: true only when the round cap cut the listing short — never for an
 	// ordinary complete listing that happened to take fewer rounds.
 	if continuationToken != nil && rounds >= maxListRounds {
 		truncated := true
-		return adapters.TreeChildren{Nodes: nodes, Truncated: &truncated}, nil
+		return adapters.TreeChildren{Nodes: prefixNodes, Truncated: &truncated}, nil
 	}
-	return adapters.TreeChildren{Nodes: nodes}, nil
+	return adapters.TreeChildren{Nodes: prefixNodes}, nil
 }

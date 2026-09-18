@@ -213,7 +213,7 @@ func TestG8PerfBaseline(t *testing.T) {
 		// A large patch: touch every other line.
 		lines := strings.Split(blobContent, "\n")
 		for i := 0; i < len(lines); i += 2 {
-			lines[i] = lines[i] + " CHANGED"
+			lines[i] += " CHANGED"
 		}
 		if err := os.WriteFile(filepath.Join(dir, "big.txt"), []byte(strings.Join(lines, "\n")), 0o644); err != nil {
 			t.Fatalf("write: %v", err)

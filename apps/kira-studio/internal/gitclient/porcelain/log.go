@@ -103,11 +103,13 @@ const ScanFieldCount = 11
 // and the whole point of this function is that its argv differs from LogSessionArgs' in exactly
 // one token (the format string).
 func LogScanArgs(spec WalkSpec) []string {
-	args := []string{
+	walk := WalkArgs(spec)
+	args := make([]string, 0, 6+len(walk))
+	args = append(args,
 		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
-		"--topo-order", "-z", "--format=" + ScanFormat,
-	}
-	return append(args, WalkArgs(spec)...)
+		"--topo-order", "-z", "--format="+ScanFormat,
+	)
+	return append(args, walk...)
 }
 
 // ParseLogRecord parses one NUL-delimited record (as RecordSplitter returns it) against

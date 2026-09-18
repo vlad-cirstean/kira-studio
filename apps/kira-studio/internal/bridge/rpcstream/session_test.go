@@ -1,6 +1,7 @@
 package rpcstream
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/json"
@@ -182,7 +183,7 @@ func TestSession_Stream_EmitsBlobAndJSONChunks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal wantEnv2: %v", err)
 	}
-	if string(raw2) != string(wantBytes2) {
+	if !bytes.Equal(raw2, wantBytes2) {
 		t.Fatalf("chunk 2 = %s, want byte-identical %s", raw2, wantBytes2)
 	}
 

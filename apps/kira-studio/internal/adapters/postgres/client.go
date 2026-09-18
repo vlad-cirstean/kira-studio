@@ -49,11 +49,12 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 			connConfig.Password = *cfg.Password
 		}
 	}
-	if database != "" {
+	switch {
+	case database != "":
 		connConfig.Database = database
-	} else if cfg.Database != nil && *cfg.Database != "" {
+	case cfg.Database != nil && *cfg.Database != "":
 		connConfig.Database = *cfg.Database
-	} else if connConfig.Database == "" {
+	case connConfig.Database == "":
 		// P24: no explicit database anywhere (cfg.Database blank, and neither the URI's own path
 		// nor pgx.ParseConfig("")'s PGDATABASE fallback supplied one). Left alone, the Postgres
 		// wire protocol defaults an omitted "database" startup parameter to the connecting

@@ -1,6 +1,7 @@
 package repos_test
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"testing"
@@ -131,7 +132,7 @@ func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureKey(duplicate): %v", err)
 	}
-	if string(duplicateMinted) == string(originalKey) {
+	if bytes.Equal(duplicateMinted, originalKey) {
 		t.Fatal("the duplicate's freshly-minted key equals the original's — keys are linkable across connections")
 	}
 }

@@ -177,8 +177,7 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 func languageFor(relPath string) string {
 	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(relPath), "."))
 	base := strings.ToLower(filepath.Base(relPath))
-	switch base {
-	case "dockerfile":
+	if base == "dockerfile" {
 		return "dockerfile"
 	}
 	switch ext {

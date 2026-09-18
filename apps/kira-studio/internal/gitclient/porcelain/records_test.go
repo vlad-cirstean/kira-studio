@@ -34,7 +34,7 @@ func TestRecordSplitter_DelimiterAsFirstAndLastByteOfAChunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Push: %v", err)
 	}
-	if len(recs1) != 1 || string(recs1[0]) != "" {
+	if len(recs1) != 1 || len(recs1[0]) != 0 {
 		t.Fatalf("first push: got %q, want one empty record (a leading delimiter with nothing before it)", recs1)
 	}
 	recs2, err := s.Push([]byte("more\x00"))

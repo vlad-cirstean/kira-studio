@@ -1,6 +1,7 @@
 package gitreview
 
 import (
+	"bytes"
 	"context"
 	"path/filepath"
 	"reflect"
@@ -84,7 +85,7 @@ func TestStorePutRecordRoundTrip(t *testing.T) {
 	if got.BlobOID != "oid1" || got.State != "full" || got.LineCount != 3 {
 		t.Fatalf("Record mismatch: %+v", got)
 	}
-	if string(gotContent) != string(content) {
+	if !bytes.Equal(gotContent, content) {
 		t.Fatalf("Record content = %q, want %q", gotContent, content)
 	}
 

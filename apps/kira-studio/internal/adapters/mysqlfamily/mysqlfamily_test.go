@@ -8,6 +8,7 @@
 package mysqlfamily_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -841,7 +842,7 @@ func runFamilySuite(t *testing.T, kind string, cfg model.ResolvedConnectionConfi
 			t.Fatalf("probe read back: %v", err)
 		}
 		want := []byte{0x04, 0x05}
-		if string(stored) != string(want) {
+		if !bytes.Equal(stored, want) {
 			t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
 		}
 	})

@@ -22,14 +22,8 @@ type SplitURL struct {
 
 // Split mirrors url.ts's splitUrl: two IndexOfs, not a parser, so 'api.exa' still splits cleanly.
 func Split(text string) SplitURL {
-	beforeHash, hash := text, ""
-	if i := strings.Index(text, "#"); i >= 0 {
-		beforeHash, hash = text[:i], text[i+1:]
-	}
-	base, query := beforeHash, ""
-	if i := strings.Index(beforeHash, "?"); i >= 0 {
-		base, query = beforeHash[:i], beforeHash[i+1:]
-	}
+	beforeHash, hash, _ := strings.Cut(text, "#")
+	base, query, _ := strings.Cut(beforeHash, "?")
 	return SplitURL{Base: base, Query: query, Hash: hash}
 }
 
@@ -90,10 +84,7 @@ func Build(raw string) map[string]json.RawMessage {
 		base = base[i+3:]
 	}
 
-	hostPort, path := base, ""
-	if i := strings.Index(base, "/"); i >= 0 {
-		hostPort, path = base[:i], base[i+1:]
-	}
+	hostPort, path, _ := strings.Cut(base, "/")
 
 	if hostPort != "" {
 		host := hostPort

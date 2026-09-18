@@ -1,6 +1,7 @@
 package postgres_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -1321,7 +1322,7 @@ func TestPostgres_MutateBinaryColumnRoundTrips(t *testing.T) {
 		t.Fatalf("probe read back: %v", err)
 	}
 	want := []byte{0x04, 0x05}
-	if string(stored) != string(want) {
+	if !bytes.Equal(stored, want) {
 		t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
 	}
 

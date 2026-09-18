@@ -1,6 +1,7 @@
 package gitsession
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -507,7 +508,7 @@ func TestRunOp_GlobalStashSave_FromWorkingTree_CopiesNeverDrops(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read f.txt: %v", err)
 	}
-	if string(got) != string(dirty) {
+	if !bytes.Equal(got, dirty) {
 		t.Fatalf("f.txt = %q after save, want unchanged %q", got, dirty)
 	}
 

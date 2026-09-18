@@ -1,6 +1,7 @@
 package mcpauth
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,7 +56,7 @@ func TestLoadOrMintTTLMintsOnceThenLoads(t *testing.T) {
 	if minted2 || plain2 != "" {
 		t.Fatalf("second LoadOrMintTTL: minted=%v plain=%q, want minted=false and no plaintext", minted2, plain2)
 	}
-	if string(rec1.Hash) != string(rec2.Hash) || string(rec1.Salt) != string(rec2.Salt) {
+	if !bytes.Equal(rec1.Hash, rec2.Hash) || !bytes.Equal(rec1.Salt, rec2.Salt) {
 		t.Fatal("second LoadOrMintTTL returned a different record than the first mint persisted")
 	}
 	if !Verify(plain1, rec2) {
@@ -93,7 +94,7 @@ func TestSaveIsAtomicAndLeavesNoTempFile(t *testing.T) {
 	if !ok {
 		t.Fatal("Load after Save: ok = false")
 	}
-	if string(loaded.Hash) != string(rec2.Hash) {
+	if !bytes.Equal(loaded.Hash, rec2.Hash) {
 		t.Fatal("Load after the second Save returned the first record, not the overwrite")
 	}
 

@@ -1,6 +1,7 @@
 package gitrpc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -156,7 +157,7 @@ func TestRunOpReset_RejectsInvalidMode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rev-parse HEAD: %v", err)
 	}
-	if string(headBefore) != string(headAfter) {
+	if !bytes.Equal(headBefore, headAfter) {
 		t.Fatalf("HEAD moved despite every reset being rejected: before=%q after=%q", headBefore, headAfter)
 	}
 }
@@ -311,7 +312,7 @@ func TestOpRunReset_RejectsOptionInjectingTargetPreventsArbitraryFileWrite(t *te
 	if err != nil {
 		t.Fatalf("rev-parse HEAD: %v", err)
 	}
-	if string(headBefore) != string(headAfter) {
+	if !bytes.Equal(headBefore, headAfter) {
 		t.Fatalf("HEAD moved despite the reset being refused: before=%q after=%q", headBefore, headAfter)
 	}
 }

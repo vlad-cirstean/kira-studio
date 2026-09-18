@@ -165,13 +165,14 @@ func validColumnsFor(li *LineIndex, row int) []int {
 	data := []byte(fixtureTextFor(li))
 	for off < end {
 		r, size := utf8.DecodeRune(data[off:end])
-		if r == utf8.RuneError && size <= 1 {
+		switch {
+		case r == utf8.RuneError && size <= 1:
 			units++
 			off++
-		} else if r > 0xFFFF {
+		case r > 0xFFFF:
 			units += 2
 			off += size
-		} else {
+		default:
 			units++
 			off += size
 		}

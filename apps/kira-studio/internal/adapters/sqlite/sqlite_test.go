@@ -7,6 +7,7 @@
 package sqlite_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -715,7 +716,7 @@ func TestSqlite(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read after: %v", err)
 		}
-		if len(before) != len(after) || string(before) != string(after) {
+		if !bytes.Equal(before, after) {
 			t.Error("a refused read-only DDL attempt modified the database file")
 		}
 		for _, suffix := range []string{"-wal", "-shm"} {
@@ -862,7 +863,7 @@ func TestSqlite(t *testing.T) {
 			t.Fatalf("probe read back: %v", err)
 		}
 		want := []byte{0x04, 0x05}
-		if string(stored) != string(want) {
+		if !bytes.Equal(stored, want) {
 			t.Errorf("stored bytes = %#v, want %#v (got the display text instead of decoded bytes?)", stored, want)
 		}
 	})
@@ -1059,7 +1060,7 @@ func TestSqlite(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read after: %v", err)
 		}
-		if len(before) != len(after) || string(before) != string(after) {
+		if !bytes.Equal(before, after) {
 			t.Error("a read-only session modified the database file")
 		}
 		for _, suffix := range []string{"-wal", "-shm"} {

@@ -128,6 +128,7 @@ func (s *GrpcService) resolveGrpcCallSource(args GrpcCallArgs) (grpcclient.Sourc
 	src.Target = resolver.Text(args.Target)
 	src.Metadata = resolveMetaPairs(resolver, args.Metadata)
 	resolvedMessage := resolver.Text(args.MessageJSON)
+	used = make([]apivars.UsedSecret, 0, len(resolver.Used()))
 	used = append(used, resolver.Used()...)
 	return src, resolvedMessage, used, nil
 }
@@ -480,16 +481,17 @@ func (s *GrpcService) runServerStream(ctx context.Context, args GrpcCallArgs, re
 	if err != nil {
 		maskGrpcError(err, used)
 		var gerr *grpcclient.Error
-		if errors.As(err, &gerr) && gerr.Partial != nil {
+		switch {
+		case errors.As(err, &gerr) && gerr.Partial != nil:
 			partial := *gerr.Partial
 			// D11: a cancellation or failure that received messages is still a completed call —
 			// recorded here, before the terminal event that could race a History pane's own
 			// refetch of this same row.
 			s.recordGrpcHistory(args, partial)
 			coalescer.finish(&partial, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
-		} else if errors.As(err, &gerr) {
+		case errors.As(err, &gerr):
 			coalescer.finish(nil, &GrpcCallEventErr{Code: gerr.Code, Message: gerr.Message})
-		} else {
+		default:
 			coalescer.finish(nil, &GrpcCallEventErr{Code: grpcclient.CodeTransport, Message: err.Error()})
 		}
 		return grpcclient.CallResult{}, err

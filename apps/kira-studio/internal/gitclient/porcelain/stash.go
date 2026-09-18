@@ -28,7 +28,8 @@ func StashListArgs() []string {
 // comment states the mechanism directly: %gs cannot name a PARENT commit's subject, only the stash
 // commit's own.
 func StashBaseSubjectArgs(shas []string) []string {
-	args := []string{"log", "--no-walk", "--format=%H%x1f%s", "-z"}
+	args := make([]string, 0, 4+len(shas))
+	args = append(args, "log", "--no-walk", "--format=%H%x1f%s", "-z")
 	return append(args, shas...)
 }
 
@@ -235,7 +236,8 @@ const GlobalStashFormat = "%H%x1f%H%x1f%P%x1f%s%x1f%at"
 // unchanged. Only called when the bucket is non-empty (globalStash.list's own first spawn,
 // gitops.GlobalStashListRefsArgs, already answered at least one sha).
 func GlobalStashLogArgs(shas []string) []string {
-	args := []string{"log", "--no-walk", "-m", "--first-parent", "-z", "--numstat", "-M", "-C", "--format=" + GlobalStashFormat}
+	args := make([]string, 0, 9+len(shas))
+	args = append(args, "log", "--no-walk", "-m", "--first-parent", "-z", "--numstat", "-M", "-C", "--format="+GlobalStashFormat)
 	return append(args, shas...)
 }
 

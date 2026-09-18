@@ -80,11 +80,9 @@ func rangeSubjectsFixture(n int) []byte {
 	var out []byte
 	for i := 0; i < n; i++ {
 		rec := []byte{}
-		rec = append(rec, []byte("sha")...)
-		rec = append(rec, byte('0'+i))
+		rec = append(rec, "sha"+string(rune('0'+i))...)
 		rec = append(rec, 0x1f)
-		rec = append(rec, []byte("subject ")...)
-		rec = append(rec, byte('0'+i))
+		rec = append(rec, "subject "+string(rune('0'+i))...)
 		rec = append(rec, 0x00)
 		out = append(out, rec...)
 	}

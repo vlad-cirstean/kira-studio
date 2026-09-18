@@ -51,9 +51,8 @@ func (s *Server) attachFastPathLocked(spec RepoSpec) (info RepoInfo, done bool, 
 		}
 		return RepoInfo{}, true, fmt.Errorf("repomap: attach: key %q is already attached to a different repository", spec.Key)
 	}
-	lower := strings.ToLower(spec.Key)
 	for k := range s.repos {
-		if strings.ToLower(k) == lower {
+		if strings.EqualFold(k, spec.Key) {
 			return RepoInfo{}, true, fmt.Errorf("repomap: attach: key %q collides (case-insensitively) with already-attached %q", spec.Key, k)
 		}
 	}
@@ -110,9 +109,8 @@ func (s *Server) Attach(spec RepoSpec) (RepoInfo, error) {
 		}
 		return RepoInfo{}, fmt.Errorf("repomap: attach: key %q is already attached to a different repository", spec.Key)
 	}
-	lower := strings.ToLower(spec.Key)
 	for k := range s.repos {
-		if strings.ToLower(k) == lower {
+		if strings.EqualFold(k, spec.Key) {
 			s.reposMu.Unlock()
 			inst.discardUnregistered()
 			return RepoInfo{}, fmt.Errorf("repomap: attach: key %q collides (case-insensitively) with already-attached %q", spec.Key, k)
@@ -194,9 +192,8 @@ func (s *Server) Rekey(oldKey, newKey string) error {
 	if !ok {
 		return fmt.Errorf("repomap: rekey: %q is not attached", oldKey)
 	}
-	lower := strings.ToLower(newKey)
 	for k := range s.repos {
-		if k != oldKey && strings.ToLower(k) == lower {
+		if k != oldKey && strings.EqualFold(k, newKey) {
 			return fmt.Errorf("repomap: rekey: %q collides (case-insensitively) with already-attached %q", newKey, k)
 		}
 	}
@@ -257,9 +254,8 @@ func (s *Server) pick(name string) (*repoInstance, *mcp.CallToolResult) {
 		inst.inflight.Add(1)
 		return inst, nil
 	}
-	lower := strings.ToLower(name)
 	for _, k := range s.order {
-		if strings.ToLower(k) == lower {
+		if strings.EqualFold(k, name) {
 			inst := s.repos[k]
 			inst.inflight.Add(1)
 			return inst, nil

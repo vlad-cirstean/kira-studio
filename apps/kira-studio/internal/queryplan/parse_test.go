@@ -1,6 +1,7 @@
 package queryplan
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -189,7 +190,7 @@ func TestParityFixtures(t *testing.T) {
 
 			gotCanon, _ := json.Marshal(got)
 			wantCanon, _ := json.Marshal(want)
-			if string(gotCanon) != string(wantCanon) {
+			if !bytes.Equal(gotCanon, wantCanon) {
 				t.Fatalf("plan mismatch for %s\n got: %s\nwant: %s", caseName, gotCanon, wantCanon)
 			}
 		})

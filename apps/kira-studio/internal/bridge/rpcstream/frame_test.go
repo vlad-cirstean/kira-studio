@@ -1,6 +1,7 @@
 package rpcstream
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"testing"
@@ -16,7 +17,7 @@ func TestEncodeBody_NilBlobIsByteIdenticalToPlainJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
 	}
-	if string(got) != string(want) {
+	if !bytes.Equal(got, want) {
 		t.Fatalf("encodeBody(env, nil) = %s, want byte-identical to json.Marshal(env) = %s", got, want)
 	}
 }
@@ -40,10 +41,10 @@ func TestEncodeBody_BlobLayout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal: %v", err)
 	}
-	if string(header) != string(wantHeader) {
+	if !bytes.Equal(header, wantHeader) {
 		t.Fatalf("header = %s, want %s", header, wantHeader)
 	}
-	if string(gotBlob) != string(blob) {
+	if !bytes.Equal(gotBlob, blob) {
 		t.Fatalf("blob = %q, want %q", gotBlob, blob)
 	}
 }

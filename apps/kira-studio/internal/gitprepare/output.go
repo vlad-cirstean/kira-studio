@@ -195,7 +195,8 @@ func (c *outputCollector) stderrWriter() *streamWriter { return &streamWriter{c:
 
 func (c *outputCollector) write(stream string, chunk []byte) {
 	c.mu.Lock()
-	buf := append(c.streamBuf[stream], chunk...)
+	c.streamBuf[stream] = append(c.streamBuf[stream], chunk...)
+	buf := c.streamBuf[stream]
 	for {
 		idx := bytes.IndexByte(buf, '\n')
 		if idx < 0 {
