@@ -2,7 +2,14 @@ import { defaultSettings } from '@shared/domain/settings';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { installGitStreamMock } from './support/gitStreamMock';
-import { buildGraphStreamChunk, buildOneCommitChunk } from './support/graphStreamFixture';
+import {
+  buildGraphStreamChunk,
+  buildMultiBranchChunk,
+  buildMultiBranchRefsList,
+  buildOneCommitChunk,
+  MULTI_BRANCH_FEATURE_NEWER_HIDDEN_COUNT,
+  MULTI_BRANCH_FEATURE_NEWER_NAME,
+} from './support/graphStreamFixture';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
@@ -1509,4 +1516,154 @@ test('a repo workspace: "Open all changes" on a commit opens one multi-diff tab 
   await expect(multiDiffView).toBeVisible();
   const paths = await multiDiffView.locator('.path-dir').allTextContents();
   expect(paths).toEqual(['a.ts', 'b.ts']);
+});
+
+// P93 §8.4: the desktop app's own DOM-level check for the collapse/branch-order feature —
+// `graph-branch-order.spec.ts` (webview-interaction) already covers the toolbar toggle, the
+// dashed fork stubs and the no-overlap/no-scrollbar cases in detail; this only exercises what is
+// specific to the desktop host: `RepoGraphView.vue`'s own `KeepAlive` (a tab switch away and back
+// keeps the mounted `git-ui` app alive rather than tearing it down, `MainView.vue`'s
+// `KEEP_ALIVE_VIEWS`) and `revealAndSelectSha`'s auto-expand-on-search-reveal path
+// (`App.vue:490`). `buildMultiBranchChunk`/`buildMultiBranchRefsList` (`graphStreamFixture.ts`)
+// port `fakeGraphHost.ts`'s own fixture table — see that file's doc comment for the row/parent
+// layout: `main` (HEAD, 3 commits, never collapses), `feature-newer` (5 commits, collapses by
+// default), `feature-older` (2 commits, always full). Collapsed-by-default display order: `M0,
+// M1, M2, F0, [placeholder], F4, G0, G1` (8 rows, row 7 last); fully expanded: 10 rows (row 9
+// last).
+test.describe('a repo workspace: graph branch collapse (P93 §8.4)', () => {
+  async function bootMultiBranchGraph(
+    page: import('@playwright/test').Page,
+    extraResults?: Record<string, unknown>,
+  ): Promise<void> {
+    await installGitStreamMock(
+      page,
+      REPO.repoId,
+      {
+        'repo.open': {
+          kind: 'ok',
+          repo: {
+            repoId: REPO.repoId,
+            root: REPO.root,
+            gitDir: `${REPO.root}/.git`,
+            commonDir: `${REPO.root}/.git`,
+            isBare: false,
+            isLinkedWorktree: false,
+            head: { kind: 'branch', name: 'main' },
+          },
+        },
+        'refs.list': buildMultiBranchRefsList(),
+        ...extraResults,
+      },
+      [buildGraphStreamChunk(REPO.repoId, 0, buildMultiBranchChunk())],
+    );
+    await openGitModule(page);
+    await repoRow(page).click();
+    await expect(page.locator('[data-testid="repo-graph-host"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="commit-grid"] .slick-row[data-row="7"]'),
+    ).toBeVisible();
+  }
+
+  function messageCell(page: import('@playwright/test').Page, row: number) {
+    return page
+      .locator(`[data-testid="commit-grid"] .slick-row[data-row="${row}"] .kv-cell-message`)
+      .first();
+  }
+
+  test('the default view collapses feature-newer, main and feature-older render in full', async ({
+    relaunch,
+  }) => {
+    const { window: page } = await relaunch({ control: CONTROL });
+    await bootMultiBranchGraph(page);
+
+    await expect(messageCell(page, 0)).toContainText('main tip (M0)');
+    const placeholder = messageCell(page, 4);
+    await expect(placeholder).toHaveAttribute('data-testid', 'graph-collapsed-row');
+    await expect(placeholder).toContainText(
+      `${MULTI_BRANCH_FEATURE_NEWER_HIDDEN_COUNT} more commits on ${MULTI_BRANCH_FEATURE_NEWER_NAME}`,
+    );
+    await expect(page.locator('[data-testid="commit-grid"] .slick-row[data-row="8"]')).toHaveCount(
+      0,
+    );
+  });
+
+  // RepoGraphView.vue's own KeepAlive (MainView.vue's KEEP_ALIVE_VIEWS) is what this asserts:
+  // switching to a sibling tab and back deactivates/reactivates the same mounted instance rather
+  // than tearing it down, so in-memory state (a manually expanded group; the toolbar's own
+  // collapse-off choice) survives without needing `PersistedViewState` at all.
+  //
+  // §8.4's own wording also asks that "the persisted `collapseBranches` survives a relaunch (v8's
+  // own round trip)" — not reachable at this test tier: `fixtures.ts`'s own doc comment on
+  // `relaunch()` says plainly that a second call opens an entirely fresh page with fresh mocks,
+  // "there is nothing to persist to" (no `KIRA_HOME`, no real backend), and `TabViewStateStore`
+  // only round-trips through a genuine `RepoGraphView` unmount+remount, which this KeepAlive
+  // (`:max="20"`, one pinned graph tab per open repo workspace) makes impractical to force within
+  // a single page session. The closest verifiable analog: the same value survives the one kind of
+  // "return to this tab" a KeepAlive'd session can actually exercise.
+  test('a manual expand and the toolbar collapse-off choice both survive a tab switch and back', async ({
+    relaunch,
+  }) => {
+    const { window: page } = await relaunch({ control: CONTROL });
+    await bootMultiBranchGraph(page);
+
+    await messageCell(page, 4).click(); // expand feature-newer
+    await expect(
+      page.locator('[data-testid="commit-grid"] .slick-row[data-row="9"]'),
+    ).toBeVisible();
+    await expect(page.locator('[data-testid="graph-collapse-toggle"]')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.locator('[data-testid="graph-collapse-toggle"]').click(); // collapse-off
+    await expect(page.locator('[data-testid="graph-collapse-toggle"]')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    // Switch to the Files tab (a real, non-KeepAlive'd tab) and back to the pinned graph tab.
+    await page.locator('[data-testid="git-panel-tab-files"]').click();
+    await expect(treeRow(page, 'a.ts')).toBeVisible();
+    await treeRow(page, 'a.ts').click();
+    await expect(tab(page, 'repo-file')).toHaveCount(1);
+    await tab(page, 'repo-graph').click();
+
+    await expect(
+      page.locator('[data-testid="commit-grid"] .slick-row[data-row="9"]'),
+    ).toBeVisible();
+    await expect(page.locator('[data-testid="graph-collapsed-row"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="graph-collapse-toggle"]')).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  // App.vue's `revealAndSelectSha` (search.ts's `activeHit` watcher) auto-expands a collapsed
+  // group before scrolling — `CommitGrid.vue`'s own `scrollToRow` doc comment. `'F2'` is a unique
+  // substring of exactly one commit ('feature-newer F2', row 5 once expanded, hidden inside the
+  // placeholder while collapsed) — the loaded-only scan (`searchLoadedCommits`) is synchronous
+  // over this fixture's one, fully-exhausted chunk, so no `search.run` tail request is needed.
+  test('a search reveal into a collapsed group expands it and selects the hit', async ({
+    relaunch,
+  }) => {
+    const { window: page } = await relaunch({ control: CONTROL });
+    await bootMultiBranchGraph(page);
+
+    await expect(page.locator('[data-testid="graph-collapsed-row"]')).toHaveCount(1);
+
+    await page.locator('[data-testid="search-toggle-button"]').click();
+    // `[data-testid="search-input"]` lands on `KuiSearchInput.vue`'s own root `<div>` (Vue's
+    // attrs fallthrough) — the real `<input>` is nested one level inside it.
+    const searchInput = page.locator('[data-testid="search-input"] input');
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill('F2');
+    await expect(page.locator('[data-testid="search-count"]')).toBeVisible();
+    await searchInput.press('Enter');
+
+    await expect(page.locator('[data-testid="graph-collapsed-row"]')).toHaveCount(0);
+    // Expanded order: M0, M1, M2, F0, F1, F2, F3, F4, G0, G1 — 'F2' is row 5.
+    const targetRow = page.locator('[data-testid="commit-grid"] .slick-row[data-row="5"]');
+    await expect(targetRow).toContainText('feature-newer F2');
+    await expect(targetRow).toBeVisible();
+    await expect(targetRow).toHaveClass(/kv-row-selected/);
+  });
 });
