@@ -239,6 +239,17 @@ export function buildColumns(
       field: 'sha',
       name: '',
       width: widths.graph,
+      // P92 item 2 follow-up: SlickGrid's own column default is `minWidth: 30`
+      // (`_columnDefaults`, applied by `updateColumnProps()` on every `setColumns()`) — silently
+      // applied to any column that does not declare its own, `graph` included. A one-lane (or
+      // zero-lane, the transient pre-layout state) repo's own true width (`graphColumnWidth`,
+      // `geometry.ts`) is 17-30px, so that hidden floor silently rendered the column wider than
+      // `computeMessageWidth` (`CommitGrid.vue`) accounted for — the exact gap reappeared as a
+      // permanent horizontal scrollbar §2's own `availableWidth()` fix does not touch, since the
+      // desync is inside SlickGrid's own clamp, not in what width this file asks it to use. `0`
+      // (not `undefined`) is required: `updateColumnProps()`'s clamp guards on `m.minWidth &&`, so
+      // only a falsy `minWidth` (never merged back to the default) actually disables it.
+      minWidth: 0,
       resizable: false,
       sortable: false,
       focusable: false,
@@ -251,6 +262,7 @@ export function buildColumns(
       field: 'subject',
       name: '',
       width: widths.messageWidth,
+      minWidth: 0, // see `graph`'s own comment above — same hidden SlickGrid floor, same fix.
       resizable: false,
       sortable: false,
       focusable: false,
@@ -265,6 +277,7 @@ export function buildColumns(
       field: 'author.name',
       name: '',
       width: widths.author,
+      minWidth: 0, // see `graph`'s own comment above — same hidden SlickGrid floor, same fix.
       resizable: false,
       sortable: false,
       focusable: false,
@@ -276,6 +289,7 @@ export function buildColumns(
       field: 'author.timestamp',
       name: '',
       width: widths.date,
+      minWidth: 0, // see `graph`'s own comment above — same hidden SlickGrid floor, same fix.
       resizable: false,
       sortable: false,
       focusable: false,

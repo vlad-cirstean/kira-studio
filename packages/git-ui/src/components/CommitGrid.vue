@@ -896,6 +896,14 @@ watch(
     // P92 item 4: `invalidate()`, not `updateRowCount()` + `render()` — see `handleChunkLayout`'s
     // own comment for the mechanism; `invalidate()` also repositions already-cached rows.
     grid?.invalidate();
+    // P92 item 2 follow-up: the row count crossing the "needs a vertical scrollbar" threshold is
+    // the ONE thing that can shrink `availableWidth()` with no host resize and no detailOpen
+    // toggle — the two triggers `scheduleResize`'s own ResizeObserver and the `detailOpen` watcher
+    // already cover. Without this, a history that streams past that threshold keeps the column
+    // widths computed at the pre-scrollbar width, permanently reproducing the bug §2 exists to
+    // fix. `scheduleResize` already dedupes against `lastRebuiltWidth`, so this is a no-op for
+    // every row load that does not actually cross the threshold.
+    scheduleResize();
     // P79 fix (Functional MEDIUM): newly-loaded rows (`graph.loadMore`) can be ancestors of an
     // already-resolved PR tip — without this, they showed no badge until some unrelated PR
     // resolution happened to bump `pr.generation` again (`prByAncestry` desyncing from the
