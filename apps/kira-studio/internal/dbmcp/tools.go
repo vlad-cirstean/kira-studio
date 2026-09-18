@@ -10,6 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/queryplan"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -173,115 +174,15 @@ type runQueryArgs struct {
 // §6.1: overThreshold only) → at most one approval, for verdict=="prompt" or heavy (extended) →
 // execute (unchanged) → render, now carrying a plan summary when one exists (extended).
 func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQueryArgs) (*mcp.CallToolResult, any, error) {
-	summary, err := s.resolveEnabled(args.ConnectionID)
-	if err != nil {
-		return errResult(err.Error())
+	rv, res, out, err, done := s.resolveVerdict(ctx, args)
+	if done {
+		return res, out, err
 	}
 
-	m := modesOf(summary)
-	if m.read == "deny" && m.write == "deny" && m.ddl == "deny" {
-		return errResult(fmt.Sprintf("connection %q's MCP permissions deny every statement class; change them in the connection's MCP tab", summary.Name))
-	}
+	plan, heavy := s.maybeExplain(ctx, rv.summary, args)
 
-	maxRows := args.MaxRows
-	if maxRows <= 0 {
-		maxRows = runQueryDefaultMaxRows
-	}
-	if maxRows > runQueryMaxMaxRows {
-		maxRows = runQueryMaxMaxRows
-	}
-
-	// Read once per call, not per use below: ExplainThreshold's own doc comment ("read fresh on
-	// every call, never cached") is about staleness across separate runQuery invocations, not
-	// within one — a second read microseconds later in the same call cannot see a different
-	// setting, so it was a duplicate repo read (settings.GetAll()) for no correctness benefit.
-	threshold := s.cfg.ExplainThreshold()
-
-	state, err := s.connectForQuery(args.ConnectionID)
-	if err != nil {
-		return toolError(err)
-	}
-	if state.Status != "connected" {
-		return errResult(connectStateError(state))
-	}
-
-	// A classifier error degrades to ClassUnknown rather than failing the call — never a way to
-	// bypass the gate, and never a way to break a connection either.
-	class, err := s.cfg.Query.ClassifyStatement(ctx, args.ConnectionID, args.SQL)
-	if err != nil {
-		s.log.Warn("dbmcp: run_query: classification failed, treating as unknown", "connectionId", args.ConnectionID, "error", err)
-		class = adapters.ClassUnknown
-	}
-
-	verdict := verdictFor(m, class)
-	switch verdict {
-	case "allow", "prompt":
-		// continue below — a statement the gate will deny must buy no EXPLAIN work (§5.2), so deny
-		// is refused before auto-force-explain ever runs.
-	case "deny":
-		return errResult(fmt.Sprintf("this connection's MCP permissions deny %s statements; change them in the connection's MCP tab", class))
-	default:
-		// An unrecognised mode word cannot reach here — repos/connections.go's scan coerces any
-		// unreadable mode to "deny" before this method is ever called.
-		return errResult(fmt.Sprintf("this connection's MCP permissions are misconfigured for %s statements; change them in the connection's MCP tab", class))
-	}
-
-	// Auto-force-explain (§5.2 step 7): a plan-only EXPLAIN, never ANALYZE, run before the human
-	// is asked about the query when verdict is "prompt" — the minimum information needed to tell
-	// them what they are approving. Any failure degrades to "no plan" (D19 rule 6's own posture);
-	// a run_query call must not start failing because a plan could not be parsed.
-	var plan *queryplan.Plan
-	if summary.McpAutoExplain {
-		p, planErr := s.planFor(ctx, summary, args.SQL, args.Path)
-		if planErr != nil {
-			s.log.Warn("dbmcp: run_query: auto-force-explain failed, running without a plan", "connectionId", args.ConnectionID, "error", planErr)
-		} else {
-			plan = p
-		}
-	}
-
-	// §6.1: heavy is overThreshold only, never "any warn issue" — SQLite reports no row estimate
-	// at all, so borrowing the console's isFlaggedPlan rule would raise a modal on nearly every
-	// SQLite query.
-	heavy := plan != nil && plan.OverThreshold
-
-	// At most one approval prompt per call (§5.2/§6.2): when both a permission-prompt and a heavy
-	// plan apply, one request carries Reason: ApprovalReasonPermission (the stricter reason — the
-	// user said "ask me about every write") with the plan evidence riding along.
-	if verdict == "prompt" || heavy {
-		reason := ApprovalReasonHeavy
-		if verdict == "prompt" {
-			reason = ApprovalReasonPermission
-		}
-		outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
-			ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
-			Class: class, Statement: args.SQL, Reason: reason,
-			Plan: approvalPlanFrom(plan, threshold),
-		})
-		switch outcome {
-		case ApprovalApproved:
-			// M7 finding: summary/m/verdict above were resolved before this (up to 2-minute) wait.
-			// If the user reacted to the prompt by revoking the connection's MCP exposure or
-			// tightening this class's mode to deny, an Approve landing after that must not run the
-			// statement under permissions that no longer hold — re-resolve both, the same posture
-			// MaskSetFor below already takes for mask rules post-approval.
-			resummary, err := s.resolveEnabled(args.ConnectionID)
-			if err != nil {
-				return errResult(err.Error())
-			}
-			if v := verdictFor(modesOf(resummary), class); v == "deny" {
-				return errResult(fmt.Sprintf("this connection's MCP permissions now deny %s statements; change them in the connection's MCP tab", class))
-			}
-			summary = resummary
-		case ApprovalDenied:
-			return errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
-		case ApprovalTimedOut:
-			return errResult(fmt.Sprintf("query against %q got no answer within 2 minutes", summary.Name))
-		case ApprovalAbandoned:
-			return errResult(fmt.Sprintf("the database MCP server stopped before the query against %q was answered", summary.Name))
-		default:
-			return errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
-		}
+	if res, out, err, done := s.awaitApproval(ctx, args, rv.summary, rv.class, rv.verdict, heavy, plan, rv.threshold); done {
+		return res, out, err
 	}
 
 	// M5 §4.3: resolved before Execute, so a key-store failure fails the call before the query runs,
@@ -315,7 +216,7 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 	if len(resp.Pages) == 0 {
 		return jsonResult(map[string]any{"kind": "empty", "rowCount": 0, "returned": 0})
 	}
-	rendered, err := renderPage(resp.Pages[0], maxRows, summaryOf(plan, threshold), mk, args.SQL)
+	rendered, err := renderPage(resp.Pages[0], rv.maxRows, summaryOf(plan, rv.threshold), mk, args.SQL)
 	if err != nil {
 		// §4.4/§5.3: a document/stream page under active masking rules is caller-correctable
 		// (narrow the query, or remove the rules) — surfaced as an IsError result, not a raw Go
@@ -334,6 +235,155 @@ func (s *Server) runQuery(ctx context.Context, _ *mcp.CallToolRequest, args runQ
 		result = withAdditionalStatementResultsNote(rendered, len(resp.Pages)-1)
 	}
 	return jsonResult(result)
+}
+
+// queryResolution is resolveVerdict's own bundle — everything runQuery needs from the resolve/
+// refuse/clamp/connect/classify/verdict pipeline (§5.2) to proceed into maybeExplain/awaitApproval.
+type queryResolution struct {
+	summary   model.ConnectionSummary
+	modes     modes
+	class     adapters.OpClass
+	verdict   string
+	maxRows   int
+	threshold int
+}
+
+// resolveVerdict is runQuery's own §5.2 resolve→refuse→clamp→connect→classify→verdict pipeline.
+// done is true whenever runQuery should return (res, out, err) immediately — every gate here
+// short-circuits query execution, so no EXPLAIN work or approval prompt is ever spent on a
+// statement the gate would refuse anyway.
+func (s *Server) resolveVerdict(ctx context.Context, args runQueryArgs) (rv queryResolution, res *mcp.CallToolResult, out any, err error, done bool) {
+	rv.summary, err = s.resolveEnabled(args.ConnectionID)
+	if err != nil {
+		res, out, err = errResult(err.Error())
+		return rv, res, out, err, true
+	}
+
+	rv.modes = modesOf(rv.summary)
+	if rv.modes.read == "deny" && rv.modes.write == "deny" && rv.modes.ddl == "deny" {
+		res, out, err = errResult(fmt.Sprintf("connection %q's MCP permissions deny every statement class; change them in the connection's MCP tab", rv.summary.Name))
+		return rv, res, out, err, true
+	}
+
+	rv.maxRows = args.MaxRows
+	if rv.maxRows <= 0 {
+		rv.maxRows = runQueryDefaultMaxRows
+	}
+	if rv.maxRows > runQueryMaxMaxRows {
+		rv.maxRows = runQueryMaxMaxRows
+	}
+
+	// Read once per call, not per use below: ExplainThreshold's own doc comment ("read fresh on
+	// every call, never cached") is about staleness across separate runQuery invocations, not
+	// within one — a second read microseconds later in the same call cannot see a different
+	// setting, so it was a duplicate repo read (settings.GetAll()) for no correctness benefit.
+	rv.threshold = s.cfg.ExplainThreshold()
+
+	state, cerr := s.connectForQuery(args.ConnectionID)
+	if cerr != nil {
+		res, out, err = toolError(cerr)
+		return rv, res, out, err, true
+	}
+	if state.Status != "connected" {
+		res, out, err = errResult(connectStateError(state))
+		return rv, res, out, err, true
+	}
+
+	// A classifier error degrades to ClassUnknown rather than failing the call — never a way to
+	// bypass the gate, and never a way to break a connection either.
+	class, cerr := s.cfg.Query.ClassifyStatement(ctx, args.ConnectionID, args.SQL)
+	if cerr != nil {
+		s.log.Warn("dbmcp: run_query: classification failed, treating as unknown", "connectionId", args.ConnectionID, "error", cerr)
+		class = adapters.ClassUnknown
+	}
+	rv.class = class
+
+	rv.verdict = verdictFor(rv.modes, rv.class)
+	switch rv.verdict {
+	case "allow", "prompt":
+		// continue below — a statement the gate will deny must buy no EXPLAIN work (§5.2), so deny
+		// is refused before auto-force-explain ever runs.
+	case "deny":
+		res, out, err = errResult(fmt.Sprintf("this connection's MCP permissions deny %s statements; change them in the connection's MCP tab", rv.class))
+		return rv, res, out, err, true
+	default:
+		// An unrecognised mode word cannot reach here — repos/connections.go's scan coerces any
+		// unreadable mode to "deny" before this method is ever called.
+		res, out, err = errResult(fmt.Sprintf("this connection's MCP permissions are misconfigured for %s statements; change them in the connection's MCP tab", rv.class))
+		return rv, res, out, err, true
+	}
+
+	return rv, nil, nil, nil, false
+}
+
+// maybeExplain runs §5.2 step 7's auto-force-explain (a plan-only EXPLAIN, never ANALYZE) when the
+// connection has McpAutoExplain on — the minimum information needed to tell the human what they are
+// approving before a "prompt" verdict asks them. Any failure degrades to "no plan" (D19 rule 6's own
+// posture); a run_query call must not start failing because a plan could not be parsed. heavy is
+// §6.1's own flag, overThreshold only, never "any warn issue" — SQLite reports no row estimate at
+// all, so borrowing the console's isFlaggedPlan rule would raise a modal on nearly every SQLite
+// query.
+func (s *Server) maybeExplain(ctx context.Context, summary model.ConnectionSummary, args runQueryArgs) (plan *queryplan.Plan, heavy bool) {
+	if summary.McpAutoExplain {
+		p, planErr := s.planFor(ctx, summary, args.SQL, args.Path)
+		if planErr != nil {
+			s.log.Warn("dbmcp: run_query: auto-force-explain failed, running without a plan", "connectionId", args.ConnectionID, "error", planErr)
+		} else {
+			plan = p
+		}
+	}
+	return plan, plan != nil && plan.OverThreshold
+}
+
+// awaitApproval is §5.2/§6.2's own "at most one approval prompt per call" gate: when both a
+// permission-prompt and a heavy plan apply, one request carries Reason: ApprovalReasonPermission
+// (the stricter reason — the user said "ask me about every write") with the plan evidence riding
+// along. A no-op (done false) when neither verdict == "prompt" nor heavy applies. done is true
+// whenever runQuery should return (res, out, err) immediately.
+func (s *Server) awaitApproval(ctx context.Context, args runQueryArgs, summary model.ConnectionSummary, class adapters.OpClass, verdict string, heavy bool, plan *queryplan.Plan, threshold int) (res *mcp.CallToolResult, out any, err error, done bool) {
+	if verdict != "prompt" && !heavy {
+		return nil, nil, nil, false
+	}
+
+	reason := ApprovalReasonHeavy
+	if verdict == "prompt" {
+		reason = ApprovalReasonPermission
+	}
+	outcome := s.cfg.Approvals.Request(ctx, ApprovalRequest{
+		ConnectionID: args.ConnectionID, ConnectionName: summary.Name, Kind: summary.Kind,
+		Class: class, Statement: args.SQL, Reason: reason,
+		Plan: approvalPlanFrom(plan, threshold),
+	})
+	switch outcome {
+	case ApprovalApproved:
+		// M7 finding: summary/m/verdict above were resolved before this (up to 2-minute) wait.
+		// If the user reacted to the prompt by revoking the connection's MCP exposure or
+		// tightening this class's mode to deny, an Approve landing after that must not run the
+		// statement under permissions that no longer hold — re-resolve both, the same posture
+		// MaskSetFor below already takes for mask rules post-approval.
+		resummary, rerr := s.resolveEnabled(args.ConnectionID)
+		if rerr != nil {
+			res, out, err = errResult(rerr.Error())
+			return res, out, err, true
+		}
+		if v := verdictFor(modesOf(resummary), class); v == "deny" {
+			res, out, err = errResult(fmt.Sprintf("this connection's MCP permissions now deny %s statements; change them in the connection's MCP tab", class))
+			return res, out, err, true
+		}
+		return nil, nil, nil, false
+	case ApprovalDenied:
+		res, out, err = errResult(fmt.Sprintf("query against %q was denied by the user", summary.Name))
+		return res, out, err, true
+	case ApprovalTimedOut:
+		res, out, err = errResult(fmt.Sprintf("query against %q got no answer within 2 minutes", summary.Name))
+		return res, out, err, true
+	case ApprovalAbandoned:
+		res, out, err = errResult(fmt.Sprintf("the database MCP server stopped before the query against %q was answered", summary.Name))
+		return res, out, err, true
+	default:
+		res, out, err = errResult(fmt.Sprintf("query against %q was not approved", summary.Name))
+		return res, out, err, true
+	}
 }
 
 // --- explain_query (§4) ---
