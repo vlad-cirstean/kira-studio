@@ -726,24 +726,81 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 		cancel()
 	}()
 
+	prep, res, done, err := e.restackPrepare(ctx, conn, branch)
+	if done {
+		return res, err
+	}
+
+	defer e.invalidateAfterWrite()
+
+	restacked, res, err, done := e.runRestackPlan(opCtx, ctx, conn, prep.pf.Plan)
+	if done {
+		return res, err
+	}
+
+	res, err, done = e.restoreHead(ctx, prep.origBranch, prep.origHeadSha, restacked)
+	if done {
+		return res, err
+	}
+
+	e.undo.Set(prep.undo)
+	freshHead, herr := e.Head(ctx)
+	if herr != nil {
+		return RestackResult{}, herr
+	}
+	_, inProgress, serr := e.statusAndInProgress(ctx)
+	if serr != nil {
+		return RestackResult{}, serr
+	}
+	var undoSnapshot *gitpreflight.UndoSlotSnapshot
+	if conn != nil {
+		snap := prep.undo.SnapshotFor(string(e.connIDOf(conn)))
+		undoSnapshot = &snap
+	} else {
+		snap := prep.undo.SnapshotFor("")
+		undoSnapshot = &snap
+	}
+	return RestackResult{
+		OK: true, Restacked: restacked, Remaining: []string{}, Undo: undoSnapshot,
+		Head: freshHead, InProgress: inProgress,
+	}, nil
+}
+
+// restackPrepared bundles everything RunRestack computes before any write is attempted (D6 steps
+// 2-3): the fresh preflight, HEAD's starting position, and the undo record built from both. Caller
+// (RunRestack) still owns the write phase (runRestackPlan/restoreHead) and the undo slot itself.
+type restackPrepared struct {
+	pf          gitpreflight.RestackPreflight
+	origBranch  string
+	origHeadSha string
+	undo        *gitpreflight.UndoRecord
+}
+
+// restackPrepare is RunRestack's own preflight phase: recompute the preflight FRESH, resolve
+// current branch tips and stack config, read HEAD, and build the undo record from all of it —
+// before anything moves. done is true whenever RunRestack should return (res, err) immediately with
+// no write: a genuine error, a blocked preflight, or a genuine noop (nothing to restack).
+func (e *RepoEntry) restackPrepare(ctx context.Context, conn *Conn, branch string) (prep restackPrepared, res RestackResult, done bool, err error) {
 	pf, err := e.RestackPreflight(ctx, branch)
 	if err != nil {
-		return RestackResult{}, err
+		return restackPrepared{}, RestackResult{}, true, err
 	}
 	if pf.Verdict == "blocked" {
-		return e.restackResultNoSpawn(ctx, restackBlockedError(pf))
+		res, err = e.restackResultNoSpawn(ctx, restackBlockedError(pf))
+		return restackPrepared{}, res, true, err
 	}
 	if len(pf.Plan) == 0 {
-		return e.restackResultNoSpawn(ctx, nil) // verdict == "noop": already fully up to date.
+		res, err = e.restackResultNoSpawn(ctx, nil) // verdict == "noop": already fully up to date.
+		return restackPrepared{}, res, true, err
 	}
 
 	snapshot, err := e.refsSnapshot(ctx)
 	if err != nil {
-		return RestackResult{}, err
+		return restackPrepared{}, RestackResult{}, true, err
 	}
 	config, err := e.rawStackConfig(ctx)
 	if err != nil {
-		return RestackResult{}, err
+		return restackPrepared{}, RestackResult{}, true, err
 	}
 	branchTip := map[string]string{}
 	for _, r := range snapshot.Branches {
@@ -752,7 +809,7 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 
 	head, err := e.Head(ctx)
 	if err != nil {
-		return RestackResult{}, err
+		return restackPrepared{}, RestackResult{}, true, err
 	}
 	origBranch := ""
 	origHeadSha := head.SHA
@@ -767,51 +824,68 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 	}
 	undo := buildRestackUndo(e.connIDOf(conn), e.connLabelOf(conn), pf.Base, origBranch, origHeadSha, planned)
 
-	defer e.invalidateAfterWrite()
+	return restackPrepared{pf: pf, origBranch: origBranch, origHeadSha: origHeadSha, undo: undo}, RestackResult{}, false, nil
+}
 
-	restacked := []string{}
-	for i, entry := range pf.Plan {
+// runRestackPlan is RunRestack's own per-entry rebase loop (D6 step 4): for each planned branch in
+// order, emit stack.progress, rebase --onto, and on success re-resolve the parent's new tip and
+// record it as the branch's new base. done is true whenever RunRestack should return (res, err)
+// immediately without restoring HEAD — a cancellation, a rebase conflict, or a genuine error; only
+// a clean run through every entry leaves done false, with restacked holding every planned branch.
+func (e *RepoEntry) runRestackPlan(opCtx, ctx context.Context, conn *Conn, plan []gitpreflight.RestackPlanEntry) (restacked []string, res RestackResult, err error, done bool) {
+	restacked = []string{}
+	for i, entry := range plan {
 		if opCtx.Err() != nil {
 			e.undo.Set(nil)
-			return e.restackPausedResult(ctx, &OpError{Kind: "Cancelled", Message: "the restack was cancelled"}, restacked, nil, branchNames(pf.Plan[i:]))
+			res, err = e.restackPausedResult(ctx, &OpError{Kind: "Cancelled", Message: "the restack was cancelled"}, restacked, nil, branchNames(plan[i:]))
+			return restacked, res, err, true
 		}
 
 		if conn != nil && conn.Emit != nil {
-			conn.Emit("stack.progress", RestackProgress{RepoID: e.Summary.RepoID, Branch: entry.Branch, Index: i + 1, Total: len(pf.Plan)})
+			conn.Emit("stack.progress", RestackProgress{RepoID: e.Summary.RepoID, Branch: entry.Branch, Index: i + 1, Total: len(plan)})
 		}
 
-		res, werr := e.runRestackSpawn(opCtx, gitops.RebaseOntoArgs(entry.Parent, entry.Base, entry.Branch))
+		spawnRes, werr := e.runRestackSpawn(opCtx, gitops.RebaseOntoArgs(entry.Parent, entry.Base, entry.Branch))
 		if werr != nil {
-			return RestackResult{}, werr
+			return restacked, RestackResult{}, werr, true
 		}
 		if opCtx.Err() != nil {
 			e.undo.Set(nil)
-			return e.restackPausedResult(ctx, &OpError{Kind: "Cancelled", Message: "the restack was cancelled"}, restacked, nil, branchNames(pf.Plan[i:]))
+			res, err = e.restackPausedResult(ctx, &OpError{Kind: "Cancelled", Message: "the restack was cancelled"}, restacked, nil, branchNames(plan[i:]))
+			return restacked, res, err, true
 		}
-		if res.ExitCode != 0 {
-			combined := string(res.Stdout) + "\n" + string(res.Stderr)
-			kind, message := gitops.ClassifyOpError(combined, res.ExitCode)
+		if spawnRes.ExitCode != 0 {
+			combined := string(spawnRes.Stdout) + "\n" + string(spawnRes.Stderr)
+			kind, message := gitops.ClassifyOpError(combined, spawnRes.ExitCode)
 			e.undo.Set(nil)
 			stoppedAt := entry.Branch
-			return e.restackPausedResult(ctx, &OpError{Kind: kind, Message: message}, restacked, &stoppedAt, branchNames(pf.Plan[i+1:]))
+			res, err = e.restackPausedResult(ctx, &OpError{Kind: kind, Message: message}, restacked, &stoppedAt, branchNames(plan[i+1:]))
+			return restacked, res, err, true
 		}
 
 		newParentTip, terr := e.resolveRefTip(ctx, entry.Parent)
 		if terr != nil {
-			return RestackResult{}, terr
+			return restacked, RestackResult{}, terr, true
 		}
 		if oe, werr := e.runWriteArgv(ctx, gitops.StackConfigSetArgs(gitops.StackBaseKey(entry.Branch), newParentTip)); werr != nil {
-			return RestackResult{}, werr
+			return restacked, RestackResult{}, werr, true
 		} else if oe != nil {
 			e.undo.Set(nil)
 			stoppedAt := entry.Branch
-			return e.restackPausedResult(ctx, oe, restacked, &stoppedAt, branchNames(pf.Plan[i+1:]))
+			res, err = e.restackPausedResult(ctx, oe, restacked, &stoppedAt, branchNames(plan[i+1:]))
+			return restacked, res, err, true
 		}
 
 		restacked = append(restacked, entry.Branch)
 	}
+	return restacked, RestackResult{}, nil, false
+}
 
-	// F5: restore HEAD to where it started — the last rebase always leaves HEAD on that branch.
+// restoreHead is D6 step 5: restore HEAD to where it started (F5: rebase always moves HEAD, even on
+// a no-op) — only reached once every planned branch has succeeded. done is true whenever RunRestack
+// should return (res, err) immediately — a genuine write error, or the restore itself failing (D8:
+// no undo record is set for a partial restack either way).
+func (e *RepoEntry) restoreHead(ctx context.Context, origBranch, origHeadSha string, restacked []string) (res RestackResult, err error, done bool) {
 	var restoreArgv []string
 	if origBranch != "" {
 		restoreArgv = gitops.SwitchArgs(origBranch, false)
@@ -820,35 +894,14 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 	}
 	headErr, werr := e.runWriteArgv(ctx, restoreArgv)
 	if werr != nil {
-		return RestackResult{}, werr
+		return RestackResult{}, werr, true
 	}
-
 	if headErr != nil {
 		e.undo.Set(nil)
-		return e.restackPausedResult(ctx, headErr, restacked, nil, []string{})
+		res, err = e.restackPausedResult(ctx, headErr, restacked, nil, []string{})
+		return res, err, true
 	}
-
-	e.undo.Set(undo)
-	freshHead, herr := e.Head(ctx)
-	if herr != nil {
-		return RestackResult{}, herr
-	}
-	_, inProgress, serr := e.statusAndInProgress(ctx)
-	if serr != nil {
-		return RestackResult{}, serr
-	}
-	var undoSnapshot *gitpreflight.UndoSlotSnapshot
-	if conn != nil {
-		snap := undo.SnapshotFor(string(e.connIDOf(conn)))
-		undoSnapshot = &snap
-	} else {
-		snap := undo.SnapshotFor("")
-		undoSnapshot = &snap
-	}
-	return RestackResult{
-		OK: true, Restacked: restacked, Remaining: []string{}, Undo: undoSnapshot,
-		Head: freshHead, InProgress: inProgress,
-	}, nil
+	return RestackResult{}, nil, false
 }
 
 // restackPausedResult composes a stopped-or-cancelled RunRestack return: reads back head/
