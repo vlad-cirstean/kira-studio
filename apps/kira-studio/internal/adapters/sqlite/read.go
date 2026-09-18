@@ -99,101 +99,40 @@ type readReq struct {
 
 func questionPlaceholder(int) string { return "?" }
 
-// readPage is read.ts's readPage.
-func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target ReadTarget, req readReq) (page.TabularPage, error) {
-	projectedColumns, err := adapters.ResolveProjection(target.Columns, req.Projection)
+// buildKeysetWhere extends whereSQL with the keyset boundary predicate decoded from the cursor
+// token, when the request actually wants one.
+func buildKeysetWhere(req readReq, order adapters.EffectiveOrder, fingerprint, whereSQL string, params *[]any) (string, error) {
+	keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
 	if err != nil {
-		return page.TabularPage{}, err
+		return "", err
 	}
-	// D22: the fallback chain is primary key, else a unique (all-NOT-NULL) index, else — a step
-	// further than the other SQL adapters can offer — the table's own implicit rowid (F23), which
-	// every rowid table has for free regardless of whether it declares a primary key at all.
-	var tiebreaker []string
-	switch {
-	case target.PrimaryKey != nil:
-		tiebreaker = target.PrimaryKey
-	case len(target.UniqueKeys) > 0:
-		tiebreaker = target.UniqueKeys[0]
-	case target.RowidColumn != nil:
-		tiebreaker = []string{*target.RowidColumn}
+	if len(keyValues) != len(order.KeysetColumns) {
+		return "", adapters.New(adapters.CodeQuery, "page token key length does not match the sort key", nil)
 	}
-	order, err := adapters.ComputeEffectiveOrder(req.Sort, target.Columns, tiebreaker)
-	if err != nil {
-		return page.TabularPage{}, err
+	for _, v := range keyValues {
+		*params = append(*params, v)
 	}
-	isTextSort := req.Sort != nil && req.Sort.Kind == "text"
-	wantsKeyset := req.Cursor.Mode == "after" || req.Cursor.Mode == "before"
-	if err := adapters.AssertKeysetSupported(wantsKeyset, isTextSort, order.KeysetEligible); err != nil {
-		return page.TabularPage{}, err
+	quotedKeyColumns := make([]string, len(order.KeysetColumns))
+	for i, c := range order.KeysetColumns {
+		quotedKeyColumns[i] = quoteIdent(c)
 	}
-
-	fetch, err := adapters.ResolveFetchColumns(projectedColumns, target.Columns, order, func(name string) (model.ColumnMeta, error) {
-		return resolveKeysetColumnMeta(target, name)
-	})
-	if err != nil {
-		return page.TabularPage{}, err
+	predicate := adapters.BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, 1, questionPlaceholder)
+	if whereSQL != "" {
+		return whereSQL + " AND " + predicate, nil
 	}
+	return "WHERE " + predicate, nil
+}
 
-	columns := make([]page.ColumnDescriptor, len(projectedColumns))
-	for i, c := range projectedColumns {
-		columns[i] = page.ColumnDescriptor{
-			Name: c.Name, DataType: c.DataType, TypeClass: typeClassFor(c.DataType),
-			Nullable: c.Nullable, IsPrimaryKey: c.IsPrimaryKey,
-			Generated: target.GeneratedColumns[c.Name],
-		}
-	}
-
-	relationSQL := quoteIdent(target.QualifiedName.Database) + "." + quoteIdent(target.QualifiedName.Table)
-	selectNames := make([]string, len(fetch.Columns))
-	for i, c := range fetch.Columns {
-		selectNames[i] = selectExpr(quoteIdent(c.Name))
-	}
-	selectList := strings.Join(selectNames, ", ")
-
-	var params []any
-	whereSQL := adapters.WhereClause(req.Filter)
-
-	fingerprint := adapters.RequestFingerprint(struct {
-		Path       QualifiedName   `json:"path"`
-		Projection []string        `json:"projection"`
-		Filter     *string         `json:"filter"`
-		Sort       *model.SortSpec `json:"sort"`
-		PageSize   int             `json:"pageSize"`
-	}{target.QualifiedName, req.Projection, req.Filter, req.Sort, req.PageSize})
-
-	reverseRows := req.Cursor.Mode == "before" && order.KeysetEligible
-	orderBySQL := adapters.BuildScanOrderBy(req.Sort, order, reverseRows, quoteIdent)
-
-	if wantsKeyset && req.Cursor.Mode != "offset" {
-		keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
-		if err != nil {
-			return page.TabularPage{}, err
-		}
-		if len(keyValues) != len(order.KeysetColumns) {
-			return page.TabularPage{}, adapters.New(adapters.CodeQuery, "page token key length does not match the sort key", nil)
-		}
-		for _, v := range keyValues {
-			params = append(params, v)
-		}
-		quotedKeyColumns := make([]string, len(order.KeysetColumns))
-		for i, c := range order.KeysetColumns {
-			quotedKeyColumns[i] = quoteIdent(c)
-		}
-		predicate := adapters.BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, 1, questionPlaceholder)
-		if whereSQL != "" {
-			whereSQL += " AND " + predicate
-		} else {
-			whereSQL = "WHERE " + predicate
-		}
-	}
-
+// buildPageSQL assembles the final SELECT text: SELECT/FROM, the (already keyset-extended) WHERE,
+// ORDER BY and LIMIT/OFFSET, in that order.
+func buildPageSQL(relationSQL, selectList, whereSQL, orderBySQL string, req readReq, params *[]any) string {
 	// D24: fetch pageSize + 1 to compute hasMore without a count. Bound before the OFFSET
 	// placeholder, matching M6.2's own LIMIT/OFFSET fix — params must line up with the "?"s left to
 	// right in the SQL text below, the same order it actually emits them in.
-	params = append(params, req.PageSize+1)
+	*params = append(*params, req.PageSize+1)
 	offsetSQL := ""
 	if req.Cursor.Mode == "offset" {
-		params = append(params, req.Cursor.Offset)
+		*params = append(*params, req.Cursor.Offset)
 		offsetSQL = " OFFSET ?"
 	}
 
@@ -205,7 +144,60 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
 	}
 	sqlParts = append(sqlParts, "LIMIT ?"+offsetSQL)
-	query := strings.Join(sqlParts, "\n")
+	return strings.Join(sqlParts, "\n")
+}
+
+// readPage is read.ts's readPage.
+func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target ReadTarget, req readReq) (page.TabularPage, error) {
+	// D22: the fallback chain is primary key, else a unique (all-NOT-NULL) index, else — a step
+	// further than the other SQL adapters can offer — the table's own implicit rowid (F23), which
+	// every rowid table has for free regardless of whether it declares a primary key at all.
+	var extraTiebreaker []string
+	if target.RowidColumn != nil {
+		extraTiebreaker = []string{*target.RowidColumn}
+	}
+	plan, err := adapters.PlanRelationalPage(adapters.RelationalPageArgs{
+		Columns: target.Columns, Projection: req.Projection,
+		PrimaryKey: target.PrimaryKey, UniqueKeys: target.UniqueKeys,
+		ExtraTiebreaker: extraTiebreaker,
+		Sort:            req.Sort, CursorMode: req.Cursor.Mode,
+		ResolveHidden: func(name string) (model.ColumnMeta, error) {
+			return resolveKeysetColumnMeta(target, name)
+		},
+		TypeClassFor: typeClassFor,
+		GeneratedFor: func(name string) bool { return target.GeneratedColumns[name] },
+		QuoteIdent:   quoteIdent,
+		Fingerprint: struct {
+			Path       QualifiedName   `json:"path"`
+			Projection []string        `json:"projection"`
+			Filter     *string         `json:"filter"`
+			Sort       *model.SortSpec `json:"sort"`
+			PageSize   int             `json:"pageSize"`
+		}{target.QualifiedName, req.Projection, req.Filter, req.Sort, req.PageSize},
+	})
+	if err != nil {
+		return page.TabularPage{}, err
+	}
+	projectedColumns, order, fetch := plan.ProjectedColumns, plan.Order, plan.Fetch
+	columns := plan.Columns
+
+	relationSQL := quoteIdent(target.QualifiedName.Database) + "." + quoteIdent(target.QualifiedName.Table)
+	selectNames := make([]string, len(fetch.Columns))
+	for i, c := range fetch.Columns {
+		selectNames[i] = selectExpr(quoteIdent(c.Name))
+	}
+	selectList := strings.Join(selectNames, ", ")
+
+	var params []any
+	whereSQL := adapters.WhereClause(req.Filter)
+	if plan.WantsKeyset {
+		whereSQL, err = buildKeysetWhere(req, order, plan.Fingerprint, whereSQL, &params)
+		if err != nil {
+			return page.TabularPage{}, err
+		}
+	}
+
+	query := buildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, &params)
 
 	// Streamed straight into the builder (P2 R1) rather than materialized into a [][]any and
 	// transposed afterward: BuildKeysetPosition's CellAt is only ever called for the first and last
@@ -245,7 +237,7 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 		return page.TabularPage{}, err
 	}
 
-	if reverseRows {
+	if plan.ReverseRows {
 		builder.Reverse()
 		firstRow, lastRow = lastRow, firstRow
 	}
@@ -257,7 +249,7 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 	position, err := adapters.BuildKeysetPosition(adapters.KeysetPositionArgs{
 		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: displayRowCount,
 		ProbedExtra: probedExtra, Order: order, KeysetColumnIdx: fetch.KeysetColumnIdx,
-		Fingerprint: fingerprint,
+		Fingerprint: plan.Fingerprint,
 		CellAt: func(row, col int) *string {
 			if row == 0 {
 				return toCellText(firstRow[col])

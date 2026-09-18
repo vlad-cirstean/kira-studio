@@ -19,6 +19,75 @@ var (
 	whitespaceOrSemicolon = regexp.MustCompile(`[\s;]`)
 )
 
+const (
+	scanNormal = iota
+	scanLineComment
+	scanBlockComment
+	scanSingle
+	scanDouble
+	scanBacktick
+)
+
+// scanNormalArm handles the top-level state: comment/quote openers switch state, ';' is the match.
+// A two-char opener (`--`, `/*`) reports nextIndex one past itself, same as the loop's own i++, so
+// the caller's for-loop increment lands past both chars together.
+func scanNormalArm(s string, i int) (nextIndex, nextState int, found bool) {
+	c := s[i]
+	switch {
+	case c == '-' && i+1 < len(s) && s[i+1] == '-':
+		return i + 1, scanLineComment, false
+	case c == '/' && i+1 < len(s) && s[i+1] == '*':
+		return i + 1, scanBlockComment, false
+	case c == '\'':
+		return i, scanSingle, false
+	case c == '"':
+		return i, scanDouble, false
+	case c == '`':
+		return i, scanBacktick, false
+	case c == ';':
+		return i, scanNormal, true
+	}
+	return i, scanNormal, false
+}
+
+func scanLineCommentArm(s string, i int) (nextIndex, nextState int) {
+	if s[i] == '\n' {
+		return i, scanNormal
+	}
+	return i, scanLineComment
+}
+
+func scanBlockCommentArm(s string, i int) (nextIndex, nextState int) {
+	if s[i] == '*' && i+1 < len(s) && s[i+1] == '/' {
+		return i + 1, scanNormal
+	}
+	return i, scanBlockComment
+}
+
+// scanQuoteArm is the shared body of the three quote states: a doubled quote char is an escaped
+// quote (stays in state, consumes both), a lone one closes the literal.
+func scanQuoteArm(s string, i int, quote byte, state int) (nextIndex, nextState int) {
+	if s[i] == quote {
+		if i+1 < len(s) && s[i+1] == quote {
+			return i + 1, state
+		}
+		return i, scanNormal
+	}
+	return i, state
+}
+
+func scanSingleArm(s string, i int) (nextIndex, nextState int) {
+	return scanQuoteArm(s, i, '\'', scanSingle)
+}
+
+func scanDoubleArm(s string, i int) (nextIndex, nextState int) {
+	return scanQuoteArm(s, i, '"', scanDouble)
+}
+
+func scanBacktickArm(s string, i int) (nextIndex, nextState int) {
+	return scanQuoteArm(s, i, '`', scanBacktick)
+}
+
 // firstTopLevelSemicolon scans sqlText once, tracking comment/string-literal state, and returns
 // the byte index of the first ';' that appears outside a comment or a quoted literal — or -1 if
 // there is none. This is Go's answer to query.ts's own guard, which instead compared the full text
@@ -28,69 +97,29 @@ var (
 // is detected internally via SQLite's own pzTail, but that fact never crosses the driver.Stmt
 // interface), so the boundary is found by parsing the SQL text directly instead.
 func firstTopLevelSemicolon(s string) int {
-	const (
-		normal = iota
-		lineComment
-		blockComment
-		single
-		double
-		backtick
-	)
-	state := normal
+	state := scanNormal
 	for i := 0; i < len(s); i++ {
-		c := s[i]
+		var next, nextState int
+		var found bool
 		switch state {
-		case normal:
-			switch {
-			case c == '-' && i+1 < len(s) && s[i+1] == '-':
-				state = lineComment
-				i++
-			case c == '/' && i+1 < len(s) && s[i+1] == '*':
-				state = blockComment
-				i++
-			case c == '\'':
-				state = single
-			case c == '"':
-				state = double
-			case c == '`':
-				state = backtick
-			case c == ';':
-				return i
-			}
-		case lineComment:
-			if c == '\n' {
-				state = normal
-			}
-		case blockComment:
-			if c == '*' && i+1 < len(s) && s[i+1] == '/' {
-				state = normal
-				i++
-			}
-		case single:
-			if c == '\'' {
-				if i+1 < len(s) && s[i+1] == '\'' {
-					i++
-				} else {
-					state = normal
-				}
-			}
-		case double:
-			if c == '"' {
-				if i+1 < len(s) && s[i+1] == '"' {
-					i++
-				} else {
-					state = normal
-				}
-			}
-		case backtick:
-			if c == '`' {
-				if i+1 < len(s) && s[i+1] == '`' {
-					i++
-				} else {
-					state = normal
-				}
-			}
+		case scanNormal:
+			next, nextState, found = scanNormalArm(s, i)
+		case scanLineComment:
+			next, nextState = scanLineCommentArm(s, i)
+		case scanBlockComment:
+			next, nextState = scanBlockCommentArm(s, i)
+		case scanSingle:
+			next, nextState = scanSingleArm(s, i)
+		case scanDouble:
+			next, nextState = scanDoubleArm(s, i)
+		case scanBacktick:
+			next, nextState = scanBacktickArm(s, i)
 		}
+		if found {
+			return next
+		}
+		i = next
+		state = nextState
 	}
 	return -1
 }
