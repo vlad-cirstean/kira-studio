@@ -70,9 +70,13 @@ type DbMcpSettings struct {
 // server start/stop side effect) — never an installer, never a one-time write. HooksPromptDismissed
 // is the first-run banner's own "don't ask again" leaf (§9.4), independent of HooksEnabled so
 // declining the prompt once doesn't reappear on every new Claude Code tab.
+// KeepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept awake automatically whenever at
+// least one Claude Code session is live (internal/keepawake owns the actual OS assertion),
+// independent of the title bar's own keep-awake toggle. Off by default.
 type ClaudeCodeSettings struct {
 	HooksEnabled         bool `json:"hooksEnabled"`
 	HooksPromptDismissed bool `json:"hooksPromptDismissed"`
+	KeepAwakeWithAgents  bool `json:"keepAwakeWithAgents"`
 }
 
 // ApiSettings mirrors packages/shared/domain/settings.ts's apiSettingsSchema (P90 item 1) — the
@@ -142,7 +146,7 @@ func DefaultSettings() Settings {
 		},
 		CodeIntel:  CodeIntelSettings{McpServerEnabled: false},
 		DbMcp:      DbMcpSettings{ServerEnabled: false},
-		ClaudeCode: ClaudeCodeSettings{HooksEnabled: false, HooksPromptDismissed: false},
+		ClaudeCode: ClaudeCodeSettings{HooksEnabled: false, HooksPromptDismissed: false, KeepAwakeWithAgents: false},
 	}
 }
 
@@ -206,6 +210,7 @@ type DbMcpPatch struct {
 type ClaudeCodePatch struct {
 	HooksEnabled         *bool `json:"hooksEnabled,omitempty"`
 	HooksPromptDismissed *bool `json:"hooksPromptDismissed,omitempty"`
+	KeepAwakeWithAgents  *bool `json:"keepAwakeWithAgents,omitempty"`
 }
 
 type SettingsPatch struct {

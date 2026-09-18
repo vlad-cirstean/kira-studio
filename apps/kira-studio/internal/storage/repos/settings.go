@@ -78,6 +78,7 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
 	leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
 	leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
+	leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	return result, nil
 }
 
@@ -235,6 +236,11 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		}
 		if cc.HooksPromptDismissed != nil {
 			if err := upsertSettingsLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
+				return model.Settings{}, err
+			}
+		}
+		if cc.KeepAwakeWithAgents != nil {
+			if err := upsertSettingsLeaf(tx, "claudeCode.keepAwakeWithAgents", *cc.KeepAwakeWithAgents); err != nil {
 				return model.Settings{}, err
 			}
 		}
