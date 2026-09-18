@@ -122,11 +122,22 @@ func (g *Graph) containmentImplementationsOf(ctx context.Context, name string, t
 		out = append(out, ns)
 	}
 
-	// Forward: an "implementation" reference elsewhere named `name` recovers its own innermost
-	// enclosing symbol — the implementing/extending class.
+	if err := g.forwardContainmentImplementations(ctx, name, files, syms, add); err != nil {
+		return nil, err
+	}
+	if err := g.reverseContainmentImplementations(ctx, target, syms, add); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// forwardContainmentImplementations is containmentImplementationsOf's own forward half: an
+// "implementation" reference elsewhere named name recovers its own innermost enclosing symbol —
+// the implementing/extending class — reported through add.
+func (g *Graph) forwardContainmentImplementations(ctx context.Context, name string, files fileCache, syms symbolCache, add func(namedSymbol)) error {
 	refs, err := g.store.ReferencesByName(ctx, g.repoID, name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, r := range refs {
 		if r.Kind != "implementation" {
@@ -134,53 +145,59 @@ func (g *Graph) containmentImplementationsOf(ctx context.Context, name string, t
 		}
 		rf, ok, err := g.cachedFile(ctx, files, r.FileID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if !ok || rf.Language == "go" || rf.Language == "rust" {
 			continue
 		}
 		fileSymbols, err := g.cachedSymbols(ctx, syms, r.FileID)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if enclosing := innermostEnclosingSymbol(fileSymbols, r.StartByte, r.EndByte); enclosing != nil {
 			add(namedSymbol{sym: *enclosing, file: rf})
 		}
 	}
+	return nil
+}
 
-	// Reverse: an "implementation" reference contained within target's own span names an
-	// interface/base type target itself declares — resolved back to a real definition.
-	if target != nil {
-		fileSymbols, err := g.cachedSymbols(ctx, syms, target.sym.FileID)
-		if err != nil {
-			return nil, err
+// reverseContainmentImplementations is containmentImplementationsOf's own reverse half: an
+// "implementation" reference contained within target's own span names an interface/base type
+// target itself declares — resolved back to a real definition and reported through add. A nil
+// target is a no-op.
+func (g *Graph) reverseContainmentImplementations(ctx context.Context, target *namedSymbol, syms symbolCache, add func(namedSymbol)) error {
+	if target == nil {
+		return nil
+	}
+	fileSymbols, err := g.cachedSymbols(ctx, syms, target.sym.FileID)
+	if err != nil {
+		return err
+	}
+	fileRefs, err := g.store.ReferencesInFile(ctx, target.sym.FileID)
+	if err != nil {
+		return err
+	}
+	for _, r := range fileRefs {
+		if r.Kind != "implementation" {
+			continue
 		}
-		fileRefs, err := g.store.ReferencesInFile(ctx, target.sym.FileID)
-		if err != nil {
-			return nil, err
+		if r.StartByte < target.sym.StartByte || r.EndByte > target.sym.EndByte {
+			continue
 		}
-		for _, r := range fileRefs {
-			if r.Kind != "implementation" {
-				continue
-			}
-			if r.StartByte < target.sym.StartByte || r.EndByte > target.sym.EndByte {
-				continue
-			}
-			site := resolveSite{
-				File: target.file, Kind: "implementation",
-				StartByte: r.StartByte, EndByte: r.EndByte,
-				NameStartByte: r.NameStartByte, NameEnd: r.NameEndByte,
-			}
-			declared, _, err := g.resolveName(ctx, r.Name, fileSymbols, site)
-			if err != nil {
-				return nil, err
-			}
-			for _, c := range declared {
-				add(namedSymbol{sym: c.sym, file: c.file})
-			}
+		site := resolveSite{
+			File: target.file, Kind: "implementation",
+			StartByte: r.StartByte, EndByte: r.EndByte,
+			NameStartByte: r.NameStartByte, NameEnd: r.NameEndByte,
+		}
+		declared, _, err := g.resolveName(ctx, r.Name, fileSymbols, site)
+		if err != nil {
+			return err
+		}
+		for _, c := range declared {
+			add(namedSymbol{sym: c.sym, file: c.file})
 		}
 	}
-	return out, nil
+	return nil
 }
 
 func (g *Graph) targetsFromNamedSymbols(ctx context.Context, results []namedSymbol) ([]Target, error) {

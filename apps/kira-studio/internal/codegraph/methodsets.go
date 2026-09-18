@@ -391,43 +391,57 @@ func (g *Graph) goInterfacesSatisfiedBy(ctx context.Context, ix *goTypes, have m
 	seenType := map[string]bool{}
 	var out []Target
 	for _, m := range names {
-		syms, err := g.store.FindSymbolsByName(ctx, g.repoID, m)
+		targets, err := g.interfacesForMethod(ctx, ix, m, have, seenType)
 		if err != nil {
 			return nil, err
 		}
-		for _, s := range syms {
-			if s.Kind != "method" || s.ParentID == nil {
-				continue // a concrete, receiver-based method — never an interface candidate.
-			}
-			parent, ok, err := g.store.SymbolByID(ctx, *s.ParentID)
-			if err != nil {
-				return nil, err
-			}
-			if !ok || seenType[parent.Name] {
-				continue
-			}
-			seenType[parent.Name] = true
+		out = append(out, targets...)
+	}
+	return out, nil
+}
 
-			want, promoted, _, err := ix.methodSet(ctx, parent.Name, 0)
-			if err != nil {
-				return nil, err
-			}
-			if !supersetOf(have, want) {
-				continue
-			}
-			parentFile, ok, err := g.cachedFile(ctx, ix.files, parent.FileID)
-			if err != nil {
-				return nil, err
-			}
-			if !ok {
-				continue
-			}
-			t, err := g.targetFromSymbol(ctx, parent, parentFile, goMethodSetRule(promoted), Scoped)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, t)
+// interfacesForMethod is goInterfacesSatisfiedBy's own per-method-name body: every
+// FindSymbolsByName row for m that is an interface's own method_elem child (ParentID set) names a
+// candidate interface, deduplicated by interface name via seenType, kept when have is a superset
+// of that interface's own method set.
+func (g *Graph) interfacesForMethod(ctx context.Context, ix *goTypes, m string, have map[string]bool, seenType map[string]bool) ([]Target, error) {
+	syms, err := g.store.FindSymbolsByName(ctx, g.repoID, m)
+	if err != nil {
+		return nil, err
+	}
+	var out []Target
+	for _, s := range syms {
+		if s.Kind != "method" || s.ParentID == nil {
+			continue // a concrete, receiver-based method — never an interface candidate.
 		}
+		parent, ok, err := g.store.SymbolByID(ctx, *s.ParentID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok || seenType[parent.Name] {
+			continue
+		}
+		seenType[parent.Name] = true
+
+		want, promoted, _, err := ix.methodSet(ctx, parent.Name, 0)
+		if err != nil {
+			return nil, err
+		}
+		if !supersetOf(have, want) {
+			continue
+		}
+		parentFile, ok, err := g.cachedFile(ctx, ix.files, parent.FileID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+		t, err := g.targetFromSymbol(ctx, parent, parentFile, goMethodSetRule(promoted), Scoped)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
 	}
 	return out, nil
 }

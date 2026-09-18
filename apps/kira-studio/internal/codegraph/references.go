@@ -124,23 +124,32 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		return Refs{}, err
 	}
 
+	sites, total, unattributed, err := g.scanReferenceRows(ctx, refRows, targets, name, mode, kindSet, limit)
+	if err != nil {
+		return Refs{}, err
+	}
+
+	if opt.IncludeDefinition {
+		sites, total = g.appendDefinitionSites(ctx, targets, sites, total, limit)
+	}
+
+	return Refs{Sites: sites, Total: total, Truncated: total > len(sites), Unattributed: unattributed}, nil
+}
+
+// scanReferenceRows is ReferencesTo's own main loop: filter each row by kind and self-site, run
+// resolveRefInclusion, and append a Site for every included row still under limit — total and
+// unattributed keep counting past limit, since Refs.Total/Unattributed report the whole match, not
+// just the page returned.
+func (g *Graph) scanReferenceRows(ctx context.Context, refRows []codeindex.ReferenceRow, targets []candidate, name string, mode RefMode, kindSet map[string]bool, limit int) ([]Site, int, int, error) {
 	files := fileCache{}
 	symbolsByFile := symbolCache{}
-	// groupResult is groupTargets' own memoized entry: which symbols (by id) a reference from this
-	// group would resolve to, plus whether that group carries any locality evidence at all
-	// (discriminant, below).
-	type groupResult struct {
-		ids          map[int64]bool
-		conf         Confidence
-		discriminant bool
-	}
 	// groupTargets memoizes, per (directory, kind, language), the set of symbol ids a reference to
 	// name from some file in that group would resolve to (§5.5). P69b: a "read" reference's own tier
 	// membership is clamped by its kind (resolve.go), and the Go package-privacy rule depends on
 	// language, so both join directory in the memo key — a name/kind/language combination used many
 	// times across few directories still costs one resolution per (directory, kind, language) group,
 	// not one per occurrence.
-	groupTargets := map[string]groupResult{}
+	groupTargets := map[string]refGroupResult{}
 
 	targetIDs := make(map[int64]bool, len(targets))
 	for _, t := range targets {
@@ -156,48 +165,21 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		}
 		rf, ok, err := g.cachedFile(ctx, files, r.FileID)
 		if err != nil {
-			return Refs{}, err
+			return nil, 0, 0, err
 		}
 		if !ok || isSelfSite(r, rf, targets) {
 			continue
 		}
 
-		included := mode == NameOnly
-		// siteConf is §7.1's own per-site signal: RepoWide for a NameOnly site (nothing was
-		// resolved, so a repository-wide name match is literally what the row is), else the
-		// resolving group's own confidence.
-		siteConf := RepoWide
-		if !included {
-			dir := dirOf(rf.Path)
-			key := dir + "\x00" + r.Kind + "\x00" + rf.Language
-			group, ok := groupTargets[key]
-			if !ok {
-				ids, conf, err := g.groupResolutionTargets(ctx, dir, rf.Language, r.Kind, name)
-				if err != nil {
-					return Refs{}, err
-				}
-				// A group that resolved RepoWide with more than one candidate carries no locality
-				// evidence at all — every same-named definition in the repository is equally
-				// "in the set," so membership in it proves nothing about which one this occurrence
-				// means. A singleton candidate is kept regardless of tier: a name with exactly one
-				// definition repository-wide is unambiguous even at RepoWide, which is what
-				// preserves recall for the ordinary cross-directory case (P69d §A.4 commit 2).
-				group = groupResult{ids: ids, conf: conf, discriminant: conf != RepoWide || len(ids) == 1}
-				groupTargets[key] = group
-			}
-			if !group.discriminant {
-				unattributed++
-				continue
-			}
-			siteConf = group.conf
-			for id := range targetIDs {
-				if group.ids[id] {
-					included = true
-					break
-				}
-			}
+		incl, err := g.resolveRefInclusion(ctx, dirOf(rf.Path), rf.Language, r.Kind, name, mode, groupTargets, targetIDs)
+		if err != nil {
+			return nil, 0, 0, err
 		}
-		if !included {
+		if incl.unattributed {
+			unattributed++
+			continue
+		}
+		if !incl.included {
 			continue
 		}
 
@@ -207,7 +189,7 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 		}
 		fileSymbols, err := g.cachedSymbols(ctx, symbolsByFile, r.FileID)
 		if err != nil {
-			return Refs{}, err
+			return nil, 0, 0, err
 		}
 		enclosingName := ""
 		if enc := innermostEnclosingSymbol(fileSymbols, r.StartByte, r.EndByte); enc != nil {
@@ -217,31 +199,34 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 			Path: rf.Path, Language: rf.Language,
 			Kind: r.Kind, Name: r.Name,
 			Span: referenceSpan(r), NameSpan: referenceNameSpan(r),
-			Enclosing: enclosingName, Confidence: siteConf,
+			Enclosing: enclosingName, Confidence: incl.confidence,
 		})
 	}
+	return sites, total, unattributed, nil
+}
 
-	if opt.IncludeDefinition {
-		for _, t := range targets {
-			enclosingName := ""
-			if t.sym.ParentID != nil {
-				if parent, ok, err := g.store.SymbolByID(ctx, *t.sym.ParentID); err == nil && ok {
-					enclosingName = parent.Name
-				}
-			}
-			total++
-			if len(sites) < limit {
-				sites = append(sites, Site{
-					Path: t.file.Path, Language: t.file.Language,
-					Kind: t.sym.Kind, Name: t.sym.Name,
-					Span: symbolSpan(t.sym), NameSpan: symbolNameSpan(t.sym),
-					Enclosing: enclosingName, Confidence: Exact,
-				})
+// appendDefinitionSites is ReferencesTo's own IncludeDefinition tail: add each target's own
+// NameSpan as an Exact-confidence Site, still counted against total/limit, for a caller that wants
+// the definition included alongside its references.
+func (g *Graph) appendDefinitionSites(ctx context.Context, targets []candidate, sites []Site, total int, limit int) ([]Site, int) {
+	for _, t := range targets {
+		enclosingName := ""
+		if t.sym.ParentID != nil {
+			if parent, ok, err := g.store.SymbolByID(ctx, *t.sym.ParentID); err == nil && ok {
+				enclosingName = parent.Name
 			}
 		}
+		total++
+		if len(sites) < limit {
+			sites = append(sites, Site{
+				Path: t.file.Path, Language: t.file.Language,
+				Kind: t.sym.Kind, Name: t.sym.Name,
+				Span: symbolSpan(t.sym), NameSpan: symbolNameSpan(t.sym),
+				Enclosing: enclosingName, Confidence: Exact,
+			})
+		}
 	}
-
-	return Refs{Sites: sites, Total: total, Truncated: total > len(sites), Unattributed: unattributed}, nil
+	return sites, total
 }
 
 // groupResolutionTargets is ReferencesTo's own memoized computation: which symbols (by id) would a
@@ -255,6 +240,60 @@ func (g *Graph) ReferencesTo(ctx context.Context, q Query, opt RefOpts) (Refs, e
 // any kind (§4.3). kind is set on the sentinel so a "read" reference gets resolveName's own tier<=1
 // clamp (§4.2). The returned Confidence is what ReferencesTo's own attribution gate reads (P69d §A.4
 // commit 2) — resolveName already computes it; this used to discard it.
+// refGroupResult is groupTargets' own memoized entry: which symbols (by id) a reference from this
+// group would resolve to, plus whether that group carries any locality evidence at all
+// (discriminant, below).
+type refGroupResult struct {
+	ids          map[int64]bool
+	conf         Confidence
+	discriminant bool
+}
+
+// refInclusion is resolveRefInclusion's own verdict for one reference row: whether it counts as a
+// reference to q's own target at all, at what confidence, and whether it was dropped for lack of
+// locality evidence rather than a genuine non-match.
+type refInclusion struct {
+	included     bool
+	confidence   Confidence
+	unattributed bool
+}
+
+// resolveRefInclusion is ReferencesTo's own per-row resolution step, for a row already past the
+// kind/self-site filters. NameOnly always includes at RepoWide confidence (§7.1: nothing was
+// resolved, so a repository-wide name match is literally what the row is); Resolved looks up (or
+// computes and memoizes into groupTargets) the (directory, kind, language) group's own resolution
+// targets and checks whether q's own target set intersects them.
+func (g *Graph) resolveRefInclusion(ctx context.Context, dir, language, kind, name string, mode RefMode, groupTargets map[string]refGroupResult, targetIDs map[int64]bool) (refInclusion, error) {
+	if mode == NameOnly {
+		return refInclusion{included: true, confidence: RepoWide}, nil
+	}
+	key := dir + "\x00" + kind + "\x00" + language
+	group, ok := groupTargets[key]
+	if !ok {
+		ids, conf, err := g.groupResolutionTargets(ctx, dir, language, kind, name)
+		if err != nil {
+			return refInclusion{}, err
+		}
+		// A group that resolved RepoWide with more than one candidate carries no locality
+		// evidence at all — every same-named definition in the repository is equally
+		// "in the set," so membership in it proves nothing about which one this occurrence
+		// means. A singleton candidate is kept regardless of tier: a name with exactly one
+		// definition repository-wide is unambiguous even at RepoWide, which is what
+		// preserves recall for the ordinary cross-directory case (P69d §A.4 commit 2).
+		group = refGroupResult{ids: ids, conf: conf, discriminant: conf != RepoWide || len(ids) == 1}
+		groupTargets[key] = group
+	}
+	if !group.discriminant {
+		return refInclusion{unattributed: true}, nil
+	}
+	for id := range targetIDs {
+		if group.ids[id] {
+			return refInclusion{included: true, confidence: group.conf}, nil
+		}
+	}
+	return refInclusion{confidence: group.conf}, nil
+}
+
 func (g *Graph) groupResolutionTargets(ctx context.Context, dir, language, kind, name string) (map[int64]bool, Confidence, error) {
 	sentinel := codeindex.FileRow{Path: dir + "/\x00", Language: language}
 	site := resolveSite{File: sentinel, Kind: kind, StartByte: -1, EndByte: -1, NameStartByte: -1, NameEnd: -1}

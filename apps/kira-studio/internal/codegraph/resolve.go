@@ -301,6 +301,79 @@ type resolveSite struct {
 	NameStartByte, NameEnd int
 }
 
+// buildResolveCandidates is resolveName's own §5.1-step-2 candidate construction: one candidate
+// per symbol row sharing the name, dropping the self-reference and ranking each by tier plus,
+// within tier 0, whether it is a recursive call or a same-parent sibling.
+func buildResolveCandidates(rows []codeindex.SymbolRow, filesByID map[int64]codeindex.FileRow, site resolveSite, enclosing *codeindex.SymbolRow) []candidate {
+	var candidates []candidate
+	for _, row := range rows {
+		f, ok := filesByID[row.FileID]
+		if !ok {
+			continue // a symbol whose file vanished between the two reads — skip rather than fail.
+		}
+		if site.StartByte >= 0 && f.Path == site.File.Path &&
+			row.NameStartByte == site.NameStartByte && row.NameEndByte == site.NameEnd {
+			continue // self-reference drop (§5.1 step 2).
+		}
+		tier := tierOf(f, site.File)
+		rank := 2
+		if tier == 0 {
+			switch {
+			case row.StartByte <= site.StartByte && row.EndByte >= site.EndByte:
+				// The candidate's own span contains the reference — a recursive/self call.
+				rank = 0
+			case enclosing != nil && sameParent(row.ParentID, enclosing.ParentID):
+				// The candidate and the reference's innermost enclosing definition share the
+				// same parent — a sibling method in the same class, or another top-level
+				// function in the same file (both have a nil parent).
+				rank = 1
+			}
+		}
+		candidates = append(candidates, candidate{sym: row, file: f, tier: tier, sameFileRank: rank})
+	}
+	return candidates
+}
+
+// clampLocalityForKindOrName applies P69b's two locality clamps together — filtering to tier <= 1
+// is the same operation for both, so applying it once for whichever condition (or both) holds is
+// equivalent to running each independently.
+func clampLocalityForKindOrName(candidates []candidate, site resolveSite, name string) []candidate {
+	if site.Kind == "read" || (site.File.Language == "go" && isUnexportedGoName(name)) {
+		candidates = filterTierAtMost(candidates, 1)
+	}
+	return candidates
+}
+
+// markSameReceiver is resolveName's own §5.1 same-receiver marking: when the reference site sits
+// inside a Go method, mark every candidate method sharing that method's own receiver type — a
+// demotion among ties, never a filter. Skipped entirely for a non-Go site or one not inside a
+// method, per §5.2's own cost note.
+func (g *Graph) markSameReceiver(ctx context.Context, candidates []candidate, site resolveSite, enclosing *codeindex.SymbolRow) error {
+	if site.File.Language != "go" || enclosing == nil || enclosing.Kind != "method" {
+		return nil
+	}
+	refs := referenceCache{}
+	receiverType, err := g.receiverTypeOf(ctx, refs, *enclosing)
+	if err != nil {
+		return err
+	}
+	if receiverType == "" {
+		return nil
+	}
+	for i := range candidates {
+		c := &candidates[i]
+		if c.file.Language != "go" || c.sym.Kind != "method" {
+			continue
+		}
+		candReceiver, err := g.receiverTypeOf(ctx, refs, c.sym)
+		if err != nil {
+			return err
+		}
+		c.sameReceiver = candReceiver != "" && candReceiver == receiverType
+	}
+	return nil
+}
+
 // resolveName runs §5.1-§5.4 for one name, returning the winning tier's ranked, capped candidates
 // and the confidence for the whole result. An empty result (nil, "") is a real "no definition
 // found" answer, not an error — including Go's own deliberate empty result for an unexported name
@@ -332,84 +405,31 @@ func (g *Graph) resolveName(ctx context.Context, name string, refSymbols []codei
 		enclosing = innermostEnclosingSymbol(refSymbols, site.StartByte, site.EndByte)
 	}
 
-	var candidates []candidate
-	for _, row := range rows {
-		f, ok := filesByID[row.FileID]
-		if !ok {
-			continue // a symbol whose file vanished between the two reads — skip rather than fail.
-		}
-		if site.StartByte >= 0 && f.Path == site.File.Path &&
-			row.NameStartByte == site.NameStartByte && row.NameEndByte == site.NameEnd {
-			continue // self-reference drop (§5.1 step 2).
-		}
-		tier := tierOf(f, site.File)
-		rank := 2
-		if tier == 0 {
-			switch {
-			case row.StartByte <= site.StartByte && row.EndByte >= site.EndByte:
-				// The candidate's own span contains the reference — a recursive/self call.
-				rank = 0
-			case enclosing != nil && sameParent(row.ParentID, enclosing.ParentID):
-				// The candidate and the reference's innermost enclosing definition share the
-				// same parent — a sibling method in the same class, or another top-level
-				// function in the same file (both have a nil parent).
-				rank = 1
-			}
-		}
-		candidates = append(candidates, candidate{sym: row, file: f, tier: tier, sameFileRank: rank})
-	}
+	candidates := buildResolveCandidates(rows, filesByID, site, enclosing)
 	if len(candidates) == 0 {
 		return nil, "", nil
 	}
 
 	// P69b: a bare-identifier "read" reference (an argument, a binary operand, a slice bound) carries
 	// no import or qualification evidence, so a name-based resolver genuinely can't tell a local from
-	// a distant module-level constant sharing its name. Clamp to same-file-or-same-directory before
-	// the Go rule below — every read site this phase indexes is already tier <= 1 by construction (a
+	// a distant module-level constant sharing its name; an unexported Go name outside its own package
+	// has the same problem. Both clamp to same-file-or-same-directory before the winning tier is
+	// chosen below — every read site this phase indexes is already tier <= 1 by construction (a
 	// package-level constant is read inside its own package), so this loses no real capability and
 	// closes the cross-directory false positives a raw capture would otherwise return.
-	if site.Kind == "read" {
-		candidates = filterTierAtMost(candidates, 1)
-		if len(candidates) == 0 {
-			return nil, "", nil
-		}
-	}
-
-	if site.File.Language == "go" && isUnexportedGoName(name) {
-		candidates = filterTierAtMost(candidates, 1)
-		if len(candidates) == 0 {
-			return nil, "", nil
-		}
+	candidates = clampLocalityForKindOrName(candidates, site, name)
+	if len(candidates) == 0 {
+		return nil, "", nil
 	}
 
 	bestTier := minTier(candidates)
 	candidates = filterTier(candidates, bestTier)
 
-	// §5.1: when the reference site itself sits inside a Go method, mark every candidate method
-	// sharing that method's own receiver type — a demotion among ties, never a filter. Skipped
-	// entirely for a non-Go site or one not inside a method, per §5.2's own cost note. Runs after
-	// filterTier narrows to the winning tier (P79 review): sameReceiver is only read by
+	// Runs after filterTier narrows to the winning tier (P79 review): sameReceiver is only read by
 	// sortCandidates/ruleFor below, both after this point, so marking it before the tier filter
 	// spent a full ReferencesInFile read per candidate outside the winning tier for nothing.
-	if site.File.Language == "go" && enclosing != nil && enclosing.Kind == "method" {
-		refs := referenceCache{}
-		receiverType, err := g.receiverTypeOf(ctx, refs, *enclosing)
-		if err != nil {
-			return nil, "", err
-		}
-		if receiverType != "" {
-			for i := range candidates {
-				c := &candidates[i]
-				if c.file.Language != "go" || c.sym.Kind != "method" {
-					continue
-				}
-				candReceiver, err := g.receiverTypeOf(ctx, refs, c.sym)
-				if err != nil {
-					return nil, "", err
-				}
-				c.sameReceiver = candReceiver != "" && candReceiver == receiverType
-			}
-		}
+	if err := g.markSameReceiver(ctx, candidates, site, enclosing); err != nil {
+		return nil, "", err
 	}
 
 	sortCandidates(candidates, site.Kind, site.File.Language, site.File.Path)
