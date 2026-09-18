@@ -38,6 +38,7 @@ import {
   setDbMcpEnabled,
 } from '../state/dbmcp';
 import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
+import { setKeepAwakeAgentAware } from '../state/keepAwake';
 import { maskRulesState } from '../state/maskRules';
 import {
   hydrateRepoMap,
@@ -341,6 +342,18 @@ async function onToggleAgentHooksEnabled(enabled: boolean): Promise<void> {
     await setAgentHooksEnabled(enabled);
   } finally {
     claudeCodeHooksToggling.value = false;
+  }
+}
+
+// P87 §9: same instant-action posture — claudeCode.keepAwakeWithAgents both persists and
+// recomputes the live assertion in one call.
+const keepAwakeAgentAwareToggling = ref(false);
+async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
+  keepAwakeAgentAwareToggling.value = true;
+  try {
+    await setKeepAwakeAgentAware(enabled);
+  } finally {
+    keepAwakeAgentAwareToggling.value = false;
   }
 }
 
@@ -1610,6 +1623,24 @@ async function onAddScript(): Promise<void> {
                 {{ agentHooksState.status.settingsPath }}
               </p>
             </template>
+
+            <!-- P87 §9: independent of the title bar's own keep-awake button — either source is
+                 enough to hold the assertion, and this leaf's own instant-action posture mirrors
+                 the hooks toggle just above. -->
+            <label class="field checkbox">
+              <Checkbox
+                :model-value="settingsState.claudeCode.keepAwakeWithAgents"
+                :disabled="keepAwakeAgentAwareToggling"
+                data-testid="settings-claude-code-keep-awake"
+                @update:model-value="onToggleKeepAwakeAgentAware"
+              />
+              <span>Keep this Mac awake while a Claude Code session is running</span>
+              <span class="helper-text"
+                >Prevents idle sleep, and system sleep on AC power, for as long as at least one
+                Claude Code tab is live. Independent of the title bar's own keep-awake button —
+                either one is enough to keep the machine awake.</span
+              >
+            </label>
           </template>
 
           <template v-else-if="activeSection === 'Code intelligence'">

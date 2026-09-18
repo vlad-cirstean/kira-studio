@@ -10,6 +10,7 @@ import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
 import * as GitClientsService from '@bindings/gitclientsservice.js';
 import * as GitHubService from '@bindings/githubservice.js';
+import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
 import * as LinkService from '@bindings/linkservice.js';
@@ -377,6 +378,16 @@ const studioControl = {
   agentHooksStatus: (): Promise<WailsModels.AgentHooksStatus> => unwrap(AgentHooksService.Status()),
   agentHooksSetEnabled: (enabled: boolean): Promise<WailsModels.AgentHooksStatus> =>
     unwrap(AgentHooksService.SetEnabled({ enabled })),
+
+  // P87 §7.2: the titlebar keep-awake toggle and the agent-aware Settings leaf — agentHooksStatus's
+  // own "just unwrap, no trust()" shape (a bool, a bool and a string, nothing secret).
+  keepAwakeStatus: (): Promise<WailsModels.KeepAwakeStatus> => unwrap(KeepAwakeService.Status()),
+  keepAwakeSetManual: (enabled: boolean): Promise<WailsModels.KeepAwakeStatus> =>
+    unwrap(KeepAwakeService.SetManual({ enabled })),
+  keepAwakeSetAgentAware: (enabled: boolean): Promise<WailsModels.KeepAwakeStatus> =>
+    unwrap(KeepAwakeService.SetAgentAware({ enabled })),
+  onKeepAwakeChanged: (cb: (s: WailsModels.KeepAwakeStatus) => void): (() => void) =>
+    on(CHANNEL.keepAwake, cb),
 
   opsRecent: (limit: number): Promise<OpRecord[]> =>
     unwrap(OpsService.Recent({ limit })).then((r) => trust<OpRecord[]>(r ?? [])),

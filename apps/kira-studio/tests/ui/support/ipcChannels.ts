@@ -201,6 +201,11 @@ export const IPC = {
   agentHooksSetEnabled: 'kira:agentHooks:setEnabled',
   terminalAgentSessions: 'kira:agent:sessions:list',
 
+  // P87 §10.3: the titlebar keep-awake toggle and the agent-aware Settings leaf.
+  keepAwakeStatus: 'kira:keepAwake:status',
+  keepAwakeSetManual: 'kira:keepAwake:setManual',
+  keepAwakeSetAgentAware: 'kira:keepAwake:setAgentAware',
+
   connectionState: 'kira:connection:state',
   connectionMetadataInvalidated: 'kira:connection:metadataInvalidated',
   connectionsChanged: 'kira:connections:changed',
@@ -226,4 +231,9 @@ export const IPC = {
   // emitWailsEvent(page, IPC.agentSessions/agentEvent, …), terminal's own precedent above.
   agentSessions: 'kira:agent:sessions',
   agentEvent: 'kira:agent:event',
+  // P87 §3.2/§10.3: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) —
+  // agentSessions' own shape restated. Real wire channel string verbatim
+  // (bridge/events.go's ChannelKeepAwake), no FQN_SUFFIX_BY_IPC_KEY entry (a push channel, never
+  // a bound call) — driven by emitWailsEvent(page, IPC.keepAwake, …), terminal's own precedent.
+  keepAwake: 'kira:keepAwake:changed',
 } as const;

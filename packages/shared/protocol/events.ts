@@ -54,6 +54,9 @@ export const CHANNEL = {
   // P86 §8.4: one Claude Code hook firing for one tab, Emit'd (not EmitTo) — a hook event has no
   // window to address, so every window's own store filters by terminalId against tabs it owns.
   agentEvent: 'kira:agent:event',
+  // P87 §3.2: the titlebar keep-awake toggle's own state, Emit'd (not EmitTo) exactly like
+  // agentSessions — one machine, one assertion, so every window's button must agree.
+  keepAwake: 'kira:keepAwake:changed',
 } as const;
 
 /** Summed across every process metrics.Sample covers (P56's ticker) — a single app-wide readout

@@ -15,6 +15,7 @@ import { hydrateConnections } from './state/connections';
 import { hydrateCustomScripts } from './state/customScripts';
 import { hydrateDbMcp, hydrateDbMcpApprovals } from './state/dbmcp';
 import { hydrateGitClients } from './state/gitClients';
+import { initKeepAwake } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
 import { hydrateOps } from './state/ops';
 import { hydrateRepoMap } from './state/repomap';
@@ -312,6 +313,7 @@ async function bootstrap(): Promise<void> {
     hydrateDbMcpApprovals(),
     hydrateAgentHooks(),
     initAgentSessions(),
+    initKeepAwake(),
     hydrateOps(),
     hydrateTabs(),
   ]);

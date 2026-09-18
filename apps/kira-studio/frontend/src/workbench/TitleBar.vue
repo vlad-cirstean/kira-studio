@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
 import { moduleOfWorkspace } from '@shared/domain/workspace';
+import { computed } from 'vue';
 import { control } from '../bridge/control';
+import { keepAwakeState, setKeepAwakeManual } from '../state/keepAwake';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { settingsOpen } from '../state/settings';
 import { activateWorkspace, workspaceState } from '../state/workspace';
@@ -28,6 +30,25 @@ function onNewWindow(): void {
     console.error('new window', err);
   });
 }
+
+// P87 §8.2: the button shows only the manual source — an "auto-held by the agent-aware setting"
+// third appearance is out of scope (§13). onNewWindow's own posture: no toast channel in the title
+// bar, a rejection is logged, not surfaced.
+function onToggleKeepAwake(): void {
+  setKeepAwakeManual(!keepAwakeState.status.manual).catch((err: unknown) => {
+    console.error('toggle keep-awake', err);
+  });
+}
+
+// §8.3: aria-pressed plus this state-naming tooltip carry what a missing coffee-off glyph would
+// have — @vscode/codicons ships no such glyph, so the button can't also swap its icon the way the
+// Connections/Operations toggles do.
+const keepAwakeTooltip = computed(() => {
+  if (keepAwakeState.status.error) return `Keep awake failed: ${keepAwakeState.status.error}`;
+  return keepAwakeState.status.manual
+    ? 'Keeping this Mac awake — click to stop'
+    : 'Keep this Mac awake';
+});
 </script>
 
 <template>
@@ -60,15 +81,6 @@ function onNewWindow(): void {
          icons, not a colour-only trick) plus the muted colour when it's not — .is-on used to be a
          background tint alone, easy to miss against the bar's own colour). -->
     <div class="title-bar-actions">
-      <button
-        type="button"
-        class="title-action title-action--labelled"
-        data-testid="new-window"
-        @click="onNewWindow"
-      >
-        <CodiconIcon name="empty-window" :size="15" />
-        <span>New window</span>
-      </button>
       <button
         type="button"
         class="title-action"
@@ -104,6 +116,28 @@ function onNewWindow(): void {
         @click="settingsOpen = true"
       >
         <CodiconIcon name="settings-gear" :size="15" />
+      </button>
+      <button
+        v-if="keepAwakeState.status.supported"
+        type="button"
+        class="title-action"
+        :class="{ 'is-on': keepAwakeState.status.manual }"
+        :aria-pressed="keepAwakeState.status.manual"
+        v-tooltip="keepAwakeTooltip"
+        data-testid="toggle-keep-awake"
+        aria-label="Keep this Mac awake"
+        @click="onToggleKeepAwake"
+      >
+        <CodiconIcon name="coffee" :size="15" />
+      </button>
+      <button
+        type="button"
+        class="title-action title-action--labelled"
+        data-testid="new-window"
+        @click="onNewWindow"
+      >
+        <CodiconIcon name="empty-window" :size="15" />
+        <span>New window</span>
       </button>
     </div>
   </div>

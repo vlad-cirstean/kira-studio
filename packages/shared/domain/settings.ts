@@ -170,9 +170,13 @@ export type DbMcpSettings = z.infer<typeof dbMcpSettingsSchema>;
 // launch (internal/bridge/agenthooks.go owns the actual listener start/stop side effect), never
 // cached. hooksPromptDismissed is the first-run banner's own "don't ask again" leaf (§9.4),
 // independent of hooksEnabled so declining the prompt once doesn't reappear on every new tab.
+// keepAwakeWithAgents is P87 §6's own leaf: on, this Mac is kept awake automatically whenever at
+// least one Claude Code session (P86's own tracked running-agent count) is live, independent of
+// the title bar's own keep-awake toggle. Off by default — an OS power assertion is opt-in.
 export const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
   hooksEnabled: z.boolean().default(false),
   hooksPromptDismissed: z.boolean().default(false),
+  keepAwakeWithAgents: z.boolean().default(false),
 });
 export type ClaudeCodeSettings = z.infer<typeof claudeCodeSettingsSchema>;
 
@@ -208,6 +212,7 @@ export const settingsSchema = /*#__PURE__*/ z.object({
   claudeCode: claudeCodeSettingsSchema.default({
     hooksEnabled: false,
     hooksPromptDismissed: false,
+    keepAwakeWithAgents: false,
   }),
 });
 export type Settings = z.infer<typeof settingsSchema>;
@@ -270,5 +275,6 @@ export const defaultSettings: Settings = {
   claudeCode: {
     hooksEnabled: false,
     hooksPromptDismissed: false,
+    keepAwakeWithAgents: false,
   },
 };

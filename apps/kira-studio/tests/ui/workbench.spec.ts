@@ -1,5 +1,6 @@
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { emitWailsEvent } from './support/mockRuntime';
 
 // Ported from tests/e2e/workbench.spec.ts (P57 D16). Five of its seven scenarios asserted real
 // persistence across a relaunch (panel visibility, settings appearance/Advanced sections, word
@@ -55,8 +56,10 @@ test("the scrollbar corner is not left at Chromium's opaque-white default (P42 F
 });
 
 // P92 item 3: the title bar's own action button for shell.BuildMenu's ItemNewWindow, previously
-// reachable only from the native menu — nothing in the renderer could reach it before.
-test('the title bar has a New window button, before the project-panel toggle, that calls WindowsService.OpenNew once per click', async ({
+// reachable only from the native menu — nothing in the renderer could reach it before. P87 moved
+// it to the rightmost position, inserting the keep-awake button immediately to its left — this
+// test's own title and DOM-order assertion are updated to match, not ported unchanged.
+test('the title bar has a New window button, rightmost of the action row, that calls WindowsService.OpenNew once per click', async ({
   relaunch,
 }) => {
   const { window, control } = await relaunch({
@@ -66,14 +69,68 @@ test('the title bar has a New window button, before the project-panel toggle, th
   await expect(newWindow).toBeVisible();
   await expect(newWindow).toContainText('New window');
 
-  // DOM order: New window before the project-panel toggle (both in `.title-bar-actions`).
+  // DOM order: Connections, Operations, Settings, keep-awake, New window (P87's own reorder).
   const testIds = await window
-    .locator('[data-testid="new-window"], [data-testid="toggle-project-panel"]')
+    .locator(
+      '[data-testid="toggle-project-panel"], [data-testid="toggle-operations-panel"], ' +
+        '[data-testid="open-settings"], [data-testid="toggle-keep-awake"], [data-testid="new-window"]',
+    )
     .evaluateAll((els) => els.map((el) => el.getAttribute('data-testid')));
-  expect(testIds).toEqual(['new-window', 'toggle-project-panel']);
+  expect(testIds).toEqual([
+    'toggle-project-panel',
+    'toggle-operations-panel',
+    'open-settings',
+    'toggle-keep-awake',
+    'new-window',
+  ]);
 
   const openNewCalls = () => control.log().filter((e) => e.channel === IPC.windowsOpenNew);
   expect(openNewCalls()).toHaveLength(0);
   await newWindow.click();
   await expect.poll(() => openNewCalls().length).toBe(1);
+});
+
+// P87 §10.3: the titlebar keep-awake toggle — renders (mockRuntime.ts's own default keepAwakeStatus
+// has supported: true), one click issues exactly one KeepAwakeService.SetManual carrying
+// {enabled: true}, and the button gains .is-on/aria-pressed="true".
+test('the keep-awake button toggles on click, calling KeepAwakeService.SetManual once with {enabled: true}', async ({
+  relaunch,
+}) => {
+  const { window, control } = await relaunch({
+    control: [
+      {
+        channel: IPC.keepAwakeSetManual,
+        response: { manual: true, supported: true, error: '' },
+      },
+    ],
+  });
+  const button = window.locator('[data-testid="toggle-keep-awake"]');
+  await expect(button).toBeVisible();
+  await expect(button).not.toHaveClass(/is-on/);
+  await expect(button).toHaveAttribute('aria-pressed', 'false');
+
+  const setManualCalls = () => control.log().filter((e) => e.channel === IPC.keepAwakeSetManual);
+  expect(setManualCalls()).toHaveLength(0);
+  await button.click();
+  await expect.poll(() => setManualCalls().length).toBe(1);
+  expect(setManualCalls()[0]?.args).toEqual({ enabled: true });
+
+  await expect(button).toHaveClass(/is-on/);
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+});
+
+// The cross-window broadcast: a ChannelKeepAwake event with no click at all still turns the
+// button on — nothing else in this file covers a push-driven (not click-driven) title-bar state.
+test('the keep-awake button turns on from a ChannelKeepAwake broadcast with no click', async ({
+  relaunch,
+}) => {
+  const { window } = await relaunch();
+  const button = window.locator('[data-testid="toggle-keep-awake"]');
+  await expect(button).toBeVisible();
+  await expect(button).not.toHaveClass(/is-on/);
+
+  await emitWailsEvent(window, IPC.keepAwake, { manual: true, supported: true, error: '' });
+
+  await expect(button).toHaveClass(/is-on/);
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
 });

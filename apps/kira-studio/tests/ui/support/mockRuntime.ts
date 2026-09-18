@@ -196,6 +196,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   agentHooksStatus: 'AgentHooksService.Status',
   agentHooksSetEnabled: 'AgentHooksService.SetEnabled',
   terminalAgentSessions: 'TerminalService.AgentSessions',
+
+  keepAwakeStatus: 'KeepAwakeService.Status',
+  keepAwakeSetManual: 'KeepAwakeService.SetManual',
+  keepAwakeSetAgentAware: 'KeepAwakeService.SetAgentAware',
 };
 
 /** ipc.ts's legacy channel string (what every `ControlSnapshot.channel` and fixture is keyed by,
@@ -413,6 +417,12 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // miss.
   [IPC.agentHooksStatus]: JSON.stringify({ running: false, settingsPath: '', error: '' }),
   [IPC.terminalAgentSessions]: JSON.stringify({ sessions: [] }),
+  // P87: main.ts's bootstrap() joins initKeepAwake() to the same unconditional-every-boot
+  // Promise.all above, same reasoning. supported: true so the titlebar button renders in every
+  // spec — the UI suite runs against a static server, not a real Go build, and a spec that never
+  // cares about keep-awake should still see the titlebar it will ship with. A spec that DOES care
+  // (workbench.spec.ts's own keep-awake cases) still wins with its own snapshot.
+  [IPC.keepAwakeStatus]: JSON.stringify({ manual: false, supported: true, error: '' }),
   // C6 §8.5: openRepoWorkspace/closeRepoWorkspace call these fire-and-forget on every workspace
   // open/close (state/workspace.ts's own comment: "a failed index start must never block opening a
   // workspace") — no spec asserts on their own echo, the same reasoning opsCancel's own wildcard
