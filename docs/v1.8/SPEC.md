@@ -1560,6 +1560,81 @@ payload (7 new override leaves sent with every `httpSend`) having pushed a pre-e
 threshold stale, not a P91 regression. `bun run build:vscode`/`bun run test:webview`: clean, 45
 passed (expected — `apps/kira-studio-vscode/` untouched). No known open item.
 
+## P92 result
+
+Landed per plan (`docs/v1.8/plans/P92-git-graph-titlebar-tabs-bug-batch.md`), 13 commits
+(`a4659482`, `d702ea16`, `e6bbadae`, `0b67bbe1`, `789bcd34`, `1be57f55`, `ba61ed98`, `439b2310`,
+`ad077043`, `5d0895fe`, `3f159f95`, `82f2a47a`, `6c22e1ca`). Resumed from a prior session's own
+work (rate-limited mid-debug) — real progress already committed plus uncommitted debug scaffolding
+in `CommitGrid.vue`, cleaned up rather than kept.
+
+**Item 8** (`a4659482`): the pinned `repo-graph` tab's own creation path left `path` unset, tripping
+the DB's `NOT NULL` constraint on the very first write — given a real (empty-string) path instead.
+**Item 4** (`d702ea16`): a row whose height changes after its first render (a decoration chunk
+landing late) now repositions every row below it via `invalidate()`, not `updateRowCount()` +
+`render()` (which never repositions already-cached rows). **Item 1** (`0b67bbe1`): the graph column
+gained a drag handle and a capped default width (`DEFAULT_GRAPH_LANE_CAP`, 6 lanes/95px) instead of
+growing unbounded with branch count; `PersistedViewState` bumped to v7. **Item 10** (`789bcd34`):
+ref/tag badges render as an outline (colored border, transparent fill) instead of a filled chip.
+**Item 9** (`1be57f55`): a general-settings control for git-graph font size. **Item 3** (`ba61ed98`):
+a "New window" title-bar button, before the project-panel toggle, calling `WindowsService.OpenNew`.
+**Item 6** (`439b2310`): Repos/Files/Review are three peer top-level tabs now, not Review nested
+inside Files' own Files/Search strip. **Item 7** (`ad077043`): a visible go-to-file action on the
+diff view, reusing P74's existing open-and-land-on-line path. **Item 5** (`5d0895fe`): "Open all
+changes" on a commit opens one `repo-multi-diff` tab (per-file collapsible sections, only the
+expanded one's editor actually mounts) instead of one tab per changed file.
+
+**Item 2 — the root cause, corrected.** The prior session's own diagnosis (a missing
+`scheduleResize()` call in the `loadedRows` watcher, so a row count crossing the
+needs-a-scrollbar threshold never re-measured) was real but insufficient alone — re-verified by
+removing it after the fix below and confirming the regression test still passed, since this
+sandbox's Chromium renders its scrollbar as a non-layout-consuming overlay
+(`viewport.clientWidth` never actually shrank here). Kept anyway as a correct, cheap, properly
+deduped (`lastRebuiltWidth`) defensive fix for any real platform whose scrollbar does consume
+layout width, per the plan's own explicit claim. The actual, empirically-traced cause (stack-trace
+property interceptors on SlickGrid's own `setColumns`, not guesswork): SlickGrid's
+`_columnDefaults` carries a hidden `minWidth: 30`, silently merged onto any column declaring none
+of its own and clamped up whenever seeded narrower — `graphColumnWidth(0) = 17`, the transient
+zero-lane state at mount, is exactly such a case. That 13px of silent inflation was the entire gap
+between the computed and rendered widths. Fixed in `columns.ts` (`3f159f95`) by declaring
+`minWidth: 0` (not `undefined` — `updateColumnProps()`'s clamp guards on `m.minWidth &&`, so only a
+falsy value disables it) on all four columns.
+
+**Test coverage.** `82f2a47a` covers items 1, 2, 4, 10 in
+`apps/kira-studio-vscode/tests/interaction/graph-columns.spec.ts` (new fixtures in
+`fakeGraphHost.ts`: `streamManyRows` for a real vertical scrollbar, `streamTwoChunksSecondDecorated`
+for item 4's late-height-change case). `6c22e1ca` adds the three desktop-side Playwright cases the
+plan's own test section named and the prior session's commits never included: item 3
+(`workbench.spec.ts`, button visibility/DOM order/exactly-one-call-per-click), item 6
+(`repo-workspace.spec.ts`, three top-level tabs plus the Files tab's own two-segment strip), and
+item 5 (`repo-workspace.spec.ts`, "Open all changes" opens one `repo-multi-diff` tab listing every
+changed path). Item 5 needed real new mock infrastructure: `gitStreamMock.ts`'s own doc comment had
+flagged `graph.stream` as a known gap since P74/P75 (it only ever answered a plain unary req/res,
+never the streamed, binary-carrying chunks `graph.stream` actually sends). `graphStreamFixture.ts`
+builds a real chunk with the actual `@kira/git-ipc` codec (FlatBuffers encoding) rather than
+hand-rolling a second copy of it, splitting the result across `page.evaluate`'s JSON-only argument
+boundary (scalar fields plus one base64 blob); `gitStreamMock.ts` reassembles the real blob-frame
+wire format in-page, where the request's own runtime `id`/`version` are known. `tsconfig.tests.json`
+gained matching `allowImportingTsExtensions`/`lib` entries mirroring `git-ipc`'s own tsconfig, so
+that import typechecks. The plan's own `rowSvg.test.ts` update for item 1 turned out to not apply —
+already confirmed and documented as a deviation in `0b67bbe1`'s own commit message: that test file
+never calls `buildRowSvg` directly, so there was nothing there to update; `viewState.test.ts` got
+the real update, for the v7 schema bump.
+
+**Verification.** `go build`/`go vet`/`go test ./...` clean, no flake this run. `bun run
+typecheck`/`biome check .`/`scripts/check-tokens.sh` clean (the same two pre-existing
+`UncommittedChangesStrip.vue`/`RequestSettingsPane.vue` findings every prior phase in this chapter
+has recorded, both untouched by this phase). `bun run build` (desktop) and `bun run build:vscode`
+both succeed. `bun run test:unit`: 1517 passed, 0 failed. `bun run test:webview`
+(`webview-layout` + `webview-interaction`, including item 2's own regression case): 50 passed, 0
+failed. Full `bun run test:ui` (`ui` project, 306 tests): 259 passed, 47 failed — every failure a
+Monaco-timeout case (`data-kira-editor-text`/`__kiraRetention` never materializing) in files with
+zero relation to this phase (console/http/gRPC/SQL-schema/autocomplete/slick-grid/leaks specs);
+confirmed pre-existing and unrelated by `git diff --stat` against the pre-phase commit showing zero
+overlap with any failing file, and by isolated reruns of a sample reproducing the identical
+failures with no other tests competing for resources — the same class of Monaco-timeout flake
+P90's own result section recorded (47 failures there too). No known open item.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
