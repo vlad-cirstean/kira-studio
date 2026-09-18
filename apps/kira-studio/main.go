@@ -87,94 +87,14 @@ func main() {
 
 	startedAt := time.Now()
 
-	if err := config.EnsureLayout(); err != nil {
-		startupfail.Fatal(startupfail.StepEnsureLayout, err)
-	}
-	if err := logging.Init(); err != nil {
-		startupfail.Fatal(startupfail.StepLogging, err)
-	}
-	logging.Sweep()
+	core := openCore()
+	db, cipher, authorizer := core.db, core.cipher, core.authorizer
+	repositories, secretsRepo, maskRulesSvc := core.repositories, core.secretsRepo, core.maskRulesSvc
 
-	db, err := storage.Open()
-	if err != nil {
-		startupfail.Fatal(startupfail.StepStorage, err)
-	}
+	git := wireGit(repositories)
+	gitRunner, gitDiscovery, gitRegistry := git.runner, git.discovery, git.registry
+	askpassBroker, gitRouter, gitSock := git.askpassBroker, git.router, git.sock
 
-	cipher := secrets.New()
-	// P14: constructed beside the cipher so its own startup log records OS-authentication
-	// availability the same way cipher's Status does.
-	authorizer := localauth.New(time.Now, localauth.Evaluate, localauth.Available)
-
-	repositories, err := repos.New(db.DB)
-	if err != nil {
-		startupfail.Fatal(startupfail.StepRepos, err)
-	}
-	secretsRepo := repos.NewSecrets(db.DB, cipher)
-	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
-	// secretsRepo just above.
-	repositories.Variables = repos.NewVariables(db.DB, cipher)
-	// M5 §2.5/§3.2: the per-connection correlation key column, same "needs a Cipher" shape.
-	maskKeysRepo := repos.NewMaskKeys(db.DB, cipher)
-	maskRulesSvc := maskrules.New(repositories.MaskRules, maskKeysRepo)
-
-	// G1 §3.7: the git socket listener. Start's error is logged, never fatal (D5) — the app must
-	// boot even when the git socket could not, e.g. a second instance already serving it.
-	// G2 D18/D19: repository lifecycle moves to a refcounted gitsession.Registry, shared across
-	// every connection, with gitrpc rebuilt as a per-connection Router over it.
-	gitRunner := gitclient.NewExecRunner()
-	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
-	// G7 D16: the server-owned settings a remote op reads fresh on every push pre-flight/run and
-	// every auto-fetch tick — never cached, since a stale protected-branch list is a safety bug.
-	// G18 D15: gitPath joins the same closure — the third leaf of the same table, read the same
-	// way, threaded into every internal/gitrpc Discovery.Status call site (Registry.Settings).
-	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
-		s, err := repositories.Settings.GetAll()
-		if err != nil {
-			slog.Warn("read git settings", "scope", "git", "err", err)
-			return nil, 0, ""
-		}
-		return s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes, s.Git.GitPath
-	}
-	// G18 D8: the seven per-repo display settings (D3), backed by GitRepoSettingsRepo — D14's
-	// log.level sentinel substitution happens entirely inside that repo, invisibly here.
-	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
-	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
-	// G7 D8: a broker that fails to start is logged and left nil — every remote op then runs with
-	// no askpass interposition at all, D10's own already-supported "user's own askpass wins" path,
-	// not a new failure mode. It must never be fatal to boot (same posture as the socket below).
-	askpassBroker, err := gitaskpass.New(gitaskpass.Options{})
-	if err != nil {
-		slog.Warn("start askpass broker", "scope", "startup", "err", err)
-		askpassBroker = nil
-	}
-	// C10 §3.3/§10 S5: hoisted out of gitsock.Deps.Router literal so the native git stream
-	// (shell.RegisterGitStream, below) can share the exact same Router — one handler table served
-	// over two transports (the socket, for external clients; the in-process Wails stream, for this
-	// app's own renderer), never two independently constructed ones.
-	gitRouter := gitrpc.New(gitrpc.Deps{
-		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
-		Askpass: askpassBroker,
-		// G18 D11: the settings.setGitPath migration leg's own write path — the exact
-		// SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) shape D11 names,
-		// reused rather than reinvented.
-		SetGitPath: func(gitPath string) error {
-			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
-			return err
-		},
-	})
-	gitSock := gitsock.New(gitsock.Deps{
-		SocketPath:    filepath.Join(config.KiraHome(), "git.sock"),
-		LockPath:      filepath.Join(config.KiraHome(), "git.sock.lock"),
-		Clients:       repositories.GitClients,
-		Registry:      gitRegistry,
-		Router:        gitRouter,
-		ServerVersion: buildinfo.Version,
-		Now:           time.Now,
-	})
-	if err := gitSock.Start(); err != nil {
-		slog.Warn("git socket listener", "scope", "startup", "err", err)
-	}
 	// P5 D8: the SAME authorizer instance connections.New below is given — that is what makes the
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
 	apiVarsSvc := apivars.New(repositories.Variables, cipher, authorizer)
@@ -197,64 +117,9 @@ func main() {
 	// P72 §9.2: match the stored advanced.gitLogLevel rather than always booting at Info.
 	logging.SetLevel(settings.Advanced.GitLogLevel)
 
-	adapterDeps := adapters.Deps{Log: func(level, message string) {
-		switch level {
-		case "error":
-			slog.Error(message, "scope", "adapter")
-		case "warn":
-			slog.Warn(message, "scope", "adapter")
-		default:
-			slog.Info(message, "scope", "adapter")
-		}
-	}}
-	goCache := enginecache.NewCache(settings.Cache.L2BudgetMb*1024*1024, adapterDeps.Log)
-	router := adapterhost.NewRouter(adapterDeps, goCache)
-	deps.Router = router
-
-	preconnectSupervisor := preconnect.New()
-	connectionsSvc := connections.New(connections.Deps{
-		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
-		Cipher: cipher, Auth: authorizer, Backend: router, Preconnect: preconnectSupervisor,
-		MaskRules: repositories.MaskRules,
-	})
-	connectionsSvc.Start()
-	deps.Connections = connectionsSvc
-
-	treeSvc := tree.New(repositories.Connections, repositories.Metadata, router, connectionsSvc)
-	deps.Tree = treeSvc
-
-	// Configure pushes the budget to both caches (§4.9).
-	router.PushCacheConfig(settings)
-
-	// The router's in-process scheduler is oplog's only EventSource now (P58f D9) — every kind has
-	// been native since P58e, so the Node child never produces an op:start/op:end of its own to fan
-	// in (enginebackend.Merge, which used to do that, is deleted).
-	oplogWiring := oplog.New(router.Host(), repositories.Ops, settings.Advanced.OpLogRetentionDays)
-	oplogWiring.Start()
-
-	// P8 D7/F18: a scratch tab's response history is swept once per launch, beside oplog's own
-	// startup prune — tabs is the liveness oracle (TabsRepo.Save always re-inserts every tab
-	// that's currently open), so this removes only a closed tab's history, never a live one's.
-	if err := repositories.ResponseHistory.SweepOrphans(); err != nil {
-		slog.Warn("sweep orphaned response history", "scope", "startup", "err", err)
-	}
-	// P11 D11: the same startup prune, for a scratch tab's gRPC call history.
-	if err := repositories.GrpcHistory.SweepOrphans(); err != nil {
-		slog.Warn("sweep orphaned grpc call history", "scope", "startup", "err", err)
-	}
-	// P23 D5(b): return freed pages to the filesystem once the freelist is worth reclaiming — a
-	// no-op on a database opened before this phase (auto_vacuum stays NONE, D5(a) never converts
-	// an existing file) and on one whose freelist is still small.
-	if err := (&repos.Maintenance{DB: db.DB}).Reclaim(); err != nil {
-		slog.Warn("reclaim freed pages", "scope", "startup", "err", err)
-	}
-
-	processSet := metrics.NewCachedPIDs(
-		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
-		metrics.RescanEvery,
-	)
-	metricsTicker := metrics.NewTicker(processSet.PIDs, metrics.Interval)
-	metricsTicker.Start()
+	adaptersW := wireAdapters(&deps, settings, repositories, secretsRepo, cipher, authorizer, db)
+	router, connectionsSvc := adaptersW.router, adaptersW.connectionsSvc
+	oplogWiring, metricsTicker := adaptersW.oplogWiring, adaptersW.metricsTicker
 
 	// The two adapters below are needed inside the Services list, which is itself an argument to
 	// application.New — but both need the *App that New alone produces (P56 §4.11's ordering
@@ -270,126 +135,17 @@ func main() {
 	// nothing is added to the quit teardown below.
 	updateChecker := appupdate.NewChecker(buildinfo.Version)
 
-	// C3 §7.4/D7: the repo-map MCP server's embedded instance — owned by this app's own lifecycle,
-	// same posture as gitSock just above. StartIfEnabled's own failure (no repository resolved at
-	// this process's cwd, a bind conflict) is logged, never fatal, mirroring gitSock.Start().
-	repoMapSvc := &bridge.RepoMapService{
-		Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Discovery: gitDiscovery, Runner: gitRunner,
-	}
-	bridge.StartRepoMapIfEnabled(repoMapSvc)
+	embedded := wireEmbeddedServices(deps, gitDiscovery, gitRunner, gitSock, connectionsSvc, oplogWiring, metricsTicker)
+	repoMapSvc, dbMcpSvc := embedded.repoMapSvc, embedded.dbMcpSvc
+	agentHooksSvc, keepAwakeSvc := embedded.agentHooksSvc, embedded.keepAwakeSvc
+	windowsSvc, terminalSvc := embedded.windowsSvc, embedded.terminalSvc
+	codeWorkspaceSvc := embedded.codeWorkspaceSvc
+	events, eventsDetach := embedded.events, embedded.eventsDetach
 
-	// M1 §3.3: the DB MCP server's embedded instance — same posture as repoMapSvc just above, but
-	// no repository to resolve: it reads this app's own connections/tree/router straight from deps.
-	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
-	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
-	// restart of the embedded server within one app run.
-	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
-	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
-	bridge.StartDbMcpIfEnabled(dbMcpSvc)
-
-	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
-	// Index/Graph — opens nothing until first use (db.go's ensureOpen). The embedded repo-map
-	// server above keeps opening its own Store over the same file; two pools in one process are
-	// exactly what WAL plus _busy_timeout=5000 (buildDSN) exist for, rather than threading one
-	// Store through RepoMapService's own start/stop lifecycle and coupling two independent
-	// features for no gain.
-	codeIndexStore := codeindex.OpenStore()
-	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
-		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
-		IndexStore: codeIndexStore,
-		// P67d §6.2/§6.4: a removed repository's live MCP grant is revoked immediately, not merely
-		// at the next restart; a rename re-keys the live instance so a `repo` argument stays honest.
-		OnRepoRemoved: func(id string) { bridge.RepoMapNotifyRepoRemoved(repoMapSvc, id) },
-		OnRepoRenamed: func(id, name string) { bridge.RepoMapNotifyRepoRenamed(repoMapSvc, id, name) },
-	}
-
-	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
-	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
-	// leaf is already on).
-	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
-	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
-
-	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
-	// the agent-aware setting (§1). The driver is a runtime.GOOS switch — a real caffeinate child
-	// on macOS, a documented no-op everywhere else. Constructed before terminalSvc below, since its
-	// Registry.OnChange closure closes over it.
-	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepawake.New(keepawake.NewPlatformDriver())}
-	bridge.StartKeepAwake(keepAwakeSvc)
-
-	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
-	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
-	// menu command already uses.
-	windowsSvc := &bridge.WindowsService{Deps: deps}
-
-	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
-	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
-	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
-	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
-	// P86 §11: the status-bar widget's own app-wide authority — every window's live session list,
-	// republished whenever a Claude Code session's own liveness changes anywhere.
-	terminalSvc.Registry.OnChange = func() {
-		bridge.TerminalAgentSessionsChanged(terminalSvc)
-		// P87 §1.1: the agent reason's other input. AgentSessions() is safe to call from here —
-		// session.go documents OnChange as fired outside the registry mutex for exactly this reason.
-		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, len(terminalSvc.Registry.AgentSessions()))
-	}
-
-	events := bridge.NewEvents(emitter)
-	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
-
-	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
-	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
-	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
-	// them, not just the most recently created (P2 R1's finding, generalised past one window).
-	windows := shell.NewWindowRegistry()
-
-	// closeFlush routes each window's own "flush before close" ack back to whichever
-	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
-	// the quit one below: at most one window is ever waiting at a time.
-	closeFlush := shell.NewCloseFlushCoordinator()
-
-	// G12 D8: assigned below, once `app` exists — declared here (nil until then) so `teardown`
-	// (which is defined before `app` is) can still close over the real value by reference.
-	var unsubscribePairing func()
-
-	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
-	// before the flush wait rather than after it — P56 D3/index.ts:156).
-	beforeFlush := sync.OnceFunc(func() {
-		metricsTicker.Stop()
-		windows.DetachAll()
-	})
-	teardown := sync.OnceFunc(func() {
-		eventsDetach()
-		if unsubscribePairing != nil {
-			unsubscribePairing()
-		}
-		oplogWiring.Stop()
-		connectionsSvc.Shutdown()
-		bridge.StopRepoMap(repoMapSvc)
-		bridge.StopDbMcp(dbMcpSvc)
-		bridge.StopAgentHooks(agentHooksSvc)
-		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
-		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
-		// controller's release is independent of the PTY registry terminalSvc.Shutdown() stops.
-		bridge.StopKeepAwake(keepAwakeSvc)
-		codeWorkspaceSvc.Shutdown()
-		terminalSvc.Shutdown()
-		if err := gitSock.Close(); err != nil {
-			slog.Warn("close git socket", "scope", "shutdown", "err", err)
-		}
-		if askpassBroker != nil {
-			if err := askpassBroker.Close(); err != nil {
-				slog.Warn("close askpass broker", "scope", "shutdown", "err", err)
-			}
-		}
-		if err := repositories.Close(); err != nil {
-			slog.Warn("close repos", "scope", "shutdown", "err", err)
-		}
-		if err := db.Close(); err != nil {
-			slog.Warn("close db", "scope", "shutdown", "err", err)
-		}
-	})
-	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second, windows.Keys)
+	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
+		repoMapSvc, dbMcpSvc, agentHooksSvc, keepAwakeSvc, codeWorkspaceSvc, terminalSvc,
+		gitSock, askpassBroker, repositories, db)
+	windows, closeFlush, quitter := lifecycle.windows, lifecycle.closeFlush, lifecycle.quitter
 
 	// G12 D8: the pairing-request fallback when no Kira Studio window exists to focus. NOT
 	// registered as a Wails service (application.NewService) — a service's ServiceStartup error
@@ -485,6 +241,440 @@ func main() {
 	attachBrowser(app)
 	quitter.Attach(app)
 
+	wireWindowsAndMenu(postAppDeps{
+		app: app, router: router, gitRouter: gitRouter, gitSock: gitSock, repositories: repositories,
+		startedAt: startedAt, events: events, windows: windows, closeFlush: closeFlush, quitter: quitter,
+		terminalSvc: terminalSvc, windowsSvc: windowsSvc, keepAwakeSvc: keepAwakeSvc, notifier: notifier,
+		attachDialogs: attachDialogs, setUnsubscribePairing: lifecycle.setUnsubscribePairing,
+	})
+
+	if err := app.Run(); err != nil {
+		startupfail.Fatal(startupfail.StepRun, err)
+	}
+}
+
+// coreOpened is openCore's own result — the boot-order prefix of main's own comment: config layout,
+// logging, DB, cipher, authorizer, repos.
+type coreOpened struct {
+	db           *storage.DB
+	cipher       *secrets.Cipher
+	authorizer   *localauth.Authorizer
+	repositories *repos.Repos
+	secretsRepo  *repos.SecretsRepo
+	maskRulesSvc *maskrules.Service
+}
+
+// openCore runs main's own boot-order prefix: config.EnsureLayout -> logging.Init/Sweep ->
+// storage.Open (migrates) -> secrets.New -> repos.New + repos.NewSecrets/NewVariables/NewMaskKeys
+// -> maskrules.New. A failure at any startupfail.Fatal step here exits the process; it never
+// returns an error for the caller to handle.
+func openCore() coreOpened {
+	if err := config.EnsureLayout(); err != nil {
+		startupfail.Fatal(startupfail.StepEnsureLayout, err)
+	}
+	if err := logging.Init(); err != nil {
+		startupfail.Fatal(startupfail.StepLogging, err)
+	}
+	logging.Sweep()
+
+	db, err := storage.Open()
+	if err != nil {
+		startupfail.Fatal(startupfail.StepStorage, err)
+	}
+
+	cipher := secrets.New()
+	// P14: constructed beside the cipher so its own startup log records OS-authentication
+	// availability the same way cipher's Status does.
+	authorizer := localauth.New(time.Now, localauth.Evaluate, localauth.Available)
+
+	repositories, err := repos.New(db.DB)
+	if err != nil {
+		startupfail.Fatal(startupfail.StepRepos, err)
+	}
+	secretsRepo := repos.NewSecrets(db.DB, cipher)
+	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
+	// secretsRepo just above.
+	repositories.Variables = repos.NewVariables(db.DB, cipher)
+	// M5 §2.5/§3.2: the per-connection correlation key column, same "needs a Cipher" shape.
+	maskKeysRepo := repos.NewMaskKeys(db.DB, cipher)
+	maskRulesSvc := maskrules.New(repositories.MaskRules, maskKeysRepo)
+
+	return coreOpened{
+		db: db, cipher: cipher, authorizer: authorizer,
+		repositories: repositories, secretsRepo: secretsRepo, maskRulesSvc: maskRulesSvc,
+	}
+}
+
+// gitWired is wireGit's own result: runner, discovery, registry, settings closure (wired directly
+// onto registry, not returned separately), askpass broker, router, socket.
+type gitWired struct {
+	runner        gitclient.Runner
+	discovery     *gitclient.Discovery
+	registry      *gitsession.Registry
+	askpassBroker *gitaskpass.Broker
+	router        *gitrpc.Router
+	sock          *gitsock.Server
+}
+
+// wireGit runs main's own git-wiring block: runner -> discovery -> registry (with its own
+// Settings/RepoSettingsGet/RepoSettingsSet closures wired on) -> askpass broker -> gitRouter
+// (hoisted so the native git stream, wired later in main, shares the exact same Router the socket
+// below uses) -> gitSock, started. A start failure on either the askpass broker or the socket is
+// logged, never fatal (D5/D8) — the app must still boot.
+func wireGit(repositories *repos.Repos) gitWired {
+	// G2 D18/D19: repository lifecycle moves to a refcounted gitsession.Registry, shared across
+	// every connection, with gitrpc rebuilt as a per-connection Router over it.
+	gitRunner := gitclient.NewExecRunner()
+	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
+	gitRegistry := gitsession.NewRegistry(gitRunner)
+	// G7 D16: the server-owned settings a remote op reads fresh on every push pre-flight/run and
+	// every auto-fetch tick — never cached, since a stale protected-branch list is a safety bug.
+	// G18 D15: gitPath joins the same closure — the third leaf of the same table, read the same
+	// way, threaded into every internal/gitrpc Discovery.Status call site (Registry.Settings).
+	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
+		s, err := repositories.Settings.GetAll()
+		if err != nil {
+			slog.Warn("read git settings", "scope", "git", "err", err)
+			return nil, 0, ""
+		}
+		return s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes, s.Git.GitPath
+	}
+	// G18 D8: the seven per-repo display settings (D3), backed by GitRepoSettingsRepo — D14's
+	// log.level sentinel substitution happens entirely inside that repo, invisibly here.
+	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
+	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
+	// G7 D8: a broker that fails to start is logged and left nil — every remote op then runs with
+	// no askpass interposition at all, D10's own already-supported "user's own askpass wins" path,
+	// not a new failure mode. It must never be fatal to boot (same posture as the socket below).
+	askpassBroker, err := gitaskpass.New(gitaskpass.Options{})
+	if err != nil {
+		slog.Warn("start askpass broker", "scope", "startup", "err", err)
+		askpassBroker = nil
+	}
+	// C10 §3.3/§10 S5: hoisted out of gitsock.Deps.Router literal so the native git stream
+	// (shell.RegisterGitStream, below) can share the exact same Router — one handler table served
+	// over two transports (the socket, for external clients; the in-process Wails stream, for this
+	// app's own renderer), never two independently constructed ones.
+	gitRouter := gitrpc.New(gitrpc.Deps{
+		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
+		Askpass: askpassBroker,
+		// G18 D11: the settings.setGitPath migration leg's own write path — the exact
+		// SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) shape D11 names,
+		// reused rather than reinvented.
+		SetGitPath: func(gitPath string) error {
+			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
+			return err
+		},
+	})
+	gitSock := gitsock.New(gitsock.Deps{
+		SocketPath:    filepath.Join(config.KiraHome(), "git.sock"),
+		LockPath:      filepath.Join(config.KiraHome(), "git.sock.lock"),
+		Clients:       repositories.GitClients,
+		Registry:      gitRegistry,
+		Router:        gitRouter,
+		ServerVersion: buildinfo.Version,
+		Now:           time.Now,
+	})
+	if err := gitSock.Start(); err != nil {
+		slog.Warn("git socket listener", "scope", "startup", "err", err)
+	}
+	return gitWired{
+		runner: gitRunner, discovery: gitDiscovery, registry: gitRegistry,
+		askpassBroker: askpassBroker, router: gitRouter, sock: gitSock,
+	}
+}
+
+// adaptersWired is wireAdapters' own result: the adapter router, the connections service, oplog's
+// wiring and the metrics ticker — every piece main's own later blocks (events wiring, teardown,
+// the Services list) still reach past this function's own return.
+type adaptersWired struct {
+	router         *adapterhost.Router
+	connectionsSvc *connections.Service
+	oplogWiring    *oplog.Wiring
+	metricsTicker  *metrics.Ticker
+}
+
+// wireAdapters runs main's own adapter/cache/connections/tree/oplog/metrics block: the adapter
+// router (backed by enginecache) -> preconnect supervisor -> connections service, started -> tree
+// service -> the cache budget pushed to the router -> oplog, started -> the two per-launch history
+// sweeps plus the freelist reclaim -> the process-metrics ticker, started. deps is mutated in place
+// (Router/Connections/Tree) at the exact points the original sequential code set them, since
+// several bridge.XxxService{Deps: deps} literals built later copy *deps by value.
+func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *repos.Repos, secretsRepo *repos.SecretsRepo, cipher *secrets.Cipher, authorizer *localauth.Authorizer, db *storage.DB) adaptersWired {
+	adapterDeps := adapters.Deps{Log: func(level, message string) {
+		switch level {
+		case "error":
+			slog.Error(message, "scope", "adapter")
+		case "warn":
+			slog.Warn(message, "scope", "adapter")
+		default:
+			slog.Info(message, "scope", "adapter")
+		}
+	}}
+	goCache := enginecache.NewCache(settings.Cache.L2BudgetMb*1024*1024, adapterDeps.Log)
+	router := adapterhost.NewRouter(adapterDeps, goCache)
+	deps.Router = router
+
+	preconnectSupervisor := preconnect.New()
+	connectionsSvc := connections.New(connections.Deps{
+		Conns: repositories.Connections, Secrets: secretsRepo, Metadata: repositories.Metadata,
+		Cipher: cipher, Auth: authorizer, Backend: router, Preconnect: preconnectSupervisor,
+		MaskRules: repositories.MaskRules,
+	})
+	connectionsSvc.Start()
+	deps.Connections = connectionsSvc
+
+	treeSvc := tree.New(repositories.Connections, repositories.Metadata, router, connectionsSvc)
+	deps.Tree = treeSvc
+
+	// Configure pushes the budget to both caches (§4.9).
+	router.PushCacheConfig(settings)
+
+	// The router's in-process scheduler is oplog's only EventSource now (P58f D9) — every kind has
+	// been native since P58e, so the Node child never produces an op:start/op:end of its own to fan
+	// in (enginebackend.Merge, which used to do that, is deleted).
+	oplogWiring := oplog.New(router.Host(), repositories.Ops, settings.Advanced.OpLogRetentionDays)
+	oplogWiring.Start()
+
+	// P8 D7/F18: a scratch tab's response history is swept once per launch, beside oplog's own
+	// startup prune — tabs is the liveness oracle (TabsRepo.Save always re-inserts every tab
+	// that's currently open), so this removes only a closed tab's history, never a live one's.
+	if err := repositories.ResponseHistory.SweepOrphans(); err != nil {
+		slog.Warn("sweep orphaned response history", "scope", "startup", "err", err)
+	}
+	// P11 D11: the same startup prune, for a scratch tab's gRPC call history.
+	if err := repositories.GrpcHistory.SweepOrphans(); err != nil {
+		slog.Warn("sweep orphaned grpc call history", "scope", "startup", "err", err)
+	}
+	// P23 D5(b): return freed pages to the filesystem once the freelist is worth reclaiming — a
+	// no-op on a database opened before this phase (auto_vacuum stays NONE, D5(a) never converts
+	// an existing file) and on one whose freelist is still small.
+	if err := (&repos.Maintenance{DB: db.DB}).Reclaim(); err != nil {
+		slog.Warn("reclaim freed pages", "scope", "startup", "err", err)
+	}
+
+	processSet := metrics.NewCachedPIDs(
+		func() ([]int32, error) { return metrics.AppProcessSet(metrics.AnchorNeedles, metrics.HelperNeedles) },
+		metrics.RescanEvery,
+	)
+	metricsTicker := metrics.NewTicker(processSet.PIDs, metrics.Interval)
+	metricsTicker.Start()
+
+	return adaptersWired{
+		router: router, connectionsSvc: connectionsSvc, oplogWiring: oplogWiring, metricsTicker: metricsTicker,
+	}
+}
+
+// embeddedWired is wireEmbeddedServices' own result — every embedded-service handle main's later
+// blocks (the Services list, teardown, the window-closing terminal cleanup) still reach past this
+// function's own return.
+type embeddedWired struct {
+	repoMapSvc       *bridge.RepoMapService
+	dbMcpSvc         *bridge.DbMcpService
+	agentHooksSvc    *bridge.AgentHooksService
+	keepAwakeSvc     *bridge.KeepAwakeService
+	windowsSvc       *bridge.WindowsService
+	terminalSvc      *bridge.TerminalService
+	codeWorkspaceSvc *bridge.CodeWorkspaceService
+	events           *bridge.Events
+	eventsDetach     func()
+}
+
+// wireEmbeddedServices runs main's own embedded-service block: repo-map MCP -> DB MCP (with its
+// own approval broker) -> code workspace (native code-viewing, wired to notify repo-map of a
+// removed/renamed repository) -> Claude Code hook reporting -> keep-awake -> the windows service
+// handle -> the embedded terminal (its own OnChange republishing both the status-bar widget and
+// keep-awake's agent-session count) -> the app-wide event bus, attached to every producer built so
+// far. deps is taken by value, since every call site here is at or after the point main's own
+// deps.Events assignment (the emitter) has already run — each bridge.XxxService{Deps: deps}
+// literal below is exactly the same value copy the original sequential code made in place.
+func wireEmbeddedServices(deps appcore.Deps, gitDiscovery *gitclient.Discovery, gitRunner gitclient.Runner, gitSock *gitsock.Server, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker) embeddedWired {
+	// C3 §7.4/D7: the repo-map MCP server's embedded instance — owned by this app's own lifecycle,
+	// same posture as gitSock just above. StartIfEnabled's own failure (no repository resolved at
+	// this process's cwd, a bind conflict) is logged, never fatal, mirroring gitSock.Start().
+	repoMapSvc := &bridge.RepoMapService{
+		Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Discovery: gitDiscovery, Runner: gitRunner,
+	}
+	bridge.StartRepoMapIfEnabled(repoMapSvc)
+
+	// M1 §3.3: the DB MCP server's embedded instance — same posture as repoMapSvc just above, but
+	// no repository to resolve: it reads this app's own connections/tree/router straight from deps.
+	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
+	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
+	// restart of the embedded server within one app run.
+	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
+	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
+	bridge.StartDbMcpIfEnabled(dbMcpSvc)
+
+	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
+	// Index/Graph — opens nothing until first use (db.go's ensureOpen). The embedded repo-map
+	// server above keeps opening its own Store over the same file; two pools in one process are
+	// exactly what WAL plus _busy_timeout=5000 (buildDSN) exist for, rather than threading one
+	// Store through RepoMapService's own start/stop lifecycle and coupling two independent
+	// features for no gain.
+	codeIndexStore := codeindex.OpenStore()
+	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
+		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
+		IndexStore: codeIndexStore,
+		// P67d §6.2/§6.4: a removed repository's live MCP grant is revoked immediately, not merely
+		// at the next restart; a rename re-keys the live instance so a `repo` argument stays honest.
+		OnRepoRemoved: func(id string) { bridge.RepoMapNotifyRepoRemoved(repoMapSvc, id) },
+		OnRepoRenamed: func(id, name string) { bridge.RepoMapNotifyRepoRenamed(repoMapSvc, id, name) },
+	}
+
+	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
+	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
+	// leaf is already on).
+	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
+	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
+
+	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
+	// the agent-aware setting (§1). The driver is a runtime.GOOS switch — a real caffeinate child
+	// on macOS, a documented no-op everywhere else. Constructed before terminalSvc below, since its
+	// Registry.OnChange closure closes over it.
+	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepawake.New(keepawake.NewPlatformDriver())}
+	bridge.StartKeepAwake(keepAwakeSvc)
+
+	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
+	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
+	// menu command already uses.
+	windowsSvc := &bridge.WindowsService{Deps: deps}
+
+	// P83 §3.2/§4: the embedded terminal's own bound service — a PTY registry behind a Wails
+	// service plus ChannelTerminal's push channel, deliberately not on the git contract (§3.1).
+	// P86 §8.3: AgentHooks lets a claude-code launch's Open compose the `--settings` flag and env.
+	terminalSvc := &bridge.TerminalService{Emit: deps.Events, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
+	// P86 §11: the status-bar widget's own app-wide authority — every window's live session list,
+	// republished whenever a Claude Code session's own liveness changes anywhere.
+	terminalSvc.Registry.OnChange = func() {
+		bridge.TerminalAgentSessionsChanged(terminalSvc)
+		// P87 §1.1: the agent reason's other input. AgentSessions() is safe to call from here —
+		// session.go documents OnChange as fired outside the registry mutex for exactly this reason.
+		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, len(terminalSvc.Registry.AgentSessions()))
+	}
+
+	events := bridge.NewEvents(deps.Events)
+	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
+
+	return embeddedWired{
+		repoMapSvc: repoMapSvc, dbMcpSvc: dbMcpSvc, agentHooksSvc: agentHooksSvc, keepAwakeSvc: keepAwakeSvc,
+		windowsSvc: windowsSvc, terminalSvc: terminalSvc, codeWorkspaceSvc: codeWorkspaceSvc,
+		events: events, eventsDetach: eventsDetach,
+	}
+}
+
+// lifecycleWired is wireLifecycle's own result: the window registry, the close-flush coordinator
+// and the quitter main's later blocks (openWindow, BuildMenu, app's own ShouldQuit/OnShutdown)
+// still reach past this function's own return, plus setUnsubscribePairing — the pairing-broker
+// unsubscribe main wires in once `app` exists further down still needs to land inside the same
+// teardown closure this function owns.
+type lifecycleWired struct {
+	windows               *shell.WindowRegistry
+	closeFlush            *shell.CloseFlushCoordinator
+	quitter               *shell.Quitter
+	setUnsubscribePairing func(func())
+}
+
+// wireLifecycle runs main's own pre-app window-lifecycle block: the window registry -> the
+// close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
+// which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
+// -> the quitter built over both. unsubscribePairing is declared here (nil until main wires the
+// pairing broker once `app` exists) so teardown, itself built here, can still close over the real
+// value by reference — setUnsubscribePairing is how main assigns it later.
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, repoMapSvc *bridge.RepoMapService, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, codeWorkspaceSvc *bridge.CodeWorkspaceService, terminalSvc *bridge.TerminalService, gitSock *gitsock.Server, askpassBroker *gitaskpass.Broker, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
+	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
+	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
+	// them, not just the most recently created (P2 R1's finding, generalised past one window).
+	windows := shell.NewWindowRegistry()
+
+	// closeFlush routes each window's own "flush before close" ack back to whichever
+	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
+	// the quit one below: at most one window is ever waiting at a time.
+	closeFlush := shell.NewCloseFlushCoordinator()
+
+	// G12 D8: assigned below, once `app` exists — declared here (nil until then) so `teardown`
+	// (which is defined before `app` is) can still close over the real value by reference.
+	var unsubscribePairing func()
+
+	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
+	// before the flush wait rather than after it — P56 D3/index.ts:156).
+	beforeFlush := sync.OnceFunc(func() {
+		metricsTicker.Stop()
+		windows.DetachAll()
+	})
+	teardown := sync.OnceFunc(func() {
+		eventsDetach()
+		if unsubscribePairing != nil {
+			unsubscribePairing()
+		}
+		oplogWiring.Stop()
+		connectionsSvc.Shutdown()
+		bridge.StopRepoMap(repoMapSvc)
+		bridge.StopDbMcp(dbMcpSvc)
+		bridge.StopAgentHooks(agentHooksSvc)
+		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
+		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
+		// controller's release is independent of the PTY registry terminalSvc.Shutdown() stops.
+		bridge.StopKeepAwake(keepAwakeSvc)
+		codeWorkspaceSvc.Shutdown()
+		terminalSvc.Shutdown()
+		if err := gitSock.Close(); err != nil {
+			slog.Warn("close git socket", "scope", "shutdown", "err", err)
+		}
+		if askpassBroker != nil {
+			if err := askpassBroker.Close(); err != nil {
+				slog.Warn("close askpass broker", "scope", "shutdown", "err", err)
+			}
+		}
+		if err := repositories.Close(); err != nil {
+			slog.Warn("close repos", "scope", "shutdown", "err", err)
+		}
+		if err := db.Close(); err != nil {
+			slog.Warn("close db", "scope", "shutdown", "err", err)
+		}
+	})
+	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second, windows.Keys)
+
+	return lifecycleWired{
+		windows: windows, closeFlush: closeFlush, quitter: quitter,
+		setUnsubscribePairing: func(f func()) { unsubscribePairing = f },
+	}
+}
+
+// postAppDeps is wireWindowsAndMenu's own argument bundle — every piece main built before `app`
+// existed that this block still needs, gathered into one struct since the block itself (dialog
+// attach, pairing wiring, notification-response routing, the three window closures, the menu, the
+// startup window list) is one continuous unit that only makes sense once `app` is real.
+type postAppDeps struct {
+	app          *application.App
+	router       *adapterhost.Router
+	gitRouter    *gitrpc.Router
+	gitSock      *gitsock.Server
+	repositories *repos.Repos
+	startedAt    time.Time
+	events       *bridge.Events
+	windows      *shell.WindowRegistry
+	closeFlush   *shell.CloseFlushCoordinator
+	quitter      *shell.Quitter
+	terminalSvc  *bridge.TerminalService
+	windowsSvc   *bridge.WindowsService
+	keepAwakeSvc *bridge.KeepAwakeService
+	notifier     *notifications.NotificationService
+
+	attachDialogs         func(app *application.App, window func() application.Window)
+	setUnsubscribePairing func(func())
+}
+
+// wireWindowsAndMenu runs main's own post-`app` block: the dialog attach point -> the git-pairing
+// notification wiring (front the app and post a system notification when a pairing request
+// arrives, withdraw it once resolved) -> the notification-tap router -> the two Wails streams ->
+// the three window closures (open/openNew/reopen) -> the reopen/system-wake handlers -> the menu
+// -> the startup window list, opened. Nothing here is needed past main's own app.Run() call, so
+// this returns nothing.
+func wireWindowsAndMenu(d postAppDeps) {
+	app := d.app
+
 	// The sheet a Save/Open dialog attaches to is the window that actually asked — Current()
 	// resolves the real key window on darwin ([NSApp keyWindow], application_darwin.go); the
 	// registry fallback only matters where Current() can't resolve one (this sandbox's Linux
@@ -497,25 +687,63 @@ func main() {
 		if w := app.Window.Current(); w != nil {
 			return w
 		}
-		return windows.Any()
+		return d.windows.Any()
 	}
-	attachDialogs(app, windowToActOn)
+	d.attachDialogs(app, windowToActOn)
 
-	// G12 D8/F4, revised by G14 D4: brings Kira Studio to the front the moment a pairing request is
-	// enqueued, *and* posts a system notification the user can act on without ever finding that
-	// window — window activation alone is routinely demoted to a bouncing Dock icon and is
-	// invisible under a full-screen space or a second display (F6), so it is now the accompaniment
-	// rather than the sole mechanism. Lives here, not in internal/gitsock, because it is the only
-	// place in the tree that legitimately imports both gitsock and application (the layering
-	// test's own rule).
+	wirePairingNotifications(d, windowToActOn)
+
+	shell.RegisterEngineStream(app, d.router)
+	shell.RegisterGitStream(app, d.gitRouter)
+
+	opener := &windowOpener{
+		app: app, windowDeps: shell.WindowDeps{Windows: d.repositories.Windows, StartedAt: d.startedAt},
+		windows: d.windows, events: d.events, closeFlush: d.closeFlush, quitter: d.quitter,
+		terminalSvc: d.terminalSvc, repositories: d.repositories,
+	}
+	d.windowsSvc.OpenNewWindow = opener.openNew
+	shell.AttachReopen(app, opener.reopen)
+	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
+	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.keepAwakeSvc) })
+
+	isDev := app.Env.Info().Debug
+	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
+		AppName: "Kira Studio", IsDev: isDev, Events: d.events, Quit: d.quitter.RequestQuit, NewWindow: opener.openNew,
+	}))
+
+	// Startup: one window per stored record (C1's migration guarantees at least the "main" row on
+	// a fresh database), in order — the first time this app has ever been able to open more than
+	// one.
+	records, err := d.repositories.Windows.List()
+	if err != nil {
+		startupfail.Fatal(startupfail.StepWindowList, err)
+	}
+	if len(records) == 0 {
+		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
+		if err := d.repositories.Windows.Create(rec); err != nil {
+			startupfail.Fatal(startupfail.StepWindowCreate, err)
+		}
+		records = []model.WindowRecord{rec}
+	}
+	for _, rec := range records {
+		opener.open(rec)
+	}
+}
+
+// wirePairingNotifications runs wireWindowsAndMenu's own pairing-notification block: the
+// pairing-changed subscription (front the app and post a system notification when a request
+// arrives, withdraw it once resolved — G12 D8/F4, revised by G14 D4) and the notification-tap
+// router (G14 D4). Lives here, not in internal/gitsock, because main.go is the only place in the
+// tree that legitimately imports both gitsock and application (the layering test's own rule).
+func wirePairingNotifications(d postAppDeps, windowToActOn func() application.Window) {
 	var lastPresentedPairingID string
-	unsubscribePairing = gitSock.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
+	d.setUnsubscribePairing(d.gitSock.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
 		if snap.Pending == nil {
 			// The request that was presented resolved (approved/denied/timed out) without a fresh
 			// one taking its place — withdraw its notification so Notification Centre never keeps
 			// a live Approve/Deny button for something already decided.
 			if lastPresentedPairingID != "" {
-				withdrawPairingNotification(notifier, lastPresentedPairingID)
+				withdrawPairingNotification(d.notifier, lastPresentedPairingID)
 			}
 			lastPresentedPairingID = "" // the edge latch: a future request is a fresh "just arrived".
 			return
@@ -526,14 +754,14 @@ func main() {
 			return
 		}
 		if lastPresentedPairingID != "" {
-			withdrawPairingNotification(notifier, lastPresentedPairingID)
+			withdrawPairingNotification(d.notifier, lastPresentedPairingID)
 		}
 		lastPresentedPairingID = snap.Pending.RequestID
 		req := snap.Pending
 		// Notify first, always — the user who is not looking at Kira Studio needs this to be
 		// what tells them. Then, if a window exists, bring it forward too: a user who *is*
 		// looking at Kira Studio still gets the in-app dialog in front of them.
-		notifyPairingPending(notifier, req)
+		notifyPairingPending(d.notifier, req)
 		if w := windowToActOn(); w != nil {
 			// Runs on the broker's own goroutine — never block it on the UI thread.
 			application.InvokeAsync(func() {
@@ -542,7 +770,7 @@ func main() {
 				w.Focus()
 			})
 		}
-	})
+	}))
 
 	// G14 D4: routes a tapped notification action straight onto the broker — the single authority
 	// over a pairing decision (SPEC §3.3) — without any state of our own. A stale action (already
@@ -551,7 +779,7 @@ func main() {
 	// about the trust model changes and the broker already logged it. Tapping the notification's
 	// body (not a button) is never an implicit approve — it only brings the window forward, same
 	// as the fallback above, so the in-app dialog can answer it.
-	notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
+	d.notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
 		if result.Error != nil {
 			slog.Debug("git pairing: notification response error", "scope", "gitsock", "err", result.Error)
 			return
@@ -562,9 +790,9 @@ func main() {
 		}
 		switch result.Response.ActionIdentifier {
 		case pairingApproveActionID:
-			gitSock.Broker().Approve(requestID)
+			d.gitSock.Broker().Approve(requestID)
 		case pairingDenyActionID:
-			gitSock.Broker().Deny(requestID)
+			d.gitSock.Broker().Deny(requestID)
 		case notifications.DefaultActionIdentifier:
 			if w := windowToActOn(); w != nil {
 				application.InvokeAsync(func() {
@@ -575,140 +803,119 @@ func main() {
 			}
 		}
 	})
+}
 
-	shell.RegisterEngineStream(app, router)
-	shell.RegisterGitStream(app, gitRouter)
+// windowOpener groups the three window closures (open/openNew/reopen) main used to build as
+// closures capturing the same handful of variables — a struct-of-methods instead, purely to keep
+// each one small enough to measure on its own; openNew and reopen both call open, exactly as the
+// original closures called each other.
+type windowOpener struct {
+	app          *application.App
+	windowDeps   shell.WindowDeps
+	windows      *shell.WindowRegistry
+	events       *bridge.Events
+	closeFlush   *shell.CloseFlushCoordinator
+	quitter      *shell.Quitter
+	terminalSvc  *bridge.TerminalService
+	repositories *repos.Repos
+}
 
-	windowDeps := shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt}
-
-	// openWindow opens one workbench from an already-persisted record and registers it — the one
-	// path every window (startup, reopen, "New Window") ultimately goes through. Its own
-	// WindowClosing listener implements D5: delete the row only if another window remains open,
-	// so closing the last window leaves it behind for the next Dock click or relaunch to restore.
-	//
-	// primaryWorkArea (shell.Options' first-launch size clamp, P22 D6(a)) is resolved fresh here,
-	// on every call, rather than captured once before app.Run() — round-2 review finding 4:
-	// GetPrimary() is backed by a cache macOS only starts populating once its native run loop's
-	// ApplicationDidFinishLaunching fires (application_darwin.go's own `run()`), which happens
-	// only after C.run() — i.e. strictly after app.Run() is called, never before. A value captured
-	// before Run() is therefore permanently nil for every window opened this way, including
-	// "New Window" and Dock-reopen, even though those happen well after Run() and the cache is
-	// long since populated by the time they run. Resolving it per call fixes that for them.
-	// It can NOT fix the very first window(s) opened at startup, below (line ~342): those are
-	// still created before app.Run() ever runs, so no ordering of this lookup changes their
-	// primaryWorkArea, which stays nil — first real launch keeps the unclamped 1280×800 default
-	// until the window is resized once (DefaultBounds' own doc comment). Deferring startup window
-	// creation until after ApplicationDidFinishLaunching would close that gap but is a materially
-	// larger structural change, out of scope for this fix.
-	openWindow := func(rec model.WindowRecord) {
-		var primaryWorkArea *application.Rect
-		if screen := app.Screen.GetPrimary(); screen != nil {
-			primaryWorkArea = &screen.WorkArea
-		}
-		win := app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
-		detach := shell.Attach(win, windowDeps, rec.Key)
-		windows.Add(rec.Key, win, detach)
-		// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
-		// window's own close-flush wait completes (closeflush.go's own doc comment) — this
-		// window is still counted (RemoveAndCount, below, is what removes it, and only once a
-		// real Close() actually goes through), so `== 1` means "I am the only one left".
-		shell.AttachCloseFlush(win, rec.Key, events, closeFlush, func() bool { return windows.Count() == 1 })
-		win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
-			// A window that closes mid-quit-handshake without ever acking through the flush
-			// channel is removed from the pending set here rather than being waited out for the
-			// full timeout (C8) — a no-op when no quit is in flight, since Quitter.Flushed
-			// ignores a key it isn't currently waiting on.
-			quitter.Flushed(rec.Key)
-			// P83 §4's teardown table: a terminal never outlives the window that opened it, even
-			// when the renderer never gets to ack.
-			terminalSvc.Registry.CloseWindow(rec.Key)
-			if windows.RemoveAndCount(rec.Key) > 0 {
-				if err := repositories.Windows.Delete(rec.Key); err != nil {
-					slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
-				}
-			}
-		})
+// open opens one workbench from an already-persisted record and registers it — the one path every
+// window (startup, reopen, "New Window") ultimately goes through. Its own WindowClosing listener
+// implements D5: delete the row only if another window remains open, so closing the last window
+// leaves it behind for the next Dock click or relaunch to restore.
+//
+// primaryWorkArea (shell.Options' first-launch size clamp, P22 D6(a)) is resolved fresh here, on
+// every call, rather than captured once before app.Run() — round-2 review finding 4: GetPrimary()
+// is backed by a cache macOS only starts populating once its native run loop's
+// ApplicationDidFinishLaunching fires (application_darwin.go's own `run()`), which happens only
+// after C.run() — i.e. strictly after app.Run() is called, never before. A value captured before
+// Run() is therefore permanently nil for every window opened this way, including "New Window" and
+// Dock-reopen, even though those happen well after Run() and the cache is long since populated by
+// the time they run. Resolving it per call fixes that for them. It can NOT fix the very first
+// window(s) opened at startup (wireWindowsAndMenu's own call into this): those are still created
+// before app.Run() ever runs, so no ordering of this lookup changes their primaryWorkArea, which
+// stays nil — first real launch keeps the unclamped 1280×800 default until the window is resized
+// once (DefaultBounds' own doc comment). Deferring startup window creation until after
+// ApplicationDidFinishLaunching would close that gap but is a materially larger structural change,
+// out of scope for this fix.
+func (o *windowOpener) open(rec model.WindowRecord) {
+	var primaryWorkArea *application.Rect
+	if screen := o.app.Screen.GetPrimary(); screen != nil {
+		primaryWorkArea = &screen.WorkArea
 	}
-
-	// openNewWindow is the *New Window* (⇧⌘N) menu command (D8): a fresh workbench, ordered after
-	// every existing one, cascaded from whichever window is currently focused (D10).
-	openNewWindow := func() {
-		records, err := repositories.Windows.List()
-		if err != nil {
-			slog.Error("list windows", "scope", "window", "err", err)
-			return
-		}
-		order := 0
-		for _, r := range records {
-			if r.Order >= order {
-				order = r.Order + 1
+	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
+	detach := shell.Attach(win, o.windowDeps, rec.Key)
+	o.windows.Add(rec.Key, win, detach)
+	// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
+	// window's own close-flush wait completes (closeflush.go's own doc comment) — this window is
+	// still counted (RemoveAndCount, below, is what removes it, and only once a real Close()
+	// actually goes through), so `== 1` means "I am the only one left".
+	shell.AttachCloseFlush(win, rec.Key, o.events, o.closeFlush, func() bool { return o.windows.Count() == 1 })
+	win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
+		// A window that closes mid-quit-handshake without ever acking through the flush channel is
+		// removed from the pending set here rather than being waited out for the full timeout
+		// (C8) — a no-op when no quit is in flight, since Quitter.Flushed ignores a key it isn't
+		// currently waiting on.
+		o.quitter.Flushed(rec.Key)
+		// P83 §4's teardown table: a terminal never outlives the window that opened it, even when
+		// the renderer never gets to ack.
+		o.terminalSvc.Registry.CloseWindow(rec.Key)
+		if o.windows.RemoveAndCount(rec.Key) > 0 {
+			if err := o.repositories.Windows.Delete(rec.Key); err != nil {
+				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
 			}
 		}
-		rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: shell.CascadeFrom(app.Window.Current())}
-		if err := repositories.Windows.Create(rec); err != nil {
-			slog.Error("create window", "scope", "window", "err", err)
-			return
-		}
-		openWindow(rec)
-	}
-	windowsSvc.OpenNewWindow = openNewWindow
+	})
+}
 
-	// reopenWindow is the Dock-reopen path (shell.AttachReopen only calls this when zero windows
-	// are live): bring back the highest-order stored workbench, or mint a fresh "main" one if
-	// every window row was somehow deleted (D5).
-	reopenWindow := func() {
-		records, err := repositories.Windows.List()
-		if err != nil {
-			slog.Error("list windows for reopen", "scope", "window", "err", err)
-			return
-		}
-		if len(records) == 0 {
-			rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
-			if err := repositories.Windows.Create(rec); err != nil {
-				slog.Error("create window for reopen", "scope", "window", "err", err)
-				return
-			}
-			openWindow(rec)
-			return
-		}
-		best := records[0]
-		for _, r := range records[1:] {
-			if r.Order > best.Order {
-				best = r
-			}
-		}
-		openWindow(best)
-	}
-	shell.AttachReopen(app, reopenWindow)
-	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
-	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(keepAwakeSvc) })
-
-	isDev := app.Env.Info().Debug
-	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
-		AppName: "Kira Studio", IsDev: isDev, Events: events, Quit: quitter.RequestQuit, NewWindow: openNewWindow,
-	}))
-
-	// Startup: one window per stored record (C1's migration guarantees at least the "main" row on
-	// a fresh database), in order — the first time this app has ever been able to open more than
-	// one.
-	records, err := repositories.Windows.List()
+// openNew is the *New Window* (⇧⌘N) menu command (D8): a fresh workbench, ordered after every
+// existing one, cascaded from whichever window is currently focused (D10).
+func (o *windowOpener) openNew() {
+	records, err := o.repositories.Windows.List()
 	if err != nil {
-		startupfail.Fatal(startupfail.StepWindowList, err)
+		slog.Error("list windows", "scope", "window", "err", err)
+		return
+	}
+	order := 0
+	for _, r := range records {
+		if r.Order >= order {
+			order = r.Order + 1
+		}
+	}
+	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: shell.CascadeFrom(o.app.Window.Current())}
+	if err := o.repositories.Windows.Create(rec); err != nil {
+		slog.Error("create window", "scope", "window", "err", err)
+		return
+	}
+	o.open(rec)
+}
+
+// reopen is the Dock-reopen path (shell.AttachReopen only calls this when zero windows are live):
+// bring back the highest-order stored workbench, or mint a fresh "main" one if every window row
+// was somehow deleted (D5).
+func (o *windowOpener) reopen() {
+	records, err := o.repositories.Windows.List()
+	if err != nil {
+		slog.Error("list windows for reopen", "scope", "window", "err", err)
+		return
 	}
 	if len(records) == 0 {
 		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
-		if err := repositories.Windows.Create(rec); err != nil {
-			startupfail.Fatal(startupfail.StepWindowCreate, err)
+		if err := o.repositories.Windows.Create(rec); err != nil {
+			slog.Error("create window for reopen", "scope", "window", "err", err)
+			return
 		}
-		records = []model.WindowRecord{rec}
+		o.open(rec)
+		return
 	}
-	for _, rec := range records {
-		openWindow(rec)
+	best := records[0]
+	for _, r := range records[1:] {
+		if r.Order > best.Order {
+			best = r
+		}
 	}
-
-	if err := app.Run(); err != nil {
-		startupfail.Fatal(startupfail.StepRun, err)
-	}
+	o.open(best)
 }
 
 // platformErrorOnce bounds G29 D7's ErrorHandler to at most one alert per process, independent of
