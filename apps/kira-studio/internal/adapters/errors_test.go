@@ -7,6 +7,50 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
 
+// TestStripSQLComments exercises the scanner's per-state arms directly (P94 pass 2, CLAUDE.md §9):
+// quote-awareness, dollar quoting, nested block comments and MySQL/MariaDB executable comments all
+// interact through shared depth/execComment state, which AssertNoTransactionEscalation's own tests
+// above cover only indirectly.
+func TestStripSQLComments(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"no comment", "SELECT 1", "SELECT 1"},
+		{"line comment to end of line", "SELECT 1 -- trailing\nFROM t", "SELECT 1  \nFROM t"},
+		{"block comment becomes one space", "READ/*x*/WRITE", "READ WRITE"},
+		{"nested block comment", "READ /* /* */ x */ WRITE", "READ   WRITE"},
+		{"doubly nested block comment", "a /* b /* c /* d */ e */ f */ g", "a   g"},
+		{"unterminated block comment consumes to EOF", "SELECT 1 /* oops", "SELECT 1 "},
+		// A `'`, `"` or backtick-quoted run is skipped whole before comment markers inside it are
+		// considered (finding #1, M6) — a `--`/`/*` inside a string literal is not a real comment.
+		{"line comment marker inside single-quoted string is not a comment", "SELECT '--' AS note", "SELECT '--' AS note"},
+		{"block comment marker inside double-quoted string is not a comment", `SELECT "/*" AS note`, `SELECT "/*" AS note`},
+		{"comment marker inside backtick identifier is not a comment", "SELECT `--col` FROM t", "SELECT `--col` FROM t"},
+		{"doubled quote inside string is not a close", "SELECT 'it''s -- fine'", "SELECT 'it''s -- fine'"},
+		{"real comment after a closed string is still stripped", "SELECT '' -- trailing\n", "SELECT ''  \n"},
+		// Postgres dollar-quoted strings ($$...$$ / $tag$...$tag$) are skipped the same way.
+		{"dollar-quoted string hides a comment marker", "SELECT $$--not a comment$$", "SELECT $$--not a comment$$"},
+		{"tagged dollar quote hides a comment marker", "SELECT $tag$/* not */ $tag$", "SELECT $tag$/* not */ $tag$"},
+		{"bare dollar sign is not a quote", "SELECT $1", "SELECT $1"},
+		// MySQL/MariaDB executable comments run their body as real SQL — only the marker and closing
+		// */ are stripped, the body stays (finding #2, M7).
+		{"mysql executable comment body survives", "/*!COMMIT*/", " COMMIT "},
+		{"mariadb executable comment body survives", "/*M!COMMIT*/", " COMMIT "},
+		{"version-gated executable comment body survives", "/*!50000 COMMIT */", "  COMMIT  "},
+		{"ordinary block comment is still stripped", "/* COMMIT */ SELECT 1", "  SELECT 1"},
+		{"exec comment nested inside ordinary comment is not recognised", "/* /*!COMMIT*/ */", " "},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := adapters.StripSQLComments(tt.in); got != tt.want {
+				t.Fatalf("StripSQLComments(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestAssertNoTransactionEscalation(t *testing.T) {
 	tests := []struct {
 		name       string
