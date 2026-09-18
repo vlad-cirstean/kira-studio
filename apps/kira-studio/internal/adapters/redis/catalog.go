@@ -137,6 +137,85 @@ func escapeGlobPrefix(s string) string {
 	return b.String()
 }
 
+// namespaceScanAccumulator collects one listNamespaceChildren walk's namespace/key nodes as SCAN
+// rounds discover them, plus each name's first-seen order (map iteration order is not stable, so
+// the order slices are what buildNamespaceNodes sorts and walks).
+type namespaceScanAccumulator struct {
+	namespaceNodes map[string]model.TreeNode
+	namespaceOrder []string
+	keyNodes       map[string]model.TreeNode
+	keyOrder       []string
+}
+
+// add classifies one SCANned key as a namespace segment or a leaf key under prefix, merging it
+// into acc if not already seen.
+func (acc *namespaceScanAccumulator) add(key, prefix, dbName string, namespaceSegments []string) {
+	// Defensive, not load-bearing given the caller's own escaping: skip rather than panic on a
+	// key MATCH somehow returned that doesn't actually start with the literal prefix.
+	if !strings.HasPrefix(key, prefix) {
+		return
+	}
+	rest := key[len(prefix):]
+	sep := strings.IndexByte(rest, ':')
+	if sep < 0 {
+		if _, seen := acc.keyNodes[key]; !seen {
+			acc.keyOrder = append(acc.keyOrder, key)
+		}
+		segments := make([]model.PathSegment, 0, len(namespaceSegments)+2)
+		segments = append(segments, model.PathSegment{Kind: "database", Name: dbName})
+		for _, s := range namespaceSegments {
+			segments = append(segments, model.PathSegment{Kind: "namespace", Name: s})
+		}
+		segments = append(segments, model.PathSegment{Kind: "key", Name: key})
+		acc.keyNodes[key] = model.TreeNode{
+			Kind: "key", Name: key, Path: model.EncodePath(segments), HasChildren: false,
+		}
+		return
+	}
+	segment := rest[:sep]
+	if _, seen := acc.namespaceNodes[segment]; seen {
+		return
+	}
+	segments := make([]model.PathSegment, 0, len(namespaceSegments)+2)
+	segments = append(segments, model.PathSegment{Kind: "database", Name: dbName})
+	for _, s := range namespaceSegments {
+		segments = append(segments, model.PathSegment{Kind: "namespace", Name: s})
+	}
+	segments = append(segments, model.PathSegment{Kind: "namespace", Name: segment})
+	acc.namespaceNodes[segment] = model.TreeNode{
+		Kind: "namespace", Name: segment, Path: model.EncodePath(segments), HasChildren: true,
+	}
+	acc.namespaceOrder = append(acc.namespaceOrder, segment)
+}
+
+// scanRound runs one SCAN round of listNamespaceChildren's walk, merging any keys it returns into
+// acc and returning the next cursor.
+func scanRound(ctx context.Context, conn scanner, cursor uint64, matchPattern, prefix, dbName string, namespaceSegments []string, acc *namespaceScanAccumulator) (uint64, error) {
+	keys, nextCursor, err := conn.Scan(ctx, cursor, matchPattern, scanCount).Result()
+	if err != nil {
+		return 0, mapError(err)
+	}
+	for _, key := range keys {
+		acc.add(key, prefix, dbName, namespaceSegments)
+	}
+	return nextCursor, nil
+}
+
+// buildNamespaceNodes sorts acc's namespace and key names and assembles the final ordered node
+// list: namespaces first, then keys, each alphabetical.
+func buildNamespaceNodes(acc namespaceScanAccumulator) []model.TreeNode {
+	sort.Strings(acc.namespaceOrder)
+	sort.Strings(acc.keyOrder)
+	nodes := make([]model.TreeNode, 0, len(acc.namespaceOrder)+len(acc.keyOrder))
+	for _, name := range acc.namespaceOrder {
+		nodes = append(nodes, acc.namespaceNodes[name])
+	}
+	for _, name := range acc.keyOrder {
+		nodes = append(nodes, acc.keyNodes[name])
+	}
+	return nodes
+}
+
 // listNamespaceChildren ports catalog.ts's listNamespaceChildren: the ':'-splitting SCAN walk.
 // namespaceSegments is just the local segments collected while descending the tree, joined back
 // into a scan prefix here, never reconstructed from a leaf.
@@ -146,10 +225,10 @@ func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, nam
 		prefix = strings.Join(namespaceSegments, ":") + ":"
 	}
 	matchPattern := escapeGlobPrefix(prefix) + "*"
-	namespaceNodes := map[string]model.TreeNode{}
-	var namespaceOrder []string
-	keyNodes := map[string]model.TreeNode{}
-	var keyOrder []string
+	acc := namespaceScanAccumulator{
+		namespaceNodes: map[string]model.TreeNode{},
+		keyNodes:       map[string]model.TreeNode{},
+	}
 
 	var cursor uint64
 	rounds := 0
@@ -157,64 +236,18 @@ func listNamespaceChildren(ctx context.Context, conn scanner, dbName string, nam
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return adapters.TreeChildren{}, err
 		}
-		keys, nextCursor, err := conn.Scan(ctx, cursor, matchPattern, scanCount).Result()
+		nextCursor, err := scanRound(ctx, conn, cursor, matchPattern, prefix, dbName, namespaceSegments, &acc)
 		if err != nil {
-			return adapters.TreeChildren{}, mapError(err)
+			return adapters.TreeChildren{}, err
 		}
 		cursor = nextCursor
-		for _, key := range keys {
-			// Defensive, not load-bearing given the escaping above: skip rather than panic on a
-			// key MATCH somehow returned that doesn't actually start with the literal prefix.
-			if !strings.HasPrefix(key, prefix) {
-				continue
-			}
-			rest := key[len(prefix):]
-			sep := strings.IndexByte(rest, ':')
-			if sep < 0 {
-				if _, seen := keyNodes[key]; !seen {
-					keyOrder = append(keyOrder, key)
-				}
-				segments := make([]model.PathSegment, 0, len(namespaceSegments)+2)
-				segments = append(segments, model.PathSegment{Kind: "database", Name: dbName})
-				for _, s := range namespaceSegments {
-					segments = append(segments, model.PathSegment{Kind: "namespace", Name: s})
-				}
-				segments = append(segments, model.PathSegment{Kind: "key", Name: key})
-				keyNodes[key] = model.TreeNode{
-					Kind: "key", Name: key, Path: model.EncodePath(segments), HasChildren: false,
-				}
-				continue
-			}
-			segment := rest[:sep]
-			if _, seen := namespaceNodes[segment]; seen {
-				continue
-			}
-			segments := make([]model.PathSegment, 0, len(namespaceSegments)+2)
-			segments = append(segments, model.PathSegment{Kind: "database", Name: dbName})
-			for _, s := range namespaceSegments {
-				segments = append(segments, model.PathSegment{Kind: "namespace", Name: s})
-			}
-			segments = append(segments, model.PathSegment{Kind: "namespace", Name: segment})
-			namespaceNodes[segment] = model.TreeNode{
-				Kind: "namespace", Name: segment, Path: model.EncodePath(segments), HasChildren: true,
-			}
-			namespaceOrder = append(namespaceOrder, segment)
-		}
 		rounds++
 		if cursor == 0 || rounds >= maxScanRounds {
 			break
 		}
 	}
 
-	sort.Strings(namespaceOrder)
-	sort.Strings(keyOrder)
-	nodes := make([]model.TreeNode, 0, len(namespaceOrder)+len(keyOrder))
-	for _, name := range namespaceOrder {
-		nodes = append(nodes, namespaceNodes[name])
-	}
-	for _, name := range keyOrder {
-		nodes = append(nodes, keyNodes[name])
-	}
+	nodes := buildNamespaceNodes(acc)
 
 	// P43 iter2 F16/D21: true only when the round cap cut the scan short (cursor != 0 means SCAN
 	// itself says there is more) — never for an ordinary complete scan that happened to take fewer

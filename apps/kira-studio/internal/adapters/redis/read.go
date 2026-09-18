@@ -77,6 +77,58 @@ func readString(ctx context.Context, conn *goredis.Client, key string, meta keyM
 // (set) or 2 (hash/zset) — elements alternate field/value for pairSize 2.
 type scanRoundFn func(ctx context.Context, cursor uint64) (elements []string, nextCursor uint64, err error)
 
+// decodeScanCursor decodes readScanFamily's page token for an "after" cursor into the SCAN cursor
+// and (pairSize==1 only) the running display-index offset carried from prior pages. A zero-value
+// (mode other than "after") is the ordinary fresh-scan start.
+func decodeScanCursor(req readReq, pairSize int, fingerprint string) (cursor uint64, rowOffset int, err error) {
+	if req.Cursor.Mode != "after" {
+		return 0, 0, nil
+	}
+	keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
+	if err != nil {
+		return 0, 0, err
+	}
+	wantFields := 1
+	if pairSize == 1 {
+		wantFields = 2
+	}
+	if len(keyValues) != wantFields {
+		return 0, 0, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+	}
+	parsed, err := strconv.ParseUint(keyValues[0], 10, 64)
+	if err != nil {
+		return 0, 0, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+	}
+	cursor = parsed
+	if pairSize == 1 {
+		offset, err := strconv.Atoi(keyValues[1])
+		if err != nil {
+			return 0, 0, adapters.New(adapters.CodeQuery, "malformed page token", nil)
+		}
+		rowOffset = offset
+	}
+	return cursor, rowOffset, nil
+}
+
+// scanFamilyRound runs one round of readScanFamily's SCAN-family loop: fetches one batch via
+// scanOnce and pushes every element (or field/value pair) into builder, returning the next cursor
+// and how many rows this round pushed.
+func scanFamilyRound(ctx context.Context, scanOnce scanRoundFn, cursor uint64, pairSize, rowOffset, rowCount int, builder *page.KeyValuePageBuilder) (nextCursor uint64, pushed int, err error) {
+	elements, nextCursor, err := scanOnce(ctx, cursor)
+	if err != nil {
+		return 0, 0, mapError(err)
+	}
+	for i := 0; i < len(elements); i += pairSize {
+		if pairSize == 2 {
+			builder.Push(elements[i], elements[i+1])
+		} else {
+			builder.Push(strconv.Itoa(rowOffset+rowCount+pushed), elements[i])
+		}
+		pushed++
+	}
+	return nextCursor, pushed, nil
+}
+
 // readScanFamily is read.ts's own shared cursor-loop body for hash/set/zset (§8.8's per-type
 // renderers): accumulates whole SCAN rounds without slicing mid-round, so a round's remaining
 // elements are never dropped — the page can overshoot req.pageSize by up to one round. An offset
@@ -92,32 +144,9 @@ func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, red
 		return page.KeyValuePage{}, adapters.New(adapters.CodeUnsupported,
 			"redis cursor pagination is forward-only; there is no previous page", nil)
 	}
-	var cursor uint64
-	rowOffset := 0 // meaningful only for pairSize==1 — the running display index carried from prior pages
-	if req.Cursor.Mode == "after" {
-		keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
-		if err != nil {
-			return page.KeyValuePage{}, err
-		}
-		wantFields := 1
-		if pairSize == 1 {
-			wantFields = 2
-		}
-		if len(keyValues) != wantFields {
-			return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
-		}
-		parsed, err := strconv.ParseUint(keyValues[0], 10, 64)
-		if err != nil {
-			return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
-		}
-		cursor = parsed
-		if pairSize == 1 {
-			offset, err := strconv.Atoi(keyValues[1])
-			if err != nil {
-				return page.KeyValuePage{}, adapters.New(adapters.CodeQuery, "malformed page token", nil)
-			}
-			rowOffset = offset
-		}
+	cursor, rowOffset, err := decodeScanCursor(req, pairSize, fingerprint)
+	if err != nil {
+		return page.KeyValuePage{}, err
 	}
 
 	builder := page.NewKeyValuePageBuilder(redisType, meta.ttlMs, meta.memoryBytes, false)
@@ -133,19 +162,12 @@ func readScanFamily(ctx context.Context, scanOnce scanRoundFn, pairSize int, red
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return page.KeyValuePage{}, err
 		}
-		elements, nextCursor, err := scanOnce(ctx, cursor)
+		nextCursor, pushed, err := scanFamilyRound(ctx, scanOnce, cursor, pairSize, rowOffset, rowCount, builder)
 		if err != nil {
-			return page.KeyValuePage{}, mapError(err)
+			return page.KeyValuePage{}, err
 		}
 		cursor = nextCursor
-		for i := 0; i < len(elements); i += pairSize {
-			if pairSize == 2 {
-				builder.Push(elements[i], elements[i+1])
-			} else {
-				builder.Push(strconv.Itoa(rowOffset+rowCount), elements[i])
-			}
-			rowCount++
-		}
+		rowCount += pushed
 		if cursor == 0 {
 			exhausted = true
 		}

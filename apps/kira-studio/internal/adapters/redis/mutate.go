@@ -106,6 +106,63 @@ func assertEditableType(ctx context.Context, conn *goredis.Client, key string) e
 	return nil
 }
 
+// applyUpdate is mutateDB's "update" arm.
+func applyUpdate(ctx context.Context, conn *goredis.Client, rowOp model.MutationRowOp) (int, error) {
+	key, err := keyNameFrom(rowOp.Key, "update")
+	if err != nil {
+		return 0, err
+	}
+	value, err := valueFrom(rowOp.Changes, "update")
+	if err != nil {
+		return 0, err
+	}
+	if err := assertEditableType(ctx, conn, key); err != nil {
+		return 0, err
+	}
+	// goredis.KeepTTL, not 0: a plain SET clears the key's existing expiry, silently
+	// dropping a TTL the user never asked to change (P2 R1 finding).
+	if err := conn.Set(ctx, key, value, goredis.KeepTTL).Err(); err != nil {
+		return 0, mapError(err)
+	}
+	return 1, nil
+}
+
+// applyDelete is mutateDB's "delete" arm. DEL is type-agnostic — works for any of the six redis
+// types alike.
+func applyDelete(ctx context.Context, conn *goredis.Client, rowOp model.MutationRowOp) (int, error) {
+	key, err := keyNameFrom(rowOp.Key, "delete")
+	if err != nil {
+		return 0, err
+	}
+	deleted, err := conn.Del(ctx, key).Result()
+	if err != nil {
+		return 0, mapError(err)
+	}
+	return int(deleted), nil
+}
+
+// applyInsert is mutateDB's default (insert) arm: NX — creating a brand-new key must never
+// silently overwrite an existing one; that's what update (a plain SET) is for. A collision
+// surfaces as a query-time condition, not a connection failure.
+func applyInsert(ctx context.Context, conn *goredis.Client, rowOp model.MutationRowOp) (int, error) {
+	key, err := keyNameFrom(rowOp.Values, "insert")
+	if err != nil {
+		return 0, err
+	}
+	value, err := valueFrom(rowOp.Values, "insert")
+	if err != nil {
+		return 0, err
+	}
+	created, err := conn.SetNX(ctx, key, value, 0).Result()
+	if err != nil {
+		return 0, mapError(err)
+	}
+	if !created {
+		return 0, adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
+	}
+	return 1, nil
+}
+
 // mutateDB is mutate.ts's mutate.
 func mutateDB(ctx context.Context, conn *goredis.Client, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
 	// §8.12's standard: enforced here, not only greyed out in the UI.
@@ -134,58 +191,20 @@ func mutateDB(ctx context.Context, conn *goredis.Client, op *adapters.OpCtx, rea
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return model.MutationResult{}, err
 		}
+		var affected int
+		var err error
 		switch rowOp.Kind {
 		case "update":
-			key, err := keyNameFrom(rowOp.Key, "update")
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			value, err := valueFrom(rowOp.Changes, "update")
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			if err := assertEditableType(ctx, conn, key); err != nil {
-				return model.MutationResult{}, err
-			}
-			// goredis.KeepTTL, not 0: a plain SET clears the key's existing expiry, silently
-			// dropping a TTL the user never asked to change (P2 R1 finding).
-			if err := conn.Set(ctx, key, value, goredis.KeepTTL).Err(); err != nil {
-				return model.MutationResult{}, mapError(err)
-			}
-			affectedRows++
-
+			affected, err = applyUpdate(ctx, conn, rowOp)
 		case "delete":
-			// DEL is type-agnostic — works for any of the six redis types alike.
-			key, err := keyNameFrom(rowOp.Key, "delete")
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			deleted, err := conn.Del(ctx, key).Result()
-			if err != nil {
-				return model.MutationResult{}, mapError(err)
-			}
-			affectedRows += int(deleted)
-
-		default: // insert: NX — creating a brand-new key must never silently overwrite an
-			// existing one; that's what update (a plain SET) is for. A collision surfaces as a
-			// query-time condition, not a connection failure.
-			key, err := keyNameFrom(rowOp.Values, "insert")
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			value, err := valueFrom(rowOp.Values, "insert")
-			if err != nil {
-				return model.MutationResult{}, err
-			}
-			created, err := conn.SetNX(ctx, key, value, 0).Result()
-			if err != nil {
-				return model.MutationResult{}, mapError(err)
-			}
-			if !created {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
-			}
-			affectedRows++
+			affected, err = applyDelete(ctx, conn, rowOp)
+		default: // insert
+			affected, err = applyInsert(ctx, conn, rowOp)
 		}
+		if err != nil {
+			return model.MutationResult{}, err
+		}
+		affectedRows += affected
 	}
 
 	return model.MutationResult{AffectedRows: affectedRows}, nil
