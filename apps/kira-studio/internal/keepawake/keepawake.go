@@ -91,6 +91,14 @@ func (c *Controller) Held() bool {
 	return c.held
 }
 
+// Supported forwards the driver's own Supported() — internal/bridge's own boot-time and per-status
+// read of whether this OS/build can hold a keep-awake assertion at all (§3.1: the titlebar hides
+// its button outright when this is false, rather than offering a control that does nothing). The
+// driver never changes after New, so this needs no lock.
+func (c *Controller) Supported() bool {
+	return c.driver.Supported()
+}
+
 // Err returns the last acquire failure, nil once an acquire has succeeded.
 func (c *Controller) Err() error {
 	c.mu.Lock()

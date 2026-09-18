@@ -76,6 +76,12 @@ const (
 	// window to address: a hook event is filtered by the receiving window against terminals it
 	// owns instead (state/agentSessions.ts's own reducer, keyed by terminalId).
 	ChannelAgentEvent = "kira:agent:event"
+	// ChannelKeepAwake is P87 §3.2's own app-wide broadcast — the titlebar toggle's state, Emit'd
+	// (not EmitTo) exactly like ChannelAgentSessions: one machine, one assertion, so every window's
+	// titlebar button must agree. Process-scoped, never persisted: an OS power assertion that
+	// outlives the reason a user made it is a surprise, and the persistent half of this feature is
+	// the Settings toggle.
+	ChannelKeepAwake = "kira:keepAwake:changed"
 )
 
 // ChannelEngineState is declared for completeness and deliberately never emitted: nothing in

@@ -30,8 +30,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
@@ -39,6 +39,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
@@ -308,6 +309,13 @@ func main() {
 	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
 	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
 
+	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
+	// the agent-aware setting (§1). The driver is a runtime.GOOS switch — a real caffeinate child
+	// on macOS, a documented no-op everywhere else. Constructed before terminalSvc below, since its
+	// Registry.OnChange closure closes over it.
+	keepAwakeSvc := &bridge.KeepAwakeService{Deps: deps, Ctl: keepawake.New(keepawake.NewPlatformDriver())}
+	bridge.StartKeepAwake(keepAwakeSvc)
+
 	// P92 item 3: hoisted so openNewWindow (defined below, once `app` exists) can be assigned onto
 	// it — the title bar's "New window" button reaches this same OpenNewWindow closure the ⇧⌘N
 	// menu command already uses.
@@ -319,7 +327,12 @@ func main() {
 	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry(), AgentHooks: agentHooksSvc}
 	// P86 §11: the status-bar widget's own app-wide authority — every window's live session list,
 	// republished whenever a Claude Code session's own liveness changes anywhere.
-	terminalSvc.Registry.OnChange = func() { bridge.TerminalAgentSessionsChanged(terminalSvc) }
+	terminalSvc.Registry.OnChange = func() {
+		bridge.TerminalAgentSessionsChanged(terminalSvc)
+		// P87 §1.1: the agent reason's other input. AgentSessions() is safe to call from here —
+		// session.go documents OnChange as fired outside the registry mutex for exactly this reason.
+		bridge.KeepAwakeAgentSessionsChanged(keepAwakeSvc, len(terminalSvc.Registry.AgentSessions()))
+	}
 
 	events := bridge.NewEvents(emitter)
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
@@ -355,6 +368,10 @@ func main() {
 		bridge.StopRepoMap(repoMapSvc)
 		bridge.StopDbMcp(dbMcpSvc)
 		bridge.StopAgentHooks(agentHooksSvc)
+		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
+		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
+		// controller's release is independent of the PTY registry terminalSvc.Shutdown() stops.
+		bridge.StopKeepAwake(keepAwakeSvc)
 		codeWorkspaceSvc.Shutdown()
 		terminalSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
@@ -418,6 +435,7 @@ func main() {
 			application.NewService(repoMapSvc),
 			application.NewService(dbMcpSvc),
 			application.NewService(agentHooksSvc),
+			application.NewService(keepAwakeSvc),
 			// C5 §3.3/C6 §7: the native code-viewing workspace's own bound service — Discovery/
 			// Runner mirror gitrpc's own seam rather than reusing gitRegistry (this workspace
 			// needs one read-only runner and the resolved git.path, never gitsession's refcounted
@@ -662,6 +680,8 @@ func main() {
 		openWindow(best)
 	}
 	shell.AttachReopen(app, reopenWindow)
+	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
+	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(keepAwakeSvc) })
 
 	isDev := app.Env.Info().Debug
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
