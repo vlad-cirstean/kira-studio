@@ -66,6 +66,7 @@
     "@vscode/vsce": "3.9.2",
     "@wailsio/runtime": "3.0.0-beta.21",
     "bun-types": "1.4.2",
+    "knip": "6.37.0",
     "mariadb": "3.5.4",
     "pg": "8.23.0",
     "simple-icons": "16.31.0",
@@ -81,12 +82,9 @@
     "@floating-ui/dom": "1.8.0",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
-    "flatbuffers": "25.9.23",
     "fuzzysort": "4.0.2",
     "markdown-it": "15.0.2",
     "monaco-editor": "0.56.0",
-    "shlex": "3.0.0",
-    "slickgrid": "5.20.0",
-    "zod": "4.6.5"
+    "slickgrid": "5.20.0"
   }
 }

@@ -2,7 +2,6 @@
  * Watches `.git` and worktree paths for changes. One real implementation today
  * (`packages/git/src/nodeFileWatcher.ts`, W6), used by the extension host — any future
  * Node-based host reuses it unchanged, since it needs nothing host-specific.
- * `ports/testFakes.ts`'s `FakeFileWatcher` is the second implementation, for unit tests.
  */
 import type { Disposable } from './disposable.ts';
 

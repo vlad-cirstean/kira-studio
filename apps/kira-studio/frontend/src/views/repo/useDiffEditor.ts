@@ -21,8 +21,8 @@ import { registerDiffEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import {
   getOrCreateModel,
+  KIRA_EDITOR_THEME,
   loadMonaco,
-  REPO_THEME_NAME,
   repoDiffUris,
   repoRevisionDiffUris,
 } from './monaco';
@@ -177,7 +177,7 @@ export function useDiffEditor(
     );
 
     const created = mod.editor.createDiffEditor(container.value, {
-      theme: REPO_THEME_NAME,
+      theme: KIRA_EDITOR_THEME,
       readOnly: true,
       domReadOnly: true,
       originalEditable: false,

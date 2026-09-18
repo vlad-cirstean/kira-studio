@@ -13,7 +13,6 @@
     "@kira/api-core": "workspace:*",
     "@kira/git-core": "workspace:*",
     "@kira/git-ipc": "workspace:*",
-    "@kira/git-ui": "workspace:*",
-    "@kira/kira-ui": "workspace:*"
+    "@kira/git-ui": "workspace:*"
   }
 }

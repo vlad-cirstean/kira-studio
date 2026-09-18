@@ -1,0 +1,81 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "rules": {
+    // 6 of the findings this rule catches are deliberate, documented same-value exports across
+    // five unrelated subsystems (independently-tunable perf knobs defaulted equal, a sentinel bit
+    // pattern reused on purpose, a schema kept separately named for a future phase to widen) — a
+    // real design decision each, not an accident. `warn` keeps every instance visible in the
+    // report (nothing hidden) without failing the pre-push hook/CI on a finding this phase
+    // declined to touch for that reason. The one genuine case this run found (an alias explicitly
+    // commented "kept for one phase... drops this") was fixed in code instead of covered by this
+    // downgrade — see `editor/monaco.ts`.
+    "duplicates": "warn"
+  },
+  "ignoreDependencies": [
+    // Ambient VS Code API types, resolved through tsconfig's own `"types"` array
+    // (apps/kira-studio-vscode/tsconfig.json), never a static import.
+    "@types/vscode",
+    // CSS class-name references only (`codicon-*`), never imported as a JS/TS module — used in
+    // both the root devDependency and packages/git-ui's own dependency.
+    "@vscode/codicons",
+    // Invoked by scripts/package-vscode.ts through a constructed filesystem path
+    // (`node_modules/@vscode/vsce/vsce`), never a static import.
+    "@vscode/vsce",
+    // Consumed transitively through @tailwindcss/vite's plugin and `@tailwind` CSS directives —
+    // never imported by name in TS.
+    "tailwindcss"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.ts",
+        // Manual, documented run (`scripts/demo-dbs/README.md`) — no package.json script wraps it.
+        "scripts/demo-dbs/sqlite/seed.ts",
+        "packages/db-fixtures/fixtures/*.ts",
+        "packages/db-fixtures/support/*.ts"
+      ],
+      "project": ["scripts/**/*.ts", "packages/db-fixtures/**/*.ts"]
+    },
+    "apps/kira-studio/frontend": {
+      "entry": ["src/main.ts", "index.html"],
+      "project": ["src/**/*.{ts,vue}"]
+    },
+    "apps/kira-studio-vscode": {
+      "entry": [
+        "src/extension.ts",
+        "src/webview/main.ts",
+        "tests/**/*.spec.ts",
+        "tests/**/*.entry.ts",
+        "playwright.config.ts"
+      ],
+      "project": ["src/**/*.{ts,vue}", "tests/**/*.ts"]
+    },
+    "packages/shared": { "entry": ["**/*.ts"], "project": ["**/*.ts"] },
+    "packages/api-core": {
+      "entry": ["src/index.ts", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "packages/git-ipc": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/git-core": {
+      "entry": [
+        "src/index.ts",
+        "src/**/*.test.ts",
+        // Invoked via `bun run` against its own absolute path, from a Go test
+        // (apps/kira-studio/internal/gitsearch/differential_test.go) — never a static import.
+        "src/search/differentialRunner.ts"
+      ],
+      "project": ["src/**/*.ts"]
+    },
+    "packages/git-ui": {
+      "entry": ["src/index.ts", "src/icons/setiFileIcon.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,vue}"]
+    },
+    "packages/kira-ui": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,vue}"]
+    }
+  }
+}

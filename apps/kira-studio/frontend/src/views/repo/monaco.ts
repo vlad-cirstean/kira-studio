@@ -3,7 +3,9 @@
 // `MonacoModule`, the theme definition) into `editor/monaco.ts`, shared by every editor surface in
 // the app — re-exported here unchanged so this file's own consumers (RepoFileView.vue,
 // RepoDiffView.vue, navigation.ts) need no edit.
-export { loadMonaco, type MonacoModule, REPO_THEME_NAME } from '../../editor/monaco';
+// P94: `REPO_THEME_NAME` was P60a's own "kept as an alias for one phase... P60b drops this" —
+// overdue, dropped here (knip's duplicates check). Consumers now import KIRA_EDITOR_THEME.
+export { KIRA_EDITOR_THEME, loadMonaco, type MonacoModule } from '../../editor/monaco';
 
 import type { MonacoModule } from '../../editor/monaco';
 

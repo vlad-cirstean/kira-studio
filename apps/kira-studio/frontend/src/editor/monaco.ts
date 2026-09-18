@@ -27,9 +27,6 @@ function wireWorker(mod: MonacoModule): void {
 // Code's own theme keys, e.g. "--kira-bg: #1f1f1f; /* editor.background */"), so `base: 'vs-dark'`
 // is correct and there is only one theme to define.
 export const KIRA_EDITOR_THEME = 'kira-editor';
-// P60a §2.1: kept as an alias for one phase — every repo-view import site still spells the old
-// name; P60b drops this.
-export const REPO_THEME_NAME = KIRA_EDITOR_THEME;
 
 // C6 dogfooding finding (§13.5's own live-verification pass, real WebKit — the engine the packaged
 // app's WKWebView actually embeds, matching playwright.config.ts's own choice of `webkit` for

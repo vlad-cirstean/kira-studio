@@ -21,8 +21,8 @@ import { monacoLanguageFor } from './language';
 import { renderMarkdownReading } from './markdownReading';
 import {
   getOrCreateModel,
+  KIRA_EDITOR_THEME,
   loadMonaco,
-  REPO_THEME_NAME,
   repoFileUri,
   repoRevisionFileUri,
 } from './monaco';
@@ -205,7 +205,7 @@ async function mount(): Promise<void> {
 
   const editor = mod.editor.create(container.value, {
     model,
-    theme: REPO_THEME_NAME,
+    theme: KIRA_EDITOR_THEME,
     readOnly: true,
     domReadOnly: true,
     automaticLayout: true,

@@ -60,6 +60,12 @@
   },
   "overrides": [
     {
+      "includes": ["knip.json"],
+      "json": {
+        "parser": { "allowComments": true }
+      }
+    },
+    {
       "includes": ["**/*.vue"],
       "linter": {
         "rules": {
