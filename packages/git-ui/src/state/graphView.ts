@@ -1,10 +1,16 @@
-import type { CommitStore } from '@kira/git-core';
+import type { CommitStore, LayoutChunk } from '@kira/git-core';
+import { identityRowPlan, projectLayoutInput } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
 import { markRaw, type ShallowRef, shallowRef, watch } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
-import { createLayoutClient, type LayoutClient } from '../graph/layoutClient.ts';
+import {
+  createLayoutClient,
+  type LayoutClient,
+  LayoutClientStaleError,
+} from '../graph/layoutClient.ts';
 import { LayoutStore } from '../graph/layoutStore.ts';
+import type { GraphOrderState } from './graphOrder.ts';
 import { composeRevealSearchHitAnnouncement } from './liveAnnouncements.ts';
 import { type ChunkSource, PackedStreamState } from './packedStream.ts';
 
@@ -76,6 +82,7 @@ export class GraphViewState {
   readonly #packed: PackedStreamState;
   readonly #bridge: BridgeClient;
   readonly #layoutClient: LayoutClient;
+  readonly #order: GraphOrderState | undefined;
   readonly #layoutListeners = new Set<(range: LayoutRange) => void>();
   #abortController: AbortController | undefined;
   #loadController: AbortController | undefined;
@@ -88,9 +95,19 @@ export class GraphViewState {
   #autoRefreshPending = false;
   #lastAutoRefreshAt = 0;
 
-  constructor(bridge: BridgeClient, layoutClient: LayoutClient = createLayoutClient()) {
+  /** `order` is P93 §7's `GraphOrderState` — optional, since not every host of this class needs
+   *  branch grouping (a caller that omits it gets the identity plan, §5.4, reproducing pre-P93
+   *  behaviour exactly). When given, `#rebuildLayout` (below) rebuilds its plan on every call —
+   *  see `rebuildOrder()`'s own doc comment for why that is a plain method, not a reactive watch
+   *  over `order.revision`. */
+  constructor(
+    bridge: BridgeClient,
+    layoutClient: LayoutClient = createLayoutClient(),
+    order?: GraphOrderState,
+  ) {
     this.#bridge = bridge;
     this.#layoutClient = layoutClient;
+    this.#order = order;
     this.#packed = new PackedStreamState();
     this.store = this.#packed.store;
     this.loadedRows = this.#packed.loadedRows;
@@ -376,19 +393,67 @@ export class GraphViewState {
     this.laneCount.value = 0;
   }
 
+  /**
+   * P93 §5.3: rebuilds `#order`'s plan (if attached — otherwise the identity plan, §5.4) against
+   * the store's current rows, projects it into display-row coordinates, and re-lays-out the
+   * *whole* visible list in one worker pass. Replaces the old per-chunk incremental
+   * `submit(store.layoutInput(from, to))`/`layout.append(...)` pair — §5.1's reason: under
+   * display order a new page's rows scatter into existing groups, so there is no contiguous
+   * `[from, to)` range left to append incrementally; every plan-affecting change (a page
+   * landing, a group toggled, tips changing) relays out from scratch.
+   *
+   * Called from `#applyChunk` after every chunk, and from the public `rebuildOrder()` after
+   * `App.vue` mutates `#order`'s own inputs. `#order.rebuild()` is only ever called from here —
+   * one path from "an input changed" to "the plan is rebuilt", not a call site racing a reactive
+   * watch over `#order.revision` to do the same work twice.
+   */
+  async #rebuildLayout(): Promise<void> {
+    this.#order?.rebuild(this.store, this.generation.value);
+    const plan = this.#order?.plan.value ?? identityRowPlan(this.store.rowCount);
+    const input = projectLayoutInput(plan, this.store.layoutInput(0, this.store.rowCount));
+
+    // W15's `layoutSubmitMs` — the worker round trip for the *first* relayout only, so a
+    // first-paint `firstPageMs`/`worstFrameMs` miss is attributable to this hop or not in one
+    // line rather than re-derived. Marked here, not measured externally, because this `await` is
+    // the only place that round trip is ever isolated from the rest of this method's own work.
+    const markSubmit = !this.#layoutSubmitMarked;
+    if (markSubmit) performance.mark('kira:layout-submit-start');
+    this.#layoutClient.reset(); // §5.3: every rebuild starts a fresh pass, never a resumed one
+    let layoutChunk: LayoutChunk;
+    try {
+      layoutChunk = await this.#layoutClient.submit(input);
+    } catch (error) {
+      // A newer rebuild's own `reset()` (this method, re-entered) marked this submit stale —
+      // that newer rebuild's own result is what should land, not this one. Nothing to apply.
+      if (error instanceof LayoutClientStaleError) return;
+      throw error;
+    }
+    if (markSubmit) {
+      this.#layoutSubmitMarked = true;
+      performance.mark('kira:layout-submit-end');
+      performance.measure(
+        'kira:layout-submit',
+        'kira:layout-submit-start',
+        'kira:layout-submit-end',
+      );
+    }
+    // `clear()` and `append()` in the same synchronous block: `laneCount` never observably
+    // passes through 0 the way it would if `clear()` ran on its own, earlier.
+    this.layout.clear();
+    this.layout.append(layoutChunk);
+    this.laneCount.value = this.layout.laneCount;
+  }
+
+  /** `App.vue`'s own entry point after `#order.setTips`/`.toggleGroup`/`.setCollapseEnabled` —
+   *  the "a collapse toggle, a refs/HEAD change" triggers §5.1 names beside a page landing. A
+   *  no-op when this instance has no `#order` attached. */
+  async rebuildOrder(): Promise<void> {
+    await this.#rebuildLayout();
+  }
+
   async #applyChunk(chunk: StreamChunkOf<'graph.stream'>): Promise<void> {
-    // P72 §4: a restart-at-row-0 chunk used to clear `layout` here, before its replacement
-    // exists — `laneCount` passed through 0 for a whole worker round trip, which is the
-    // checkout-misalignment symptom. Only `LayoutClient.reset()` (dropping the stale frontier so
-    // the coming `submit()` starts a fresh pass, not a resumed one) belongs on this side of the
-    // await; `LayoutStore.clear()` moves next to `append()` below, so the previous layout stays
-    // on screen until its replacement is ready to swap in synchronously.
-    let wasReset = false;
     const range = await this.#packed.applyChunk(chunk, {
-      onReset: () => {
-        wasReset = true;
-        this.#layoutClient.reset();
-      },
+      onReset: () => this.#layoutClient.reset(),
       onCorrupted: async () => {
         // The re-open supersedes this call's own still-in-flight stream (W2's
         // supersede-on-reopen rule), so nothing else from the corrupted sequence is applied
@@ -400,27 +465,7 @@ export class GraphViewState {
     if (!range) return; // corrupted — already re-opening from row 0, nothing to lay out
 
     const { from, to } = range;
-    // W15's `layoutSubmitMs` — the worker round trip for the *first* page only, so a first-page
-    // `firstPageMs`/`worstFrameMs` miss is attributable to this hop or not in one line rather
-    // than re-derived. Marked here, not measured externally, because this `await` is the only
-    // place that round trip is ever isolated from the rest of `#applyChunk`'s own work.
-    const markSubmit = !this.#layoutSubmitMarked;
-    if (markSubmit) performance.mark('kira:layout-submit-start');
-    const layoutChunk = await this.#layoutClient.submit(this.store.layoutInput(from, to));
-    if (markSubmit) {
-      this.#layoutSubmitMarked = true;
-      performance.mark('kira:layout-submit-end');
-      performance.measure(
-        'kira:layout-submit',
-        'kira:layout-submit-start',
-        'kira:layout-submit-end',
-      );
-    }
-    // `clear()` and `append()` in the same synchronous block: `laneCount` never observably
-    // passes through 0 the way it would if `clear()` ran back on the `onReset` hook above.
-    if (wasReset) this.layout.clear();
-    this.layout.append(layoutChunk);
-    this.laneCount.value = this.layout.laneCount;
+    await this.#rebuildLayout();
     for (const listener of this.#layoutListeners) listener({ from, to });
   }
 
