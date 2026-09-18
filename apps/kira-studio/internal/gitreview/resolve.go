@@ -140,6 +140,17 @@ func findRef(branches, remoteBranches []porcelain.RefRow, shortName string) (por
 // order → the current HEAD branch when it is none of the above, de-duplicated by ref name, first
 // reason wins.
 func ResolveBase(in Input) Core {
+	base, reason, upstreamRef, upstreamFound := resolveBaseRef(in)
+	candidates := collectCandidates(in, upstreamRef, upstreamFound)
+	return Core{Base: base, Reason: reason, Candidates: candidates}
+}
+
+// resolveBaseRef is ResolveBase's own steps 1-3 (§6.8): the branch's upstream when it names a
+// genuinely different branch, else OriginHead, else the first existing Candidates member, else
+// ReasonNone. Also returns the resolved upstream ref (found or not) so collectCandidates can reuse
+// it without re-resolving — every Reason value below is produced at the exact same branch as
+// before this split.
+func resolveBaseRef(in Input) (base *string, reason Reason, upstreamRef porcelain.RefRow, upstreamFound bool) {
 	var upstreamShort, upstreamBareName string
 	var hasUpstream bool
 	if in.Branch.Upstream != nil {
@@ -147,40 +158,36 @@ func ResolveBase(in Input) Core {
 		upstreamShort = upstreamRefShortName(*in.Branch.Upstream)
 		upstreamBareName = bareUpstreamName(*in.Branch.Upstream)
 	}
-	upstreamRef, upstreamFound := porcelain.RefRow{}, false
 	if hasUpstream {
 		upstreamRef, upstreamFound = findRef(in.Branches, in.RemoteBranches, upstreamShort)
 	}
 
-	var base *string
-	reason := ReasonNone
-
 	if upstreamFound && upstreamBareName != in.Branch.ShortName {
 		b := upstreamShort
-		base = &b
-		reason = ReasonUpstream
+		return &b, ReasonUpstream, upstreamRef, upstreamFound
 	}
 
-	if base == nil {
-		if in.OriginHead != "" {
-			if _, ok := findRef(in.Branches, in.RemoteBranches, in.OriginHead); ok {
-				h := in.OriginHead
-				base = &h
-				reason = ReasonDefaultBranch
-			}
-		}
-		if base == nil {
-			for _, c := range in.Candidates {
-				if _, ok := findRef(in.Branches, in.RemoteBranches, c); ok {
-					cc := c
-					base = &cc
-					reason = ReasonDefaultBranch
-					break
-				}
-			}
+	if in.OriginHead != "" {
+		if _, ok := findRef(in.Branches, in.RemoteBranches, in.OriginHead); ok {
+			h := in.OriginHead
+			return &h, ReasonDefaultBranch, upstreamRef, upstreamFound
 		}
 	}
+	for _, c := range in.Candidates {
+		if _, ok := findRef(in.Branches, in.RemoteBranches, c); ok {
+			cc := c
+			return &cc, ReasonDefaultBranch, upstreamRef, upstreamFound
+		}
+	}
+	return nil, ReasonNone, upstreamRef, upstreamFound
+}
 
+// collectCandidates builds the header picker's shortlist, ordered upstream (when it exists at all,
+// even when resolveBaseRef rejected it for being same-named — the user may deliberately want
+// origin/feature-x as its own base) → OriginHead → each existing Candidates member in configured
+// order → the current HEAD branch when it is none of the above, de-duplicated by ref name, first
+// reason wins.
+func collectCandidates(in Input, upstreamRef porcelain.RefRow, upstreamFound bool) []Candidate {
 	candidates := []Candidate{}
 	seen := make(map[string]bool)
 	push := func(ref, kind string, r Reason) {
@@ -210,6 +217,5 @@ func ResolveBase(in Input) Core {
 			break
 		}
 	}
-
-	return Core{Base: base, Reason: reason, Candidates: candidates}
+	return candidates
 }
