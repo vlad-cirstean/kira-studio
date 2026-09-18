@@ -119,41 +119,49 @@ func chBuildNode(raw json.RawMessage, mergeTreeNodes *[]*chBuilderNode) *chBuild
 	}
 
 	if nodeType == "ReadFromMergeTree" {
-		var pk *chRawIndex
-		for i := range typed.Indexes {
-			if typed.Indexes[i].Type != nil && *typed.Indexes[i].Type == "PrimaryKey" {
-				pk = &typed.Indexes[i]
-				break
-			}
-		}
-		if pk != nil {
-			relationOrPlaceholder := "?"
-			if typed.Description != nil {
-				relationOrPlaceholder = *typed.Description
-			}
-			// D15: the primary key did not narrow the read.
-			if pk.SelectedGranules != nil && pk.InitialGranules != nil && *pk.SelectedGranules == *pk.InitialGranules {
-				b.issues = append(b.issues, Issue{
-					Severity: "warn", Code: "pk-not-narrowed",
-					Message: fmt.Sprintf("the primary key on %q did not narrow the read — every granule was selected", relationOrPlaceholder),
-				})
-			}
-			// D15: every part read.
-			initialParts := 0
-			if pk.InitialParts != nil {
-				initialParts = *pk.InitialParts
-			}
-			if pk.SelectedParts != nil && pk.InitialParts != nil && *pk.SelectedParts == *pk.InitialParts && initialParts > 1 {
-				b.issues = append(b.issues, Issue{
-					Severity: "warn", Code: "all-parts-read",
-					Message: fmt.Sprintf("every part of %q was read (%d parts)", relationOrPlaceholder, initialParts),
-				})
-			}
-		}
+		chMergeTreeIssues(b, typed)
 		*mergeTreeNodes = append(*mergeTreeNodes, b)
 	}
 
 	return b
+}
+
+// chMergeTreeIssues appends D15's own two ReadFromMergeTree issues to b.issues — a primary key
+// that did not narrow the read, and every part of the table read — based on typed's own
+// PrimaryKey index entry, when one is present.
+func chMergeTreeIssues(b *chBuilderNode, typed chRawNode) {
+	var pk *chRawIndex
+	for i := range typed.Indexes {
+		if typed.Indexes[i].Type != nil && *typed.Indexes[i].Type == "PrimaryKey" {
+			pk = &typed.Indexes[i]
+			break
+		}
+	}
+	if pk == nil {
+		return
+	}
+	relationOrPlaceholder := "?"
+	if typed.Description != nil {
+		relationOrPlaceholder = *typed.Description
+	}
+	// D15: the primary key did not narrow the read.
+	if pk.SelectedGranules != nil && pk.InitialGranules != nil && *pk.SelectedGranules == *pk.InitialGranules {
+		b.issues = append(b.issues, Issue{
+			Severity: "warn", Code: "pk-not-narrowed",
+			Message: fmt.Sprintf("the primary key on %q did not narrow the read — every granule was selected", relationOrPlaceholder),
+		})
+	}
+	// D15: every part read.
+	initialParts := 0
+	if pk.InitialParts != nil {
+		initialParts = *pk.InitialParts
+	}
+	if pk.SelectedParts != nil && pk.InitialParts != nil && *pk.SelectedParts == *pk.InitialParts && initialParts > 1 {
+		b.issues = append(b.issues, Issue{
+			Severity: "warn", Code: "all-parts-read",
+			Message: fmt.Sprintf("every part of %q was read (%d parts)", relationOrPlaceholder, initialParts),
+		})
+	}
 }
 
 func parseClickhousePlan(planRawText string, estimateRows []estimateRow, thresholdRows int) (Plan, error) {
