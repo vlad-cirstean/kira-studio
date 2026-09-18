@@ -80,9 +80,72 @@ type Scenario struct {
 	Run      func(t *testing.T, a adapters.Adapter, cfg model.ResolvedConnectionConfig)
 }
 
-// RunMatrix drives every case as a subtest: RequireMatrix, Principal.Setup, build the config,
-// Connect, assert Outcome, run each Scenario whose Requires passes, Disconnect. kind is the
-// adapter's own registry name ("redis", "mongodb", ...); fixture is passed straight through to
+// runMatrixCase runs one Case: Principal.Setup, build the config, Connect, assert Outcome, run
+// each Scenario whose Requires passes, Disconnect. Called once per case inside RunMatrix's own
+// t.Run. Deliberately does NOT call t.Helper(): verified empirically (P94 pass 2) that marking
+// this function a helper collapses every one of its own assertions' reported line to the single
+// generic "runMatrixCase(...)" call site inside RunMatrix's loop, losing exactly which check
+// failed; leaving it unmarked keeps each t.Errorf/t.Fatalf attributed to its own line here, same
+// as before this function existed as a separate extraction.
+func runMatrixCase(t *testing.T, kind string, fixture any, deps adapters.Deps, base model.ResolvedConnectionConfig, c Case) {
+	if c.Principal != nil {
+		c.Principal.Setup(t, fixture)
+	}
+	cfg := base
+	if c.Config != nil {
+		cfg = c.Config(base)
+	}
+
+	a, err := adapters.CreateAdapter(kind, deps)
+	if err != nil {
+		t.Fatalf("CreateAdapter(%s): %v", kind, err)
+	}
+
+	info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("matrix-"+kind))
+
+	if c.Expect.Succeed {
+		if err != nil {
+			t.Fatalf("Connect: want success, got %v", err)
+		}
+		t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
+		for k, want := range c.Expect.Details {
+			if got := info.Details[k]; got != want {
+				t.Errorf("Details[%s] = %q, want %q", k, got, want)
+			}
+		}
+		for _, s := range c.Then {
+			if s.Requires != nil && !s.Requires(a.Caps()) {
+				continue
+			}
+			t.Run(s.Name, func(t *testing.T) { s.Run(t, a, cfg) })
+		}
+		return
+	}
+
+	if err == nil {
+		t.Fatal("Connect: want an error, got nil")
+	}
+	// P29 F6: the op log persists this exact error text to disk for
+	// advanced.opLogRetentionDays — verify a failed connect never echoes the password
+	// back, in either config shape. The failure message deliberately does not print the
+	// error itself, so a real leak doesn't also land in CI logs.
+	if p := cfg.Password; p != nil && *p != "" && strings.Contains(err.Error(), *p) {
+		t.Error("Connect error text contains the connection password verbatim")
+	}
+	if p := passwordFromURI(cfg.URI); p != "" && strings.Contains(err.Error(), p) {
+		t.Error("Connect error text contains the URI-embedded password verbatim")
+	}
+	code, _ := adapters.CodeOf(err)
+	if c.Expect.FailWith != "" && code != c.Expect.FailWith {
+		t.Errorf("code = %v, want %v (err: %v)", code, c.Expect.FailWith, err)
+	}
+	if c.Expect.NotCode != "" && code == c.Expect.NotCode {
+		t.Errorf("code = %v, must not be %v (err: %v)", code, c.Expect.NotCode, err)
+	}
+}
+
+// RunMatrix drives every case as a subtest: RequireMatrix, then runMatrixCase per case. kind is
+// the adapter's own registry name ("redis", "mongodb", ...); fixture is passed straight through to
 // each case's own Principal.Setup, untouched.
 func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnectionConfig, cases []Case) {
 	t.Helper()
@@ -90,62 +153,7 @@ func RunMatrix(t *testing.T, kind string, fixture any, base model.ResolvedConnec
 	deps := adapters.Deps{Log: func(level, message string) {}}
 
 	for _, c := range cases {
-		t.Run(c.Name, func(t *testing.T) {
-			if c.Principal != nil {
-				c.Principal.Setup(t, fixture)
-			}
-			cfg := base
-			if c.Config != nil {
-				cfg = c.Config(base)
-			}
-
-			a, err := adapters.CreateAdapter(kind, deps)
-			if err != nil {
-				t.Fatalf("CreateAdapter(%s): %v", kind, err)
-			}
-
-			info, err := a.Connect(context.Background(), cfg, adapters.NewOpCtx("matrix-"+kind))
-
-			if c.Expect.Succeed {
-				if err != nil {
-					t.Fatalf("Connect: want success, got %v", err)
-				}
-				t.Cleanup(func() { _ = a.Disconnect(context.Background()) })
-				for k, want := range c.Expect.Details {
-					if got := info.Details[k]; got != want {
-						t.Errorf("Details[%s] = %q, want %q", k, got, want)
-					}
-				}
-				for _, s := range c.Then {
-					if s.Requires != nil && !s.Requires(a.Caps()) {
-						continue
-					}
-					t.Run(s.Name, func(t *testing.T) { s.Run(t, a, cfg) })
-				}
-				return
-			}
-
-			if err == nil {
-				t.Fatal("Connect: want an error, got nil")
-			}
-			// P29 F6: the op log persists this exact error text to disk for
-			// advanced.opLogRetentionDays — verify a failed connect never echoes the password
-			// back, in either config shape. The failure message deliberately does not print the
-			// error itself, so a real leak doesn't also land in CI logs.
-			if p := cfg.Password; p != nil && *p != "" && strings.Contains(err.Error(), *p) {
-				t.Error("Connect error text contains the connection password verbatim")
-			}
-			if p := passwordFromURI(cfg.URI); p != "" && strings.Contains(err.Error(), p) {
-				t.Error("Connect error text contains the URI-embedded password verbatim")
-			}
-			code, _ := adapters.CodeOf(err)
-			if c.Expect.FailWith != "" && code != c.Expect.FailWith {
-				t.Errorf("code = %v, want %v (err: %v)", code, c.Expect.FailWith, err)
-			}
-			if c.Expect.NotCode != "" && code == c.Expect.NotCode {
-				t.Errorf("code = %v, must not be %v (err: %v)", code, c.Expect.NotCode, err)
-			}
-		})
+		t.Run(c.Name, func(t *testing.T) { runMatrixCase(t, kind, fixture, deps, base, c) })
 	}
 }
 
