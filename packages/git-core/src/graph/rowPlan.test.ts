@@ -4,10 +4,9 @@ import { buildRowPlan, identityRowPlan, projectLayoutInput, type TipRef } from '
 
 /**
  * P93 §8.1: `rowPlan.ts` clears `CLAUDE.md`'s unit-test bar on its own — priority propagation and
- * group-major ordering interact, index math (display-vs-store) has real boundaries, and "final on
- * arrival" is an incremental-arrival invariant invisible in the output of any single call.
- * Contraction's own cases (§4.1/§4.3) land alongside that logic, in a later commit over this same
- * file.
+ * group-major ordering interact, index math (display-vs-store) has real boundaries, contraction
+ * has several interacting rules of its own (§4.1/§4.3), and "final on arrival" is an
+ * incremental-arrival invariant invisible in the output of any single call.
  *
  * Every fixture below numbers commits so a commit's own number equals its own store row — the
  * store assigns rows in append order, and every fixture appends in ascending commit-number order,
@@ -101,7 +100,7 @@ describe('buildRowPlan — assignment and ordering', () => {
     expect(orderA).toEqual([0, 1, 3, 2]);
   });
 
-  test('every row renders (identity collapse — contraction lands in a later commit)', () => {
+  test('every row renders when collapse is disabled, however large a group is', () => {
     const store = new CommitStore();
     store.appendPage([
       commit(0, [1]),
@@ -113,12 +112,138 @@ describe('buildRowPlan — assignment and ordering', () => {
       commit(6, [7]),
       commit(7, []),
     ]);
-    const plan = buildRowPlan(store, [tip(0, 'main'), tip(2, 'feature', 'feature/x')], {
+    const plan = buildRowPlan(store, [tip(0, 'main'), tip(2, 'feature', 'feature/x')], noOptions);
+    expect(plan.length).toBe(store.rowCount);
+    for (let d = 0; d < plan.length; d++) expect(plan.entryAt(d).kind).toBe('commit');
+  });
+});
+
+describe('buildRowPlan — contraction (§4.1/§4.3)', () => {
+  /** Same shape as the ordering fixtures above: `main` (tip row 0) chains 0 -> 1 -> 7 (row 7 the
+   *  shared root); `feature` (tip row 2) chains 2 -> 3 -> 4 -> 5 -> 6 -> 7. Group 0 (main) claims
+   *  rows 0, 1, 7 — exactly `MIN_COLLAPSIBLE`, so it never collapses either way. Group 1 (feature)
+   *  claims rows 2, 3, 4, 5, 6 — 5 members, collapsing to tip (2), a placeholder hiding 3/4/5, and
+   *  oldest (6). */
+  function records() {
+    return [
+      commit(0, [1]),
+      commit(1, [7]),
+      commit(2, [3]),
+      commit(3, [4]),
+      commit(4, [5]),
+      commit(5, [6]),
+      commit(6, [7]),
+      commit(7, []),
+    ];
+  }
+  function tips(): TipRef[] {
+    return [tip(0, 'main'), tip(2, 'feature', 'feature/x')];
+  }
+
+  test('a group of more than MIN_COLLAPSIBLE members collapses to tip, placeholder, oldest', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const plan = buildRowPlan(store, tips(), { ...noOptions, collapseEnabled: true });
+
+    expect(plan.length).toBe(6); // group 0's 3 rows + group 1's tip/placeholder/oldest
+    expect(plan.entryAt(plan.displayRowOf(2)).kind).toBe('commit'); // tip
+    expect(plan.entryAt(plan.displayRowOf(6)).kind).toBe('commit'); // oldest
+
+    const placeholderDisplayRow = plan.containingDisplayRow(4);
+    const placeholder = plan.entryAt(placeholderDisplayRow);
+    expect(placeholder.kind).toBe('collapsed');
+    expect(placeholder.hiddenCount).toBe(3);
+    expect(placeholder.storeRow).toBe(3); // the first hidden row
+
+    for (const row of [3, 4, 5]) {
+      expect(plan.displayRowOf(row)).toBe(-1); // hidden — no display row of its own
+      expect(plan.containingDisplayRow(row)).toBe(placeholderDisplayRow);
+    }
+  });
+
+  test('a group of exactly MIN_COLLAPSIBLE members never collapses', () => {
+    // `feature` (tip row 1) chains 1 -> 2 -> 3 -> 4 (row 4 the shared root, claimed by `main`) —
+    // exactly 3 own members.
+    const store = new CommitStore();
+    store.appendPage([
+      commit(0, [4]),
+      commit(1, [2]),
+      commit(2, [3]),
+      commit(3, [4]),
+      commit(4, []),
+    ]);
+    const plan = buildRowPlan(store, [tip(0, 'main'), tip(1, 'feature')], {
       ...noOptions,
       collapseEnabled: true,
     });
     expect(plan.length).toBe(store.rowCount);
     for (let d = 0; d < plan.length; d++) expect(plan.entryAt(d).kind).toBe('commit');
+  });
+
+  test('group 0 never collapses, however many members it has', () => {
+    const store = new CommitStore();
+    store.appendPage([
+      commit(0, [1]),
+      commit(1, [2]),
+      commit(2, [3]),
+      commit(3, [4]),
+      commit(4, []),
+    ]);
+    const plan = buildRowPlan(store, [tip(0, 'main')], { ...noOptions, collapseEnabled: true });
+    expect(plan.length).toBe(store.rowCount);
+    for (let d = 0; d < plan.length; d++) expect(plan.entryAt(d).kind).toBe('commit');
+  });
+
+  test('a key in the expanded set renders its group in full', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const plan = buildRowPlan(store, tips(), {
+      expandedKeys: new Set(['feature']),
+      collapseEnabled: true,
+      revision: 1,
+    });
+    expect(plan.length).toBe(store.rowCount);
+    for (let d = 0; d < plan.length; d++) expect(plan.entryAt(d).kind).toBe('commit');
+  });
+
+  test('expanding one group restores its rows in order and leaves the other group alone', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const collapsed = buildRowPlan(store, tips(), { ...noOptions, collapseEnabled: true });
+    const expanded = buildRowPlan(store, tips(), {
+      expandedKeys: new Set(['feature']),
+      collapseEnabled: true,
+      revision: 2,
+    });
+
+    expect(expanded.length).toBe(store.rowCount);
+    const featureDisplayRows = [2, 3, 4, 5, 6].map((row) => expanded.displayRowOf(row));
+    expect(featureDisplayRows).toEqual([...featureDisplayRows].sort((a, b) => a - b));
+    for (const row of [2, 3, 4, 5, 6]) {
+      expect(expanded.entryAt(expanded.displayRowOf(row)).kind).toBe('commit');
+    }
+    for (const row of [0, 1, 7]) {
+      expect(collapsed.entryAt(collapsed.displayRowOf(row)).groupIndex).toBe(0);
+      expect(expanded.entryAt(expanded.displayRowOf(row)).groupIndex).toBe(0);
+    }
+  });
+
+  test('a placeholder projects no internal link, no duplicate, and nothing pointing earlier', () => {
+    const store = new CommitStore();
+    store.appendPage(records());
+    const plan = buildRowPlan(store, tips(), { ...noOptions, collapseEnabled: true });
+    const input = projectLayoutInput(plan, store.layoutInput(0, store.rowCount));
+
+    const placeholderDisplayRow = plan.containingDisplayRow(4);
+    const start = input.parentOffsets[placeholderDisplayRow];
+    const end = input.parentOffsets[placeholderDisplayRow + 1];
+    const targets = Array.from(input.parentRows.subarray(start, end));
+
+    for (const target of targets) expect(target).toBeGreaterThan(placeholderDisplayRow);
+    expect(new Set(targets).size).toBe(targets.length);
+    // Exactly one kept link: down to the oldest row (6), the placeholder's only non-internal,
+    // non-upward parent target.
+    expect(targets).toEqual([plan.displayRowOf(6)]);
   });
 });
 
