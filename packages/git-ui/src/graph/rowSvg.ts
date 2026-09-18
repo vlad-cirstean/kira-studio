@@ -267,6 +267,19 @@ export function planNode(slice: RowSlice, nodeCenterY: number): readonly NodeSha
   const cy = nodeCenterY;
   const color = slice.color;
 
+  // P93 §6.1: three small stacked dots in the group's lane colour, checked before the HEAD
+  // ring/halo logic below — a placeholder is never HEAD (`graphColumn.ts`'s `readSlice` always
+  // sets `isHead: false` for a collapsed entry), so this returns before that computation rather
+  // than relying on the flag alone to keep it empty.
+  if (slice.nodeKind === 'collapsed') {
+    const { collapsedDotRadius: r, collapsedDotGap: gap } = GEOMETRY;
+    return [
+      { cx, cy: cy - gap, r, color, filled: true, dashed: false },
+      { cx, cy, r, color, filled: true, dashed: false },
+      { cx, cy: cy + gap, r, color, filled: true, dashed: false },
+    ];
+  }
+
   // G19 D1 / G21 D1: the HEAD ring is additive — appended to whichever shapes this kind already
   // returns, never replacing them. Built once, appended at every return below. Its own
   // `headRingRadius` (not `mergeRadius`, which a merge-at-HEAD's own merge ring already uses at

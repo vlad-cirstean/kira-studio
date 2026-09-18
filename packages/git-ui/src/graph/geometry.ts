@@ -38,6 +38,12 @@ export const GEOMETRY = {
   strokeWidth: 1.6,
   maxLanes: 12,
   overdraw: 0.5,
+  /** P93 §6.1: the collapsed node's own three stacked dots — small enough that all three plus
+   *  their gaps fit inside the row's own compact height (a placeholder never uses the expanded
+   *  height, `columns.ts`'s `rowMetadata`), clearly smaller than `nodeRadius` so a placeholder
+   *  never reads as an ordinary commit at a glance. */
+  collapsedDotRadius: 1.8,
+  collapsedDotGap: 4.5,
 } as const;
 
 /**

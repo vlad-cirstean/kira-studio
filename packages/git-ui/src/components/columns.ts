@@ -100,6 +100,53 @@ export interface StackContext {
 
 const NO_STACK_CONTEXT: StackContext = { stackInfoFor: () => undefined };
 
+/** P93 §4.2/§7: the placeholder's own accessors — `plan` so `messageFormatter`/`authorFormatter`/
+ *  `dateFormatter`/`rowMetadata` can each ask `entryAt(row).kind` without a fifth copy of
+ *  `MessageSearchContext`'s "re-read on every render pass" convention per call site, and `labelFor`
+ *  to turn a `RowPlanEntry.groupIndex` into the branch name the "N more commits on X" text needs
+ *  (`RowPlan.groupKeyAt` only ever exposes the raw, unreadable key — `GraphOrderState.tips`'s own
+ *  doc comment). `undefined` for the synthetic `other` group (index `tips.length`, no `TipRef` of
+ *  its own) — `collapsedMessageText` below falls back to branch-less wording for it. */
+export interface CollapsedRowContext {
+  readonly plan: () => RowPlan;
+  readonly labelFor: (groupIndex: number) => string | undefined;
+}
+
+/** A default's own permissive stand-in for a real `RowPlan` — unlike `identityRowPlan(0)`, it
+ *  never asserts out of range, since a caller using the default (no real `GraphOrderState`
+ *  attached) may still call a formatter with any row `getLength`/`SlickGrid` gave it; every entry
+ *  reads as an ordinary `'commit'` row, the same behaviour every formatter here had before P93. */
+const PERMISSIVE_PLAN: RowPlan = {
+  length: Number.MAX_SAFE_INTEGER,
+  revision: 0,
+  entryAt: (displayRow) => ({
+    kind: 'commit',
+    storeRow: displayRow,
+    groupIndex: 0,
+    hiddenCount: 0,
+  }),
+  storeRowAt: (displayRow) => displayRow,
+  displayRowOf: (storeRow) => storeRow,
+  containingDisplayRow: (storeRow) => storeRow,
+  groupKeyAt: () => 'identity',
+  forkParentOf: () => -1,
+};
+
+const NO_COLLAPSED_ROW_CONTEXT: CollapsedRowContext = {
+  plan: () => PERMISSIVE_PLAN,
+  labelFor: () => undefined,
+};
+
+/** P93 §4.2: "a chevron, then `47 more commits on feature/x`" — the label clause is dropped
+ *  entirely for the `other` group (no branch name to name), rather than printing a placeholder
+ *  word for it. */
+export function collapsedMessageText(hiddenCount: number, label: string | undefined): string {
+  const commits = hiddenCount === 1 ? 'commit' : 'commits';
+  return label === undefined
+    ? `${hiddenCount} more ${commits}`
+    : `${hiddenCount} more ${commits} on ${label}`;
+}
+
 /** G-UX (item 2b): the message cell is a 2-row CSS grid now (`CommitGrid.vue`'s `<style>`), not a
  *  single flex row — `refBadges.ts`'s badge strip and `buildPrBadge`'s own badge, when either is
  *  present, share one `grid-row: 1` wrapper (`.kv-message-badges-row`) above the subject's own
@@ -117,10 +164,35 @@ function messageFormatter(
   laneCtx: LaneColorContext,
   prCtx: PrContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
+  collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
 ): Formatter<CommitRecord> {
   return (row, _cell, _value, _columnDef, dataContext) => {
     const cell = document.createElement('span');
     cell.className = 'kv-cell-message';
+
+    // P93 §4.2: the placeholder's own message cell — chevron + "N more commits on X", never the
+    // badge/subject rendering below (a contracted range has no single subject either).
+    const entry = collapsedCtx.plan().entryAt(row);
+    if (entry.kind === 'collapsed') {
+      cell.classList.add('kv-cell-message--collapsed');
+      cell.dataset.testid = 'graph-collapsed-row';
+      cell.dataset.groupKey = collapsedCtx.plan().groupKeyAt(row);
+      // `codicon-chevron-right`, not `FileTree.vue`/`ReviewCommitRow.vue`'s own expanded/collapsed
+      // pair — a placeholder row only ever means "collapsed" (expanding it replaces the row
+      // outright, §4.2), so there is no expanded state for this glyph to reflect.
+      const chevron = document.createElement('span');
+      chevron.className = 'codicon codicon-chevron-right kv-collapsed-chevron';
+      chevron.setAttribute('aria-hidden', 'true');
+      cell.appendChild(chevron);
+      const text = document.createElement('span');
+      text.className = 'kv-message-subject';
+      text.textContent = collapsedMessageText(
+        entry.hiddenCount,
+        collapsedCtx.labelFor(entry.groupIndex),
+      );
+      cell.appendChild(text);
+      return cell;
+    }
 
     const badges = buildRefBadges(
       dataContext.decoration,
@@ -165,8 +237,19 @@ function messageFormatter(
   };
 }
 
-const authorFormatter: Formatter<CommitRecord> = (_row, _cell, _value, _columnDef, dataContext) =>
-  textCell(dataContext.author.name, 'kv-cell-author');
+/** P93 §4.2: "Author/date cells: empty" for a placeholder — a contracted range has no single
+ *  author, and showing the newest hidden commit's would read as a fact about the row. Promoted
+ *  from a bare constant (pre-P93) to a function for the same reason `dateFormatter` already is:
+ *  it needs `collapsedCtx.plan()`, closed over per grid instance like every other formatter here. */
+function authorFormatter(
+  collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
+): Formatter<CommitRecord> {
+  return (row, _cell, _value, _columnDef, dataContext) => {
+    if (collapsedCtx.plan().entryAt(row).kind === 'collapsed')
+      return textCell('', 'kv-cell-author');
+    return textCell(dataContext.author.name, 'kv-cell-author');
+  };
+}
 
 /** `ctx.dateFormat`/`ctx.now` are accessors, not values, so a single `Column[]` array built once
  *  keeps rendering the *current* format on every SlickGrid-triggered re-render — `CommitGrid.vue`
@@ -177,8 +260,13 @@ export interface DateFormatterContext {
   readonly now: () => number;
 }
 
-function dateFormatter(ctx: DateFormatterContext): Formatter<CommitRecord> {
-  return (_row, _cell, _value, _columnDef, dataContext) => {
+function dateFormatter(
+  ctx: DateFormatterContext,
+  collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
+): Formatter<CommitRecord> {
+  return (row, _cell, _value, _columnDef, dataContext) => {
+    // P93 §4.2: same "empty for a placeholder" rule as `authorFormatter` — no single date either.
+    if (collapsedCtx.plan().entryAt(row).kind === 'collapsed') return textCell('', 'kv-cell-date');
     const timestamp = dataContext.author.timestamp;
     const text =
       ctx.dateFormat() === 'absolute'
@@ -232,6 +320,7 @@ export function buildColumns(
   prCtx: PrContext = NO_PR_CONTEXT,
   stackCtx: StackContext = NO_STACK_CONTEXT,
   options: BuildColumnsOptions = {},
+  collapsedCtx: CollapsedRowContext = NO_COLLAPSED_ROW_CONTEXT,
 ): Column<CommitRecord>[] {
   const columns: Column<CommitRecord>[] = [
     {
@@ -267,7 +356,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: messageFormatter(searchCtx, laneCtx, prCtx, stackCtx),
+      formatter: messageFormatter(searchCtx, laneCtx, prCtx, stackCtx, collapsedCtx),
     },
   ];
   if (options.compact) return columns;
@@ -282,7 +371,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: authorFormatter,
+      formatter: authorFormatter(collapsedCtx),
     },
     {
       id: DATE_COLUMN_ID,
@@ -294,7 +383,7 @@ export function buildColumns(
       sortable: false,
       focusable: false,
       selectable: false,
-      formatter: dateFormatter(dateCtx),
+      formatter: dateFormatter(dateCtx, collapsedCtx),
     },
   );
   return columns;
@@ -342,7 +431,15 @@ function rowHasBadges(
 }
 
 export function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata | null {
-  const row = ctx.plan().storeRowAt(displayRow);
+  const entry = ctx.plan().entryAt(displayRow);
+  if (entry.kind === 'collapsed') {
+    // P93 §4.2: "the compact height... A placeholder never carries badges" — nor is it ever
+    // `kv-row-selected`/`-head`/`-stash`: `entry.storeRow` is only the placeholder's first
+    // contracted row (a shape `getItem` needs, §4.2's own note), not a fact about the placeholder
+    // itself, so `store.decorationAt`/`isSelected` are never consulted for it.
+    return { cssClasses: 'kv-row-collapsed' };
+  }
+  const row = entry.storeRow;
   const classes: string[] = [];
   if (ctx.isSelected(row)) classes.push('kv-row-selected');
   const decoration = ctx.store.decorationAt(row);

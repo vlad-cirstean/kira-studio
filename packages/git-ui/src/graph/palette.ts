@@ -26,9 +26,12 @@ export function laneClass(colorIndex: number, paletteSize: number = DEFAULT_PALE
  *  high-contrast kind, which would silently erase a ring in every ordinary theme. */
 export const NODE_CLASS = 'kv-node';
 
-/** The three shapes `rowSvg.ts` draws (§7.6/W8's table): ordinary, merge (more than one parent),
- *  stash (a `stash` decoration on the row). */
-export type NodeKind = 'commit' | 'merge' | 'stash';
+/** The four shapes `rowSvg.ts` draws (§7.6/W8's table, plus P93 §6.1): ordinary, merge (more than
+ *  one parent), stash (a `stash` decoration on the row), collapsed (a P93 branch-group
+ *  placeholder — `graphColumn.ts`'s `readSlice` sets this directly from `RowPlanEntry.kind`,
+ *  never from `nodeKindFor` below, since a placeholder has no single commit's parent count or
+ *  decorations to read). */
+export type NodeKind = 'commit' | 'merge' | 'stash' | 'collapsed';
 
 /**
  * Stash takes precedence over merge when a row is both — which a real stash commit always is (it

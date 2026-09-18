@@ -23,6 +23,7 @@ import { graphColumnWidth } from '../graph/geometry.ts';
 import { createGraphFormatter } from '../graph/graphColumn.ts';
 import { laneAt } from '../graph/hitTest.ts';
 import { useGraphVisible } from '../graphVisibility.ts';
+import type { GraphOrderState } from '../state/graphOrder.ts';
 import type { GraphViewState, LayoutRange } from '../state/graphView.ts';
 import type { PrState } from '../state/pr.ts';
 import type { SearchState } from '../state/search.ts';
@@ -30,12 +31,24 @@ import type { SelectionState } from '../state/selection.ts';
 import type { StackState } from '../state/stack.ts';
 import { type ColumnWidths, type DateFormat, DEFAULT_COLUMN_WIDTHS } from '../state/viewState.ts';
 import { compactRowHeightPx, rowHeightPx, TokenReader } from '../theme/readTokens.ts';
-import { buildColumns, createCommitDataView, GRAPH_COLUMN_ID } from './columns.ts';
+import {
+  buildColumns,
+  collapsedMessageText,
+  createCommitDataView,
+  GRAPH_COLUMN_ID,
+} from './columns.ts';
 import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
 
 const props = defineProps<{
   graphView: GraphViewState;
+  /** P93 §4.2/§7: the collapse/expand half of the branch-ordered layout — `handleClick`'s own
+   *  branch for a placeholder row, and `scrollToRow`'s auto-expand, both call `toggleGroup` on
+   *  this then `graphView.rebuildOrder()`. Required, not optional (unlike `search`/`pr`/`stack`):
+   *  every mount of this component threads the same `GraphOrderState` `App.vue` gives `graphView`
+   *  itself (`graphView.plan` already reflects it either way; this is only where the toggle and
+   *  the group label lookup live). */
+  order: GraphOrderState;
   selection: SelectionState;
   columnWidths: ColumnWidths;
   dateFormat: DateFormat;
@@ -283,6 +296,15 @@ function stackInfoFor(branchName: string): { stacked: boolean; stale: boolean } 
   return undefined;
 }
 
+/** P93 §4.2: turns a `RowPlanEntry.groupIndex` into the branch name a placeholder's own "N more
+ *  commits on X" text and `aria-label` both need — `RowPlan.groupKeyAt` only ever exposes the raw,
+ *  unreadable key (`GraphOrderState.tips`'s own doc comment); `undefined` for the synthetic
+ *  `other` group (index `order.tips.length`, no `TipRef` of its own), `collapsedMessageText`'s own
+ *  fallback for that case. */
+function groupLabelFor(groupIndex: number): string | undefined {
+  return props.order.tips[groupIndex]?.label;
+}
+
 /** P92 item 2: the width the column model must sum to — SlickGrid's own viewport content box, not
  *  the host's. `clientWidth` already excludes the vertical scrollbar's gutter; `host.clientWidth`
  *  does not, and the difference is a permanent horizontal scrollbar (SlickGrid's own
@@ -323,6 +345,7 @@ function currentColumns(): Column<CommitRecord>[] {
     },
     { stackInfoFor },
     { compact: props.detailOpen },
+    { plan, labelFor: groupLabelFor },
   );
 }
 
@@ -400,12 +423,29 @@ function handleHandleKeydown(column: keyof ColumnWidths, event: KeyboardEvent): 
   }
 }
 
+/** P93 §4.2: a placeholder's own click/Enter/Space activation — expands its group, session-only
+ *  (`GraphOrderState.toggleGroup`), and rebuilds the plan the identical way `App.vue`'s own tips
+ *  watcher does (fire-and-forget: the grid's own `plan` watcher, already wired, picks up the
+ *  result). `scrollToRow`'s auto-expand calls this too. */
+function toggleGroup(displayRow: number): void {
+  props.order.toggleGroup(plan().groupKeyAt(displayRow));
+  void props.graphView.rebuildOrder();
+}
+
 /** G-UX D2 (item 1b): a click on an unselected row opens the detail pane on the FIRST click —
  *  clicking the already-selected row still toggles it closed (the only mouse-only way to close
  *  it, agreeing with `Esc` and the narrow-breakpoint drawer). G-UX D8 (item 8): the date cell no
  *  longer has any click behaviour of its own — the relative/absolute toggle lives in the Display
- *  settings section now, so a click anywhere on the row means exactly one thing. */
+ *  settings section now, so a click anywhere on the row means exactly one thing.
+ *
+ *  P93 §4.2: a collapsed placeholder is "never 'selected' in `SelectionState`'s sense — there is
+ *  no sha to select" — a click on one expands its group instead, never reaching `selection.select`
+ *  or either detail-pane emit. */
 function handleClick(displayRow: number): void {
+  if (plan().entryAt(displayRow).kind === 'collapsed') {
+    toggleGroup(displayRow);
+    return;
+  }
   const row = plan().storeRowAt(displayRow);
   const wasSelected = props.selection.row.value === row;
   props.selection.select(row);
@@ -480,13 +520,18 @@ function openMenuFromKeyboard(row: number): void {
  *  `App.vue`'s search-reveal path already uses) rather than duplicating it — a stub click does not
  *  toggle the detail pane, matching keyboard navigation rather than an ordinary row click. Returns
  *  whether it claimed the click, so `onClick`'s own handler knows not to fall through to
- *  `handleClick`. */
+ *  `handleClick`.
+ *
+ *  P93 §4.2: "click anywhere on the row" expands a collapsed placeholder — including its own
+ *  graph cell, even one whose own contracted internal merges left it a fork stub of its own
+ *  (§4.3) — so this bails out for one and lets `handleClick`'s toggle win instead of navigating. */
 function handleForkStubClick(
   displayRow: number,
   cell: number,
   event: MouseEvent | undefined,
 ): boolean {
   if (!grid || !event) return false;
+  if (plan().entryAt(displayRow).kind === 'collapsed') return false;
   const columns = grid.getColumns();
   if (columns[cell]?.id !== GRAPH_COLUMN_ID) return false;
   const parentDisplayRow = plan().forkParentOf(displayRow);
@@ -507,16 +552,29 @@ function pageSize(): number {
 
 /** P93 §7: `displayRow` walks display rows (branch-ordered, §3) — arrow-key/Home/End/Page nav
  *  moves by one row on screen, not by one store row, which after branch grouping are no longer
- *  the same thing. Placeholder-skipping (P93 §4's collapsed rows) is commit 7's own scope; every
- *  entry is a `'commit'` until then, so this needs no branch on `entryAt(...).kind` yet. */
+ *  the same thing.
+ *
+ *  P93 §4.2: a collapsed placeholder is never "selected" (there is no sha to select) — arrow/Home/
+ *  End/Page navigation still lands *focus* on it (a real, tabbable row a keyboard user must be
+ *  able to reach to `Enter`/`Space`-activate it, §4.2's own "with it focused"), so `pendingFocusRow`
+ *  and the scroll still happen; only `selection.select` is skipped, leaving whatever commit row
+ *  was selected before still selected underneath it. */
 function moveSelection(displayRow: number): void {
   const length = plan().length;
   if (length === 0) return;
   const clampedDisplay = Math.max(0, Math.min(displayRow, length - 1));
-  const row = plan().storeRowAt(clampedDisplay);
-  props.selection.select(row);
+  const entry = plan().entryAt(clampedDisplay);
   pendingFocusRow = clampedDisplay;
   grid?.scrollRowIntoView(clampedDisplay);
+  if (entry.kind === 'collapsed') {
+    // No `selection.select` call means the `selection.row` watch (which normally does this) never
+    // fires — same reasoning as `focusGrid`'s own doc comment on a same-value `select()` being a
+    // no-op: force the render pass `applyAccessibility`'s `pendingFocusRow` consumption needs.
+    grid?.invalidateRows([clampedDisplay]);
+    grid?.render();
+    return;
+  }
+  props.selection.select(entry.storeRow);
 }
 
 /**
@@ -540,7 +598,15 @@ function moveSelection(displayRow: number): void {
 function handleKeyDown(event: KeyboardEvent): boolean {
   const length = plan().length;
   const currentStoreRow = props.selection.row.value;
-  const currentDisplayRow = currentStoreRow < 0 ? -1 : plan().displayRowOf(currentStoreRow);
+  const selectionDisplayRow = currentStoreRow < 0 ? -1 : plan().displayRowOf(currentStoreRow);
+  // P93 §4.2: arrow/Home/End/Page navigation continues from wherever DOM focus actually is, not
+  // from the last *selected* commit — a collapsed placeholder is focusable (`moveSelection`'s own
+  // doc comment) but never selected, so `selection.row` alone would strand navigation one row
+  // short of it forever. `focusedRowIndex` is exactly "the row the user is actually on" (its own
+  // doc comment); falls back to the selection-derived row whenever nothing has focus yet (a fresh
+  // mount, before any `focusin`), unchanged from before this existed.
+  const currentDisplayRow =
+    focusedRowIndex !== null && focusedRowIndex < length ? focusedRowIndex : selectionDisplayRow;
   switch (event.key) {
     case 'ArrowUp':
       if (length === 0) return false;
@@ -574,7 +640,24 @@ function handleKeyDown(event: KeyboardEvent): boolean {
       return true;
     case 'Enter':
       event.preventDefault();
-      emit('toggleDetail');
+      // P93 §4.2: "click anywhere on the row, or Enter/Space with it focused, expands the group"
+      // — Enter on a focused placeholder expands it instead of toggling the detail pane (there is
+      // no commit to show details for).
+      if (currentDisplayRow >= 0 && plan().entryAt(currentDisplayRow).kind === 'collapsed') {
+        toggleGroup(currentDisplayRow);
+      } else {
+        emit('toggleDetail');
+      }
+      return true;
+    case ' ':
+      // Space has no meaning on an ordinary row today (SPEC never gave it one) — claimed only for
+      // a focused placeholder, so an ordinary row's Space still falls through to the browser's own
+      // default (e.g. a page-down scroll a plain `<div>` focus target would otherwise get).
+      if (currentDisplayRow < 0 || plan().entryAt(currentDisplayRow).kind !== 'collapsed') {
+        return false;
+      }
+      event.preventDefault();
+      toggleGroup(currentDisplayRow);
       return true;
     case 'Escape':
       event.preventDefault();
@@ -734,12 +817,26 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     rowNode.setAttribute('aria-selected', isSelected ? 'true' : 'false');
     rowNode.tabIndex = row === tabbableRow ? 0 : -1;
 
-    const commit = props.graphView.store.commitAt(plan().storeRowAt(row));
-    const dateText =
-      props.dateFormat === 'absolute'
-        ? formatAbsoluteDate(commit.author.timestamp)
-        : formatRelativeDate(commit.author.timestamp, Date.now());
-    rowNode.setAttribute('aria-label', composeRowLabel(commit, dateText));
+    // P93 §4.2: "`aria-expanded="false"` on the row, `aria-label` = the message text" — a
+    // placeholder has no single commit to read `composeRowLabel` from (`store.commitAt` below
+    // reads only its first contracted row, a shape for `getItem`, never a fact about the row,
+    // `columns.ts`'s own note on why formatters never read it either).
+    const entry = plan().entryAt(row);
+    if (entry.kind === 'collapsed') {
+      rowNode.setAttribute('aria-expanded', 'false');
+      rowNode.setAttribute(
+        'aria-label',
+        collapsedMessageText(entry.hiddenCount, groupLabelFor(entry.groupIndex)),
+      );
+    } else {
+      rowNode.removeAttribute('aria-expanded');
+      const commit = props.graphView.store.commitAt(entry.storeRow);
+      const dateText =
+        props.dateFormat === 'absolute'
+          ? formatAbsoluteDate(commit.author.timestamp)
+          : formatRelativeDate(commit.author.timestamp, Date.now());
+      rowNode.setAttribute('aria-label', composeRowLabel(commit, dateText));
+    }
 
     const cells = rowNode.querySelectorAll<HTMLElement>('.slick-cell');
     for (const [index, cellNode] of cells.entries()) {
@@ -1106,8 +1203,21 @@ onBeforeUnmount(() => {
 /** `App.vue` (W11) calls this once a refresh's re-walk re-resolves a previously selected sha
  *  back to a (possibly different) row — `initialScrollRow` only ever applies once, at mount
  *  (see its own doc comment above), so a refresh that happens later needs an imperative path
- *  back to the same underlying `scrollRowIntoView` call. */
-function scrollToRow(row: number): void {
+ *  back to the same underlying `scrollRowIntoView` call.
+ *
+ *  P93 §8.4: "a search reveal that lands inside a collapsed group expands it and scrolls to the
+ *  commit" — when `row` is currently hidden (`displayRowOf` returns `-1`, `RowPlan`'s own
+ *  contract for a contracted member), this expands its containing group first
+ *  (`containingDisplayRow` finds the placeholder row, `groupKeyAt` its key) and awaits the rebuild
+ *  before scrolling against the NEW plan's own `displayRowOf` — `async` now, unlike before P93;
+ *  both existing callers (`App.vue`) already discard the return value, so this is source-
+ *  compatible for them either way. */
+async function scrollToRow(row: number): Promise<void> {
+  if (plan().displayRowOf(row) < 0) {
+    const key = plan().groupKeyAt(plan().containingDisplayRow(row));
+    props.order.toggleGroup(key);
+    await props.graphView.rebuildOrder();
+  }
   grid?.scrollRowIntoView(plan().displayRowOf(row));
 }
 
@@ -1341,6 +1451,14 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   font-style: italic;
 }
 
+/* P93 §4.2: the placeholder row — `columns.ts`'s `rowMetadata` sets `kv-row-collapsed`
+   (`getItemMetadata`'s own `cssClasses`), never `kv-row-selected`/`-head`/`-stash` (its own doc
+   comment on why). The muted tone doubles as the "this is not a real commit" cue the row itself
+   otherwise gives no other visual signal for. */
+.kv-commit-grid .slick-row.kv-row-collapsed {
+  color: var(--kv-description-fg);
+}
+
 .kv-commit-grid .slick-cell {
   position: absolute;
   border: none;
@@ -1435,6 +1553,25 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* P93 §4.2: the placeholder's own message cell — a plain flex row (never badges, so the 2-row
+   grid `.kv-cell-message` otherwise uses has nothing to lay out), chevron then the "N more commits
+   on X" text in the same muted italic `.kv-row-stash`'s own subject already uses. */
+.kv-cell-message.kv-cell-message--collapsed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kv-cell-message--collapsed .kv-message-subject {
+  font-style: italic;
+  color: var(--kv-description-fg);
+}
+
+.kv-collapsed-chevron {
+  flex-shrink: 0;
+  font-size: var(--kv-t-md);
 }
 
 /* P11 W13: `columns.ts`'s `messageFormatter`, active only while a search query is compiled. The

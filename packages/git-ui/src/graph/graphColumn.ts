@@ -50,13 +50,32 @@ function readSlice(
       forkStub: undefined,
     };
   }
-  const storeRow = plan.storeRowAt(row);
-  const decoration = store.decorationAt(storeRow);
+  const entry = plan.entryAt(row);
   const segmentCount = layout.segmentsInRow(row, reusable);
   // P93 §6.2: the parent is always above (a smaller display row, already laid out in the same
   // pass) whenever `forkParentOf` returns one, so `layout.colorOf` needs no extra bounds check.
   const forkParentRow = plan.forkParentOf(row);
   const forkStub = forkParentRow >= 0 ? { color: layout.colorOf(forkParentRow) } : undefined;
+
+  if (entry.kind === 'collapsed') {
+    // P93 §6.1: a placeholder has no single commit's parent count or decorations to derive a
+    // shape/HEAD state from — `nodeKind` comes straight from the plan entry, never `nodeKindFor`,
+    // and `isHead` is always false (a placeholder is never the checked-out commit).
+    return {
+      row,
+      lane: layout.laneOf(row),
+      color: layout.colorOf(row),
+      laneCount: layout.laneCount,
+      nodeKind: 'collapsed',
+      segments: reusable,
+      segmentCount,
+      isHead: false,
+      forkStub,
+    };
+  }
+
+  const storeRow = entry.storeRow;
+  const decoration = store.decorationAt(storeRow);
   return {
     row,
     lane: layout.laneOf(row),

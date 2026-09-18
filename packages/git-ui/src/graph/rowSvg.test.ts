@@ -111,6 +111,34 @@ describe('planNode — G19 D1 HEAD ring', () => {
   });
 });
 
+// P93 §6.1/§8.2: a collapsed placeholder has no single commit to derive a shape from — three
+// stacked dots at a fixed offset from the node centre, never the HEAD ring/halo machinery.
+describe('planNode — P93 §6.1 collapsed', () => {
+  test('a collapsed node draws three filled, non-dashed dots at the expected offsets', () => {
+    const shapes = planNode(baseSlice({ nodeKind: 'collapsed' }), 22);
+    expect(shapes).toHaveLength(3);
+    const ys = shapes.map((s) => s.cy).sort((a, b) => a - b);
+    expect(ys).toEqual([22 - GEOMETRY.collapsedDotGap, 22, 22 + GEOMETRY.collapsedDotGap]);
+    for (const shape of shapes) {
+      expect(shape.r).toBe(GEOMETRY.collapsedDotRadius);
+      expect(shape.filled).toBe(true);
+      expect(shape.dashed).toBe(false);
+      expect(shape.isHeadRing).toBeFalsy();
+      expect(shape.isHeadHalo).toBeFalsy();
+    }
+  });
+
+  test('a collapsed node ignores isHead — no ring or halo even when set', () => {
+    const shapes = planNode(baseSlice({ nodeKind: 'collapsed', isHead: true }), 22);
+    expect(shapes).toHaveLength(3);
+    expect(shapes.every((s) => !s.isHeadRing && !s.isHeadHalo)).toBe(true);
+  });
+
+  test('a collapsed row with no layout yet (lane undefined) draws nothing', () => {
+    expect(planNode(baseSlice({ nodeKind: 'collapsed', lane: undefined }), 22)).toHaveLength(0);
+  });
+});
+
 describe('edgeCommand — G21 D3c EDGE_KIND_MERGE_IN', () => {
   const rowHeight = 22;
   // P7 (item 1): deliberately NOT rowHeight / 2 (11) — proves edgeCommand actually consumes this

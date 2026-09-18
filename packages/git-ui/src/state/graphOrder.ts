@@ -44,6 +44,16 @@ export class GraphOrderState {
     this.#tips = tips;
   }
 
+  /** P93 §4.2: `columns.ts`'s `messageFormatter` reads this to turn a placeholder's own
+   *  `groupIndex` into the human label (`TipRef.label`) its "N more commits on X" text needs —
+   *  `RowPlan.groupKeyAt` only ever exposes the raw key, deliberately (its shape is fixed, §7's
+   *  own note), so the label lookup lives here instead. Index `tips.length` is the synthetic
+   *  `other` group, which has no `TipRef` of its own — callers get `undefined` and fall back to
+   *  branch-less wording. */
+  get tips(): readonly TipRef[] {
+    return this.#tips;
+  }
+
   /** A collapsed group's own expand/collapse click (P93 §4.2) — toggles `key` (a `TipRef.key`,
    *  or the synthetic `other` group's own key) in the session-only expanded set. */
   toggleGroup(key: string): void {
@@ -67,11 +77,23 @@ export class GraphOrderState {
   rebuild(store: CommitStore, _generation: number): void {
     const revision = this.revision.value + 1;
     this.revision.value = revision;
-    this.plan.value = buildRowPlan(store, this.#tips, {
+    const plan = buildRowPlan(store, this.#tips, {
       expandedKeys: this.#expandedKeys,
       collapseEnabled: this.#collapseEnabled,
       revision,
     });
+    this.plan.value = plan;
+    // P93 §4.4: "pruned on every rebuild to keys that still match a group" — a checkout or ref
+    // change re-partitions every group, so an expanded entry naming a group the new plan has no
+    // row for is both meaningless (never read again by `buildRowPlan`) and, left alone, a session-
+    // long accumulation of dead branch names. Cheap next to `buildRowPlan`'s own O(rows) pass.
+    if (this.#expandedKeys.size > 0) {
+      const liveKeys = new Set<string>();
+      for (let row = 0; row < plan.length; row++) liveKeys.add(plan.groupKeyAt(row));
+      for (const key of this.#expandedKeys) {
+        if (!liveKeys.has(key)) this.#expandedKeys.delete(key);
+      }
+    }
   }
 
   /** Called alongside `GraphViewState.reset()` on a repo switch (`App.vue:259`) — clears the

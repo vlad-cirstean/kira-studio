@@ -290,7 +290,9 @@ watch(graphView.loadedRows, () => {
   const found = graphView.store.rowOfSha(sha) !== -1;
   if (!found && !graphView.exhausted.value) return;
   pendingSelectionSha.value = null;
-  if (selection.selectBySha(sha)) commitGridRef.value?.scrollToRow(selection.row.value);
+  // P93 §8.4: `scrollToRow` is `async` now — this callback itself is not, and a page-arrival
+  // re-select has nothing further to sequence after the scroll, so fire-and-forget is correct.
+  if (selection.selectBySha(sha)) void commitGridRef.value?.scrollToRow(selection.row.value);
 });
 
 // ---------------------------------------------------------------------------------------
@@ -471,7 +473,10 @@ async function revealAndSelectSha(sha: string): Promise<void> {
   const row = graphView.store.rowOfSha(sha);
   if (row === -1) return; // defensive only — revealSha's own contract: "found" means row >= 0
   selection.select(row);
-  commitGridRef.value?.scrollToRow(row);
+  // P93 §8.4: `scrollToRow` is `async` now — it may need to expand a collapsed group first
+  // (`CommitGrid.vue`'s own doc comment) — awaited here so a search reveal genuinely lands on
+  // the commit rather than racing the expand.
+  await commitGridRef.value?.scrollToRow(row);
 }
 
 /** G14 D10: "Open in graph" from the review diff toolbar. Opens the target repo first when it is
@@ -1680,6 +1685,7 @@ onBeforeUnmount(() => {
             <CommitGrid
               ref="commitGridRef"
               :graph-view="graphView"
+              :order="graphOrder"
               :selection="selection"
               :column-widths="columnWidths"
               :date-format="dateFormat"
