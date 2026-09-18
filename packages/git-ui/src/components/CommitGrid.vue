@@ -15,7 +15,7 @@
  * `cssClasses` (`columns.ts`) is what actually paints a selected row; changing selection
  * invalidates exactly the two affected rows (`#watchSelection` below), never the whole grid.
  */
-import type { CommitRecord } from '@kira/git-core';
+import type { CommitRecord, RowPlan } from '@kira/git-core';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -145,6 +145,17 @@ function minWidthFor(column: keyof ColumnWidths): number {
   return column === 'date' ? Math.max(MIN_COLUMN_WIDTH, measuredDateWidth.value) : MIN_COLUMN_WIDTH;
 }
 
+/** P93 §7: every translation site in this file's own coordinate conversion — SlickGrid's rows
+ *  (`instance.onClick`, `getViewport()`, `data-row`, …) are *display* rows, while
+ *  `props.selection.row`/`viewState.scrollRow`/this component's own `scrollToRow`/`scrollToTopRow`
+ *  contract stay *store* rows (§5.4's identity plan makes the two the same array position for
+ *  every caller that has not attached a `GraphOrderState`, so nothing changes for them). An
+ *  accessor, not a captured value, so a plan rebuild never needs this component rebuilt — only
+ *  the grid invalidated (the `plan` watcher below). */
+function plan(): RowPlan {
+  return props.graphView.plan.value;
+}
+
 // Built once per mounted grid (W8): closes over this instance's own LayoutStore/CommitStore
 // (props.graphView is assumed stable for the life of one CommitGrid — a repo switch remounts
 // this component rather than swapping graphView underneath it) and a rowHeight accessor so a
@@ -159,6 +170,7 @@ function minWidthFor(column: keyof ColumnWidths): number {
 const graphFormatter = createGraphFormatter(
   props.graphView.layout,
   props.graphView.store,
+  plan,
   (row) => grid?.getRowHeight(row) ?? compactRowHeightPx(tokenReader),
   () => compactRowHeightPx(tokenReader),
   () => widths.value.graph,
@@ -392,10 +404,11 @@ function handleHandleKeydown(column: keyof ColumnWidths, event: KeyboardEvent): 
  *  it, agreeing with `Esc` and the narrow-breakpoint drawer). G-UX D8 (item 8): the date cell no
  *  longer has any click behaviour of its own — the relative/absolute toggle lives in the Display
  *  settings section now, so a click anywhere on the row means exactly one thing. */
-function handleClick(row: number): void {
+function handleClick(displayRow: number): void {
+  const row = plan().storeRowAt(displayRow);
   const wasSelected = props.selection.row.value === row;
   props.selection.select(row);
-  pendingFocusRow = row;
+  pendingFocusRow = displayRow;
   if (wasSelected) emit('toggleDetail');
   else emit('openDetail');
 }
@@ -424,7 +437,8 @@ function handleContextMenu(event: MouseEvent): void {
   event.preventDefault();
   const cell = grid?.getCellFromEvent(event);
   if (!cell) return;
-  props.selection.select(cell.row);
+  const row = plan().storeRowAt(cell.row);
+  props.selection.select(row);
 
   const badgeEl =
     event.target instanceof Element ? event.target.closest<HTMLElement>('[data-ref-kind]') : null;
@@ -437,20 +451,23 @@ function handleContextMenu(event: MouseEvent): void {
     }
   }
   if (refKind === 'stash') {
-    emit('stashContextMenu', { row: cell.row, x: event.clientX, y: event.clientY });
+    emit('stashContextMenu', { row, x: event.clientX, y: event.clientY });
     return;
   }
 
-  emit('contextMenu', { row: cell.row, x: event.clientX, y: event.clientY });
+  emit('contextMenu', { row, x: event.clientX, y: event.clientY });
 }
 
 /** `Shift+F10`/the Menu key (§6.6): opens the same menu `handleContextMenu` does, anchored to
  *  the selected row's own bounding rect rather than a click point that does not exist for a
- *  keyboard invocation. */
+ *  keyboard invocation. `row` (the parameter, and what this emits) is a *store* row, matching
+ *  `contextMenu`'s own contract (§7: "the context menus ... speak store rows") — only the DOM
+ *  lookup below needs the display row `data-row` is actually keyed by. */
 function openMenuFromKeyboard(row: number): void {
   if (!grid) return;
   const container = grid.getContainerNode();
-  const rowNode = container.querySelector<HTMLElement>(`.slick-row[data-row="${row}"]`);
+  const displayRow = plan().displayRowOf(row);
+  const rowNode = container.querySelector<HTMLElement>(`.slick-row[data-row="${displayRow}"]`);
   const rect = rowNode?.getBoundingClientRect();
   emit('contextMenu', { row, x: rect?.left ?? 0, y: rect?.bottom ?? 0 });
 }
@@ -461,13 +478,18 @@ function pageSize(): number {
   return Math.max(1, bottom - top);
 }
 
-function moveSelection(row: number): void {
-  const loaded = props.graphView.loadedRows.value;
-  const clamped = Math.max(0, Math.min(row, loaded - 1));
-  if (clamped < 0) return;
-  props.selection.select(clamped);
-  pendingFocusRow = clamped;
-  grid?.scrollRowIntoView(clamped);
+/** P93 §7: `displayRow` walks display rows (branch-ordered, §3) — arrow-key/Home/End/Page nav
+ *  moves by one row on screen, not by one store row, which after branch grouping are no longer
+ *  the same thing. Placeholder-skipping (P93 §4's collapsed rows) is commit 7's own scope; every
+ *  entry is a `'commit'` until then, so this needs no branch on `entryAt(...).kind` yet. */
+function moveSelection(displayRow: number): void {
+  const length = plan().length;
+  if (length === 0) return;
+  const clampedDisplay = Math.max(0, Math.min(displayRow, length - 1));
+  const row = plan().storeRowAt(clampedDisplay);
+  props.selection.select(row);
+  pendingFocusRow = clampedDisplay;
+  grid?.scrollRowIntoView(clampedDisplay);
 }
 
 /**
@@ -489,38 +511,39 @@ function moveSelection(row: number): void {
  * block the browser's own default behaviour for it — `Tab` leaving the grid, most of all).
  */
 function handleKeyDown(event: KeyboardEvent): boolean {
-  const loaded = props.graphView.loadedRows.value;
-  const current = props.selection.row.value;
+  const length = plan().length;
+  const currentStoreRow = props.selection.row.value;
+  const currentDisplayRow = currentStoreRow < 0 ? -1 : plan().displayRowOf(currentStoreRow);
   switch (event.key) {
     case 'ArrowUp':
-      if (loaded === 0) return false;
+      if (length === 0) return false;
       event.preventDefault();
-      moveSelection(current < 0 ? 0 : current - 1);
+      moveSelection(currentDisplayRow < 0 ? 0 : currentDisplayRow - 1);
       return true;
     case 'ArrowDown':
-      if (loaded === 0) return false;
+      if (length === 0) return false;
       event.preventDefault();
-      moveSelection(current < 0 ? 0 : current + 1);
+      moveSelection(currentDisplayRow < 0 ? 0 : currentDisplayRow + 1);
       return true;
     case 'Home':
-      if (loaded === 0) return false;
+      if (length === 0) return false;
       event.preventDefault();
       moveSelection(0);
       return true;
     case 'End':
-      if (loaded === 0) return false;
+      if (length === 0) return false;
       event.preventDefault();
-      moveSelection(loaded - 1);
+      moveSelection(length - 1);
       return true;
     case 'PageUp':
-      if (loaded === 0) return false;
+      if (length === 0) return false;
       event.preventDefault();
-      moveSelection((current < 0 ? 0 : current) - pageSize());
+      moveSelection((currentDisplayRow < 0 ? 0 : currentDisplayRow) - pageSize());
       return true;
     case 'PageDown':
-      if (loaded === 0) return false;
+      if (length === 0) return false;
       event.preventDefault();
-      moveSelection((current < 0 ? 0 : current) + pageSize());
+      moveSelection((currentDisplayRow < 0 ? 0 : currentDisplayRow) + pageSize());
       return true;
     case 'Enter':
       event.preventDefault();
@@ -541,14 +564,14 @@ function handleKeyDown(event: KeyboardEvent): boolean {
       emit('refresh');
       return true;
     case 'F10':
-      if (!event.shiftKey || current < 0) return false;
+      if (!event.shiftKey || currentStoreRow < 0) return false;
       event.preventDefault();
-      openMenuFromKeyboard(current);
+      openMenuFromKeyboard(currentStoreRow);
       return true;
     case 'ContextMenu':
-      if (current < 0) return false;
+      if (currentStoreRow < 0) return false;
       event.preventDefault();
-      openMenuFromKeyboard(current);
+      openMenuFromKeyboard(currentStoreRow);
       return true;
     default:
       return false;
@@ -658,12 +681,15 @@ function scheduleResize(): void {
 function applyAccessibility(range: { startRow: number; endRow: number }): void {
   if (!grid) return;
   const container = grid.getContainerNode();
-  const totalRows = props.graphView.loadedRows.value;
+  const totalRows = plan().length;
   const columns = grid.getColumns();
   container.setAttribute('aria-rowcount', String(totalRows));
   container.setAttribute('aria-colcount', String(columns.length));
 
-  const selectedRow = props.selection.row.value;
+  // P93 §7: `props.selection.row` is a store row; every `row` this loop touches is a display row
+  // (`data-row`'s own indexing, and `range`'s) — translated once, here, rather than per row.
+  const selectedStoreRow = props.selection.row.value;
+  const selectedRow = selectedStoreRow >= 0 ? plan().displayRowOf(selectedStoreRow) : -1;
   // No row selected yet (a fresh mount with nothing persisted): row 0, if it exists, is the one
   // tab stop into the grid — the ARIA grid pattern's own answer to "what receives focus before
   // anything has been chosen" (a plain `Tab` must land somewhere real, never nothing at all, once
@@ -681,7 +707,7 @@ function applyAccessibility(range: { startRow: number; endRow: number }): void {
     rowNode.setAttribute('aria-selected', isSelected ? 'true' : 'false');
     rowNode.tabIndex = row === tabbableRow ? 0 : -1;
 
-    const commit = props.graphView.store.commitAt(row);
+    const commit = props.graphView.store.commitAt(plan().storeRowAt(row));
     const dateText =
       props.dateFormat === 'absolute'
         ? formatAbsoluteDate(commit.author.timestamp)
@@ -753,7 +779,9 @@ onMounted(() => {
 
   const dataView = createCommitDataView({
     store: props.graphView.store,
-    loadedRows: () => props.graphView.loadedRows.value,
+    plan,
+    // `row` here is already a store row — `rowMetadata` (columns.ts) translates the incoming
+    // display row before calling this.
     isSelected: (row) => props.selection.row.value === row,
     // P7 (item 1): a row with a ref/PR badge gets the taller, expanded height —
     // `rowMetadata`/`rowHasBadges` (columns.ts) are what actually decide "does this row have one".
@@ -824,7 +852,9 @@ onMounted(() => {
     if (scrollRaf !== 0) return;
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = 0;
-      if (grid) emit('scroll', grid.getViewport().top);
+      // `scroll`'s own contract (`viewState.scrollRow`) is a store row — `getViewport().top` is
+      // SlickGrid's own display row.
+      if (grid) emit('scroll', plan().storeRowAt(grid.getViewport().top));
     });
   });
   // `stopImmediatePropagation()` only for a key `handleKeyDown` actually claimed — see that
@@ -870,7 +900,11 @@ onMounted(() => {
   });
 
   updateHandlePositions();
-  if (props.initialScrollRow !== undefined) instance.scrollRowIntoView(props.initialScrollRow);
+  // `initialScrollRow` (`viewState.scrollRow`) is a persisted store row — translate to the
+  // display row this mount's plan currently resolves it to.
+  if (props.initialScrollRow !== undefined) {
+    instance.scrollRowIntoView(plan().displayRowOf(props.initialScrollRow));
+  }
   previousSelectedRow = props.selection.row.value;
 });
 
@@ -884,7 +918,12 @@ watch(
   () => props.selection.row.value,
   (row) => {
     if (!grid) return;
-    const rows = [previousSelectedRow, row].filter((value) => value >= 0);
+    // `invalidateRows` takes SlickGrid's own display rows — `previousSelectedRow`/`row` are both
+    // store rows (matching `SelectionState`'s own coordinate system), translated here.
+    const rows = [previousSelectedRow, row]
+      .filter((value) => value >= 0)
+      .map((value) => plan().displayRowOf(value))
+      .filter((value) => value >= 0);
     if (rows.length > 0) grid.invalidateRows(rows);
     grid.render();
     previousSelectedRow = row;
@@ -893,9 +932,6 @@ watch(
 watch(
   () => props.graphView.loadedRows.value,
   () => {
-    // P92 item 4: `invalidate()`, not `updateRowCount()` + `render()` — see `handleChunkLayout`'s
-    // own comment for the mechanism; `invalidate()` also repositions already-cached rows.
-    grid?.invalidate();
     // P92 item 2 follow-up: the row count crossing the "needs a vertical scrollbar" threshold is
     // the ONE thing that can shrink `availableWidth()` with no host resize and no detailOpen
     // toggle — the two triggers `scheduleResize`'s own ResizeObserver and the `detailOpen` watcher
@@ -911,6 +947,17 @@ watch(
     // is no `pr` source at all.
     if (props.pr) scheduleAncestryRebuild();
   },
+);
+// P93 §7: the plan changes on every relayout — a page landing (already covered by `loadedRows`
+// above, but `plan` always changes right alongside it, §5.3, so `invalidate()` belongs here
+// instead of being called from both) and, later, a collapse toggle or `App.vue`'s own tips
+// watcher recomputing the order with the row count unchanged, which `loadedRows` alone would
+// never catch. `invalidate()`, not `render()` alone: a plan rebuild can move which store row a
+// given display row shows, and `updateRowCount()`'s own index rebuild (`invalidate()`'s contract,
+// P92 item 4's own comment) must run whether or not the row *count* moved.
+watch(
+  () => props.graphView.plan.value,
+  () => grid?.invalidate(),
 );
 watch(
   () => props.graphView.generation.value,
@@ -1029,7 +1076,7 @@ onBeforeUnmount(() => {
  *  (see its own doc comment above), so a refresh that happens later needs an imperative path
  *  back to the same underlying `scrollRowIntoView` call. */
 function scrollToRow(row: number): void {
-  grid?.scrollRowIntoView(row);
+  grid?.scrollRowIntoView(plan().displayRowOf(row));
 }
 
 /** G-UX item 2/D10: an auto-refresh's own viewport restore — `App.vue` captures
@@ -1038,13 +1085,15 @@ function scrollToRow(row: number): void {
  *  `RefreshButton.vue` originally raised for why auto-refresh did not exist). Distinct from
  *  `scrollToRow`, which centers a target row rather than pinning it to the viewport's top. */
 function scrollToTopRow(row: number): void {
-  grid?.scrollRowToTop(row);
+  grid?.scrollRowToTop(plan().displayRowOf(row));
 }
 
 /** The row currently pinned at the viewport's top — `App.vue`'s own capture half of the
- *  auto-refresh viewport restore, paired with `scrollToTopRow` above. */
+ *  auto-refresh viewport restore, paired with `scrollToTopRow` above. A store row, matching that
+ *  function's own contract. */
 function getViewportTop(): number | undefined {
-  return grid?.getViewport().top;
+  const top = grid?.getViewport().top;
+  return top === undefined ? undefined : plan().storeRowAt(top);
 }
 
 /** `docs/plans/P11.md` W14: `SearchBox.vue`'s second-stage `Escape` (§6.6) asks to move real DOM
@@ -1057,10 +1106,11 @@ function getViewportTop(): number | undefined {
  *  cannot be relied on to trigger the selection watcher's own invalidate/render (a same-value
  *  `select()` call is a no-op): `invalidateRows`/`render()` are called directly instead, which is
  *  what actually runs `onRendered` → `applyAccessibility` and lets `pendingFocusRow` take effect.
- *  A no-op with nothing loaded yet (`loadedRows === 0`) — there is no row to focus. */
+ *  A no-op with nothing loaded yet (`plan().length === 0`) — there is no row to focus. */
 function focusGrid(): void {
-  if (!grid || props.graphView.loadedRows.value === 0) return;
-  const row = Math.max(0, props.selection.row.value);
+  if (!grid || plan().length === 0) return;
+  const selectedStoreRow = props.selection.row.value;
+  const row = selectedStoreRow >= 0 ? plan().displayRowOf(selectedStoreRow) : 0;
   grid.scrollRowIntoView(row);
   pendingFocusRow = row;
   grid.invalidateRows([row]);

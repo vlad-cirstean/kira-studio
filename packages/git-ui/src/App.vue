@@ -12,7 +12,7 @@
  * picker's own label, the rendered rows themselves).
  */
 
-import type { FileChangeKind } from '@kira/git-core';
+import type { FileChangeKind, TipRef } from '@kira/git-core';
 import { SETTINGS } from '@kira/git-core';
 import type { EventPayload, HostKind, StashEntry, Transport, UiActionKind } from '@kira/git-ipc';
 import {
@@ -75,6 +75,7 @@ import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
+import { GraphOrderState } from './state/graphOrder.ts';
 import { GraphViewState } from './state/graphView.ts';
 import {
   composeLoadMoreAnnouncement,
@@ -129,7 +130,11 @@ const props = defineProps<{
 
 const bridge = new BridgeClient(props.transport, props.hostConnectionState);
 const connectionState = bridge.connectionState;
-const graphView = new GraphViewState(bridge);
+// P93 §7: one `GraphOrderState` for the life of this component, exactly like `graphView` itself
+// — threaded into it so `graphView.rebuildOrder()` has an order to rebuild against. Reset
+// alongside `graphView.reset()` in `handleRepoOpened` below.
+const graphOrder = new GraphOrderState();
+const graphView = new GraphViewState(bridge, undefined, graphOrder);
 // A fresh CommitStore for the life of this component (graphView is never swapped out from under
 // it — a repo switch resets the same GraphViewState instance rather than replacing it, matching
 // CommitGrid.vue's own documented assumption), so this can be constructed once, directly.
@@ -257,6 +262,7 @@ async function handleRepoOpened(repoId: string): Promise<void> {
   pendingSelectionSha.value = null;
   selection.clear();
   graphView.reset();
+  graphOrder.reset();
   await graphView.openStream(repoId);
 }
 
@@ -286,6 +292,75 @@ watch(graphView.loadedRows, () => {
   pendingSelectionSha.value = null;
   if (selection.selectBySha(sha)) commitGridRef.value?.scrollToRow(selection.row.value);
 });
+
+// ---------------------------------------------------------------------------------------
+// P93 §3.2: the priority-ordered tip list driving `graphOrder`'s branch grouping.
+// ---------------------------------------------------------------------------------------
+
+/** Checked-out branch (or detached HEAD) first, then every stash entry, then locals+remotes
+ *  interleaved by `committerDate` descending, then tags likewise — `buildRowPlan`'s own
+ *  `other` bucket (index `tips.length`) implicitly catches everything left over. Rebuilt whole
+ *  on every relevant ref/stash change (the watch below) rather than diffed — cheap next to the
+ *  relayout it drives, and `buildRowPlan` only cares about each tip's identity, not stability
+ *  across rebuilds. */
+function buildGraphTips(): TipRef[] {
+  const tips: TipRef[] = [];
+  const head = refsState.head.value;
+  if (head?.kind === 'branch') {
+    const branch = refsState.branches.value.find((row) => row.isHead);
+    if (branch) {
+      tips.push({ sha: branch.objectId, key: `branch:${branch.refname}`, label: branch.shortName });
+    }
+  } else if (head?.kind === 'detached') {
+    tips.push({ sha: head.sha, key: `detached:${head.sha}`, label: head.sha.slice(0, 7) });
+  }
+  // `head.kind === 'unborn'` contributes no group 0 tip — no commit exists yet to be one.
+
+  for (const entry of stashState.entries.value) {
+    tips.push({ sha: entry.sha, key: `stash:${entry.index}`, label: `stash@{${entry.index}}` });
+  }
+
+  // Locals and remotes interleaved by `committerDate` descending; ties break on kind (branch
+  // before remoteBranch) then refname ascending, per §3.2's table.
+  const branchesAndRemotes = [...refsState.branches.value, ...refsState.remoteBranches.value]
+    .filter((row) => !row.isHead)
+    .sort(
+      (a, b) =>
+        b.committerDate - a.committerDate ||
+        a.kind.localeCompare(b.kind) ||
+        a.refname.localeCompare(b.refname),
+    );
+  for (const row of branchesAndRemotes) {
+    tips.push({ sha: row.objectId, key: `ref:${row.refname}`, label: row.shortName });
+  }
+
+  const tags = [...refsState.tags.value].sort(
+    (a, b) => b.committerDate - a.committerDate || a.refname.localeCompare(b.refname),
+  );
+  for (const row of tags) {
+    tips.push({
+      sha: row.peeledObjectId ?? row.objectId,
+      key: `tag:${row.refname}`,
+      label: row.shortName,
+    });
+  }
+
+  return tips;
+}
+
+watch(
+  [
+    refsState.branches,
+    refsState.remoteBranches,
+    refsState.tags,
+    refsState.head,
+    stashState.entries,
+  ],
+  () => {
+    graphOrder.setTips(buildGraphTips());
+    void graphView.rebuildOrder();
+  },
+);
 
 // ---------------------------------------------------------------------------------------
 // P5 W11's "selection wiring": `DetailState` does not watch `SelectionState` itself (it is kept

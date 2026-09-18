@@ -14,7 +14,7 @@
  * a real `HTMLElement`/`SVGElement`, never a string — enforced by the library, not by discipline,
  * so a commit subject containing `<script>` is text by construction.
  */
-import type { CommitRecord, CommitStore, DecorationRef } from '@kira/git-core';
+import type { CommitRecord, CommitStore, DecorationRef, RowPlan } from '@kira/git-core';
 import type { PrRecord } from '@kira/git-ipc';
 import type { Column, CustomDataView, Formatter, ItemMetadata } from 'slickgrid';
 // G19 D1: isHeadDecoration is promoted to rowSvg.ts (the graph column's own module), imported
@@ -309,9 +309,16 @@ export function buildColumns(
  *  P7 (item 1): also `getItemMetadata`'s `height`, now that `CommitGrid.vue` turns on
  *  `enableVariableRowHeight` — `expandedRowHeight`/`prsFor` are optional so every existing caller
  *  of `rowMetadata` that only needs the class behaviour keeps compiling; only `CommitGrid.vue`
- *  passes real ones. */
+ *  passes real ones.
+ *
+ *  P93 §7: `plan` translates the incoming row (SlickGrid's own display-row indexing) into the
+ *  store row every other field here reads — `isSelected`/`prsFor` still take/answer for a STORE
+ *  row (`SelectionState`'s own coordinate system, §1's "rows are one coordinate system" no longer
+ *  true grid-wide but still true for selection), so `rowMetadata` translates once, at its own top,
+ *  rather than pushing that onto every caller. */
 export interface RowMetadataContext {
   readonly store: CommitStore;
+  readonly plan: () => RowPlan;
   readonly isSelected: (row: number) => boolean;
   readonly expandedRowHeight?: () => number;
   readonly prsFor?: (sha: string) => readonly PrRecord[] | undefined;
@@ -334,7 +341,8 @@ function rowHasBadges(
   return (ctx.prsFor(sha)?.length ?? 0) > 0;
 }
 
-export function rowMetadata(ctx: RowMetadataContext, row: number): ItemMetadata | null {
+export function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata | null {
+  const row = ctx.plan().storeRowAt(displayRow);
   const classes: string[] = [];
   if (ctx.isSelected(row)) classes.push('kv-row-selected');
   const decoration = ctx.store.decorationAt(row);
@@ -353,17 +361,19 @@ export function rowMetadata(ctx: RowMetadataContext, row: number): ItemMetadata 
  * fresh on every invocation — no cache, no memoization — because the only way to guarantee "the
  * grid is never handed materialized rows" is for nothing here to *hold* a materialized row for
  * longer than one formatter pass needs it. `getLength`/`isSelected` are accessors rather than
- * captured values so this data view always answers with the store's/selection's *current* state,
- * matching the plan's own sketch (`getLength: () => graphView.loadedRows.value`).
+ * captured values so this data view always answers with the store's/selection's *current* state.
+ *
+ * P93 §7: `row` throughout this data view is SlickGrid's own — the *display* row, `plan().length`
+ * long and possibly reordered from arrival order (§5.4's identity plan is what every non-P93
+ * caller still gets, unchanged). `getLength` no longer reads the store's loaded count directly;
+ * `getItem`/`getItemMetadata` translate through `plan().storeRowAt` before touching the store.
  */
-export interface CommitDataViewDeps extends RowMetadataContext {
-  readonly loadedRows: () => number;
-}
+export type CommitDataViewDeps = RowMetadataContext;
 
 export function createCommitDataView(deps: CommitDataViewDeps): CustomDataView<CommitRecord> {
   return {
-    getLength: () => deps.loadedRows(),
-    getItem: (row: number) => deps.store.commitAt(row),
+    getLength: () => deps.plan().length,
+    getItem: (row: number) => deps.store.commitAt(deps.plan().storeRowAt(row)),
     getItemMetadata: (row: number) => rowMetadata(deps, row),
   };
 }

@@ -1,4 +1,4 @@
-import type { CommitStore, LayoutChunk } from '@kira/git-core';
+import type { CommitStore, LayoutChunk, RowPlan } from '@kira/git-core';
 import { identityRowPlan, projectLayoutInput } from '@kira/git-core';
 import type { StreamChunkOf } from '@kira/git-ipc';
 import { TransportError } from '@kira/git-ipc';
@@ -69,6 +69,13 @@ export class GraphViewState {
   readonly exhausted: ShallowRef<boolean>;
   readonly lastChunkSource: ShallowRef<ChunkSource | undefined>;
   readonly laneCount: ShallowRef<number> = shallowRef(0);
+  /** P93 §7: the current `RowPlan` (branch-grouped, or `identityRowPlan` with no `#order`
+   *  attached, §5.4) — `CommitGrid.vue`'s own translation sites and `columns.ts`/`graphColumn.ts`
+   *  read this to convert between display rows (SlickGrid's own indexing) and store rows
+   *  (`CommitStore`/`SelectionState`'s). A fresh object on every `#rebuildLayout()` call, so a
+   *  plain `watch(() => graphView.plan.value, ...)` already sees every rebuild — no separate
+   *  revision counter needed for that. */
+  readonly plan: ShallowRef<RowPlan> = shallowRef(identityRowPlan(0));
   readonly loading: ShallowRef<LoadingState> = shallowRef('idle');
   readonly generation: ShallowRef<number>;
   /** W13's `revealSha` own live-region text — `App.vue` forwards it into the shared region
@@ -391,6 +398,7 @@ export class GraphViewState {
     this.layout.clear();
     this.#layoutClient.reset();
     this.laneCount.value = 0;
+    this.plan.value = identityRowPlan(0);
   }
 
   /**
@@ -410,6 +418,7 @@ export class GraphViewState {
   async #rebuildLayout(): Promise<void> {
     this.#order?.rebuild(this.store, this.generation.value);
     const plan = this.#order?.plan.value ?? identityRowPlan(this.store.rowCount);
+    this.plan.value = plan;
     const input = projectLayoutInput(plan, this.store.layoutInput(0, this.store.rowCount));
 
     // W15's `layoutSubmitMs` — the worker round trip for the *first* relayout only, so a
