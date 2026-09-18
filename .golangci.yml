@@ -8,7 +8,9 @@ linters:
   enable:
     - bodyclose      # perf/leak: an unclosed HTTP body holds a connection. 0 findings — keeps it so.
     - copyloopvar    # Go 1.22+ made the loop-var copy redundant. 5.
+    - gocognit       # SonarSource cognitive complexity, threshold 30. 46 non-test at pass 2 start.
     - gocritic       # perf tag only, minus hugeParam + rangeValCopy. 34.
+    - gocyclo        # cyclomatic complexity, same threshold. 22 non-test at pass 2 start.
     - govet          # already run standalone; free here, and catches the same set.
     - ineffassign    # dead stores — dead code, statement level. 1.
     - makezero       # make([]T, n) then append. 0 findings — keeps it so.
@@ -16,6 +18,10 @@ linters:
     - unconvert      # redundant conversions. 1.
     - unused         # SPEC's Go dead-code answer, staticcheck-based. 11.
   settings:
+    gocognit:
+      min-complexity: 30
+    gocyclo:
+      min-complexity: 30
     gocritic:
       enabled-tags:
         - performance
@@ -26,7 +32,7 @@ linters:
     generated: lax
     rules:
       - path: _test\.go
-        linters: [prealloc]
+        linters: [gocognit, gocyclo, prealloc]
 
 issues:
   # golangci-lint truncates at 50 per linter / 3 per message by default and still
@@ -34,3 +40,7 @@ issues:
   # for this plan. Never leave these at their defaults.
   max-issues-per-linter: 0
   max-same-issues: 0
+  # Same trap, second mechanism: the default drops a finding whose file+line another
+  # linter already reported, which hid 28 of gocyclo's 32 behind gocognit's own
+  # finding on the same func line. Both metrics must always report independently.
+  uniq-by-line: false

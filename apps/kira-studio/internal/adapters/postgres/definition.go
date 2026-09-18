@@ -322,7 +322,6 @@ func buildDefinition(ctx context.Context, exec queryExec, segments []model.PathS
 	}
 
 	keyword := relationKeyword[objectKind]
-	notes := []string{composedScopeNote}
 	var statements []string
 	var constraintMetas []model.ConstraintMeta
 	var forkNotes []string
@@ -335,6 +334,8 @@ func buildDefinition(ctx context.Context, exec queryExec, segments []model.PathS
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
+	notes := make([]string, 0, 1+len(forkNotes))
+	notes = append(notes, composedScopeNote)
 	notes = append(notes, forkNotes...)
 
 	relComment, columnComments, err := fetchComments(ctx, exec, info.OID, m.qname, keyword)
