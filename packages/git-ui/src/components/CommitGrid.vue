@@ -478,6 +478,13 @@ function handleContextMenu(event: MouseEvent): void {
   event.preventDefault();
   const cell = grid?.getCellFromEvent(event);
   if (!cell) return;
+  // P93 §4.2: "a collapsed row is never 'selected'" applies to a right-click too — its own
+  // storeRowAt is a hidden (contracted) row, not one on screen, so selecting it and opening a
+  // commit-scoped menu for it would be wrong in the same way handleClick's own guard avoids.
+  if (plan().entryAt(cell.row).kind === 'collapsed') {
+    toggleGroup(cell.row);
+    return;
+  }
   const row = plan().storeRowAt(cell.row);
   props.selection.select(row);
 

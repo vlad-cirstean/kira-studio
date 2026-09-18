@@ -200,6 +200,14 @@ const scrollRow = ref(0);
 /** G-UX D9: the graph search row's own open/closed state — closed by default, toggled by `/`/
  *  `Ctrl+F`/`Ctrl+Alt+F` (`toggleSearch` below) and persisted like `detailOpen`. */
 const searchOpen = ref(false);
+/** P93 §4.4: the collapse-by-default toggle (`AppToolbar.vue`'s own `graph-collapse-toggle`) —
+ *  `true` by default (a fresh/discarded persisted blob), persisted like `searchOpen`. Reaches
+ *  `graphOrder` (a plain, non-reactive class) through two explicit call sites below, never a
+ *  reactive `watch`: the synchronous `graphOrder.setCollapseEnabled(...)` call right after
+ *  `setCollapseBranches` applies this default at setup, and `bootstrap()`'s own persisted-restore
+ *  applies a real value later — see each call site's own comment for why neither needs an
+ *  `immediate: true` watch. */
+const collapseBranches = ref(true);
 /** First-mount-only rehydration target for `CommitGrid.vue`'s own `initialScrollRow` prop (see
  *  that component's doc comment on why it is one-shot) — `undefined` until `bootstrap()` reads a
  *  persisted value, so a first-ever mount (nothing persisted yet) passes nothing and scrolls
@@ -363,6 +371,21 @@ watch(
     void graphView.rebuildOrder();
   },
 );
+
+/** P93 §4.4/§7: the toolbar's collapse-branches toggle — the only place `collapseBranches` writes
+ *  through to `graphOrder` (a plain, non-reactive class) and asks for a relayout. `bootstrap()`'s
+ *  own persisted-restore applies its value to `graphOrder` directly instead of through this
+ *  function (see its own comment) — no relayout needed there, since the stream `graphView
+ *  .openStream` starts right after already produces the first one. */
+function setCollapseBranches(on: boolean): void {
+  collapseBranches.value = on;
+  graphOrder.setCollapseEnabled(on);
+  void graphView.rebuildOrder();
+}
+// Applies collapseBranches's own default (true) to graphOrder up front — GraphOrderState's own
+// field defaults to false (P93 §4.4's doc comment), and nothing else would set it before the
+// first real rebuild otherwise. Plain, synchronous, no relayout: the store is still empty here.
+graphOrder.setCollapseEnabled(collapseBranches.value);
 
 // ---------------------------------------------------------------------------------------
 // P5 W11's "selection wiring": `DetailState` does not watch `SelectionState` itself (it is kept
@@ -1118,7 +1141,7 @@ function retryBootstrap(): void {
 // (judgment call 7) — a remembered term silently re-running against a repository that has moved
 // on is the same stale-state argument the diff/selected-file omission already made.
 let lastPersisted: PersistedViewState = {
-  version: 7,
+  version: 8,
   repoId: null,
   loadedRows: 0,
   detailOpen: true,
@@ -1133,6 +1156,7 @@ let lastPersisted: PersistedViewState = {
   searchRegex: false,
   searchScope: 'both',
   searchOpen: false,
+  collapseBranches: true,
 };
 
 async function bootstrap(): Promise<void> {
@@ -1171,6 +1195,12 @@ async function bootstrap(): Promise<void> {
     searchState.regex.value = persisted.searchRegex;
     searchState.scope.value = persisted.searchScope;
     searchOpen.value = persisted.searchOpen;
+    // P93 §4.4: pushed straight to graphOrder, not through setCollapseBranches — that function
+    // also asks for a relayout, and the graphView.openStream(...) call below already produces the
+    // first one once the persisted repo's rows arrive; a relayout against the still-empty store
+    // here would just be redone.
+    collapseBranches.value = persisted.collapseBranches;
+    graphOrder.setCollapseEnabled(persisted.collapseBranches);
 
     // §6.3's "collapsed by default" below `wide`: a persisted `detailOpen: true` from an earlier,
     // wider session must not reopen the pane/drawer over a mount that starts narrower — without
@@ -1231,6 +1261,7 @@ async function bootstrap(): Promise<void> {
       searchState.regex,
       searchState.scope,
       searchOpen,
+      collapseBranches,
     ],
     ([
       repoId,
@@ -1247,6 +1278,7 @@ async function bootstrap(): Promise<void> {
       searchRegex,
       searchScope,
       isSearchOpen,
+      isCollapseBranches,
     ]) => {
       lastPersisted = {
         ...lastPersisted,
@@ -1264,6 +1296,7 @@ async function bootstrap(): Promise<void> {
         searchRegex,
         searchScope,
         searchOpen: isSearchOpen,
+        collapseBranches: isCollapseBranches,
       };
       props.viewState.write(lastPersisted);
     },
@@ -1600,6 +1633,7 @@ onBeforeUnmount(() => {
           :actions="actions"
           :pr-state="prState"
           :search-open="searchOpen"
+          :collapse-branches="collapseBranches"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
           @save-global-stash="globalStashSaveOpen = true"
@@ -1611,6 +1645,7 @@ onBeforeUnmount(() => {
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @open-repo-settings="repoSettingsDialogOpen = true"
           @toggle-search="toggleSearchRow"
+          @toggle-collapse-branches="setCollapseBranches(!collapseBranches)"
         />
         <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
           <SearchBox
@@ -1638,6 +1673,7 @@ onBeforeUnmount(() => {
           :actions="actions"
           :pr-state="prState"
           :search-open="searchOpen"
+          :collapse-branches="collapseBranches"
           @stash-changes="stashCreateOpen = true"
           @branch-from-stash="handleBranchFromStash"
           @save-global-stash="globalStashSaveOpen = true"
@@ -1649,6 +1685,7 @@ onBeforeUnmount(() => {
           @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
           @open-repo-settings="repoSettingsDialogOpen = true"
           @toggle-search="toggleSearchRow"
+          @toggle-collapse-branches="setCollapseBranches(!collapseBranches)"
         />
         <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
           <SearchBox

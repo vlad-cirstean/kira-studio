@@ -41,13 +41,20 @@
  * not derived from lane count alone, so its width needs the same persistence every other column
  * width already gets. A v6 blob has no opinion on it, so the whole blob is discarded and the panel
  * re-seeds from `DEFAULT_COLUMN_WIDTHS`, same policy as every prior version bump above.
+ *
+ * P93 §4.4 (version 8): adds `collapseBranches` — the collapse-by-default toggle (§7,
+ * `AppToolbar.vue`'s own `graph-collapse-toggle`), the same kind of view preference `searchOpen`
+ * already is. Defaults to `true` on a fresh/discarded blob, per §4.4's own "collapse by default"
+ * decision — the per-group expanded set itself stays session-only (`GraphOrderState`, never
+ * persisted here), so a v7 blob is discarded whole rather than partially reused, same policy as
+ * every prior bump.
  */
 import type { SearchScope } from '@kira/git-core';
 import { DEFAULT_GRAPH_LANE_CAP, graphColumnWidth } from '../graph/geometry.ts';
 import type { FileListMode } from './detail.ts';
 
 export interface PersistedViewState {
-  readonly version: 7;
+  readonly version: 8;
   readonly repoId: string | null;
   readonly loadedRows: number;
   readonly detailOpen: boolean;
@@ -67,6 +74,8 @@ export interface PersistedViewState {
   readonly searchScope: SearchScope;
   /** G-UX D9: the search row's own open/closed state — see the file doc comment's v6 entry. */
   readonly searchOpen: boolean;
+  /** P93 §4.4: the collapse-by-default toggle — see the file doc comment's v8 entry. */
+  readonly collapseBranches: boolean;
 }
 
 export interface ColumnWidths {
@@ -114,7 +123,7 @@ function isPersistedViewStateShape(value: unknown): value is PersistedViewState 
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Record<string, unknown>;
   return (
-    record.version === 7 &&
+    record.version === 8 &&
     (typeof record.repoId === 'string' || record.repoId === null) &&
     typeof record.loadedRows === 'number' &&
     typeof record.detailOpen === 'boolean' &&
@@ -130,7 +139,8 @@ function isPersistedViewStateShape(value: unknown): value is PersistedViewState 
     (record.searchScope === 'commits' ||
       record.searchScope === 'refs' ||
       record.searchScope === 'both') &&
-    typeof record.searchOpen === 'boolean'
+    typeof record.searchOpen === 'boolean' &&
+    typeof record.collapseBranches === 'boolean'
   );
 }
 

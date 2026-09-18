@@ -81,6 +81,9 @@ const props = defineProps<{
   /** Whether `App.vue`'s own search row is currently open — drives the toggle button's `active`
    *  state, the same `active` = "revealed" convention `ReviewView.vue`'s own filter toggle uses. */
   searchOpen: boolean;
+  /** P93 §4.4/§7: whether every non-checked-out branch group collapses by default — drives the
+   *  collapse-toggle button's own `active` state, same convention as `searchOpen` above. */
+  collapseBranches: boolean;
 }>();
 const emit = defineEmits<{
   /** `docs/plans/P9.md` W14: opens `StashDialog.vue`'s create mode — owned by `App.vue`, exactly
@@ -111,6 +114,9 @@ const emit = defineEmits<{
    *  its own, the same "emit, don't own" shape every other dialog/panel-toggling emit above
    *  already follows. */
   (event: 'toggle-search'): void;
+  /** P93 §4.4/§7: toggles `App.vue`'s own `collapseBranches` preference — the toolbar owns no
+   *  collapse state of its own, same "emit, don't own" shape as `toggle-search` above. */
+  (event: 'toggle-collapse-branches'): void;
 }>();
 
 function copy(text: string, whatCopied: string): void {
@@ -398,6 +404,17 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
     </span>
 
     <span class="kv-toolbar-spacer" aria-hidden="true"></span>
+
+    <KuiButton
+      variant="icon"
+      icon="codicon-list-tree"
+      :active="collapseBranches"
+      :aria-pressed="collapseBranches"
+      v-kui-tooltip="'Collapse other branches'"
+      aria-label="Collapse other branches"
+      data-testid="graph-collapse-toggle"
+      @click="emit('toggle-collapse-branches')"
+    />
 
     <KuiButton
       variant="icon"
