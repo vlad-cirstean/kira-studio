@@ -1,0 +1,14 @@
+#!/bin/sh
+# Kira Studio pre-push — P94 §5. The heavier whole-repo checks, run where a cold
+# multi-minute wait is acceptable and a per-commit one is not.
+# Bypass mid-investigation only: git push --no-verify
+set -e
+
+if [ ! -d node_modules ]; then
+  echo "pre-push: node_modules is missing — run \`bun install\` first." >&2
+  exit 1
+fi
+
+go build ./...
+bun run lint:go
+bun run lint:dead
