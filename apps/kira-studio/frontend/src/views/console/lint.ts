@@ -32,7 +32,9 @@ function lintSqlConsole(
 
 const MONGO_BRACKET_PAIRS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
 
-function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
+// Exported for its own direct table-driven test (P94 pass 3 §6 item 1) — this function had zero
+// prior coverage, direct or indirect, before that pass's refactor.
+export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
   const issues: ConsoleDiagnostic[] = [];
   const stack: Array<{ ch: string; pos: number }> = [];
   const n = text.length;
