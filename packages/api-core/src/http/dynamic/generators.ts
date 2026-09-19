@@ -26,7 +26,7 @@ import { faker } from './fakerEntry';
 
 type Faker = typeof faker;
 
-export const GENERATORS: Record<FakeName, (f: Faker) => string> = {
+const GENERATORS: Record<FakeName, (f: Faker) => string> = {
   'fake.string.uuid': (f) => f.string.uuid(),
   // D9/D12: the clock, not the RNG — Postman defines both $timestamp/$isoTimestamp as reading the
   // current time, so neither goes through faker even though they live in this same lazy-loaded

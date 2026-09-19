@@ -5,8 +5,8 @@
 // how an importer becomes either noisy (flagging things that change nothing) or dishonest (staying
 // silent about things that do) — D6's own reasoning.
 
-export type CurlFlagArity = 0 | 1;
-export type CurlFlagCategory = 'known' | 'ignored' | 'warned';
+type CurlFlagArity = 0 | 1;
+type CurlFlagCategory = 'known' | 'ignored' | 'warned';
 
 // D5/D8/D9: the semantic id a 'known' flag feeds — parse.ts switches on this rather than on the
 // raw spelling, so `-H`/`--header` and `-X`/`--request` are indistinguishable once looked up.

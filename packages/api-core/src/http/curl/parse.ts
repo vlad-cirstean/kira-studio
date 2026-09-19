@@ -8,12 +8,7 @@ import {
   type HttpUrlEncodedFieldState,
 } from '@kira/shared/domain/http';
 import { type CurlFlagId, expandShortCluster, type FlagSpec, lookupFlag } from './flags';
-import { CURL_WARNING_KINDS, type CurlWarning, type CurlWarningKind, tokenize } from './tokenize';
-
-// P7 D4-D9: argv → this app's own request-state vocabulary. Re-exported here (rather than only in
-// tokenize.ts) so every consumer of parseCurl's public surface — the corpus test, the import
-// dialog — imports one module for both the result shape and its warning vocabulary.
-export { CURL_WARNING_KINDS, type CurlWarning, type CurlWarningKind };
+import { type CurlWarning, tokenize } from './tokenize';
 
 export interface ParsedCurl {
   /** Only the fields a curl command can express — everything else keeps its default (the caller

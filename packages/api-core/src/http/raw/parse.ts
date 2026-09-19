@@ -7,8 +7,8 @@ import {
 
 // P9 D11: the warning vocabulary — a closed union, mirroring http/curl/tokenize.ts's own
 // CurlWarningKind shape (P7 D4) so the dialog can render either list with the same component.
-export const RAW_WARNING_KINDS = ['chunked-transfer-encoding', 'content-length-dropped'] as const;
-export type RawWarningKind = (typeof RAW_WARNING_KINDS)[number];
+const RAW_WARNING_KINDS = ['chunked-transfer-encoding', 'content-length-dropped'] as const;
+type RawWarningKind = (typeof RAW_WARNING_KINDS)[number];
 export interface RawWarning {
   kind: RawWarningKind;
   detail: string;
