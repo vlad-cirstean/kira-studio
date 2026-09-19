@@ -35,6 +35,12 @@
         "noDelete": "error",
         "noDynamicNamespaceImportAccess": "error",
         "noReExportAll": "error"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "error",
+          "options": { "maxAllowedComplexity": 30 }
+        }
       }
     }
   },
@@ -59,6 +65,14 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["**/tests/**", "**/test/**", "**/*.test.ts", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "complexity": { "noExcessiveCognitiveComplexity": "off" }
+        }
+      }
+    },
     {
       "includes": ["knip.json"],
       "json": {
