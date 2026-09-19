@@ -279,104 +279,147 @@ type XmlToken =
   | { kind: 'open'; raw: string; name: string; selfClosing: boolean; offset: number }
   | { kind: 'close'; raw: string; name: string; offset: number };
 
+/** One scan's result: the token it read, and the index just past it — every `scanXml*` below
+ *  shares this shape (P94 pass 3 §4.3, shape 1: `tokenizeXml` dispatches, one scanner per
+ *  construct owns its own loop and its own error). Offsets and error strings are asserted
+ *  byte-identical against the pre-split version (§4.1). */
+interface XmlScanStep {
+  token: XmlToken;
+  next: number;
+}
+
+function scanXmlTextRun(text: string, i: number, n: number): XmlScanStep {
+  const start = i;
+  while (i < n && text[i] !== '<') i++;
+  return { token: { kind: 'text', raw: text.slice(start, i), offset: start }, next: i };
+}
+
+function scanXmlComment(text: string, i: number, start: number): XmlScanStep {
+  const end = text.indexOf('-->', i + 4);
+  if (end < 0) throw new XmlScanError(`unterminated comment at offset ${start}`);
+  return { token: { kind: 'comment', raw: text.slice(i, end + 3), offset: start }, next: end + 3 };
+}
+
+function scanXmlCdata(text: string, i: number, start: number): XmlScanStep {
+  const end = text.indexOf(']]>', i + 9);
+  if (end < 0) throw new XmlScanError(`unterminated CDATA section at offset ${start}`);
+  return { token: { kind: 'cdata', raw: text.slice(i, end + 3), offset: start }, next: end + 3 };
+}
+
+function scanXmlPi(text: string, i: number, start: number): XmlScanStep {
+  const end = text.indexOf('?>', i + 2);
+  if (end < 0) throw new XmlScanError(`unterminated processing instruction at offset ${start}`);
+  return { token: { kind: 'pi', raw: text.slice(i, end + 2), offset: start }, next: end + 2 };
+}
+
+function scanXmlDoctype(text: string, i: number, start: number, n: number): XmlScanStep {
+  let j = i + 9;
+  let bracketDepth = 0;
+  let closed = false;
+  while (j < n) {
+    const c = text[j];
+    if (c === '[') bracketDepth++;
+    else if (c === ']') bracketDepth--;
+    else if (c === '>' && bracketDepth <= 0) {
+      j++;
+      closed = true;
+      break;
+    }
+    j++;
+  }
+  if (!closed) throw new XmlScanError(`unterminated DOCTYPE at offset ${start}`);
+  return { token: { kind: 'doctype', raw: text.slice(start, j), offset: start }, next: j };
+}
+
+/** The attribute text after a tag's name, up to its unquoted `>`/`/>` — its own quote-state loop,
+ *  split out of `scanXmlTag` so the name scan and this body scan each carry only their own
+ *  complexity score. `closed` is false for either an unterminated tag or a quote still open at
+ *  end of input — both are the same "unterminated tag" error to the caller. */
+function scanXmlTagBody(
+  text: string,
+  j: number,
+  n: number,
+): { next: number; selfClosing: boolean; closed: boolean } {
+  let quote: string | null = null;
+  let selfClosing = false;
+  let closedTag = false;
+  while (j < n) {
+    const c = text[j];
+    if (quote) {
+      if (c === quote) quote = null;
+      j++;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      quote = c;
+      j++;
+      continue;
+    }
+    if (c === '/' && text[j + 1] === '>') {
+      selfClosing = true;
+      j += 2;
+      closedTag = true;
+      break;
+    }
+    if (c === '>') {
+      j++;
+      closedTag = true;
+      break;
+    }
+    j++;
+  }
+  return { next: j, selfClosing, closed: closedTag && quote === null };
+}
+
+/** An opening or closing tag — name, then `scanXmlTagBody`'s attribute scan. */
+function scanXmlTag(text: string, i: number, start: number, n: number): XmlScanStep {
+  let j = i + 1;
+  const closing = text[j] === '/';
+  if (closing) j++;
+  const nameStart = j;
+  while (j < n && /[^\s/>]/.test(text[j])) j++;
+  const name = text.slice(nameStart, j);
+  if (name.length === 0) throw new XmlScanError(`malformed tag at offset ${start}`);
+
+  const body = scanXmlTagBody(text, j, n);
+  if (!body.closed) throw new XmlScanError(`unterminated tag at offset ${start}`);
+  const raw = text.slice(start, body.next);
+  if (closing) {
+    if (body.selfClosing) throw new XmlScanError(`malformed closing tag at offset ${start}`);
+    return { token: { kind: 'close', raw, name, offset: start }, next: body.next };
+  }
+  return {
+    token: { kind: 'open', raw, name, selfClosing: body.selfClosing, offset: start },
+    next: body.next,
+  };
+}
+
 function tokenizeXml(text: string): XmlToken[] {
   const tokens: XmlToken[] = [];
   const n = text.length;
   let i = 0;
   while (i < n) {
     if (text[i] !== '<') {
-      const start = i;
-      while (i < n && text[i] !== '<') i++;
-      tokens.push({ kind: 'text', raw: text.slice(start, i), offset: start });
+      const step = scanXmlTextRun(text, i, n);
+      tokens.push(step.token);
+      i = step.next;
       continue;
     }
     const start = i;
+    let step: XmlScanStep;
     if (text.startsWith('<!--', i)) {
-      const end = text.indexOf('-->', i + 4);
-      if (end < 0) throw new XmlScanError(`unterminated comment at offset ${start}`);
-      tokens.push({ kind: 'comment', raw: text.slice(i, end + 3), offset: start });
-      i = end + 3;
-      continue;
-    }
-    if (text.startsWith('<![CDATA[', i)) {
-      const end = text.indexOf(']]>', i + 9);
-      if (end < 0) throw new XmlScanError(`unterminated CDATA section at offset ${start}`);
-      tokens.push({ kind: 'cdata', raw: text.slice(i, end + 3), offset: start });
-      i = end + 3;
-      continue;
-    }
-    if (text.startsWith('<?', i)) {
-      const end = text.indexOf('?>', i + 2);
-      if (end < 0) throw new XmlScanError(`unterminated processing instruction at offset ${start}`);
-      tokens.push({ kind: 'pi', raw: text.slice(i, end + 2), offset: start });
-      i = end + 2;
-      continue;
-    }
-    if (/^<!doctype/i.test(text.slice(i, i + 9))) {
-      let j = i + 9;
-      let bracketDepth = 0;
-      let closed = false;
-      while (j < n) {
-        const c = text[j];
-        if (c === '[') bracketDepth++;
-        else if (c === ']') bracketDepth--;
-        else if (c === '>' && bracketDepth <= 0) {
-          j++;
-          closed = true;
-          break;
-        }
-        j++;
-      }
-      if (!closed) throw new XmlScanError(`unterminated DOCTYPE at offset ${start}`);
-      tokens.push({ kind: 'doctype', raw: text.slice(start, j), offset: start });
-      i = j;
-      continue;
-    }
-    // an opening or closing tag
-    let j = i + 1;
-    const closing = text[j] === '/';
-    if (closing) j++;
-    const nameStart = j;
-    while (j < n && /[^\s/>]/.test(text[j])) j++;
-    const name = text.slice(nameStart, j);
-    if (name.length === 0) throw new XmlScanError(`malformed tag at offset ${start}`);
-    let quote: string | null = null;
-    let selfClosing = false;
-    let closedTag = false;
-    while (j < n) {
-      const c = text[j];
-      if (quote) {
-        if (c === quote) quote = null;
-        j++;
-        continue;
-      }
-      if (c === '"' || c === "'") {
-        quote = c;
-        j++;
-        continue;
-      }
-      if (c === '/' && text[j + 1] === '>') {
-        selfClosing = true;
-        j += 2;
-        closedTag = true;
-        break;
-      }
-      if (c === '>') {
-        j++;
-        closedTag = true;
-        break;
-      }
-      j++;
-    }
-    if (!closedTag || quote !== null) throw new XmlScanError(`unterminated tag at offset ${start}`);
-    const raw = text.slice(start, j);
-    if (closing) {
-      if (selfClosing) throw new XmlScanError(`malformed closing tag at offset ${start}`);
-      tokens.push({ kind: 'close', raw, name, offset: start });
+      step = scanXmlComment(text, i, start);
+    } else if (text.startsWith('<![CDATA[', i)) {
+      step = scanXmlCdata(text, i, start);
+    } else if (text.startsWith('<?', i)) {
+      step = scanXmlPi(text, i, start);
+    } else if (/^<!doctype/i.test(text.slice(i, i + 9))) {
+      step = scanXmlDoctype(text, i, start, n);
     } else {
-      tokens.push({ kind: 'open', raw, name, selfClosing, offset: start });
+      step = scanXmlTag(text, i, start, n);
     }
-    i = j;
+    tokens.push(step.token);
+    i = step.next;
   }
   return tokens;
 }
