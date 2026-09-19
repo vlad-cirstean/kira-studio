@@ -18,7 +18,7 @@ import type {
 import type { MenuItem, MenuSection } from '@kira/kira-ui';
 import { applyMenuLabel, originLabel } from './stashListModel.ts';
 
-export type { MenuItem, MenuSection };
+export type { MenuSection };
 
 function gatedItem(
   id: string,

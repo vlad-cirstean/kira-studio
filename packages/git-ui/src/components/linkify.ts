@@ -19,7 +19,7 @@
  * when there is none — the same "button when capable, inert text otherwise" shape the PR row
  * already established, never a raw `<a>` either way.
  */
-export type LinkifiedSegment =
+type LinkifiedSegment =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'link'; readonly url: string };
 
@@ -46,7 +46,7 @@ function trimTrailingPunctuation(url: string): string {
   return url.slice(0, end);
 }
 
-export function linkifySegments(text: string): LinkifiedSegment[] {
+function linkifySegments(text: string): LinkifiedSegment[] {
   const segments: LinkifiedSegment[] = [];
   let lastIndex = 0;
   URL_PATTERN.lastIndex = 0;

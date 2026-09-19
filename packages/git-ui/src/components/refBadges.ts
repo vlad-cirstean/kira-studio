@@ -121,7 +121,7 @@ export function badgeSpecFor(ref: DecorationRef): BadgeSpec {
   }
 }
 
-export interface OverflowSpec {
+interface OverflowSpec {
   /** The `N` in "+N" — the *hidden* count, not the row's total decoration count. */
   readonly count: number;
   /** Names every decoration on the row, not just the hidden ones — "a row with six decorations
@@ -129,7 +129,7 @@ export interface OverflowSpec {
   readonly title: string;
 }
 
-export interface BadgePlan {
+interface BadgePlan {
   readonly visible: readonly BadgeSpec[];
   readonly overflow: OverflowSpec | null;
 }
@@ -149,7 +149,7 @@ export interface StackBadgeInfo {
 /** The pure "what to render" computation: which badges show, and what the overflow badge (if
  *  any) says — with no DOM touched, so this is what `tests/unit/ui/refBadges.test.ts` exercises
  *  directly. `buildRefBadges` below is a thin DOM-construction layer over this. */
-export function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
+function planBadges(decorations: readonly DecorationRef[]): BadgePlan {
   const specs = decorations.map(badgeSpecFor);
   const visible = specs.slice(0, MAX_VISIBLE_BADGES);
   const overflow: OverflowSpec | null =

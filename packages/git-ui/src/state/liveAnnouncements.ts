@@ -25,7 +25,7 @@ const COUNT_FORMATTER = new Intl.NumberFormat();
  *  detail of a `.vue` SFC's `<script setup>` block, not an exported function, and both call sites
  *  want the same "grouped thousands" formatting the plan's own example ("5,000 more loaded,
  *  122,400 remaining") shows. */
-export function formatCount(count: number): string {
+function formatCount(count: number): string {
   return COUNT_FORMATTER.format(count);
 }
 

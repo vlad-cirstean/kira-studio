@@ -31,9 +31,9 @@ import { splitHighlights } from './searchHighlight.ts';
  *  `dataContext` directly and ignore `value`, so which leaf each column claims is otherwise
  *  arbitrary — chosen for readability, not because the formatter uses it. */
 export const GRAPH_COLUMN_ID = 'graph';
-export const MESSAGE_COLUMN_ID = 'message';
-export const AUTHOR_COLUMN_ID = 'author';
-export const DATE_COLUMN_ID = 'date';
+const MESSAGE_COLUMN_ID = 'message';
+const AUTHOR_COLUMN_ID = 'author';
+const DATE_COLUMN_ID = 'date';
 
 function isStashDecoration(ref: DecorationRef): boolean {
   return ref.kind === 'stash';
@@ -405,7 +405,7 @@ export function buildColumns(
  *  row (`SelectionState`'s own coordinate system, §1's "rows are one coordinate system" no longer
  *  true grid-wide but still true for selection), so `rowMetadata` translates once, at its own top,
  *  rather than pushing that onto every caller. */
-export interface RowMetadataContext {
+interface RowMetadataContext {
   readonly store: CommitStore;
   readonly plan: () => RowPlan;
   readonly isSelected: (row: number) => boolean;
@@ -430,7 +430,7 @@ function rowHasBadges(
   return (ctx.prsFor(sha)?.length ?? 0) > 0;
 }
 
-export function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata | null {
+function rowMetadata(ctx: RowMetadataContext, displayRow: number): ItemMetadata | null {
   const entry = ctx.plan().entryAt(displayRow);
   if (entry.kind === 'collapsed') {
     // P93 §4.2: "the compact height... A placeholder never carries badges" — nor is it ever

@@ -13,7 +13,7 @@ import { badgeSpecFor } from './refBadges.ts';
  *  reads off the badge) so the visible and announced names of a ref can never disagree. Prefixed
  *  by its kind: a bare name ("main") read out of context is ambiguous between a branch and a tag
  *  in a way the badge's own shape/icon already disambiguates visually. */
-export function describeDecoration(ref: DecorationRef): string {
+function describeDecoration(ref: DecorationRef): string {
   const name = badgeSpecFor(ref).text;
   switch (ref.kind) {
     case 'branch':

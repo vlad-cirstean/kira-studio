@@ -9,7 +9,7 @@
 import { validateRefName } from '@kira/git-core';
 import type { RefRow } from '@kira/git-ipc';
 
-export type TagCreateVerdict = 'clean' | 'blockedByExisting' | 'movesWithForce' | 'invalidName';
+type TagCreateVerdict = 'clean' | 'blockedByExisting' | 'movesWithForce' | 'invalidName';
 
 export interface TagCreateState {
   readonly nameValid: boolean;

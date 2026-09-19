@@ -21,19 +21,7 @@ import { GEOMETRY } from './geometry.ts';
 import type { EdgeSegment } from './layoutStore.ts';
 import { laneClass, NODE_CLASS, type NodeKind } from './palette.ts';
 
-// Re-exported so a consumer of rowSvg.ts (the plan's own sketch defines GEOMETRY directly here)
-// never needs to know it actually lives in geometry.ts — see that file's own doc comment for why
-// (W6 needed it before W8 existed, per the plan's own dependency ordering).
-export { GEOMETRY };
-
 const SVG_NS = 'http://www.w3.org/2000/svg';
-
-/** The lane area alone (no `padLeft`/`gutterPad`) — `graphColumnWidth` in `geometry.ts` is
- *  `padLeft + gutterWidth(laneCount) + gutterPad`; this is the piece `hitTest.ts`'s `laneAt`
- *  needs to know where the gutter itself starts and ends within the column. */
-export function gutterWidth(laneCount: number): number {
-  return Math.min(laneCount, GEOMETRY.maxLanes) * GEOMETRY.laneWidth;
-}
 
 /**
  * One row's complete input to `buildRowSvg`: the reused `segments` buffer and how many of its
@@ -192,7 +180,7 @@ export interface EdgePathPlan {
  *  Two *different* lanes sharing a colour (legal once `laneCount` exceeds the palette size) are
  *  concatenated into the same path too — same visual result, one fewer element, and nothing reads
  *  lane identity back out of an already-drawn path. */
-export function planEdgePaths(
+function planEdgePaths(
   slice: RowSlice,
   rowHeight: number,
   nodeCenterY: number,

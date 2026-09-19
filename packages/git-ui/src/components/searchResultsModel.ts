@@ -27,7 +27,7 @@ function commitOptionId(hit: CommitHit): string {
   return `kv-search-option-commit-${hit.sha}`;
 }
 
-export interface SearchResultsSection {
+interface SearchResultsSection {
   readonly title: string;
   readonly options: readonly SearchOption[];
   readonly hiddenCount: number;

@@ -12,7 +12,7 @@ import type { RefRow, RefTrack } from '@kira/git-ipc';
  *  digit/non-digit runs and compares digit runs numerically. `"v10.1"` sorts after `"v10"` the
  *  same way: their shared `"v10"` prefix compares equal, and the run `undefined` (nothing left)
  *  vs `".1"` (something left) makes the shorter name sort first. */
-export function naturalCompare(a: string, b: string): number {
+function naturalCompare(a: string, b: string): number {
   const partsA = a.match(/\d+|\D+/g) ?? [];
   const partsB = b.match(/\d+|\D+/g) ?? [];
   const len = Math.max(partsA.length, partsB.length);
@@ -44,7 +44,7 @@ export function filterRefs(rows: readonly RefRow[], filter: string): RefRow[] {
   return rows.filter((row) => row.shortName.toLowerCase().includes(needle));
 }
 
-export function sortByName(rows: readonly RefRow[]): RefRow[] {
+function sortByName(rows: readonly RefRow[]): RefRow[] {
   return [...rows].sort((a, b) => a.shortName.localeCompare(b.shortName));
 }
 
@@ -75,10 +75,7 @@ export function capItems<T>(
   return { visible: items.slice(0, cap), hiddenCount: items.length - cap };
 }
 
-export function capSection(
-  rows: readonly RefRow[],
-  cap: number = REF_LIST_SECTION_CAP,
-): RefListSection {
+function capSection(rows: readonly RefRow[], cap: number = REF_LIST_SECTION_CAP): RefListSection {
   return capItems(rows, cap);
 }
 

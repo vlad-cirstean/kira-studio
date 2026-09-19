@@ -29,7 +29,7 @@ const UPGRADE_COMMANDS: Record<Platform, string> = {
   unknown: "your package manager's git upgrade command",
 };
 
-export function upgradeCommandFor(platform: Platform): string {
+function upgradeCommandFor(platform: Platform): string {
   return UPGRADE_COMMANDS[platform];
 }
 
