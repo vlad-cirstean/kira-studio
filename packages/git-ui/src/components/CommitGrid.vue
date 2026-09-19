@@ -38,6 +38,7 @@ import {
   GRAPH_COLUMN_ID,
 } from './columns.ts';
 import { formatAbsoluteDate, formatRelativeDate, measureAbsoluteDateWidth } from './dateFormat.ts';
+import { type GridKeyboardDeps, handleGridKeyDown } from './gridKeyboard.ts';
 import { composeRowLabel } from './rowAccessibility.ts';
 
 const props = defineProps<{
@@ -584,6 +585,22 @@ function moveSelection(displayRow: number): void {
   props.selection.select(entry.storeRow);
 }
 
+// P94 pass 3 §4.3: everything handleKeyDown's own branches need, built once — plan/toggleGroup/
+// openMenuFromKeyboard/pageSize/moveSelection are stable function declarations (hoisted, so this
+// object can reference them regardless of where in the script they're each defined);
+// focusedRowIndex is a getter since it's a plain, non-reactive `let` that must be read fresh on
+// every call, never snapshotted once here.
+const keyboardDeps: GridKeyboardDeps = {
+  plan,
+  focusedRowIndex: () => focusedRowIndex,
+  selectionRow: props.selection.row,
+  moveSelection,
+  pageSize,
+  toggleGroup,
+  openMenuFromKeyboard,
+  emit,
+};
+
 /**
  * §6.6's own keyboard model. Wired through `grid.onKeyDown` (not a plain `host` DOM listener —
  * see `onMounted`'s subscription for why): SlickGrid's own `handleKeyDown`, bound to its internal
@@ -601,98 +618,11 @@ function moveSelection(displayRow: number): void {
  * this matters for `Tab` specifically: this function's caller is exactly where SlickGrid decides
  * whether to `preventDefault()` a keydown, so claiming a key we did nothing with would silently
  * block the browser's own default behaviour for it — `Tab` leaving the grid, most of all).
+ *
+ * The branches themselves live in gridKeyboard.ts's own handleGridKeyDown (P94 pass 3 §4.3).
  */
 function handleKeyDown(event: KeyboardEvent): boolean {
-  const length = plan().length;
-  const currentStoreRow = props.selection.row.value;
-  const selectionDisplayRow = currentStoreRow < 0 ? -1 : plan().displayRowOf(currentStoreRow);
-  // P93 §4.2: arrow/Home/End/Page navigation continues from wherever DOM focus actually is, not
-  // from the last *selected* commit — a collapsed placeholder is focusable (`moveSelection`'s own
-  // doc comment) but never selected, so `selection.row` alone would strand navigation one row
-  // short of it forever. `focusedRowIndex` is exactly "the row the user is actually on" (its own
-  // doc comment); falls back to the selection-derived row whenever nothing has focus yet (a fresh
-  // mount, before any `focusin`), unchanged from before this existed.
-  const currentDisplayRow =
-    focusedRowIndex !== null && focusedRowIndex < length ? focusedRowIndex : selectionDisplayRow;
-  switch (event.key) {
-    case 'ArrowUp':
-      if (length === 0) return false;
-      event.preventDefault();
-      moveSelection(currentDisplayRow < 0 ? 0 : currentDisplayRow - 1);
-      return true;
-    case 'ArrowDown':
-      if (length === 0) return false;
-      event.preventDefault();
-      moveSelection(currentDisplayRow < 0 ? 0 : currentDisplayRow + 1);
-      return true;
-    case 'Home':
-      if (length === 0) return false;
-      event.preventDefault();
-      moveSelection(0);
-      return true;
-    case 'End':
-      if (length === 0) return false;
-      event.preventDefault();
-      moveSelection(length - 1);
-      return true;
-    case 'PageUp':
-      if (length === 0) return false;
-      event.preventDefault();
-      moveSelection((currentDisplayRow < 0 ? 0 : currentDisplayRow) - pageSize());
-      return true;
-    case 'PageDown':
-      if (length === 0) return false;
-      event.preventDefault();
-      moveSelection((currentDisplayRow < 0 ? 0 : currentDisplayRow) + pageSize());
-      return true;
-    case 'Enter':
-      event.preventDefault();
-      // P93 §4.2: "click anywhere on the row, or Enter/Space with it focused, expands the group"
-      // — Enter on a focused placeholder expands it instead of toggling the detail pane (there is
-      // no commit to show details for).
-      if (currentDisplayRow >= 0 && plan().entryAt(currentDisplayRow).kind === 'collapsed') {
-        toggleGroup(currentDisplayRow);
-      } else {
-        emit('toggleDetail');
-      }
-      return true;
-    case ' ':
-      // Space has no meaning on an ordinary row today (SPEC never gave it one) — claimed only for
-      // a focused placeholder, so an ordinary row's Space still falls through to the browser's own
-      // default (e.g. a page-down scroll a plain `<div>` focus target would otherwise get).
-      if (currentDisplayRow < 0 || plan().entryAt(currentDisplayRow).kind !== 'collapsed') {
-        return false;
-      }
-      event.preventDefault();
-      toggleGroup(currentDisplayRow);
-      return true;
-    case 'Escape':
-      event.preventDefault();
-      emit('closeDetail');
-      return true;
-    case 'F5':
-      event.preventDefault();
-      emit('refresh');
-      return true;
-    case 'r':
-    case 'R':
-      if (!event.ctrlKey && !event.metaKey) return false;
-      event.preventDefault();
-      emit('refresh');
-      return true;
-    case 'F10':
-      if (!event.shiftKey || currentStoreRow < 0) return false;
-      event.preventDefault();
-      openMenuFromKeyboard(currentStoreRow);
-      return true;
-    case 'ContextMenu':
-      if (currentStoreRow < 0) return false;
-      event.preventDefault();
-      openMenuFromKeyboard(currentStoreRow);
-      return true;
-    default:
-      return false;
-  }
+  return handleGridKeyDown(event, keyboardDeps);
 }
 
 // W15: `kira:layout-complete` fires exactly once, the first time a `LayoutChunk` is applied and
