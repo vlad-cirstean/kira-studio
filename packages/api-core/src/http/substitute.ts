@@ -136,6 +136,40 @@ export function classifyReference(
   return 'unknown';
 }
 
+/** P94 pass 3 (§4.3): `resolve`'s three "no pipeline result" outcomes (still-dynamic,
+ *  pipeline-failed, plain-unknown) used to repeat `sanitizeUnresolved ? sanitizeUnresolved(span) :
+ *  span` at each of four call sites. This carries the resolved text when there is one, so the
+ *  loop applies that one fallback exactly once, at the tail, regardless of which branch produced
+ *  it. `dynamic` is still called at most once per occurrence (D8) — never re-invoked to recover
+ *  which branch fired. */
+function resolveOne(
+  kind: ReferenceKind,
+  name: string,
+  pipeline: readonly TransformName[],
+  values: Readonly<Record<string, string>>,
+  dynamic?: (name: string) => string | null,
+): { kind: ReferenceKind; text: string } {
+  if (kind === 'dynamic') {
+    // D2: a generated value is, from every consumer's point of view, finished — the text is
+    // final and nothing downstream has work to do — which is exactly what 'resolved' already
+    // means. No fifth ReferenceKind (Go's union would need one it could never produce).
+    //
+    // D8: the pipe applies AFTER per-occurrence generation — `dynamic?.(name)` is still called
+    // once per occurrence, at this same point in the walk; D6 only wraps its *return value*.
+    const generated = dynamic?.(name) ?? null;
+    if (generated === null) return { kind: 'dynamic', text: '' };
+    const applied = applyPipeline(pipeline, generated);
+    // D5: a transform that cannot be applied leaves the entire span verbatim and classifies the
+    // reference unknown — nothing is emitted half-transformed.
+    return applied !== null ? { kind: 'resolved', text: applied } : { kind: 'unknown', text: '' };
+  }
+  if (kind === 'resolved') {
+    const applied = applyPipeline(pipeline, values[name]);
+    return applied !== null ? { kind: 'resolved', text: applied } : { kind: 'unknown', text: '' };
+  }
+  return { kind: 'unknown', text: '' };
+}
+
 export function resolve(
   text: string,
   values: Readonly<Record<string, string>>,
@@ -175,31 +209,6 @@ export function resolve(
     };
 
     const kind = classifyReference(name, values, secretNames);
-    if (kind === 'dynamic') {
-      // D2: a generated value is, from every consumer's point of view, finished — the text is
-      // final and nothing downstream has work to do — which is exactly what 'resolved' already
-      // means. No fifth ReferenceKind (Go's union would need one it could never produce).
-      //
-      // D8: the pipe applies AFTER per-occurrence generation — `dynamic?.(name)` is still called
-      // once per occurrence, at this same point in the walk; D6 only wraps its *return value*.
-      const generated = dynamic?.(name) ?? null;
-      if (generated !== null) {
-        const applied = applyPipeline(pipeline, generated);
-        if (applied !== null) {
-          pushRef('resolved');
-          out += applied;
-          continue;
-        }
-        // D5: a transform that cannot be applied leaves the entire span verbatim and classifies
-        // the reference unknown — nothing is emitted half-transformed.
-        pushRef('unknown');
-        out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
-        continue;
-      }
-      pushRef('dynamic');
-      out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
-      continue;
-    }
     if (kind === 'deferred') {
       // Never sanitized, and never transformed here: a downstream pass (Go's apivars.Resolve)
       // still has to find this span by its exact, untouched name and pipeline (D6's load-bearing
@@ -209,19 +218,9 @@ export function resolve(
       out += span;
       continue;
     }
-    if (kind === 'resolved') {
-      const applied = applyPipeline(pipeline, values[name]);
-      if (applied !== null) {
-        pushRef('resolved');
-        out += applied;
-        continue;
-      }
-      pushRef('unknown');
-      out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
-      continue;
-    }
-    pushRef('unknown');
-    out += sanitizeUnresolved ? sanitizeUnresolved(span) : span;
+    const outcome = resolveOne(kind, name, pipeline, values, dynamic);
+    pushRef(outcome.kind);
+    out += outcome.kind === 'resolved' ? outcome.text : (sanitizeUnresolved?.(span) ?? span);
   }
 
   return { text: out, refs };
