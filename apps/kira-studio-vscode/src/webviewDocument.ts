@@ -16,7 +16,7 @@
  *  this file's repo-root-relative path. */
 export const WEBVIEW_ENTRY = 'apps/kira-studio-vscode/src/webview/main.ts';
 
-export interface ViteManifestEntry {
+interface ViteManifestEntry {
   readonly file: string;
   readonly css?: readonly string[];
   readonly imports?: readonly string[];

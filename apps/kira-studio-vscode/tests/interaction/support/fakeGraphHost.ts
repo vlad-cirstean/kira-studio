@@ -21,18 +21,18 @@ import type { DecorationRef, PackedCommitChunk, RefRow, StashEntry } from '@kira
 import { CONTRACT_VERSION } from '@kira/git-ipc';
 import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
 
-export const FAKE_REPO_ROOT = '/fake/repo';
+const FAKE_REPO_ROOT = '/fake/repo';
 export const FAKE_REPO_ID = '/fake/repo';
-export const FAKE_SHA = '2222222222222222222222222222222222222222';
-export const FAKE_SUBJECT = 'Add the graph column fixture';
+const FAKE_SHA = '2222222222222222222222222222222222222222';
+const FAKE_SUBJECT = 'Add the graph column fixture';
 // G32 round-3 performance review, finding #7's own regression fixture: a second, independent
 // (zero-parent) commit — `streamTwoChunksThenEnd` below streams it as its OWN chunk, so a test can
 // observe what CommitGrid.vue does when a second `graph.stream` chunk lands with the same lane
 // count as the first (both are lane-0 roots — see lanes.ts's own "route into a free lane" pass:
 // neither has a parent link to continue, so each independently claims the lowest free lane, which
 // is lane 0 both times).
-export const FAKE_SHA_2 = '3333333333333333333333333333333333333333';
-export const FAKE_SUBJECT_2 = 'A second, same-lane commit';
+const FAKE_SHA_2 = '3333333333333333333333333333333333333333';
+const FAKE_SUBJECT_2 = 'A second, same-lane commit';
 export const OTHER_REPO_ID = '/fake/other-repo';
 // P92 item 2's own regression fixture: enough rows to overflow the grid host vertically, so a
 // real vertical scrollbar takes layout width — the one condition that reproduces the bogus
@@ -129,8 +129,8 @@ function branchOrderSha(row: number): string {
   return (row + 1).toString(16).padStart(2, '0').repeat(20);
 }
 
-export const BRANCH_ORDER_ROW_COUNT = 10;
-export const BRANCH_ORDER_SHAS = {
+const BRANCH_ORDER_ROW_COUNT = 10;
+const BRANCH_ORDER_SHAS = {
   featureNewerTip: branchOrderSha(0),
   featureNewerOldest: branchOrderSha(4),
   featureOlderTip: branchOrderSha(5),
@@ -139,7 +139,7 @@ export const BRANCH_ORDER_SHAS = {
   mainRoot: branchOrderSha(9),
 } as const;
 export const FEATURE_NEWER_SHORT_NAME = 'feature-newer';
-export const FEATURE_OLDER_SHORT_NAME = 'feature-older';
+const FEATURE_OLDER_SHORT_NAME = 'feature-older';
 export const FEATURE_NEWER_HIDDEN_COUNT = 3; // F1, F2, F3 — hidden inside the placeholder
 
 const BRANCH_ORDER_SUBJECTS = [

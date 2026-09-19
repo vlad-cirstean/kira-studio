@@ -20,9 +20,9 @@ import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
 
 export const FAKE_REPO_ID = '/fake/repo';
 export const FAKE_BRANCH = 'feature/example';
-export const FAKE_BASE = 'main';
+const FAKE_BASE = 'main';
 export const FAKE_SHA = '1111111111111111111111111111111111111111';
-export const FAKE_SUBJECT = 'Add the example feature';
+const FAKE_SUBJECT = 'Add the example feature';
 export const FAKE_FILE_PATH = 'src/example.ts';
 // G-UX D3/D6 (items 3/6): a second file, a different extension, sorted AFTER `FAKE_FILE_PATH` in
 // flat view's own path sort (`fileTreeModel.ts`'s `buildFlatList`: 'e' < 'z') — added purely so

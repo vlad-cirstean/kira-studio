@@ -14,7 +14,7 @@ import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
 
 export const MANY_REPO_ID = '/fake/many-repo';
 export const MANY_BRANCH = 'feature/many';
-export const MANY_BASE = 'main';
+const MANY_BASE = 'main';
 
 function shaFor(index: number): string {
   return index.toString(16).padStart(40, '0');

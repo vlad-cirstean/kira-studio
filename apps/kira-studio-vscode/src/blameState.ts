@@ -13,7 +13,7 @@ import { formatRelativeDate } from '@kira/git-core';
 /** The sentinel `porcelain.UncommittedBlameSHA`/`blame.line`'s own wire result use for a line
  *  whose content isn't in any commit yet (an unstaged, on-disk edit) — mirrored here as the
  *  literal string both the contract's own doc comment and the Go side already carry. */
-export const UNCOMMITTED_BLAME_SHA = '0000000000000000000000000000000000000000';
+const UNCOMMITTED_BLAME_SHA = '0000000000000000000000000000000000000000';
 
 export type BlameDisplayState =
   | { readonly kind: 'none' }

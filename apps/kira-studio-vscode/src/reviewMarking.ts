@@ -48,7 +48,7 @@ export interface ReviewMarkingDeps {
 
 /** An explicit `{uri, ranges}` target — the hover command link and the CodeLens's own invocation
  *  (D2), bypassing tab/selection resolution entirely. */
-export interface MarkTarget {
+interface MarkTarget {
   readonly uri: vscode.Uri;
   readonly ranges: readonly LineRange[];
 }
