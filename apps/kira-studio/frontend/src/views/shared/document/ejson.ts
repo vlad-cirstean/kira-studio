@@ -82,6 +82,134 @@ function dateMillis(value: unknown): number | null {
   return null;
 }
 
+interface WrapperSpec {
+  /** Whether `value`'s own keys match this wrapper's shape — key set and value types alike. */
+  match(keys: readonly string[], value: Record<string, unknown>): boolean;
+  /** `null` means "matched the key shape but not a renderable value" (only `$numberDouble`'s own
+   *  Infinity/NaN case) — `detectWrapper`'s own loop then falls through to the next spec, which,
+   *  since wrapper key shapes are mutually exclusive, means the overall `null` fallback. */
+  render(value: Record<string, unknown>): ScalarRender | null;
+}
+
+// P94 pass 3 §4.3: one table entry per EJSON wrapper `detectWrapper` recognises — this file's own
+// doc comment above (moved to `detectWrapper` itself) still names which types render as
+// constructor calls vs. verbatim EJSON text.
+const WRAPPER_TABLE: readonly WrapperSpec[] = [
+  {
+    match: (keys, value) =>
+      keys.length === 1 && keys[0] === '$oid' && typeof value.$oid === 'string',
+    render: (value) => ({ text: `ObjectId("${value.$oid}")`, token: 'bson', bsonType: 'ObjectId' }),
+  },
+  {
+    match: (keys) => keys.length === 1 && keys[0] === '$date',
+    render: (value) => {
+      const millis = dateMillis(value.$date);
+      if (millis === null) return null;
+      return {
+        text: `ISODate("${new Date(millis).toISOString()}")`,
+        token: 'bson',
+        bsonType: 'Date',
+      };
+    },
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 && keys[0] === '$numberInt' && typeof value.$numberInt === 'string',
+    render: (value) => ({
+      text: `NumberInt(${value.$numberInt})`,
+      token: 'bson',
+      bsonType: 'Int32',
+    }),
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 && keys[0] === '$numberLong' && typeof value.$numberLong === 'string',
+    render: (value) => ({
+      text: `NumberLong("${value.$numberLong}")`,
+      token: 'bson',
+      bsonType: 'Int64',
+    }),
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 && keys[0] === '$numberDecimal' && typeof value.$numberDecimal === 'string',
+    render: (value) => ({
+      text: `NumberDecimal("${value.$numberDecimal}")`,
+      token: 'bson',
+      bsonType: 'Decimal128',
+    }),
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 && keys[0] === '$numberDouble' && typeof value.$numberDouble === 'string',
+    render: (value) => {
+      const raw = value.$numberDouble as string;
+      // Infinity/-Infinity/NaN have no bare-number JSON spelling — fall through to the verbatim
+      // fallback below rather than emitting text `parseDocumentLiteral` cannot re-tokenize.
+      return Number.isFinite(Number(raw))
+        ? { text: raw, token: 'number', bsonType: 'Double' }
+        : null;
+    },
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 &&
+      keys[0] === '$binary' &&
+      isPlainObject(value.$binary) &&
+      typeof value.$binary.base64 === 'string' &&
+      typeof value.$binary.subType === 'string',
+    render: (value) => {
+      const subType = (value.$binary as { subType: string }).subType;
+      return {
+        text: JSON.stringify(value),
+        token: 'bson',
+        bsonType: subType.toLowerCase() === '04' ? 'UUID' : 'Binary',
+      };
+    },
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 &&
+      keys[0] === '$timestamp' &&
+      isPlainObject(value.$timestamp) &&
+      typeof value.$timestamp.t === 'number' &&
+      typeof value.$timestamp.i === 'number',
+    render: (value) => ({ text: JSON.stringify(value), token: 'bson', bsonType: 'Timestamp' }),
+  },
+  {
+    match: (keys, value) =>
+      keys.length === 1 &&
+      keys[0] === '$regularExpression' &&
+      isPlainObject(value.$regularExpression) &&
+      typeof value.$regularExpression.pattern === 'string',
+    render: (value) => ({ text: JSON.stringify(value), token: 'bson', bsonType: 'RegExp' }),
+  },
+  {
+    match: (keys, value) =>
+      (keys.length === 1 || keys.length === 2) &&
+      keys.includes('$code') &&
+      typeof value.$code === 'string' &&
+      keys.every((k) => k === '$code' || k === '$scope'),
+    render: (value) => ({ text: JSON.stringify(value), token: 'bson', bsonType: 'Code' }),
+  },
+  {
+    match: (keys, value) =>
+      keys.includes('$ref') &&
+      keys.includes('$id') &&
+      typeof value.$ref === 'string' &&
+      keys.every((k) => k === '$ref' || k === '$id' || k === '$db'),
+    render: (value) => ({ text: JSON.stringify(value), token: 'bson', bsonType: 'DBRef' }),
+  },
+  {
+    match: (keys, value) => keys.length === 1 && keys[0] === '$minKey' && value.$minKey === 1,
+    render: (value) => ({ text: JSON.stringify(value), token: 'bson', bsonType: 'MinKey' }),
+  },
+  {
+    match: (keys, value) => keys.length === 1 && keys[0] === '$maxKey' && value.$maxKey === 1,
+    render: (value) => ({ text: JSON.stringify(value), token: 'bson', bsonType: 'MaxKey' }),
+  },
+];
+
 /**
  * Recognises a single-purpose EJSON wrapper object by shape and renders its shell text. Returns
  * `null` for a plain object (no known wrapper key). The six types `literal.ts` can construct
@@ -92,101 +220,10 @@ function dateMillis(value: unknown): number | null {
  */
 function detectWrapper(value: Record<string, unknown>): ScalarRender | null {
   const keys = objectKeys(value);
-
-  if (keys.length === 1 && keys[0] === '$oid' && typeof value.$oid === 'string') {
-    return { text: `ObjectId("${value.$oid}")`, token: 'bson', bsonType: 'ObjectId' };
-  }
-  if (keys.length === 1 && keys[0] === '$date') {
-    const millis = dateMillis(value.$date);
-    if (millis !== null) {
-      return {
-        text: `ISODate("${new Date(millis).toISOString()}")`,
-        token: 'bson',
-        bsonType: 'Date',
-      };
-    }
-  }
-  if (keys.length === 1 && keys[0] === '$numberInt' && typeof value.$numberInt === 'string') {
-    return { text: `NumberInt(${value.$numberInt})`, token: 'bson', bsonType: 'Int32' };
-  }
-  if (keys.length === 1 && keys[0] === '$numberLong' && typeof value.$numberLong === 'string') {
-    return {
-      text: `NumberLong("${value.$numberLong}")`,
-      token: 'bson',
-      bsonType: 'Int64',
-    };
-  }
-  if (
-    keys.length === 1 &&
-    keys[0] === '$numberDecimal' &&
-    typeof value.$numberDecimal === 'string'
-  ) {
-    return {
-      text: `NumberDecimal("${value.$numberDecimal}")`,
-      token: 'bson',
-      bsonType: 'Decimal128',
-    };
-  }
-  if (keys.length === 1 && keys[0] === '$numberDouble' && typeof value.$numberDouble === 'string') {
-    const raw = value.$numberDouble;
-    // Infinity/-Infinity/NaN have no bare-number JSON spelling — fall through to the verbatim
-    // fallback below rather than emitting text `parseDocumentLiteral` cannot re-tokenize.
-    if (Number.isFinite(Number(raw))) {
-      return { text: raw, token: 'number', bsonType: 'Double' };
-    }
-  }
-  if (
-    keys.length === 1 &&
-    keys[0] === '$binary' &&
-    isPlainObject(value.$binary) &&
-    typeof value.$binary.base64 === 'string' &&
-    typeof value.$binary.subType === 'string'
-  ) {
-    const isUuid = value.$binary.subType.toLowerCase() === '04';
-    return {
-      text: JSON.stringify(value),
-      token: 'bson',
-      bsonType: isUuid ? 'UUID' : 'Binary',
-    };
-  }
-  if (
-    keys.length === 1 &&
-    keys[0] === '$timestamp' &&
-    isPlainObject(value.$timestamp) &&
-    typeof value.$timestamp.t === 'number' &&
-    typeof value.$timestamp.i === 'number'
-  ) {
-    return { text: JSON.stringify(value), token: 'bson', bsonType: 'Timestamp' };
-  }
-  if (
-    keys.length === 1 &&
-    keys[0] === '$regularExpression' &&
-    isPlainObject(value.$regularExpression) &&
-    typeof value.$regularExpression.pattern === 'string'
-  ) {
-    return { text: JSON.stringify(value), token: 'bson', bsonType: 'RegExp' };
-  }
-  if (
-    (keys.length === 1 || keys.length === 2) &&
-    keys.includes('$code') &&
-    typeof value.$code === 'string' &&
-    keys.every((k) => k === '$code' || k === '$scope')
-  ) {
-    return { text: JSON.stringify(value), token: 'bson', bsonType: 'Code' };
-  }
-  if (
-    keys.includes('$ref') &&
-    keys.includes('$id') &&
-    typeof value.$ref === 'string' &&
-    keys.every((k) => k === '$ref' || k === '$id' || k === '$db')
-  ) {
-    return { text: JSON.stringify(value), token: 'bson', bsonType: 'DBRef' };
-  }
-  if (keys.length === 1 && keys[0] === '$minKey' && value.$minKey === 1) {
-    return { text: JSON.stringify(value), token: 'bson', bsonType: 'MinKey' };
-  }
-  if (keys.length === 1 && keys[0] === '$maxKey' && value.$maxKey === 1) {
-    return { text: JSON.stringify(value), token: 'bson', bsonType: 'MaxKey' };
+  for (const spec of WRAPPER_TABLE) {
+    if (!spec.match(keys, value)) continue;
+    const rendered = spec.render(value);
+    if (rendered) return rendered;
   }
   return null;
 }
