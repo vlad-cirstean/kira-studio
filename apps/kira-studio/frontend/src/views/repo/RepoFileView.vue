@@ -4,19 +4,15 @@
 import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
-import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
-import { claimBlameStatus, publishBlameStatus, releaseBlameStatus } from '../../state/blameStatus';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { patchRepoFileTabState } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnotation';
-import { type BlameLineController, createBlameLineController } from './blameLine';
 import { registerEditor, unmountEditor } from './editors';
+import { loadFileContent } from './fileContent';
 import { monacoLanguageFor } from './language';
 import { renderMarkdownReading } from './markdownReading';
 import {
@@ -28,6 +24,7 @@ import {
 } from './monaco';
 import { ensureNavigationRegistered } from './navigation';
 import { consumeReveal } from './reveal';
+import { useInlineBlame } from './useInlineBlame';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 
@@ -119,11 +116,7 @@ function onReadingClick(event: MouseEvent): void {
 
 let disposeCursorSub: (() => void) | null = null;
 let unregisterFind: (() => void) | null = null;
-let blameHandle: BlameAnnotationHandle | null = null;
-let blameController: BlameLineController | null = null;
-let blameToken: symbol | undefined;
-let stopBlamePublish: (() => void) | undefined;
-let unwatchInlineBlame: (() => void) | null = null;
+const inlineBlame = useInlineBlame();
 
 // §11: every Monaco instance is readOnly/domReadOnly — neither the keyboard nor a paste can
 // mutate a model. The rest of the option set mirrors §9.3 verbatim (no minimap/suggestions/
@@ -139,46 +132,18 @@ async function mount(): Promise<void> {
   }
 
   const rev = props.tab.state.rev;
-  let content: { kind: 'found' | 'missing' | 'binary' | 'tooLarge'; text: string };
-  if (rev === null) {
-    try {
-      content = await control.codeWorkspaceReadFile(repoId, props.tab.path);
-    } catch (err) {
-      state.value = 'error';
-      errorMessage.value = err instanceof Error ? err.message : String(err);
-      return;
-    }
-  } else {
-    // P74 §7.3: a revision-pinned tab reads via the git transport, the same request
-    // RepoDiffView.vue already uses for a commit diff's two sides — never the worktree file.
-    const gitRepoId = gitRepoIdFor(repoId);
-    if (!gitRepoId) {
-      state.value = 'error';
-      errorMessage.value = 'This repository is not open.';
-      return;
-    }
-    const transport = gitTransportFor(repoId);
-    try {
-      const result = await transport.request('file.read', {
-        repoId: gitRepoId,
-        rev,
-        path: props.tab.path,
-      });
-      content = { kind: result.kind, text: result.kind === 'found' ? result.content : '' };
-    } catch (err) {
-      state.value = 'error';
-      errorMessage.value = err instanceof Error ? err.message : String(err);
-      return;
-    } finally {
-      transport.dispose();
-    }
+  const result = await loadFileContent(repoId, props.tab.path, rev);
+  if (result.kind === 'error') {
+    state.value = 'error';
+    errorMessage.value = result.message;
+    return;
   }
-  if (content.kind !== 'found') {
-    state.value = content.kind;
+  if (result.kind !== 'found') {
+    state.value = result.kind;
     return;
   }
   // D11: held on a ref (not only handed to the model below) so the reading view can render it too.
-  fileText.value = content.text;
+  fileText.value = result.text;
   if (isMarkdown.value && view.value === 'reading') {
     void ensureMarkdownRendered();
   }
@@ -198,7 +163,7 @@ async function mount(): Promise<void> {
   const model = getOrCreateModel(
     mod,
     uri,
-    content.text,
+    result.text,
     language,
     rev === null ? { repoId, path: props.tab.path } : undefined,
   );
@@ -240,48 +205,12 @@ async function mount(): Promise<void> {
   // always worked with no git backing. Read live (not just at mount) so toggling the setting
   // takes effect on the open tab immediately, the same live-apply `wordWrap` already gets.
   const gitRepoId = gitRepoIdFor(repoId);
-  // `repoId` narrows to `string` above (past the early-return), but that narrowing doesn't carry
-  // into a nested closure — re-binding to a fresh `const` gives it a plain `string` type of its
-  // own, captured below with no cast needed.
-  const workspaceCodeRepoId: string = repoId;
   // `blame.line` always blames the working tree (contract.ts:1718) — a revision-pinned tab shows
   // different bytes, so its line numbers do not correspond.
   const blameable = gitRepoId !== undefined && rev === null;
   if (blameable && gitRepoId) {
-    // 7d (moved, P76 §4/§5.3): one lease for this mount, shared by the controller and the reveal
-    // callback below — blameLine.ts's controller has no transport of its own to release, so
-    // whoever creates it disposes it (onUnmounted).
-    const transport = gitTransportFor(workspaceCodeRepoId);
-    blameController = createBlameLineController({
-      transport,
-      gitRepoId,
-      path: props.tab.path,
-      cursor: editor,
-    });
-    // P76 §5.3: resolved even when `inlineBlame` is off, to feed the status bar — the setting
-    // governs the inline annotation only (its own label: "…in the repository file viewer"),
-    // never blame resolution itself.
-    blameToken = claimBlameStatus((sha) => {
-      void transport.request('graph.revealCommit', { repoId: gitRepoId, sha });
-    });
-    const controller = blameController;
-    const token = blameToken;
-    stopBlamePublish = watch(controller.state, (s) => publishBlameStatus(token, s), {
-      immediate: true,
-    });
+    inlineBlame.attach({ gitRepoId, workspaceRepoId: repoId, path: props.tab.path, editor, mod });
   }
-  // §5.3: toggles only the renderer — the controller (and the status-bar publish above) run
-  // regardless of this setting.
-  function syncBlameAnnotation(): void {
-    if (settingsState.appearance.inlineBlame && blameController) {
-      blameHandle ??= attachBlameAnnotation(mod, editor, blameController);
-    } else {
-      blameHandle?.dispose();
-      blameHandle = null;
-    }
-  }
-  syncBlameAnnotation();
-  unwatchInlineBlame = watch(() => settingsState.appearance.inlineBlame, syncBlameAnnotation);
 
   // §9.3/§12, widened by C7 D12: a pending reveal (a search result or go-to-definition match that
   // arrived while this tab wasn't mounted) wins over the persisted revealLine — the mount-time
@@ -339,17 +268,7 @@ onUnmounted(() => {
   disposeCursorSub = null;
   unregisterFind?.();
   unregisterFind = null;
-  unwatchInlineBlame?.();
-  unwatchInlineBlame = null;
-  blameHandle?.dispose();
-  blameHandle = null;
-  stopBlamePublish?.();
-  stopBlamePublish = undefined;
-  if (blameToken !== undefined) releaseBlameStatus(blameToken);
-  blameToken = undefined;
-  blameController?.dispose();
-  blameController?.transport.dispose();
-  blameController = null;
+  inlineBlame.dispose();
   unmountEditor(props.tab.id);
   editorInstance = null;
 });

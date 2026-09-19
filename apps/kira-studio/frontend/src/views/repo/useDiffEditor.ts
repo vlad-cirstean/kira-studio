@@ -45,6 +45,88 @@ function toDiffSide(result: {
   };
 }
 
+interface DiffSidesLoaded {
+  diff: { head: DiffSide; worktree: DiffSide };
+  gitRepoId: string | undefined;
+}
+
+// P94 pass 3 §4.3: mount()'s own two-branch content read (worktree HEAD-vs-worktree vs a
+// revision-pinned commit diff), each with its own try/catch/error-message plumbing — lifted out
+// so mount() itself only branches on the result. `error` is a string, not thrown: mount()'s own
+// contract is to set `state`/`errorMessage` and return, never to unwind past this call.
+async function loadDiffSides(
+  repoId: string,
+  path: string,
+  left: string | null,
+  right: string | null,
+): Promise<DiffSidesLoaded | { error: string }> {
+  if (left === null) {
+    try {
+      const diff = await control.codeWorkspaceReadDiff(repoId, path);
+      return { diff, gitRepoId: undefined };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  const gitRepoId = gitRepoIdFor(repoId);
+  if (!gitRepoId || right === null) {
+    return { error: 'This repository is not open.' };
+  }
+  // 7d (P68 review): this lease is only ever used for the two requests below, so it is released
+  // as soon as they settle rather than left to leak for the rest of the mount.
+  const transport = gitTransportFor(repoId);
+  try {
+    const [leftResult, rightResult] = await Promise.all([
+      transport.request('file.read', { repoId: gitRepoId, rev: left, path }),
+      transport.request('file.read', { repoId: gitRepoId, rev: right, path }),
+    ]);
+    return { diff: { head: toDiffSide(leftResult), worktree: toDiffSide(rightResult) }, gitRepoId };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    transport.dispose();
+  }
+}
+
+// P74 §7.4 item 1 / P92 item 7: the diff editor's own "go to file" — a revision-backed diff
+// resolves the target through the git transport; C6's plain worktree-vs-HEAD comparison already
+// shows the live file on disk (right === null), so the modified pane *is* that file — open it
+// directly, no round trip.
+function wireGoToFile(
+  modifiedEditor: import('monaco-editor').editor.IStandaloneCodeEditor,
+  repoId: string,
+  path: string,
+  gitRepoId: string | undefined,
+  right: string | null,
+): () => void {
+  return () => {
+    const line = modifiedEditor.getPosition()?.lineNumber ?? 1;
+    if (gitRepoId === undefined || right === null) {
+      openRepoFileTab(repoId, path, { preview: false, reveal: { line } });
+      return;
+    }
+    const targetGitRepoId = gitRepoId;
+    const targetRev = right;
+    const transport = gitTransportFor(repoId);
+    transport
+      .request('editor.goToFile', { repoId: targetGitRepoId, rev: targetRev, path, line })
+      .then((outcome) => {
+        // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
+        // composition) — the tab switch is the visible confirmation. `unavailable` is the one
+        // branch with no other signal; this raw editor view has no toast/live-region channel to
+        // surface it through, so it goes to the console rather than dropping silently.
+        if (outcome.kind === 'unavailable') {
+          console.warn(`repo.goToFileFromDiff: ${path} unavailable — ${outcome.reason}`);
+        }
+      })
+      .catch((err: unknown) => {
+        console.warn('repo.goToFileFromDiff failed:', err);
+      })
+      .finally(() => transport.dispose());
+  };
+}
+
 export type DiffEditorState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
 
 export interface DiffEditorParams {
@@ -93,40 +175,13 @@ export function useDiffEditor(
 
   async function mount(): Promise<void> {
     const { editorKey, repoId, path, left, right, review } = params;
-    let gitRepoId: string | undefined;
-    let diff: { head: DiffSide; worktree: DiffSide };
-    if (left === null) {
-      try {
-        diff = await control.codeWorkspaceReadDiff(repoId, path);
-      } catch (err) {
-        state.value = 'error';
-        errorMessage.value = err instanceof Error ? err.message : String(err);
-        return;
-      }
-    } else {
-      gitRepoId = gitRepoIdFor(repoId);
-      if (!gitRepoId || right === null) {
-        state.value = 'error';
-        errorMessage.value = 'This repository is not open.';
-        return;
-      }
-      // 7d (P68 review): this lease is only ever used for the two requests below, so it is
-      // released as soon as they settle rather than left to leak for the rest of the mount.
-      const transport = gitTransportFor(repoId);
-      try {
-        const [leftResult, rightResult] = await Promise.all([
-          transport.request('file.read', { repoId: gitRepoId, rev: left, path }),
-          transport.request('file.read', { repoId: gitRepoId, rev: right, path }),
-        ]);
-        diff = { head: toDiffSide(leftResult), worktree: toDiffSide(rightResult) };
-      } catch (err) {
-        state.value = 'error';
-        errorMessage.value = err instanceof Error ? err.message : String(err);
-        return;
-      } finally {
-        transport.dispose();
-      }
+    const loaded = await loadDiffSides(repoId, path, left, right);
+    if ('error' in loaded) {
+      state.value = 'error';
+      errorMessage.value = loaded.error;
+      return;
     }
+    const { diff, gitRepoId } = loaded;
 
     if (diff.head.kind === 'binary' || diff.worktree.kind === 'binary') {
       state.value = 'binary';
@@ -213,36 +268,7 @@ export function useDiffEditor(
     // matches the file on disk (C6 D7's own reasoning for which side is navigable), and
     // IStandaloneDiffEditor itself has no getAction, so this has to reach through to one pane.
     const modifiedEditor = created.getModifiedEditor();
-
-    // P74 §7.4 item 1 / P92 item 7: the diff editor's own "go to file" — a revision-backed diff
-    // resolves the target through the git transport; C6's plain worktree-vs-HEAD comparison
-    // already shows the live file on disk (right === null), so the modified pane *is* that file —
-    // open it directly, no round trip.
-    goToFileImpl = () => {
-      const line = modifiedEditor.getPosition()?.lineNumber ?? 1;
-      if (gitRepoId === undefined || right === null) {
-        openRepoFileTab(repoId, path, { preview: false, reveal: { line } });
-        return;
-      }
-      const targetGitRepoId = gitRepoId;
-      const targetRev = right;
-      const transport = gitTransportFor(repoId);
-      transport
-        .request('editor.goToFile', { repoId: targetGitRepoId, rev: targetRev, path, line })
-        .then((outcome) => {
-          // `liveFile`/`virtualBlob` already opened their own tab (hostHandlers.ts's own
-          // composition) — the tab switch is the visible confirmation. `unavailable` is the one
-          // branch with no other signal; this raw editor view has no toast/live-region channel to
-          // surface it through, so it goes to the console rather than dropping silently.
-          if (outcome.kind === 'unavailable') {
-            console.warn(`repo.goToFileFromDiff: ${path} unavailable — ${outcome.reason}`);
-          }
-        })
-        .catch((err: unknown) => {
-          console.warn('repo.goToFileFromDiff failed:', err);
-        })
-        .finally(() => transport.dispose());
-    };
+    goToFileImpl = wireGoToFile(modifiedEditor, repoId, path, gitRepoId, right);
 
     state.value = 'found';
   }
