@@ -72,13 +72,8 @@ import {
 } from './focusRequest';
 import { buildMaskTagCache, createMaskPreviewTransform } from './maskPreview';
 import { cellMenu, type FkNavContext, headerMenu, rowMenu } from './menu';
-import {
-  addInsertRow,
-  discardCellEdit,
-  pendingFor,
-  stageEdit,
-  stageInsertValue,
-} from './pendingChanges';
+import { applyPastedCells, resolvePasteTarget } from './paste';
+import { discardCellEdit, pendingFor, stageEdit, stageInsertValue } from './pendingChanges';
 import { matchedRows, searchState } from './search';
 import {
   createDisplayValueExtractor,
@@ -97,7 +92,6 @@ import {
   type NavColumns,
   navColumnsFor,
   navValuesFor,
-  pasteTargetRows,
   rowsForSelection,
   cellNavEntry as rvCellNavEntry,
   columnValuesFor as rvColumnValuesFor,
@@ -389,10 +383,6 @@ function currentDialect() {
 
 function isDeleted(row: number): boolean {
   return !!pendingFor(props.tabId)?.deletes.has(row);
-}
-
-function columnDescriptor(name: string): ColumnDescriptor | undefined {
-  return getPage(props.tabId)?.columns.find((c) => c.name === name);
 }
 
 // C7/§5 D7 — rowsForColumnOps/columnValuesFor bound to this file's own displayRows/tabId/page/
@@ -1856,52 +1846,9 @@ async function onPaste(): Promise<void> {
   if (!clipboardText) return;
 
   const parsed = parseDelimited(clipboardText);
-  const startRow =
-    sel.kind === 'row' ? Math.min(...sel.rows) : sel.kind === 'range' ? sel.anchorRow : sel.row;
-  const startCol = sel.kind === 'row' ? 0 : sel.kind === 'range' ? sel.anchorCol : sel.col;
   const columns = currentOrder();
-  // P36 D28: the server computes a generated column's value — an explicit paste into one is
-  // silently dropped rather than staged into an insert the server would then reject outright.
-  const insertColumns = columns.filter((name) => !columnDescriptor(name)?.generated);
-  const insertIds = new Map<number, string>();
-  const pending = pendingFor(props.tabId);
-
-  // Finding 3 (round 2) — a `range`-kind paste used to write to `startRow + ri`, a raw contiguous
-  // walk that ignores the active filter (a 'cell'-kind paste anchors on one already-visible row
-  // and only ever grows downward from it, so it's unaffected; 'row'-kind pastes the user's own
-  // explicit gutter-click rows, never a span). `pasteTargetRows` walks only the rows the filter
-  // still shows, continuing into the pending-insert region (never filtered) once it runs out.
-  const rangeTargetRows =
-    sel.kind === 'range'
-      ? pasteTargetRows(currentDisplayRows(), p.rowCount, startRow, parsed.length)
-      : null;
-
-  for (let ri = 0; ri < parsed.length; ri++) {
-    const row = rangeTargetRows ? rangeTargetRows[ri] : startRow + ri;
-    if (row === undefined || row < 0) continue;
-    const isNewRow = row >= p.rowCount;
-    let insertId = insertIds.get(row);
-    if (isNewRow && insertId === undefined) {
-      // P2 R2: reuse the PendingInsert already staged at this display row instead of always
-      // appending a fresh one — insertRows' identity is positional (pending.inserts[row -
-      // p.rowCount]), so a paste landing on an existing staged row must update it, not create a
-      // sibling.
-      insertId = pending?.inserts[row - p.rowCount]?.id ?? addInsertRow(props.tabId, insertColumns);
-      insertIds.set(row, insertId);
-    }
-    const cols = parsed[ri] as string[];
-    for (let ci = 0; ci < cols.length; ci++) {
-      const name = columns[startCol + ci];
-      if (!name) continue;
-      if (isNewRow) {
-        if (insertId && !columnDescriptor(name)?.generated) {
-          stageInsertValue(props.tabId, insertId, name, cols[ci] as string);
-        }
-      } else {
-        stageEdit(props.tabId, row, name, cols[ci] as string);
-      }
-    }
-  }
+  const target = resolvePasteTarget(sel, p, currentDisplayRows(), parsed.length);
+  const insertRows = applyPastedCells(props.tabId, p, columns, target, parsed);
 
   // C9/§5 D9 rule 1 — a paste landing on an *existing* staged insert row updates its `values` in
   // place via `stageInsertValue`, which never changes `inserts.length` and so never reaches the
@@ -1913,11 +1860,11 @@ async function onPaste(): Promise<void> {
   // insert-count watch's own next tick: the tab's *first* ever insert, created moments ago by
   // `addInsertRow` above, whose `state.inserts` this closure captured as a plain `[]` before that
   // row's tab-scoped `TabPending` (and its own real, reactive `inserts` array) existed at all.
-  if (insertIds.size > 0 && grid && dataSource) {
+  if (insertRows.size > 0 && grid && dataSource) {
     dataSource.setState(dataSourceState(p, currentOrder()));
     grid.updateRowCount();
     const idx = { displayRows: currentDisplayRows(), pageRowCount: p.rowCount };
-    for (const row of insertIds.keys()) grid.invalidateRow(displayPositionOf(idx, row));
+    for (const row of insertRows) grid.invalidateRow(displayPositionOf(idx, row));
     grid.render();
   }
 }
