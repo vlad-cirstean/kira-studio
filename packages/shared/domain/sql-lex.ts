@@ -28,6 +28,66 @@ export interface SqlLexSpan {
   quoteChar?: string;
 }
 
+/** P94 pass 3 §4.3: `scanSqlSpan`'s four span kinds, one scanner each — the parent only dispatches
+ *  on the first character(s), each scanner keeps its own loop and its own EOF/`closed` handling. */
+function scanLineComment(source: string, i: number, n: number): SqlLexSpan {
+  let j = i + 2;
+  while (j < n && source[j] !== '\n') j++;
+  return { kind: 'lineComment', start: i, end: j, closed: true };
+}
+
+function scanBlockComment(source: string, i: number, n: number): SqlLexSpan {
+  let j = i + 2;
+  while (j < n && !(source[j] === '*' && source[j + 1] === '/')) j++;
+  if (j >= n) return { kind: 'blockComment', start: i, end: n, closed: false };
+  return { kind: 'blockComment', start: i, end: j + 2, closed: true };
+}
+
+// Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape (every SQL
+// dialect here honours that); a backslash escaping the next character too is dialect-specific
+// (sql-split.ts's own SplitSqlOptions.backslashEscapes doc comment).
+function scanQuotedRun(
+  source: string,
+  i: number,
+  n: number,
+  quote: string,
+  backslashEscapes: boolean,
+): SqlLexSpan {
+  let j = i + 1;
+  let closed = false;
+  while (j < n) {
+    if (backslashEscapes && source[j] === '\\') {
+      j += 2;
+      continue;
+    }
+    if (source[j] === quote) {
+      if (source[j + 1] === quote) {
+        j += 2;
+        continue;
+      }
+      j++;
+      closed = true;
+      break;
+    }
+    j++;
+  }
+  // A trailing backslash-escape at the very end of source (j at n-1) steps j to n+1 above — clamp
+  // back to n (finding #15, M6): end must never exceed source.length, the same "the source length
+  // when unterminated" contract every other arm here already honours.
+  return { kind: 'quote', start: i, end: Math.min(j, n), closed, quoteChar: quote };
+}
+
+// Postgres dollar-quoting: $$ ... $$ or $tag$ ... $tag$. `null` when `source[i]` isn't the start
+// of one (the caller falls through to "no span here").
+function scanDollarQuote(source: string, i: number, n: number): SqlLexSpan | null {
+  const match = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
+  if (!match) return null;
+  const tag = match[0];
+  const closeIdx = source.indexOf(tag, i + tag.length);
+  if (closeIdx < 0) return { kind: 'dollarQuote', start: i, end: n, closed: false };
+  return { kind: 'dollarQuote', start: i, end: closeIdx + tag.length, closed: true };
+}
+
 /** Recognises and scans one of the four lexical spans this SQL lexer family agrees on — a line
  *  comment, a block comment, a quoted run (`'...'`/`"..."`/`` `...` ``), or a Postgres-style
  *  dollar-quoted string — starting at `source[i]`. Returns `null` when `i` doesn't start one of
@@ -37,54 +97,11 @@ export function scanSqlSpan(source: string, i: number, options: SqlLexOptions): 
   const n = source.length;
   const c = source[i];
 
-  if (c === '-' && source[i + 1] === '-') {
-    let j = i + 2;
-    while (j < n && source[j] !== '\n') j++;
-    return { kind: 'lineComment', start: i, end: j, closed: true };
-  }
-  if (c === '/' && source[i + 1] === '*') {
-    let j = i + 2;
-    while (j < n && !(source[j] === '*' && source[j + 1] === '/')) j++;
-    if (j >= n) return { kind: 'blockComment', start: i, end: n, closed: false };
-    return { kind: 'blockComment', start: i, end: j + 2, closed: true };
-  }
-  // Single/double/back-quoted runs: '' or "" or `` doubles the quote as an escape (every SQL
-  // dialect here honours that); a backslash escaping the next character too is dialect-specific
-  // (sql-split.ts's own SplitSqlOptions.backslashEscapes doc comment).
+  if (c === '-' && source[i + 1] === '-') return scanLineComment(source, i, n);
+  if (c === '/' && source[i + 1] === '*') return scanBlockComment(source, i, n);
   if (c === "'" || c === '"' || c === '`') {
-    const quote = c;
-    let j = i + 1;
-    let closed = false;
-    while (j < n) {
-      if (options.backslashEscapes && source[j] === '\\') {
-        j += 2;
-        continue;
-      }
-      if (source[j] === quote) {
-        if (source[j + 1] === quote) {
-          j += 2;
-          continue;
-        }
-        j++;
-        closed = true;
-        break;
-      }
-      j++;
-    }
-    // A trailing backslash-escape at the very end of source (j at n-1) steps j to n+1 above —
-    // clamp back to n (finding #15, M6): end must never exceed source.length, the same "the
-    // source length when unterminated" contract every other arm here already honours.
-    return { kind: 'quote', start: i, end: Math.min(j, n), closed, quoteChar: quote };
+    return scanQuotedRun(source, i, n, c, options.backslashEscapes);
   }
-  // Postgres dollar-quoting: $$ ... $$ or $tag$ ... $tag$.
-  if (c === '$' && options.dollarQuoting) {
-    const match = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(source.slice(i));
-    if (match) {
-      const tag = match[0];
-      const closeIdx = source.indexOf(tag, i + tag.length);
-      if (closeIdx < 0) return { kind: 'dollarQuote', start: i, end: n, closed: false };
-      return { kind: 'dollarQuote', start: i, end: closeIdx + tag.length, closed: true };
-    }
-  }
+  if (c === '$' && options.dollarQuoting) return scanDollarQuote(source, i, n);
   return null;
 }

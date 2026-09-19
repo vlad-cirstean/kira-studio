@@ -7,7 +7,7 @@
 // `Statement` nodes, each a flat sibling list of tokens with exactly two groupings (`Parens`,
 // `CompositeIdentifier`) — every real grammar rule lives in `ddl.ts`/`sqlRefs.ts`, unchanged; this
 // file only supplies the tokenizer + those two groupings.
-import { scanSqlSpan } from './sql-lex';
+import { type SqlLexOptions, scanSqlSpan } from './sql-lex';
 
 export interface LNode {
   readonly name: string;
@@ -219,6 +219,82 @@ function scanNumberEnd(source: string, start: number): number {
 // below tests in place with no per-call `source.slice(i)` allocation (M7 finding #18).
 const OPERATOR_RE = /[=<>+\-*/%|!]+/y;
 
+/** P94 pass 3 §4.3: one of `scanLevel`'s nine character-class branches, lifted out so its own
+ *  branching (the `null`/keyword/identifier three-way classification, past `scanNumberEnd`'s
+ *  existing helper) doesn't nest inside scanLevel's own while+if. */
+function scanNumberToken(source: string, i: number): { node: MNode; next: number } {
+  const end = scanNumberEnd(source, i);
+  return { node: leaf('Number', i, end), next: end };
+}
+
+function scanIdentifierToken(
+  source: string,
+  i: number,
+  n: number,
+  keywords: ReadonlySet<string>,
+): { node: MNode; next: number } {
+  const start = i;
+  let j = i + 1;
+  while (j < n && isIdentPart(source[j])) j++;
+  const word = source.slice(start, j);
+  const lower = word.toLowerCase();
+  const name = lower === 'null' ? 'Null' : keywords.has(lower) ? 'Keyword' : 'Identifier';
+  return { node: leaf(name, start, j), next: j };
+}
+
+function scanOperatorToken(source: string, i: number): { node: MNode; next: number } | null {
+  OPERATOR_RE.lastIndex = i;
+  const opMatch = OPERATOR_RE.exec(source);
+  if (!opMatch) return null;
+  return { node: leaf('Operator', i, i + opMatch[0].length), next: i + opMatch[0].length };
+}
+
+/** `scanSqlSpan`'s three outcomes, folded into scanLevel's own vocabulary: no span here (`null`),
+ *  a comment (dropped — `node: null`, `next` still advances), or a quote/dollar-quote (a leaf
+ *  node). Lifted out so the comment-vs-quote branch and the QuotedIdentifier/String ternary don't
+ *  nest inside scanLevel's own while+if. */
+function scanSpanNode(
+  source: string,
+  i: number,
+  lexOptions: SqlLexOptions,
+  identifierQuotes: string,
+): { node: MNode | null; next: number } | null {
+  const span = scanSqlSpan(source, i, lexOptions);
+  if (!span) return null;
+  // Comments are trivia, not structure — dropped here exactly like whitespace, never a sibling in
+  // any parent's children list. This is what lets a header comment sit ahead of a real statement
+  // (a pg_dump preamble's own shape) without derailing `ddl.ts`'s `TokenCursor`, which always
+  // expects its very first token to be the statement's own leading keyword — the same "comments
+  // are noise… dropped" rule `ddl.ts`'s own `parseColumnDefs` already states for a column list's
+  // comments, generalised to every level rather than one.
+  if (span.kind === 'lineComment' || span.kind === 'blockComment') {
+    return { node: null, next: span.end };
+  }
+  const name =
+    span.quoteChar && identifierQuotes.includes(span.quoteChar) ? 'QuotedIdentifier' : 'String';
+  return { node: leaf(name, span.start, span.end), next: span.end };
+}
+
+/** A `(` and everything up to its matching `)` (or EOF, R2: never throws) — the recursive call
+ *  into `scanLevel` is the stack. Lifted out of `scanLevel` itself so the recursion and its own
+ *  "was there really a closing paren" check don't nest inside scanLevel's own while+if. */
+function scanParenGroup(
+  source: string,
+  i: number,
+  n: number,
+  opts: SqlTokenOptions,
+): { node: MNode; next: number } {
+  const inner = scanLevel(source, i + 1, n, opts, true);
+  const groupedInner = groupComposite(inner.nodes);
+  const children: MNode[] = [leaf('(', i, i + 1), ...groupedInner];
+  let to = inner.next;
+  if (source[inner.next] === ')') {
+    children.push(leaf(')', inner.next, inner.next + 1));
+    to = inner.next + 1;
+  }
+  return { node: group('Parens', i, to, children), next: to };
+}
+
 // One flat level of tokens (the root document, or a Parens' own contents) — a Parens is produced
 // here directly (nested via a normal recursive call, not a caller-managed stack — the recursion is
 // the stack), balanced or, at EOF, an unterminated one ending at the source length (R2: never
@@ -245,39 +321,17 @@ function scanLevel(
       continue;
     }
 
-    const span = scanSqlSpan(source, i, lexOptions);
-    if (span) {
-      // Comments are trivia, not structure — dropped here exactly like whitespace, never a
-      // sibling in any parent's children list. This is what lets a header comment sit ahead of a
-      // real statement (a pg_dump preamble's own shape) without derailing `ddl.ts`'s
-      // `TokenCursor`, which always expects its very first token to be the statement's own
-      // leading keyword — the same "comments are noise… dropped" rule `ddl.ts`'s own
-      // `parseColumnDefs` already states for a column list's comments, generalised to every
-      // level rather than one.
-      if (span.kind === 'lineComment' || span.kind === 'blockComment') {
-        i = span.end;
-        continue;
-      }
-      const name =
-        span.quoteChar && opts.identifierQuotes.includes(span.quoteChar)
-          ? 'QuotedIdentifier'
-          : 'String';
-      nodes.push(leaf(name, span.start, span.end));
-      i = span.end;
+    const spanToken = scanSpanNode(source, i, lexOptions, opts.identifierQuotes);
+    if (spanToken) {
+      if (spanToken.node) nodes.push(spanToken.node);
+      i = spanToken.next;
       continue;
     }
 
     if (c === '(') {
-      const inner = scanLevel(source, i + 1, n, opts, true);
-      const groupedInner = groupComposite(inner.nodes);
-      const children: MNode[] = [leaf('(', i, i + 1), ...groupedInner];
-      let to = inner.next;
-      if (source[inner.next] === ')') {
-        children.push(leaf(')', inner.next, inner.next + 1));
-        to = inner.next + 1;
-      }
-      nodes.push(group('Parens', i, to, children));
-      i = to;
+      const t = scanParenGroup(source, i, n, opts);
+      nodes.push(t.node);
+      i = t.next;
       continue;
     }
     if (c === ')') {
@@ -289,21 +343,16 @@ function scanLevel(
     }
 
     if (isDigit(c) || (c === '.' && isDigit(source[i + 1]))) {
-      const end = scanNumberEnd(source, i);
-      nodes.push(leaf('Number', i, end));
-      i = end;
+      const t = scanNumberToken(source, i);
+      nodes.push(t.node);
+      i = t.next;
       continue;
     }
 
     if (isIdentStart(c)) {
-      const start2 = i;
-      i++;
-      while (i < n && isIdentPart(source[i])) i++;
-      const word = source.slice(start2, i);
-      const lower = word.toLowerCase();
-      if (lower === 'null') nodes.push(leaf('Null', start2, i));
-      else if (opts.keywords.has(lower)) nodes.push(leaf('Keyword', start2, i));
-      else nodes.push(leaf('Identifier', start2, i));
+      const t = scanIdentifierToken(source, i, n, opts.keywords);
+      nodes.push(t.node);
+      i = t.next;
       continue;
     }
 
@@ -318,11 +367,10 @@ function scanLevel(
       continue;
     }
 
-    OPERATOR_RE.lastIndex = i;
-    const opMatch = OPERATOR_RE.exec(source);
-    if (opMatch) {
-      nodes.push(leaf('Operator', i, i + opMatch[0].length));
-      i += opMatch[0].length;
+    const opToken = scanOperatorToken(source, i);
+    if (opToken) {
+      nodes.push(opToken.node);
+      i = opToken.next;
       continue;
     }
 
