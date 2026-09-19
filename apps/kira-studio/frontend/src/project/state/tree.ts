@@ -1,4 +1,8 @@
-import type { ConnectionColor, ConnectionStatus } from '@shared/domain/connection';
+import type {
+  ConnectionColor,
+  ConnectionStatus,
+  ConnectionSummary,
+} from '@shared/domain/connection';
 import type { SavedFilterQuery } from '@shared/domain/queries';
 import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
@@ -518,51 +522,69 @@ watch(
 // why a row is even showing as matched.
 export const activeSearchQuery = computed(() => debouncedQuery.value);
 
+// P94 pass 3 §4.3/§6 item 3: one connection's own row plus its (possibly search-filtered)
+// expanded children — moved out of searchResult's own computed body, but every reactive read
+// inside it (connectionsState.states, treeState.expanded/children/visibility/loading/errors)
+// still runs inside searchResult's dependency tracking, because searchResult calls this
+// SYNCHRONOUSLY, from inside its own computed callback (below) — never hoisted out or memoized
+// separately. `null` means this connection is filtered out entirely (a search query matched
+// neither its own name nor anything under it).
+function connectionRow(
+  conn: ConnectionSummary,
+  query: string,
+  stats: SearchStats,
+): { row: TreeRowVm; children: readonly TreeRowVm[] } | null {
+  const connKey = rowKey(conn.id, '');
+  const state = connectionsState.states[conn.id];
+  const naturallyExpanded = treeState.expanded.has(connKey);
+  const childNodes = treeState.children[connKey];
+  const view: ConnectionView = {
+    sets: toSets(treeState.visibility[conn.id] ?? EMPTY_VISIBILITY),
+    keyBrowser: state?.caps?.keyBrowser === true,
+  };
+
+  if (query && !childNodes) stats.incomplete = true;
+
+  const childOut: TreeRowVm[] = [];
+  let descendantMatch = false;
+  if (childNodes && (query ? true : naturallyExpanded)) {
+    descendantMatch = buildRows(conn.id, '', childNodes, 1, view, query, childOut, stats);
+  }
+
+  const selfMatches = query ? conn.name.toLowerCase().includes(query) : false;
+  if (query && !selfMatches && !descendantMatch) return null;
+
+  const rowExpanded = query ? naturallyExpanded || descendantMatch : naturallyExpanded;
+  const status = state?.status ?? 'disconnected';
+  const row: TreeRowVm = {
+    key: connKey,
+    depth: 0,
+    connectionId: conn.id,
+    path: '',
+    kind: 'connection',
+    name: conn.name,
+    hasChildren: true,
+    expanded: rowExpanded,
+    loading: treeState.loading.has(connKey),
+    error: treeState.errors[connKey],
+    matched: query ? selfMatches : undefined,
+    color: conn.color,
+    status,
+    statusDetail: status === 'error' ? (state?.error ?? null) : (state?.serverVersion ?? null),
+  };
+  return { row, children: rowExpanded ? childOut : [] };
+}
+
 const searchResult = computed(() => {
   const rows: TreeRowVm[] = [];
   const stats: SearchStats = { incomplete: false };
   const query = debouncedQuery.value;
 
   for (const conn of connectionsState.records) {
-    const connKey = rowKey(conn.id, '');
-    const state = connectionsState.states[conn.id];
-    const naturallyExpanded = treeState.expanded.has(connKey);
-    const childNodes = treeState.children[connKey];
-    const view: ConnectionView = {
-      sets: toSets(treeState.visibility[conn.id] ?? EMPTY_VISIBILITY),
-      keyBrowser: state?.caps?.keyBrowser === true,
-    };
-
-    if (query && !childNodes) stats.incomplete = true;
-
-    const childOut: TreeRowVm[] = [];
-    let descendantMatch = false;
-    if (childNodes && (query ? true : naturallyExpanded)) {
-      descendantMatch = buildRows(conn.id, '', childNodes, 1, view, query, childOut, stats);
-    }
-
-    const selfMatches = query ? conn.name.toLowerCase().includes(query) : false;
-    if (query && !selfMatches && !descendantMatch) continue;
-
-    const rowExpanded = query ? naturallyExpanded || descendantMatch : naturallyExpanded;
-    const status = state?.status ?? 'disconnected';
-    rows.push({
-      key: connKey,
-      depth: 0,
-      connectionId: conn.id,
-      path: '',
-      kind: 'connection',
-      name: conn.name,
-      hasChildren: true,
-      expanded: rowExpanded,
-      loading: treeState.loading.has(connKey),
-      error: treeState.errors[connKey],
-      matched: query ? selfMatches : undefined,
-      color: conn.color,
-      status,
-      statusDetail: status === 'error' ? (state?.error ?? null) : (state?.serverVersion ?? null),
-    });
-    if (rowExpanded) for (const r of childOut) rows.push(r);
+    const result = connectionRow(conn, query, stats);
+    if (!result) continue;
+    rows.push(result.row);
+    for (const r of result.children) rows.push(r);
   }
 
   return { rows, incomplete: query ? stats.incomplete : false };
