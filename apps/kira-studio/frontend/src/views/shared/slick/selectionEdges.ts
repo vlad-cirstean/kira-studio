@@ -38,6 +38,98 @@ export const SEL_EDGE_LAYER_KEYS = [
  *  @param displayColCount the display column count (gutter excluded) — only consulted for a
  *    `'row'` selection's own left/right edge-column test.
  */
+type MarkFn = (pos: number, displayCol: number, flags: CellClassFlags) => void;
+
+/** The `cell`/`range` family: one rectangle, `mark`ed on its top/bottom/left/right rows only —
+ *  c0/c1 get their full edge flags, interior columns of the top/bottom row get just that one
+ *  flag (§6 item 2, walked case: a 1x1 `cell`, where c0 === c1 and every flag is true at once). */
+function markCellRangeEdges(
+  sel: Extract<Selection, { kind: 'cell' | 'range' }>,
+  start: number,
+  end: number,
+  pageRowAt: (pos: number) => number,
+  mark: MarkFn,
+): void {
+  const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
+  const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
+  const r0 = Math.min(anchorRow, sel.row);
+  const r1 = Math.max(anchorRow, sel.row);
+  const c0 = Math.min(anchorCol, sel.col);
+  const c1 = Math.max(anchorCol, sel.col);
+  for (let pos = start; pos <= end; pos++) {
+    const pageRow = pageRowAt(pos);
+    if (pageRow < r0 || pageRow > r1) continue;
+    const isTop = pageRow === r0;
+    const isBottom = pageRow === r1;
+    mark(pos, c0, {
+      selEdgeLeft: true,
+      selEdgeRight: c0 === c1,
+      selEdgeTop: isTop,
+      selEdgeBottom: isBottom,
+    });
+    if (c1 !== c0)
+      mark(pos, c1, { selEdgeRight: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
+    // Interior columns of the top/bottom row only — c0/c1 already got their own edge above.
+    if (isTop) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeTop: true });
+    if (isBottom) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeBottom: true });
+  }
+}
+
+/** The `row` family: every column across the full row width sits on a selected row's own
+ *  top/bottom boundary, not just the two ends (§6 item 2, walked case: two adjacent selected
+ *  rows, where the shared boundary between them is neither row's top nor bottom). */
+function markRowEdges(
+  sel: Extract<Selection, { kind: 'row' }>,
+  start: number,
+  end: number,
+  pageRowAt: (pos: number) => number,
+  displayColCount: number,
+  mark: MarkFn,
+): void {
+  const rows = new Set(sel.rows);
+  const lastCol = displayColCount - 1;
+  for (let pos = start; pos <= end; pos++) {
+    const pageRow = pageRowAt(pos);
+    if (!rows.has(pageRow)) continue;
+    const isTop = !rows.has(pageRow - 1);
+    const isBottom = !rows.has(pageRow + 1);
+    for (let c = 0; c <= lastCol; c++) {
+      mark(pos, c, {
+        selEdgeLeft: c === 0,
+        selEdgeRight: c === lastCol,
+        selEdgeTop: isTop,
+        selEdgeBottom: isBottom,
+      });
+    }
+  }
+}
+
+/** The `column` family: top/bottom is the rendered range's own first/last position (a column
+ *  selection has no page-row bound), left/right is per selected column against its neighbours
+ *  (§6 item 2, walked case: two non-adjacent selected columns, each keeping its own left+right
+ *  edge rather than merging). */
+function markColumnEdges(
+  sel: Extract<Selection, { kind: 'column' }>,
+  start: number,
+  end: number,
+  displayRowCount: number,
+  mark: MarkFn,
+): void {
+  const cols = new Set(sel.cols);
+  for (let pos = start; pos <= end; pos++) {
+    const isTop = pos === 0;
+    const isBottom = pos === displayRowCount - 1;
+    for (const c of cols) {
+      mark(pos, c, {
+        selEdgeTop: isTop,
+        selEdgeBottom: isBottom,
+        selEdgeLeft: !cols.has(c - 1),
+        selEdgeRight: !cols.has(c + 1),
+      });
+    }
+  }
+}
+
 export function computeSelEdgeHashes(
   sel: Selection | null,
   renderedBounds: { start: number; end: number },
@@ -51,7 +143,7 @@ export function computeSelEdgeHashes(
   const { start, end } = renderedBounds;
   if (end < start) return hashes;
 
-  const mark = (pos: number, displayCol: number, flags: CellClassFlags): void => {
+  const mark: MarkFn = (pos, displayCol, flags) => {
     const field = fieldAtDisplayCol(displayCol);
     if (!field) return;
     for (const cls of classesFrom(flags)) {
@@ -64,63 +156,11 @@ export function computeSelEdgeHashes(
   };
 
   if (sel.kind === 'cell' || sel.kind === 'range') {
-    const anchorRow = sel.kind === 'range' ? sel.anchorRow : sel.row;
-    const anchorCol = sel.kind === 'range' ? sel.anchorCol : sel.col;
-    const r0 = Math.min(anchorRow, sel.row);
-    const r1 = Math.max(anchorRow, sel.row);
-    const c0 = Math.min(anchorCol, sel.col);
-    const c1 = Math.max(anchorCol, sel.col);
-    for (let pos = start; pos <= end; pos++) {
-      const pageRow = pageRowAt(pos);
-      if (pageRow < r0 || pageRow > r1) continue;
-      const isTop = pageRow === r0;
-      const isBottom = pageRow === r1;
-      mark(pos, c0, {
-        selEdgeLeft: true,
-        selEdgeRight: c0 === c1,
-        selEdgeTop: isTop,
-        selEdgeBottom: isBottom,
-      });
-      if (c1 !== c0)
-        mark(pos, c1, { selEdgeRight: true, selEdgeTop: isTop, selEdgeBottom: isBottom });
-      // Interior columns of the top/bottom row only — c0/c1 already got their own edge above.
-      if (isTop) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeTop: true });
-      if (isBottom) for (let c = c0 + 1; c <= c1 - 1; c++) mark(pos, c, { selEdgeBottom: true });
-    }
+    markCellRangeEdges(sel, start, end, pageRowAt, mark);
   } else if (sel.kind === 'row') {
-    const rows = new Set(sel.rows);
-    const lastCol = displayColCount - 1;
-    for (let pos = start; pos <= end; pos++) {
-      const pageRow = pageRowAt(pos);
-      if (!rows.has(pageRow)) continue;
-      const isTop = !rows.has(pageRow - 1);
-      const isBottom = !rows.has(pageRow + 1);
-      // Every column across the full row width sits on the row's own top/bottom boundary, not
-      // just the two ends (a cell/range rectangle's top/bottom edge is only the two boundary
-      // columns' cells — a row selection's is every column, see the fix this was ported with).
-      for (let c = 0; c <= lastCol; c++) {
-        mark(pos, c, {
-          selEdgeLeft: c === 0,
-          selEdgeRight: c === lastCol,
-          selEdgeTop: isTop,
-          selEdgeBottom: isBottom,
-        });
-      }
-    }
+    markRowEdges(sel, start, end, pageRowAt, displayColCount, mark);
   } else if (sel.kind === 'column') {
-    const cols = new Set(sel.cols);
-    for (let pos = start; pos <= end; pos++) {
-      const isTop = pos === 0;
-      const isBottom = pos === displayRowCount - 1;
-      for (const c of cols) {
-        mark(pos, c, {
-          selEdgeTop: isTop,
-          selEdgeBottom: isBottom,
-          selEdgeLeft: !cols.has(c - 1),
-          selEdgeRight: !cols.has(c + 1),
-        });
-      }
-    }
+    markColumnEdges(sel, start, end, displayRowCount, mark);
   }
   return hashes;
 }
