@@ -117,7 +117,7 @@ export function resolveTabState(
 
 // D6: the response is runtime-only, never persisted (mirrors consoleTabStateSchema's own results
 // comment) — a restored tab's response pane starts empty, exactly like a fresh one.
-export interface HttpRequestViewRuntime {
+interface HttpRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   opId: string | null;
   // P10 D15/C5: timeline is the failed send's own partial timeline (ipcerr.Error.Details,

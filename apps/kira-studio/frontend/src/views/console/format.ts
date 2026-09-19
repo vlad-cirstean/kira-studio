@@ -104,7 +104,7 @@ function formatMongoStatement(
   return { text: `db.${collection}.${method}(\n${indented}\n)` };
 }
 
-export interface FormatFailure {
+interface FormatFailure {
   /** Which statement, 0-based — the same index D12's caret mapping walks the before/after split
    *  by. */
   index: number;

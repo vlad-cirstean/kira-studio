@@ -9,7 +9,7 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 // the two never fetch independently and disagree mid-flight. Runtime-only, component-local in
 // spirit even though it lives in a module-level store — nothing here is tab state, nothing is
 // persisted (§3.1).
-export interface CookiesRuntime {
+interface CookiesRuntime {
   cookies: HttpCookieWire[];
   loading: boolean;
 }

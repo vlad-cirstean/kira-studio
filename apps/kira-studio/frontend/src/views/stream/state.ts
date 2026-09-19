@@ -23,7 +23,7 @@ function isBatchPagination(connectionId: string): boolean {
 // at all) plus `polled`: runtime-only (never persisted) tracking of whether this tab has loaded
 // at least once, so SQS's view (caps.pagination === 'batch') can show a "click Poll" placeholder
 // until the user explicitly asks for a page (D10/D12 — never auto-loaded).
-export interface StreamViewRuntime {
+interface StreamViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   /** P43 F6/D7: the last *action* (SQS delete) that failed, verbatim from the server — sibling to

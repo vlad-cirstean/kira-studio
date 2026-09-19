@@ -127,7 +127,7 @@ function wireGoToFile(
   };
 }
 
-export type DiffEditorState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
+type DiffEditorState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'bothMissing' | 'error';
 
 export interface DiffEditorParams {
   /** editors.ts's own registry key — see this file's own header comment. */

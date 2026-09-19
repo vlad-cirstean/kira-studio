@@ -13,7 +13,7 @@ import type { MonacoModule } from './monaco';
 
 type StandaloneEditor = import('monaco-editor').editor.IStandaloneCodeEditor;
 
-export interface InlineBlameAttachParams {
+interface InlineBlameAttachParams {
   gitRepoId: string;
   /** A fresh transport lease is opened for the blame controller itself — this is only the repo id
    *  it's leased against (`gitTransportFor`'s own key), never a transport to reuse. */

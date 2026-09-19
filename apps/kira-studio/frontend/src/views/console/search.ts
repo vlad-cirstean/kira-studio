@@ -29,7 +29,7 @@ export interface Match {
 
 // Searches the active result set's loaded page only, never the server (§8.5's D28, every other
 // view's own precedent).
-export function runSearch(
+function runSearch(
   tabId: string,
   q: SearchQuery,
   onProgress: (

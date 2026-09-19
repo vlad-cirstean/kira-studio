@@ -14,7 +14,7 @@ import { setPage } from './page';
 // state, narrowed to a single row index since a document has no columns to select within — this
 // view mounts no cell editor dock to publish into at all) are the only view-local runtime this
 // adds.
-export interface DocumentViewRuntime {
+interface DocumentViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   /** P43 F6/D7: the last *action* (insert/edit/delete) that failed, verbatim from the server —

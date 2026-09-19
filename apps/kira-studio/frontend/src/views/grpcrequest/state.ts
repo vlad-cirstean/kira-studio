@@ -70,7 +70,7 @@ const MAX_LIVE_MESSAGES = 10_000;
 // reverted — every push over the cap still trims back to exactly MAX_LIVE_MESSAGES.
 
 // D6: the response is runtime-only, never persisted.
-export interface GrpcRequestViewRuntime {
+interface GrpcRequestViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   opId: string | null;
   /** F5/P21 round 1: the streaming event subscriber's own key, set alongside `opId` when a call
@@ -128,7 +128,7 @@ registerTabRuntimeCleanup((tabId) => {
 
 // ---- D4: the schema browser's own runtime ----
 
-export interface GrpcSchemaRuntime {
+interface GrpcSchemaRuntime {
   status: 'idle' | 'loading' | 'error';
   schema: GrpcSchemaWire | null;
   error: string | null;

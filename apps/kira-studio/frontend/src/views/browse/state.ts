@@ -10,7 +10,7 @@ import { classifyLoadError, createRuntimeStore } from '../shared/viewOp';
 // P41 D12: one level at a time, loaded by a single `treeChildren` call — never a second tree.
 // `nodes` holds exactly what `children(level)` returned; there is nothing to page (D16 — this is
 // not a cancellable engine op, `kira:tree:children` never has been).
-export interface BrowseViewRuntime {
+interface BrowseViewRuntime {
   status: 'idle' | 'loading' | 'error';
   error: { code: string; message: string } | null;
   /** P43 F6/D7: the last *action* (a key/object delete from this level) that failed, verbatim

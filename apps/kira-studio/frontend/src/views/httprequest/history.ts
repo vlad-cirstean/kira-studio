@@ -19,7 +19,6 @@ interface Extra {
 const {
   runtime,
   ensure: ensureRuntime,
-  load: loadHistory,
   ensureFresh: ensureHistoryFresh,
   noteRecorded: noteSendRecorded,
   view: viewHistoryEntry,
@@ -38,7 +37,6 @@ const {
 export {
   backToLatest,
   ensureHistoryFresh,
-  loadHistory,
   noteSendRecorded,
   runtime as historyRuntime,
   viewHistoryEntry,

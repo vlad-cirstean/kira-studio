@@ -9,7 +9,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 /** The unit a dialect's own native cost figure is reported in — never compared across dialects
  *  (F17: MariaDB's and MySQL's identically-named `cost` field disagree by three orders of
  *  magnitude for a comparable scan). 'none' covers SQLite and ClickHouse, which report no cost. */
-export type CostUnit = 'postgres-planner' | 'mysql-cost' | 'mariadb-cost' | 'none';
+type CostUnit = 'postgres-planner' | 'mysql-cost' | 'mariadb-cost' | 'none';
 
 export interface PlanIssue {
   severity: 'warn' | 'info';

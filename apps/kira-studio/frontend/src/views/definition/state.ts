@@ -6,7 +6,7 @@ import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { tabsState } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
 
-export interface DefinitionViewRuntime {
+interface DefinitionViewRuntime {
   status: 'idle' | 'loading' | 'error';
   error: string | null; // the raw IPC message, '[CODE] text' and all (§0 note 13)
   source: 'cache' | 'server' | null;

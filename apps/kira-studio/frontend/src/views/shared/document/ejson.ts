@@ -9,7 +9,7 @@
 // plain `JSON.parse` is exact here.
 import type { BeautifyMode, BeautifyResult } from '../../../beautify';
 
-export type DocNodeKind = 'object' | 'array' | 'scalar';
+type DocNodeKind = 'object' | 'array' | 'scalar';
 
 /** The BSON type a node resolved to, for the type tooltip and the ObjectId/date affordances.
  *  'json' means a plain JSON scalar with no extended-JSON wrapper around it. */

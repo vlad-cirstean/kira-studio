@@ -20,7 +20,7 @@ import { bumpPageVersion, documentRow, drop as dropPage, getPage, setPage } from
  *  closes, so it is deliberately not stored here. P18 D17: `kind` distinguishes an ordinary
  *  query-result page (resultPages.ts) from a plan result (explainResults.ts) — both share every
  *  other piece of this record's own lifecycle (close/close-others/close-to-the-right/eviction). */
-export interface ConsoleResult {
+interface ConsoleResult {
   key: string;
   rowCount: number;
   kind: 'page' | 'plan';
@@ -36,11 +36,11 @@ export interface ConsoleResult {
  *  KiB MaxCellBytes), so whether it would have warned is genuinely unknown — the strip says so
  *  rather than silently claiming there was nothing to check. */
 type AutoExplainPlans = Array<{ statement: string; plan: QueryPlan }>;
-export type AutoExplainState =
+type AutoExplainState =
   | { kind: 'plans'; plans: AutoExplainPlans; worstIndex: number }
   | { kind: 'truncated' };
 
-export interface ConsoleViewRuntime {
+interface ConsoleViewRuntime {
   status: 'idle' | 'running' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   opId: string | null; // the in-flight op, for the stop button

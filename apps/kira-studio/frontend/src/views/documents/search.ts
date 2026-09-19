@@ -29,7 +29,7 @@ export function previewLineFor(body: string): string {
 // document's "columns" are dynamic, so there is no per-field grid to search field-by-field the
 // way views/grid/search.ts does, and full-text-over-EJSON would be new scope this task doesn't
 // ask for.
-export function runSearch(
+function runSearch(
   tabId: string,
   q: SearchQuery,
   onProgress: (

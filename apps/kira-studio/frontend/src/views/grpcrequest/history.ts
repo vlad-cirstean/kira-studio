@@ -9,7 +9,6 @@ import { control } from '../../bridge/control';
 // than a second hand-copied 100 lines (F9). gRPC has no compare selection, so it passes no Extra.
 const {
   runtime,
-  load: loadGrpcHistory,
   ensureFresh: ensureGrpcHistoryFresh,
   noteRecorded: noteGrpcCallRecorded,
   view: viewGrpcHistoryEntry,
@@ -27,7 +26,6 @@ const {
 export {
   backToLatestGrpc,
   ensureGrpcHistoryFresh,
-  loadGrpcHistory,
   noteGrpcCallRecorded,
   runtime as grpcHistoryRuntime,
   viewGrpcHistoryEntry,
