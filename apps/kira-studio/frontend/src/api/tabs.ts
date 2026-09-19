@@ -13,7 +13,6 @@ import {
 import {
   asGrpcRequestTab,
   asHttpRequestTab,
-  asVariableSetTab,
   type GrpcRequestTabRecord,
   type HttpRequestTabRecord,
   type VariableSetTabRecord,
@@ -179,12 +178,8 @@ export function renameVariableSetTabs(scope: VariableScope, ownerId: string, nam
   }
 }
 
-export function patchVariableSetTabState(id: string, patch: Partial<VariableSetTabState>): void {
+function patchVariableSetTabState(id: string, patch: Partial<VariableSetTabState>): void {
   patchTabState(id, 'variable-set', patch, { skipUnchanged: false });
-}
-
-export function findVariableSetTab(id: string): VariableSetTabRecord | null {
-  return asVariableSetTab(tabsState.tabs.find((t) => t.id === id));
 }
 
 /** Deleting a collection or an environment closes any open tab for it (D16) — unlike a request

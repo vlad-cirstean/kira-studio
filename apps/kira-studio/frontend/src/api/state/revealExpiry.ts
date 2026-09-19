@@ -11,7 +11,7 @@
  *  sliding "so a long editing session can't hold one authentication open indefinitely". Keep in
  *  sync with GraceWindow by hand; there is no shared constant to import across the Go/TS boundary
  *  for a time.Duration. */
-export const REVEAL_GRACE_WINDOW_MS = 5 * 60 * 1000;
+const REVEAL_GRACE_WINDOW_MS = 5 * 60 * 1000;
 
 /** A keyed expiry scheduler over one reactive `Record<string, string>` map: `schedule(key)` arms
  *  (or re-arms) a timer that deletes `map[key]` after the grace window; `clear(key)` cancels one

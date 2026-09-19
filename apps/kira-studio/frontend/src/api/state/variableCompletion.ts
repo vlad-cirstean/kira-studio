@@ -115,7 +115,7 @@ export interface VariableSupport {
   candidates: (ctx: { text: string; from: number; word: string }) => Completion[];
 }
 
-export interface HoverInfo {
+interface HoverInfo {
   /** The reference's own value, distinct from its explanation — present only for a 'resolved'
    *  reference with an actual value to show (never for deferred/dynamic/unknown, which have only
    *  ever had an explanation). */

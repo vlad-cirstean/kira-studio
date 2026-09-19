@@ -38,14 +38,14 @@ const activeEnvironment = computed<ApiEnvironment | null>(
 
 /** '' when no environment is active — the same convention SetActiveEnvironment's own id arg
  *  uses, and what control.httpSend's environmentId will carry at send time. */
-export const activeEnvironmentId = computed(() => activeEnvironment.value?.id ?? '');
+const activeEnvironmentId = computed(() => activeEnvironment.value?.id ?? '');
 
 /** P18 D17/D19: the active environment's colour, for the request views' toolbar rail and head
  *  dot (LAW 07) — 'none' with no environment active, the same "the rail slot stays reserved
  *  either way" treatment a colour of 'none' already gets. Always defined (never undefined), so
  *  ViewChrome's `envColor` prop always drives the dot rather than falling through to a
  *  connection's own colour, which an Api tab never has (F20 #6). */
-export const activeEnvironmentColor = computed<PaletteColor>(
+const activeEnvironmentColor = computed<PaletteColor>(
   () => activeEnvironment.value?.color ?? 'none',
 );
 
@@ -169,7 +169,7 @@ export function openEnvironments(): void {
 // since a variable-set tab, unlike the dialog it replaces, can now be open more than once at a
 // time (one per collection/environment).
 
-export interface VariableSetRuntime {
+interface VariableSetRuntime {
   rows: ApiVariable[];
   /** A reveal failure's message (D10) — shown in the view's own MessageStrip. */
   error: string | null;
@@ -183,7 +183,7 @@ function defaultVariableSetRuntime(): VariableSetRuntime {
 // lint rule) — this is that same small "one reactive record, keyed by tabId, created on first
 // touch" shape, inlined rather than hoisted somewhere both sides could reach, since this is the
 // only api/-side per-tab runtime that exists.
-export const variableSetRuntime = reactive({} as Record<string, VariableSetRuntime>);
+const variableSetRuntime = reactive({} as Record<string, VariableSetRuntime>);
 
 function ensureVariableSetRuntime(tabId: string): VariableSetRuntime {
   if (!variableSetRuntime[tabId]) {
