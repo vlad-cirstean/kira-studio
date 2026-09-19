@@ -1795,6 +1795,63 @@ scratch bare-repo `git push` confirmed `.githooks/pre-push` actually fires (`go 
 `lint:dead` all ran); knip re-run after the barrel rewrites landed 0 new findings beyond what §4.4
 already accounted for. No known open item beyond P95 (opened by name, above).
 
+**Pass 2 — Go complexity (`docs/v1.8/plans/P94-code-quality-tooling-iter2.md`), 29 commits.**
+`gocognit` and `gocyclo` enabled at `min-complexity: 30` with `_test.go` excluded, bringing
+`.golangci.yml` to the 11 linters pass 1 scoped for the phase. Re-measured against `cb7c5aca`
+rather than trusting pass 1's §11: **49 distinct non-test functions** over threshold (46
+`gocognit`, 22 `gocyclo`, 19 both), not the 47 + 4 §11 stated — pass 1's number was taken under
+`golangci-lint` v2's `issues.uniq-by-line: true` default, which hid 28 of `gocyclo`'s 32 findings
+behind a `gocognit` finding on the same `func` line. `uniq-by-line: false` is now set in the
+config with that reason recorded inline, beside pass 1's own `max-issues-per-linter` note. Also
+re-measured at pass 1's base commit (`f7b51382`): pass 1's fixes moved zero complexity scores —
+identical finding sets — so §11's "pass 1's `gocritic` fixes will have moved some scores" was
+wrong; `unused`/`prealloc`/`gocritic`/`copyloopvar` do not add or remove branches. All 49
+refactored, one commit per package, worst first, shared relational read/mutate helpers hoisted
+into `internal/adapters` first so the three SQL adapters consume one copy. One extra commit beyond
+the plan's 26 refactor commits: `StripSQLComments` (§9's own list) had no direct test before this
+pass, so a table-driven one was added and committed separately, ahead of the mongo commit.
+`(*Router).ForConn`'s `Request` dispatch (commit 12, gitrpc) landed as a package-level
+`requestHandlers map[string]requestHandler` table rather than the plan's suggested
+struct-of-methods — a deviation from §5's sketch, not from its intent: every arm already forwarded
+to an existing handler with nothing to extract, so a lookup table clears the same `gocyclo` score
+with less code moved, and `ForConn`'s own subscription, drop-oldest `select`, both goroutines and
+unsubscribe-once guarantee are untouched either way. That table shape meant
+`TestGitrpcDispatch_EveryMethodIsClassified`'s AST walk — which only recognised `switch method`
+statements — needed a second recognised shape (a `map[string]XxxHandler{...}` composite literal,
+keyed the same way) to keep deriving the real dispatched-method set instead of silently under
+counting; fixed and folded into the same gitrpc commit. Every other §6-named risky function
+(`readTopic`'s empty-poll latch, `(*Session).ReadPage`'s locked helpers, `RunRestack`'s three
+`defer`s, `ServerStream`'s partial-result-on-error paths, `MaskContinuationTokens`'
+byte-identical-fixture requirement, `main`'s construction order, `RunMatrix`'s `t.Helper()` chain)
+verified per its own named check, not just a passing package test. Verification: `golangci-lint`
+(pinned v2.13.2) **0 findings** across all 11 linters against the real committed config
+(`uniq-by-line: false` already in effect, not hiding anything). `GOOS=darwin` could not be run
+end-to-end from this container — `internal/gitclient`'s unconditionally-`cgo` FSEvents file
+(`docs/DEV_ENVIRONMENT.md`'s own documented, pre-existing limit: a `darwin && cgo` file cross-
+compiles from this container under neither `CGO_ENABLED=1` nor `0`) fails any package that
+transitively imports `internal/gitclient`, `internal/codeparse`'s tree-sitter cgo binding fails the
+same way, and Wails itself does not cross-compile for `main`; confirmed instead that none of the 49
+refactored files carries a `//go:build` tag, so no platform-conditional file is in scope for a
+darwin-only finding either way. `go build`/`go vet`/`go test ./...` clean, no flake. `bun run
+lint:all`: `golangci-lint` clean as above; Biome (1 pre-existing warning, 1 pre-existing info) and
+knip (pre-existing duplicate-export and config-hint findings) unchanged from pass 1's baseline —
+both out of scope for this Go-only pass (pass 3 owns the TS/Vue and `knip` work, per §12). `bun run
+build` and `bun run build:vscode` both succeed. `bun run test:unit`: 1538 passed, 0 failed —
+identical to pass 1. `bun run test:webview`: 55 passed, 0 failed — identical to pass 1. `bun run
+test:ui` (316 tests): 311 passed, 1 failed, 4 did not run. The failure is
+`http-request-body.spec.ts`'s already-named 500-byte threshold flake; `tree.spec.ts`, pass 1's
+other named flake, passed clean this run (18.1s) — consistent with both being recorded as
+resource-contention flakes rather than a phase-caused regression, and no new failure appeared. The
+eight functions named for elevated care (§6's seven plus `RunMatrix`) each have their own
+package's tests passing: `internal/gitrpc`, `internal/adapters/kafka`, `internal/gitclient/
+logsession`, `internal/gitsession`, `internal/grpcclient`, `internal/ipcfixture`, `internal/
+adapters/testsupport`; `main` has no test files of its own, so its boot proof is `test:ui`'s
+already-real, server-tagged (`-tags server`) backend (`docs/DEV_ENVIRONMENT.md`'s established
+substitute for a GUI-driven boot check in a display-less sandbox), which ran clean above. No
+behaviour changes noticed while reading any of the 49 functions worth logging as a follow-up. None
+of pass 1's deferred items touched: no `errcheck`/`staticcheck` (P95 owns them), no Biome
+complexity rule, no `knip` `exports`/`types`, none of §11's named pass-4 flakes.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
