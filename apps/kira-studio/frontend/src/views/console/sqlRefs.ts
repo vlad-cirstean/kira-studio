@@ -49,6 +49,32 @@ const END_FROM = new Set([
   'for',
 ]);
 
+const JOIN_START = new Set(['join', 'left', 'right', 'inner', 'full', 'cross', 'natural']);
+
+// P94 pass 3 §4.3: folds every keyword-set check refsInStatement's own loop made into one lookup.
+function classifyKeyword(t: LNode, source: string): 'end' | 'join' | 'on' | 'using' | undefined {
+  if (t.name !== 'Keyword') return undefined;
+  const w = text(t, source).toLowerCase();
+  if (END_FROM.has(w)) return 'end';
+  if (JOIN_START.has(w)) return 'join';
+  if (w === 'on') return 'on';
+  if (w === 'using') return 'using';
+  return undefined;
+}
+
+// A join's ON condition, from `toks[i]` (the `on` keyword itself) up to but not including
+// whatever ends it — another join's own start keyword, or END_FROM. Its own qualified
+// identifiers are not table refs, so the caller skips straight over them.
+function skipJoinCondition(toks: readonly LNode[], i: number, source: string): number {
+  let j = i + 1;
+  while (j < toks.length) {
+    const cls = classifyKeyword(toks[j] as LNode, source);
+    if (cls === 'end' || cls === 'join') break;
+    j++;
+  }
+  return j;
+}
+
 function collectCteNames(toks: readonly LNode[], source: string): Set<string> {
   const names = new Set<string>();
   if (!isKeyword(toks[0], 'with', source)) return names;
@@ -117,23 +143,15 @@ function refsInStatement(toks: readonly LNode[], source: string): TableRef[] {
   let i = toks.findIndex((t) => isKeyword(t, 'from', source));
   if (i < 0) return refs;
   i++;
-  const joinStart = new Set(['join', 'left', 'right', 'inner', 'full', 'cross', 'natural']);
   while (i < toks.length) {
     const t = toks[i] as LNode;
-    const w = t.name === 'Keyword' ? text(t, source).toLowerCase() : undefined;
-    if (w !== undefined && END_FROM.has(w)) break;
-    if (w === 'on') {
-      // Skip the join condition entirely — its own qualified identifiers are not table refs.
-      i++;
-      while (i < toks.length) {
-        const u = toks[i] as LNode;
-        const uw = u.name === 'Keyword' ? text(u, source).toLowerCase() : undefined;
-        if (uw !== undefined && (joinStart.has(uw) || END_FROM.has(uw))) break;
-        i++;
-      }
+    const cls = classifyKeyword(t, source);
+    if (cls === 'end') break;
+    if (cls === 'on') {
+      i = skipJoinCondition(toks, i, source);
       continue;
     }
-    if (w !== undefined && (joinStart.has(w) || w === 'using')) {
+    if (cls === 'join' || cls === 'using') {
       i++;
       continue;
     }

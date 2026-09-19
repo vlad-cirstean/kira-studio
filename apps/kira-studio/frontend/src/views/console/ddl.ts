@@ -161,6 +161,55 @@ function readQualifiedName(c: TokenCursor, source: string): QualifiedName | unde
   return undefined;
 }
 
+// One constraint word (`NOT NULL`/`PRIMARY KEY`/`UNIQUE`/`REFERENCES …`) starting at `tail[i]`,
+// applied onto `column` in place. Returns how many EXTRA tail slots it consumed (its own keyword
+// token at `i` is always accounted for by the caller's own loop increment) — `NOT NULL`/
+// `PRIMARY KEY` each consume one more token, `REFERENCES table(col)` doesn't need to (its own
+// lookahead is bounded, never chained with another constraint word).
+function applyConstraintWord(
+  column: DdlColumn,
+  tail: readonly LNode[],
+  i: number,
+  source: string,
+): number {
+  const t = tail[i] as LNode;
+  const w = keywordText(t, source);
+  if (w === undefined) return 0;
+  if (w === 'not' && tail[i + 1]?.name === 'Null') {
+    column.notNull = true;
+    return 1;
+  }
+  if (w === 'primary' && isKeyword(tail[i + 1], 'key', source)) {
+    column.primaryKey = true;
+    return 1;
+  }
+  if (w === 'unique') {
+    column.unique = true;
+    return 0;
+  }
+  if (w === 'references') {
+    const targetNode = tail[i + 1];
+    const target =
+      targetNode?.name === 'CompositeIdentifier'
+        ? splitComposite(targetNode, source)
+        : targetNode && isNameNode(targetNode)
+          ? [unquotedName(targetNode, source)]
+          : undefined;
+    if (target && target.length > 0) {
+      const refTable = target[target.length - 1] as string;
+      const parensNode = tail[i + 2];
+      const inner =
+        parensNode?.name === 'Parens' ? childrenOf(parensNode).find(isNameNode) : undefined;
+      column.references = {
+        table: refTable,
+        column: inner ? unquotedName(inner, source) : undefined,
+      };
+    }
+    return 0;
+  }
+  return 0;
+}
+
 function parseColumnDef(segment: LNode[], source: string): DdlColumn | undefined {
   const nameNode = segment[0];
   if (!nameNode) return undefined;
@@ -178,36 +227,7 @@ function parseColumnDef(segment: LNode[], source: string): DdlColumn | undefined
   const column: DdlColumn = { name, type };
   const tail = rest.slice(typeEnd);
   for (let i = 0; i < tail.length; i++) {
-    const t = tail[i] as LNode;
-    const w = keywordText(t, source);
-    if (w === undefined) continue;
-    if (w === 'not' && tail[i + 1]?.name === 'Null') {
-      column.notNull = true;
-      i++;
-    } else if (w === 'primary' && isKeyword(tail[i + 1], 'key', source)) {
-      column.primaryKey = true;
-      i++;
-    } else if (w === 'unique') {
-      column.unique = true;
-    } else if (w === 'references') {
-      const targetNode = tail[i + 1];
-      const target =
-        targetNode?.name === 'CompositeIdentifier'
-          ? splitComposite(targetNode, source)
-          : targetNode && isNameNode(targetNode)
-            ? [unquotedName(targetNode, source)]
-            : undefined;
-      if (target && target.length > 0) {
-        const refTable = target[target.length - 1] as string;
-        const parensNode = tail[i + 2];
-        let refColumn: string | undefined;
-        if (parensNode?.name === 'Parens') {
-          const inner = childrenOf(parensNode).find(isNameNode);
-          refColumn = inner ? unquotedName(inner, source) : undefined;
-        }
-        column.references = { table: refTable, column: refColumn };
-      }
-    }
+    i += applyConstraintWord(column, tail, i, source);
   }
   return column;
 }

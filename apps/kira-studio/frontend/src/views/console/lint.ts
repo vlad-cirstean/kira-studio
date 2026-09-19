@@ -32,6 +32,32 @@ function lintSqlConsole(
 
 const MONGO_BRACKET_PAIRS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
 
+// A `//` line comment starting at `text[i]` — returns the index just past it (the newline itself,
+// if any, is left for the main loop's own default `i++`, matching the pre-extraction behaviour).
+function skipLineComment(text: string, i: number): number {
+  let j = i;
+  while (j < text.length && text[j] !== '\n') j++;
+  return j;
+}
+
+// A single/double-quoted run starting at `text[i]` (the opening quote itself) — `\` escapes the
+// next character. `next` is one past the closing quote when `closed`, or `text.length` when the
+// string ran to EOF unterminated.
+function scanStringLiteral(text: string, i: number): { next: number; closed: boolean } {
+  const quote = text[i];
+  const n = text.length;
+  let j = i + 1;
+  while (j < n) {
+    if (text[j] === '\\') {
+      j += 2;
+      continue;
+    }
+    if (text[j] === quote) return { next: j + 1, closed: true };
+    j++;
+  }
+  return { next: n, closed: false };
+}
+
 // Exported for its own direct table-driven test (P94 pass 3 §6 item 1) — this function had zero
 // prior coverage, direct or indirect, before that pass's refactor.
 export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
@@ -42,26 +68,13 @@ export function lintMongoBrackets(text: string): ConsoleDiagnostic[] {
   while (i < n) {
     const c = text[i];
     if (c === '/' && text[i + 1] === '/') {
-      while (i < n && text[i] !== '\n') i++;
+      i = skipLineComment(text, i);
       continue;
     }
     if (c === "'" || c === '"') {
-      const quote = c;
       const start = i;
-      i++;
-      let closed = false;
-      while (i < n) {
-        if (text[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (text[i] === quote) {
-          i++;
-          closed = true;
-          break;
-        }
-        i++;
-      }
+      const { next, closed } = scanStringLiteral(text, i);
+      i = next;
       if (!closed) {
         issues.push({
           from: start,
