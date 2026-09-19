@@ -1,5 +1,6 @@
 import { loadDynamicGenerator, type Reference, resolve } from '@kira/api-core';
 import type {
+  GrpcCallEvent,
   GrpcCallResultWire,
   GrpcMessageWire,
   GrpcMetaPairWire,
@@ -225,6 +226,37 @@ export function findMethod(
 
 // ---- D7/D8: the call itself ----
 
+// P94 pass 3 §4.3: the event handler's own per-call apply step, lifted out so
+// ensureGrpcCallSubscription's callback only finds the matching tab and delegates. `rt` is the
+// same reactive runtime object the caller already found — mutated here exactly as it was inline,
+// so this carries no reactive-dependency-tracking risk (unlike a computed, a plain event handler
+// has no active effect to preserve; Vue only needs the write to happen, not where it's written from).
+function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCallEvent): void {
+  // P21 round 2 performance finding 6: markRaw on each incoming message before it ever
+  // touches the reactive rt.messages array — a GrpcMessageWire is an immutable wire value
+  // (this view never mutates a field of one in place), so nothing here needs Vue to wrap it
+  // in its own per-field reactive Proxy. Without this, every pushed message was itself
+  // deep-proxied on the way in, on top of the array's own reactivity.
+  rt.messages.push(...event.messages.map((m) => markRaw(m)));
+  rt.trueMessageCount += event.messages.length;
+  for (const m of event.messages) rt.messageBytes += m.wireBytes;
+  if (rt.messages.length > MAX_LIVE_MESSAGES) {
+    rt.messages.splice(0, rt.messages.length - MAX_LIVE_MESSAGES);
+  }
+  if (event.done) {
+    rt.opId = null;
+    if (event.error) {
+      rt.status = event.error.code === 'E_GRPC_CANCELLED' ? 'cancelled' : 'error';
+      rt.error = event.error;
+      if (event.status) rt.result = event.status;
+    } else {
+      rt.status = 'idle';
+      rt.result = event.status ?? rt.result;
+    }
+    noteGrpcCallRecorded(tabId);
+  }
+}
+
 let subscribedToGrpcCall = false;
 function ensureGrpcCallSubscription(): void {
   if (subscribedToGrpcCall) return;
@@ -233,29 +265,7 @@ function ensureGrpcCallSubscription(): void {
     for (const tabId of Object.keys(runtime)) {
       const rt = runtime[tabId];
       if (!rt || rt.lastCallId !== event.callId) continue;
-      // P21 round 2 performance finding 6: markRaw on each incoming message before it ever
-      // touches the reactive rt.messages array — a GrpcMessageWire is an immutable wire value
-      // (this view never mutates a field of one in place), so nothing here needs Vue to wrap it
-      // in its own per-field reactive Proxy. Without this, every pushed message was itself
-      // deep-proxied on the way in, on top of the array's own reactivity.
-      rt.messages.push(...event.messages.map((m) => markRaw(m)));
-      rt.trueMessageCount += event.messages.length;
-      for (const m of event.messages) rt.messageBytes += m.wireBytes;
-      if (rt.messages.length > MAX_LIVE_MESSAGES) {
-        rt.messages.splice(0, rt.messages.length - MAX_LIVE_MESSAGES);
-      }
-      if (event.done) {
-        rt.opId = null;
-        if (event.error) {
-          rt.status = event.error.code === 'E_GRPC_CANCELLED' ? 'cancelled' : 'error';
-          rt.error = event.error;
-          if (event.status) rt.result = event.status;
-        } else {
-          rt.status = 'idle';
-          rt.result = event.status ?? rt.result;
-        }
-        noteGrpcCallRecorded(tabId);
-      }
+      applyGrpcEvent(tabId, rt, event);
       break;
     }
   });
