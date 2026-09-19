@@ -5,7 +5,7 @@
  */
 import type { ColorState } from './types.ts';
 
-export const DEFAULT_PALETTE_SIZE = 8;
+const DEFAULT_PALETTE_SIZE = 8;
 
 export function initialColorState(paletteSize: number = DEFAULT_PALETTE_SIZE): ColorState {
   return { nextColor: 0, paletteSize };

@@ -26,7 +26,7 @@ export class MalformedBlobFrameError extends Error {
   }
 }
 
-export function isBlobMarker(value: unknown): value is { readonly $blob: true } {
+function isBlobMarker(value: unknown): value is { readonly $blob: true } {
   return (
     value !== null && typeof value === 'object' && (value as { $blob?: unknown }).$blob === true
   );
@@ -35,11 +35,7 @@ export function isBlobMarker(value: unknown): value is { readonly $blob: true } 
 /** Walks message the same shape `codec.ts`'s three traversals do, replacing the single
  *  `{"$blob":true}` marker with blob. Lives here rather than in `codec.ts` because it is a
  *  property of a blob-carrying channel's own framing, not of the buffer encodings `codec.ts` owns. */
-export function substituteBlob(
-  value: unknown,
-  blob: ArrayBuffer,
-  seen: { count: number },
-): unknown {
+function substituteBlob(value: unknown, blob: ArrayBuffer, seen: { count: number }): unknown {
   if (isBlobMarker(value)) {
     seen.count++;
     return blob;
@@ -53,7 +49,7 @@ export function substituteBlob(
   return value;
 }
 
-export function substituteBlobRoot(message: unknown, blob: ArrayBuffer): unknown {
+function substituteBlobRoot(message: unknown, blob: ArrayBuffer): unknown {
   const seen = { count: 0 };
   const result = substituteBlob(message, blob, seen);
   if (seen.count === 0) {
