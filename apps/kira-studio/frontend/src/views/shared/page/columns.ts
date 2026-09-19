@@ -8,7 +8,7 @@ import { typeDescription } from '../typeGlossary';
 // undercut it (their own `minWidth: 40` was a different, lower number), which is how a column as
 // short as "id" could persist at a one-character-wide render across a reload (found against the
 // real app: minWidth only ever bounded an interactive drag, never a width read back from storage).
-export const MIN_WIDTH = 64;
+const MIN_WIDTH = 64;
 // P28 D5: the floor a freshly *measured* column may not fall below, separate from MIN_WIDTH above.
 // The two were one constant doing two different jobs: MIN_WIDTH is the interactive-resize floor (a
 // deliberate narrow drag must stay possible, and a width read back from storage is a deliberate
@@ -16,7 +16,7 @@ export const MIN_WIDTH = 64;
 // values are all short ("id", "qty", a boolean) measured to exactly 64px, of which ~20px is header
 // chrome and 20px is CELL_PADDING — reported as columns rendering very narrow. 96px is the same
 // figure DEFAULT_COLUMN_WIDTH below already uses for "nothing measurable at all".
-export const MIN_INITIAL_WIDTH = 96;
+const MIN_INITIAL_WIDTH = 96;
 const MAX_WIDTH = 480;
 const CELL_PADDING = 20; // px, both sides combined plus a little breathing room
 const SAMPLE_ROWS = 50;

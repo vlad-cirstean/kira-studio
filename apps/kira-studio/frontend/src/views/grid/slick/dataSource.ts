@@ -10,20 +10,12 @@ import { rawPendingFor } from '../pendingChanges';
 // file keeps only what genuinely does: `createDisplayValueExtractor`/`pendingRowClasses` both read
 // `pendingChanges.ts`. Re-exported verbatim so `SlickGridHost.vue`'s own import
 // (`from './slick/dataSource'`) is untouched.
-export type {
-  DisplayRowIndex,
-  GridDataSourceState,
-  InsertHandle,
-  KiraGridDataSource,
-  RowHandle,
-} from '../../shared/slick/dataSource';
+export type { GridDataSourceState, RowHandle } from '../../shared/slick/dataSource';
 export {
   createGridDataSource,
-  dataLength,
   displayPositionOf,
   isRowVisible,
   rowAtDisplayPosition,
-  rowHandleAt,
 } from '../../shared/slick/dataSource';
 
 /**

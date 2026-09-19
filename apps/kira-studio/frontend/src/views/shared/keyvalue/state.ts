@@ -13,7 +13,7 @@ import { getPage, setPage } from './page';
 //
 // P63: keyed by `viewKey`, not `tabId` — a real KeyValue tab's own id, or BrowseView.vue's
 // `${tab.id}::preview` for the split's preview pane (host.ts's own seam).
-export interface KeyValueViewRuntime {
+interface KeyValueViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   /** P43 F6/D7: the last *action* (edit/add/delete) that failed, verbatim from the server —

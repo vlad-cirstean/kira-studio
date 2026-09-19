@@ -8,12 +8,12 @@ import { cell, getPage } from './page';
 // not a new SQLite table). Closing a tab or reloading its page silently discards uncommitted
 // edits, exactly like closing a spreadsheet you never saved.
 
-export interface PendingEdit {
+interface PendingEdit {
   row: number; // page-relative row index (matches DataGrid.vue's `r`), never the gutter number
   changes: Record<string, string | null>;
 }
 
-export interface PendingInsert {
+interface PendingInsert {
   id: string; // local identity for Vue :key and discard — never sent to the server
   values: Record<string, string | null>;
 }

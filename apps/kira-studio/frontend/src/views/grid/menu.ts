@@ -124,7 +124,7 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
  *  `setPage`, so by the time the request is made, the page in the store is the *filtered* one —
  *  requesting before the await would risk the target tab's own first, unfiltered mount-load
  *  consuming it and selecting the wrong record. */
-export async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Promise<void> {
+async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Promise<void> {
   const filter = foreignKeyValueFilter(
     ctx.dialect,
     entry.columns,
@@ -188,7 +188,7 @@ function fkEditItem(entry: ForeignKeyMeta, ctx: FkNavContext): MenuItem {
 
 // P67 §5.1: mirrors foreignKeyNavItems one for one (same edges) — spliced into cellMenu's own
 // fkItems array right after the nav items (P7 D3's own invariant, now for two actions).
-export function foreignKeyEditItems(
+function foreignKeyEditItems(
   columnName: string,
   meta: ObjectMeta | null,
   ctx: FkNavContext,

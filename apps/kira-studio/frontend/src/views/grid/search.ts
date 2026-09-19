@@ -17,7 +17,7 @@ export interface Match {
   end: number;
 }
 
-export function runSearch(
+function runSearch(
   tabId: string,
   q: SearchQuery,
   onProgress: (

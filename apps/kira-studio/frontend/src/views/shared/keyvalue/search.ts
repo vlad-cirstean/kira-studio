@@ -22,7 +22,7 @@ export interface Match {
 
 // Searches the loaded page only, never the server — same discipline as grid/search.ts (§8.5's
 // D28), applied to keyvalue's own two-column shape.
-export function runSearch(
+function runSearch(
   tabId: string,
   q: SearchQuery,
   onProgress: (

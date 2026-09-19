@@ -23,7 +23,7 @@ import { clearPending, hasPending, registerFullPrimaryKeyAccessor } from './pend
 // `import type { Selection } from './state'` site is unchanged.
 export type { Selection };
 
-export interface DataViewRuntime {
+interface DataViewRuntime {
   status: 'idle' | 'loading' | 'error' | 'cancelled';
   error: { code: string; message: string } | null;
   /** P43 F5/D7: the last *action* (commit) that failed, verbatim from the server. Distinct from

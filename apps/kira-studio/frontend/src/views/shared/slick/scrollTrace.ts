@@ -17,7 +17,7 @@
 //   __kiraScrollTrace.start()
 //   copy(JSON.stringify(__kiraScrollTrace.stop()))
 
-export interface ScrollTraceEvent {
+interface ScrollTraceEvent {
   /** el.scrollTop at the moment this native `scroll` event was handled. */
   offset: number;
   /** performance.now() at the moment this native `scroll` event was handled. */
@@ -42,7 +42,7 @@ export interface ScrollTraceEvent {
   afterRaf: boolean;
 }
 
-export interface ScrollTraceFrame {
+interface ScrollTraceFrame {
   /** requestAnimationFrame's own timestamp for this tick. */
   t: number;
   /** Native `scroll` events observed since the previous rAF tick. F2's direct, real-hardware test
@@ -100,7 +100,7 @@ export interface ScrollTraceFrame {
   rows: number;
 }
 
-export interface ScrollTraceStats {
+interface ScrollTraceStats {
   p50: number;
   p95: number;
   max: number;
@@ -110,7 +110,7 @@ export interface ScrollTraceStats {
   stddev: number;
 }
 
-export interface ScrollTraceSummary {
+interface ScrollTraceSummary {
   pxPerFrame: ScrollTraceStats;
   uncoveredPx: ScrollTraceStats;
   renderMs: ScrollTraceStats;

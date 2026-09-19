@@ -5,7 +5,7 @@ import { data } from '../../bridge/data';
 // P67 §4.1: the popover's own fetch + decode + state shape — no component logic here, this module
 // is what FkPreviewPopover.vue renders.
 
-export interface PreviewColumn {
+interface PreviewColumn {
   name: string;
   dataType: string;
   typeClass: TypeClass;
@@ -14,7 +14,7 @@ export interface PreviewColumn {
   isPrimaryKey: boolean;
 }
 
-export interface PreviewRow {
+interface PreviewRow {
   values: { text: string; isNull: boolean; truncated: boolean }[];
 }
 

@@ -14,7 +14,7 @@ export interface SearchQuery {
   regex: boolean;
 }
 
-export interface ScanResult<M> {
+interface ScanResult<M> {
   matches: M[];
   /** The true, uncapped count — `matches.length` once `found <= MAX_SCAN_MATCHES`, `MAX_SCAN_MATCHES`
    *  otherwise (D4/F6). */
@@ -46,7 +46,7 @@ export function chunkRowsForColumns(columnCount: number): number {
 // generous for anything a person actually navigates (Prev/Next through a highlight list) and
 // bounded for a machine — ~5 MB by F6's own per-match figure, two orders of magnitude past
 // realistic use.
-export const MAX_SCAN_MATCHES = 50_000;
+const MAX_SCAN_MATCHES = 50_000;
 
 /** P28 D11: the compiler itself moved down to editor/searchPattern.ts, so the request/response
  *  find bar's own case/word/regex toggles mean exactly what these three mean here rather than
