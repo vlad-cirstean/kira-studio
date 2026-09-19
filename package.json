@@ -28,7 +28,7 @@
     "mcp:repo-map:build": "go build -o apps/kira-studio/bin/kira-repo-map ./apps/kira-studio/cmd/kira-repo-map",
     "lint": "biome check . && sh scripts/check-tokens.sh",
     "lint:go": "sh scripts/install-golangci-lint.sh && \"$(go env GOPATH)/bin/golangci-lint\" run",
-    "lint:dead": "knip --include files,dependencies,unlisted,duplicates",
+    "lint:dead": "knip",
     "lint:all": "bun run lint && bun run lint:go && bun run lint:dead",
     "format": "biome check --write .",
     "typecheck": "sh -c 'bun run typecheck:tests & p1=$!; bun run typecheck:web & p2=$!; bun run typecheck:unit & p3=$!; bun run typecheck:api-core & p4=$!; bun run typecheck:git & p5=$!; fail=0; wait $p1 || fail=1; wait $p2 || fail=1; wait $p3 || fail=1; wait $p4 || fail=1; wait $p5 || fail=1; exit $fail'",

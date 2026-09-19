@@ -11,6 +11,11 @@
     // downgrade — see `editor/monaco.ts`.
     "duplicates": "warn"
   },
+  // `go` is the system Go toolchain, invoked by six scripts in this file's own package.json
+  // (`dev`, `mcp:repo-map:build`, `lint:go`, `package`, `test:go`, `typecheck` via `go env`).
+  // It is not an npm bin and never will be. Gated only from pass 3, when `lint:dead` dropped
+  // its `--include` filter and turned the `binaries` rule on.
+  "ignoreBinaries": ["go"],
   "ignoreDependencies": [
     // Ambient VS Code API types, resolved through tsconfig's own `"types"` array
     // (apps/kira-studio-vscode/tsconfig.json), never a static import.
@@ -37,7 +42,9 @@
       "project": ["scripts/**/*.ts", "packages/db-fixtures/**/*.ts"]
     },
     "apps/kira-studio/frontend": {
-      "entry": ["src/main.ts", "index.html"],
+      // src/main.ts dropped (P94 pass 3 §3.2): knip already reaches it through package.json's
+      // own field for this workspace — a redundant entry pattern, not a second real entry point.
+      "entry": ["index.html"],
       "project": ["src/**/*.{ts,vue}"]
     },
     "apps/kira-studio-vscode": {
@@ -45,23 +52,29 @@
         "src/extension.ts",
         "src/webview/main.ts",
         "tests/**/*.spec.ts",
-        "tests/**/*.entry.ts",
-        "playwright.config.ts"
+        "tests/**/*.entry.ts"
+        // playwright.config.ts dropped (P94 pass 3 §3.2): knip's own Playwright plugin already
+        // reaches it — a redundant entry pattern.
       ],
       "project": ["src/**/*.{ts,vue}", "tests/**/*.ts"]
     },
     "packages/shared": { "entry": ["**/*.ts"], "project": ["**/*.ts"] },
     "packages/api-core": {
-      "entry": ["src/index.ts", "test/**/*.test.ts"],
+      // src/index.ts dropped (P94 pass 3 §3.2): knip already reaches it through package.json's
+      // own `main`/`exports` field — a redundant entry pattern. test/**/*.test.ts corrected to
+      // test/**/*.spec.ts (P94 pass 3 §3.2): this directory holds *.spec.ts, not *.test.ts — the
+      // original pattern matched nothing since the day it landed.
+      "entry": ["test/**/*.spec.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "packages/git-ipc": {
-      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
+      "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.ts"]
     },
     "packages/git-core": {
       "entry": [
-        "src/index.ts",
+        // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
         "src/**/*.test.ts",
         // Invoked via `bun run` against its own absolute path, from a Go test
         // (apps/kira-studio/internal/gitsearch/differential_test.go) — never a static import.
@@ -70,11 +83,14 @@
       "project": ["src/**/*.ts"]
     },
     "packages/git-ui": {
-      "entry": ["src/index.ts", "src/icons/setiFileIcon.ts", "src/**/*.test.ts"],
+      // src/index.ts and src/icons/setiFileIcon.ts both dropped (P94 pass 3 §3.2) — knip already
+      // reaches both through package.json's own `main`/`exports` field.
+      "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.{ts,vue}"]
     },
     "packages/kira-ui": {
-      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      // src/index.ts dropped (P94 pass 3 §3.2) — see apps/kira-studio/frontend's own note above.
+      "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.{ts,vue}"]
     }
   }
