@@ -32,8 +32,8 @@ export interface FloatOptions {
  *  surface that ignores them, and a surface that fits is unaffected either way, since these are
  *  only ever a *maximum*. Custom properties rather than direct `style.maxHeight` writes so a
  *  consumer keeps control of whether the cap applies to itself or to an inner scroll container. */
-export const FLOAT_MAX_WIDTH_VAR = '--kira-float-max-w';
-export const FLOAT_MAX_HEIGHT_VAR = '--kira-float-max-h';
+const FLOAT_MAX_WIDTH_VAR = '--kira-float-max-w';
+const FLOAT_MAX_HEIGHT_VAR = '--kira-float-max-h';
 
 function setIfChanged(el: HTMLElement, prop: string, px: number): void {
   const next = `${Math.max(0, Math.round(px))}px`;

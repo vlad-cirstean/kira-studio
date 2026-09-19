@@ -7,4 +7,4 @@
 // call site — and anything reaching for the shared rpc.ts primitives through this path — is
 // unchanged.
 export { control } from './index';
-export { on, trust, unwrap, windowKey } from './rpc';
+export { unwrap } from './rpc';

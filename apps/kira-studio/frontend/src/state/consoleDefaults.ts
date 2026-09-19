@@ -5,7 +5,7 @@ import { reactive } from 'vue';
 // which database it targets from inside the script itself (unlike MariaDB's own `USE db;`), so
 // "Set as default" on a database/schema row remembers the row's own encoded path here and
 // openConsoleTab() substitutes it in when a console is opened at the root.
-export const consoleDefaults = reactive({} as Record<string, string>);
+const consoleDefaults = reactive({} as Record<string, string>);
 
 export function setConsoleDefault(connectionId: string, path: string): void {
   consoleDefaults[connectionId] = path;

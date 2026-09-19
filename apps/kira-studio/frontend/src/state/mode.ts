@@ -13,7 +13,7 @@ import { workspaceState } from './workspace';
 // cannot leak each other's tabs across a window. P22 D12 adds a debounced, eventually-persisted
 // side effect (below) without disturbing that — `tests/ui/mode-switch.spec.ts`'s own "mode
 // switching writes nothing" case still passes unchanged, since it counts tabsSave calls, not this.
-export const modeState = reactive({ active: 'studio' as AppMode });
+const modeState = reactive({ active: 'studio' as AppMode });
 
 // P22 D12: which module a window was in, so it reopens into the same one. `windows.bounds_json`'s
 // own persistence (internal/shell/window.go's Attach) is entirely native-event-driven
@@ -60,15 +60,6 @@ export function setMode(mode: AppMode): void {
   workspaceState.active = mode;
 }
 
-/** Every tab whose kind belongs to `mode` — what a mode's own tab strip renders. A repo tab can
- *  never match: TAB_KIND_MODE['repo-graph' | 'repo-file'] is the fixed sentinel `'repo'`, which is
- *  never equal to an AppMode (D2 — the isolation is enforced by the value, not only by this
- *  filter). Kept for any caller that only ever means "studio" or "api"; tabsForWorkspace below is
- *  the general form the tab strip itself now uses. */
-export function tabsForMode(mode: AppMode): TabRecord[] {
-  return tabsState.tabs.filter((t) => TAB_KIND_MODE[t.kind] === mode);
-}
-
 // C5 D2/§4.1: the actual workspace a tab belongs to — its own explicit workspaceId when set (every
 // repo tab), else its kind's fixed mode (every studio/api tab, `null` today and forever unless a
 // later phase adds per-connection isolation there too, §13). This one function is what replaces
@@ -77,8 +68,8 @@ export function workspaceKeyOf(tab: TabRecord): WorkspaceKey {
   return (tab.workspaceId as WorkspaceKey | null) ?? (TAB_KIND_MODE[tab.kind] as AppMode);
 }
 
-/** Every tab in workspace `key` — tabsForMode's own generalisation, widened to a genuine stable
- *  partition (§6.1): every pinned-kind tab of `key` first (in their existing relative order), then
+/** Every tab in workspace `key` — a genuine stable partition (§6.1): every pinned-kind tab of
+ *  `key` first (in their existing relative order), then
  *  the rest (ditto), regardless of where each sits in `tabsState.tabs`. Computed here rather than
  *  relied on as an insertion-order invariant, so the guarantee survives any past or future
  *  tab-insertion path (splice, restore, moveTab) without each one having to remember to preserve

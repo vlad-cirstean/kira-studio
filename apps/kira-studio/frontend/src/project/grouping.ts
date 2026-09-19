@@ -61,7 +61,7 @@ export function labelForKind(
 // The complete, curated list of kinds that get their own folder, in render order. Any kind not
 // named here is never grouped and keeps its position — which is what leaves redis namespaces/keys
 // and s3 prefixes/objects exactly as they are today.
-export const GROUPED_KINDS: readonly { kind: NodeKind }[] = [
+const GROUPED_KINDS: readonly { kind: NodeKind }[] = [
   { kind: 'view' },
   { kind: 'matview' },
   { kind: 'sequence' },

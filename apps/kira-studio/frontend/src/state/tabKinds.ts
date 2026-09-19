@@ -96,7 +96,7 @@ import { closeTerminalSession } from './terminals';
 // project panel" menu item (F11) — nothing here changes what Studio does, only where it lives.
 /** A codicon name, or a file path whose icon comes from the shared seti set
  *  (`repo/fileIcon.ts`) — the same rule the repo file tree and the diff tree already use. */
-export type TabIcon = string | { readonly filePath: string };
+type TabIcon = string | { readonly filePath: string };
 
 export interface TabKindDef<K extends TabKind = TabKind> {
   mode: (typeof TAB_KIND_MODE)[K];

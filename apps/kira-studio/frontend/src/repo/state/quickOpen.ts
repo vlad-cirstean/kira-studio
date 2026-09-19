@@ -14,7 +14,7 @@ import {
 // 144.06ms at 200k); threshold is fuzzysort's own documented "good match" floor.
 export const QUICK_OPEN_MAX_RESULTS = 50;
 export const QUICK_OPEN_MAX_CANDIDATES = 50_000;
-export const QUICK_OPEN_THRESHOLD = 0.4;
+const QUICK_OPEN_THRESHOLD = 0.4;
 
 // §3.2 rule 2: small against fuzzysort's 0..1 scale, so it only ever breaks a near-tie, never
 // promotes a worse match.
@@ -22,7 +22,7 @@ const DEPTH_PENALTY = 0.001;
 
 // §3.1: repository-relative path, git's own bytes verbatim — no NFC normalisation (enumerate.go's
 // tier-2 rule; openRepoFileTab hands this straight to ReadFile).
-export interface QuickOpenItem {
+interface QuickOpenItem {
   path: string;
   name: string; // basename
   dir: string; // parent dir, '' at root
@@ -40,7 +40,7 @@ function buildItems(paths: readonly string[]): QuickOpenItem[] {
   });
 }
 
-export interface HighlightPart {
+interface HighlightPart {
   text: string;
   matched: boolean;
 }
@@ -175,7 +175,7 @@ export function quickOpenResults(): QuickOpenRow[] {
 // the palette if it happened to be showing repoId (the ordinary case is already covered by the
 // workspaceState.active watch below, since closeRepoWorkspace always clears `active` first when the
 // closed workspace was the active one).
-export function dropQuickOpen(repoId: string): void {
+function dropQuickOpen(repoId: string): void {
   snapshotCache.delete(repoId);
   if (quickOpenState.open && quickOpenState.repoId === repoId) closeQuickOpen();
 }

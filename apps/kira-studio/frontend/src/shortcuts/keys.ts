@@ -3,7 +3,7 @@ import { type Binding, type Chord, SHORTCUTS, type ShortcutId } from '@shared/do
 // Menus build synchronously and AppInfo (bridge/control.ts's appInfo()) is fetched async, so a UA
 // sniff beats plumbing a platform bridge through for one boolean that never changes for the
 // process's lifetime.
-export const isMac = navigator.userAgent.includes('Mac');
+const isMac = navigator.userAgent.includes('Mac');
 
 function resolveChord(id: ShortcutId): Chord {
   const binding: Binding = SHORTCUTS[id];
@@ -48,7 +48,7 @@ const DOM_KEY: Record<string, string> = { Return: 'Enter' };
 // `chord.ctrl` (a literal Control, distinct from cmdOrCtrl) only ever appears on the two
 // `global: true` tab-navigation bindings (shared/domain/shortcuts.ts) — an Electron accelerator owns
 // those, never a local keydown handler — so a local match only ever needs cmdOrCtrl/shift/alt.
-export function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
+function matchesShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
   const chord = resolveChord(id);
   const cmdOrCtrlPressed = isMac ? e.metaKey : e.ctrlKey;
   const otherPlatformModPressed = isMac ? e.ctrlKey : e.metaKey;

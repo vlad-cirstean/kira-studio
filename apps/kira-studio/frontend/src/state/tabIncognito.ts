@@ -14,7 +14,7 @@ import { registerTabRuntimeCleanup } from './tabRuntime';
 //
 // Standing rule for later phases: any new bridge write reachable from a request tab must consult
 // isIncognito first.
-export const incognitoState = reactive({ ids: new Set<string>() });
+const incognitoState = reactive({ ids: new Set<string>() });
 
 export function isIncognito(tabId: string): boolean {
   return incognitoState.ids.has(tabId);

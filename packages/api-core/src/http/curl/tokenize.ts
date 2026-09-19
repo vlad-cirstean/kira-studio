@@ -7,9 +7,10 @@ import { split } from 'shlex';
 //
 // D4: the warning vocabulary is a closed union (mirrors internal/postman's own warning kinds,
 // P4 D12) — defined here rather than in parse.ts because D18 pins tokenize.ts to "shlex only" as
-// its one dependency, and this module's own TokenizeResult already needs the type. parse.ts
-// re-exports it for its own public API; every other CurlWarningKind member is used only there.
-export const CURL_WARNING_KINDS = [
+// its one dependency, and this module's own TokenizeResult already needs the type. index.ts
+// re-exports CurlWarning/CurlWarningKind for the package's public API (P94 pass 3 §5.2: the array
+// itself has no consumer outside this file, only the derived type does).
+const CURL_WARNING_KINDS = [
   'shell-operator',
   'unknown-flag',
   'unsupported-flag',

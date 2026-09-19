@@ -64,7 +64,7 @@ function rgbaToHex8(rgba: string): string | undefined {
   return `#${byte(Number(r))}${byte(Number(g))}${byte(Number(b))}${byte(Number(a) * 255)}`;
 }
 
-export function normalizeColor(color: string): string {
+function normalizeColor(color: string): string {
   if (normalizeCanvasCtx === undefined) {
     normalizeCanvasCtx = document.createElement('canvas').getContext('2d');
   }

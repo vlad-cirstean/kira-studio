@@ -8,10 +8,10 @@ import { reactive } from 'vue';
 
 /** F4/D6: the app's one hover-pause constant, shared with the editor's lint tooltip
  *  (CodeMirrorHost.vue's `delay: 400`). */
-export const TOOLTIP_DELAY_MS = 400;
+const TOOLTIP_DELAY_MS = 400;
 /** D6: moving between two hinted controls within this window re-opens with no delay, so scanning
  *  a toolbar reads as one gesture instead of five separate 400 ms waits. */
-export const TOOLTIP_REARM_MS = 300;
+const TOOLTIP_REARM_MS = 300;
 
 /** The attribute the directive writes and the controller reads — also the Playwright handle that
  *  replaces `title` (D8: one source of truth for hit-testing and for the displayed string). */

@@ -102,7 +102,7 @@ export function gitRepoIdFor(codeRepoId: string): string | undefined {
 
 /** The reverse of `gitRepoIdFor` — a git `repoId` (from an inbound `editor.*` request's own
  *  params) back to the `code_repos.id` every native tab/workspace call needs, or `undefined`. */
-export function codeRepoIdFor(gitRepoId: string): string | undefined {
+function codeRepoIdFor(gitRepoId: string): string | undefined {
   return codeReposState.records.find((r) => r.repoId === gitRepoId)?.id;
 }
 

@@ -40,7 +40,7 @@ export interface TreeRowVm {
 // `database:kira_test/schema:app#function` — a real encoded path can never contain '#'
 // (encodeURIComponent('#') is '%23', and every path segment is `${kind}:${name}`), so this
 // collides with no node's path and no other group's (P19 D2/realities #8).
-export function groupPath(parentPath: string, kind: NodeKind): string {
+function groupPath(parentPath: string, kind: NodeKind): string {
   return `${parentPath}#${kind}`;
 }
 
@@ -219,7 +219,7 @@ export async function refreshConnection(connectionId: string): Promise<void> {
 // (tree.Service's own freshness rule, reached via the reconnect push), so refresh:false already
 // reaches the server; refresh:true on top would force a re-fetch of a path a *sibling window* may
 // have already refreshed under the same epoch, which the epoch rule says is unnecessary.
-export async function refreshExpanded(connectionId: string): Promise<void> {
+async function refreshExpanded(connectionId: string): Promise<void> {
   const prefix = `${connectionId}|`;
   const paths = [...treeState.expanded]
     .filter((k) => k.startsWith(prefix))

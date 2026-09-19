@@ -30,7 +30,7 @@ export interface EditorCompletion {
   snippet?: string;
 }
 
-export interface EditorCompletionResult {
+interface EditorCompletionResult {
   /** Offset the replacement range starts at — the option's own `insert`/`label` replaces
    *  `[from, ctx.offset)`. */
   from: number;
