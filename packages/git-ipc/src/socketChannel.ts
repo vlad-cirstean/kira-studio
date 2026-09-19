@@ -89,8 +89,76 @@ export class FrameDeliveryError extends Error {
   }
 }
 
+interface FrameDrainState {
+  recvBuffer: Buffer;
+}
+
+// A blob frame's body (BLOB_FRAME_DISCRIMINANT-prefixed) — `parseBlobFrameBody`'s own parse
+// failure destroys the socket exactly like a malformed JSON body does (deliverFrame below).
+// Returns whether the frame was delivered (drainFrames' own signal to keep draining or stop).
+function deliverBlobFrame(
+  body: Buffer,
+  deliver: (message: unknown) => void,
+  destroy: (err: Error) => void,
+): boolean {
+  try {
+    deliver(parseBlobFrameBody(body));
+    return true;
+  } catch (err) {
+    destroy(err instanceof Error ? err : new MalformedBlobFrameError(String(err)));
+    return false;
+  }
+}
+
+// A plain JSON frame's body — see deliverBlobFrame's own doc comment.
+function deliverFrame(
+  body: Buffer,
+  deliver: (message: unknown) => void,
+  destroy: (err: Error) => void,
+): boolean {
+  try {
+    deliver(JSON.parse(body.toString('utf8')));
+    return true;
+  } catch (err) {
+    destroy(err instanceof Error ? err : new FrameDeliveryError(String(err)));
+    return false;
+  }
+}
+
+// Drains *every* complete frame currently sitting in `state.recvBuffer` — two frames delivered in
+// one read would otherwise strand the second until more data arrives (this file's own doc
+// comment). The four early `return`s below are real early returns, not `break`s: each ends this
+// whole drain (the caller's `socket.on('data', …)` handler has nothing left to do either way),
+// not just the current frame — past each of them there either isn't a complete frame yet (a
+// partial header or a partial body) or the socket is already being destroyed, and recvBuffer must
+// not be touched again after that.
+function drainFrames(
+  state: FrameDrainState,
+  deliver: (message: unknown) => void,
+  destroy: (err: Error) => void,
+): void {
+  for (;;) {
+    if (state.recvBuffer.byteLength < FRAME_HEADER_LEN) return;
+    const declaredLength = state.recvBuffer.readUInt32BE(0);
+    if (declaredLength > MAX_FRAME_BYTES) {
+      destroy(new FrameTooLargeError(declaredLength));
+      return;
+    }
+    const frameEnd = FRAME_HEADER_LEN + declaredLength;
+    if (state.recvBuffer.byteLength < frameEnd) return;
+    const body = state.recvBuffer.subarray(FRAME_HEADER_LEN, frameEnd);
+    state.recvBuffer = state.recvBuffer.subarray(frameEnd);
+
+    const delivered =
+      body.byteLength > 0 && body[0] === BLOB_FRAME_DISCRIMINANT
+        ? deliverBlobFrame(body, deliver, destroy)
+        : deliverFrame(body, deliver, destroy);
+    if (!delivered) return;
+  }
+}
+
 export function createSocketChannel(socket: Socket): SocketChannel {
-  let recvBuffer: Buffer = Buffer.alloc(0);
+  const drainState: FrameDrainState = { recvBuffer: Buffer.alloc(0) };
   let currentHandler: ((message: unknown) => void) | null = null;
   const closeHandlers = new Set<(err?: Error) => void>();
 
@@ -120,38 +188,11 @@ export function createSocketChannel(socket: Socket): SocketChannel {
   }
 
   socket.on('data', (chunk: Buffer) => {
-    recvBuffer = recvBuffer.byteLength === 0 ? chunk : Buffer.concat([recvBuffer, chunk]);
-    // Drain *every* complete frame present after this read — two frames delivered in one
-    // TCP/Unix read would otherwise strand the second until more data arrives (this file's own
-    // doc comment; the classic bug this loop exists to avoid).
-    for (;;) {
-      if (recvBuffer.byteLength < FRAME_HEADER_LEN) return;
-      const declaredLength = recvBuffer.readUInt32BE(0);
-      if (declaredLength > MAX_FRAME_BYTES) {
-        socket.destroy(new FrameTooLargeError(declaredLength));
-        return;
-      }
-      const frameEnd = FRAME_HEADER_LEN + declaredLength;
-      if (recvBuffer.byteLength < frameEnd) return;
-      const body = recvBuffer.subarray(FRAME_HEADER_LEN, frameEnd);
-      recvBuffer = recvBuffer.subarray(frameEnd);
-
-      if (body.byteLength > 0 && body[0] === BLOB_FRAME_DISCRIMINANT) {
-        try {
-          deliver(parseBlobFrameBody(body));
-        } catch (err) {
-          socket.destroy(err instanceof Error ? err : new MalformedBlobFrameError(String(err)));
-          return;
-        }
-      } else {
-        try {
-          deliver(JSON.parse(body.toString('utf8')));
-        } catch (err) {
-          socket.destroy(err instanceof Error ? err : new FrameDeliveryError(String(err)));
-          return;
-        }
-      }
-    }
+    drainState.recvBuffer =
+      drainState.recvBuffer.byteLength === 0
+        ? chunk
+        : Buffer.concat([drainState.recvBuffer, chunk]);
+    drainFrames(drainState, deliver, (err) => socket.destroy(err));
   });
   socket.on('close', () => fireClose());
   socket.on('error', (err) => fireClose(err));
