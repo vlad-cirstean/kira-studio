@@ -13,6 +13,7 @@ import { closeContextMenu, contextMenuState, type MenuItem } from '../state/cont
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import { computeFloatPosition, pointReference } from '../theme/floatingPosition';
+import { CONTEXT_MENU_KEY_HANDLERS, type ContextMenuKeyContext } from './contextMenuKeys';
 
 const SUBMENU_OPEN_DELAY_MS = 150;
 
@@ -69,15 +70,6 @@ const activeSubItem = computed(() =>
   activeSubIndex.value >= 0 ? (navigableSub.value[activeSubIndex.value] ?? null) : null,
 );
 
-/** Wraps in both directions; from -1 (nothing active yet), Down lands on the first row and Up on
- *  the last — the ordinary "nothing selected yet" convention, not the generic wrap formula's own
- *  off-by-one from -1. */
-function stepIndex(current: number, delta: 1 | -1, length: number): number {
-  if (length === 0) return -1;
-  if (current < 0) return delta === 1 ? 0 : length - 1;
-  return (current + delta + length) % length;
-}
-
 // P23: anchored to the mouse click point, not an element (theme/floatingPosition.ts's own
 // pointReference) — flip is off because a point has no "other side" to flip to, only the
 // viewport edges shift() already keeps it clear of. This menu only opens briefly (a click,
@@ -133,64 +125,36 @@ function onDocMouseDown(e: MouseEvent): void {
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) closeContextMenu();
 }
 
+function clearSubmenuTimer(): void {
+  if (submenuTimer) clearTimeout(submenuTimer);
+}
+
+// P94 pass 3 §4.3: the handler table itself (contextMenuKeys.ts) owns every branch's body;
+// onKeydown stays the Escape guard, the open guard and the lookup. `keyCtx` carries the SFC's own
+// refs/computed refs directly (never a snapshot), since a handler must re-read `.value` at the
+// exact point the inline code did (contextMenuKeys.ts's own header comment).
+const keyCtx: ContextMenuKeyContext = {
+  activeIndex,
+  activeSubIndex,
+  openSubmenuId,
+  navigable,
+  navigableSub,
+  activeTopItem,
+  activeSubItem,
+  clearSubmenuTimer,
+  onItemClick,
+};
+
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     closeContextMenu();
     return;
   }
   if (!contextMenuState.open) return;
-
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    const delta = e.key === 'ArrowDown' ? 1 : -1;
-    if (activeSubIndex.value >= 0) {
-      activeSubIndex.value = stepIndex(activeSubIndex.value, delta, navigableSub.value.length);
-    } else {
-      activeIndex.value = stepIndex(activeIndex.value, delta, navigable.value.length);
-      // Arrow-navigating past a hover-opened submenu trigger must not leave it open behind the
-      // newly active row — the same thing hovering a non-submenu row already does (onRowEnter).
-      if (submenuTimer) clearTimeout(submenuTimer);
-      openSubmenuId.value = null;
-    }
-    return;
-  }
-
-  if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    if (activeSubIndex.value >= 0) return; // already as deep as this menu goes
-    const current = activeTopItem.value;
-    if (current?.type !== 'submenu') return;
-    if (submenuTimer) clearTimeout(submenuTimer);
-    openSubmenuId.value = current.id;
-    activeSubIndex.value = navigableSub.value.length > 0 ? 0 : -1;
-    return;
-  }
-
-  if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    if (activeSubIndex.value < 0) return; // already at the top level
-    openSubmenuId.value = null;
-    activeSubIndex.value = -1;
-    return;
-  }
-
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    if (activeSubIndex.value >= 0) {
-      const sub = activeSubItem.value;
-      if (sub?.type === 'item') void onItemClick(sub);
-      return;
-    }
-    const current = activeTopItem.value;
-    if (!current) return;
-    if (current.type === 'submenu') {
-      if (submenuTimer) clearTimeout(submenuTimer);
-      openSubmenuId.value = current.id;
-      activeSubIndex.value = navigableSub.value.length > 0 ? 0 : -1;
-      return;
-    }
-    void onItemClick(current);
-  }
+  const handler = CONTEXT_MENU_KEY_HANDLERS[e.key];
+  if (!handler) return;
+  e.preventDefault();
+  handler(keyCtx);
 }
 
 onMounted(() => {
