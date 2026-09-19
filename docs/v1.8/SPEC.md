@@ -1852,6 +1852,84 @@ behaviour changes noticed while reading any of the 49 functions worth logging as
 of pass 1's deferred items touched: no `errcheck`/`staticcheck` (P95 owns them), no Biome
 complexity rule, no `knip` `exports`/`types`, none of §11's named pass-4 flakes.
 
+**Pass 3 — TS/Vue complexity and dead exports
+(`docs/v1.8/plans/P94-code-quality-tooling-iter3.md`), 26 commits.** Biome's
+`complexity/noExcessiveCognitiveComplexity` enabled at `maxAllowedComplexity: 30`, and `lint:dead`
+drops its `--include files,dependencies,unlisted,duplicates` filter to become plain `knip`, gating
+on `exports`/`types`/`binaries` too. Re-measured against the pre-phase commit rather than trusting
+the parent plan's §11 guess: **21 functions over 30**, not the sketch's flat "21" — 2 of them
+(`gitStreamMock.ts:127`'s `send`, 36; `mode-switch.spec.ts:234`'s `evaluate` helper, 34) are
+test-only, exempted in prose by §4.2 but never in config; a first `overrides` entry (the four test
+globs — `**/tests/**`, `**/test/**`, `**/*.test.ts`, `**/*.spec.ts`) turns that into **19**, verified
+by diffing Biome's finding set before/after the override: exactly those two drop, nothing else
+moves. The 15 remaining functions refactored one commit each, worst score first, across the plan's
+four shapes (scanner/tokenizer split, accumulate-then-decide, dispatch table, Vue lifecycle) —
+`beautify.ts:43`'s `parseJsonString` (a named risk item, §6) stays under the gate at 29, confirmed
+by a dedicated re-check: forcing the rule to `maxAllowedComplexity: 3` over every file commits 1-15
+touched and reading every function's own score shows nothing above 30 outside the two exempted test
+functions, `beautify.ts:43` included.
+
+**knip (commits 17-25).** Re-derived after the complexity refactors landed, per §5.3, rather than
+reusing the parent plan's stale count: **73 exports + 50 types = 123** findings, not the sketch's
+71 + 46 = 117 or pass 1's own 122 baseline — the delta is `InlineBlameAttachParams`, a type this
+pass's own `useInlineBlame.ts` extraction (commit 15) introduced. Dropping `--include` also turned
+on the `binaries` rule, surfacing `go` (the system toolchain six `package.json` scripts invoke,
+never an npm bin) — resolved with `ignoreBinaries: ["go"]`. Triage confirmed §5.1's two predicted
+non-categories stay empty (no test-only-helper exemption needed, no intentional-public-API
+category — both checked by reading, not grepping, per the plan's own warning about same-named
+symbols in unrelated modules) and executed the three real fixes: **105 keyword-drops**, **15
+re-export-list prunes** (the 7 named shims: `views/grid/slick/dataSource.ts`, `bridge/control.ts`,
+`packages/api-core/src/http/curl/parse.ts`, `packages/git-ui/src/graph/rowSvg.ts`,
+`views/grpcrequest/history.ts`, `views/httprequest/history.ts`,
+`packages/git-ui/src/components/rowMenuModel.ts`), and **3 real deletions**, not the plan's
+anticipated 1 — `api/tabs.ts`'s `findVariableSetTab` as named, plus two more the plan didn't
+anticipate: `graph/rowSvg.ts`'s `gutterWidth` and `state/mode.ts`'s `tabsForMode`, both attempted
+as ordinary keyword-drops first, both then flagged by Biome's `noUnusedVariables` as having zero
+callers anywhere (not just zero external importers) once `export` came off, and deleted instead of
+left as dead private code. One knock-on finding surfaced only after commit 17 removed
+`curl/parse.ts`'s re-export: `tokenize.ts`'s own `CURL_WARNING_KINDS` lost its only external
+reachability and turned unused on a later `knip` run; fixed in commit 24 (a new commit, not an
+amend to 17, since other commits had already built on it) with its doc comment corrected to point
+at `index.ts`'s real re-export path. `ignoreExportsUsedInFile` declined, per §5.2's own reasoning:
+it would have cleared the 105 keyword-drops with one config line at the cost of blinding every
+future pass to genuine dead public surface. knip's 8 actionable configuration hints folded into
+`knip.json` (a corrected `api-core` entry glob, 7 redundant `entry` patterns dropped since a
+`package.json` field or knip's own plugin already reaches each); the 4 remaining hints (asking for
+`.vue`/`.css` compiler registration) stay declined — `.vue` imports already resolve correctly
+without one, and honoring them means converting `knip.json` to `knip.ts` for no functional gain.
+Confirmed by diffing knip's full finding set immediately before and after commit 25's edit:
+identical apart from the resolved hints and the `go` binary — no export/type finding moved.
+
+**Verification (§10).** `bun run lint` and `bun run typecheck` clean throughout, per-commit. `bun
+run lint:all` clean: Biome 0 errors (1 pre-existing warning, 1 pre-existing info, both untouched and
+out of scope), `golangci-lint` 0 findings (pass 2's 11 linters, untouched — no Go work this pass),
+`knip`/`lint:dead` exits 0 (6 pre-existing `duplicates` findings at `warn`, untouched; 4 declined
+configuration hints, informational only). `go build`/`go vet`/`go test ./...` all clean, no Go files
+touched. `bun run build` and `bun run build:vscode` both succeed. `bun run test:unit`: **1543
+passed**, 0 failed (1538 pass 2's baseline, +5 for commit 7's own new `lintMongoBrackets`
+table-driven test — the plan's one permitted new test, §9). `bun run test:webview`: 55 passed, 0
+failed — identical to pass 2. `bun run test:ui` (316 tests): two full concurrent runs taken, since
+the first showed a different failure set than the plan's stated pass-2 baseline (311 passed/1
+failed/4 did not run) — run 1: 309 passed/3 failed/4 did not run
+(`api-ui-consistency.spec.ts`'s hover z-index case, `sql-schema.spec.ts`'s no-completion case,
+`http-request-body.spec.ts`'s 500-byte case); run 2: 310 passed/2 failed/4 did not run
+(`data-view.spec.ts`'s pagination case, `http-request-body.spec.ts`'s 500-byte case again). Per
+§10's own isolation method (the same one pass 1 used to tell contention from regression):
+`api-ui-consistency`'s hover case, `sql-schema`'s no-completion case and `data-view`'s pagination
+case each pass clean under `--project=ui --workers=1` alone — three different tests failing once
+each across two runs, never the same test twice except one, is resource contention under the
+4-worker concurrent run, not a regression this pass introduced. `http-request-body.spec.ts`'s
+form-data case is the one exception: it reproduces identically (`Received: 657`, `Expected: < 500`)
+in both concurrent runs *and* in isolation — exactly the plan's own named, pre-existing flake (§12,
+owned by pass 4). No unexplained failure remains. Pass-3-specific checks: Biome forced to
+`maxAllowedComplexity: 3` over commits 1-15's files shows the worst score at 30
+(`rowPlan.ts`'s `projectLayoutInput`, one of `buildRowPlan`'s three split phases) — not over the
+real gate, since the rule fires on *exceeding* 30, confirmed by re-running the same files at the
+real `maxAllowedComplexity: 30` and getting zero findings; `beautify.ts:43` stays at 29. Knip diff
+before/after commit 25 confirmed clean as described above. Test override confirmed to drop exactly
+the two named findings, nothing else. No known open item beyond what pass 1 already opened as P95
+and what §12 names as pass 4's.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
