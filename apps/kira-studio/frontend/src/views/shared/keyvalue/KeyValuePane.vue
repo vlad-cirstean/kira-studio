@@ -39,11 +39,7 @@ import {
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatBytes } from '../../../format';
 import { registerCommand } from '../../../shortcuts/commands';
-import {
-  clearSelectedCellFor,
-  publishSelectedCell,
-  type SelectedCell,
-} from '../../../state/cellSelection';
+import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConfirmDialogStore } from '../../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../../state/connections';
 import { useContextMenuStore } from '../../../state/contextMenu';
@@ -89,6 +85,7 @@ import {
   toggleSearchOpen,
 } from './state';
 
+const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const objectStoreStore = useObjectStoreStore();
@@ -377,7 +374,7 @@ const objectSaveError = ref<string | null>(null);
 watch(page, () => {
   objectDraft.value = null;
   objectSaveError.value = null;
-  clearSelectedCellFor(props.viewKey);
+  cellSelectionStore.clearSelectedCellFor(props.viewKey);
 });
 
 async function saveObjectEdit(): Promise<void> {
@@ -555,7 +552,7 @@ function onRowClick(i: number): void {
         }
       : {}),
   };
-  publishSelectedCell(selected);
+  cellSelectionStore.publishSelectedCell(selected);
 }
 
 // P2 R2 (task #98): `@click="onRowClick(i)"` closes over the v-for's `i`, so Vue's compiler can

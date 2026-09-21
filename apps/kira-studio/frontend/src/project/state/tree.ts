@@ -9,7 +9,7 @@ import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filte
 import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { connectConnection, connectionRecord, connectionsState } from '../../state/connections';
-import { dropSchemaColumns } from '../../state/schemaColumns';
+import { useSchemaColumnsStore } from '../../state/schemaColumns';
 import { reloadTabsForTarget } from '../../state/viewCommands';
 import { isVisible, toSets, type VisibilitySets } from '../filter';
 import { isLeafKind, labelForGroup, partitionChildren } from '../grouping';
@@ -194,7 +194,7 @@ export function toggleGroup(connectionId: string, path: string): void {
 export async function refresh(connectionId: string, path: string): Promise<void> {
   treeState.expanded.add(rowKey(connectionId, path));
   await control.treeInvalidate(connectionId, path);
-  dropSchemaColumns(connectionId, path);
+  useSchemaColumnsStore().dropSchemaColumns(connectionId, path);
   await loadChildren(connectionId, path, false);
 }
 
@@ -204,7 +204,7 @@ export async function refresh(connectionId: string, path: string): Promise<void>
 // produces, so this and a reconnect never disagree about what "refreshed" means.
 export async function refreshConnection(connectionId: string): Promise<void> {
   await control.treeInvalidate(connectionId);
-  dropSchemaColumns(connectionId);
+  useSchemaColumnsStore().dropSchemaColumns(connectionId);
   await refreshExpanded(connectionId);
 }
 

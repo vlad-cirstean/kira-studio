@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, ref, watch } from 'vue';
-import {
-  clearSelectedCellFor,
-  publishSelectedCell,
-  type SelectedCell,
-} from '../../state/cellSelection';
+import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { settingsState } from '../../state/settings';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -29,6 +25,7 @@ import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from
 import { type Match, matchedRows, searchState } from './search';
 import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded } from './state';
 
+const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 
 // A three-way switch over a console result's own kind (P8) — tabular results render through
@@ -174,7 +171,7 @@ function isSelected(row: number, col: number): boolean {
 // page in the first place.
 watch([() => props.pageKey, () => pageVersion.n], () => {
   selected.value = null;
-  clearSelectedCellFor(props.tabId);
+  cellSelectionStore.clearSelectedCellFor(props.tabId);
 });
 
 // P40 D10: rebuilt only when the search result changes (a completed scan or prev/next), not per
@@ -203,7 +200,7 @@ function goToMatch(match: Match): void {
 defineExpose({ goToMatch, expandAll, collapseAll });
 
 function publish(selectedCell: Omit<SelectedCell, 'tabId' | 'connectionId' | 'path'>): void {
-  publishSelectedCell({
+  cellSelectionStore.publishSelectedCell({
     tabId: props.tabId,
     connectionId: props.connectionId,
     path: props.path,

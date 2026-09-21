@@ -19,11 +19,7 @@ import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickg
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { shortcutFor } from '../../shortcuts/keys';
-import {
-  clearSelectedCellFor,
-  publishSelectedCell,
-  type SelectedCell,
-} from '../../state/cellSelection';
+import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
 import {
@@ -114,6 +110,7 @@ import { parseTextSortTerms } from './sortTerms';
 import { runtime, type Selection, setActionError, setMaskPreview, setSort } from './state';
 
 const contextMenuStore = useContextMenuStore();
+const cellSelectionStore = useCellSelectionStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -2484,19 +2481,19 @@ watch(
     const t = tab();
     const target = selectionTarget();
     if (!p || !t || !target || target.row < 0 || target.row >= p.rowCount) {
-      clearSelectedCellFor(props.tabId);
+      cellSelectionStore.clearSelectedCellFor(props.tabId);
       return;
     }
     const order = currentOrder();
     const pageCol = pageColumnIndexFor(p, order, target.col);
     if (pageCol < 0) {
-      clearSelectedCellFor(props.tabId);
+      cellSelectionStore.clearSelectedCellFor(props.tabId);
       return;
     }
     const view = displayCell(target.row, target.col);
     const column = p.columns[pageCol];
     if (!column) {
-      clearSelectedCellFor(props.tabId);
+      cellSelectionStore.clearSelectedCellFor(props.tabId);
       return;
     }
     const targetRow = target.row;
@@ -2532,7 +2529,7 @@ watch(
           ? () => discardCellEdit(props.tabId, targetRow, column.name)
           : undefined,
     };
-    publishSelectedCell(selected);
+    cellSelectionStore.publishSelectedCell(selected);
   },
   { immediate: true },
 );

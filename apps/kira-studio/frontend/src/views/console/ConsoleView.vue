@@ -9,12 +9,7 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
-import {
-  cachedRelationsFor,
-  containerPathFor,
-  effectiveSchema,
-  ensureSchemaColumns,
-} from '../../state/schemaColumns';
+import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
 import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -59,6 +54,7 @@ import {
 } from './state';
 
 const contextMenuStore = useContextMenuStore();
+const schemaColumnsStore = useSchemaColumnsStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -123,7 +119,7 @@ const containerPath = computed(() =>
 watch(
   () => [props.tab.connectionId, containerPath.value] as const,
   ([connectionId, path]) => {
-    if (connectionId && path) void ensureSchemaColumns(connectionId, path);
+    if (connectionId && path) void schemaColumnsStore.ensureSchemaColumns(connectionId, path);
   },
   { immediate: true },
 );
@@ -135,7 +131,7 @@ watch(
 // relation names as a distinct fallback layer — but this is the one place lint/hover read, so
 // they can never disagree with completion about what the console knows.
 const ddlSchema = computed(() =>
-  effectiveSchema(props.tab.connectionId ?? '', containerPath.value ?? '', documentDdlSchema.value),
+  schemaColumnsStore.effectiveSchema(props.tab.connectionId ?? '', containerPath.value ?? '', documentDdlSchema.value),
 );
 
 // D21/D22: undefined for any kind with no console at all, which a mounted ConsoleView never
@@ -150,7 +146,7 @@ const completionSources = computed(() => {
     const connectionId = props.tab.connectionId;
     const cached =
       connectionId && containerPath.value
-        ? cachedRelationsFor(connectionId, containerPath.value)
+        ? schemaColumnsStore.cachedRelationsFor(connectionId, containerPath.value)
         : [];
     return consoleCompletionSources(
       connectionKind.value,

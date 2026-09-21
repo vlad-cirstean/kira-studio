@@ -4,7 +4,7 @@ import { control } from '../bridge/control';
 import { data } from '../bridge/data';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { connectionRecord, connectionsState } from '../state/connections';
-import { closeGenerateDataDialog, fakeDataDialogState } from '../state/fakeData';
+import { useFakeDataStore } from '../state/fakeData';
 import { findDataTab } from '../state/tabs';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -28,7 +28,8 @@ import { sqlDialectFor } from '../views/shared/sqlIdent';
 // and the command palette alike. App.vue mounts this fresh (v-if) on every open, so onMounted below
 // is the one and only place a run's fields get their starting values (D8).
 
-const tabId = computed(() => fakeDataDialogState.tabId);
+const fakeDataStore = useFakeDataStore();
+const tabId = computed(() => fakeDataStore.tabId);
 const tab = computed(() => (tabId.value ? findDataTab(tabId.value) : null));
 const connRecord = computed(() => connectionRecord(tab.value?.connectionId));
 const caps = computed(() =>
@@ -77,7 +78,7 @@ onMounted(() => {
 
 function onClose(): void {
   if (running.value) return; // Stop first — a run in flight owns the dialog until it stops.
-  closeGenerateDataDialog();
+  fakeDataStore.closeGenerateDataDialog();
 }
 
 const sqlDialect = computed(() => sqlDialectFor(connRecord.value?.kind));
@@ -137,7 +138,7 @@ async function onGenerate(): Promise<void> {
     });
     running.value = false;
     currentOpId.value = null;
-    closeGenerateDataDialog();
+    fakeDataStore.closeGenerateDataDialog();
     await reloadAfterMutation(t.id);
   } catch (err) {
     running.value = false;

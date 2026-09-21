@@ -6,11 +6,14 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import type { DdlSchema } from '../../frontend/src/views/console/ddl';
 
-const { schemaColumnsState, effectiveSchema } = await import(
-  '../../frontend/src/state/schemaColumns'
-);
+setActivePinia(pinia);
+
+const { useSchemaColumnsStore } = await import('../../frontend/src/state/schemaColumns');
+const schemaColumnsStore = useSchemaColumnsStore();
 
 const CACHED_RELATIONS = [
   {
@@ -39,16 +42,24 @@ const EMPTY_DOCUMENT: DdlSchema = { tables: [] };
 describe('state/schemaColumns.ts — effectiveSchema (P22c D4/D6)', () => {
   test('a hand-authored document with tables wins wholesale over the cache', () => {
     const key = 'conn-doc-wins|database:app/schema:pub';
-    schemaColumnsState.byContainer[key] = CACHED_RELATIONS;
-    const schema = effectiveSchema('conn-doc-wins', 'database:app/schema:pub', DOCUMENT_SCHEMA);
+    schemaColumnsStore.byContainer[key] = CACHED_RELATIONS;
+    const schema = schemaColumnsStore.effectiveSchema(
+      'conn-doc-wins',
+      'database:app/schema:pub',
+      DOCUMENT_SCHEMA,
+    );
     expect(schema).toBe(DOCUMENT_SCHEMA);
     expect(schema.tables.map((t) => t.name)).toEqual(['widgets']);
   });
 
   test('with no document, the cache fills in as a DdlSchema', () => {
     const key = 'conn-cache-fills|database:app/schema:pub';
-    schemaColumnsState.byContainer[key] = CACHED_RELATIONS;
-    const schema = effectiveSchema('conn-cache-fills', 'database:app/schema:pub', EMPTY_DOCUMENT);
+    schemaColumnsStore.byContainer[key] = CACHED_RELATIONS;
+    const schema = schemaColumnsStore.effectiveSchema(
+      'conn-cache-fills',
+      'database:app/schema:pub',
+      EMPTY_DOCUMENT,
+    );
     expect(schema.tables).toHaveLength(1);
     const table = schema.tables[0];
     if (!table) throw new Error('expected one table');
@@ -64,20 +75,28 @@ describe('state/schemaColumns.ts — effectiveSchema (P22c D4/D6)', () => {
     // (lint/performance/noDelete) and without an undefined assignment fighting the Record's
     // non-optional value type.
     Reflect.deleteProperty(
-      schemaColumnsState.byContainer,
+      schemaColumnsStore.byContainer,
       'conn-both-empty|database:app/schema:pub',
     );
-    const schema = effectiveSchema('conn-both-empty', 'database:app/schema:pub', EMPTY_DOCUMENT);
+    const schema = schemaColumnsStore.effectiveSchema(
+      'conn-both-empty',
+      'database:app/schema:pub',
+      EMPTY_DOCUMENT,
+    );
     expect(schema.tables).toEqual([]);
   });
 
   test('a view relation is marked isView, a table is not', () => {
     const key = 'conn-view-kind|database:app/schema:pub';
-    schemaColumnsState.byContainer[key] = [
+    schemaColumnsStore.byContainer[key] = [
       { name: 'order_summary', kind: 'view', columns: [] },
       ...CACHED_RELATIONS,
     ];
-    const schema = effectiveSchema('conn-view-kind', 'database:app/schema:pub', EMPTY_DOCUMENT);
+    const schema = schemaColumnsStore.effectiveSchema(
+      'conn-view-kind',
+      'database:app/schema:pub',
+      EMPTY_DOCUMENT,
+    );
     const byName = Object.fromEntries(schema.tables.map((t) => [t.name, t]));
     expect(byName.order_summary?.isView).toBe(true);
     expect(byName.order_items?.isView).toBeUndefined();

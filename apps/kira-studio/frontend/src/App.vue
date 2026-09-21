@@ -13,7 +13,7 @@ import { runCommand } from './shortcuts/commands';
 import { usePaletteStore } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
 import { useDatagripImportStore } from './state/datagripImport';
-import { fakeDataDialogState } from './state/fakeData';
+import { useFakeDataStore } from './state/fakeData';
 import { toggleOperationsPanel, toggleProjectPanel } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useObjectStoreStore } from './state/objectStore';
@@ -37,6 +37,7 @@ const tooltipStore = useTooltipStore();
 const paletteStore = usePaletteStore();
 const modeStore = useModeStore();
 const datagripImportStore = useDatagripImportStore();
+const fakeDataStore = useFakeDataStore();
 const objectStoreStore = useObjectStoreStore();
 
 let unsubscribe: Array<() => void> = [];
@@ -98,7 +99,7 @@ onUnmounted(() => {
   <DataGripImportDialog v-if="datagripImportStore.open" />
   <ApiDialogs />
   <UploadObjectDialog v-if="objectStoreStore.open" />
-  <GenerateDataDialog v-if="fakeDataDialogState.open" />
+  <GenerateDataDialog v-if="fakeDataStore.open" />
   <GitPairingDialog />
   <DbMcpApprovalDialog />
   <GitCredentialDialog />

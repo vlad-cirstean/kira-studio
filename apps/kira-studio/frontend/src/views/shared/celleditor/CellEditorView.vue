@@ -6,7 +6,7 @@ import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import { findRanges } from '../../../editor/findRanges';
 import MonacoHost from '../../../editor/MonacoHost.vue';
 import { formatBytes } from '../../../format';
-import { cellKey, clearSelectedCellFor, type SelectedCell } from '../../../state/cellSelection';
+import { cellKey, type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { connectionRecord } from '../../../state/connections';
 import { type MenuItem, useContextMenuStore } from '../../../state/contextMenu';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
@@ -35,6 +35,7 @@ import { overrideFor, readOnlyReasonFor, setOverride } from './state';
 import TimestampPane from './TimestampPane.vue';
 import { validateFormat } from './validate';
 
+const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 
 // P24 D23: hoisted out of statusLine's own recompute — this sits on the 50 ms cell-selection
@@ -307,7 +308,7 @@ function onEditorKeydown(e: KeyboardEvent): void {
 }
 
 function closePanel(): void {
-  clearSelectedCellFor(selectedCell.value.tabId);
+  cellSelectionStore.clearSelectedCellFor(selectedCell.value.tabId);
 }
 
 // P22b D14: one cell's own value, often a large JSON blob dumped straight from the console (F21),

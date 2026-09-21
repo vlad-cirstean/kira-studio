@@ -11,7 +11,7 @@ import type {
 import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
-import { publishSelectedCell } from '../../state/cellSelection';
+import { useCellSelectionStore } from '../../state/cellSelection';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
@@ -49,6 +49,7 @@ import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { consoleColumnWidths, setConsoleColumnWidths } from './state';
 
+const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
@@ -518,7 +519,7 @@ function onGridClick(_e: SlickEventData, args: OnClickEventArgs): void {
   if (!column) return;
   const handle = dataSource.getItem(args.row);
   const view = cell(props.pageKey, handle.row, pageCol);
-  publishSelectedCell({
+  cellSelectionStore.publishSelectedCell({
     tabId: props.tabId,
     connectionId: props.connectionId,
     path: props.path,

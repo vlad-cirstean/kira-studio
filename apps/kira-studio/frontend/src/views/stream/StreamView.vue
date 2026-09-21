@@ -4,11 +4,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
-import {
-  clearSelectedCellFor,
-  publishSelectedCell,
-  type SelectedCell,
-} from '../../state/cellSelection';
+import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
@@ -57,6 +53,7 @@ import {
   toggleSearchOpen,
 } from './state';
 
+const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 
@@ -180,7 +177,7 @@ function onCellClick(i: number, name: string, value: string | null, truncated = 
     // mount below passes `:read-only="true"`, the same flag the console's own viewer mount uses).
     hasPrimaryKey: true,
   };
-  publishSelectedCell(selected);
+  cellSelectionStore.publishSelectedCell(selected);
 }
 
 // P2 R2 (task #98): same closure-per-render problem the deleted DataGrid.vue found first (P2 R1) — a template
@@ -224,7 +221,7 @@ function onBodyCellClickFromEvent(e: MouseEvent): void {
 // highlight while the dock kept showing the previous batch's message body.
 watch(
   () => pageVersion.n,
-  () => clearSelectedCellFor(props.tab.id),
+  () => cellSelectionStore.clearSelectedCellFor(props.tab.id),
 );
 
 function onStop(): void {

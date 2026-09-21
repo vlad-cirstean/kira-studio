@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { selectedCellFor } from '../../../state/cellSelection';
+import { useCellSelectionStore } from '../../../state/cellSelection';
 import { layoutState, setCellEditorHeight } from '../../../state/layout';
 import PanelSplitter from '../../../theme/primitives/PanelSplitter.vue';
 import CellEditorView from './CellEditorView.vue';
+
+const cellSelectionStore = useCellSelectionStore();
 
 // Mounted by the view that owns the tab (P26 D1), so one dock <-> one tab, torn down with it.
 // `readOnly` (P40 D11): true when the mounting view has no write path for its cells at all (the
@@ -14,7 +16,7 @@ const props = withDefaults(defineProps<{ tabId: string; readOnly?: boolean }>(),
   readOnly: false,
 });
 
-const cell = computed(() => selectedCellFor(props.tabId));
+const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
 </script>
 
 <template>

@@ -4,7 +4,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { openGenerateDataDialog } from '../../state/fakeData';
+import { useFakeDataStore } from '../../state/fakeData';
 import { connColorVar } from '../../theme/connColor';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
@@ -35,6 +35,7 @@ import {
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
 // restore (SlickGridHost's own onMounted) work without a manual watcher.
+const fakeDataStore = useFakeDataStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
@@ -131,7 +132,7 @@ function onGenerateData(): void {
   // M5 §6.4: the same lockout DataToolbar.vue's own Generate button applies — this is the
   // command-palette/keyboard-shortcut path to the identical action, and must not bypass it.
   if (!canGenerateDataFor(caps.value, connRecord.value?.readOnly) || rt.value?.maskPreview) return;
-  openGenerateDataDialog(props.tab.id);
+  fakeDataStore.openGenerateDataDialog(props.tab.id);
 }
 
 let unregisterCommands: Array<() => void> = [];

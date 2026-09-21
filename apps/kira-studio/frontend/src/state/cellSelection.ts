@@ -1,5 +1,6 @@
 import type { ColumnDescriptor } from '@shared/protocol/page';
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 
 // The only thing that crosses between the grid and the cell editor (D1): `views/shared/celleditor/`
 // imports nothing from `views/grid/` — §11 forbids sideways view imports, and this publication
@@ -43,27 +44,31 @@ export interface SelectedCell {
   onRevert?: () => void;
 }
 
-// P26 D2/D3: one record per tab rather than one global slot — the dock that renders a tab's
-// selection is now mounted by the view that owns that tab, so "which cell is selected" is
-// per-tab state like every other piece of tab state (views/*/state.ts's runtimes).
-const cellSelectionState = reactive<{ byTab: Record<string, SelectedCell> }>({ byTab: {} });
+export const useCellSelectionStore = defineStore('cellSelection', () => {
+  // P26 D2/D3: one record per tab rather than one global slot — the dock that renders a tab's
+  // selection is now mounted by the view that owns that tab, so "which cell is selected" is
+  // per-tab state like every other piece of tab state (views/*/state.ts's runtimes).
+  const state = reactive<{ byTab: Record<string, SelectedCell> }>({ byTab: {} });
 
-export function selectedCellFor(tabId: string): SelectedCell | null {
-  return cellSelectionState.byTab[tabId] ?? null;
-}
+  function selectedCellFor(tabId: string): SelectedCell | null {
+    return state.byTab[tabId] ?? null;
+  }
 
-// Replaces the tab's record wholesale — never mutates the existing object. CellEditorView
-// compares on `cellKey` plus `value`, so an in-place mutation would be invisible to it.
-export function publishSelectedCell(cell: SelectedCell): void {
-  cellSelectionState.byTab[cell.tabId] = cell;
-}
+  // Replaces the tab's record wholesale — never mutates the existing object. CellEditorView
+  // compares on `cellKey` plus `value`, so an in-place mutation would be invisible to it.
+  function publishSelectedCell(cell: SelectedCell): void {
+    state.byTab[cell.tabId] = cell;
+  }
 
-/** No cell is selected in this tab any more — a cleared selection, a row/column selection with
- *  no single cell in it, a page whose rows no longer reach the selected index, or a closed tab
- *  (state/tabs.ts's four close paths). All the same operation. */
-export function clearSelectedCellFor(tabId: string): void {
-  delete cellSelectionState.byTab[tabId];
-}
+  /** No cell is selected in this tab any more — a cleared selection, a row/column selection with
+   *  no single cell in it, a page whose rows no longer reach the selected index, or a closed tab
+   *  (state/tabs.ts's four close paths). All the same operation. */
+  function clearSelectedCellFor(tabId: string): void {
+    delete state.byTab[tabId];
+  }
+
+  return { ...toRefs(state), selectedCellFor, publishSelectedCell, clearSelectedCellFor };
+});
 
 /** Stable identity of a selection, for `data-cell-key` and for change detection. */
 export function cellKey(cell: SelectedCell): string {

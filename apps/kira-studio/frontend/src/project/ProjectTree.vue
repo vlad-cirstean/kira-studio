@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
 import { connectionsState } from '../state/connections';
 import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
-import { initSchemaColumnsSync } from '../state/schemaColumns';
+import { useSchemaColumnsStore } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
 import { settingsState } from '../state/settings';
 import {
@@ -31,6 +31,7 @@ import {
 import TreeRow from './TreeRow.vue';
 
 const contextMenuStore = useContextMenuStore();
+const schemaColumnsStore = useSchemaColumnsStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
@@ -60,7 +61,7 @@ const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(nu
 onMounted(() => {
   initTreeSync();
   initSchemaSync();
-  initSchemaColumnsSync();
+  schemaColumnsStore.initSchemaColumnsSync();
 });
 
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;

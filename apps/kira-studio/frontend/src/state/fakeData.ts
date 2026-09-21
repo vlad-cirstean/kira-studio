@@ -1,4 +1,5 @@
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 
 // P15 D11: mirrors state/objectStore.ts's uploadDialogState shape — a tiny reactive open/close
 // flag plus the one identity the dialog needs (the tab), so project/menus.ts-style callers (and
@@ -10,13 +11,17 @@ export interface FakeDataDialogState {
   tabId: string | null;
 }
 
-export const fakeDataDialogState = reactive<FakeDataDialogState>({ open: false, tabId: null });
+export const useFakeDataStore = defineStore('fakeData', () => {
+  const state = reactive<FakeDataDialogState>({ open: false, tabId: null });
 
-export function openGenerateDataDialog(tabId: string): void {
-  fakeDataDialogState.tabId = tabId;
-  fakeDataDialogState.open = true;
-}
+  function openGenerateDataDialog(tabId: string): void {
+    state.tabId = tabId;
+    state.open = true;
+  }
 
-export function closeGenerateDataDialog(): void {
-  fakeDataDialogState.open = false;
-}
+  function closeGenerateDataDialog(): void {
+    state.open = false;
+  }
+
+  return { ...toRefs(state), openGenerateDataDialog, closeGenerateDataDialog };
+});

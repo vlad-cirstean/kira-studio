@@ -2,7 +2,7 @@
 import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { openGenerateDataDialog } from '../../state/fakeData';
+import { useFakeDataStore } from '../../state/fakeData';
 import { maskRulesState } from '../../state/maskRules';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
@@ -38,6 +38,7 @@ import {
 // the active one (DataView.vue's own v-else-if chain), so the two agreed in practice, but the
 // nullable-tab plumbing this used to need (fourteen `if (!tab.value) return` guards) existed only
 // because of the divergence, not a real case.
+const fakeDataStore = useFakeDataStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
@@ -158,7 +159,7 @@ function onToggleSearch(): void {
 }
 function onGenerateData(): void {
   if (!canGenerateData.value) return;
-  openGenerateDataDialog(props.tab.id);
+  fakeDataStore.openGenerateDataDialog(props.tab.id);
 }
 
 const columnsOpen = ref(false);
