@@ -8,7 +8,7 @@ import { useCodeReposStore } from '../state/coderepos';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
-import { terminalCountAtPath } from '../state/terminals';
+import { useTerminalsStore } from '../state/terminals';
 import { useWorkspaceStore } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -37,6 +37,7 @@ const fileTreeStore = useFileTreeStore();
 const repoLinksStore = useRepoLinksStore();
 const repoPanelTabStore = useRepoPanelTabStore();
 const repoSearchStore = useRepoSearchStore();
+const terminalsStore = useTerminalsStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -416,12 +417,12 @@ onUnmounted(() => {
                   {{ repoHeadsStore.repoHeadLabel(repo.id) }}
                 </span>
                 <CodiconIcon
-                  v-if="terminalCountAtPath(repo.root) > 0"
+                  v-if="terminalsStore.terminalCountAtPath(repo.root) > 0"
                   name="terminal-bash"
                   :size="12"
                   class="worktree-badge-icon"
                   data-testid="repo-terminal-indicator"
-                  v-tooltip="terminalTooltip(terminalCountAtPath(repo.root))"
+                  v-tooltip="terminalTooltip(terminalsStore.terminalCountAtPath(repo.root))"
                 />
               </div>
               <div
@@ -447,12 +448,12 @@ onUnmounted(() => {
                   <span class="worktree-label" v-tooltip="wt.path">{{ worktreeLabel(wt) }}</span>
                   <span v-if="wt.isMain" class="worktree-badge" v-tooltip="'Main worktree'">main</span>
                   <CodiconIcon
-                    v-if="terminalCountAtPath(wt.path) > 0"
+                    v-if="terminalsStore.terminalCountAtPath(wt.path) > 0"
                     name="terminal-bash"
                     :size="12"
                     class="worktree-badge-icon"
                     data-testid="repo-terminal-indicator"
-                    v-tooltip="terminalTooltip(terminalCountAtPath(wt.path))"
+                    v-tooltip="terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))"
                   />
                   <CodiconIcon
                     v-if="wt.locked"

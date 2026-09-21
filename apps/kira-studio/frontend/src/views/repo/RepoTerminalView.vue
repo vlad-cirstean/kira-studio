@@ -26,16 +26,17 @@ import type { TerminalTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useSettingsStore } from '../../state/settings';
-import { openTerminalSession, resizeTerminal, terminalSession } from '../../state/terminals';
+import { useTerminalsStore } from '../../state/terminals';
 
 const props = defineProps<{ tab: TerminalTabRecord }>();
 const settingsStore = useSettingsStore();
+const terminalsStore = useTerminalsStore();
 
 const container = ref<HTMLElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
 let renderer: typeof import('./terminalRenderer') | null = null;
 
-const session = computed(() => terminalSession(props.tab.id));
+const session = computed(() => terminalsStore.terminalSession(props.tab.id));
 const footerText = computed(() => {
   const s = session.value;
   if (!s) return '';
@@ -55,10 +56,10 @@ async function mount(): Promise<void> {
 
   // §7.3/§7.4: openTerminalSession only on the tab's very first mount — a remount (switching back
   // to an already-open terminal) reattaches the same live session, never spawns a second one.
-  const isFirstOpen = !terminalSession(props.tab.id);
+  const isFirstOpen = !terminalsStore.terminalSession(props.tab.id);
   const dims = mod.fitTerminal(props.tab.id) ?? { cols: 80, rows: 24 };
   if (isFirstOpen) {
-    void openTerminalSession(
+    void terminalsStore.openTerminalSession(
       props.tab.id,
       props.tab.state.codeRepoId,
       props.tab.state.cwd,
@@ -73,7 +74,7 @@ async function mount(): Promise<void> {
   // into one notification per frame (SlickGridHost.vue's own precedent).
   resizeObserver = new ResizeObserver(() => {
     const d = mod.fitTerminal(props.tab.id);
-    if (d) resizeTerminal(props.tab.id, d.cols, d.rows);
+    if (d) terminalsStore.resizeTerminal(props.tab.id, d.cols, d.rows);
   });
   resizeObserver.observe(container.value);
 }
@@ -95,7 +96,7 @@ watch(
   () => [settingsStore.appearance.fontFamily, settingsStore.appearance.fontSize] as const,
   () => {
     const d = renderer?.applyTerminalAppearance(props.tab.id);
-    if (d) resizeTerminal(props.tab.id, d.cols, d.rows);
+    if (d) terminalsStore.resizeTerminal(props.tab.id, d.cols, d.rows);
   },
 );
 

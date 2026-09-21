@@ -8,7 +8,7 @@ import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useSettingsStore } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { onTerminalOutput, writeTerminal } from '../../state/terminals';
+import { useTerminalsStore } from '../../state/terminals';
 
 interface Attached {
   term: Terminal;
@@ -69,6 +69,7 @@ export function getOrCreateTerminal(tabId: string): Attached {
   host.style.width = '100%';
 
   const settingsStore = useSettingsStore();
+  const terminalsStore = useTerminalsStore();
   const term = new Terminal({
     scrollback: 5000,
     cursorBlink: true,
@@ -81,17 +82,17 @@ export function getOrCreateTerminal(tabId: string): Attached {
   term.loadAddon(fit);
   term.open(host);
 
-  const off = onTerminalOutput(tabId, (bytes) => term.write(bytes));
+  const off = terminalsStore.onTerminalOutput(tabId, (bytes) => term.write(bytes));
   // onData is real text (typed characters, paste, escape sequences) — UTF-8 encoded before it
   // crosses the wire. onBinary is xterm's own byte-per-char convention (mouse reports, Alt-meta) —
   // each JS char code already IS the intended byte value, so it is never UTF-8 encoded, only
   // reinterpreted 1:1 into a Uint8Array. Getting these two swapped would corrupt typed non-ASCII
   // text (mis-encoding it) or corrupt binary escape sequences (double-UTF-8-encoding raw bytes).
-  term.onData((d) => writeTerminal(tabId, encoder.encode(d)));
+  term.onData((d) => terminalsStore.writeTerminal(tabId, encoder.encode(d)));
   term.onBinary((d) => {
     const bytes = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) bytes[i] = d.charCodeAt(i) & 0xff;
-    writeTerminal(tabId, bytes);
+    terminalsStore.writeTerminal(tabId, bytes);
   });
 
   const attached: Attached = { term, fit, host, off };

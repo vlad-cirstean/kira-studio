@@ -23,7 +23,7 @@ import { pinia } from './state/pinia';
 import { queryClient } from './state/queryClient';
 import { ensureWorkspaceShell } from './state/repoTabs';
 import { useTabsStore } from './state/tabs';
-import { hydrateTerminalDefaults } from './state/terminals';
+import { useTerminalsStore } from './state/terminals';
 import './theme/base.css';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
@@ -309,6 +309,7 @@ async function bootstrap(): Promise<void> {
   const connectionsStore = useConnectionsStore(pinia);
   const tabsStore = useTabsStore(pinia);
   const settingsStore = useSettingsStore(pinia);
+  const terminalsStore = useTerminalsStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -327,7 +328,7 @@ async function bootstrap(): Promise<void> {
     loadMaskRuleCounts(),
     codeReposStore.hydrateCodeRepos(),
     customScriptsStore.hydrateCustomScripts(),
-    hydrateTerminalDefaults(),
+    terminalsStore.hydrateTerminalDefaults(),
     gitClientsStore.hydrateGitClients(),
     dbMcpStore.hydrateDbMcp(),
     dbMcpStore.hydrateDbMcpApprovals(),

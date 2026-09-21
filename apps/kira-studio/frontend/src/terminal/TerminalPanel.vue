@@ -5,7 +5,7 @@ import { useConfirmDialogStore } from '../state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useSettingsStore } from '../state/settings';
-import { terminalDefaults } from '../state/terminals';
+import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
@@ -27,6 +27,7 @@ const contextMenuStore = useContextMenuStore();
 
 const customScriptsStore = useCustomScriptsStore();
 const settingsStore = useSettingsStore();
+const terminalsStore = useTerminalsStore();
 
 const search = ref('');
 const adding = ref(false);
@@ -84,7 +85,7 @@ async function onAdd(): Promise<void> {
 function runScript(script: CustomScript): void {
   openTerminalTab({
     workspaceId: 'terminal',
-    cwd: script.workingDir || terminalDefaults.cwd,
+    cwd: script.workingDir || terminalsStore.terminalDefaults.cwd,
     launch: { command: script.command, label: script.name, color: script.color, kind: 'script' },
   });
 }

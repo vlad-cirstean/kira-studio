@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { terminalDefaults } from '../state/terminals';
+import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
+
+const terminalsStore = useTerminalsStore();
 
 // P91 §12: MainView.vue's own fallback when the Terminal module has no active tab — the state a
 // fresh install always opens in. GitStart.vue verbatim in shape: an EmptyState with one primary
 // action, disabled while the resolved home directory (§7.2) isn't known yet.
 function onNewTerminal(): void {
-  if (terminalDefaults.cwd === '') return;
-  openTerminalTab({ workspaceId: 'terminal', cwd: terminalDefaults.cwd });
+  if (terminalsStore.terminalDefaults.cwd === '') return;
+  openTerminalTab({ workspaceId: 'terminal', cwd: terminalsStore.terminalDefaults.cwd });
 }
 </script>
 
@@ -21,8 +23,8 @@ function onNewTerminal(): void {
           type="button"
           class="p-dlgbtn primary"
           data-testid="terminal-start-new"
-          :disabled="terminalDefaults.cwd === ''"
-          v-tooltip="terminalDefaults.cwd === '' ? 'Home directory unavailable' : undefined"
+          :disabled="terminalsStore.terminalDefaults.cwd === ''"
+          v-tooltip="terminalsStore.terminalDefaults.cwd === '' ? 'Home directory unavailable' : undefined"
           @click="onNewTerminal"
         >
           <span class="icon-box"><CodiconIcon name="terminal-bash" :size="13" /></span>

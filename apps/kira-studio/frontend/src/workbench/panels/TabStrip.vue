@@ -14,7 +14,7 @@ import { useSettingsStore } from '../../state/settings';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
-import { terminalDefaults } from '../../state/terminals';
+import { useTerminalsStore } from '../../state/terminals';
 import { openTerminalTab, type TerminalLaunch } from '../../state/terminalTabs';
 import { useWorkspaceStore } from '../../state/workspace';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -30,6 +30,7 @@ const tabIncognitoStore = useTabIncognitoStore();
 const workspaceStore = useWorkspaceStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
+const terminalsStore = useTerminalsStore();
 
 function isPinned(tab: TabRecord): boolean {
   return TAB_KINDS[tab.kind].pinned === true;
@@ -312,9 +313,9 @@ function terminalModuleMenuItems(): MenuItem[] {
       id: 'new-terminal',
       label: 'Terminal',
       icon: 'terminal-bash',
-      disabled: terminalDefaults.cwd === '',
+      disabled: terminalsStore.terminalDefaults.cwd === '',
       run: () => {
-        openTerminalTab({ workspaceId: 'terminal', cwd: terminalDefaults.cwd });
+        openTerminalTab({ workspaceId: 'terminal', cwd: terminalsStore.terminalDefaults.cwd });
       },
     },
   ];

@@ -86,7 +86,7 @@ import { useConnectionsStore } from './connections';
 import type { MenuItem } from './contextMenu';
 import { useSettingsStore } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
-import { closeTerminalSession } from './terminals';
+import { useTerminalsStore } from './terminals';
 
 // P1 D4/F19: the tab-kind registry, split from workbench/tabViews.ts (C4) by the lint rules —
 // this half is component-free (title/icon/railColor/dropResources/menuExtras/state constructors
@@ -530,7 +530,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     duplicateState: (tab: TerminalTabRecord): TerminalTabState => ({ ...tab.state }),
     // The one place a PTY dies on close — blind-called for every kind (dropPageStoresForTab), so
     // a non-terminal tab id is a registry miss here, not a branch.
-    dropResources: (tabId) => closeTerminalSession(tabId),
+    dropResources: (tabId) => useTerminalsStore().closeTerminalSession(tabId),
     menuExtras: () => [],
     parseState: parseStateWith(terminalTabStateSchema),
   },
