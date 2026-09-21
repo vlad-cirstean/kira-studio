@@ -170,28 +170,25 @@ duplicated here; this file only points at them.
 ## CodeGraph
 
 Code navigation in this repo goes through [CodeGraph](https://github.com/colbymchenry/codegraph),
-not repo-map. Same job — symbol index, call graphs, blast radius — swapped in because repo-map's
-MCP tools never reached a harness session's tool manifest (fixed at session start, not read from
-MCP config at runtime) and needed a manual curl/JSON-RPC workaround for every call. CodeGraph's
-prompt hook sidesteps that: it queries the index on every message and injects matching symbols
-automatically, no explicit tool call needed.
+not repo-map: symbol index, call graphs, blast radius, registered as an MCP server via the
+committed `.mcp.json` — use the MCP tools, not the `codegraph` CLI.
 
 **Use it when working in this repository.** Standing expectation, not a demo: read the injected
 context before opening whole files, query it before grepping for a symbol.
 
-`.claude/hooks/session-start.sh` installs the CLI and builds/syncs the index on every session —
-nothing manual needed. Outside that hook (a shell with no Claude Code session): `npm install -g
-@colbymchenry/codegraph && codegraph install --yes --target=claude --init`.
+**The tools aren't in the default tool list.** Call `ToolSearch` for `"codegraph"` first — it
+loads `codegraph_explore`, `codegraph_node` and the rest by name, then they're callable like any
+other tool. Don't fall back to the CLI just because they're not visible yet; search for them.
 
-Two ways to use it, in order of preference:
+- **Automatic** — a `UserPromptSubmit` hook (`codegraph prompt-hook`) fires on every message and
+  injects matching symbols as `<codegraph_context>`, no tool call needed. Read it before
+  searching files.
+- **Explicit** — `codegraph_explore` answers most code questions in one call: the relevant
+  symbols' source plus the call paths between them, including dynamic-dispatch hops grep can't
+  follow. `codegraph_node` reads one symbol's source plus its caller/callee trail.
 
-1. **Automatic** — `codegraph prompt-hook` fires on every message and prints matching symbols as
-   `<codegraph_context>`. Read it before searching files.
-2. **Explicit** — `codegraph explore "<query>"` for source, call paths and blast radius in one
-   shot; `codegraph query <search>` to search symbols; `codegraph callers`/`codegraph impact
-   <symbol>` for call graphs. Same MCP-manifest timing gap repo-map had —
-   `mcp__codegraph__*` tools may not surface in a harness session — the CLI works regardless, so
-   default to it over hoping the MCP tool got registered.
+`.claude/hooks/session-start.sh` installs the `codegraph` binary and builds/syncs the index every
+session — that's build tooling, not how code gets navigated; navigation is the MCP tools above.
 
 Doesn't touch the shipped repo-map feature (Settings dialog's Code intelligence tab,
 `internal/repomap`) — that stays product, unrelated to this dev-tooling swap.
