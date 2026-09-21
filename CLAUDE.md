@@ -109,6 +109,12 @@ duplicated here; this file only points at them.
   one cohesive subsystem. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and stay
   as shipped, never renumbered after landing; every chapter from here on, cohesive-subsystem chapters
   included, uses `P`.
+- **Splitting a phase keeps its number — it doesn't consume a new one.** When a `SPEC.md` row turns
+  out to be two pieces of work (prep vs. the actual migration, backend vs. frontend, whatever the
+  split), rename it `P<n> Part 1: …` and add `P<n> Part 2: …` (`Part 3`, etc. if it splits further)
+  right after it, not `P<n>` and a freshly incremented `P<n+1>`. Each part still gets its own plan
+  under `plans/`, its own implementation pass, and its own result section — the split only changes
+  the numbering, not the loop each part goes through.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`, no
   skipped validation to make something demo. Scope left out of a phase stays out entirely, never
   half-implemented.
