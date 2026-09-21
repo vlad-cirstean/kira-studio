@@ -6,7 +6,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { registerCommand } from '../shortcuts/commands';
 import { useCodeReposStore } from '../state/coderepos';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import { ensureReviewPanelWidth } from '../state/layout';
+import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
 import { terminalCountAtPath } from '../state/terminals';
 import { useWorkspaceStore } from '../state/workspace';
@@ -39,6 +39,7 @@ const contextMenuStore = useContextMenuStore();
 
 const codeReposStore = useCodeReposStore();
 const workspaceStore = useWorkspaceStore();
+const layoutStore = useLayoutStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -311,7 +312,7 @@ watch(
     // §14 OQ2: widen once, only if the user has never manually resized the panel — checked inside
     // ensureReviewPanelWidth itself (state/layout.ts's own widthUserSet). 320px: VS Code's ~300px
     // sidebar default, rounded up a little for the review panes' own extra density.
-    ensureReviewPanelWidth(320);
+    layoutStore.ensureReviewPanelWidth(320);
   },
   { immediate: true },
 );

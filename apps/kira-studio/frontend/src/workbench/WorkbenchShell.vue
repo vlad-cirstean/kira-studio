@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
-import { layoutState, setOperationsHeight, setProjectWidth } from '../state/layout';
+import { useLayoutStore } from '../state/layout';
 import { useWorkspaceStore } from '../state/workspace';
 import PanelSplitter from '../theme/primitives/PanelSplitter.vue';
 import { MODES } from './modes';
@@ -11,6 +11,7 @@ import TabStrip from './panels/TabStrip.vue';
 import StatusBar from './StatusBar.vue';
 
 const workspaceStore = useWorkspaceStore();
+const layoutStore = useLayoutStore();
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component
 // (ProjectPanel for Studio, api/CollectionsPanel for Api, GitPanel for Git) — the shared
@@ -19,13 +20,13 @@ const workspaceStore = useWorkspaceStore();
 // moduleOfWorkspace folds a repo key onto 'git' before the registry lookup.
 const activeModePanel = computed(() => MODES[moduleOfWorkspace(workspaceStore.active)].panel);
 
-const projectVisible = computed(() => layoutState.panel.project.visible);
-const opsVisible = computed(() => layoutState.panel.operations.visible);
+const projectVisible = computed(() => layoutStore.panel.project.visible);
+const opsVisible = computed(() => layoutStore.panel.operations.visible);
 
 const gridStyle = computed(() => ({
-  '--project-w': projectVisible.value ? `${layoutState.panel.project.width}px` : '0px',
+  '--project-w': projectVisible.value ? `${layoutStore.panel.project.width}px` : '0px',
   '--project-split-w': projectVisible.value ? 'var(--kira-gap)' : '0px',
-  '--ops-h': opsVisible.value ? `${layoutState.panel.operations.height}px` : '0px',
+  '--ops-h': opsVisible.value ? `${layoutStore.panel.operations.height}px` : '0px',
   '--ops-split-h': opsVisible.value ? 'var(--kira-gap)' : '0px',
 }));
 </script>
@@ -44,10 +45,10 @@ const gridStyle = computed(() => ({
       v-if="projectVisible"
       style="grid-area: splitproj"
       orientation="col"
-      :size="layoutState.panel.project.width"
+      :size="layoutStore.panel.project.width"
       :min="180"
       :max="480"
-      @resize="setProjectWidth"
+      @resize="layoutStore.setProjectWidth"
     />
 
     <div class="editor-area" style="grid-area: main">
@@ -60,10 +61,10 @@ const gridStyle = computed(() => ({
       style="grid-area: splitops"
       orientation="row"
       reverse
-      :size="layoutState.panel.operations.height"
+      :size="layoutStore.panel.operations.height"
       :min="100"
       :max="500"
-      @resize="setOperationsHeight"
+      @resize="layoutStore.setOperationsHeight"
     />
     <div
       v-if="opsVisible"

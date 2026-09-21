@@ -14,7 +14,7 @@ import { usePaletteStore } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
 import { useDatagripImportStore } from './state/datagripImport';
 import { useFakeDataStore } from './state/fakeData';
-import { toggleOperationsPanel, toggleProjectPanel } from './state/layout';
+import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useObjectStoreStore } from './state/objectStore';
 import { settingsOpen } from './state/settings';
@@ -39,6 +39,7 @@ const modeStore = useModeStore();
 const datagripImportStore = useDatagripImportStore();
 const fakeDataStore = useFakeDataStore();
 const objectStoreStore = useObjectStoreStore();
+const layoutStore = useLayoutStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
@@ -69,8 +70,8 @@ onMounted(() => {
       modeStore.setMode('studio');
       void datagripImportStore.pickAndScanDataGripProject();
     }),
-    control.onToggleProjectPanel(toggleProjectPanel),
-    control.onToggleOperationsPanel(toggleOperationsPanel),
+    control.onToggleProjectPanel(layoutStore.toggleProjectPanel),
+    control.onToggleOperationsPanel(layoutStore.toggleOperationsPanel),
     control.onCommandPalette(paletteStore.togglePalette),
     control.onQuickOpen(openQuickOpen),
     control.onTabNext(activateNextTab),

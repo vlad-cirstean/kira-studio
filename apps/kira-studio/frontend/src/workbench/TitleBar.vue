@@ -4,7 +4,7 @@ import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
-import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
+import { useLayoutStore } from '../state/layout';
 import { settingsOpen } from '../state/settings';
 import { useWorkspaceStore } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -12,6 +12,7 @@ import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
 const keepAwakeStore = useKeepAwakeStore();
+const layoutStore = useLayoutStore();
 const workspaceStore = useWorkspaceStore();
 
 // P67b §4.3: three peer modules — Studio, Api, Git. A repository is an instance inside Git, not a
@@ -87,26 +88,26 @@ const keepAwakeTooltip = computed(() => {
       <button
         type="button"
         class="title-action"
-        :class="{ 'is-on': layoutState.panel.project.visible }"
+        :class="{ 'is-on': layoutStore.panel.project.visible }"
         v-tooltip="'Connections'"
         data-testid="toggle-project-panel"
-        @click="toggleProjectPanel"
+        @click="layoutStore.toggleProjectPanel"
       >
         <CodiconIcon
-          :name="layoutState.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
+          :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
           :size="15"
         />
       </button>
       <button
         type="button"
         class="title-action"
-        :class="{ 'is-on': layoutState.panel.operations.visible }"
+        :class="{ 'is-on': layoutStore.panel.operations.visible }"
         v-tooltip="'Operations'"
         data-testid="toggle-operations-panel"
-        @click="toggleOperationsPanel"
+        @click="layoutStore.toggleOperationsPanel"
       >
         <CodiconIcon
-          :name="layoutState.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
+          :name="layoutStore.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
           :size="15"
         />
       </button>

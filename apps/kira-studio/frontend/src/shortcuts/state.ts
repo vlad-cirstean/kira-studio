@@ -3,7 +3,7 @@ import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
 import { openQuickOpen } from '../repo/state/quickOpen';
 import { openCreateDialog } from '../state/connections';
-import { toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
+import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { settingsOpen } from '../state/settings';
 import { activateNextTab, activatePrevTab, closeTab } from '../state/tabs';
@@ -16,6 +16,8 @@ interface PaletteCommand {
 }
 
 export const usePaletteStore = defineStore('palette', () => {
+  const layoutStore = useLayoutStore();
+
   // D12: deliberately small and 1:1 with already-reachable actions — every global shortcut this
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
   // worth a name in the palette. No fuzzy scoring, no "go to anything" navigation (§8.15 calls
@@ -54,8 +56,16 @@ export const usePaletteStore = defineStore('palette', () => {
     // P7 D12: same "registered by CollectionsPanel.vue, mounted for the whole of Api mode" shape.
     { id: 'api.importCurl', label: 'Import from curl…', run: () => runCommand('api.importCurl') },
     { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
-    { id: 'toggle-project-panel', label: 'Toggle project panel', run: toggleProjectPanel },
-    { id: 'toggle-operations-panel', label: 'Toggle operations panel', run: toggleOperationsPanel },
+    {
+      id: 'toggle-project-panel',
+      label: 'Toggle project panel',
+      run: () => layoutStore.toggleProjectPanel(),
+    },
+    {
+      id: 'toggle-operations-panel',
+      label: 'Toggle operations panel',
+      run: () => layoutStore.toggleOperationsPanel(),
+    },
     { id: 'view.find', label: 'Find', run: () => runCommand('view.find') },
     // C7 S10: registered by GitPanel.vue while mounted — a no-op outside a repo workspace, the
     // same view-scoped shape every other runCommand entry in this list already has.

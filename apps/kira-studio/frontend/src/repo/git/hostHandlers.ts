@@ -27,7 +27,7 @@ import type {
 } from '@kira/git-ipc';
 import { control } from '../../bridge/control';
 import { useCodeReposStore } from '../../state/coderepos';
-import { layoutState, toggleProjectPanel } from '../../state/layout';
+import { useLayoutStore } from '../../state/layout';
 import {
   openRepoCommitDiffTab,
   openRepoDiffTab,
@@ -372,7 +372,8 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       }
       pendingReviewTargetByCodeRepoId.set(codeRepoId, { repoId: gitRepoId, branch });
       setRepoPanelTab('review');
-      if (!layoutState.panel.project.visible) toggleProjectPanel();
+      const layoutStore = useLayoutStore();
+      if (!layoutStore.panel.project.visible) layoutStore.toggleProjectPanel();
       deps.emitLocal('review.target', { repoId: gitRepoId, branch });
       return {};
     },

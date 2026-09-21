@@ -25,7 +25,7 @@ import { ensureWorkspaceShell } from './state/repoTabs';
 import { hydrateTabs } from './state/tabs';
 import { hydrateTerminalDefaults } from './state/terminals';
 import './theme/base.css';
-import { hydrateLayout } from './state/layout';
+import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { hydrateSettings } from './state/settings';
 import { useWorkspaceStore } from './state/workspace';
@@ -305,6 +305,7 @@ async function bootstrap(): Promise<void> {
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
   const opsStore = useOpsStore(pinia);
+  const layoutStore = useLayoutStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -314,7 +315,7 @@ async function bootstrap(): Promise<void> {
   // render, the same way hydrateLayout/hydrateSettings below hydrate their own state.
   modeStore.hydrateMode(await control.windowsEnsure());
   await Promise.all([
-    hydrateLayout(),
+    layoutStore.hydrateLayout(),
     hydrateSettings(),
     hydrateConnections(),
     // M5 §7.5/§6.2: every connection's own masked-column count — the Settings glance's data, and
