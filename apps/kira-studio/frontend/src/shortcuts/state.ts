@@ -9,7 +9,7 @@ import { settingsOpen } from '../state/settings';
 import { activateNextTab, activatePrevTab, closeTab } from '../state/tabs';
 import { runCommand } from './commands';
 
-export interface PaletteCommand {
+interface PaletteCommand {
   id: string;
   label: string;
   run: () => void;

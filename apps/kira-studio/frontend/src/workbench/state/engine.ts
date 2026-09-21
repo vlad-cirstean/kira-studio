@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { ready, request } from '../../bridge/port';
 
-export type EngineConnectionStatus = 'connecting' | 'ok' | 'down';
+type EngineConnectionStatus = 'connecting' | 'ok' | 'down';
 
 export const useEngineStore = defineStore('engine', () => {
   const state = reactive({
