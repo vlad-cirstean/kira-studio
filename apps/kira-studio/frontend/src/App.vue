@@ -7,7 +7,7 @@ import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
 import QuickOpen from './repo/QuickOpen.vue';
-import { openQuickOpen } from './repo/state/quickOpen';
+import { useQuickOpenStore } from './repo/state/quickOpen';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { usePaletteStore } from './shortcuts/state';
@@ -40,6 +40,7 @@ const datagripImportStore = useDatagripImportStore();
 const fakeDataStore = useFakeDataStore();
 const objectStoreStore = useObjectStoreStore();
 const layoutStore = useLayoutStore();
+const quickOpenStore = useQuickOpenStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
@@ -73,7 +74,7 @@ onMounted(() => {
     control.onToggleProjectPanel(layoutStore.toggleProjectPanel),
     control.onToggleOperationsPanel(layoutStore.toggleOperationsPanel),
     control.onCommandPalette(paletteStore.togglePalette),
-    control.onQuickOpen(openQuickOpen),
+    control.onQuickOpen(quickOpenStore.openQuickOpen),
     control.onTabNext(activateNextTab),
     control.onTabPrev(activatePrevTab),
     control.onTabClose(closeActiveTab),

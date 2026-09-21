@@ -3,33 +3,31 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
 import {
-  closeQuickOpen,
   QUICK_OPEN_MAX_CANDIDATES,
   QUICK_OPEN_MAX_RESULTS,
   type QuickOpenRow,
-  quickOpenIndexTruncated,
-  quickOpenLoading,
-  quickOpenResults,
-  quickOpenState,
+  useQuickOpenStore,
 } from './state/quickOpen';
+
+const quickOpenStore = useQuickOpenStore();
 
 const inputRef = ref<HTMLInputElement | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 const activeIndex = ref(0);
 
-const loading = computed(() => quickOpenLoading());
-const rows = computed(() => quickOpenResults());
+const loading = computed(() => quickOpenStore.quickOpenLoading());
+const rows = computed(() => quickOpenStore.quickOpenResults());
 // C13-7: two independent conditions, worth distinct wording for -- a query-dependent one (this
 // query's own results hit the display cap, so there may be more matches for it specifically) and a
 // query-independent one (the candidate set itself is incomplete, so some files were never
 // searchable at all, regardless of how few real matches this query happens to have).
 const resultsTruncated = computed(
-  () => quickOpenState.query.trim() !== '' && rows.value.length === QUICK_OPEN_MAX_RESULTS,
+  () => quickOpenStore.query.trim() !== '' && rows.value.length === QUICK_OPEN_MAX_RESULTS,
 );
-const indexTruncated = computed(() => quickOpenIndexTruncated());
+const indexTruncated = computed(() => quickOpenStore.quickOpenIndexTruncated());
 
 watch(
-  () => quickOpenState.open,
+  () => quickOpenStore.open,
   async (open) => {
     if (!open) return;
     activeIndex.value = 0;
@@ -51,13 +49,13 @@ watch(activeIndex, () => {
 // D7: the repo's own file-open entry point, verbatim — no `reveal`, since a file has no line to
 // reveal (openRepoFileTab skips both patchRepoFileTabState and requestReveal without it).
 function openRow(row: QuickOpenRow, preview: boolean): void {
-  void openRepoFileTab(quickOpenState.repoId, row.path, { preview });
+  void openRepoFileTab(quickOpenStore.repoId, row.path, { preview });
 }
 
 function runOpenAt(index: number, preview: boolean): void {
   const row = rows.value[index];
   if (!row) return;
-  closeQuickOpen();
+  quickOpenStore.closeQuickOpen();
   openRow(row, preview);
 }
 
@@ -65,7 +63,7 @@ function onKeydown(e: KeyboardEvent): void {
   wrapSelectionOnType(e);
   if (e.key === 'Escape') {
     e.preventDefault();
-    closeQuickOpen();
+    quickOpenStore.closeQuickOpen();
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
     activeIndex.value = Math.min(rows.value.length - 1, activeIndex.value + 1);
@@ -83,17 +81,17 @@ function onKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    v-if="quickOpenState.open"
+    v-if="quickOpenStore.open"
     class="palette-backdrop"
     data-testid="quick-open-backdrop"
-    @click="closeQuickOpen"
+    @click="quickOpenStore.closeQuickOpen"
   >
     <div class="palette p-float quick-open" data-testid="quick-open" @click.stop>
       <div class="palette-input-pad">
         <div class="p-input ui md palette-input">
           <input
             ref="inputRef"
-            v-model="quickOpenState.query"
+            v-model="quickOpenStore.query"
             data-testid="quick-open-input"
             type="text"
             placeholder="Search files by name"

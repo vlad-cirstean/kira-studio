@@ -1,7 +1,7 @@
 import { repoIdOfWorkspace } from '@shared/domain/workspace';
 import fuzzysort, { type KeysResult, type Result, type SnapshotKeys } from 'fuzzysort';
-import { reactive, watch } from 'vue';
-import { pinia } from '../../state/pinia';
+import { defineStore } from 'pinia';
+import { reactive, toRefs, watch } from 'vue';
 import { useWorkspaceStore } from '../../state/workspace';
 import {
   ensureRepoTreeLoaded,
@@ -9,10 +9,6 @@ import {
   repoTreePaths,
   repoTreeTruncated,
 } from './fileTree';
-
-// Module-level `watch()` calls below run at import time, before `app.use(pinia)` — the explicit
-// instance is required here (state/pinia.ts's own header comment).
-const workspaceStore = useWorkspaceStore(pinia);
 
 // C9 §3.4: limit bounds sort work (fuzzysort's own `limit`), not just render work; candidates
 // bounds the per-keystroke matching cost itself (D3's measured knee — 34.78ms worst query at 50k,
@@ -97,117 +93,130 @@ function toRow(item: QuickOpenItem, nameResult: Result | undefined): QuickOpenRo
   return { path: item.path, dir: item.dir, nameParts: highlightParts(nameResult, item.name) };
 }
 
-export const quickOpenState = reactive({ open: false, repoId: '', query: '' });
+export const useQuickOpenStore = defineStore('quickOpen', () => {
+  const workspaceStore = useWorkspaceStore();
 
-// D6: gated on the active workspace, not on a mounted component — reachable with the project panel
-// collapsed. D8: loads the tree itself, since byRepo may have no entry yet.
-export function openQuickOpen(): void {
-  const repoId = repoIdOfWorkspace(workspaceStore.active);
-  if (repoId === null) return;
-  quickOpenState.repoId = repoId;
-  quickOpenState.query = '';
-  quickOpenState.open = true;
-  ensureRepoTreeLoaded(repoId);
-}
+  const state = reactive({ open: false, repoId: '', query: '' });
 
-// C14-8: the fuzzysort snapshot is a large per-repo allocation (~110-150MB measured on a big repo)
-// that used to live for the whole workspace's lifetime once the palette had been opened once, even
-// after closing it -- three large open repos could hold ~350MB idle for a feature used in bursts.
-// Evicting on close trades that for one rebuild the next time the palette opens (15-26ms measured,
-// negligible against the memory freed) -- ensureSnapshot already rebuilds transparently on demand,
-// keyed off `paths`' own reference identity, so this needs no other change.
-export function closeQuickOpen(): void {
-  const repoId = quickOpenState.repoId;
-  quickOpenState.open = false;
-  if (repoId) snapshotCache.delete(repoId);
-}
-
-/** True while `openQuickOpen`'s own tree load for the open repo hasn't resolved yet. */
-export function quickOpenLoading(): boolean {
-  return quickOpenState.open && !isRepoTreeLoaded(quickOpenState.repoId);
-}
-
-// C13-7: was `quickOpenTruncated`, reading `snapshotCache.get(repoId)?.candidatesTruncated` for
-// its own half of this condition -- but snapshotCache is a plain (non-reactive) Map, so that read
-// registered no Vue dependency at all. The wrapping `computed` (QuickOpen.vue's own `truncated`)
-// then cached whatever this returned the first time the palette opened for good: `quickOpenState.
-// repoId` and `repoTreeTruncated`'s own reactive Map read were its only two real dependencies, and
-// neither changes when a later tree refresh's `paths` array crosses QUICK_OPEN_MAX_CANDIDATES.
-// Fixed by deriving the candidate-cap half the same way repoTreePaths already does for everything
-// else -- reading the tracked reactive `paths` array directly needs no cache lookup at all.
-//
-// Renamed (not just fixed in place) because this is a query-INDEPENDENT condition -- "the
-// candidate set quick open searches is incomplete" -- distinct from the query-dependent "this
-// query's own results hit the QUICK_OPEN_MAX_RESULTS display cap" (checked by the caller against
-// its own `rows.length`, quickOpenResults's own return). The old single `quickOpenTruncated` name
-// and the UI's single notice conflated the two: a query with 3 real matches in a huge repo used to
-// still claim "first 50 of many matches" merely because the candidate set was capped.
-export function quickOpenIndexTruncated(): boolean {
-  const repoId = quickOpenState.repoId;
-  if (!repoId) return false;
-  if (repoTreeTruncated(repoId)) return true;
-  return repoTreePaths(repoId).length > QUICK_OPEN_MAX_CANDIDATES;
-}
-
-export function quickOpenResults(): QuickOpenRow[] {
-  const { repoId, query } = quickOpenState;
-  if (!repoId || !isRepoTreeLoaded(repoId)) return [];
-  const cache = ensureSnapshot(repoId);
-  const q = query.trim();
-  // §3.3: empty query shows the first MAX_RESULTS items, unmatched — the "open it, see something"
-  // affordance, costing no fuzzysort call.
-  if (q === '') {
-    return cache.items.slice(0, QUICK_OPEN_MAX_RESULTS).map((item) => toRow(item, undefined));
+  // D6: gated on the active workspace, not on a mounted component — reachable with the project
+  // panel collapsed. D8: loads the tree itself, since byRepo may have no entry yet.
+  function openQuickOpen(): void {
+    const repoId = repoIdOfWorkspace(workspaceStore.active);
+    if (repoId === null) return;
+    state.repoId = repoId;
+    state.query = '';
+    state.open = true;
+    ensureRepoTreeLoaded(repoId);
   }
-  const results = fuzzysort.go(q, cache.snapshot, {
-    limit: QUICK_OPEN_MAX_RESULTS,
-    threshold: QUICK_OPEN_THRESHOLD,
-    // §3.2: basename beats path (0.8-discounted path score so a path-only match still surfaces),
-    // shallower breaks a near-tie. No recency term yet — deliberately out of scope (§9).
-    scoreFn: (r: KeysResult<QuickOpenItem>) => {
-      const name = r[0] ? r[0].score : 0;
-      const path = r[1] ? r[1].score * 0.8 : 0;
-      return Math.max(name, path) - r.obj.depth * DEPTH_PENALTY;
-    },
-  });
-  return results.map((r) => toRow(r.obj, r[0]));
-}
 
-// C9 D9 cache eviction — a removed or closed repo's snapshot must not outlive it in this
-// module-level cache. Called both by the `openRepos` watch below (C13-3: every closeRepoWorkspace,
-// removeCodeRepo included, since it calls closeRepoWorkspace itself) and directly wherever a caller
-// wants the eviction to happen synchronously rather than on the watcher's next flush. Also closes
-// the palette if it happened to be showing repoId (the ordinary case is already covered by the
-// workspaceStore.active watch below, since closeRepoWorkspace always clears `active` first when the
-// closed workspace was the active one).
-function dropQuickOpen(repoId: string): void {
-  snapshotCache.delete(repoId);
-  if (quickOpenState.open && quickOpenState.repoId === repoId) closeQuickOpen();
-}
+  // C14-8: the fuzzysort snapshot is a large per-repo allocation (~110-150MB measured on a big
+  // repo) that used to live for the whole workspace's lifetime once the palette had been opened
+  // once, even after closing it -- three large open repos could hold ~350MB idle for a feature
+  // used in bursts. Evicting on close trades that for one rebuild the next time the palette opens
+  // (15-26ms measured, negligible against the memory freed) -- ensureSnapshot already rebuilds
+  // transparently on demand, keyed off `paths`' own reference identity, so this needs no other
+  // change.
+  function closeQuickOpen(): void {
+    const repoId = state.repoId;
+    state.open = false;
+    if (repoId) snapshotCache.delete(repoId);
+  }
 
-// Closing the workspace (TitleBar's own close button, or removeCodeRepo's closeRepoWorkspace call)
-// must close the palette if it's showing that repo. Watched here rather than called from
-// state/workspace.ts's closeRepoWorkspace, to keep the import direction one-way (this module
-// imports state/workspace.ts, never the reverse, per §5's own check).
-watch(
-  () => workspaceStore.active,
-  (active) => {
-    if (quickOpenState.open && repoIdOfWorkspace(active) !== quickOpenState.repoId)
-      closeQuickOpen();
-  },
-);
+  /** True while `openQuickOpen`'s own tree load for the open repo hasn't resolved yet. */
+  function quickOpenLoading(): boolean {
+    return state.open && !isRepoTreeLoaded(state.repoId);
+  }
 
-// C13-3: closeRepoWorkspace (state/workspace.ts) drops this repo's own tree/search caches directly,
-// but can't call dropQuickOpen the same way without violating the one-way import direction above —
-// so it's watched here instead. workspaceStore.openRepos is always reassigned wholesale (never
-// mutated in place, both call sites), so a plain (non-deep) watch sees the pre-close membership as
-// `previous` and evicts whichever repoId(s) just dropped out.
-watch(
-  () => workspaceStore.openRepos,
-  (openRepos, previous) => {
-    if (!previous) return;
-    for (const repoId of previous) {
-      if (!openRepos.includes(repoId)) dropQuickOpen(repoId);
+  // C13-7: was `quickOpenTruncated`, reading `snapshotCache.get(repoId)?.candidatesTruncated` for
+  // its own half of this condition -- but snapshotCache is a plain (non-reactive) Map, so that read
+  // registered no Vue dependency at all. The wrapping `computed` (QuickOpen.vue's own `truncated`)
+  // then cached whatever this returned the first time the palette opened for good: `state.repoId`
+  // and `repoTreeTruncated`'s own reactive Map read were its only two real dependencies, and
+  // neither changes when a later tree refresh's `paths` array crosses QUICK_OPEN_MAX_CANDIDATES.
+  // Fixed by deriving the candidate-cap half the same way repoTreePaths already does for everything
+  // else -- reading the tracked reactive `paths` array directly needs no cache lookup at all.
+  //
+  // Renamed (not just fixed in place) because this is a query-INDEPENDENT condition -- "the
+  // candidate set quick open searches is incomplete" -- distinct from the query-dependent "this
+  // query's own results hit the QUICK_OPEN_MAX_RESULTS display cap" (checked by the caller against
+  // its own `rows.length`, quickOpenResults's own return). The old single `quickOpenTruncated` name
+  // and the UI's single notice conflated the two: a query with 3 real matches in a huge repo used
+  // to still claim "first 50 of many matches" merely because the candidate set was capped.
+  function quickOpenIndexTruncated(): boolean {
+    const repoId = state.repoId;
+    if (!repoId) return false;
+    if (repoTreeTruncated(repoId)) return true;
+    return repoTreePaths(repoId).length > QUICK_OPEN_MAX_CANDIDATES;
+  }
+
+  function quickOpenResults(): QuickOpenRow[] {
+    const { repoId, query } = state;
+    if (!repoId || !isRepoTreeLoaded(repoId)) return [];
+    const cache = ensureSnapshot(repoId);
+    const q = query.trim();
+    // §3.3: empty query shows the first MAX_RESULTS items, unmatched — the "open it, see
+    // something" affordance, costing no fuzzysort call.
+    if (q === '') {
+      return cache.items.slice(0, QUICK_OPEN_MAX_RESULTS).map((item) => toRow(item, undefined));
     }
-  },
-);
+    const results = fuzzysort.go(q, cache.snapshot, {
+      limit: QUICK_OPEN_MAX_RESULTS,
+      threshold: QUICK_OPEN_THRESHOLD,
+      // §3.2: basename beats path (0.8-discounted path score so a path-only match still surfaces),
+      // shallower breaks a near-tie. No recency term yet — deliberately out of scope (§9).
+      scoreFn: (r: KeysResult<QuickOpenItem>) => {
+        const name = r[0] ? r[0].score : 0;
+        const path = r[1] ? r[1].score * 0.8 : 0;
+        return Math.max(name, path) - r.obj.depth * DEPTH_PENALTY;
+      },
+    });
+    return results.map((r) => toRow(r.obj, r[0]));
+  }
+
+  // C9 D9 cache eviction — a removed or closed repo's snapshot must not outlive it in this
+  // module-level cache. Called both by the `openRepos` watch below (C13-3: every
+  // closeRepoWorkspace, removeCodeRepo included, since it calls closeRepoWorkspace itself) and
+  // directly wherever a caller wants the eviction to happen synchronously rather than on the
+  // watcher's next flush. Also closes the palette if it happened to be showing repoId (the
+  // ordinary case is already covered by the workspaceStore.active watch below, since
+  // closeRepoWorkspace always clears `active` first when the closed workspace was the active one).
+  function dropQuickOpen(repoId: string): void {
+    snapshotCache.delete(repoId);
+    if (state.open && state.repoId === repoId) closeQuickOpen();
+  }
+
+  // Closing the workspace (TitleBar's own close button, or removeCodeRepo's closeRepoWorkspace
+  // call) must close the palette if it's showing that repo. Watched here rather than called from
+  // state/workspace.ts's closeRepoWorkspace, to keep the import direction one-way (this module
+  // imports state/workspace.ts, never the reverse, per §5's own check).
+  watch(
+    () => workspaceStore.active,
+    (active) => {
+      if (state.open && repoIdOfWorkspace(active) !== state.repoId) closeQuickOpen();
+    },
+  );
+
+  // C13-3: closeRepoWorkspace (state/workspace.ts) drops this repo's own tree/search caches
+  // directly, but can't call dropQuickOpen the same way without violating the one-way import
+  // direction above -- so it's watched here instead. workspaceStore.openRepos is always
+  // reassigned wholesale (never mutated in place, both call sites), so a plain (non-deep) watch
+  // sees the pre-close membership as `previous` and evicts whichever repoId(s) just dropped out.
+  watch(
+    () => workspaceStore.openRepos,
+    (openRepos, previous) => {
+      if (!previous) return;
+      for (const repoId of previous) {
+        if (!openRepos.includes(repoId)) dropQuickOpen(repoId);
+      }
+    },
+  );
+
+  return {
+    ...toRefs(state),
+    openQuickOpen,
+    closeQuickOpen,
+    quickOpenLoading,
+    quickOpenIndexTruncated,
+    quickOpenResults,
+  };
+});

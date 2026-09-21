@@ -21,25 +21,18 @@ import RepoFileTree from './RepoFileTree.vue';
 import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
 import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
-import { refreshRepoHeads, repoHeadLabel } from './state/repoHeads';
+import { useRepoHeadsStore } from './state/repoHeads';
 import { refreshRepoWorktreeLinks, worktreeParentId } from './state/repoLinks';
 import { repoPanelTab, repoSearchView, setRepoPanelTab, setRepoSearchView } from './state/search';
-import {
-  collapseRepoWorktrees,
-  isWorktreesExpanded,
-  switchToWorktree,
-  toggleRepoWorktrees,
-  worktreeEntries,
-  worktreeLabel,
-  worktreesError,
-  worktreesLoading,
-} from './state/worktrees';
+import { useWorktreesStore, worktreeLabel } from './state/worktrees';
 
 const contextMenuStore = useContextMenuStore();
 
 const codeReposStore = useCodeReposStore();
 const workspaceStore = useWorkspaceStore();
 const layoutStore = useLayoutStore();
+const repoHeadsStore = useRepoHeadsStore();
+const worktreesStore = useWorktreesStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -197,7 +190,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       // watch flush later — the same reason quickOpen.ts:178 exposes dropQuickOpen alongside its
       // own watch. The §6.6 watch would collapse it anyway.
       run: () => {
-        collapseRepoWorktrees(repo.id);
+        worktreesStore.collapseRepoWorktrees(repo.id);
         workspaceStore.closeRepoWorkspace(repo.id);
       },
     });
@@ -262,7 +255,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
         label: 'Close',
         icon: 'close',
         run: () => {
-          collapseRepoWorktrees(record.id);
+          worktreesStore.collapseRepoWorktrees(record.id);
           workspaceStore.closeRepoWorkspace(record.id);
         },
       });
@@ -331,7 +324,7 @@ onMounted(() => {
   });
   // P83 plan §12.3 trigger 1: the panel is mounted for as long as the Git module is, so this is
   // once per session, not once per render.
-  void refreshRepoHeads();
+  void repoHeadsStore.refreshRepoHeads();
   // P84 §4.4 trigger 1: same reasoning — one batched worktree-parent read per session, not once
   // per row.
   void refreshRepoWorktreeLinks();
@@ -399,24 +392,24 @@ onUnmounted(() => {
                   type="button"
                   class="repo-twisty"
                   tabindex="-1"
-                  :aria-label="isWorktreesExpanded(repo.id) ? 'Collapse worktrees' : 'Expand worktrees'"
-                  :aria-expanded="isWorktreesExpanded(repo.id)"
+                  :aria-label="worktreesStore.isWorktreesExpanded(repo.id) ? 'Collapse worktrees' : 'Expand worktrees'"
+                  :aria-expanded="worktreesStore.isWorktreesExpanded(repo.id)"
                   data-testid="repo-row-expand"
-                  @click.stop="toggleRepoWorktrees(repo.id)"
+                  @click.stop="worktreesStore.toggleRepoWorktrees(repo.id)"
                 >
                   <CodiconIcon
-                    :name="isWorktreesExpanded(repo.id) ? 'chevron-down' : 'chevron-right'"
+                    :name="worktreesStore.isWorktreesExpanded(repo.id) ? 'chevron-down' : 'chevron-right'"
                     :size="13"
                   />
                 </button>
                 <CodiconIcon name="source-control" :size="16" class="repo-icon" />
                 <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
                 <span
-                  v-if="repoHeadLabel(repo.id)"
+                  v-if="repoHeadsStore.repoHeadLabel(repo.id)"
                   class="repo-head"
-                  v-tooltip="repoHeadLabel(repo.id)"
+                  v-tooltip="repoHeadsStore.repoHeadLabel(repo.id)"
                 >
-                  {{ repoHeadLabel(repo.id) }}
+                  {{ repoHeadsStore.repoHeadLabel(repo.id) }}
                 </span>
                 <CodiconIcon
                   v-if="terminalCountAtPath(repo.root) > 0"
@@ -428,12 +421,12 @@ onUnmounted(() => {
                 />
               </div>
               <div
-                v-if="isWorktreesExpanded(repo.id)"
+                v-if="worktreesStore.isWorktreesExpanded(repo.id)"
                 class="worktree-list"
                 data-testid="repo-worktrees"
               >
                 <div
-                  v-for="wt in worktreeEntries(repo.id)"
+                  v-for="wt in worktreesStore.worktreeEntries(repo.id)"
                   :key="wt.path"
                   class="worktree-row"
                   :class="{
@@ -443,7 +436,7 @@ onUnmounted(() => {
                   }"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
-                  @click.stop="switchToWorktree(repo.id, wt)"
+                  @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
@@ -466,19 +459,19 @@ onUnmounted(() => {
                   />
                 </div>
                 <div
-                  v-if="worktreesError(repo.id)"
+                  v-if="worktreesStore.worktreesError(repo.id)"
                   class="worktree-note error"
                   data-testid="repo-worktree-error"
                 >
-                  {{ worktreesError(repo.id) }}
+                  {{ worktreesStore.worktreesError(repo.id) }}
                 </div>
                 <div
-                  v-else-if="worktreesLoading(repo.id) && worktreeEntries(repo.id).length === 0"
+                  v-else-if="worktreesStore.worktreesLoading(repo.id) && worktreesStore.worktreeEntries(repo.id).length === 0"
                   class="worktree-note"
                 >
                   Loading…
                 </div>
-                <div v-else-if="worktreeEntries(repo.id).length === 0" class="worktree-note">
+                <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="worktree-note">
                   No worktrees
                 </div>
               </div>

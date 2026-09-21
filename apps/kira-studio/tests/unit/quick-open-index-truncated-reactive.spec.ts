@@ -19,11 +19,12 @@ restoreAfterEach(control);
 
 const { refreshRepoTree } = await import('../../frontend/src/repo/state/fileTree');
 const { useWorkspaceStore } = await import('../../frontend/src/state/workspace');
-const { openQuickOpen, quickOpenIndexTruncated, QUICK_OPEN_MAX_CANDIDATES } = await import(
+const { useQuickOpenStore, QUICK_OPEN_MAX_CANDIDATES } = await import(
   '../../frontend/src/repo/state/quickOpen'
 );
 
 const workspaceStore = useWorkspaceStore();
+const quickOpenStore = useQuickOpenStore();
 
 let repoCounter = 0;
 function freshRepoId() {
@@ -53,12 +54,12 @@ describe('C13-7: quickOpenIndexTruncated stays reactive across a later tree refr
     await Promise.resolve();
     await Promise.resolve();
 
-    openQuickOpen();
+    quickOpenStore.openQuickOpen();
     await Promise.resolve();
 
     // The exact shape of the original bug: a `computed` wrapping the function, accessed once while
     // the candidate set is small.
-    const truncated = computed(() => quickOpenIndexTruncated());
+    const truncated = computed(() => quickOpenStore.quickOpenIndexTruncated());
     expect(truncated.value).toBe(false);
 
     // A later tree refresh (e.g. a Refresh click, or reopening after new files landed) crosses the

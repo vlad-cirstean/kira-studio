@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
-import { openQuickOpen } from '../repo/state/quickOpen';
+import { useQuickOpenStore } from '../repo/state/quickOpen';
 import { openCreateDialog } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
@@ -17,6 +17,7 @@ interface PaletteCommand {
 
 export const usePaletteStore = defineStore('palette', () => {
   const layoutStore = useLayoutStore();
+  const quickOpenStore = useQuickOpenStore();
 
   // D12: deliberately small and 1:1 with already-reachable actions — every global shortcut this
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
@@ -73,7 +74,7 @@ export const usePaletteStore = defineStore('palette', () => {
     // C9 D6: gated on the active workspace directly (openQuickOpen's own repoIdOfWorkspace check),
     // not the registerCommand/runCommand shape repo.search above uses — quick open needs no mounted
     // panel to be meaningful, unlike repo.search's segmented-control switch.
-    { id: 'repo.quickOpen', label: 'Quick Open…', run: openQuickOpen },
+    { id: 'repo.quickOpen', label: 'Quick Open…', run: () => quickOpenStore.openQuickOpen() },
     // P74 §7.4 item 1: registered by RepoDiffView.vue only for a revision-backed diff tab — a
     // no-op elsewhere, the same view-scoped shape every other runCommand entry above has.
     {
