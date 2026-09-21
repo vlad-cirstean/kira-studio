@@ -23,14 +23,14 @@ if ! command -v codegraph >/dev/null 2>&1; then
   exit 1
 fi
 
-# Wires codegraph's MCP server into Claude Code's config and builds the graph
-# for this repo, non-interactively. --init is skipped on repeat runs since a
-# graph already exists; `sync` picks up anything that changed since last time.
+# MCP registration itself is static, committed config now (.mcp.json +
+# .claude/settings.json's permissions/hooks) rather than written here, so it
+# survives regardless of hook-vs-MCP-bootstrap ordering. This just needs the
+# binary on PATH (above) and the index built/kept in sync.
 if [ -d ".codegraph" ]; then
-  codegraph install --yes --target=claude
   codegraph sync .
 else
-  codegraph install --yes --target=claude --init
+  codegraph init .
 fi
 
 codegraph status .
