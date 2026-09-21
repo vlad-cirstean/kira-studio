@@ -143,12 +143,6 @@ export const IPC = {
   gitVsixStatus: 'kira:git:vsix:status',
   gitVsixInstall: 'kira:git:vsix:install',
 
-  repoMapStatus: 'kira:repomap:status',
-  repoMapSetEnabled: 'kira:repomap:setEnabled',
-  repoMapSetRepoEnabled: 'kira:repomap:setRepoEnabled',
-  repoMapRegenerate: 'kira:repomap:regenerate',
-  repoMapInstallClaudeCode: 'kira:repomap:installClaudeCode',
-
   dbMcpStatus: 'kira:dbmcp:status',
   dbMcpSetEnabled: 'kira:dbmcp:setEnabled',
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
@@ -169,9 +163,6 @@ export const IPC = {
   codeWorkspaceOpenWorkspace: 'kira:codeWorkspace:openWorkspace',
   codeWorkspaceCloseWorkspace: 'kira:codeWorkspace:closeWorkspace',
   codeWorkspaceReadDiff: 'kira:codeWorkspace:readDiff',
-  codeWorkspaceDefinitions: 'kira:codeWorkspace:definitions',
-  codeWorkspaceReferences: 'kira:codeWorkspace:references',
-  codeWorkspaceImplementations: 'kira:codeWorkspace:implementations',
   codeWorkspaceStartSearch: 'kira:codeWorkspace:startSearch',
   codeWorkspaceCancelSearch: 'kira:codeWorkspace:cancelSearch',
   // C7 D7: the coalesced search-results push channel, EmitTo'd to one window — grpcCall's own

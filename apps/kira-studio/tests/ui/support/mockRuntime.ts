@@ -148,12 +148,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   gitVsixStatus: 'GitClientsService.VsixStatus',
   gitVsixInstall: 'GitClientsService.InstallVsCodeIntegration',
 
-  repoMapStatus: 'RepoMapService.Status',
-  repoMapSetEnabled: 'RepoMapService.SetEnabled',
-  repoMapSetRepoEnabled: 'RepoMapService.SetRepoEnabled',
-  repoMapRegenerate: 'RepoMapService.Regenerate',
-  repoMapInstallClaudeCode: 'RepoMapService.InstallClaudeCode',
-
   dbMcpStatus: 'DbMcpService.Status',
   dbMcpSetEnabled: 'DbMcpService.SetEnabled',
   dbMcpRegenerate: 'DbMcpService.Regenerate',
@@ -174,9 +168,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   codeWorkspaceOpenWorkspace: 'CodeWorkspaceService.OpenWorkspace',
   codeWorkspaceCloseWorkspace: 'CodeWorkspaceService.CloseWorkspace',
   codeWorkspaceReadDiff: 'CodeWorkspaceService.ReadDiff',
-  codeWorkspaceDefinitions: 'CodeWorkspaceService.Definitions',
-  codeWorkspaceReferences: 'CodeWorkspaceService.References',
-  codeWorkspaceImplementations: 'CodeWorkspaceService.Implementations',
   codeWorkspaceStartSearch: 'CodeWorkspaceService.StartSearch',
   codeWorkspaceCancelSearch: 'CodeWorkspaceService.CancelSearch',
   codeWorkspaceRepoHeads: 'CodeWorkspaceService.RepoHeads',
@@ -355,22 +346,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     probed: [],
     command: '',
   }),
-  // C3: hydrateRepoMap() joins the same unconditional-every-boot list as gitVsixStatus/
-  // gitClientsList just above, same reasoning — nothing in tests/ui/ seeds a repo-map fixture, so
-  // "off, nothing running" is the honest default for a dev-server run under Playwright.
-  [IPC.repoMapStatus]: JSON.stringify({
-    running: false,
-    url: '',
-    command: '',
-    claudeAvailable: false,
-    probed: [],
-    error: '',
-    repos: [],
-  }),
   // M1 §6.2: hydrateDbMcp() joins the same unconditional-every-boot Promise.all as
-  // gitVsixStatus/repoMapStatus above, same reasoning — nothing in tests/ui/ seeds a dbmcp
-  // fixture, so "off, nothing running" is the honest default for a dev-server run under
-  // Playwright.
+  // gitVsixStatus above, same reasoning — nothing in tests/ui/ seeds a dbmcp fixture, so "off,
+  // nothing running" is the honest default for a dev-server run under Playwright.
   [IPC.dbMcpStatus]: JSON.stringify({
     running: false,
     command: '',
@@ -380,9 +358,9 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     error: '',
   }),
   // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
-  // no-committed-fixture-will-ever-snapshot-this reasoning as gitVsixStatus/repoMapStatus above.
-  // "no update" is the honest default for a dev-server run under Playwright, which never reports a
-  // tagged release version.
+  // no-committed-fixture-will-ever-snapshot-this reasoning as gitVsixStatus above. "no update" is
+  // the honest default for a dev-server run under Playwright, which never reports a tagged release
+  // version.
   [IPC.updateStatus]: JSON.stringify({
     updateAvailable: false,
     currentVersion: '0.0.0-dev',
@@ -390,8 +368,8 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   }),
   [IPC.updateOpenReleasePage]: 'null',
   // C5: main.ts's bootstrap() joins hydrateCodeRepos() to the same unconditional-every-boot
-  // Promise.all as hydrateGitClients()/hydrateRepoMap() above, same reasoning — a spec that never
-  // imports a repository gets "nothing imported yet", not a fixture miss.
+  // Promise.all as hydrateGitClients() above, same reasoning — a spec that never imports a
+  // repository gets "nothing imported yet", not a fixture miss.
   [IPC.codeWorkspaceListRepos]: '[]',
   // P83 §12.3 trigger 1: GitPanel.vue's own onMounted calls refreshRepoHeads() unconditionally,
   // fire-and-forget, every time the Git module is opened — the same "every repo-workspace spec
