@@ -8,7 +8,7 @@ import (
 )
 
 // Browser is the OS-browser seam, declared where it is consumed — the same precedent Dialogs
-// (files.go:52) and RepoMapInstaller (repomap.go:19) already set.
+// (files.go:52) and McpInstaller (dbmcp.go) already set.
 type Browser interface {
 	OpenURL(url string) error
 }

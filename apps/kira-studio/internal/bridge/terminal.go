@@ -70,10 +70,9 @@ func (s *TerminalService) emitAgentSessions() {
 
 // TerminalAgentSessionsChanged is main.go's own Registry.OnChange target — a package-level
 // function rather than a call to the exported method a Wails-bound Registry.OnChange closure
-// would need, because every exported method of a registered service is bound to the wire
-// (repomap.go's startIfEnabled doc comment records the identical reasoning): emitAgentSessions
-// itself stays unexported so it can never become a renderer-triggerable broadcast, and this
-// function is the one place outside this package allowed to reach it.
+// would need, because every exported method of a registered service is bound to the wire:
+// emitAgentSessions itself stays unexported so it can never become a renderer-triggerable
+// broadcast, and this function is the one place outside this package allowed to reach it.
 func TerminalAgentSessionsChanged(s *TerminalService) {
 	s.emitAgentSessions()
 }

@@ -3,7 +3,6 @@ package bridge
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -11,20 +10,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"golang.org/x/sync/errgroup"
 )
 
-// CodeWorkspaceService is C5 §3.3's whole bound surface, extended by C6 §7 with the index
-// lifecycle and navigation: repo import/rename/remove, the two read primitives (ListFiles,
-// ReadFile), and now OpenWorkspace/CloseWorkspace/ReadDiff/Definitions. §11's read-only guarantee
-// is unchanged — no method in this file writes into a repository's working tree, and every git
-// invocation below goes through internal/codeworkspace, which builds every Spec with
+// CodeWorkspaceService is C5 §3.3's whole bound surface: repo import/rename/remove, the two read
+// primitives (ListFiles, ReadFile), and OpenWorkspace/CloseWorkspace/ReadDiff. §11's read-only
+// guarantee is unchanged — no method in this file writes into a repository's working tree, and
+// every git invocation below goes through internal/codeworkspace, which builds every Spec with
 // ReadOnly: true.
 type CodeWorkspaceService struct {
 	Deps appcore.Deps
@@ -33,23 +29,8 @@ type CodeWorkspaceService struct {
 	// refcounted RepoEntry lifecycle gitsession.Registry owns.
 	Discovery *gitclient.Discovery
 	Runner    gitclient.Runner
-	// Registry is internal/codeworkspace's own per-repo session registry (§2/§12), now extended
-	// (C6) with each session's own Index/Graph/Watcher/catfile.Session.
+	// Registry is internal/codeworkspace's own per-repo session registry (§2/§12).
 	Registry *codeworkspace.Registry
-	// IndexStore is the shared codeindex.Store every session's Index/Graph opens against — one per
-	// process (C6 §3.1), constructed in main.go and closed by Shutdown.
-	IndexStore *codeindex.Store
-	// Home overrides KIRA_HOME for the sync lock (C6 §3.3) — empty means config.KiraHome(); a test
-	// seam, mirroring repomap.Config.Home.
-	Home string
-	// OnRepoRemoved and OnRepoRenamed are P67d §6.2's own hooks into bridge.RepoMapService (wired
-	// in main.go, not referenced by type here — the same "two service structs in one package,
-	// wired by main.go" shape bridge.Sources already uses for event wiring): a removed repository's
-	// live MCP grant must be revoked immediately, not merely at the next restart, and a rename must
-	// re-key the live instance so `list_repos`/a tool call's own `repo` argument stay honest. Both
-	// nil-checked before use — not every construction site (a test, for one) needs them wired.
-	OnRepoRemoved func(id string)
-	OnRepoRenamed func(id, name string)
 }
 
 type CodeWorkspaceIDArgs struct {
@@ -82,11 +63,9 @@ func (s *CodeWorkspaceService) gitPathSetting() string {
 }
 
 // session resolves id's own code_repos row into an internal/codeworkspace.Session, ready for a
-// ListFiles/ReadFile/ReadDiff/Definitions call — re-resolved on every request (Registry.Open now
-// reuses a live session when nothing that matters changed, §2/C6 §3.2) rather than trusting a
-// cached session this method never re-checked against a stale git.path. IndexRepoID is filled from
-// the repo row's own RepoID on every call — cheap, and correct even for a session Open reused
-// rather than rebuilt.
+// ListFiles/ReadFile/ReadDiff call — re-resolved on every request (Registry.Open now reuses a live
+// session when nothing that matters changed, §2/C6 §3.2) rather than trusting a cached session this
+// method never re-checked against a stale git.path.
 func (s *CodeWorkspaceService) session(ctx context.Context, id string) (*codeworkspace.Session, *model.CodeRepo, error) {
 	repo, err := s.Deps.Repos.CodeRepos.Get(id)
 	if err != nil {
@@ -99,18 +78,7 @@ func (s *CodeWorkspaceService) session(ctx context.Context, id string) (*codewor
 	if status.Kind != "ok" {
 		return nil, nil, ipcerr.New("E_GIT_UNAVAILABLE", "codeworkspace: git is unavailable: "+status.Kind)
 	}
-	sess := s.Registry.Open(repo.ID, repo.Root, s.Runner, status.Path)
-	sess.IndexRepoID = repo.RepoID
-	return sess, repo, nil
-}
-
-// home resolves this service's own KIRA_HOME override (a test seam) the way repomap.Config.Home
-// does.
-func (s *CodeWorkspaceService) home() string {
-	if s.Home != "" {
-		return s.Home
-	}
-	return config.KiraHome()
+	return s.Registry.Open(repo.ID, repo.Root, s.Runner, status.Path), repo, nil
 }
 
 // ListRepos returns every imported repository, sort_order then name (CodeReposRepo.List's own
@@ -348,9 +316,6 @@ func (s *CodeWorkspaceService) RenameRepo(args CodeWorkspaceRenameArgs) (model.C
 	if err != nil {
 		return model.CodeRepo{}, ipcerr.Internal(err.Error())
 	}
-	if s.OnRepoRenamed != nil {
-		s.OnRepoRenamed(args.ID, args.Name)
-	}
 	return rec, nil
 }
 
@@ -365,9 +330,6 @@ func (s *CodeWorkspaceService) RemoveRepo(args CodeWorkspaceIDArgs) error {
 		return ipcerr.Internal(err.Error())
 	}
 	s.Registry.Close(args.ID)
-	if s.OnRepoRemoved != nil {
-		s.OnRepoRemoved(args.ID)
-	}
 	return nil
 }
 
@@ -412,20 +374,14 @@ func (s *CodeWorkspaceService) ReadFile(ctx context.Context, args CodeWorkspaceR
 	return content, nil
 }
 
-// OpenWorkspace starts args.ID's own index/graph/watcher (C6 §3.3) — the warm-up path called from
-// openRepoWorkspace right after the tree/graph shell is ensured. Returns as soon as the background
-// sync goroutine is started; the initial sync of a large repository takes far longer than an IPC
-// call may.
+// OpenWorkspace opens args.ID's own session (§2/§12) — the registry entry CloseWorkspace pairs
+// with.
 func (s *CodeWorkspaceService) OpenWorkspace(ctx context.Context, args CodeWorkspaceIDArgs) error {
 	if args.ID == "" {
 		return ipcerr.BadRequest("id is required")
 	}
-	sess, _, err := s.session(ctx, args.ID)
-	if err != nil {
-		return err
-	}
-	sess.EnsureIndex(s.IndexStore, s.home(), slog.Default())
-	return nil
+	_, _, err := s.session(ctx, args.ID)
+	return err
 }
 
 // CloseWorkspace stops args.ID's own session (index, watcher, catfile) — called from
@@ -460,97 +416,10 @@ func (s *CodeWorkspaceService) ReadDiff(ctx context.Context, args CodeWorkspaceR
 	return content, nil
 }
 
-// CodeWorkspaceDefinitionArgs is Definitions's own args — line/column are Monaco's own 1-based
-// line and 1-based UTF-16 column.
-type CodeWorkspaceDefinitionArgs struct {
-	ID     string `json:"id"`
-	Path   string `json:"path"`
-	Line   int    `json:"line"`
-	Column int    `json:"column"`
-}
-
-// Definitions answers go-to-definition/hover for args.Path at (args.Line, args.Column) (C6 §6).
-// It ensures the session's own index has been started (§3.3: "Definitions itself" is one of the
-// two EnsureIndex callers, so a navigation request that somehow arrives before OpenWorkspace ever
-// did is still correct) — EnsureIndex itself is idempotent and returns immediately either way.
-func (s *CodeWorkspaceService) Definitions(ctx context.Context, args CodeWorkspaceDefinitionArgs) (codeworkspace.NavResult, error) {
-	if args.ID == "" {
-		return codeworkspace.NavResult{}, ipcerr.BadRequest("id is required")
-	}
-	if args.Path == "" {
-		return codeworkspace.NavResult{}, ipcerr.BadRequest("path is required")
-	}
-	sess, _, err := s.session(ctx, args.ID)
-	if err != nil {
-		return codeworkspace.NavResult{}, err
-	}
-	sess.EnsureIndex(s.IndexStore, s.home(), slog.Default())
-	result, err := codeworkspace.Definitions(ctx, sess, s.IndexStore, args.Path, args.Line, args.Column)
-	if err != nil {
-		return codeworkspace.NavResult{}, ipcerr.Internal(err.Error())
-	}
-	return result, nil
-}
-
-// Implementations answers go-to-implementation for args.Path at (args.Line, args.Column) (P78
-// §7.2) — Definitions's own structural copy, one call swapped.
-func (s *CodeWorkspaceService) Implementations(ctx context.Context, args CodeWorkspaceDefinitionArgs) (codeworkspace.NavResult, error) {
-	if args.ID == "" {
-		return codeworkspace.NavResult{}, ipcerr.BadRequest("id is required")
-	}
-	if args.Path == "" {
-		return codeworkspace.NavResult{}, ipcerr.BadRequest("path is required")
-	}
-	sess, _, err := s.session(ctx, args.ID)
-	if err != nil {
-		return codeworkspace.NavResult{}, err
-	}
-	sess.EnsureIndex(s.IndexStore, s.home(), slog.Default())
-	result, err := codeworkspace.Implementations(ctx, sess, s.IndexStore, args.Path, args.Line, args.Column)
-	if err != nil {
-		return codeworkspace.NavResult{}, ipcerr.Internal(err.Error())
-	}
-	return result, nil
-}
-
-// CodeWorkspaceReferenceArgs is References's own args — IncludeDeclaration maps straight to
-// Monaco's own ReferenceContext.includeDeclaration (P78 §8.1).
-type CodeWorkspaceReferenceArgs struct {
-	ID                 string `json:"id"`
-	Path               string `json:"path"`
-	Line               int    `json:"line"`
-	Column             int    `json:"column"`
-	IncludeDeclaration bool   `json:"includeDeclaration"`
-}
-
-// References answers find-references for args.Path at (args.Line, args.Column) (P78 §7.2).
-func (s *CodeWorkspaceService) References(ctx context.Context, args CodeWorkspaceReferenceArgs) (codeworkspace.RefResult, error) {
-	if args.ID == "" {
-		return codeworkspace.RefResult{}, ipcerr.BadRequest("id is required")
-	}
-	if args.Path == "" {
-		return codeworkspace.RefResult{}, ipcerr.BadRequest("path is required")
-	}
-	sess, _, err := s.session(ctx, args.ID)
-	if err != nil {
-		return codeworkspace.RefResult{}, err
-	}
-	sess.EnsureIndex(s.IndexStore, s.home(), slog.Default())
-	result, err := codeworkspace.References(ctx, sess, s.IndexStore, args.Path, args.Line, args.Column, args.IncludeDeclaration)
-	if err != nil {
-		return codeworkspace.RefResult{}, ipcerr.Internal(err.Error())
-	}
-	return result, nil
-}
-
-// Shutdown stops every open session and closes the shared index store — process teardown
-// (main.go's own teardown, beside repositories.Close()). Not a bound method: called directly from
-// main.go, the same way bridge.StopRepoMap(repoMapSvc) is.
+// Shutdown stops every open session — process teardown (main.go's own teardown, beside
+// repositories.Close()). Not a bound method: called directly from main.go.
 func (s *CodeWorkspaceService) Shutdown() {
 	s.Registry.CloseAll()
-	if s.IndexStore != nil {
-		_ = s.IndexStore.Close()
-	}
 }
 
 // ---- C7 D7: the coalescing search-results push channel ----

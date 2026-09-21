@@ -21,17 +21,23 @@ const dbMcpServerName = "kira-db"
 
 // dbMcpTokenName is mcpauth.PathNamed's own file-name argument — no repo-id slug (M1 §2.2): one DB
 // MCP instance exists per app process per KIRA_HOME, with no second identity to key several apart
-// by, unlike the repo-map server.
+// by.
 const dbMcpTokenName = "mcp-db"
 
+// McpInstaller is mcpinstall.Installer's own seam, declared where it is consumed — the same
+// "declare the interface where it's consumed" precedent GitVsix (gitclients.go) already uses.
+type McpInstaller interface {
+	Status() mcpinstall.Status
+	Install(ctx context.Context, name, url, token string) mcpinstall.Result
+}
+
 // DbMcpService is the Database MCP section's whole surface (M1 §6.2): Status, SetEnabled,
-// Regenerate, InstallClaudeCode. Copies RepoMapService's own shape exactly (§3.3) — it owns the
-// embedded *dbmcp.Server's actual lifecycle, constructed and started when the setting turns on (or
-// already is, at boot), stopped when it turns off or the app quits. Installer reuses
-// RepoMapInstaller as-is (declared in repomap.go) rather than a second, identical interface.
+// Regenerate, InstallClaudeCode — it owns the embedded *dbmcp.Server's actual lifecycle,
+// constructed and started when the setting turns on (or already is, at boot), stopped when it
+// turns off or the app quits.
 type DbMcpService struct {
 	Deps      appcore.Deps
-	Installer RepoMapInstaller
+	Installer McpInstaller
 	// Approvals is M2's prompt-mode broker — constructed once in main.go and outliving this
 	// service's own server start/stop, so the event subscription wired at boot (Events.Attach)
 	// stays valid across a restart of the embedded server.
@@ -80,10 +86,10 @@ func (s *DbMcpService) Status() DbMcpStatus {
 	return s.statusLocked()
 }
 
-// dbMcpTokenProviderFor mirrors tokenProviderFor's own mint/!mint split (repomap.go), applied to
-// dbmcp.TokenProvider's own no-repoID signature: mint always mints fresh and persists over any
-// existing file (an explicit enable); !mint loads an existing token or mints only if none exists
-// yet, or the existing one has lapsed (the app-boot-with-the-leaf-already-true path).
+// dbMcpTokenProviderFor implements dbmcp.TokenProvider's own no-repoID signature with a mint/!mint
+// split: mint always mints fresh and persists over any existing file (an explicit enable); !mint
+// loads an existing token or mints only if none exists yet, or the existing one has lapsed (the
+// app-boot-with-the-leaf-already-true path).
 func dbMcpTokenProviderFor(home string, mint bool) dbmcp.TokenProvider {
 	return func() (mcpauth.Record, string, bool, error) {
 		path := mcpauth.PathNamed(home, dbMcpTokenName)
@@ -165,12 +171,11 @@ func (s *DbMcpService) stopLocked() {
 	s.server = nil
 }
 
-// startIfEnabled is main.go's own boot-time call, mirroring StartRepoMapIfEnabled's own posture
-// exactly: a failure (a bind conflict) is logged, never fatal — the app boots regardless.
+// startIfEnabled is main.go's own boot-time call: a failure (a bind conflict) is logged, never
+// fatal — the app boots regardless.
 //
-// Unexported, reached only through StartDbMcpIfEnabled below — repomap.go's own startIfEnabled
-// doc comment explains why (Wails binds every exported method of a registered service, and a
-// wire-callable Start would let a stray call bypass the settings leaf).
+// Unexported, reached only through StartDbMcpIfEnabled below: Wails binds every exported method of
+// a registered service, and a wire-callable Start would let a stray call bypass the settings leaf.
 func (s *DbMcpService) startIfEnabled() {
 	settings, err := s.Deps.Repos.Settings.GetAll()
 	if err != nil {
@@ -187,8 +192,8 @@ func (s *DbMcpService) startIfEnabled() {
 	}
 }
 
-// stop is main.go's own shutdown call, beside bridge.StopRepoMap — see startIfEnabled's own note
-// on why this is unexported and reached only through StopDbMcp.
+// stop is main.go's own shutdown call — see startIfEnabled's own note on why this is unexported
+// and reached only through StopDbMcp.
 func (s *DbMcpService) stop() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -197,7 +202,7 @@ func (s *DbMcpService) stop() {
 
 // StartDbMcpIfEnabled and StopDbMcp are main.go's own boot/shutdown hooks for the embedded
 // instance, package-level functions rather than exported methods on DbMcpService — the identical
-// reasoning StartRepoMapIfEnabled/StopRepoMap already document.
+// reasoning startIfEnabled's own doc comment above documents.
 func StartDbMcpIfEnabled(s *DbMcpService) { s.startIfEnabled() }
 func StopDbMcp(s *DbMcpService)           { s.stop() }
 
@@ -207,10 +212,9 @@ type DbMcpSetEnabledArgs struct {
 }
 
 // SetEnabled patches the settings leaf and starts or stops the embedded instance in the same call
-// (the toggle bypasses the dialog's draft/Save flow entirely, an instant action, mirroring
-// RepoMapService.SetEnabled). Turning on always mints a fresh token, even if a file already exists
-// for a previous enable — a deliberate, explicit re-enable is exactly the event token rotation
-// ties regeneration to.
+// (the toggle bypasses the dialog's draft/Save flow entirely, an instant action). Turning on always
+// mints a fresh token, even if a file already exists for a previous enable — a deliberate, explicit
+// re-enable is exactly the event token rotation ties regeneration to.
 func (s *DbMcpService) SetEnabled(args DbMcpSetEnabledArgs) (DbMcpStatus, error) {
 	merged, err := s.Deps.Repos.Settings.Set(model.SettingsPatch{
 		DbMcp: &model.DbMcpPatch{ServerEnabled: &args.Enabled},
@@ -258,8 +262,9 @@ func (s *DbMcpService) Regenerate() DbMcpStatus {
 	return s.statusLocked()
 }
 
-// DbMcpInstallResult is mcpinstall.Result's wire projection — RepoMapInstallResult's own
-// precedent.
+// DbMcpInstallResult is mcpinstall.Result's wire projection — GitVsixInstallResult's own precedent
+// (gitclients.go): a domain package's plain Go struct never crosses the wire directly, only this
+// tagged copy of it.
 type DbMcpInstallResult struct {
 	Outcome string   `json:"outcome"`
 	Detail  string   `json:"detail"`
@@ -271,8 +276,8 @@ func toWireDbMcpInstallResult(r mcpinstall.Result) DbMcpInstallResult {
 }
 
 // InstallClaudeCode never returns a Go error — mcpinstall.Install's own contract, following
-// RepoMapService.InstallClaudeCode's precedent. A no-op result (outcome notFound) when nothing is
-// running: there is nothing to register yet.
+// connections.Service.Reveal/gitvsix.Installer.Install's precedent. A no-op result (outcome
+// notFound) when nothing is running: there is nothing to register yet.
 func (s *DbMcpService) InstallClaudeCode(ctx context.Context) DbMcpInstallResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()

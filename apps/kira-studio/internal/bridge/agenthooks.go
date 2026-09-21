@@ -116,9 +116,9 @@ func (s *AgentHooksService) stopLocked() {
 // exactly: a failure (curl missing, a bind conflict) is logged, never fatal — the app boots
 // regardless.
 //
-// Unexported, reached only through StartAgentHooksIfEnabled below — repomap.go's own startIfEnabled
-// doc comment explains why (Wails binds every exported method of a registered service, and a
-// wire-callable Start would let a stray call bypass the settings leaf).
+// Unexported, reached only through StartAgentHooksIfEnabled below: Wails binds every exported
+// method of a registered service, and a wire-callable Start would let a stray call bypass the
+// settings leaf.
 func (s *AgentHooksService) startIfEnabled() {
 	settings, err := s.Deps.Repos.Settings.GetAll()
 	if err != nil {

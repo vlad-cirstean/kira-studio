@@ -27,7 +27,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
@@ -136,14 +135,14 @@ func main() {
 	updateChecker := appupdate.NewChecker(buildinfo.Version)
 
 	embedded := wireEmbeddedServices(deps, gitDiscovery, gitRunner, gitSock, connectionsSvc, oplogWiring, metricsTicker)
-	repoMapSvc, dbMcpSvc := embedded.repoMapSvc, embedded.dbMcpSvc
+	dbMcpSvc := embedded.dbMcpSvc
 	agentHooksSvc, keepAwakeSvc := embedded.agentHooksSvc, embedded.keepAwakeSvc
 	windowsSvc, terminalSvc := embedded.windowsSvc, embedded.terminalSvc
 	codeWorkspaceSvc := embedded.codeWorkspaceSvc
 	events, eventsDetach := embedded.events, embedded.eventsDetach
 
 	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		repoMapSvc, dbMcpSvc, agentHooksSvc, keepAwakeSvc, codeWorkspaceSvc, terminalSvc,
+		dbMcpSvc, agentHooksSvc, keepAwakeSvc, codeWorkspaceSvc, terminalSvc,
 		gitSock, askpassBroker, repositories, db)
 	windows, closeFlush, quitter := lifecycle.windows, lifecycle.closeFlush, lifecycle.quitter
 
@@ -188,7 +187,6 @@ func main() {
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
 			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
-			application.NewService(repoMapSvc),
 			application.NewService(dbMcpSvc),
 			application.NewService(agentHooksSvc),
 			application.NewService(keepAwakeSvc),
@@ -469,7 +467,6 @@ func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *rep
 // blocks (the Services list, teardown, the window-closing terminal cleanup) still reach past this
 // function's own return.
 type embeddedWired struct {
-	repoMapSvc       *bridge.RepoMapService
 	dbMcpSvc         *bridge.DbMcpService
 	agentHooksSvc    *bridge.AgentHooksService
 	keepAwakeSvc     *bridge.KeepAwakeService
@@ -480,25 +477,18 @@ type embeddedWired struct {
 	eventsDetach     func()
 }
 
-// wireEmbeddedServices runs main's own embedded-service block: repo-map MCP -> DB MCP (with its
-// own approval broker) -> code workspace (native code-viewing, wired to notify repo-map of a
-// removed/renamed repository) -> Claude Code hook reporting -> keep-awake -> the windows service
-// handle -> the embedded terminal (its own OnChange republishing both the status-bar widget and
-// keep-awake's agent-session count) -> the app-wide event bus, attached to every producer built so
-// far. deps is taken by value, since every call site here is at or after the point main's own
-// deps.Events assignment (the emitter) has already run — each bridge.XxxService{Deps: deps}
-// literal below is exactly the same value copy the original sequential code made in place.
+// wireEmbeddedServices runs main's own embedded-service block: DB MCP (with its own approval
+// broker) -> code workspace (native code-viewing) -> Claude Code hook reporting -> keep-awake ->
+// the windows service handle -> the embedded terminal (its own OnChange republishing both the
+// status-bar widget and keep-awake's agent-session count) -> the app-wide event bus, attached to
+// every producer built so far. deps is taken by value, since every call site here is at or after
+// the point main's own deps.Events assignment (the emitter) has already run — each
+// bridge.XxxService{Deps: deps} literal below is exactly the same value copy the original
+// sequential code made in place.
 func wireEmbeddedServices(deps appcore.Deps, gitDiscovery *gitclient.Discovery, gitRunner gitclient.Runner, gitSock *gitsock.Server, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker) embeddedWired {
-	// C3 §7.4/D7: the repo-map MCP server's embedded instance — owned by this app's own lifecycle,
-	// same posture as gitSock just above. StartIfEnabled's own failure (no repository resolved at
-	// this process's cwd, a bind conflict) is logged, never fatal, mirroring gitSock.Start().
-	repoMapSvc := &bridge.RepoMapService{
-		Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Discovery: gitDiscovery, Runner: gitRunner,
-	}
-	bridge.StartRepoMapIfEnabled(repoMapSvc)
-
-	// M1 §3.3: the DB MCP server's embedded instance — same posture as repoMapSvc just above, but
-	// no repository to resolve: it reads this app's own connections/tree/router straight from deps.
+	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle, same
+	// posture as gitSock just above. StartIfEnabled's own failure (a bind conflict) is logged,
+	// never fatal, mirroring gitSock.Start().
 	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
 	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
 	// restart of the embedded server within one app run.
@@ -506,20 +496,10 @@ func wireEmbeddedServices(deps appcore.Deps, gitDiscovery *gitclient.Discovery, 
 	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
-	// C6 §3.1/§7: one *codeindex.Store per process for the native code workspace's own
-	// Index/Graph — opens nothing until first use (db.go's ensureOpen). The embedded repo-map
-	// server above keeps opening its own Store over the same file; two pools in one process are
-	// exactly what WAL plus _busy_timeout=5000 (buildDSN) exist for, rather than threading one
-	// Store through RepoMapService's own start/stop lifecycle and coupling two independent
-	// features for no gain.
-	codeIndexStore := codeindex.OpenStore()
+	// C5 §3.3: the native code workspace's own bound service — Discovery/Runner mirror gitrpc's
+	// own seam rather than reusing gitRegistry.
 	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
 		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
-		IndexStore: codeIndexStore,
-		// P67d §6.2/§6.4: a removed repository's live MCP grant is revoked immediately, not merely
-		// at the next restart; a rename re-keys the live instance so a `repo` argument stays honest.
-		OnRepoRemoved: func(id string) { bridge.RepoMapNotifyRepoRemoved(repoMapSvc, id) },
-		OnRepoRenamed: func(id, name string) { bridge.RepoMapNotifyRepoRenamed(repoMapSvc, id, name) },
 	}
 
 	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
@@ -557,7 +537,7 @@ func wireEmbeddedServices(deps appcore.Deps, gitDiscovery *gitclient.Discovery, 
 	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
 
 	return embeddedWired{
-		repoMapSvc: repoMapSvc, dbMcpSvc: dbMcpSvc, agentHooksSvc: agentHooksSvc, keepAwakeSvc: keepAwakeSvc,
+		dbMcpSvc: dbMcpSvc, agentHooksSvc: agentHooksSvc, keepAwakeSvc: keepAwakeSvc,
 		windowsSvc: windowsSvc, terminalSvc: terminalSvc, codeWorkspaceSvc: codeWorkspaceSvc,
 		events: events, eventsDetach: eventsDetach,
 	}
@@ -581,7 +561,7 @@ type lifecycleWired struct {
 // -> the quitter built over both. unsubscribePairing is declared here (nil until main wires the
 // pairing broker once `app` exists) so teardown, itself built here, can still close over the real
 // value by reference — setUnsubscribePairing is how main assigns it later.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, repoMapSvc *bridge.RepoMapService, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, codeWorkspaceSvc *bridge.CodeWorkspaceService, terminalSvc *bridge.TerminalService, gitSock *gitsock.Server, askpassBroker *gitaskpass.Broker, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, codeWorkspaceSvc *bridge.CodeWorkspaceService, terminalSvc *bridge.TerminalService, gitSock *gitsock.Server, askpassBroker *gitaskpass.Broker, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
@@ -610,7 +590,6 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		}
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
-		bridge.StopRepoMap(repoMapSvc)
 		bridge.StopDbMcp(dbMcpSvc)
 		bridge.StopAgentHooks(agentHooksSvc)
 		// P87 §4: killing the assertion early keeps the window between "app is quitting" and
