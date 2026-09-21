@@ -55,6 +55,10 @@
       "tailwindDirectives": true
     }
   },
+  "html": {
+    "experimentalFullSupportEnabled": true,
+    "formatter": { "enabled": false }
+  },
   "assist": {
     "enabled": true,
     "actions": {
@@ -82,12 +86,10 @@
       "includes": ["**/*.vue"],
       "linter": {
         "rules": {
-          "correctness": {
-            "noUnusedImports": "off",
-            "noUnusedVariables": "off"
-          },
+          "a11y": "off",
           "style": {
-            "useImportType": "off"
+            "useVueHyphenatedAttributes": "off",
+            "noNonNullAssertion": "off"
           }
         }
       }
