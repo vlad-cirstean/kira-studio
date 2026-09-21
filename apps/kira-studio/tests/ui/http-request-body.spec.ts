@@ -74,7 +74,11 @@ test('Http request body — code · XML round-trips through the builder and the 
   // way is the observable proof the xml() grammar (not plain text) is active.
   const editor = page.locator('[data-testid="http-request-pane"]');
   await typeInto(editor, page, '<root><a>1</a><b>two</b></root>');
-  expect(await hasTokenColor(editor, 'rgb(86, 156, 214)')).toBe(true);
+  // P96 §7: expect.poll (auto-retrying), not a one-shot evaluate() — the same reason
+  // api-ui-consistency.spec.ts's own token-colour check does (its comment at the same call).
+  // Monaco's own debounced marker/tokenize pass can still be catching up on the language-mode
+  // switch plus the insertText above when this first samples the DOM.
+  await expect.poll(() => hasTokenColor(editor, 'rgb(86, 156, 214)')).toBe(true);
 
   await page.click('[data-testid="http-body-beautify"]');
   const BEAUTIFIED = '<root>\n  <a>\n    1\n  </a>\n  <b>\n    two\n  </b>\n</root>';
