@@ -21,9 +21,9 @@ import { computeFloatPosition, pointReference } from './floatingPosition.ts';
 // ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
 // (`typeof` on an identifier requires the runtime binding in scope), and the template's own
 // `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
-// and would otherwise "fix" this to `import type`, silently erasing the import (AppToolbar.vue's
-// own `useImportType` biome-ignore precedent, for the same reason).
-// biome-ignore lint/style/useImportType: see above
+// and would otherwise "fix" this to `import type`, silently erasing the import — `biome.json`'s
+// own `**/*.vue` override turns `useImportType` off for exactly this class of false positive
+// (P96 §5.2).
 import KuiMenuList from './KuiMenuList.vue';
 
 const props = defineProps<{

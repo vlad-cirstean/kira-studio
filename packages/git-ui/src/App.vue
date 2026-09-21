@@ -27,10 +27,9 @@ import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
 // type` erases it, and Vue then renders <CommitGrid> as an unknown element with no grid inside it
 // (G14 F1). The script's only reference is `InstanceType<typeof …>`, so biome's useImportType
-// cannot tell; the template is the real caller.
-// biome-ignore lint/style/useImportType: the template instantiates this — see above
+// cannot tell (it is off for `**/*.vue` in `biome.json` for exactly this class of false positive,
+// P96 §5.2); the template is the real caller.
 import AppToolbar from './components/AppToolbar.vue';
-// biome-ignore lint/style/useImportType: the template instantiates this — see above
 import CommitGrid from './components/CommitGrid.vue';
 import ConflictBanner from './components/ConflictBanner.vue';
 import ConnectionBanner from './components/ConnectionBanner.vue';
@@ -65,8 +64,8 @@ import {
   type MenuSection,
 } from './components/rowMenuModel.ts';
 // The template instantiates this (InstanceType<typeof SearchBox> is the script's only other
-// reference) — see AppToolbar.vue's own note on this exact pattern.
-// biome-ignore lint/style/useImportType: see above
+// reference) — see AppToolbar.vue's own note on this exact pattern; `biome.json`'s own `**/*.vue`
+// override turns `useImportType` off for exactly this class of false positive (P96 §5.2).
 import SearchBox from './components/SearchBox.vue';
 import StashDetailPane from './components/StashDetailPane.vue';
 import type { SearchOption } from './components/searchResultsModel.ts';

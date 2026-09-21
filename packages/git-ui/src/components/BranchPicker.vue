@@ -20,9 +20,8 @@ import type { KuiSegmentedOption } from '@kira/kira-ui';
 // ref type) — that is still a genuine *value* read (`typeof` on an identifier requires the runtime
 // binding in scope), and the template's own `<KuiButton>`/`<KuiSegmented>` tags instantiate them as
 // components; biome's own static analysis sees neither use and would otherwise "fix" this to
-// `import type`, silently erasing the import (AppToolbar.vue's own `useImportType` biome-ignore
-// precedent, for the same reason).
-// biome-ignore lint/style/useImportType: see above
+// `import type`, silently erasing the import — `biome.json`'s own `**/*.vue` override turns
+// `useImportType` off for exactly this class of false positive (P96 §5.2).
 import {
   enabledNeighbour,
   firstEnabled,

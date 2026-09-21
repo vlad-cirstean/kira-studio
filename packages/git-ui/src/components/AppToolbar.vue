@@ -32,9 +32,9 @@ import type { MenuSection } from '@kira/kira-ui';
 // ever reads it through `InstanceType<typeof KuiMenuList>` — that is still a genuine *value* read
 // (`typeof` on an identifier requires the runtime binding in scope), and the template's own
 // `<KuiMenuList>` tag instantiates it as a component; biome's own static analysis sees neither use
-// and would otherwise "fix" this to `import type`, silently erasing the import (this file's own
-// `useImportType` biome-ignore precedent further down, for the same reason).
-// biome-ignore lint/style/useImportType: see above
+// and would otherwise "fix" this to `import type`, silently erasing the import — `biome.json`'s
+// own `**/*.vue` override turns `useImportType` off for exactly this class of false positive
+// (P96 §5.2).
 import { KuiButton, KuiMenuList, KuiPopoverPanel } from '@kira/kira-ui';
 import { computed, nextTick, ref } from 'vue';
 import type { DetailActions } from '../state/detailActions.ts';
@@ -52,13 +52,12 @@ import type { WorktreeCreateSeed, WorktreeState } from '../state/worktrees.ts';
 // PullStrategyPicker and RefreshButton: a .vue default export is a *value* — the component object
 // the template instantiates. `import type` erases it, and Vue then renders the tag as an unknown
 // element with nothing inside it (G14 F1/F3). The script's only reference to RefreshButton is
-// `InstanceType<typeof …>`, so biome's useImportType cannot tell; the template is the real caller.
-// biome-ignore lint/style/useImportType: see above
+// `InstanceType<typeof …>`, so biome's useImportType cannot tell (it is off for `**/*.vue` in
+// `biome.json` for exactly this class of false positive, P96 §5.2); the template is the real
+// caller.
 import BranchPicker from './BranchPicker.vue';
-// biome-ignore lint/style/useImportType: see above
 import PullStrategyPicker from './PullStrategyPicker.vue';
 import type { PickerTab } from './pickerModel.ts';
-// biome-ignore lint/style/useImportType: the template instantiates this — see above
 import RefreshButton from './RefreshButton.vue';
 import { remoteNamesFrom } from './rowMenuModel.ts';
 import UndoButton from './UndoButton.vue';

@@ -55,9 +55,9 @@ import type { KuiSelectOption } from '@kira/kira-ui';
 // `KuiSearchInput` is a plain (not `import type`) import even though this file's own script only
 // ever reads it through `InstanceType<typeof KuiSearchInput>` (`searchInputRef`) — the template's
 // own `<KuiSearchInput>` tag instantiates it as a component; biome's static analysis sees neither
-// use and would otherwise "fix" this to `import type`, silently erasing the import
-// (`AppToolbar.vue`'s/`review/ReviewView.vue`'s own precedent for this exact pattern).
-// biome-ignore lint/style/useImportType: see above
+// use and would otherwise "fix" this to `import type`, silently erasing the import —
+// `biome.json`'s own `**/*.vue` override turns `useImportType` off for exactly this class of
+// false positive (P96 §5.2).
 import { computeFloatPosition, KuiButton, KuiSearchInput, KuiSelect } from '@kira/kira-ui';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
