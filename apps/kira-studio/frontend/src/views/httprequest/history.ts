@@ -2,6 +2,7 @@ import type {
   ResponseHistoryEntry,
   ResponseHistorySnapshot,
 } from '@shared/domain/response-history';
+import { defineStore } from 'pinia';
 import { createHistoryStore } from '../../api/state/history';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
@@ -16,55 +17,60 @@ interface Extra {
   selected: string[];
 }
 
-const {
-  runtime,
-  ensure: ensureRuntime,
-  ensureFresh: ensureHistoryFresh,
-  noteRecorded: noteSendRecorded,
-  view: viewHistoryEntry,
-  backToLatest,
-  del,
-  clearAll,
-} = createHistoryStore<ResponseHistoryEntry, ResponseHistorySnapshot, Extra>({
-  list: (itemId, tabId) => control.historyList(itemId, tabId),
-  get: (id) => control.historyGet(id),
-  remove: (id) => control.historyDelete(id),
-  clear: (itemId, tabId) => control.historyClear(itemId, tabId),
-  findTab: findHttpRequestTab,
-  extra: () => ({ selected: [] }),
-});
+export const useHttpHistoryStore = defineStore('httpHistory', () => {
+  const {
+    runtime,
+    ensure: ensureRuntime,
+    ensureFresh: ensureHistoryFresh,
+    noteRecorded: noteSendRecorded,
+    view: viewHistoryEntry,
+    backToLatest,
+    del,
+    clearAll,
+  } = createHistoryStore<ResponseHistoryEntry, ResponseHistorySnapshot, Extra>({
+    list: (itemId, tabId) => control.historyList(itemId, tabId),
+    get: (id) => control.historyGet(id),
+    remove: (id) => control.historyDelete(id),
+    clear: (itemId, tabId) => control.historyClear(itemId, tabId),
+    findTab: findHttpRequestTab,
+    extra: () => ({ selected: [] }),
+  });
 
-export {
-  backToLatest,
-  ensureHistoryFresh,
-  noteSendRecorded,
-  runtime as historyRuntime,
-  viewHistoryEntry,
-};
-
-export async function deleteHistoryEntry(tabId: string, id: string): Promise<void> {
-  await del(tabId, id);
-  const rt = runtime[tabId];
-  if (rt) rt.selected = rt.selected.filter((s) => s !== id);
-}
-
-/** D15's destructive, unrecoverable action — the caller gates this behind confirmDialog(). */
-export async function clearHistory(tabId: string): Promise<void> {
-  await clearAll(tabId);
-  const rt = runtime[tabId];
-  if (rt) rt.selected = [];
-}
-
-/** D12: a checkbox per row, capped at two — toggling a third selected row is a no-op rather than
- *  silently evicting the first (the caller disables an unchecked row's checkbox once two are
- *  already selected, so this is reached only for a check/uncheck of an eligible row). */
-export function toggleSelected(tabId: string, id: string): void {
-  const rt = ensureRuntime(tabId);
-  const i = rt.selected.indexOf(id);
-  if (i !== -1) {
-    rt.selected.splice(i, 1);
-    return;
+  async function deleteHistoryEntry(tabId: string, id: string): Promise<void> {
+    await del(tabId, id);
+    const rt = runtime[tabId];
+    if (rt) rt.selected = rt.selected.filter((s) => s !== id);
   }
-  if (rt.selected.length >= 2) return;
-  rt.selected.push(id);
-}
+
+  /** D15's destructive, unrecoverable action — the caller gates this behind confirmDialog(). */
+  async function clearHistory(tabId: string): Promise<void> {
+    await clearAll(tabId);
+    const rt = runtime[tabId];
+    if (rt) rt.selected = [];
+  }
+
+  /** D12: a checkbox per row, capped at two — toggling a third selected row is a no-op rather than
+   *  silently evicting the first (the caller disables an unchecked row's checkbox once two are
+   *  already selected, so this is reached only for a check/uncheck of an eligible row). */
+  function toggleSelected(tabId: string, id: string): void {
+    const rt = ensureRuntime(tabId);
+    const i = rt.selected.indexOf(id);
+    if (i !== -1) {
+      rt.selected.splice(i, 1);
+      return;
+    }
+    if (rt.selected.length >= 2) return;
+    rt.selected.push(id);
+  }
+
+  return {
+    runtime,
+    ensureHistoryFresh,
+    noteSendRecorded,
+    viewHistoryEntry,
+    backToLatest,
+    deleteHistoryEntry,
+    clearHistory,
+    toggleSelected,
+  };
+});

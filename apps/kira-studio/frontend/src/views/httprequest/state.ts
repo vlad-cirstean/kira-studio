@@ -23,7 +23,7 @@ import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { noteSendRecorded } from './history';
+import { useHttpHistoryStore } from './history';
 
 export type { ResolvedRequest } from '@kira/api-core';
 
@@ -218,7 +218,7 @@ export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
       rt.response = response;
       // P8 D11: refetches the History pane's list when it's the one showing, otherwise just marks
       // it stale — a user who never opens the pane pays no IPC per send.
-      noteSendRecorded(tabId);
+      useHttpHistoryStore().noteSendRecorded(tabId);
       // P90 item 2: lets a mounted CookiesPane (request mode) refetch so a Set-Cookie shows up
       // without the user re-navigating.
       noteSendCompleted(tabId);

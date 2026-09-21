@@ -15,23 +15,17 @@ import Checkbox from '../../theme/primitives/Checkbox.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import {
-  clearHistory,
-  deleteHistoryEntry,
-  ensureHistoryFresh,
-  historyRuntime,
-  toggleSelected,
-  viewHistoryEntry,
-} from './history';
+import { useHttpHistoryStore } from './history';
 
 // P8 D15: the History pane's list — one row per response, capped at HISTORY_PER_SCOPE_LIMIT by
 // construction (P18 D4/D6), so no VirtualList/TreeHost involvement.
 const confirmDialogStore = useConfirmDialogStore();
 const tabIncognitoStore = useTabIncognitoStore();
+const httpHistoryStore = useHttpHistoryStore();
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const emit = defineEmits<{ compare: [ids: [string, string]] }>();
 
-const rt = computed(() => historyRuntime[props.tab.id]);
+const rt = computed(() => httpHistoryStore.runtime[props.tab.id]);
 const entries = computed<ResponseHistoryEntry[]>(() => rt.value?.entries ?? []);
 const selected = computed(() => rt.value?.selected ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
@@ -46,7 +40,7 @@ const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 const atCap = computed(() => entries.value.length >= HISTORY_PER_SCOPE_LIMIT);
 
 onMounted(() => {
-  ensureHistoryFresh(props.tab.id);
+  httpHistoryStore.ensureHistoryFresh(props.tab.id);
 });
 
 // P16 D15: matches method, URL, status text, or environment name — the fields already on screen
@@ -78,16 +72,16 @@ function showUrl(i: number): boolean {
 // without switching back to Body, selecting a row would leave the user staring at the same list
 // they just clicked in, with no visible sign anything happened.
 function onRowClick(id: string): void {
-  void viewHistoryEntry(props.tab.id, id);
+  void httpHistoryStore.viewHistoryEntry(props.tab.id, id);
   patchHttpRequestTabState(props.tab.id, { responsePane: 'body' });
 }
 
 function onToggle(id: string): void {
-  toggleSelected(props.tab.id, id);
+  httpHistoryStore.toggleSelected(props.tab.id, id);
 }
 
 function onDelete(id: string): void {
-  void deleteHistoryEntry(props.tab.id, id);
+  void httpHistoryStore.deleteHistoryEntry(props.tab.id, id);
 }
 
 function onCompare(): void {
@@ -99,7 +93,7 @@ async function onClear(): Promise<void> {
   const ok = await confirmDialogStore.confirmDialog('Clear this request’s response history? This cannot be undone.', {
     danger: true,
   });
-  if (ok) await clearHistory(props.tab.id);
+  if (ok) await httpHistoryStore.clearHistory(props.tab.id);
 }
 </script>
 

@@ -20,7 +20,7 @@ import ResponseFindBar, {
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
 import CookiesPane from './CookiesPane.vue';
-import { backToLatest, ensureHistoryFresh, historyRuntime } from './history';
+import { useHttpHistoryStore } from './history';
 import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
@@ -29,9 +29,10 @@ import TimelinePane from './TimelinePane.vue';
 
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const httpRequestViewStore = useHttpRequestViewStore();
+const httpHistoryStore = useHttpHistoryStore();
 
 const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
-const historyRt = computed(() => historyRuntime[props.tab.id]);
+const historyRt = computed(() => httpHistoryStore.runtime[props.tab.id]);
 
 // P8 C6/D12: the dialog mounts only while a compare is in flight — the same "reached only from an
 // explicit click" gate that keeps Monaco's chunk unfetched (beyond whatever else on the page already needed it) until then (D13).
@@ -47,7 +48,7 @@ function closeCompare(): void {
 // regardless of the live response or which pane is selected (F9's sibling reasoning). This is
 // what lets a restored tab (no live response, D10) still say "N past responses".
 onMounted(() => {
-  ensureHistoryFresh(props.tab.id);
+  httpHistoryStore.ensureHistoryFresh(props.tab.id);
 });
 
 // P8 D14/C5: Save as… adopts a scratch tab's history onto the newly-saved item (D14's `Adopt`
@@ -60,7 +61,7 @@ watch(
   () => {
     const hrt = historyRt.value;
     if (hrt) hrt.entries = null;
-    ensureHistoryFresh(props.tab.id);
+    httpHistoryStore.ensureHistoryFresh(props.tab.id);
   },
 );
 
@@ -199,7 +200,7 @@ const viewingTime = computed(() => {
 });
 
 function onBackToLatest(): void {
-  backToLatest(props.tab.id);
+  httpHistoryStore.backToLatest(props.tab.id);
 }
 
 // P16 D12: the response headers pane's own filter — matches name OR value (unlike D14's
