@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 )
@@ -31,11 +30,11 @@ type FileListing struct {
 }
 
 // ListFiles lists every tracked-plus-untracked-but-not-ignored file in the session's root
-// (codeindex.EnumerateAll, D6) plus one `git status --porcelain=v2` snapshot collapsed to the
+// (EnumerateAll, enumerate.go) plus one `git status --porcelain=v2` snapshot collapsed to the
 // tree's four-value glyph — one ls-files spawn, one status spawn, run sequentially (this is a
 // side-panel refresh, not a hot path worth the concurrency Read/Write's own gate exists for).
 func ListFiles(ctx context.Context, s *Session) (FileListing, error) {
-	paths, err := codeindex.EnumerateAll(ctx, s.Runner, s.GitPath, s.Root)
+	paths, err := EnumerateAll(ctx, s.Runner, s.GitPath, s.Root)
 	if err != nil {
 		return FileListing{}, fmt.Errorf("codeworkspace: list files: %w", err)
 	}

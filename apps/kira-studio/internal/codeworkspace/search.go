@@ -12,15 +12,14 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeindex"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/pathsafe"
 )
 
 // C7: Go-native repository-wide text search — stdlib regexp (RE2) for matching, git ls-files
-// (via codeindex.EnumerateAll, D2) for enumeration, and the same bounded-worker-pool shape
-// codeindex.Sync's own parseStale already uses for concurrency (D1). No search library: see the
-// phase plan's own D1 for the four-part breakdown and why each of those three is already answered
-// elsewhere in this repo, leaving only the scanner (this file) to hand-roll.
+// (EnumerateAll, enumerate.go) for enumeration, and a bounded worker pool (searchWorkers below)
+// for concurrency. No search library: see the phase plan's own D1 for the four-part breakdown and
+// why each of those three is already answered elsewhere in this repo, leaving only the scanner
+// (this file) to hand-roll.
 
 // SearchRequest is the wire shape a repository-wide search runs against — Monaco's own find-widget
 // vocabulary (case/whole-word/regex), so the panel's options read the same as the in-file surface.
@@ -192,10 +191,8 @@ func ValidatePattern(req SearchRequest) error {
 	return err
 }
 
-// searchWorkers: a user-initiated foreground scan, unlike codeindex.syncWorkers' background
-// reindex — min(NumCPU, 8) rather than that function's deliberate 4, since this only ever runs
-// while the user is actively waiting on it, but still capped so a search never starves the index
-// sync or the UI thread's IPC.
+// searchWorkers: a user-initiated foreground scan — min(NumCPU, 8), capped so a search never
+// starves the UI thread's IPC.
 func searchWorkers() int {
 	if n := runtime.NumCPU(); n < 8 {
 		if n < 1 {
@@ -206,8 +203,8 @@ func searchWorkers() int {
 	return 8
 }
 
-// Search runs req against every file codeindex.EnumerateAll reports for s.Root (D2), streaming
-// each file's own matches to onFile as they're found — callback-streamed, not slice-returning, so
+// Search runs req against every file EnumerateAll reports for s.Root, streaming each file's own
+// matches to onFile as they're found — callback-streamed, not slice-returning, so
 // the bridge layer can coalesce without codeworkspace ever importing an emitter (§4.1). onFile may
 // be called concurrently with itself from different worker goroutines; the one caller
 // (bridge's searchCoalescer) is documented to tolerate that with its own mutex.
@@ -223,9 +220,9 @@ func Search(ctx context.Context, s *Session, req SearchRequest, onFile func(File
 		return stats, fmt.Errorf("codeworkspace: search: %w", err)
 	}
 
-	// One ls-files spawn per run (D2's own note): the listing is not cached from ListFiles because
-	// a tree loaded minutes ago is not what a search should be answering against.
-	paths, err := codeindex.EnumerateAll(ctx, s.Runner, s.GitPath, s.Root)
+	// One ls-files spawn per run: the listing is not cached from ListFiles because a tree loaded
+	// minutes ago is not what a search should be answering against.
+	paths, err := EnumerateAll(ctx, s.Runner, s.GitPath, s.Root)
 	if err != nil {
 		return stats, fmt.Errorf("codeworkspace: search: %w", err)
 	}
@@ -329,9 +326,9 @@ func scanFile(root, relPath string, m matcher, buf []byte) (matches []SearchMatc
 	}
 	defer f.Close()
 
-	// Gate 3: a NUL byte in the first 8 KiB marks the file binary — the identical rule ReadFile and
-	// codeindex.classifyAndRead already use (Peek does not advance the reader, so the scanner below
-	// still sees the file from byte 0).
+	// Gate 3: a NUL byte in the first 8 KiB marks the file binary — the identical rule ReadFile
+	// already uses (Peek does not advance the reader, so the scanner below still sees the file from
+	// byte 0).
 	br := bufio.NewReaderSize(f, binarySniffBytes)
 	peek, _ := br.Peek(binarySniffBytes)
 	if bytes.IndexByte(peek, 0) >= 0 {
