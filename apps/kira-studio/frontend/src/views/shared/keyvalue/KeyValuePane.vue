@@ -44,7 +44,7 @@ import { useConfirmDialogStore } from '../../../state/confirmDialog';
 import { useConnectionsStore } from '../../../state/connections';
 import { useContextMenuStore } from '../../../state/contextMenu';
 import { useObjectStoreStore } from '../../../state/objectStore';
-import { settingsState } from '../../../state/settings';
+import { useSettingsStore } from '../../../state/settings';
 import { browseInvalidate } from '../../../state/viewCommands';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../../theme/connColor';
@@ -91,6 +91,7 @@ const contextMenuStore = useContextMenuStore();
 const objectStoreStore = useObjectStoreStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const connectionsStore = useConnectionsStore();
+const settingsStore = useSettingsStore();
 
 const props = defineProps<{
   viewKey: string;
@@ -183,7 +184,7 @@ function rowAt(i: number) {
 // P49 F7/D5: matches the density this row's own CSS (`--kira-row-height`) already resolves to —
 // VirtualList needs the pixel value in JS for its offset math, the CSS var alone isn't reachable
 // from there.
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function ttlText(ttlMs: number | null): string {
   if (ttlMs === null) return 'no expiry';

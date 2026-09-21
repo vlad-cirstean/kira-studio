@@ -17,7 +17,7 @@ import { useFakeDataStore } from './state/fakeData';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useObjectStoreStore } from './state/objectStore';
-import { settingsOpen } from './state/settings';
+import { useSettingsStore } from './state/settings';
 import { useTabsStore } from './state/tabs';
 import AppTooltip from './workbench/AppTooltip.vue';
 import ConfirmDialog from './workbench/ConfirmDialog.vue';
@@ -44,6 +44,7 @@ const quickOpenStore = useQuickOpenStore();
 const collectionsStore = useCollectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 const tabsStore = useTabsStore();
+const settingsStore = useSettingsStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
@@ -57,7 +58,7 @@ onMounted(() => {
   teardownTooltips = tooltipStore.initTooltips();
   unsubscribe = [
     control.onOpenSettings(() => {
-      settingsOpen.value = true;
+      settingsStore.settingsOpen = true;
     }),
     control.onNewConnection(() => connectionDialogStore.openCreateDialog()),
     // P28 D18: three menu-bar commands. Subscribed here rather than in the panels that used to

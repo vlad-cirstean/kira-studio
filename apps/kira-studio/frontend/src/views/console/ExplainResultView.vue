@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import { getPlan } from './explainResults';
@@ -12,6 +12,7 @@ import type { PlanNode } from './planModel';
 // explainResults.ts by `pageKey` — same "one prop, resolve everything else from a store" shape
 // ConsoleResultGrid.vue's own `pageKey` already uses.
 const props = defineProps<{ pageKey: string }>();
+const settingsStore = useSettingsStore();
 
 const result = computed(() => getPlan(props.pageKey));
 const plan = computed(() => result.value?.plan);
@@ -40,7 +41,7 @@ const verdict = computed(() => {
   }
   const rows = p.estimatedRowsRead.toLocaleString();
   return p.overThreshold
-    ? `Estimated to read ${rows} rows — at or above the ${settingsState.advanced.expensiveQueryRows.toLocaleString()}-row threshold`
+    ? `Estimated to read ${rows} rows — at or above the ${settingsStore.advanced.expensiveQueryRows.toLocaleString()}-row threshold`
     : `Estimated to read ${rows} rows`;
 });
 

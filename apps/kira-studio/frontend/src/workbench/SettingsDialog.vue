@@ -31,13 +31,7 @@ import { useDbMcpStore } from '../state/dbmcp';
 import { useGitClientsStore } from '../state/gitClients';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../state/maskRules';
-import {
-  patchSettings,
-  type Section,
-  sections,
-  settingsSection,
-  settingsState,
-} from '../state/settings';
+import { type Section, sections, useSettingsStore } from '../state/settings';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import Checkbox from '../theme/primitives/Checkbox.vue';
@@ -58,18 +52,19 @@ const dbMcpStore = useDbMcpStore();
 const gitClientsStore = useGitClientsStore();
 const keepAwakeStore = useKeepAwakeStore();
 const connectionsStore = useConnectionsStore();
+const settingsStore = useSettingsStore();
 const maskRuleCountsQuery = useQuery({
   queryKey: maskRuleCountsQueryKey,
   queryFn: loadMaskRuleCounts,
   staleTime: Number.POSITIVE_INFINITY,
 });
 
-// P17 D1: everything the user touches lives in this draft until Save — settingsState (and
+// P17 D1: everything the user touches lives in this draft until Save — settingsStore (and
 // therefore every other window, the database, and the app's own rendering) sees nothing until
 // then. The component is created on open and destroyed on close (StatusBar.vue's
-// v-if="settingsOpen"), which is the draft's whole lifetime — no store, no reset logic needed.
-// JSON round-trip rather than structuredClone(): settingsState is a Vue reactive proxy, and
-// structuredClone's algorithm throws on a Proxy rather than cloning the plain data underneath it.
+// v-if="settingsStore.settingsOpen"), which is the draft's whole lifetime — no reset logic needed.
+// JSON round-trip rather than structuredClone(): settingsStore's leaves are Vue reactive proxies,
+// and structuredClone's algorithm throws on a Proxy rather than cloning the plain data underneath it.
 const cloneSections = (s: Settings): Settings =>
   JSON.parse(
     JSON.stringify({
@@ -84,8 +79,8 @@ const cloneSections = (s: Settings): Settings =>
 
 // Frozen at runtime (mutation would be a bug); typed as plain Settings so diffSection below can
 // compare it against the mutable draft without a readonly/mutable type mismatch.
-const baseline: Settings = Object.freeze(cloneSections(settingsState)) as Settings;
-const draft = reactive<Settings>(cloneSections(settingsState));
+const baseline: Settings = Object.freeze(cloneSections(settingsStore)) as Settings;
+const draft = reactive<Settings>(cloneSections(settingsStore));
 
 // G7 D16: git.protectedBranches is this dialog's first array-valued leaf — cloneSections gives
 // draft/baseline each their own array object even when unedited, so a bare `!==`/`===` (every
@@ -133,10 +128,10 @@ const pendingPatch = computed<SettingsPatch>(() => {
 
 const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 
-// P85 §10.1: activeSection seeds from settingsSection (state/settings.ts's own module-level ref,
+// P85 §10.1: activeSection seeds from settingsStore.settingsSection (state/settings.ts's own ref,
 // set by openSettingsAt for a "Manage scripts…" deep link) — null (a plain open) falls back to
 // 'Appearance', G12 D9's own default.
-const activeSection = ref<Section>(settingsSection.value ?? 'Appearance');
+const activeSection = ref<Section>(settingsStore.settingsSection ?? 'Appearance');
 
 // D16: this section bypasses draft/pendingPatch entirely — a revoke must take effect immediately,
 // not wait for Save, and gitClientsState is a module-level store, not a settings leaf.
@@ -187,7 +182,7 @@ const vsixOutcomeMessage = computed(() => {
 onBeforeUnmount(() => {
   // §10.1: a later plain open (TitleBar.vue's gear icon, the command palette) must not inherit a
   // deep link this instance was opened with.
-  settingsSection.value = null;
+  settingsStore.settingsSection = null;
 });
 
 // M1 §6.2: the DB MCP token's own expiry line — "expired, regenerate" rather than a stale-looking
@@ -559,7 +554,7 @@ async function onSave(): Promise<void> {
     return;
   }
   try {
-    await patchSettings(patch);
+    await settingsStore.patchSettings(patch);
     emit('close');
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : String(err);
@@ -1489,7 +1484,7 @@ async function onAddScript(): Promise<void> {
                  line, never mixed with it. -->
             <label class="field checkbox">
               <Checkbox
-                :model-value="settingsState.claudeCode.hooksEnabled"
+                :model-value="settingsStore.claudeCode.hooksEnabled"
                 :disabled="claudeCodeHooksToggling"
                 data-testid="settings-claude-code-hooks"
                 @update:model-value="onToggleAgentHooksEnabled"
@@ -1502,7 +1497,7 @@ async function onAddScript(): Promise<void> {
               >
             </label>
 
-            <template v-if="settingsState.claudeCode.hooksEnabled">
+            <template v-if="settingsStore.claudeCode.hooksEnabled">
               <p
                 v-if="agentHooksStore.status.error"
                 class="muted-note"
@@ -1524,7 +1519,7 @@ async function onAddScript(): Promise<void> {
                  the hooks toggle just above. -->
             <label class="field checkbox">
               <Checkbox
-                :model-value="settingsState.claudeCode.keepAwakeWithAgents"
+                :model-value="settingsStore.claudeCode.keepAwakeWithAgents"
                 :disabled="keepAwakeAgentAwareToggling"
                 data-testid="settings-claude-code-keep-awake"
                 @update:model-value="onToggleKeepAwakeAgentAware"
@@ -1546,7 +1541,7 @@ async function onAddScript(): Promise<void> {
                  "enabling is never a silent action"). -->
             <label class="field checkbox">
               <Checkbox
-                :model-value="settingsState.dbMcp.serverEnabled"
+                :model-value="settingsStore.dbMcp.serverEnabled"
                 :disabled="dbMcpToggling"
                 data-testid="settings-db-mcp-enabled"
                 @update:model-value="onToggleDbMcpEnabled"
@@ -1559,7 +1554,7 @@ async function onAddScript(): Promise<void> {
               >
             </label>
 
-            <template v-if="settingsState.dbMcp.serverEnabled">
+            <template v-if="settingsStore.dbMcp.serverEnabled">
               <p v-if="dbMcpStore.status.error" class="muted-note" data-testid="db-mcp-error">
                 {{ dbMcpStore.status.error }}
               </p>

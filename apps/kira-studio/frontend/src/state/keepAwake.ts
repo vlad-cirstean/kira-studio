@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { settingsState } from './settings';
+import { useSettingsStore } from './settings';
 
 // P87 §7.1: state/agentHooks.ts's own shape — a reactive status, a hydrate, two setters that write
 // the confirmed value straight back rather than waiting for the broadcast echo (agentHooks.ts's own
@@ -38,12 +38,12 @@ export const useKeepAwakeStore = defineStore('keepAwake', () => {
     state.status = await control.keepAwakeSetManual(on);
   }
 
-  // setKeepAwakeAgentAware also writes settingsState.claudeCode.keepAwakeWithAgents directly,
+  // setKeepAwakeAgentAware also writes settingsStore.claudeCode.keepAwakeWithAgents directly,
   // mirroring setAgentHooksEnabled's own :32 — this leaf both persists and recomputes the live
   // assertion in one call, bypassing the Settings dialog's draft/Save flow entirely.
   async function setKeepAwakeAgentAware(on: boolean): Promise<void> {
     state.status = await control.keepAwakeSetAgentAware(on);
-    settingsState.claudeCode.keepAwakeWithAgents = on;
+    useSettingsStore().claudeCode.keepAwakeWithAgents = on;
   }
 
   return { ...toRefs(state), initKeepAwake, setKeepAwakeManual, setKeepAwakeAgentAware };

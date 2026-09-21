@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
-import { settingsState } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import VirtualList from '../theme/primitives/VirtualList.vue';
@@ -13,8 +13,9 @@ import { type RepoSearchRowVm, useRepoSearchStore } from './state/search';
 // Search/Stop button, and the streamed results list.
 const props = defineProps<{ repoId: string }>();
 const repoSearchStore = useRepoSearchStore();
+const settingsStore = useSettingsStore();
 
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 const selected = ref<string | null>(null);
 
 const query = computed({

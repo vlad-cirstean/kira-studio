@@ -8,23 +8,24 @@ import {
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import { openSettingsAt, settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 
 // P90 §2.6: one row per api settings leaf, in SPEC's own order — a control bound to
 // tab.state.settings.<leaf>, an "Inherit" checkbox (checked === the leaf is null), and helper text
-// naming the inherited value straight off settingsState.api. No resolver function shared with Go —
+// naming the inherited value straight off settingsStore.api. No resolver function shared with Go —
 // the rule is one `??` per leaf, and writing it twice as a function would be the drift risk, not
 // the fix (§2.6's own reasoning).
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const settingsStore = useSettingsStore();
 
 function patch(fields: Partial<HttpRequestTabRecord['state']['settings']>): void {
   patchHttpRequestTabState(props.tab.id, { settings: { ...props.tab.state.settings, ...fields } });
 }
 
 const settings = computed(() => props.tab.state.settings);
-const global = computed(() => settingsState.api);
+const global = computed(() => settingsStore.api);
 
 function onHttpVersionChange(e: Event): void {
   patch({ httpVersion: (e.target as HTMLSelectElement).value as (typeof HTTP_VERSIONS)[number] });
@@ -80,7 +81,7 @@ const effectiveFollowRedirects = computed(
 );
 
 function onEditGlobalDefaults(): void {
-  openSettingsAt('Api');
+  settingsStore.openSettingsAt('Api');
 }
 </script>
 

@@ -5,7 +5,7 @@ import { useQuickOpenStore } from '../repo/state/quickOpen';
 import { useConnectionDialogStore } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
-import { settingsOpen } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 import { runCommand } from './commands';
 
@@ -19,6 +19,7 @@ export const usePaletteStore = defineStore('palette', () => {
   const layoutStore = useLayoutStore();
   const quickOpenStore = useQuickOpenStore();
   const tabsStore = useTabsStore();
+  const settingsStore = useSettingsStore();
 
   // D12: deliberately small and 1:1 with already-reachable actions — every global shortcut this
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
@@ -61,7 +62,7 @@ export const usePaletteStore = defineStore('palette', () => {
     },
     // P7 D12: same "registered by CollectionsPanel.vue, mounted for the whole of Api mode" shape.
     { id: 'api.importCurl', label: 'Import from curl…', run: () => runCommand('api.importCurl') },
-    { id: 'open-settings', label: 'Open settings', run: () => (settingsOpen.value = true) },
+    { id: 'open-settings', label: 'Open settings', run: () => (settingsStore.settingsOpen = true) },
     {
       id: 'toggle-project-panel',
       label: 'Toggle project panel',

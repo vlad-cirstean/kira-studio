@@ -36,7 +36,7 @@ import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 
 defineOptions({ name: 'RepoGraphView' });
@@ -48,6 +48,7 @@ const container = ref<HTMLElement | null>(null);
 let handle: MountHandle | null = null;
 
 async function mountGraph(): Promise<void> {
+  const settingsStore = useSettingsStore();
   const repoId = props.tab.workspaceId
     ? repoIdOfWorkspace(props.tab.workspaceId as WorkspaceKey)
     : null;
@@ -71,7 +72,7 @@ async function mountGraph(): Promise<void> {
     view: 'graph', // never 'review' — the C11 boundary (§9): this excludes the whole review layer.
     // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat — read once here, at mount time,
     // not reactively (main.ts's own MountOptions.dateFormat doc comment).
-    dateFormat: settingsState.appearance.dateFormat,
+    dateFormat: settingsStore.appearance.dateFormat,
     pendingUiAction: pendingReveal ? { action: 'revealCommit', target: pendingReveal } : null,
     // §14 OQ4: no wire event maps onto this natively. Go's gitrpc emits no 'connection.changed'
     // analogue at all — that event is composed entirely by the VS Code extension host

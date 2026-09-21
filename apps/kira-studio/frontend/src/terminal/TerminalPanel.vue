@@ -4,7 +4,7 @@ import { computed, ref } from 'vue';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useCustomScriptsStore } from '../state/customScripts';
-import { openSettingsAt } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import { terminalDefaults } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -26,6 +26,7 @@ const contextMenuStore = useContextMenuStore();
 // and this stays the one place those rules live.
 
 const customScriptsStore = useCustomScriptsStore();
+const settingsStore = useSettingsStore();
 
 const search = ref('');
 const adding = ref(false);
@@ -105,7 +106,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       id: 'edit',
       label: 'Edit…',
       icon: 'edit',
-      run: () => openSettingsAt('Scripts'),
+      run: () => settingsStore.openSettingsAt('Scripts'),
     },
     { type: 'separator' },
     {
@@ -145,7 +146,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           aria-label="Manage scripts"
           v-tooltip="'Manage scripts…'"
           data-testid="quick-commands-manage"
-          @click="openSettingsAt('Scripts')"
+          @click="settingsStore.openSettingsAt('Scripts')"
         />
       </template>
       <template #body>

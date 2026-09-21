@@ -3,7 +3,7 @@ import type { ColumnDescriptor } from '@shared/protocol/page';
 import { computed, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useContextMenuStore } from '../../state/contextMenu';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
@@ -21,6 +21,7 @@ import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 const documentRowsStore = useDocumentRowsStore();
+const settingsStore = useSettingsStore();
 
 // A three-way switch over a console result's own kind (P8) — tabular results render through
 // ConsoleSlickGrid.vue (P30 §3, the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
@@ -42,7 +43,7 @@ const props = defineProps<{
   path: string;
 }>();
 
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 
 const page = computed(() => {
   // Establishes the reactive dependency — the page object itself is frozen and non-reactive.

@@ -28,7 +28,7 @@ import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/ranges';
 import { registerCommand } from '../../shortcuts/commands';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -62,6 +62,7 @@ const copyAsCurlStore = useCopyAsCurlStore();
 const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
 const cookiesStore = useCookiesStore();
+const settingsStore = useSettingsStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -371,14 +372,14 @@ const showFieldFilterToggle = computed(
 // false — MessageStrip.vue is too heavy for the toolbar, so this reuses the incognito chip's own
 // inline shape above.
 const effectiveSslVerify = computed(
-  () => props.tab.state.settings.sslVerify ?? settingsState.api.sslVerify,
+  () => props.tab.state.settings.sslVerify ?? settingsStore.api.sslVerify,
 );
 
 // P90 §3.1: keeps cookiesRuntime fresh for this tab's current URL — on mount, on the URL changing
 // (debounced), and after every send completes — but never while the effective cookie jar is off,
 // since a jar-off request has nothing to fetch (§3.1's own rule).
 const effectiveDisableCookieJar = computed(
-  () => props.tab.state.settings.disableCookieJar ?? settingsState.api.disableCookieJar,
+  () => props.tab.state.settings.disableCookieJar ?? settingsStore.api.disableCookieJar,
 );
 watch(
   () => props.tab.state.url,

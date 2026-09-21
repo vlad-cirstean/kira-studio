@@ -4,7 +4,7 @@ import { copyText } from '../clipboard';
 import { shortcutFor } from '../shortcuts/keys';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
-import { settingsState } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
@@ -20,12 +20,13 @@ const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
+const settingsStore = useSettingsStore();
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
 // out for exactly this. If any of TreeHost's props turned out to need widening here, that would be
 // a signal the row model was wrong; none did.
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
 
 /** Called by the panel after a mutation adds a row worth scrolling to. */

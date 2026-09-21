@@ -6,7 +6,7 @@ import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { registerCommand } from '../../shortcuts/commands';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -48,6 +48,7 @@ registerTabRuntimeCleanup((tabId) => {
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
 const tabsStore = useTabsStore();
+const settingsStore = useSettingsStore();
 
 type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'missing' | 'error';
 const state = ref<ViewState>('loading');
@@ -172,8 +173,8 @@ async function mount(): Promise<void> {
     codeLens: false,
     renderValidationDecorations: 'off',
     scrollBeyondLastLine: false,
-    fontFamily: settingsState.appearance.fontFamily,
-    fontSize: settingsState.appearance.fontSize,
+    fontFamily: settingsStore.appearance.fontFamily,
+    fontSize: settingsStore.appearance.fontSize,
   });
   registerEditor(props.tab.id, uri, editor);
   editorInstance = editor;

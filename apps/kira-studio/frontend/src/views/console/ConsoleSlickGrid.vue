@@ -13,7 +13,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { useCellSelectionStore } from '../../state/cellSelection';
 import { useContextMenuStore } from '../../state/contextMenu';
-import { appearanceVersion, settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
 import { columnsToTsv, type RowSnapshot, rowsToTsv } from '../shared/clipboardFormats';
@@ -51,6 +51,7 @@ import { consoleColumnWidths, setConsoleColumnWidths } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
+const settingsStore = useSettingsStore();
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
 // same KiraSlickGrid/dataSource.ts/slickTheme.css layer views/grid/SlickGridHost.vue already uses
@@ -247,7 +248,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
   return cols;
 }
 
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 
 const rootRef = ref<HTMLElement | null>(null);
 
@@ -880,7 +881,7 @@ watch(rowHeight, (h) => {
 // P31 D11/F13 — a font change leaves every unstored column sized for whatever font was active
 // when columns.ts's shared measuring context was first created, for the rest of the session.
 watch(
-  () => appearanceVersion.n,
+  () => settingsStore.appearanceVersion.n,
   () => {
     if (!grid || !page) return;
     resetMeasureCtx();
@@ -929,7 +930,7 @@ watch(
        SlickGridHost.vue, so a console panel never depends on a data tab having been opened first. -->
   <div
     class="slick-grid-host"
-    :class="{ 'kira-grid--row-coloring': settingsState.appearance.rowColoring }"
+    :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"
   >
     <div ref="rootRef" class="slick-grid-mount"></div>
   </div>

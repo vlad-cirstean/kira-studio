@@ -6,7 +6,7 @@
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { onTerminalOutput, writeTerminal } from '../../state/terminals';
 
@@ -68,12 +68,13 @@ export function getOrCreateTerminal(tabId: string): Attached {
   host.style.height = '100%';
   host.style.width = '100%';
 
+  const settingsStore = useSettingsStore();
   const term = new Terminal({
     scrollback: 5000,
     cursorBlink: true,
     allowProposedApi: false,
-    fontFamily: settingsState.appearance.fontFamily,
-    fontSize: settingsState.appearance.fontSize,
+    fontFamily: settingsStore.appearance.fontFamily,
+    fontSize: settingsStore.appearance.fontSize,
     theme: terminalTheme(),
   });
   const fit = new FitAddon();
@@ -115,7 +116,8 @@ export function fitTerminal(tabId: string): { cols: number; rows: number } | nul
 export function applyTerminalAppearance(tabId: string): { cols: number; rows: number } | null {
   const attached = byTabId.get(tabId);
   if (!attached) return null;
-  attached.term.options.fontFamily = settingsState.appearance.fontFamily;
-  attached.term.options.fontSize = settingsState.appearance.fontSize;
+  const settingsStore = useSettingsStore();
+  attached.term.options.fontFamily = settingsStore.appearance.fontFamily;
+  attached.term.options.fontSize = settingsStore.appearance.fontSize;
   return fitTerminal(tabId);
 }

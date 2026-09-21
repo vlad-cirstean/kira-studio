@@ -6,7 +6,7 @@
 
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
-import { settingsState } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
 import type { ConsoleDiagnostic } from './diagnostics';
@@ -60,6 +60,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:doc': [value: string]; 'update:cursor': [pos: number] }>();
 
+const settingsStore = useSettingsStore();
+
 const rootRef = ref<HTMLElement | null>(null);
 // §3.3: renders the raw doc as text while loadMonaco()'s import is in flight — never an empty box.
 const pending = ref(true);
@@ -80,7 +82,7 @@ let applyingExternal = false;
 
 function resolveWordWrap(): 'on' | 'off' {
   if (props.singleLine) return 'off';
-  return settingsState.appearance.wordWrap ? 'on' : 'off';
+  return settingsStore.appearance.wordWrap ? 'on' : 'off';
 }
 
 // §4.6: `wrapSelection.ts`'s own selection-wrap handler, ported to Monaco's `onKeyDown` rather
@@ -379,8 +381,8 @@ function applyBaseOptions(): ConstructionOptions {
     wordBasedSuggestions: props.completionSources?.length ? 'off' : undefined,
     occurrencesHighlight: 'off',
     hover: { delay: 400, above: true },
-    fontFamily: settingsState.appearance.fontFamily,
-    fontSize: settingsState.appearance.fontSize,
+    fontFamily: settingsStore.appearance.fontFamily,
+    fontSize: settingsStore.appearance.fontSize,
     ...(props.singleLine
       ? { lineDecorationsWidth: 0, lineNumbersMinChars: 0, padding: { top: 0, bottom: 0 } }
       : { padding: { top: 8, bottom: 8 } }),
@@ -570,19 +572,19 @@ watch(
 );
 
 watch(
-  () => settingsState.appearance.wordWrap,
+  () => settingsStore.appearance.wordWrap,
   () => {
     editor?.updateOptions({ wordWrap: resolveWordWrap() });
   },
 );
 
 watch(
-  () => [settingsState.appearance.fontFamily, settingsState.appearance.fontSize],
+  () => [settingsStore.appearance.fontFamily, settingsStore.appearance.fontSize],
   () => {
     if (!editor) return;
     editor.updateOptions({
-      fontFamily: settingsState.appearance.fontFamily,
-      fontSize: settingsState.appearance.fontSize,
+      fontFamily: settingsStore.appearance.fontFamily,
+      fontSize: settingsStore.appearance.fontSize,
     });
     editor.layout();
   },

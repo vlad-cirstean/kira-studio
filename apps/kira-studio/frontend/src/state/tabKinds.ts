@@ -84,7 +84,7 @@ import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { useCodeReposStore } from './coderepos';
 import { useConnectionsStore } from './connections';
 import type { MenuItem } from './contextMenu';
-import { settingsState } from './settings';
+import { useSettingsStore } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
 import { closeTerminalSession } from './terminals';
 
@@ -240,7 +240,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
       return (tail && KIND_ICON[tail.kind]) || 'table';
     },
     railColor,
-    defaultState: () => defaultDataTabState(settingsState.data.defaultPageSize),
+    defaultState: () => defaultDataTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: DataTabRecord): DataTabState => defaultDataTabState(tab.state.pageSize),
     dropResources: dropGridPagesForTab,
     menuExtras: revealInProjectPanel,
@@ -273,7 +273,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     title: tabTitle,
     icon: () => 'json',
     railColor,
-    defaultState: () => defaultDocumentTabState(settingsState.data.defaultPageSize),
+    defaultState: () => defaultDocumentTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: DocumentTabRecord): DocumentTabState =>
       defaultDocumentTabState(tab.state.pageSize),
     dropResources: dropDocumentPagesForTab,
@@ -287,7 +287,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     // them apart with no extra state.
     icon: (tab) => (pathTail(tab.path)?.kind === 'object' ? 'file' : 'symbol-key'),
     railColor,
-    defaultState: () => defaultKeyValueTabState(settingsState.data.defaultPageSize),
+    defaultState: () => defaultKeyValueTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: KeyValueTabRecord): KeyValueTabState =>
       defaultKeyValueTabState(tab.state.pageSize),
     dropResources: dropKeyValuePagesForTab,
@@ -299,7 +299,7 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
     title: tabTitle,
     icon: () => 'broadcast',
     railColor,
-    defaultState: () => defaultStreamTabState(settingsState.data.defaultPageSize),
+    defaultState: () => defaultStreamTabState(useSettingsStore().data.defaultPageSize),
     duplicateState: (tab: StreamTabRecord): StreamTabState =>
       defaultStreamTabState(tab.state.pageSize),
     dropResources: dropStreamPagesForTab,

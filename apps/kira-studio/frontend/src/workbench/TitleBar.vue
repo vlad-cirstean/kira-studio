@@ -5,13 +5,14 @@ import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { useLayoutStore } from '../state/layout';
-import { settingsOpen } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import { useWorkspaceStore } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
 const keepAwakeStore = useKeepAwakeStore();
+const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
 const workspaceStore = useWorkspaceStore();
 
@@ -117,7 +118,7 @@ const keepAwakeTooltip = computed(() => {
         v-tooltip="'Settings'"
         data-testid="open-settings"
         aria-label="Settings"
-        @click="settingsOpen = true"
+        @click="settingsStore.settingsOpen = true"
       >
         <CodiconIcon name="settings-gear" :size="15" />
       </button>
@@ -147,7 +148,7 @@ const keepAwakeTooltip = computed(() => {
   </div>
 
   <Teleport to="body">
-    <SettingsDialog v-if="settingsOpen" @close="settingsOpen = false" />
+    <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
   </Teleport>
 </template>
 

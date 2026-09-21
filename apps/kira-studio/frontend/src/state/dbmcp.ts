@@ -2,7 +2,7 @@ import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@sh
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { settingsState } from './settings';
+import { useSettingsStore } from './settings';
 
 // M1 §6.2: the Database MCP section's own store — a status-plus-last-action shape, hydrated at
 // boot (main.ts).
@@ -58,14 +58,14 @@ export const useDbMcpStore = defineStore('dbmcp', () => {
 
   // C3 §7.1/D7: the toggle applies immediately, bypassing the dialog's draft/Save flow entirely,
   // since SetEnabled both persists the leaf and starts/stops the embedded instance in one call.
-  // settingsState.dbMcp.serverEnabled is set directly from the
+  // settingsStore.dbMcp.serverEnabled is set directly from the
   // confirmed `enabled` argument rather than waited-for through the separate kira:settings:changed
   // broadcast SetEnabled also emits server-side — this window's own toggle must never lag its own
   // click, and a later broadcast arrival (this window's own echo, or another window's) reapplies the
   // identical value, a harmless no-op.
   async function setDbMcpEnabled(enabled: boolean): Promise<void> {
     state.status = await control.dbMcpSetEnabled(enabled);
-    settingsState.dbMcp.serverEnabled = enabled;
+    useSettingsStore().dbMcp.serverEnabled = enabled;
     // A fresh enable/disable makes any previous install outcome stale.
     state.installResult = null;
   }

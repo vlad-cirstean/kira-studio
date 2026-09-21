@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
 import { computed, ref } from 'vue';
-import { openSettingsAt } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -22,6 +22,7 @@ const props = defineProps<{
 }>();
 
 const cookiesStore = useCookiesStore();
+const settingsStore = useSettingsStore();
 
 const filter = ref('');
 
@@ -67,7 +68,7 @@ async function onRetry(): Promise<void> {
 }
 
 function onEditGlobalDefaults(): void {
-  openSettingsAt('Api');
+  settingsStore.openSettingsAt('Api');
 }
 
 // --- response mode ---

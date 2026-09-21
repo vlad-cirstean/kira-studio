@@ -24,7 +24,7 @@ import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelect
 import { useConnectionsStore } from '../../state/connections';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
 import { correlationKeyFor, loadMaskRules, maskRulesFor, maskRulesQueryKey } from '../../state/maskRules';
-import { appearanceVersion, settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { useTabsStore } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
@@ -110,6 +110,7 @@ const pageSearchFilterStore = usePageSearchFilterStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const settingsStore = useSettingsStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -134,7 +135,7 @@ function tab() {
   return tabsStore.findDataTab(props.tabId);
 }
 
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 
 // Same P24 D3/D4 split DataGrid.vue's own displayRows/displayRowCount use — kept as a plain,
 // non-reactive read at mount and on an explicit page reload (below), not a live `watch` on the
@@ -2548,7 +2549,7 @@ watch(
 );
 
 watch(
-  () => appearanceVersion.n,
+  () => settingsStore.appearanceVersion.n,
   () => {
     resetMeasureCtx();
     rebuildAndSetColumns();
@@ -2672,12 +2673,12 @@ defineExpose({
        touches, so an empty state overlaying it can never be wiped out by SlickGrid's own DOM writes
        the way a *child* of `rootRef` would be. §6 D6 point 1: the P9 rowColoring setting is one
        class toggle on the host root — Vue's own reactivity on this binding (not a watch) is what
-       keeps it live, since settingsState is a reactive object and this is the template's own
+       keeps it live, since settingsStore is a reactive store and this is the template's own
        ordinary :class binding. -->
   <div
     class="slick-grid-host"
     data-testid="data-grid"
-    :class="{ 'kira-grid--row-coloring': settingsState.appearance.rowColoring }"
+    :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"
   >
     <div ref="rootRef" class="slick-grid-mount"></div>
     <EmptyState

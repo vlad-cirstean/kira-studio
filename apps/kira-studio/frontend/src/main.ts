@@ -27,7 +27,7 @@ import { hydrateTerminalDefaults } from './state/terminals';
 import './theme/base.css';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
-import { hydrateSettings } from './state/settings';
+import { useSettingsStore } from './state/settings';
 import { useWorkspaceStore } from './state/workspace';
 import { planCount as consolePlanCount } from './views/console/explainResults';
 import {
@@ -308,6 +308,7 @@ async function bootstrap(): Promise<void> {
   const layoutStore = useLayoutStore(pinia);
   const connectionsStore = useConnectionsStore(pinia);
   const tabsStore = useTabsStore(pinia);
+  const settingsStore = useSettingsStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -318,7 +319,7 @@ async function bootstrap(): Promise<void> {
   modeStore.hydrateMode(await control.windowsEnsure());
   await Promise.all([
     layoutStore.hydrateLayout(),
-    hydrateSettings(),
+    settingsStore.hydrateSettings(),
     connectionsStore.hydrateConnections(),
     // M5 §7.5/§6.2: every connection's own masked-column count — the Settings glance's data, and
     // the toolbar's own "does this connection have any masked columns at all" visibility check

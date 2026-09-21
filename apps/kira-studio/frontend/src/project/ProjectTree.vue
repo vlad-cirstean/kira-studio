@@ -5,7 +5,7 @@ import { useConnectionsStore } from '../state/connections';
 import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { useSchemaColumnsStore } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
-import { settingsState } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
 import TreeHost from '../theme/primitives/TreeHost.vue';
@@ -28,6 +28,7 @@ const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const settingsStore = useSettingsStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
@@ -51,7 +52,7 @@ function isKeyBrowserRow(row: TreeRowVm): boolean {
   return connectionsStore.states[row.connectionId]?.caps?.keyBrowser === true;
 }
 
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
 
 onMounted(() => {

@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useContextMenuStore } from '../state/contextMenu';
 import { openRepoFileTab } from '../state/repoTabs';
-import { settingsState } from '../state/settings';
+import { useSettingsStore } from '../state/settings';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import { menuForRepoRow } from './menus';
 import RepoTreeRow from './RepoTreeRow.vue';
@@ -10,10 +10,11 @@ import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
 
 const contextMenuStore = useContextMenuStore();
 const fileTreeStore = useFileTreeStore();
+const settingsStore = useSettingsStore();
 
 const props = defineProps<{ repoId: string; search: string }>();
 
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 const selected = ref<string | null>(null);
 
 onMounted(() => fileTreeStore.ensureRepoTreeLoaded(props.repoId));

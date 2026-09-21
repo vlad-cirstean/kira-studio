@@ -6,7 +6,7 @@
 import { watch } from 'vue';
 import { gitTransportFor } from '../../repo/git/transport';
 import { useBlameStatusStore } from '../../state/blameStatus';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnotation';
 import { type BlameLineController, createBlameLineController } from './blameLine';
 import type { MonacoModule } from './monaco';
@@ -26,7 +26,7 @@ interface InlineBlameAttachParams {
 export interface InlineBlameHandle {
   /** Starts blame resolution for this mount: one transport lease, the cursor-line controller
    *  (`blameLine.ts`), the status-bar publish subscription, and the inline decoration renderer
-   *  toggled live off `settingsState.appearance.inlineBlame` (§5.3 — the setting governs the
+   *  toggled live off `settingsStore.appearance.inlineBlame` (§5.3 — the setting governs the
    *  renderer only; resolution and the status-bar publish run regardless). A no-op if called more
    *  than once without an intervening `dispose()`. */
   attach(params: InlineBlameAttachParams): void;
@@ -36,6 +36,7 @@ export interface InlineBlameHandle {
 
 export function useInlineBlame(): InlineBlameHandle {
   const blameStatusStore = useBlameStatusStore();
+  const settingsStore = useSettingsStore();
   let blameHandle: BlameAnnotationHandle | null = null;
   let blameController: BlameLineController | null = null;
   let blameToken: symbol | undefined;
@@ -72,7 +73,7 @@ export function useInlineBlame(): InlineBlameHandle {
     );
 
     function syncBlameAnnotation(): void {
-      if (settingsState.appearance.inlineBlame && blameController) {
+      if (settingsStore.appearance.inlineBlame && blameController) {
         blameHandle ??= attachBlameAnnotation(mod, editor, blameController);
       } else {
         blameHandle?.dispose();
@@ -80,7 +81,7 @@ export function useInlineBlame(): InlineBlameHandle {
       }
     }
     syncBlameAnnotation();
-    unwatchInlineBlame = watch(() => settingsState.appearance.inlineBlame, syncBlameAnnotation);
+    unwatchInlineBlame = watch(() => settingsStore.appearance.inlineBlame, syncBlameAnnotation);
   }
 
   function dispose(): void {

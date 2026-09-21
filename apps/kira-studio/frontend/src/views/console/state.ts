@@ -4,7 +4,7 @@ import type { Page } from '@shared/protocol/page';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import { useDocumentRowsStore } from '../shared/document/rows';
@@ -352,7 +352,7 @@ async function autoExplainCheck(
       cursor += pageCount;
       plans.push({
         statement: explainable[i],
-        plan: parseExplainPages(kind, pages, settingsState.advanced.expensiveQueryRows),
+        plan: parseExplainPages(kind, pages, useSettingsStore().advanced.expensiveQueryRows),
       });
     }
     const worstIndex = worstFlaggedIndex(plans);
@@ -561,7 +561,11 @@ export async function explain(
       statements,
     });
     if (rt.opId !== opId) return { ok: true }; // superseded by a newer op — nothing left to report into
-    const plan = parseExplainPages(kind, response.pages, settingsState.advanced.expensiveQueryRows);
+    const plan = parseExplainPages(
+      kind,
+      response.pages,
+      useSettingsStore().advanced.expensiveQueryRows,
+    );
     pushPlanResult(tabId, statement, plan);
     rt.status = 'idle';
     rt.opId = null;

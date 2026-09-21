@@ -42,7 +42,7 @@ import { useConnectionsStore } from './connections';
 import { useConsoleDefaultsStore } from './consoleDefaults';
 import { tabsForWorkspace, workspaceKeyOf } from './mode';
 import { pinia } from './pinia';
-import { settingsState } from './settings';
+import { useSettingsStore } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
@@ -527,7 +527,7 @@ export const useTabsStore = defineStore('tabs', () => {
       'data',
       connectionId,
       path,
-      () => defaultDataTabState(settingsState.data.defaultPageSize),
+      () => defaultDataTabState(useSettingsStore().data.defaultPageSize),
       {
         reuse: !opts?.newTab,
         recentKind: 'data',
@@ -570,7 +570,7 @@ export const useTabsStore = defineStore('tabs', () => {
       'document',
       connectionId,
       path,
-      () => defaultDocumentTabState(settingsState.data.defaultPageSize),
+      () => defaultDocumentTabState(useSettingsStore().data.defaultPageSize),
       { reuse: !opts?.newTab, recentKind: 'document' },
     );
   }
@@ -586,7 +586,7 @@ export const useTabsStore = defineStore('tabs', () => {
       'keyvalue',
       connectionId,
       path,
-      () => defaultKeyValueTabState(settingsState.data.defaultPageSize),
+      () => defaultKeyValueTabState(useSettingsStore().data.defaultPageSize),
       { reuse: !opts?.newTab, recentKind: 'keyvalue' },
     );
   }
@@ -602,7 +602,7 @@ export const useTabsStore = defineStore('tabs', () => {
       'stream',
       connectionId,
       path,
-      () => defaultStreamTabState(settingsState.data.defaultPageSize),
+      () => defaultStreamTabState(useSettingsStore().data.defaultPageSize),
       { reuse: !opts?.newTab, recentKind: 'stream' },
     );
   }

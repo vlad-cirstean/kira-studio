@@ -16,7 +16,7 @@ import { control } from '../../bridge/control';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { openRepoFileTab } from '../../state/repoTabs';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { registerDiffEditor, unmountEditor } from './editors';
 import { monacoLanguageFor } from './language';
 import {
@@ -173,6 +173,7 @@ export function useDiffEditor(
   let goToFileImpl: (() => void) | null = null;
 
   async function mount(): Promise<void> {
+    const settingsStore = useSettingsStore();
     const { editorKey, repoId, path, left, right, review } = params;
     const loaded = await loadDiffSides(repoId, path, left, right);
     if ('error' in loaded) {
@@ -238,8 +239,8 @@ export function useDiffEditor(
       ...(review ? { glyphMargin: true } : {}),
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      fontFamily: settingsState.appearance.fontFamily,
-      fontSize: settingsState.appearance.fontSize,
+      fontFamily: settingsStore.appearance.fontFamily,
+      fontSize: settingsStore.appearance.fontSize,
     });
     created.setModel({ original, modified });
     registerDiffEditor(editorKey, [headUri.toString(), worktreeUri.toString()], created);

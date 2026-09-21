@@ -10,7 +10,7 @@ import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { useCustomScriptsStore } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
 import { openRepoTerminalTab } from '../../state/repoTabs';
-import { openSettingsAt } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
@@ -29,6 +29,7 @@ const customScriptsStore = useCustomScriptsStore();
 const tabIncognitoStore = useTabIncognitoStore();
 const workspaceStore = useWorkspaceStore();
 const tabsStore = useTabsStore();
+const settingsStore = useSettingsStore();
 
 function isPinned(tab: TabRecord): boolean {
   return TAB_KINDS[tab.kind].pinned === true;
@@ -291,7 +292,7 @@ function newTabMenuItems(): MenuItem[] {
       id: 'manage-scripts',
       label: 'Manage scripts…',
       icon: 'settings-gear',
-      run: () => openSettingsAt('Scripts'),
+      run: () => settingsStore.openSettingsAt('Scripts'),
     },
   );
   return items;

@@ -8,7 +8,7 @@ import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelect
 import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
-import { settingsState } from '../../state/settings';
+import { useSettingsStore } from '../../state/settings';
 import { useTabsStore } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
@@ -60,6 +60,7 @@ const pageSearchFilterStore = usePageSearchFilterStore();
 const streamSearchStore = useStreamSearchStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const settingsStore = useSettingsStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -138,7 +139,7 @@ function rowAt(i: number) {
 // `.stream-row`'s CSS rule below carries none — VirtualList needs one fixed pixel value for its
 // offset math, so this adopts the same density-driven height ConsoleResultGrid.vue/KeyValueView.vue
 // (and the deleted DataGrid.vue) already use rather than inventing a fourth number.
-const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
+const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
 
 function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void {
   e.preventDefault();
