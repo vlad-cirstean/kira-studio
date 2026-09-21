@@ -10,7 +10,7 @@ import QuickOpen from './repo/QuickOpen.vue';
 import { openQuickOpen } from './repo/state/quickOpen';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
-import { togglePalette } from './shortcuts/state';
+import { usePaletteStore } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
 import { datagripImportState, pickAndScanDataGripProject } from './state/datagripImport';
 import { fakeDataDialogState } from './state/fakeData';
@@ -26,11 +26,15 @@ import DbMcpApprovalDialog from './workbench/DbMcpApprovalDialog.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
-import { initEngineState } from './workbench/state/engine';
-import { initTooltips } from './workbench/state/tooltip';
+import { useEngineStore } from './workbench/state/engine';
+import { useTooltipStore } from './workbench/state/tooltip';
 import TitleBar from './workbench/TitleBar.vue';
 import UploadObjectDialog from './workbench/UploadObjectDialog.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
+
+const engineStore = useEngineStore();
+const tooltipStore = useTooltipStore();
+const paletteStore = usePaletteStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
@@ -40,8 +44,8 @@ function closeActiveTab(): void {
 }
 
 onMounted(() => {
-  void initEngineState();
-  teardownTooltips = initTooltips();
+  void engineStore.initEngineState();
+  teardownTooltips = tooltipStore.initTooltips();
   unsubscribe = [
     control.onOpenSettings(() => {
       settingsOpen.value = true;
@@ -63,7 +67,7 @@ onMounted(() => {
     }),
     control.onToggleProjectPanel(toggleProjectPanel),
     control.onToggleOperationsPanel(toggleOperationsPanel),
-    control.onCommandPalette(togglePalette),
+    control.onCommandPalette(paletteStore.togglePalette),
     control.onQuickOpen(openQuickOpen),
     control.onTabNext(activateNextTab),
     control.onTabPrev(activatePrevTab),

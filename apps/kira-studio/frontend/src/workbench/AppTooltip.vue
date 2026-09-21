@@ -6,8 +6,9 @@
 // anchoredPosition.ts.
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { computeFloatPosition } from '../theme/floatingPosition';
-import { getAnchorElement, tooltipState } from './state/tooltip';
+import { useTooltipStore } from './state/tooltip';
 
+const tooltipStore = useTooltipStore();
 const tipRef = ref<HTMLElement | null>(null);
 const style = ref({ left: '0px', top: '0px' });
 
@@ -17,7 +18,7 @@ const style = ref({ left: '0px', top: '0px' });
 async function position(): Promise<void> {
   await nextTick();
   const el = tipRef.value;
-  const anchor = getAnchorElement();
+  const anchor = tooltipStore.getAnchorElement();
   if (!el || !anchor) return;
   const { left, top } = await computeFloatPosition(anchor, el);
   style.value = { left: `${left}px`, top: `${top}px` };
@@ -27,20 +28,20 @@ async function position(): Promise<void> {
 // under an already-open tooltip without it closing first) — the anchor itself never moves while a
 // tooltip is open (D6 closes on scroll), so only these two triggers can invalidate the placement.
 watch(
-  () => tooltipState.open,
+  () => tooltipStore.open,
   (open) => {
     if (open) void position();
   },
 );
 watch(
-  () => tooltipState.text,
+  () => tooltipStore.text,
   () => {
-    if (tooltipState.open) void position();
+    if (tooltipStore.open) void position();
   },
 );
 
 function onResize(): void {
-  if (tooltipState.open) void position();
+  if (tooltipStore.open) void position();
 }
 onMounted(() => window.addEventListener('resize', onResize));
 onUnmounted(() => window.removeEventListener('resize', onResize));
@@ -49,29 +50,29 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 <template>
   <Teleport to="body">
     <div
-      v-if="tooltipState.open"
-      :id="tooltipState.id ?? undefined"
+      v-if="tooltipStore.open"
+      :id="tooltipStore.id ?? undefined"
       ref="tipRef"
       class="app-tooltip p-float"
       role="tooltip"
       data-testid="app-tooltip"
       :style="style"
     >
-      <template v-if="tooltipState.parts">
+      <template v-if="tooltipStore.parts">
         <div class="tip-head">
-          <span class="tip-title">{{ tooltipState.parts.title }}</span>
+          <span class="tip-title">{{ tooltipStore.parts.title }}</span>
           <span
-            v-if="tooltipState.parts.meta"
+            v-if="tooltipStore.parts.meta"
             class="tip-meta"
             :style="
-              tooltipState.parts.metaColor ? { color: tooltipState.parts.metaColor } : undefined
+              tooltipStore.parts.metaColor ? { color: tooltipStore.parts.metaColor } : undefined
             "
-            >{{ tooltipState.parts.meta }}</span
+            >{{ tooltipStore.parts.meta }}</span
           >
         </div>
-        <div v-if="tooltipState.parts.body" class="tip-body">{{ tooltipState.parts.body }}</div>
+        <div v-if="tooltipStore.parts.body" class="tip-body">{{ tooltipStore.parts.body }}</div>
       </template>
-      <template v-else>{{ tooltipState.text }}</template>
+      <template v-else>{{ tooltipStore.text }}</template>
     </div>
   </Teleport>
 </template>

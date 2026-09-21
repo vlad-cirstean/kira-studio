@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
-import { closePalette, paletteCommands, paletteState } from './state';
+import { usePaletteStore } from './state';
 
+const paletteStore = usePaletteStore();
 const inputRef = ref<HTMLInputElement | null>(null);
 const activeIndex = ref(0);
 
 const filtered = computed(() => {
-  const q = paletteState.query.trim().toLowerCase();
-  if (!q) return paletteCommands;
-  return paletteCommands.filter((c) => c.label.toLowerCase().includes(q));
+  const q = paletteStore.query.trim().toLowerCase();
+  if (!q) return paletteStore.paletteCommands;
+  return paletteStore.paletteCommands.filter((c) => c.label.toLowerCase().includes(q));
 });
 
 watch(
-  () => paletteState.open,
+  () => paletteStore.open,
   async (open) => {
     if (!open) return;
     activeIndex.value = 0;
@@ -29,7 +30,7 @@ watch(filtered, () => {
 function runAt(index: number): void {
   const command = filtered.value[index];
   if (!command) return;
-  closePalette();
+  paletteStore.closePalette();
   command.run();
 }
 
@@ -37,7 +38,7 @@ function onKeydown(e: KeyboardEvent): void {
   wrapSelectionOnType(e);
   if (e.key === 'Escape') {
     e.preventDefault();
-    closePalette();
+    paletteStore.closePalette();
   } else if (e.key === 'ArrowDown') {
     e.preventDefault();
     activeIndex.value = Math.min(filtered.value.length - 1, activeIndex.value + 1);
@@ -53,17 +54,17 @@ function onKeydown(e: KeyboardEvent): void {
 
 <template>
   <div
-    v-if="paletteState.open"
+    v-if="paletteStore.open"
     class="palette-backdrop"
     data-testid="command-palette-backdrop"
-    @click="closePalette"
+    @click="paletteStore.closePalette"
   >
     <div class="palette p-float" data-testid="command-palette" @click.stop>
       <div class="palette-input-pad">
         <div class="p-input ui md palette-input">
           <input
             ref="inputRef"
-            v-model="paletteState.query"
+            v-model="paletteStore.query"
             data-testid="command-palette-input"
             type="text"
             placeholder="Type a command…"

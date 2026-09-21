@@ -58,7 +58,7 @@ import {
   totalRetainedBytes as streamRetainedBytes,
 } from './views/stream/page';
 import { searchState as streamSearchState } from './views/stream/search';
-import { vTooltip } from './workbench/state/tooltip';
+import { useTooltipStore } from './workbench/state/tooltip';
 
 /** P5 C1: what `window.__kiraRetention` reports for one of the five page stores — the decode/view
  *  caches `__kiraRetainedBytes` cannot see, since that sums `page.byteSize` only (F2). */
@@ -338,7 +338,7 @@ async function bootstrap(): Promise<void> {
   const app = createApp(App);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });
-  app.directive('tooltip', vTooltip);
+  app.directive('tooltip', useTooltipStore().vTooltip);
   app.mount('#app');
   // Off the boot critical path (Promise.all above) — an update check gains nothing from blocking
   // first paint, and Go's own 6h cache floor (§3.3) decides what actually fetches.

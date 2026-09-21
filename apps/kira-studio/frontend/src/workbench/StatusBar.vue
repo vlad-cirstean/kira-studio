@@ -9,7 +9,9 @@ import { blameStatusState } from '../state/blameStatus';
 import { cacheStatsState } from '../state/cacheStats';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
-import { engineState } from './state/engine';
+import { useEngineStore } from './state/engine';
+
+const engineStore = useEngineStore();
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
 // a single app-wide figure, not a per-process breakdown. The whole segment is v-if-gated on
@@ -182,15 +184,15 @@ const agentTooltip = computed(() =>
       <span
         class="p-status"
         data-testid="engine-status"
-        :data-status="engineState.status"
-        v-tooltip="engineState.lastPingMs !== null ? `${engineState.lastPingMs} ms` : undefined"
+        :data-status="engineStore.status"
+        v-tooltip="engineStore.lastPingMs !== null ? `${engineStore.lastPingMs} ms` : undefined"
       >
         <CodiconIcon
           name="circle-large-filled"
           :size="13"
-          :style="{ color: engineState.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
+          :style="{ color: engineStore.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
         />
-        engine {{ engineState.status }}
+        engine {{ engineStore.status }}
       </span>
     </div>
   </div>
