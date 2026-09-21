@@ -7,6 +7,7 @@ import type {
   GrpcRequestTabState,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { useCollectionsStore } from '../../api/state/collections';
 import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
@@ -15,7 +16,7 @@ import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
-import { noteGrpcCallRecorded } from './history';
+import { useGrpcCallHistoryStore } from './history';
 
 // D9: {{name}} substitution is reused exactly — the same two-token grammar @kira/api-core's
 // resolve() already implements, over gRPC's own three substitutable fields (target, metadata,
@@ -113,19 +114,6 @@ function defaultRuntime(): GrpcRequestViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<GrpcRequestViewRuntime>(defaultRuntime);
-
-export { runtime };
-
-// D2: dropResources is noDrop (the registry entry) — the runtime lives here, and a still-running
-// call must be cancelled through this hook rather than through dropResources (registerTabRuntimeCleanup
-// is the one place a closing tab's cleanup and an in-flight op's cancellation can share one call).
-registerTabRuntimeCleanup((tabId) => {
-  stopOp(runtime[tabId]);
-  delete runtime[tabId];
-  delete schemaRuntime[tabId];
-});
-
 // ---- D4: the schema browser's own runtime ----
 
 interface GrpcSchemaRuntime {
@@ -141,11 +129,6 @@ interface GrpcSchemaRuntime {
 function defaultSchemaRuntime(): GrpcSchemaRuntime {
   return { status: 'idle', schema: null, error: null, genId: 0 };
 }
-
-const { runtime: schemaRuntime, ensureRuntime: ensureSchemaRuntime } =
-  createRuntimeStore<GrpcSchemaRuntime>(defaultSchemaRuntime);
-
-export { schemaRuntime };
 
 /** Resolves stage 1 over target/metadata only (Describe has no message field) — the same
  *  short-circuit shape send() uses below. */
@@ -167,54 +150,6 @@ async function resolveForDescribe(
   return { target: resolved.target, metadata: resolved.metadata };
 }
 
-/** D4: fetches (or refetches, `reload`) the schema for the tab's current source. */
-export async function loadSchema(tabId: string, reload = false): Promise<void> {
-  const tab = findGrpcRequestTab(tabId);
-  if (!tab) return;
-  const rt = ensureSchemaRuntime(tabId);
-  rt.status = 'loading';
-  rt.error = null;
-  // Finding 13: mirrors call()'s own opId guard — a debounced watcher still fires one loadSchema
-  // per settled keystroke, and a slow response for an earlier (now-stale) target string could
-  // otherwise land after a newer one and clobber it.
-  const myGen = ++rt.genId;
-
-  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = useVariablesStore().environmentIdForTab(tabId);
-  try {
-    let target = tab.state.target;
-    let metadata: { name: string; value: string }[] = [];
-    if (tab.state.descriptorMode === 'reflection') {
-      const resolved = await resolveForDescribe(tabId);
-      if (!resolved) return;
-      target = resolved.target;
-      metadata = resolved.metadata;
-    }
-    const schema = await control.grpcDescribe({
-      descriptorMode: tab.state.descriptorMode,
-      target,
-      tls: {
-        enabled: tab.state.tlsMode === 'tls',
-        caFile: tab.state.caFile,
-        serverName: tab.state.serverName,
-      },
-      metadata,
-      protoPath: tab.state.protoPath,
-      importPaths: tab.state.importPaths,
-      collectionId,
-      environmentId,
-      reload,
-    });
-    if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
-    rt.status = 'idle';
-    rt.schema = schema;
-  } catch (err) {
-    if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
-    rt.status = 'error';
-    rt.error = err instanceof Error ? err.message : String(err);
-  }
-}
-
 /** Finds one method in a loaded schema by "Service/Method" full name. */
 export function findMethod(
   schema: GrpcSchemaWire | null,
@@ -226,8 +161,6 @@ export function findMethod(
   const m = svc?.methods.find((m) => m.name === method);
   return m ?? null;
 }
-
-// ---- D7/D8: the call itself ----
 
 // P94 pass 3 §4.3: the event handler's own per-call apply step, lifted out so
 // ensureGrpcCallSubscription's callback only finds the matching tab and delegates. `rt` is the
@@ -256,106 +189,173 @@ function applyGrpcEvent(tabId: string, rt: GrpcRequestViewRuntime, event: GrpcCa
       rt.status = 'idle';
       rt.result = event.status ?? rt.result;
     }
-    noteGrpcCallRecorded(tabId);
+    useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
   }
 }
 
-let subscribedToGrpcCall = false;
-function ensureGrpcCallSubscription(): void {
-  if (subscribedToGrpcCall) return;
-  subscribedToGrpcCall = true;
-  control.onGrpcCall((event) => {
-    for (const tabId of Object.keys(runtime)) {
-      const rt = runtime[tabId];
-      if (!rt || rt.lastCallId !== event.callId) continue;
-      applyGrpcEvent(tabId, rt, event);
-      break;
-    }
+export const useGrpcRequestViewStore = defineStore('grpcRequestView', () => {
+  const { runtime, ensureRuntime } = createRuntimeStore<GrpcRequestViewRuntime>(defaultRuntime);
+  const { runtime: schemaRuntime, ensureRuntime: ensureSchemaRuntime } =
+    createRuntimeStore<GrpcSchemaRuntime>(defaultSchemaRuntime);
+
+  // D2: dropResources is noDrop (the registry entry) — the runtime lives here, and a still-running
+  // call must be cancelled through this hook rather than through dropResources (registerTabRuntimeCleanup
+  // is the one place a closing tab's cleanup and an in-flight op's cancellation can share one call).
+  registerTabRuntimeCleanup((tabId) => {
+    stopOp(runtime[tabId]);
+    delete runtime[tabId];
+    delete schemaRuntime[tabId];
   });
-}
 
-/** D7/D8: one Call op, run through GrpcService.Call → the existing op scheduler. Unary and
- *  server-streaming both go through this one function — Go is told which (`streaming`) from the
- *  method the schema already resolved. */
-export async function call(tabId: string): Promise<void> {
-  const tab = findGrpcRequestTab(tabId);
-  if (!tab) return;
-  const rt = ensureRuntime(tabId);
-  if (rt.status === 'running') return;
-  ensureGrpcCallSubscription();
+  /** D4: fetches (or refetches, `reload`) the schema for the tab's current source. */
+  async function loadSchema(tabId: string, reload = false): Promise<void> {
+    const tab = findGrpcRequestTab(tabId);
+    if (!tab) return;
+    const rt = ensureSchemaRuntime(tabId);
+    rt.status = 'loading';
+    rt.error = null;
+    // Finding 13: mirrors call()'s own opId guard — a debounced watcher still fires one loadSchema
+    // per settled keystroke, and a slow response for an earlier (now-stale) target string could
+    // otherwise land after a newer one and clobber it.
+    const myGen = ++rt.genId;
 
-  const schema = schemaRuntime[tabId]?.schema ?? null;
-  const method = findMethod(schema, tab.state.service, tab.state.method);
-  const streaming = method?.serverStreaming ?? false;
+    const collectionId = useCollectionsStore().collectionIdFor(tab.state);
+    const environmentId = useVariablesStore().environmentIdForTab(tabId);
+    try {
+      let target = tab.state.target;
+      let metadata: { name: string; value: string }[] = [];
+      if (tab.state.descriptorMode === 'reflection') {
+        const resolved = await resolveForDescribe(tabId);
+        if (!resolved) return;
+        target = resolved.target;
+        metadata = resolved.metadata;
+      }
+      const schema = await control.grpcDescribe({
+        descriptorMode: tab.state.descriptorMode,
+        target,
+        tls: {
+          enabled: tab.state.tlsMode === 'tls',
+          caFile: tab.state.caFile,
+          serverName: tab.state.serverName,
+        },
+        metadata,
+        protoPath: tab.state.protoPath,
+        importPaths: tab.state.importPaths,
+        collectionId,
+        environmentId,
+        reload,
+      });
+      if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
+      rt.status = 'idle';
+      rt.schema = schema;
+    } catch (err) {
+      if (!findGrpcRequestTab(tabId) || rt.genId !== myGen) return;
+      rt.status = 'error';
+      rt.error = err instanceof Error ? err.message : String(err);
+    }
+  }
 
-  const opId = crypto.randomUUID();
-  rt.status = 'running';
-  rt.opId = opId;
-  rt.lastCallId = opId;
-  rt.error = null;
-  rt.result = null;
-  rt.messages = [];
-  rt.trueMessageCount = 0;
-  rt.messageBytes = 0;
-  rt.streaming = streaming;
+  // ---- D7/D8: the call itself ----
 
-  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = useVariablesStore().environmentIdForTab(tabId);
-  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-    collectionId,
-    environmentId,
-  );
-  const first = resolveGrpcTabState(tab.state, values, secretNames);
-  const resolved = first.refs.some((r) => r.kind === 'dynamic')
-    ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
-    : first;
+  let subscribedToGrpcCall = false;
+  function ensureGrpcCallSubscription(): void {
+    if (subscribedToGrpcCall) return;
+    subscribedToGrpcCall = true;
+    control.onGrpcCall((event) => {
+      for (const tabId of Object.keys(runtime)) {
+        const rt = runtime[tabId];
+        if (!rt || rt.lastCallId !== event.callId) continue;
+        applyGrpcEvent(tabId, rt, event);
+        break;
+      }
+    });
+  }
 
-  try {
-    const result = await control.grpcCall({
-      opId,
-      tabId,
-      streaming,
-      descriptorMode: tab.state.descriptorMode,
-      target: resolved.target,
-      tls: {
-        enabled: tab.state.tlsMode === 'tls',
-        caFile: tab.state.caFile,
-        serverName: tab.state.serverName,
-      },
-      protoPath: tab.state.protoPath,
-      importPaths: tab.state.importPaths,
-      service: tab.state.service,
-      method: tab.state.method,
-      messageJson: resolved.message,
-      metadata: resolved.metadata,
+  /** D7/D8: one Call op, run through GrpcService.Call → the existing op scheduler. Unary and
+   *  server-streaming both go through this one function — Go is told which (`streaming`) from the
+   *  method the schema already resolved. */
+  async function call(tabId: string): Promise<void> {
+    const tab = findGrpcRequestTab(tabId);
+    if (!tab) return;
+    const rt = ensureRuntime(tabId);
+    if (rt.status === 'running') return;
+    ensureGrpcCallSubscription();
+
+    const schema = schemaRuntime[tabId]?.schema ?? null;
+    const method = findMethod(schema, tab.state.service, tab.state.method);
+    const streaming = method?.serverStreaming ?? false;
+
+    const opId = crypto.randomUUID();
+    rt.status = 'running';
+    rt.opId = opId;
+    rt.lastCallId = opId;
+    rt.error = null;
+    rt.result = null;
+    rt.messages = [];
+    rt.trueMessageCount = 0;
+    rt.messageBytes = 0;
+    rt.streaming = streaming;
+
+    const collectionId = useCollectionsStore().collectionIdFor(tab.state);
+    const environmentId = useVariablesStore().environmentIdForTab(tabId);
+    const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
       collectionId,
       environmentId,
-      itemId: tab.state.itemId ?? '',
-      incognito: useTabIncognitoStore().isIncognito(tabId),
-    });
-    if (rt.opId !== opId) return; // superseded, or the streaming subscription already finished it
-    rt.status = 'idle';
-    rt.opId = null;
-    rt.result = result;
-    if (!streaming && result.messages) {
-      rt.messages = result.messages;
-      rt.trueMessageCount = result.messages.length;
-      rt.messageBytes = result.messages.reduce((n, m) => n + m.wireBytes, 0);
-    }
-    noteGrpcCallRecorded(tabId);
-  } catch (err) {
-    if (rt.opId !== opId) return;
-    rt.opId = null;
-    const failure = classifyLoadError(err);
-    if (failure.kind === 'cancelled') {
-      rt.status = 'cancelled';
-      return;
-    }
-    rt.status = 'error';
-    rt.error = { code: failure.code, message: failure.message };
-  }
-}
+    );
+    const first = resolveGrpcTabState(tab.state, values, secretNames);
+    const resolved = first.refs.some((r) => r.kind === 'dynamic')
+      ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
+      : first;
 
-export function stop(tabId: string): void {
-  stopOp(runtime[tabId]);
-}
+    try {
+      const result = await control.grpcCall({
+        opId,
+        tabId,
+        streaming,
+        descriptorMode: tab.state.descriptorMode,
+        target: resolved.target,
+        tls: {
+          enabled: tab.state.tlsMode === 'tls',
+          caFile: tab.state.caFile,
+          serverName: tab.state.serverName,
+        },
+        protoPath: tab.state.protoPath,
+        importPaths: tab.state.importPaths,
+        service: tab.state.service,
+        method: tab.state.method,
+        messageJson: resolved.message,
+        metadata: resolved.metadata,
+        collectionId,
+        environmentId,
+        itemId: tab.state.itemId ?? '',
+        incognito: useTabIncognitoStore().isIncognito(tabId),
+      });
+      if (rt.opId !== opId) return; // superseded, or the streaming subscription already finished it
+      rt.status = 'idle';
+      rt.opId = null;
+      rt.result = result;
+      if (!streaming && result.messages) {
+        rt.messages = result.messages;
+        rt.trueMessageCount = result.messages.length;
+        rt.messageBytes = result.messages.reduce((n, m) => n + m.wireBytes, 0);
+      }
+      useGrpcCallHistoryStore().noteGrpcCallRecorded(tabId);
+    } catch (err) {
+      if (rt.opId !== opId) return;
+      rt.opId = null;
+      const failure = classifyLoadError(err);
+      if (failure.kind === 'cancelled') {
+        rt.status = 'cancelled';
+        return;
+      }
+      rt.status = 'error';
+      rt.error = { code: failure.code, message: failure.message };
+    }
+  }
+
+  function stop(tabId: string): void {
+    stopOp(runtime[tabId]);
+  }
+
+  return { runtime, schemaRuntime, loadSchema, call, stop };
+});

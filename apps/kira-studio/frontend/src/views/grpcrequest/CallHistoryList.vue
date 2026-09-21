@@ -14,16 +14,11 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import {
-  clearGrpcHistory,
-  deleteGrpcHistoryEntry,
-  ensureGrpcHistoryFresh,
-  grpcHistoryRuntime,
-  viewGrpcHistoryEntry,
-} from './history';
+import { useGrpcCallHistoryStore } from './history';
 
 const confirmDialogStore = useConfirmDialogStore();
 const tabIncognitoStore = useTabIncognitoStore();
+const grpcCallHistoryStore = useGrpcCallHistoryStore();
 
 // P13 D12: extracted out of ResponsePane.vue's own history block, mirroring
 // views/httprequest/ResponseHistoryList.vue's shape exactly — a real toolbar (count + Clear,
@@ -35,7 +30,7 @@ const tabIncognitoStore = useTabIncognitoStore();
 // message *sequence* with metadata, a genuinely different design left for a future row (§5).
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
-const rt = computed(() => grpcHistoryRuntime[props.tab.id]);
+const rt = computed(() => grpcCallHistoryStore.runtime[props.tab.id]);
 const entries = computed<GrpcCallHistoryEntry[]>(() => rt.value?.entries ?? []);
 const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 // P18 D6: HTTP's own "the list is full" predicate, restated for gRPC's cap.
@@ -44,7 +39,7 @@ const atCap = computed(() => entries.value.length >= GRPC_HISTORY_PER_SCOPE_LIMI
 const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 
 onMounted(() => {
-  ensureGrpcHistoryFresh(props.tab.id);
+  grpcCallHistoryStore.ensureGrpcHistoryFresh(props.tab.id);
 });
 
 // P22b D14: HTTP's own ResponseHistoryList.vue idiom (P16 D15) — an always-visible filter box
@@ -64,18 +59,18 @@ const filteredEntries = computed<GrpcCallHistoryEntry[]>(() => {
 });
 
 function onRowClick(id: string): void {
-  void viewGrpcHistoryEntry(props.tab.id, id);
+  void grpcCallHistoryStore.viewGrpcHistoryEntry(props.tab.id, id);
 }
 
 function onDelete(id: string): void {
-  void deleteGrpcHistoryEntry(props.tab.id, id);
+  void grpcCallHistoryStore.deleteGrpcHistoryEntry(props.tab.id, id);
 }
 
 async function onClear(): Promise<void> {
   const ok = await confirmDialogStore.confirmDialog('Clear this request’s call history? This cannot be undone.', {
     danger: true,
   });
-  if (ok) await clearGrpcHistory(props.tab.id);
+  if (ok) await grpcCallHistoryStore.clearGrpcHistory(props.tab.id);
 }
 </script>
 

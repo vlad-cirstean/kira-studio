@@ -10,14 +10,15 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { loadSchema, schemaRuntime } from './state';
+import { useGrpcRequestViewStore } from './state';
 
 // D13's Schema pane: the source selector (Reflection / .proto file + import paths + Reload) above
 // a service→method list — inside the tab, not the left panel (D13's own reasoning: a schema is a
 // property of one request's target, not of the workspace).
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
+const grpcRequestViewStore = useGrpcRequestViewStore();
 
-const rt = computed(() => schemaRuntime[props.tab.id]);
+const rt = computed(() => grpcRequestViewStore.schemaRuntime[props.tab.id]);
 
 const SOURCE_OPTIONS = [
   { value: 'reflection' as const, label: 'Reflection', testid: 'grpc-source-reflection' },
@@ -61,7 +62,7 @@ function removeImportPath(i: number): void {
 }
 
 function onReload(): void {
-  void loadSchema(props.tab.id, true);
+  void grpcRequestViewStore.loadSchema(props.tab.id, true);
 }
 
 // P16 D15: matches service name or method name — a service whose own name matches shows all its

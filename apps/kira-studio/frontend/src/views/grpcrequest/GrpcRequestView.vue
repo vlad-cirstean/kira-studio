@@ -28,15 +28,7 @@ import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import MetadataTable from './MetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import SchemaBrowser from './SchemaBrowser.vue';
-import {
-  call,
-  findMethod,
-  loadSchema,
-  resolveGrpcTabState,
-  runtime,
-  schemaRuntime,
-  stop,
-} from './state';
+import { findMethod, resolveGrpcTabState, useGrpcRequestViewStore } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
@@ -45,8 +37,9 @@ const tabIncognitoStore = useTabIncognitoStore();
 const collectionsStore = useCollectionsStore();
 const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
+const grpcRequestViewStore = useGrpcRequestViewStore();
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
 
@@ -75,7 +68,7 @@ function onTargetInput(value: string): void {
 // needed for a value list this shape). The full browsable list with per-service grouping lives in
 // the Schema pane (SchemaBrowser.vue) — this is the fast path once a schema is already loaded.
 const methodOptions = computed(() => {
-  const schema = schemaRuntime[props.tab.id]?.schema;
+  const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema;
   if (!schema) return [];
   const out: { value: string; label: string }[] = [];
   for (const svc of schema.services) {
@@ -90,7 +83,7 @@ const selectedMethodValue = computed(() => `${props.tab.state.service}|${props.t
 function onMethodSelect(e: Event): void {
   const value = (e.target as HTMLSelectElement).value;
   const [service, method] = value.split('|');
-  const schema = schemaRuntime[props.tab.id]?.schema ?? null;
+  const schema = grpcRequestViewStore.schemaRuntime[props.tab.id]?.schema ?? null;
   const m = findMethod(schema, service, method);
   patchGrpcRequestTabState(props.tab.id, {
     service,
@@ -117,7 +110,7 @@ watch(
     if (mode === 'reflection' && !target) return;
     if (mode === 'proto' && !protoPath) return;
     schemaLoadTimer = setTimeout(() => {
-      void loadSchema(props.tab.id);
+      void grpcRequestViewStore.loadSchema(props.tab.id);
     }, SCHEMA_LOAD_DEBOUNCE_MS);
   },
   { immediate: true },
@@ -152,11 +145,11 @@ function onSaveAs(): void {
 }
 
 function onCall(): void {
-  void call(props.tab.id);
+  void grpcRequestViewStore.call(props.tab.id);
 }
 
 function onStop(): void {
-  stop(props.tab.id);
+  grpcRequestViewStore.stop(props.tab.id);
 }
 
 const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.state));

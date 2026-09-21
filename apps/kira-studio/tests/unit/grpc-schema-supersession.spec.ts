@@ -10,12 +10,17 @@ import './support/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
   '../../frontend/src/api/tabs'
 );
-const { loadSchema, schemaRuntime } = await import('../../frontend/src/views/grpcrequest/state');
+const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcrequest/state');
+const grpcRequestViewStore = useGrpcRequestViewStore();
 
 // control is a shared, process-wide singleton (bun test runs every spec file in one process) —
 // bridge-unwrap.spec.ts reflectively calls every function it finds on it, so a method left
@@ -59,21 +64,21 @@ describe('views/grpcrequest/state.ts loadSchema supersession guard (finding 13)'
       return d.promise;
     };
 
-    const older = loadSchema(id); // genId 1
-    const newer = loadSchema(id); // genId 2
+    const older = grpcRequestViewStore.loadSchema(id); // genId 1
+    const newer = grpcRequestViewStore.loadSchema(id); // genId 2
     expect(calls).toHaveLength(2);
 
     // The newer call lands first; the older one resolves after it.
     calls[1]?.resolve(schemaNamed('Newer'));
     await newer;
-    expect(schemaRuntime[id]?.schema?.services[0]?.name).toBe('Newer');
+    expect(grpcRequestViewStore.schemaRuntime[id]?.schema?.services[0]?.name).toBe('Newer');
 
     calls[0]?.resolve(schemaNamed('Older'));
     await older;
 
     // The stale response must not have overwritten the newer schema already in place.
-    expect(schemaRuntime[id]?.schema?.services[0]?.name).toBe('Newer');
-    expect(schemaRuntime[id]?.status).toBe('idle');
+    expect(grpcRequestViewStore.schemaRuntime[id]?.schema?.services[0]?.name).toBe('Newer');
+    expect(grpcRequestViewStore.schemaRuntime[id]?.status).toBe('idle');
   });
 
   test('a stale failure does not error out a load that already succeeded', async () => {
@@ -88,17 +93,17 @@ describe('views/grpcrequest/state.ts loadSchema supersession guard (finding 13)'
       return d.promise;
     };
 
-    const older = loadSchema(id); // genId 1 — will fail
-    const newer = loadSchema(id); // genId 2 — will succeed
+    const older = grpcRequestViewStore.loadSchema(id); // genId 1 — will fail
+    const newer = grpcRequestViewStore.loadSchema(id); // genId 2 — will succeed
     calls[1]?.resolve(schemaNamed('Good'));
     await newer;
-    expect(schemaRuntime[id]?.status).toBe('idle');
+    expect(grpcRequestViewStore.schemaRuntime[id]?.status).toBe('idle');
 
     calls[0]?.reject(new Error('stale failure'));
     await older;
 
-    expect(schemaRuntime[id]?.status).toBe('idle');
-    expect(schemaRuntime[id]?.schema?.services[0]?.name).toBe('Good');
-    expect(schemaRuntime[id]?.error).toBeNull();
+    expect(grpcRequestViewStore.schemaRuntime[id]?.status).toBe('idle');
+    expect(grpcRequestViewStore.schemaRuntime[id]?.schema?.services[0]?.name).toBe('Good');
+    expect(grpcRequestViewStore.schemaRuntime[id]?.error).toBeNull();
   });
 });

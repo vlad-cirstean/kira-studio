@@ -11,13 +11,18 @@ import './support/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcCallEvent, GrpcCallResultWire, GrpcSchemaWire } from '@shared/domain/grpc';
+import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
+import { pinia } from '../../frontend/src/state/pinia';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 const { openGrpcRequestTab, patchGrpcRequestTabState } = await import(
   '../../frontend/src/api/tabs'
 );
-const { call, runtime, schemaRuntime } = await import('../../frontend/src/views/grpcrequest/state');
+const { useGrpcRequestViewStore } = await import('../../frontend/src/views/grpcrequest/state');
+const grpcRequestViewStore = useGrpcRequestViewStore();
 
 const originalGrpcCall = control.grpcCall;
 afterEach(() => {
@@ -83,7 +88,12 @@ function terminalResult(): GrpcCallResultWire {
 function setUpStreamingTab(): string {
   const id = openGrpcRequestTab();
   patchGrpcRequestTabState(id, { service: 'Svc', method: 'Stream' });
-  schemaRuntime[id] = { status: 'idle', schema: streamingSchema(), error: null, genId: 0 };
+  grpcRequestViewStore.schemaRuntime[id] = {
+    status: 'idle',
+    schema: streamingSchema(),
+    error: null,
+    genId: 0,
+  };
   return id;
 }
 
@@ -95,20 +105,20 @@ describe("a server-streaming call's terminal event race (F5)", () => {
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
     (control as any).grpcCall = () => grpcCallDeferred.promise;
 
-    const callPromise = call(id);
+    const callPromise = grpcRequestViewStore.call(id);
     // Wait a tick so call() has run its synchronous setup (subscribing, setting opId/lastCallId)
     // and reached the awaited control.grpcCall.
     await Promise.resolve();
     await Promise.resolve();
 
-    const opId = runtime[id]?.opId;
+    const opId = grpcRequestViewStore.runtime[id]?.opId;
     expect(opId).toBeTruthy();
 
     // The control-plane response lands FIRST — the reverse of the order the code used to assume.
     grpcCallDeferred.resolve(terminalResult());
     await callPromise;
-    expect(runtime[id]?.opId).toBeNull();
-    expect(runtime[id]?.status).toBe('idle');
+    expect(grpcRequestViewStore.runtime[id]?.opId).toBeNull();
+    expect(grpcRequestViewStore.runtime[id]?.status).toBe('idle');
 
     // The terminal event — carrying the trailing batch — is delivered only now, after opId has
     // already been cleared.
@@ -126,9 +136,9 @@ describe("a server-streaming call's terminal event race (F5)", () => {
 
     // The fix: the event is still matched (via lastCallId, which opId-clearing does not touch)
     // and its messages are applied — this is exactly what used to be silently dropped.
-    expect(runtime[id]?.messages).toHaveLength(2);
-    expect(runtime[id]?.trueMessageCount).toBe(2);
-    expect(runtime[id]?.messageBytes).toBe(20);
+    expect(grpcRequestViewStore.runtime[id]?.messages).toHaveLength(2);
+    expect(grpcRequestViewStore.runtime[id]?.trueMessageCount).toBe(2);
+    expect(grpcRequestViewStore.runtime[id]?.messageBytes).toBe(20);
   });
 
   test('the terminal event arriving before the control-plane response still works (the order the code always handled)', async () => {
@@ -138,10 +148,10 @@ describe("a server-streaming call's terminal event race (F5)", () => {
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
     (control as any).grpcCall = () => grpcCallDeferred.promise;
 
-    const callPromise = call(id);
+    const callPromise = grpcRequestViewStore.call(id);
     await Promise.resolve();
     await Promise.resolve();
-    const opId = runtime[id]?.opId;
+    const opId = grpcRequestViewStore.runtime[id]?.opId;
 
     capturedCallback?.({
       callId: opId as string,
@@ -150,14 +160,14 @@ describe("a server-streaming call's terminal event race (F5)", () => {
       done: true,
       status: terminalResult(),
     });
-    expect(runtime[id]?.opId).toBeNull();
-    expect(runtime[id]?.messages).toHaveLength(1);
+    expect(grpcRequestViewStore.runtime[id]?.opId).toBeNull();
+    expect(grpcRequestViewStore.runtime[id]?.messages).toHaveLength(1);
 
     grpcCallDeferred.resolve(terminalResult());
     await callPromise;
 
     // The return path's own supersession guard bails out — the event already finalized this call.
-    expect(runtime[id]?.messages).toHaveLength(1);
+    expect(grpcRequestViewStore.runtime[id]?.messages).toHaveLength(1);
   });
 });
 
@@ -171,10 +181,10 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
     const grpcCallDeferred = deferred<GrpcCallResultWire>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
     (control as any).grpcCall = () => grpcCallDeferred.promise;
-    const callPromise = call(id);
+    const callPromise = grpcRequestViewStore.call(id);
     await Promise.resolve();
     await Promise.resolve();
-    const opId = runtime[id]?.opId as string;
+    const opId = grpcRequestViewStore.runtime[id]?.opId as string;
 
     capturedCallback?.({
       callId: opId,
@@ -186,7 +196,7 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
     // This fails against the pre-fix handler, which pushed event.messages straight into the
     // reactive array with no markRaw — reactive()'s own array getter wraps every plain-object
     // element it returns, so the pushed message would come back as a reactive Proxy.
-    expect(isReactive(runtime[id]?.messages[0])).toBe(false);
+    expect(isReactive(grpcRequestViewStore.runtime[id]?.messages[0])).toBe(false);
 
     grpcCallDeferred.resolve(terminalResult());
     await callPromise;
@@ -201,10 +211,10 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
     const grpcCallDeferred = deferred<GrpcCallResultWire>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real grpcCall
     (control as any).grpcCall = () => grpcCallDeferred.promise;
-    const callPromise = call(id);
+    const callPromise = grpcRequestViewStore.call(id);
     await Promise.resolve();
     await Promise.resolve();
-    const opId = runtime[id]?.opId as string;
+    const opId = grpcRequestViewStore.runtime[id]?.opId as string;
 
     let seq = 0;
     function pushBatch(n: number): void {
@@ -219,11 +229,11 @@ describe('live-stream message buffer (P21 round 2 performance finding 6)', () =>
 
     for (let i = 0; i < 156; i++) pushBatch(64); // 156 * 64 = 9 984
     pushBatch(16); // exactly 10 000 — right at the cap, no trim triggered yet
-    expect(runtime[id]?.messages.length).toBe(10_000);
+    expect(grpcRequestViewStore.runtime[id]?.messages.length).toBe(10_000);
 
     pushBatch(1); // crosses the cap: this is the splice this test pins
-    expect(runtime[id]?.messages.length).toBe(10_000);
-    expect(runtime[id]?.trueMessageCount).toBe(10_001);
+    expect(grpcRequestViewStore.runtime[id]?.messages.length).toBe(10_000);
+    expect(grpcRequestViewStore.runtime[id]?.trueMessageCount).toBe(10_001);
 
     grpcCallDeferred.resolve(terminalResult());
     await callPromise;

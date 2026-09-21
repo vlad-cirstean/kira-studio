@@ -24,19 +24,21 @@ import ResponseFindBar, {
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
 import CallHistoryList from './CallHistoryList.vue';
-import { backToLatestGrpc, ensureGrpcHistoryFresh, grpcHistoryRuntime } from './history';
-import { runtime } from './state';
+import { useGrpcCallHistoryStore } from './history';
+import { useGrpcRequestViewStore } from './state';
 
 // D14: three segments — Messages · Metadata · History — and deliberately no Raw, no Timeline (D14
 // answers P9 OQ-9/P10 OQ-8: absent, not a degraded pane — the message list and this status line
 // already are the honest view for this protocol, F7).
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
+const grpcRequestViewStore = useGrpcRequestViewStore();
+const grpcCallHistoryStore = useGrpcCallHistoryStore();
 
-const rt = computed(() => runtime[props.tab.id]);
-const historyRt = computed(() => grpcHistoryRuntime[props.tab.id]);
+const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
+const historyRt = computed(() => grpcCallHistoryStore.runtime[props.tab.id]);
 
 onMounted(() => {
-  ensureGrpcHistoryFresh(props.tab.id);
+  grpcCallHistoryStore.ensureGrpcHistoryFresh(props.tab.id);
 });
 
 watch(
@@ -44,7 +46,7 @@ watch(
   () => {
     const hrt = historyRt.value;
     if (hrt) hrt.entries = null;
-    ensureGrpcHistoryFresh(props.tab.id);
+    grpcCallHistoryStore.ensureGrpcHistoryFresh(props.tab.id);
   },
 );
 
@@ -166,7 +168,7 @@ watch(
 );
 
 function onBackToLatest(): void {
-  backToLatestGrpc(props.tab.id);
+  grpcCallHistoryStore.backToLatestGrpc(props.tab.id);
 }
 
 // P22b D14: find-in-message — HTTP's own ResponsePane.vue find bar (P16 D11), applied to the one
