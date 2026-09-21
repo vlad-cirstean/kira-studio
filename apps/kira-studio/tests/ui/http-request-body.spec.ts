@@ -99,7 +99,7 @@ test('Http request body — form-data with a real file field sends a path, never
 }) => {
   const PICKED_FILE = {
     canceled: false,
-    file: { path: '/tmp/report.csv', name: 'report.csv', size: 2048 },
+    file: { path: '/tmp/report.csv', name: 'report.csv', size: 4 * 1024 * 1024 },
   };
   const CONTROL: ControlSnapshot[] = [
     { channel: IPC.filesChooseOpen, response: PICKED_FILE },
@@ -122,7 +122,7 @@ test('Http request body — form-data with a real file field sends a path, never
   await rows.nth(1).locator('[data-testid="http-formdata-name"]').fill('upload');
   await rows.nth(1).locator('[data-testid="http-formdata-choose-file"]').click();
   const fileCaption = rows.nth(1).locator('[data-testid="http-formdata-file-caption"]');
-  await expect(fileCaption).toHaveText('report.csv (2.0 KB)');
+  await expect(fileCaption).toHaveText('report.csv (4.0 MB)');
   // Finding 7: the caption shows only the basename — the full path (a shared collection could
   // point this at an arbitrary local file) must still be auditable somewhere before Send.
   await expect(fileCaption).toHaveAttribute('data-kira-tip', '/tmp/report.csv');
@@ -146,11 +146,12 @@ test('Http request body — form-data with a real file field sends a path, never
 
   // The load-bearing assertion (D4/F7): the picked file's bytes never crossed the bridge — every
   // call this test made (a no-args call logs `args: undefined`, which JSON.stringify reports as
-  // `undefined`, not a string — treated as 0 bytes) carries only short metadata, never anything
-  // file-sized.
+  // `undefined`, not a string — treated as 0 bytes) is bounded against the picked file's own size,
+  // so no logged argument can be carrying it. A regression that actually put the file on the wire
+  // would carry the file's bytes (base64-inflated, so even larger) and fail this bound.
   for (const entry of control.log()) {
     const size = entry.args === undefined ? 0 : JSON.stringify(entry.args).length;
-    expect(size).toBeLessThan(500);
+    expect(size).toBeLessThan(PICKED_FILE.file.size);
   }
 });
 
