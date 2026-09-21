@@ -49,10 +49,9 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
 | Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
-| Code parsing (C1, extraction fixes C2) | `github.com/tree-sitter/go-tree-sitter` (the official cgo binding) plus ten upstream grammar modules — java, python, javascript, typescript+tsx, go, rust, html, css, json, svelte, all MIT | `internal/codeparse` is the only package in the repo importing tree-sitter, and the only unconditionally-cgo one (every other cgo file in the app is a `darwin && cgo`-gated exception, below) — a real, priced cost: a C compiler becomes a build requirement for this package and anything importing it, and `CGO_ENABLED=0` no longer builds such a caller. Declined every pure-Go alternative found: `gotreesitter` is a from-scratch reimplementation of the parse-table interpreter and every external scanner (3.9x slower per its own README, with 3 of 206 grammars already degraded), a materially different risk than `modernc.org/sqlite`'s mechanical transpilation of the same upstream C; `malivvan/tree-sitter` (a wasm build under `wazero`, the right architecture) is 5 stars/3 commits/self-described pre-release; building that wasm ourselves would mean owning a toolchain and a regeneration script for a capability the packaged darwin build already has via cgo. Every grammar reports ABI 14, inside the binding's own compatible range [13, 15] (`TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION`/`TREE_SITTER_LANGUAGE_VERSION`), checked at construction. Binary size delta measured the same way P11's own gRPC dependency was (a minimal program against a `println` baseline, `linux/amd64`, no flags): **+6.6 MB** for the grammar registry alone. Vue has no grammar of its own (no Go module exists) and is parsed as an HTML container with per-block injection instead. **C2** compiles TypeScript and TSX against javascript's own vendored `tags.scm` first, then their own — upstream ships the TypeScript file as an *addition* to the JavaScript one (signature/abstract/interface patterns only, no `; inherits:` header), so the TypeScript file alone indexed almost nothing; composing both is what makes a plain class, function, method or call show up in a `.ts`/`.tsx` file at all. C2 also adds four small repo-authored `queries/<lang>/c2_implements.scm` files (TypeScript, TSX, JavaScript, Python) beside the vendored `tags.scm`s — recovering `implements`/`extends`/base-class relationships no vendored pattern expresses for those four languages, through the same `@reference.implementation` capture Java and Rust's own vendored queries already use. Not the only hand-written query text in the package any more: P64 (type aliases/enums/module consts, TypeScript/TSX) and P64b (package-level const/var for Go, module consts for JavaScript, a widened constant value list for TypeScript/TSX) each add their own repo-authored `p64[b]_declarations.scm` files beside `c2_implements.scm` — `queries.go`'s own `Provenance` table is the current, authoritative list of every repo-authored query file (§4.1's own "no hand-written queries" gets a narrow, named exception here, tracked there rather than re-counted in prose as the set keeps growing) |
-| MCP servers (C3, second server M1) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/repomap`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. Binary size delta measured the same way as `codeparse`'s own row, above, comparing the whole `cmd/kira-studio` binary before/after (no separate helper binary exists, see the `internal/repomap` section below): **+12.38 MB** (`linux/amd64`, unstripped) for `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) — measured at C3, marking the SDK's own arrival in the graph; `internal/dbmcp` (M1) is app code on top of that same already-linked graph, not a new dependency tree, so this figure is not re-measured for the second server |
-| Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). All 84 basic languages Monaco ships get a registered Monarch grammar as of P67c (`views/repo/monacoEntry.ts`'s own `register.all.js` import, up from 19); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs and navigation (C6)" below |
-| Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own three substring filters (`CommandPalette.vue`, the tree's own name filter, `search_files`'s SQL `LIKE`) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
+| MCP server (M1; the repo-map MCP server this row used to also cover was removed in v1.9 P97) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/dbmcp`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. The original **+12.38 MB** (`linux/amd64`, unstripped) binary-size measurement at C3 covered `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) together; it is now historical, since `internal/repomap` is gone and `internal/dbmcp` (M1) was always app code on top of the same already-linked SDK graph, not a separate cost of its own — not re-measured for that reason |
+| Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). All 84 basic languages Monaco ships get a registered Monarch grammar as of P67c (`views/repo/monacoEntry.ts`'s own `register.all.js` import, up from 19); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs (C6)" below |
+| Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own substring filters (`CommandPalette.vue`, the tree's own name filter) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
 | Git graph in the native workspace (C10) | The four `packages/*` workspaces the VS Code extension already used — `@kira/git-ui`, `@kira/git-ipc`, `@kira/git-core`, `@kira/kira-ui` — added to `apps/kira-studio/frontend/package.json` as `workspace:*`, plus `seti-icons` (a `git-ui` dependency) | No reimplementation and no new runtime dependency of its own: `git-ui` publishes `main: ./src/index.ts` and compiles from source the same way `@shared` does, so there is no separate build step, but its `.vue` files now typecheck under `typecheck:web` too. Statically imported (`RepoGraphView.vue`), not behind a dynamic `import()` boundary — the graph is the pinned first tab of every repo workspace, not an occasional feature — so its cost lands in the eager `index-*.js`/`index-*.css` bundle rather than a lazy chunk: measured (`bun run build`, this phase's own before/after), **+507 KB raw / +159 KB gzip** JS and **+72 KB raw / +11 KB gzip** CSS, plus one new `layout.worker-*.js` chunk (5 KB raw, git-ui's own graph lane-layout worker, loaded as a Worker script the same way `editor.worker` already is, so it carries no separate gzip line). The `monacoEntry-*.js` chunk (C5/C6) is untouched — Monaco's own dynamic-import boundary is unaffected. See "Git graph in the native workspace (C10)" below |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
@@ -453,10 +452,8 @@ connection-flow change out of scope for this pass.
 ## Storage
 
 `~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`), `logs/`, the git module's own
-`review.db`, `codeindex.db` (plus its `-wal`/`-shm`), `git.sock`/`git.sock.lock`, the
-per-repository sync flocks `codeindex-sync-<12 hex>.lock`, the repo-map MCP tokens
-`mcp-repo-map-*-token.json`, and the DB MCP server's own token `mcp-db-token.json` (one per
-`KIRA_HOME`, no slug) — each covered in its own paragraph below.
+`review.db`, `git.sock`/`git.sock.lock`, and the DB MCP server's own token `mcp-db-token.json` (one
+per `KIRA_HOME`, no slug) — each covered in its own paragraph below.
 
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
 Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
@@ -898,276 +895,6 @@ and `review_comment`, the flat file/line AI-comment list, anchored by both a com
 path's blob oid at that commit. Sessions are purged after 14 days idle — returning after that
 window starts clean, by design rather than as an error case.
 
-### Code parsing and the code graph (C1/C2)
-
-**A third SQLite file, `codeindex.db`, the same reason as the second (C1).** The tree-sitter parse
-cache — per-file declarations, references and injected-block ranges over every repository this
-process has indexed — lives in its own file for the same lifecycle reason `review.db` does:
-order-of-100-MB, rewritten constantly, nothing like settings/tab state, and `kira.db`'s own
-`SetMaxOpenConns(1)` would serialise a reindex behind every debounced tab save. Unlike `review.db`,
-this is **one shared file across every repository**, not one review session's own state — every
-table carries a `repo_id` column instead, `SetMaxOpenConns(4)` matches the reindex worker pool's own
-size, and dropping one repository's data is `DELETE FROM file WHERE repo_id = ?` (cascading to its
-blocks/symbols/references) rather than a file removal, reclaimed afterward by the same
-`_auto_vacuum=INCREMENTAL` pragma every SQLite file in this app already sets. WAL matters more here
-than anywhere else in the app: C3's MCP server is a **separate process** reading this file while the
-studio app writes it. A stored `meta.parser_fingerprint` (a hash over every grammar module version
-actually linked, an `extractionVersion` constant bumped whenever a change to `codeparse`'s own
-extraction logic — not a grammar or query change, both already covered — would alter what a parse
-produces, plus every vendored *and* repo-authored query file's own bytes) is checked on every sync;
-a mismatch truncates and rebuilds that one repository's rows rather than trusting them under a
-changed extraction contract. A repository untouched for 14 days has its rows swept the same way, on
-any open, the same idle window `review.db` uses. **C3's repo-map MCP server has two independent
-instances that can each open this file at once** — an embedded one inside this app's own process
-and a headless one (`bun run mcp:repo-map`), below — and a per-repository lock file,
-`${KIRA_HOME}/codeindex-sync-<first 12 hex of sha256(repo_id)>.lock`, keeps two instances from
-parsing one repository's initial sync twice; WAL, `_busy_timeout` and the connection pool are what
-make the file itself safe under that, unchanged from C1's own design, and each batch transaction
-also retries a bounded number of times (5 attempts, 200ms backoff) on SQLite's BUSY/LOCKED result
-code before giving up (P64c §2.3) — resilience insurance for a transaction that loses the write-lock
-race past `_busy_timeout`, not something the normal path ever hits. **P64c overlaps `Sync`'s parse
-and write phases**: a single writer goroutine batches `FileWrite`s into `replaceFileBatch`-sized
-(256) transactions as the parse worker pool produces them, streamed over a batch-wide buffered
-channel, instead of materializing every write into one slice before any of them land — parse and
-write cost about the same (~1.7s each on this repository), so overlapping them recovers close to
-the smaller of the two rather than paying both in sequence. Measured on this repository (1848 files,
-4 CPUs, this checkout): a cold full `Sync` is **~2.3-2.5s**, down from ~3.5s sequential, and peak
-retained heap during the pass drops from the whole repository's parse output (order of 150 MiB) to
-about one batch. **Schema version is 2 as of
-C2**: `reference` also
-carries the identifier's own range (`name_start_byte`/`name_end_byte`/`name_start_row`/
-`name_start_column`), separate from the reference node's own range — for a Java `method_invocation`
-or a JavaScript member call, that node range starts at the receiver, before the method name, so a
-cursor placed on the name itself matched nothing before this. The migration
-(`0002_c2_reference_name_range.sql`) is a `DELETE FROM file` (cascading to every table below it)
-plus a `DROP`/`CREATE TABLE reference`, not an `ALTER TABLE ... ADD COLUMN` — a defaulted column
-would leave every pre-existing row claiming an identifier at byte 0, and since the fingerprint bump
-above rebuilds those rows at the next `Sync` regardless, a briefly *empty* cache beats one that is
-briefly *wrong*. `reference.kind` is unconstrained `TEXT`, so P78's three new kinds (`field`,
-`receiver`, `embed`) needed no migration of their own — by construction, a new reference kind never
-does — and the new repo-authored query file that emits them flows into `meta.parser_fingerprint`
-automatically, since the fingerprint already hashes every query file's bytes. See
-`internal/codegraph`, directly below, for what reads this range.
-
-**`internal/codegraph` (C2) computes the code graph live over `codeindex.db`'s own rows — no edge
-table, ever.** `Graph` is built from a `*codeindex.Store` plus a `repo_id`, never from an `Index` —
-the same seam that lets C3's repo-map MCP server (below) open the identical file and, in its
-degraded no-`git` mode, answer without a worktree present at all; `Sync` writes `meta.repo_root` on
-every pass precisely so that path can map to a `repo_id` with no `gitclient.Runner` in hand. An edge table would be
-derived, cross-file state: saving one file can change which definition a reference in an
-*unrelated* file resolves to (resolution can fall back repository-wide), so keeping it correct
-would mean recomputing far more than the changed file on every save — against a watcher whose
-`ChangedRanges` is already best-effort. Rows stay the single source of truth; every query is a
-function over them, evaluated fresh, with no result cached across calls.
-
-Three operations, plus the search/outline companions SPEC's C3 row also needs (so C3 never reaches
-into `codeindex` directly): `DefinitionOf`, `ImplementationsOf`, `ReferencesTo`, `SymbolAt`,
-`Outline`, `SearchSymbols`, `SearchFiles`. Resolution is name plus scope-tier plus rank, **never
-type inference or import resolution** — a repository with two unrelated `Client` types gets both,
-labelled honestly rather than silently guessed. A reference resolves against every same-named
-symbol in the repository, kept only from the tightest non-empty tier of three: same file, same
-scope unit, repository-wide — confidence is `exact` (one candidate, tier 0/1), `scoped` (several,
-tier 0/1) or `repoWide` (tier 2) accordingly, and every `Target` carries the rule that placed it
-(e.g. `sameFile.enclosing`, `sameDirectory`, `repoWide`) for a caller to render or log. The scope
-unit and its one extra rule are per language family:
-
-| Language family | Scope unit (tier 1) | Extra rule |
-|---|---|---|
-| Go | directory (a package) | An unexported name (lower-case first rune) never reaches tier 2 — no same-directory candidate is a real "no result," not a repo-wide guess |
-| Java | directory | A candidate whose file basename equals the name ranks first, for `type`/`class`/`implementation` references only — Java requires it for a public type |
-| Python | directory | none |
-| JavaScript, TypeScript, TSX, Vue, Svelte | file, then directory | A candidate whose file basename (minus extension, `index` excluded) equals the name ranks first — the default-export convention |
-| Rust | file, then directory | none |
-
-Stated plainly, the graph's own honest limits: two same-named methods on unrelated types are
-indistinguishable for every language but Go — `queries/go/p78_method_sets.scm` stores a `receiver`
-reference per method declaration, and `resolve.go`'s own `sameReceiver` tiebreak demotes (never
-filters) a candidate method on a different receiver type, computed only when the reference site
-itself sits inside a Go method, and only after `filterTier` has already narrowed to the winning tier
-(cheaper: `sameReceiver` is read only by the ranking below, so computing it earlier would spend a
-full reference read per candidate outside the winning tier for nothing). A Java/JavaScript
-member call's stored reference range starts at the receiver, so a cursor placed before the method
-name still resolves through the wider node span rather than the identifier itself; a builtin or an
-external (`node_modules`) name resolves to nothing rather than erroring; and a same-name shadowing
-local is not distinguished from its outer binding beyond same-file containment order, since no
-`locals.scm` exists to tell them apart.
-
-`ImplementationsOf` answers "explicit `implements`/`extends`/base-class relationships," differently
-per language because the stored evidence differs: Java, TypeScript, TSX, JavaScript and Python
-recover an implementer by containment (the innermost enclosing symbol around an `implementation`
-reference elsewhere named the target, and the same rows read the other way for what a concrete type
-itself declares); Rust has no containing symbol to recover at all, so every matching reference *is*
-the impl block's own location, reported directly; Go is answered structurally, by method set (P78),
-since Go has no `implements` keyword to recover in the first place:
-
-- `methodSet(ctx, typeName, depth)` (`internal/codegraph/methodsets.go`) assembles a type's methods
-  from ordinary stored rows and walks embedding (a struct's embedded field, an interface's
-  `type_elem`) to a depth cap of **8**, with a cycle guard so mutual embedding terminates.
-- Candidate discovery is seeded by `rarestGoMethodName` — the wanted method with the fewest
-  `FindSymbolsByName` rows — an accepted bounded-cost heuristic. A type that owns the seeded method
-  only through promotion is invisible to the forward search (Known open items, below).
-- Matching is **by method name only, never by signature**. Confidence is always `Scoped`; the rule
-  strings are `implementationsOf.goMethodSet` / `…goMethodSet.promoted`. No case claims `Exact`.
-- The reverse direction (`goInterfacesSatisfiedBy`) unions candidates over every name in the
-  concrete type's method set, not one rarest name — seeding from one name is sound only in the
-  forward direction, since an interface needs only a subset of the concrete type's methods.
-- A depth-cap/cycle-guard truncated result is not memoised: `methodSet` returns a `truncated` bool
-  threaded through every call site, and the memo write is gated on it, so a truncated answer never
-  poisons a later unrelated lookup.
-
-None of this added an edge table or a schema column — every query above stays a function over rows,
-evaluated fresh per call, per this section's own "no result cached across calls" rule above.
-
-A Vue/Svelte SFC's `<script setup>` block is an ordinary module for every one of these operations —
-a definition there has a `block_id` and participates in cross-file resolution exactly like a `.ts`
-file. A position inside a `template` block has no reference row to hit at all (no vendored query
-emits one for HTML/Vue/Svelte template regions), so `DefinitionOf` falls back to the caller's own
-word-under-cursor name, resolved against the same file's symbols — SPEC's own stated navigation
-case, at the cost of one optional field and no new parsing. Nothing cross-component resolves: no
-prop flow, no Angular DI, no JSX element-to-component edge — each would need a type system or a
-hand-written identifier query this phase never adds.
-
-### The repo-map MCP server (C3, P64-P69d)
-
-**`internal/repomap` (C3) is an MCP protocol server in front of `codegraph.Graph` — no new parsing,
-no new resolution logic, just a wire format.** `github.com/modelcontextprotocol/go-sdk` (Apache-2.0,
-the protocol org's own reference implementation, v1.7.0) over MCP's Streamable HTTP transport, never
-stdio: the server is one long-running process serving as many concurrent clients/tool calls as
-connect, not a process spawned fresh per client (stdio ties one process to one client by
-construction, which is the wrong shape for "an agent keeps calling this while it works"). Seven
-tools, one per `codegraph` operation this chapter's own SPEC row names plus `outline_file` and
-(P64) `read_symbol` — `find_definition`, `find_references`, `find_implementations`,
-`search_symbols`, `search_files`, `outline_file`, `read_symbol` — each a thin argument-to-`Query`
-translation (`locator.go`'s five resolution rules: an explicit `file`+`line`, a `file`+`symbol`
-hint, or `symbol` alone resolved through `SearchSymbols`, ambiguity returned as candidates rather
-than a silent top-hit guess) and a grep-like text rendering (`render.go`) that prints every
-`Target`'s own `Rule`/`Confidence` rather than hiding C2's honesty markers behind a clean-looking
-result. `read_symbol` is the one tool that returns a declaration's own bytes rather than a
-position: the same locator resolves a target, then `source.go`'s `readSymbolRows` returns its
-exact indexed extent (start/end row, already stored, previously surfaced nowhere) plus a
-backward-walked doc comment — bounded by `maxLines`/64 KiB, `[stale]`-marked the same way a C8 hit
-line is. **P67f (§2)**: every handler waits out a full reindex, not only the initial one — a tool
-call blocks on `codeindex.Index.SyncSettled()` under the same 25s bound `waitReady` already used for
-the initial sync, and returns "is reindexing … retry shortly" rather than an empty result if a
-watcher-triggered rescan is still running past it. A response also carries a one-line `index
-degraded: the last full sync of … failed (…); results may be incomplete.` prefix while the last full
-sync stands failed — the one window (a failed sync, never retried) nothing can wait out — clearing
-itself the moment a later sync succeeds; empty and costs nothing in the normal case.
-
-**P64b's Go package-level `const`/`var` are indexed as definitions with reference rows for a
-`range`/index-expression, call-argument, binary-operand or Go slice-bound read; a selector base or an
-assignment RHS still returns empty by construction.** Go's grammar has no `const_identifier` node
-kind distinguishing a constant's use from any other identifier use, so a name-based capture has to
-pick specific grammar positions rather than "every read" — the two uncaptured shapes are the honest
-answer for those positions, not "unused." **P67f (§3)** first narrowed this to a `range` clause's own
-operand and an `index_expression`'s operand (`queries/go/p67f_reads.scm`, and
-`queries/javascript/p67f_reads.scm` for JavaScript/TypeScript/TSX/Vue alike) — the shape a session
-asking "where is this allowlist actually read?" needs and the one the P67e dogfooding log's own repro
-hit. **P69b** (`docs/v1.6/plans/P69b-repo-map-bare-identifier-reads.md`) added the commonest read
-shape of all — a bare identifier passed as a call argument or used as a comparison/arithmetic
-operand — plus Go's own slice bounds (`raw[:n]`) and slice operand. The capture alone is not
-shippable: a bare identifier carries no import or qualification evidence, so without a resolver
-change it over-matches badly (measured: `find_references {"symbol":"path"}` went from 2 correct hits
-to 589 wrong ones, unrelated same-named locals repo-wide). `resolveName` (`codegraph/resolve.go`)
-now clamps a `"read"` reference's candidates to tier ≤ 1 (same file or same directory) before
-resolving — every read site any of these patterns capture is already tier ≤ 1 by construction (a
-package-level constant is consulted inside its own package), so this closes the over-match without
-losing real capability, and brought the `path` case to 0 cross-directory false positives. A blanket
-`identifier`/`field_identifier` reference pattern covering every remaining read position (a selector
-base, an assignment RHS) was measured and declined each time it came up: P64b's own whole-identifier
-measurement (257,971 new reference rows for Go alone against a then-current whole-repo total of
-134,068, a 2.9x blowup), P67f's narrower one (selector-base reads alone, 64,652 rows for one position
-against the range/index fix's own ~3.7k), and P69b's own (argument/operand/slice rows: +62,904 `read`
-rows, +44.3% total reference rows, scoped to this repo's own `repo_id`) — a name-based resolver
-ranking every local `err` as a candidate either way, and the tier clamp narrows what a cross-directory
-read can answer rather than removing the ambiguity a selector base or an assignment RHS would add.
-`find_definition`, `search_symbols`, `outline_file` and `read_symbol` all work normally for these;
-`find_references` now answers for every read shape this section names except a selector base and an
-assignment RHS.
-
-**M1c (`docs/v1.7/plans/M1c-repomap-struct-field-fix.md`) indexes Go struct fields, TS/TSX
-interface/type-literal/class members and JS class fields as definitions, and a plain `x.Field`
-selector or `obj.prop` member read — not just one in call position — as a `"field"` reference.**
-Before this, neither half existed: a struct/class field was never a symbol at all, and only a
-selector/member sitting in a call's own function position (`c.Greet()`) earned a reference row. A
-`"field"` reference is its own kind, deliberately outside the `"read"` kind's tier ≤ 1 clamp above —
-a selector names its member explicitly, unlike a bare identifier, so it carries the qualification
-evidence a cross-directory read needs and is not subject to the same over-match risk. The previously
-declined **selector base** measurement (the `x` in `x.Field`, priced in the paragraph above) stays
-declined; M1c captures the field half only, a different position.
-
-**C8 adds one source line under each hit — the one place this server reads a file's own bytes,
-never a whole file.** `find_definition`, `find_references`, `find_implementations` and
-`search_symbols` (plus the ambiguous-candidates list, since disambiguating between same-named
-symbols is exactly what a source line is for) each follow a hit line with the literal line of code
-at that position, indented four spaces: `source.go`'s `Server.sourceFor` groups hits by file and
-reads each in one forward pass (`bufio.Reader.ReadSlice`, not `bufio.Scanner`, so one
-minified/vendored line's own length can't silently drop every later hit's source line in the same
-file), through `internal/pathsafe`'s containment check. A line is truncated at 512 bytes with a
-trailing `…` (truncated, never omitted — an over-long line's head is still informative), staleness
-is stamped by comparing the indexed row against `os.Stat` (`codeindex.FileRow.MatchesDisk`, the same
-rule `Index.isStale` uses) and printed as a `[stale] ` prefix, and every failure mode (a deleted
-file, a symlink escaping the repository, a NUL byte) degrades to a `[no source: <reason>]` note
-rather than an error — a navigation answer never turns into a tool failure because a file changed
-underneath it. `omitSource` restores the exact pre-C8 compact shape for a caller that wants it.
-`outline_file` is unchanged, so its own "without reading its bytes" still holds and is the sentence
-naming the cheap tool — `search_files` is no longer, since P64 adds a per-row line count to its own
-output, and P64's own `read_symbol` reads bytes by design, the one deliberate exception to "never a
-whole file."
-
-**Two independent instances of the same server code, never a shared listener.** *Embedded*: started
-and stopped by this app's own process, in step with the `codeIntel.mcpServerEnabled` setting — on
-while the app is running and the toggle is on, off the moment either isn't (`internal/bridge/
-repomap.go`'s `RepoMapService`, `main.go`'s own `StartRepoMapIfEnabled`/`StopRepoMap` calls beside
-`gitSock.Start`/`Close`). **P67d: one embedded `repomap.Server` now serves however many imported
-repositories (`code_repos`) a user grants MCP access to, not the one repository that happened to
-match this process's own working directory** — the toggle is general, matching the reported bug
-(`internal/repomap` split into `Server`, the transport/token/tool-registration/instance-registry
-owner, and a `repoInstance` per attached repository — index, graph, watcher, sync lock, readiness
-gate — `internal/repomap/instance.go`/`attach.go`). `RepoMapService.attachGrantedLocked` attaches
-every granted repository on enable (and on each new grant while running); `SetRepoEnabled`
-grants/revokes one repository, attaching or detaching its live instance immediately if the server is
-running; removing or renaming an imported repository revokes/re-keys its live grant immediately too
-(`CodeWorkspaceService.OnRepoRemoved`/`OnRepoRenamed`, wired in `main.go`). Every navigation tool
-takes an optional `repo` argument (the repository's own derived key, from its `code_repos.name`) —
-resolved by `Server.pick` when omitted: the sole attached repository if there is exactly one, else
-an error naming every attached key; a new eighth tool, `list_repos`, lists them. *Headless*: `bun run
-mcp:repo-map`, a wholly separate OS process, not managed by any setting, resolving its own repository
-from `--repo` or its own cwd via `AttachDir` (unchanged) — the path C4-C6 use for developing on this
-repo, or any repository, without the GUI open; still exactly one repository attached at startup.
-Each instance binds its own port (a fixed default first, an OS-assigned ephemeral one on conflict —
-never `0.0.0.0`, always `127.0.0.1`). Token files diverge by design since P67d: the embedded
-instance now mints/loads **one app-scoped token** covering every granted repository
-(`mcp-repo-map-app-token.json`, `mcpauth.Path(home, "app")` — an explicit enable uses
-`mcpauth.LoadOrMintTTL(…, mcpauth.TTL)`, not an unconditional fresh `MintTTL`, since one registration
-now covers every grant and a toggle-off-and-on must not silently invalidate it; the explicit
-Regenerate action is the one way to force a fresh one). Every token now carries a fixed **7-day**
-expiry (`mcpauth.TTL`, M1) applied uniformly to both servers, with `Record.ExpiresAt` zero meaning
-"not yet stamped" so a pre-M1 file on disk is stamped on load with no migration and no file-format
-version. Rotation happens only at a moment a human can read the fresh plaintext — server start, or
-an explicit Regenerate — never mid-flight. A lapsed token gets a distinct, actionable message rather
-than a bare 401: `mcpauth.TokenVerifier` names the server (`"kira-repo-map"` or `"kira-db"`) and the
-expiry instant, and points the caller at the re-registration command Settings shows.
-
-The headless binary keeps its original one-token-per-repository files (`internal/mcpauth`:
-`crypto/rand`, base64url on the wire, `sha256(salt‖token)` at rest —
-`git_clients`' own trust-store shape, one JSON file per instance under `KIRA_HOME` rather than a
-database table, since `kira.db` is never opened by this server package and a `codeindex.db` table
-would mean a second connection pool for a two-column read). Every request is checked — the SDK's own
-`auth.RequireBearerToken` middleware wraps the tool handler, itself wrapped in `http.
-NewCrossOriginProtection()` (P67d §4: the SDK applies DNS-rebinding protection by default but not
-cross-origin protection) — because a loopback TCP port, unlike `git.sock`'s Unix domain socket, is
-any local process's for the asking regardless of who is meant to be the only caller.
-
-**Registration is Claude Code CLI only** (`internal/mcpinstall`, `claude mcp add --transport http
---scope user <name> <url> --header "Authorization: Bearer <token>"`, verified against the real CLI):
-the Settings dialog's Code intelligence tab shows the command before its Install button, never the
-reverse, and the button re-resolves `claude`'s own location fresh on every click rather than trusting
-a cached probe. No VS Code MCP registration of any kind is attempted. `internal/mcpinstall` is reused
-as-is by the DB MCP server's own Settings section (`internal/bridge/dbmcp.go` takes the same
-`RepoMapInstaller` interface rather than declaring a second, identical one), which shows its own
-command before its own Install button the same way.
-
 ### The native code workspace (C5-C9)
 
 **Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
@@ -1203,15 +930,13 @@ the nav-level reason (a repository is an instance inside the Git module, not a s
   (`views/repo/RepoGraphView.vue`, no stubbed handler, no `TODO`); **C10 replaced the
   `TAB_VIEWS['repo-graph']` mapping** (`workbench/tabViews.ts`) with the real `packages/git-ui`
   mount (`RepoGraphTabView`).
-- **The file list is `codeindex.EnumerateAll`** (`internal/codeindex`, C1's own `Enumerate`
-  widened to drop its parseable-extension filter, D6) — the same `git ls-files -z --cached --others
-  --exclude-standard` argv, so a project tree and C1's own parse pipeline can never disagree about
-  what ".gitignore semantics" means. Capped at 200,000 paths (an honest IPC-payload limit, not a
+- **The file list is `codeworkspace.EnumerateAll`** (`internal/codeworkspace/enumerate.go`) — the
+  same `git ls-files -z --cached --others --exclude-standard` argv the search scanner also uses (§C7,
+  below), unfiltered by extension (D6). Capped at 200,000 paths (an honest IPC-payload limit, not a
   UI virtualization one — `theme/primitives/TreeHost.vue` already virtualizes the rendered rows).
-  **Refresh is on workspace open and an explicit Refresh action only — nothing live.** `codeindex`'s
-  own worktree watcher covers only directories holding parseable files (C1's own scope), which is
-  not the signal a *complete* file tree needs, and a second worktree watcher just for a tree refresh
-  would spend a watcher's worth of complexity on a button (Known open items, below).
+  **Refresh is on workspace open and an explicit Refresh action only — nothing live**: there is no
+  worktree watcher of any kind, so a change made outside the app is picked up only on the next open
+  or an explicit Refresh.
 - **Read-only, enforced in three places**, each independently: the bound service
   (`internal/bridge/codeworkspace.go`, `CodeWorkspaceService`) has no write method at all, and
   every git invocation inside `internal/codeworkspace` builds its `gitclient.Spec` with
@@ -1225,10 +950,10 @@ the nav-level reason (a repository is an instance inside the Git module, not a s
   repository can contain a symlink pointing anywhere on the machine, so resolving before the
   containment check (not after joining alone) is what actually prevents this read-only viewer from
   being used to read `~/.ssh/id_rsa`. `internal/codeworkspace/paths.go` keeps the name as a
-  two-line delegate (`internal/pathsafe`'s own doc comment covers why: a leaf package, this
-  package's precedent, so `internal/repomap`'s source-line reader can validate a path without
-  pulling all of `codeworkspace` — `catfile`/`porcelain`, the whole `Session` type — into the
-  headless `cmd/kira-repo-map` binary for one pure function).
+  two-line delegate (`internal/pathsafe`'s own doc comment covers why: a leaf package, so a
+  consumer that only needs this one containment check — `codeworkspace/search.go`'s repository-wide
+  scanner is the other one — never has to pull in `catfile`/`porcelain` or the whole `Session` type
+  for it).
 - **Monaco (`monaco-editor`, viewer-only) renders the file** — see the Stack table's own row above
   for the package-layout correction this phase found (no `edcore.main.js` in the pinned version;
   `monaco-editor/features/register.all.js` is its real equivalent) and the measured chunk size.
@@ -1268,94 +993,13 @@ the nav-level reason (a repository is an instance inside the Git module, not a s
   branch for this: `editor.defineTheme`'s `colors` values go through `Color.fromHex`, which accepts
   only hex forms and returns *red*, not an error, on anything else, and a translucent token
   (`--kira-scrollbar`, `--kira-search-match`) normalizes to `rgba(...)` before this branch existed.
-**Diff tabs and navigation (C6): a real index per open repository, go-to-definition/hover, and a
-worktree-vs-HEAD diff tab — still entirely read-only.**
+**Diff tabs (C6): a worktree-vs-HEAD diff tab — still entirely read-only.**
 
-- **The index lifecycle is a port of `repomap.Server`'s own sequence, into `codeworkspace.Session`.**
-  `Session` grows a `*codeindex.Index`, a `*codegraph.Graph`, a `*codeindex.Watcher` and a lazily-
-  built `*catfile.Session`; `EnsureIndex` starts them idempotently and returns immediately — the
-  initial sync of a large repository takes far longer than an IPC call may — closing a readiness
-  channel exactly once regardless of outcome (a failed sync still opens the gate with a partial
-  index, honest rather than hanging). Two callers: `OpenWorkspace` (the warm-up path, fired from
-  `openRepoWorkspace`/the restore loop, fire-and-forget) and `Definitions` itself, so a navigation
-  request that somehow arrives first is still correct.
-- **`Registry.Open` now reuses a session when its Root/GitPath are unchanged**, rebuilding (closing
-  the old one first) only on a real change — C5's stateless "rebuild on every request" would tear
-  down a live index and two `cat-file` processes on every tree refresh. `Registry.Close`/`CloseAll`
-  do real work now too: stopping the index, watcher and catfile session, called from
-  `CloseWorkspace`, `RemoveRepo`, and process teardown (`CodeWorkspaceService.Shutdown`, beside
-  `bridge.StopRepoMap`).
-- **The per-repository sync flock moved from `internal/repomap` into `internal/codeindex`**
-  (`SyncLock`/`AcquireSyncLock`/`SyncLockPath`, exported) — both the embedded/headless repo-map
-  server and a native workspace's own index share the identical discipline
-  (`${KIRA_HOME}/codeindex-sync-<slug>.lock`, `LOCK_EX` around the initial `Sync` only, a stuck lock
-  degrades rather than hangs) without a third copy of the same ~70 lines.
-- **Byte-to-UTF-16 conversion lives in Go** (`internal/codeworkspace/textpos.go`'s `LineIndex`) —
-  `codegraph` speaks bytes and byte columns; the workspace service is the one place that already
-  reads file bytes (`ReadFile`) and so the one place that can convert honestly. Lines split on `\n`
-  only (a CRLF line's own `\r` stays part of the line's bytes but is never itself an addressable
-  Monaco column — both directions clamp just before it); one UTF-16 unit per rune at or below
-  U+FFFF, two for a surrogate pair (a column landing between the pair's two halves clamps to the
-  first, never the second); an invalid UTF-8 byte is exactly one UTF-16 unit, not a special case,
-  since that's what `utf8.DecodeRune`'s own `RuneError`/`size==1` answer already gives; a tab is one
-  unit, never expanded; every input clamps into range rather than erroring. The renderer only ever
-  sends/receives Monaco's own 1-based line and 1-based UTF-16 column — it never sees a byte offset.
-- **Navigation resolves through `codegraph.Query.Byte`, not `.Point`** — the byte path alone carries
-  `innermostReferenceNode`, the fallback that resolves a method call when the cursor sits on the
-  method name but the stored reference range starts at the receiver (a limit `repomap`'s own
-  `Point`-only path, forced there by having no bytes, cannot avoid). `Definitions`
-  (`internal/codeworkspace/nav.go`) checks the index's readiness non-blocking — an in-flight sync
-  answers `status: "indexing"` immediately, never a wait, since a hover that hangs is worse than one
-  that says "still building" and gets asked again on the next dwell — and answers `"unavailable"`
-  for a file the index genuinely has no row for (an unparsed language, C1's 2 MiB parse cap, a path
-  added since the last sync), checked by a real `codeindex.GetFile` lookup rather than a string
-  match on `codegraph`'s own error text.
-- **One provider pair answers both hover and go-to-definition** (`views/repo/navigation.ts`) —
-  `Definitions` returns the resolved name plus every candidate `Target`; the definition provider
-  maps them to `Location[]`, the hover renders them as one `IMarkdownString` with each target's own
-  `Rule`/`Confidence` printed on every line (never only on a low-confidence one), following
-  `internal/repomap/render.go`'s own discipline that a `repoWide` guess must never read like a fact.
-  One scheme-scoped `LanguageFilter` (`{ scheme: 'kira-repo', hasAccessToAllModels: true }`) covers
-  every open repo-file/repo-diff model in every registered language plus plaintext.
-  `gotoLocation.multipleDefinitions` is `'goto'`, never Monaco's default `'peek'` — kept as a
-  deliberate preference (the hover already lists every candidate), not a workaround: standalone
-  Monaco's peek preview used to resolve a candidate through `ITextModelService`, which in the
-  standalone build only found already-created models, so a cross-file candidate with no open tab
-  rendered an empty preview pane (the real cause of a missing modifier-click underline and preview —
-  the click itself already worked, since the editor opener needs no model at all). P78 §1.4 closed
-  that gap: `views/repo/textModels.ts` installs a `kira-repo`-aware `ITextModelService` at Monaco
-  bootstrap, resolving a tab-owned URI through `mod.editor.getModel` and an unopened `kira-repo` URI
-  by reading the file over `codeWorkspaceReadFile` and routing it through the same
-  `getOrCreateModel` cache a later tab open reuses. `find-references` and `go-to-implementation`
-  both use it too, and both render through Monaco's own peek UI —
-  `gotoLocation.multipleReferences`/`multipleImplementations` are `'peek'` in both `RepoFileView.vue`
-  and `RepoDiffView.vue`, definitions alone stay `'goto'`.
-- **The preview-model registry is a capped LRU.** `textModels.ts` keeps at most `PREVIEW_MODEL_LIMIT`
-  (40) models created with no owning tab, refcounting live holders so an open peek's model is never
-  disposed under it (P79 review fix — the returned `dispose()` used to be a no-op); a preview
-  promoted into a real tab leaves the registry rather than being evicted.
-- **Both new providers** (`views/repo/navigation.ts`'s `registerReferenceProvider`/
-  `registerImplementationProvider`) **use the same scheme-scoped `LanguageFilter`** as the
-  definition/hover pair above. `codegraph.Site` gained a `Confidence` field so a bare `Location[]`
-  isn't the only thing crossing the wire; `internal/codeworkspace/nav.go` gained `References` and
-  `Implementations`, with `References` deliberately never early-returning on an empty `Sites` list
-  (`Total`/`Truncated`/`Unattributed` can carry a real reading even when every occurrence is
-  unattributed); `bridge/codeworkspace.go` exposes both, `Implementations` reusing
-  `CodeWorkspaceDefinitionArgs`. The three handlers' shared preamble —
-  `resolveQueryPoint`/`resolvePosition`, including the symlink-containment guard — is one pair of
-  helpers, not three copies; security-relevant, so worth knowing it lives in one place.
-- **The hover swaps its disclaimer for a Go receiver match.** Each target's `Rule`/`Confidence` is
-  still printed on every line, under a blanket *"Name-resolved, not type-resolved"* disclaimer —
-  except `navigation.ts` swaps that line for *"Receiver-matched (Go) — signatures are not
-  compared."* when every target resolved via `sameReceiver`.
 - **Model URIs are built with `Uri.from`, not string interpolation** (`views/repo/monaco.ts`,
   `kira-repo://<repoId>/<path>`) — the editor opener has to recover `(repoId, path)` from a `Uri`
   the other direction, and a path containing a space, `#`, `?` or `%` does not survive a plain
   template-literal round trip; `Uri.from` escapes correctly and `uri.authority`/`uri.path` give the
-  decoded values back. A model's own navigability is a `WeakMap` keyed by the model object, not a
-  URI-shape check: the diff editor's HEAD-side model is deliberately never recorded (its content is
-  a different revision than the index describes, so answering a definition there would be a lie);
-  the diff's worktree side is, since it's byte-identical to what the index parsed.
+  decoded values back.
 - **The diff tab** (`repo-diff`, `views/repo/RepoDiffView.vue`) reads a path's HEAD-vs-worktree
   content (`internal/codeworkspace/diff.go`'s `ReadDiff`) — the worktree side through the existing
   `ReadFile` classification, the HEAD side through the session's own lazily-built `catfile.Session`
@@ -1377,7 +1021,7 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   anything; the diff editor computes its diff there. Measured chunk delta (`bun run build`): the
   diff contribution was already inside `register.all.js` (C5's own bundle), so the Monaco chunk size
   is unchanged by this phase — confirmed, not just assumed, against a real build.
-- **A reveal (a search result, or a go-to-definition candidate) now applies to a tab whose editor
+- **A reveal (a search result) now applies to a tab whose editor
   is already mounted and active, not only on mount** (C7 D12, `views/repo/reveal.ts`) — the case
   the paragraph above left implicit. `RepoFileView.vue` still applies its own persisted
   `state.revealLine` on mount, but `openRepoFileTab`'s reveal option now also calls
@@ -1391,14 +1035,14 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
 - **No search library — RE2 (stdlib `regexp`) plus `git ls-files` plus a bounded worker pool
   already written twice in this repo *is* the library answer.** A text search is four parts:
   pattern matching (RE2 — linear time, so a user-typed pattern can never hang the app), ignore
-  semantics (`codeindex.EnumerateAll`, the same `git ls-files -z --cached --others
-  --exclude-standard` the project tree already uses — D2), concurrency (a channel-fed worker pool
-  shaped exactly like `codeindex.Sync`'s own `parseStale`), and a scanner (`internal/codeworkspace/
-  search.go`, hand-rolled because this is where the app's own rules actually live: binary/size/
-  long-line gates, UTF-16 columns, preview windowing). An indexed engine
-  (`sourcegraph/zoekt`, `google/codesearch`) was declined for building and serving a *second* index
-  this chapter doesn't need, when the whole point is grepping the worktree as it is right now.
-- **Enumeration is unchanged and unwidened — the same `codeindex.EnumerateAll` the project tree
+  semantics (`codeworkspace.EnumerateAll`, the same `git ls-files -z --cached --others
+  --exclude-standard` the project tree already uses — D2), concurrency (a channel-fed bounded worker
+  pool), and a scanner (`internal/codeworkspace/search.go`, hand-rolled because this is where the
+  app's own rules actually live: binary/size/long-line gates, UTF-16 columns, preview windowing). An
+  indexed engine (`sourcegraph/zoekt`, `google/codesearch`) was declined for building and serving a
+  *second* index this chapter doesn't need, when the whole point is grepping the worktree as it is
+  right now.
+- **Enumeration is unchanged and unwidened — the same `codeworkspace.EnumerateAll` the project tree
   already calls.** `.git` internals are never reported (git's own rule), and a repository that
   commits its dependencies (a vendored `vendor/` tree) gets them searched, because they're part of
   what that repository is — a hardcoded skip list would be wrong in both directions, hiding a
@@ -1408,14 +1052,16 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
   containment check every other read in this chapter goes through — a search touches every file in
   the worktree, unlike the tree, which only reads what's clicked, so a committed symlink pointing
   at `~/.ssh/id_rsa` is a real risk here, not a theoretical one); a NUL byte in the first 8 KiB (the
-  identical rule `ReadFile`/`codeindex.classifyAndRead` already use) or a file over `MaxReadBytes`
-  reused verbatim (a match in a file the viewer can't open is a result nobody can click); a NUL
-  found only later, checked once per matching line rather than once per line scanned, which drops
-  the whole file including matches already collected for it.
-- **A match's column is computed by `utf16Units`, extracted out of `LineIndex.Position` (C7 S1)** —
-  the scanner has one line in hand, not a whole file, so it cannot call `LineIndex` directly, but it
-  must use the identical UTF-16 rules or a result click could land the cursor a column off on any
-  line with a non-ASCII rune.
+  identical rule `ReadFile` uses) or a file over `MaxReadBytes` reused verbatim (a match in a file
+  the viewer can't open is a result nobody can click); a NUL found only later, checked once per
+  matching line rather than once per line scanned, which drops the whole file including matches
+  already collected for it.
+- **A match's column is computed by `utf16Units`, extracted out of `LineIndex.Position`
+  (`internal/codeworkspace/textpos.go`, C7 S1)** — the scanner has one line in hand, not a whole
+  file, so it cannot call `LineIndex` directly, but it must use the identical UTF-16 rules or a
+  result click could land the cursor a column off on any line with a non-ASCII rune. This is
+  `LineIndex`'s sole surviving consumer since P97 removed the native code-navigation feature that
+  originally motivated it.
 - **Results stream over a new coalescing push channel, `kira:code:search`** — `ChannelGrpcCall`'s
   own D8 shape restated (flush on 60 ms/an accumulated match count/the terminal event, which always
   fires even on cancel), `EmitTo`'d to the one window that asked. One search in flight per
@@ -1475,18 +1121,15 @@ worktree-vs-HEAD diff tab — still entirely read-only.**
 
 - **No new enumeration — reads `repo/state/fileTree.ts`'s already-loaded `paths` array**
   (`repoTreePaths`, a five-line accessor beside `repoTreeTruncated`/`repoTreeError`). That array is
-  already `codeworkspace.ListFiles` → `codeindex.EnumerateAll`'s own output, so quick open inherits
-  the project tree's exact snapshot rather than a second, independently-stale one: refreshed on
-  workspace open and on the tree's own Refresh action, never live (Known open items, below). A
-  lower-layer read was declined on two grounds: a new Go binding would re-run `git ls-files` for
-  bytes the renderer already holds, and `codegraph`'s indexed file table (the *parseable* subset,
-  C1's own `Enumerate`) would silently exclude `README.md`, `Taskfile.yml`, every `.json`/`.md` —
-  files SPEC's row explicitly wants reachable.
+  already `codeworkspace.ListFiles` → `codeworkspace.EnumerateAll`'s own output, so quick open
+  inherits the project tree's exact snapshot rather than a second, independently-stale one:
+  refreshed on workspace open and on the tree's own Refresh action, never live. A lower-layer read
+  was declined on one ground: a new Go binding would re-run `git ls-files` for bytes the renderer
+  already holds.
 - **Matching is `fuzzysort` (MIT, 4.0.2, zero transitive dependencies), a direct dependency,
   entirely in the renderer — no Go call, no IPC per keystroke.** Every substring filter already in
-  this app (`CommandPalette.vue`, the tree's own name filter, `codegraph.SearchFiles`'s SQL `LIKE`
-  — the last one says so in its own MCP tool schema: *"not a fuzzy finder"*) was declined as not
-  fuzzy at all; Monaco's own internal `base/common/fuzzyScorer.js` was declined too — reachable, MIT,
+  this app (`CommandPalette.vue`, the tree's own name filter) was declined as not fuzzy at all;
+  Monaco's own internal `base/common/fuzzyScorer.js` was declined too — reachable, MIT,
   the literal VS Code algorithm, but shipping no typings for that module under this repo's `strict`
   config, and only the string scorer, not VS Code's item-level basename-vs-path ranking on top of
   it. Measured against this repository's own 2,176-path listing (`fuzzysort@4.0.2`,
@@ -3055,8 +2698,9 @@ GitServer (internal/gitsock)
   this paragraph claimed otherwise: a source file saved by an editor produces no event on this
   watcher at all, checked directly against `watcher_fsnotify.go`/`watcher_fsevents_darwin.go`'s own
   `newBackend`, and its output (`chan Signal`, two values) has no path to carry even if it did.
-  C1's own worktree watcher (`internal/codeindex`) is a second, independent one for exactly this
-  gap — see Storage, above, and the git-module transport row's own `fsevents` entry. Debounced
+  Nothing else in this app watches the worktree itself — the native code workspace's own project
+  tree and search are both refresh-on-demand, by design (Known open items, below), not backed by a
+  second watcher. Debounced
   200 ms, delivered to each subscriber over its own coalescing buffered channel so one slow client
   cannot stall the watcher for the others. **The darwin backend is
   FSEvents** (`gitclient/watcher_fsevents_darwin.go`, `darwin && cgo`), with the `fsnotify`
@@ -3640,13 +3284,12 @@ one.
 
 ### The server (M1)
 
-`internal/dbmcp` is a second, separate instance of the same pattern `internal/repomap` uses
-(`go-sdk/mcp`, loopback-only Streamable HTTP, `mcpauth` bearer token) — never a mode of the existing
-server. `DefaultPort` **8766**, adjacent to repo-map's 8765, with the same OS-assigned-ephemeral
-fallback on conflict (`http.go:37-43`). Two servers, not one, because they serve unrelated graphs
-with very different trust postures: repo-map is read-only by construction, this one can write and
-run DDL by design. One token file, `mcp-db-token.json`, no slug, because one instance exists per app
-process per `KIRA_HOME` (`internal/bridge/dbmcp.go:22-25`). Lifecycle is `bridge.DbMcpService` — the
+`internal/dbmcp` is an MCP protocol server (`go-sdk/mcp`, loopback-only Streamable HTTP, `mcpauth`
+bearer token) fronting the app's own database connections, this app's only embedded MCP server since
+v1.9 P97 removed the repo-map one it originally sat beside. `DefaultPort` **8766**, with an
+OS-assigned-ephemeral fallback on conflict (`http.go:37-43`). One token file, `mcp-db-token.json`, no
+slug, because one instance exists per app process per `KIRA_HOME` (`internal/bridge/dbmcp.go:22-25`).
+Lifecycle is `bridge.DbMcpService` — the
 server is constructed and started when the Settings toggle turns on (or already is, at boot) and
 stopped when it turns off or the app quits; the `ApprovalBroker` is constructed once in `main.go`
 and **outlives** the server's own start/stop, so the boot-time event subscription stays valid across
@@ -3739,9 +3382,9 @@ type-cast error routinely embeds the literal it failed on (`1ad96285`).
 
 ### The UI surfaces
 
-`workbench/SettingsDialog.vue`'s `sections` array has **eight** entries, and **`'Database MCP'` is
-its own section**, listed after `'Code intelligence'` — it is *not* part of the Code intelligence
-tab. That section holds the enable toggle, the registration command and Install button, the
+`workbench/SettingsDialog.vue`'s `sections` array has **ten** entries, and **`'Database MCP'` is
+its own section** — the app's only embedded-MCP-server settings pane since P97 removed the repo-map
+one. That section holds the enable toggle, the registration command and Install button, the
 token-expiry line, and a read-only **Exposed connections** glance (per-row read/write/DDL modes,
 auto-explain, and M5's masked-column count) with **no second editor**.
 `project/ConnectionDialog.vue`'s `DetailTab` is now **five** values — `'General' | 'Advanced' |
@@ -4111,36 +3754,11 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   window is resized once. Fixing this needs deferring startup window creation until after that
   event fires — a materially larger structural change than this fix.
 
-- **Go implementation search misses a type satisfying an interface purely through promoted
-  (embedded) methods** (P78/P79 review). Go implementations are answered by method-set comparison
-  (`internal/codegraph/methodsets.go`, above) rather than an `implements` keyword, and forward
-  candidates (`goConcreteTypesSatisfying`) come only from a literal method declaration named after
-  one of the interface's own methods — `type T struct { io.ReadCloser }` satisfying
-  `interface{ Read; Close }` is invisible, since `T` itself declares neither method. Fixing this
-  needs a materially different, more expensive candidate-discovery strategy than a review fix pass
-  covers, and is further constrained by this file's own "no edge table" rule (`codegraph.go`).
-
-- **Every parse leaks one `go-pointer` registry entry** (P69d). `go-tree-sitter@v0.25.0`'s
-  `ParseWithOptions` saves its `*ParseOptions` into `mattn/go-pointer`'s package-global map
-  (`parser.go:350`, and `:477`/`:548`/`:631`/`query.go:788`) with no matching `Unref` anywhere in
-  the package — an upstream bug, and v0.25.0 is the newest published version, so there is nothing
-  to upgrade to. `codeparse.Session` passes options on every parse (it is the only mid-parse
-  cancellation mechanism the library offers that does not SIGSEGV), so each parse permanently
-  retains one `C.malloc(1)` and one map entry: measured **75.6 B of Go heap and 239 B of RSS per
-  parse**, ≈ 0.43 MiB of RSS for one full index of this repository's 1,878 files, growing across
-  re-indexes for a process's lifetime. Not fixable in our own code: `pointer.Save` mints a fresh
-  key per call regardless of the value, so reusing one pooled `ParseOptions` still leaks one entry
-  per parse (measured 43.7 B/parse, 42% less and still unbounded) while forcing a rewrite of the
-  per-parse cancellation handoff P69c had just stabilised. Passing no options at all removes the
-  leak entirely and removes mid-parse cancellation with it. Closing this needs the upstream
-  one-line fix — `ParseCtx` is already marked for removal in 0.26, so that file is in flux — or
-  vendoring tree-sitter's whole C runtime, which `CLAUDE.md`'s library-reuse rule declines.
 - **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
   open and on an explicit Refresh action only — a file created, deleted or modified outside the app
-  is not reflected until one of those happens. `codeindex`'s own worktree watcher covers only
-  directories holding parseable files, which is not the signal a complete file tree needs, and a
-  second worktree watcher just for a tree refresh would spend a watcher's worth of complexity on a
-  button.
+  is not reflected until one of those happens. There is no worktree watcher of any kind (P97 removed
+  the only one this app ever had), so a live-refreshing tree needs one built for this purpose alone —
+  a watcher's worth of complexity on a button.
 - **`.vue`/`.svelte` files color as plain HTML in C5's Monaco viewer** (§9.4). No Monaco grammar
   exists for either, so a `<script>` block's contents color as HTML text, not as TypeScript/
   JavaScript — the alternative is a hand-written SFC Monarch grammar, which `CLAUDE.md`'s
@@ -4154,36 +3772,9 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   P67c's own `defineKiraTheme` extension means both sides resolve every overlapping name from the
   same `--kira-*` token, so a future order flip would be cosmetically harmless — but restructuring
   `vscode-bridge.css` off `:root` is its own `packages/git-ui` contract change, not attempted here.
-- **A repository open in the native workspace while the embedded repo-map MCP server serves the
-  same repository parses every saved file twice** (C6 §3.1). Two independent `codeindex.Index`
-  instances in one process, each with its own watcher, each reacting to the identical file-save
-  event. **P67d: this is now reachable for any repository a user has granted MCP access to, not only
-  the one that happened to match the app process's own cwd** — previously near-unreachable in
-  practice (the embedded instance rarely started for a packaged app at all), now a normal
-  configuration whenever a repository is both open in the Git module and granted. Still harmless —
-  `codeindex.Store.ReplaceFile` is transactional, and the shared `codeindex.db` is WAL-mode with a
-  busy timeout precisely for two pools in one process — and still bounded (one extra parse per save,
-  not per keystroke), but real; threading one `*codeindex.Index` through both features would couple
-  two independent lifecycles for a savings that has never mattered in practice (P67d §13, explicitly
-  declined). The per-repository sync *flock* (`internal/codeindex.AcquireSyncLock`) only covers each
-  side's own *initial* sync, by design — it is not a general single-parser guarantee.
-- **The repo-map MCP server's watcher is armed before its own initial `Sync` completes**
-  (`repomap/server.go:168`-`170`, P64c §1.5/§6.7): `runInitialSync` runs in a goroutine and
-  `idx.Watch()` is called immediately after, so a watcher-driven `GetFile`/`ReplaceFile` write can
-  interleave with the initial full `Sync`'s own batch transactions. Real, but not a throughput
-  problem — concurrent writers against `codeindex.db` were measured to serialize cleanly with zero
-  errors (P64c §1.5), and arming the watcher later would trade this for a worse correctness gap (an
-  edit landing during the initial `Sync` would be missed entirely, since nothing re-scans once the
-  gate opens) — closing it properly needs queueing watcher events during the initial `Sync` and
-  draining them after, watcher-lifecycle design rather than a parse-and-write throughput fix.
-- **A C6 navigation position can drift by a line if the worktree file changed after the tab
-  opened** (§4's own honest limit, `internal/codeworkspace/textpos.go`). The byte/UTF-16 conversion
-  is always computed against the file's bytes *on disk right now*, not the bytes Monaco's model
-  last loaded; the watcher keeps the index converging on the same signal, so the window is narrow,
-  but a hover or jump landing mid-drift can be off by a line until the next sync catches up.
 - **C7's repository-wide search has no include/exclude filter.** A repository that commits its
   dependencies (a vendored `vendor/` tree) searches them, because enumeration is unchanged
-  `codeindex.EnumerateAll` — the right answer is a glob library (`bmatcuk/doublestar` or
+  `codeworkspace.EnumerateAll` — the right answer is a glob library (`bmatcuk/doublestar` or
   `gobwas/glob`, both MIT, since `path.Match` has no `**`) plus a two-field UI, deferred whole
   rather than half-built.
 - **C7's search results are a point-in-time snapshot with no live update.** A file changed,
@@ -4205,21 +3796,17 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
 - **The native graph and the VS Code extension hold independent `gitsession.Conn`s over the same
   repository** (C10 §8). Correct by design — each connection's own hold/refcount is exactly what
   lets `repo.close` release only that connection's share (`internal/gitrpc/handlers.go`) — but it
-  means a repository can be open twice in one process, each with its own watcher subscription, the
-  same shape C6 already recorded for `codeindex` above (a repository open in the native workspace
-  while the embedded repo-map MCP server serves the same repository parses every saved file twice).
+  means a repository can be open twice in one process, each with its own watcher subscription.
   Harmless (each connection's own hold is independently refcounted and released) and bounded, but
   real.
 
-- **Both `internal/repomap/http.go`'s and `internal/dbmcp/http.go`'s HTTP servers leave
-  `WriteTimeout`/`ReadTimeout` unset** (P67d §4.2 gave repomap `ReadHeaderTimeout`/`IdleTimeout`
-  plus the cross-origin wrapper; M7 finding #7 brought dbmcp's server up to the same shape —
-  narrowing this item rather than closing it). Deliberate: the Streamable HTTP transport holds
-  long-lived server-to-client streams, and a write/read deadline would cut one mid-response; a slow
-  client body on a long POST is not a threat on loopback the way a slow header (`ReadHeaderTimeout`,
-  now bounded on both) is. Loopback-only binding plus the cross-origin wrapper narrow who can reach
-  either server further still, but a client that opens a connection and simply never finishes its
-  response body can still tie one up indefinitely.
+- **`internal/dbmcp/http.go`'s HTTP server leaves `WriteTimeout`/`ReadTimeout` unset** (M7 finding
+  #7 gave it `ReadHeaderTimeout`/`IdleTimeout` plus the cross-origin wrapper). Deliberate: the
+  Streamable HTTP transport holds long-lived server-to-client streams, and a write/read deadline
+  would cut one mid-response; a slow client body on a long POST is not a threat on loopback the way
+  a slow header (`ReadHeaderTimeout`, now bounded) is. Loopback-only binding plus the cross-origin
+  wrapper narrow who can reach the server further still, but a client that opens a connection and
+  simply never finishes its response body can still tie one up indefinitely.
 - **Native `review.session.save`/`.load` (`repo/git/reviewSession.ts`, backed by the pinned
   repo-graph tab's own persisted state) has no expiry**, unlike the VS Code extension's own
   `ReviewSessionStore`, which discards a saved session past `REVIEW_SESSION_TTL_MS` (14 days,
@@ -4234,25 +3821,6 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   Building a standalone version needs a new `OpRequest` kind, a new `opSpec` with an undo policy, a
   new preflight, a new dialog and a `ContractVersion` bump — out of scope until a phase actually
   asks for it.
-
-Architecture/security:
-- **`codeworkspace/session.go`'s initial-sync goroutine (`EnsureIndex`) isn't joined before
-  `Close()` touches the index it's still writing to.** `repomap/instance.go`'s equivalent path is
-  fixed (`syncDone`, closed by `runInitialSync`; `close()` waits on it before calling `idx.Close()`)
-  — `codeworkspace.Session.Close()` cancels the sync context and calls `watcher.Close()`/
-  `index.Close()` immediately after, with no equivalent wait, so a still-running parse worker can
-  touch state `index.Close()` just freed.
-- **A `Session.EnsureIndex` vs `Close` race can leak a watcher goroutine.** `EnsureIndex` sets
-  `s.index`/`s.graph`/`s.ready`/`s.cancel` under lock, then calls `idx.Watch` and assigns
-  `s.watcher` *unlocked* and after a second lock/unlock — if `Close()` (which snapshots every field
-  and clears them under one lock, then runs `closeOnce`) interleaves between those two steps, the
-  watcher `EnsureIndex` assigns afterward is never captured by the already-run `Close()` and never
-  closed by a second call (`closeOnce` no-ops it).
-- **Watcher writes arriving during the initial sync's one large transaction can be dropped past
-  SQLite's busy-timeout on a very large repo — narrowed, not closed.** `f15309ca` added a bounded
-  `SQLITE_BUSY`/`LOCKED` retry (`replaceFilesTxWithBusyRetry`, 5 attempts × 200ms) around every
-  batch write, stretching the effective tolerance past the DSN's 5s `busy_timeout`; still unmeasured
-  and still theoretical for a repository large enough to exhaust the retry budget too.
 
 Correctness:
 - **`review.open`'s pending-target map entry (`hostHandlers.ts`'s `pendingReviewTargetByCodeRepoId`)
@@ -4276,9 +3844,6 @@ Performance:
 - **No debounce on the quick-open palette's keystroke handler** (the project tree got a 150ms
   debounce in C13-6, quick-open did not) — low severity, 20-35ms per keystroke measured even at the
   file-count cap.
-- **A restored session on app boot starts every restored repo's index sync with no cross-repo
-  concurrency limiter** — likely fine in practice (incremental after first run) but unmeasured at
-  scale.
 
 - **The dbmcp bearer token reaches `claude mcp add` in plaintext argv** (`internal/mcpinstall/
   install.go`'s `Install`/`Command`, M6 round-1 finding), visible to any other local process or

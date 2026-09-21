@@ -3,8 +3,8 @@
 [![PR](https://github.com/vlad-cirstean/kira-studio/actions/workflows/pr.yml/badge.svg)](https://github.com/vlad-cirstean/kira-studio/actions/workflows/pr.yml)
 
 A native macOS workbench combining a visual database client (DataGrip/DBeaver class, ten database
-engines), an HTTP/gRPC API client (Postman/Insomnia class), and a git client with code intelligence
-(a VS Code-adjacent workspace: file tree, Monaco viewer, diffs, go-to-definition, search) — built
+engines), an HTTP/gRPC API client (Postman/Insomnia class), and a git client
+(a VS Code-adjacent workspace: file tree, Monaco viewer, diffs, search) — built
 on Wails (Go) and Vue 3, one app you switch between with a mode button.
 
 ## Status
@@ -163,23 +163,13 @@ A couple of things worth knowing up front:
 - **gRPC support** — unary and streaming calls alongside HTTP, sharing the same collections,
   environments and variables.
 
-## Code intelligence features
+## Code workspace features
 
 - **Repository import** — import a git repository beside a database connection; it opens as its own
   independent workspace, with its own isolated tab set.
 - **Project tree and file viewer** — every tracked/untracked-but-not-ignored file, opened read-only
   into Monaco; refreshes on workspace open and on an explicit Refresh, not live.
 - **Diff tabs** — worktree-vs-HEAD diffs in Monaco's own diff editor.
-- **Code navigation** — go-to-definition and hover, backed by a tree-sitter code graph built in Go
-  and cached in SQLite; covers Java, Python, JavaScript, TypeScript/TSX, Go and Rust, plus
-  HTML/CSS/JSON/Svelte and Vue (parsed as an HTML container with per-block injection).
-  Find-references and go-to-implementation join definitions and hover, rendered through Monaco's own
-  peek UI; Cmd/Ctrl+click navigates, with a cross-file link preview. Go implementations are answered
-  by a **method-set comparison, following embedding** — never a signature comparison and never real
-  type inference, so a result is a strong structural match, not a proof (Go has no `implements`
-  keyword for anything more precise).
-- **Navigation readout** — a status-bar item summarising the last references/implementations query
-  (e.g. "3 references · 2 unattributed"), cleared when the active tab changes.
 - **Search** — in-file via Monaco's own find widget; repository-wide in Go, with streamed results
   and no `ripgrep` subprocess.
 - **Quick Open (⌘P)** — a fuzzy file finder over the open repository.
@@ -191,17 +181,13 @@ A couple of things worth knowing up front:
   regardless of that setting, and clicking it reveals the commit in the graph tab. A file tab pinned
   to a historical revision shows no blame at all — blame only ever reflects the working tree.
 - **Markdown reading view** — a rendered-Markdown toggle beside the raw view, per tab.
-- **Repo-map MCP server** — a local MCP server exposing the same code graph to an AI client (Claude
-  Code and similar), off by default and enabled per repository from Settings → Code intelligence.
-  The exact registration command is shown before the Install button, deliberately — enabling it is
-  never a silent action.
 
 ## Database MCP features
 
-- **A second local MCP server** — separate from the repo-map one: its own process-lifetime
-  instance, its own loopback port (8766 by default, falling back to an OS-assigned one if that's
-  taken), its own bearer token. Off by default; enabled from Settings → Database MCP, which shows
-  the registration command before its Install button, the same as Code intelligence.
+- **A local MCP server** — its own process-lifetime instance, its own loopback port (8766 by
+  default, falling back to an OS-assigned one if that's taken), its own bearer token. Off by
+  default; enabled from Settings → Database MCP, which shows the registration command before its
+  Install button.
 - **Six tools** — `list_connections`, `list_children`, `describe_table`, `describe_schema`,
   `run_query`, `explain_query`. `run_query` executes through the same adapter path the app's own SQL
   console uses.
@@ -226,7 +212,7 @@ A couple of things worth knowing up front:
 The git backend runs inside Kira Studio — spawn discipline, porcelain parsing, the paged log walk,
 pre-flight hazard analysis, every write — and serves two frontends over it: a native **Git** module
 in this window (its own `AppMode`, with a pinned native graph tab and a native code-review layer,
-both described under Code intelligence above), and **Kira Version**, a VS Code extension that dials
+both described under Code workspace above), and **Kira Version**, a VS Code extension that dials
 the same backend over a Unix socket at `~/.kira-studio/git.sock`. The `.vsix` ships inside the DMG
 rather than through the Marketplace, and installs from a *Connected editors* pane in Settings.
 
@@ -381,10 +367,9 @@ bun run dev        # installs everything needed, then `wails3 task dev` — nati
 | `bun run package` | Builds the native Wails bundle and the `.dmg` around it, and ad-hoc signs both — `apps/kira-studio/bin/Kira Studio.{app,dmg}` (`prepackage` runs `bun run setup` first, same as `dev`). The packaged `kira-version.vsix` is copied into the bundle *before* signing, so the signature covers it |
 | `bun run verify:packaging` | Confirms the packaged bundle still ships no auto-update behavior |
 
-**App data:** the app keeps `kira.db`, `logs/`, the git module's own `review.db`, `codeindex.db`
-(plus its `-wal`/`-shm`), its `git.sock`/`git.sock.lock`, the per-repository sync flocks
-`codeindex-sync-<12 hex>.lock`, the repo-map MCP tokens `mcp-repo-map-*-token.json`, and the
-database MCP server's own token `mcp-db-token.json`, all under `~/.kira-studio/`. The `KIRA_HOME`
+**App data:** the app keeps `kira.db`, `logs/`, the git module's own `review.db`, its
+`git.sock`/`git.sock.lock`, and the database MCP server's own token `mcp-db-token.json`, all under
+`~/.kira-studio/`. The `KIRA_HOME`
 environment variable relocates that whole directory — the test suite uses it to keep tests off a
 developer's real data, and the git socket follows it, so two `KIRA_HOME`s are two fully independent
 backends rather than two processes fighting over one socket.
@@ -456,8 +441,7 @@ Top-level layout — `apps/` holds this and any future Wails app; `packages/` ho
 across apps:
 
 ```
-apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops, git, code intelligence (codeparse/codeindex/codegraph/codeworkspace/repomap), database MCP (dbmcp/mask/maskrules/queryplan/mcpauth), the update checker
-apps/kira-studio/cmd/kira-repo-map  the headless repo-map MCP binary — the repo's only other `main` package
+apps/kira-studio/internal        the Go app: adapters, storage, IPC bridge, tree service, connection state, ops, git, code workspace (codeworkspace), database MCP (dbmcp/mask/maskrules/queryplan/mcpauth), the update checker
 apps/kira-studio/frontend/src    the Vue 3 app (bindings + the built bundle live alongside it, both gitignored)
 apps/kira-studio/tests/unit      unit suite — no external resource
 apps/kira-studio/tests/ui        Playwright against the built bundle, WebKit, both wire planes mocked
@@ -480,7 +464,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state br
 [`docs/v1.1/SPEC.md`](docs/v1.1/SPEC.md) (Studio), [`docs/v1.2/SPEC.md`](docs/v1.2/SPEC.md) (Api),
 [`docs/v1.3/SPEC.md`](docs/v1.3/SPEC.md) (the headless git backend),
 [`docs/v1.4/SPEC.md`](docs/v1.4/SPEC.md) (reliability/tooling polish across existing modules),
-[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence),
+[`docs/v1.5/SPEC.md`](docs/v1.5/SPEC.md) (code intelligence, since removed in v1.9 P97),
 [`docs/v1.6/SPEC.md`](docs/v1.6/SPEC.md) (editor consolidation and tooling upgrades), and
 [`docs/v1.7/SPEC.md`](docs/v1.7/SPEC.md) (the database MCP server) — all completed
 (`docs/v1/SPEC.md` is the v1 record — see `docs/v1/README.md`).
@@ -506,9 +490,9 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full current-state br
   record (see `docs/v1.6/README.md`): [`SPEC.md`](docs/v1.6/SPEC.md) and
   [`plans/`](docs/v1.6/plans/) — editor consolidation onto Monaco, a dependency/runtime upgrade,
   native git-blame, and the repo-map MCP server.
-- [`docs/v1.5/`](docs/v1.5/) — the completed code intelligence chapter's own phasing record (see
-  `docs/v1.5/README.md`): [`SPEC.md`](docs/v1.5/SPEC.md) and [`plans/`](docs/v1.5/plans/), phases
-  C1 through C14.
+- [`docs/v1.5/`](docs/v1.5/) — the code intelligence chapter, since removed in v1.9 P97; its own
+  phasing record (see `docs/v1.5/README.md`): [`SPEC.md`](docs/v1.5/SPEC.md) and
+  [`plans/`](docs/v1.5/plans/), phases C1 through C14.
 - [`docs/v1.4/`](docs/v1.4/) — the completed reliability/tooling/polish chapter's own phasing record
   (see `docs/v1.4/README.md`): [`SPEC.md`](docs/v1.4/SPEC.md) and [`plans/`](docs/v1.4/plans/).
 - [`docs/v1.3/`](docs/v1.3/) — the completed git-backend chapter's own phasing record (see

@@ -217,19 +217,16 @@ running it here.
   needs. **Read the installed module source under
   `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** —
   it's the real source for the exact pinned version.
-- **`go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...` need a C
-  compiler as of C1** — `internal/codeparse` (the tree-sitter binding plus ten grammar modules) is
-  unconditionally cgo, not behind any build tag, since parsing needs the same C runtime and
-  grammars on every platform this app runs on; `gcc`/`clang` is present in this container and in
-  every environment that already builds the Wails shell, and the first build compiles roughly 34 MB
-  of generated C once (Go's build cache absorbs every build after). `CGO_ENABLED=0` no longer
-  builds a package that imports it. Every *other* cgo call this app makes (a handful of darwin-only
-  files in `internal/secrets`, `internal/metrics`, `internal/localauth`, `internal/gitclient`'s and
-  `internal/codeindex`'s own FSEvents watchers) is still behind a `darwin && cgo` build tag with a
-  real, working `!darwin || !cgo` companion, invisible to a Linux build; `modernc.org/sqlite` (the
-  sqlite adapter and the app's own storage) stays cgo-free on every platform. Only the
-  `apps/kira-studio` `main` package imports Wails and needs the GTK/WebKit headers on top of that,
-  so prefer `./apps/kira-studio/internal/...` for a fast loop.
+- **No package under `internal/` needs a C compiler on Linux any more** (v1.9 P97 removed
+  `internal/codeparse`, this repo's one unconditionally-cgo package). Every remaining cgo call this
+  app makes (a handful of darwin-only files in `internal/secrets`, `internal/metrics`,
+  `internal/localauth`, and `internal/gitclient`'s own FSEvents watcher) is behind a `darwin && cgo`
+  build tag with a real, working `!darwin || !cgo` companion, invisible to a Linux build;
+  `modernc.org/sqlite` (the sqlite adapter and the app's own storage) stays cgo-free on every
+  platform. `go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...`
+  need no C compiler in this container as a result. Only the `apps/kira-studio` `main` package
+  imports Wails and needs the GTK/WebKit headers, so prefer `./apps/kira-studio/internal/...` for a
+  fast loop.
 - **`GOOS=darwin` cross-compiles here only with `CGO_ENABLED=0`.** A pure-Go package builds and
   vets for `darwin/arm64` from this container (`GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build
   ./…`, exit 0); a cgo one cannot be built for darwin here at all (`CGO_ENABLED=1 GOOS=darwin`
@@ -278,67 +275,13 @@ running it here.
   this repo's established substitute for GUI-driven boot proofs in a sandbox with no display,
   preferred over `xvfb`/`xdotool`/screenshot techniques. `tests/e2e-real/` is built on it.
 
-## repo-map MCP server — running and registering it in this environment (C3, updated C8/P64c/P67d/M1)
+## Playwright UI tier — `webkit` needs fetching explicitly
 
-- **Run `bun run mcp:repo-map:build` once after a fresh clone, before registering with any MCP
-  client.** `internal/codeparse`'s cgo build (above) is the same ~34 MB-of-generated-C cost here;
-  the separate build script exists precisely so a client's own connection attempt isn't the first
-  thing to pay it. `bun run mcp:repo-map` (no `:build`) always rebuilds too (Go's own build cache
-  makes a no-op rebuild sub-second) and then execs the binary — the one command to actually run it.
-- **A cold cgo rebuild of `kira-repo-map` measures ~34s in this container** (build cache cleared,
-  P64c §1.2) — this is the grammar compile, not index time, and it is what "restart the server to
-  pick up a change" actually pays first. It is easy to misread as "the reindex is hanging": a full
-  cold `Sync` of this repository itself is a few seconds (below/`docs/ARCHITECTURE.md`'s
-  `codeindex.db` paragraph); a rebuild-then-index that feels like it took a minute is overwhelmingly
-  this one-time compile, not the parse-and-write pipeline. A warm build-cache rebuild (most restarts
-  in one session) is sub-second, per the bullet above.
-- **`bun run mcp:repo-map` blocks in the foreground, serving HTTP, and prints its own registration
-  command to stdout once bound** — it is not a one-shot script. Run it in the background (this
-  environment's own "start, poll, test, kill inside one invocation" rule, above) if a following
-  command needs to register against it or call it with `curl` in the same session.
-- **Register the real `claude` CLI against it** with the exact command the process prints, e.g.
-  `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
-  "Authorization: Bearer <token>"` — verified in this environment against a real `claude` (2.1.270):
-  `claude mcp list` reports the server "✓ Connected" once running. `claude mcp remove kira-repo-map -s user`
-  cleans up the global `~/.claude.json` entry afterward — leaving a stale registration behind
-  confuses a later, unrelated session in the same container. **Read the host and port off the
-  startup banner every time, not off this example** — `internal/repomap/http.go` binds
-  `DefaultPort` 8765 first but falls back to an OS-assigned ephemeral port when it's taken
-  (reproduced here: one instance bound `8765`, a second bound `http://127.0.0.1:46717/mcp`, minutes
-  apart in the same container); this container routinely has an instance already running, so the
-  fallback is the normal case here, not an edge case.
-- **A restart cannot recover a token it didn't capture the first time.** `mcpauth` stores only a
-  salted hash (`${KIRA_HOME}/mcp-repo-map-<slug>-token.json`), so a restart prints "Using this
-  repository's existing token" and no token — a session that lost the first printout is stuck, and
-  a mismatched bearer answers `401 invalid token` with no hint the token itself is the problem. Fix:
-  delete that repository's token file and restart, then capture the freshly printed token
-  immediately (`CLAUDE.md`'s mint-a-fresh-one recipe). The stuck window is now **bounded**: since M1
-  every token expires after 7 days (`mcpauth.TTL`), so a stale one eventually remints itself —
-  deleting the file is how you stop waiting, not the only way out. A **lapsed** token is
-  distinguishable from a wrong one: `mcpauth.TokenVerifier` answers with a message naming the server
-  and the expiry instant, where a mismatched token still answers a bare `401 invalid token`.
-- **Responses now carry a source line under each hit (C8)**: `find_definition`, `find_references`,
-  `find_implementations` and `search_symbols` each follow a hit's own grep-style line with one
-  indented line of the actual code at that position (truncated at 512 bytes, `[stale]`/
-  `[no source: ...]` markers where it can't be read honestly) — a `curl` recipe against this server
-  now sees that extra line in `result.content[0].text`; pass `"omitSource": true` in a tool call's
-  arguments for the old compact shape.
-- **`KIRA_REPO_MAP_LOG`** (`debug`/`info`/`warn`/`error`, default `error`) controls stderr verbosity
-  for both the headless and embedded instance — a stdio server's stderr used to be the client's
-  literal log file; now merely conventional, since Streamable HTTP means stdout is free too (the
-  process's own startup banner and registration command use it deliberately, §3.1 of the plan).
-- **The embedded instance no longer needs a repository at the app process's own working directory**
-  (P67d) — one embedded `repomap.Server` serves however many imported repositories the user grants
-  access to from the Code intelligence tab, each granted or revoked individually; enabling the
-  toggle there starts the server directly, with no working-directory resolution involved. Use the
-  headless path (`bun run mcp:repo-map --repo <path>`) to point the server at an arbitrary checkout
-  from this environment instead.
-- **The Playwright UI tier needs `webkit` explicitly fetched** (unrelated to this phase, but hit
-  while verifying its own spec): this container ships only Chromium preinstalled.
-  `bunx playwright install webkit` downloads the browser itself; its own post-install warning names
-  the missing system libraries (`apt-get install libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0
-  libflite1 gstreamer1.0-libav` at the time of writing) — install exactly those, not a generic
-  `playwright install-deps`, which pulls far more than `webkit` alone needs.
+This container ships only Chromium preinstalled. `bunx playwright install webkit` downloads the
+browser itself; its own post-install warning names the missing system libraries (`apt-get install
+libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav` at the time of
+writing) — install exactly those, not a generic `playwright install-deps`, which pulls far more
+than `webkit` alone needs.
 
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
@@ -380,19 +323,33 @@ pre-push design.
   in the new `.githooks/pre-push` hook (`bun run lint:go`, `bun run lint:dead`, ~30s warm) — push is
   when work leaves the machine, the same boundary CI defends — and in CI's `checks` job.
 
+## A pre-P97 dev box still has orphaned repo-map files on disk
+
+The app has never shipped, so migration 0025 is a plain forward drop with no installed base to
+preserve (`docs/ARCHITECTURE.md`'s Storage section) — nothing cleans up a dev box's own leftovers
+from before v1.9 P97. If this container (or a persistent dev machine) ran a pre-P97 build, delete
+by hand: `${KIRA_HOME}/codeindex.db*` (the tree-sitter parse cache), `${KIRA_HOME}/codeindex-sync-
+*.lock` (its per-repository sync flocks) and `${KIRA_HOME}/mcp-repo-map-*-token.json` (the repo-map
+MCP tokens). No runtime cleanup code is shipped for this — a permanent housekeeping path in a
+shipping app would be permanent code for a one-off developer chore.
+
 ## Database MCP server — reaching it in this environment (M1-M5)
 
-Unlike repo-map, this server exists only inside the app process: `apps/kira-studio/cmd/` holds only
-`g1measure` and `kira-repo-map`, and `package.json` has no `mcp:*` script for it.
+This server exists only inside the app process: `apps/kira-studio/cmd/` holds only `g1measure`, and
+`package.json` has no `mcp:*` script for it.
 
 - **No headless binary and no `bun run mcp:*` script exists for it.** The only ways to reach it here
   are `bun run dev` (needs a GUI this container does not have) or a `go build -tags server` boot
   proof — the same `//go:build server` route documented above for the bound-call surface. M5's own
   verification did exactly that and drove a real `dbmcp` endpoint with `curl`.
 - Its token is `${KIRA_HOME}/mcp-db-token.json` — no repo slug, one per `KIRA_HOME`
-  (`internal/bridge/dbmcp.go`'s `dbMcpTokenName`, via `mcpauth.PathNamed`) — and it carries the same
-  7-day expiry as repo-map's since M1 (`mcpauth.TTL`).
-- Its port is `DefaultPort` **8766** (`internal/dbmcp/server.go`), with the same ephemeral fallback
-  on conflict, so the read-it-off-the-banner rule above applies here too.
-- The JSON-RPC `curl` shape is identical to `CLAUDE.md`'s repo-map recipe; only the port, the token
-  and the tool names differ. See that recipe rather than duplicating it here.
+  (`internal/bridge/dbmcp.go`'s `dbMcpTokenName`, via `mcpauth.PathNamed`) — and it carries a 7-day
+  expiry since M1 (`mcpauth.TTL`).
+- Its port is `DefaultPort` **8766** (`internal/dbmcp/server.go`), with an ephemeral fallback on
+  conflict (`net.Listen` retried on `127.0.0.1:0`) — read the actually-bound port off the process's
+  own startup output, not off this example.
+- Its endpoint is `http://127.0.0.1:<port>/mcp`, an ordinary `go-sdk/mcp` Streamable HTTP server
+  (`internal/dbmcp/http.go`'s `bindHTTP`) — a JSON-RPC 2.0 `tools/call` POST with an `Authorization:
+  Bearer <token>` header reaches it the same way any MCP Streamable HTTP client would; the SDK's own
+  client package is the reference for the exact request shape (`Content-Type`/`Accept` framing) if
+  driving it with a raw `curl` rather than a real MCP client.

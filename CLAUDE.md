@@ -206,5 +206,6 @@ other tool. Don't fall back to the CLI just because they're not visible yet; sea
 `.claude/hooks/session-start.sh` installs the `codegraph` binary and builds/syncs the index every
 session — that's build tooling, not how code gets navigated; navigation is the MCP tools above.
 
-Doesn't touch the shipped repo-map feature (Settings dialog's Code intelligence tab,
-`internal/repomap`) — that stays product, unrelated to this dev-tooling swap.
+The shipped repo-map feature (Settings dialog's Code intelligence tab, `internal/repomap`) was
+removed in v1.9 P97 — CodeGraph above is now the only code-index in this repo, no name collision
+to keep straight.
