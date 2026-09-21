@@ -279,17 +279,6 @@ function onOpenFile(index: number, pinned: boolean): void {
   cursor: pointer;
 }
 
-/* W17: scoped to the header, not the whole row — `--kv-row-hover-bg` behind
- * `.kv-review-row-body`'s own `--kv-diff-deleted-fg` text (the FileTree's per-file/per-directory
- * deletion count) drops below 4.5:1 in `vscode-dark` (axe caught it: hovering an *expanded* row
- * left the lighter hover tint sitting behind that red text, something the panel's own detail pane
- * never risked, since a grid row's hover state lives in a wholly different region from the detail
- * pane it reveals). The row's own background — `--kv-app-bg`, via `.kv-review-view` — is what the
- * body already sits on while unhovered, and that combination already passes. */
-.kv-review-row:hover .kv-review-row-header {
-  background-color: var(--kv-row-hover-bg);
-}
-
 .kv-review-row:focus-visible {
   outline: 1px solid var(--kv-focus-border);
   outline-offset: -2px;
@@ -302,6 +291,17 @@ function onOpenFile(index: number, pinned: boolean): void {
   padding: var(--kv-s-2) var(--kv-s-3);
   min-width: 0;
   font-family: var(--kv-font-ui);
+}
+
+/* W17: scoped to the header, not the whole row — `--kv-row-hover-bg` behind
+ * `.kv-review-row-body`'s own `--kv-diff-deleted-fg` text (the FileTree's per-file/per-directory
+ * deletion count) drops below 4.5:1 in `vscode-dark` (axe caught it: hovering an *expanded* row
+ * left the lighter hover tint sitting behind that red text, something the panel's own detail pane
+ * never risked, since a grid row's hover state lives in a wholly different region from the detail
+ * pane it reveals). The row's own background — `--kv-app-bg`, via `.kv-review-view` — is what the
+ * body already sits on while unhovered, and that combination already passes. */
+.kv-review-row:hover .kv-review-row-header {
+  background-color: var(--kv-row-hover-bg);
 }
 
 .kv-review-row-chevron {
@@ -367,9 +367,9 @@ function onOpenFile(index: number, pinned: boolean): void {
   opacity: 0;
 }
 
+.kv-review-row-header-focused .kv-review-row-actions,
 .kv-review-row:hover .kv-review-row-actions,
-.kv-review-row:focus-within .kv-review-row-actions,
-.kv-review-row-header-focused .kv-review-row-actions {
+.kv-review-row:focus-within .kv-review-row-actions {
   opacity: 1;
 }
 

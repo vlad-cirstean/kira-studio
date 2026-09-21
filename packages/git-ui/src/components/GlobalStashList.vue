@@ -121,7 +121,7 @@ async function onMenuSelect(id: string): Promise<void> {
         <span
           v-if="globalRowModel(entry).origin"
           class="kv-stash-origin"
-          v-kui-tooltip="'Saved from ' + globalRowModel(entry).origin"
+          v-kui-tooltip="`Saved from ${globalRowModel(entry).origin}`"
           >{{ globalRowModel(entry).origin }}</span
         >
         <span v-if="globalRowModel(entry).auto" class="kv-stash-auto" v-kui-tooltip="'Created automatically by an auto-stashed checkout'">auto</span>

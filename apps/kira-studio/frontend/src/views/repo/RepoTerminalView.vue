@@ -5,6 +5,7 @@
 // this session.
 let terminalRendererPromise: Promise<typeof import('./terminalRenderer')> | null = null;
 
+// biome-ignore lint/correctness/noUnusedVariables: called from the <script setup> block below — Biome's Vue support does not link scope across a plain <script> and <script setup> block in one SFC.
 function loadTerminalRenderer(): Promise<typeof import('./terminalRenderer')> {
   if (!terminalRendererPromise) {
     terminalRendererPromise = import('./terminalRenderer').catch((err) => {

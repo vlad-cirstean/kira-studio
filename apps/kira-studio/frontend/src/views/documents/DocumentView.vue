@@ -95,7 +95,7 @@ const props = defineProps<{ tab: DocumentTabRecord }>();
 // without reloading, so the fresh-open path this comment used to describe never hit it).
 registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
 
-const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => load(props.tab.id),
 );

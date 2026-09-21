@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
 import CodiconIcon from '../theme/CodiconIcon.vue';
-import { connColorVar } from '../theme/connColor';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PanelShell from '../theme/primitives/PanelShell.vue';
@@ -18,7 +17,7 @@ import {
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
-import { initVariables, openEnvironments, variablesState } from './state/variables';
+import { initVariables, openEnvironments } from './state/variables';
 import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell

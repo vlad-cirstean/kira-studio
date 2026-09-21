@@ -98,7 +98,7 @@ const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord
 
 // D10/D12: a batch tab (SQS) never auto-loads on reconnect — only an explicit Poll does,
 // since every poll consumes from the queue rather than merely browsing it.
-const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => {
     if (!isBatch.value) return load(props.tab.id);

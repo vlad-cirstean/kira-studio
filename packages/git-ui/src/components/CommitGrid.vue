@@ -1381,13 +1381,6 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
   outline-offset: -1px;
 }
 
-/* The stash tip (refs/stash — W7's DecorationRef "stash" kind): italic subject text is the row-
-   level cue; the badge itself (dashed square, codicon-archive) is refBadges.ts's job, rendered
-   inline in the message cell, not here. */
-.kv-commit-grid .slick-row.kv-row-stash .kv-message-subject {
-  font-style: italic;
-}
-
 /* P93 §4.2: the placeholder row — `columns.ts`'s `rowMetadata` sets `kv-row-collapsed`
    (`getItemMetadata`'s own `cssClasses`), never `kv-row-selected`/`-head`/`-stash` (its own doc
    comment on why). The muted tone doubles as the "this is not a real commit" cue the row itself
@@ -1504,6 +1497,13 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
 .kv-cell-message--collapsed .kv-message-subject {
   font-style: italic;
   color: var(--kv-description-fg);
+}
+
+/* The stash tip (refs/stash — W7's DecorationRef "stash" kind): italic subject text is the row-
+   level cue; the badge itself (dashed square, codicon-archive) is refBadges.ts's job, rendered
+   inline in the message cell, not here. */
+.kv-commit-grid .slick-row.kv-row-stash .kv-message-subject {
+  font-style: italic;
 }
 
 .kv-collapsed-chevron {

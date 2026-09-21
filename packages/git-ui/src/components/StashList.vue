@@ -126,11 +126,16 @@ async function onMenuSelect(id: string): Promise<void> {
       :tabindex="focusedRowId === `stash:${entry.sha}` ? 0 : -1"
     >
       <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
-        <span class="kv-stash-index">{{ "stash@{" + entry.index + "}" }}</span>
+        <span class="kv-stash-index">{{
+          // A template literal here would put two closing braces back to back, which this Vue
+          // parser reads as the mustache's own closing delimiter mid-expression.
+          // biome-ignore lint/style/useTemplate: see above
+          "stash@{" + entry.index + "}"
+        }}</span>
         <span
           v-if="originLabel(entry, currentBranch)"
           class="kv-stash-origin"
-          v-kui-tooltip="'Stashed from ' + originLabel(entry, currentBranch)"
+          v-kui-tooltip="`Stashed from ${originLabel(entry, currentBranch)}`"
           >{{ originLabel(entry, currentBranch) }}</span
         >
         <span v-if="isAutoStash(entry)" class="kv-stash-auto" v-kui-tooltip="'Created automatically by an auto-stashed checkout'">auto</span>
@@ -159,7 +164,7 @@ async function onMenuSelect(id: string): Promise<void> {
       :sections="stashMenuSections"
       :x="stashMenu.x"
       :y="stashMenu.y"
-      :label="'stash@{' + stashMenu.entry.index + '} actions'"
+      :label="`stash@{${stashMenu.entry.index}} actions`"
       @select="onMenuSelect"
       @close="stashMenu = undefined"
     />

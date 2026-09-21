@@ -10,7 +10,7 @@ import KeyValuePane from '../shared/keyvalue/KeyValuePane.vue';
 // `tab` tells KeyValuePane to wrap itself in its own ViewChrome
 // (icon/path/name/refresh/stop/reconnect) — see that file's own module doc comment for why the
 // chrome lives there rather than here.
-const props = defineProps<{ tab: KeyValueTabRecord }>();
+defineProps<{ tab: KeyValueTabRecord }>();
 </script>
 
 <template>

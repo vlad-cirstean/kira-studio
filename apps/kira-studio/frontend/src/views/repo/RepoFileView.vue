@@ -330,7 +330,7 @@ onUnmounted(() => {
   color: var(--kira-fg);
   background: var(--kira-bg);
 }
-.md-reading :deep(> *) {
+.md-reading > :deep(*) {
   max-width: 72ch;
 }
 .md-reading :deep(h1),

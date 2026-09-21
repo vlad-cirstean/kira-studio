@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T extends StickyRowLike & { key: string }">
 import { computed, ref } from 'vue';
+// biome-ignore lint/correctness/noUnusedImports: StickyRowLike is used only in the generic attribute above.
 import { STICKY_MAX_ROWS, type StickyRowLike, stickyBand, stickyInsetFor } from './stickyBand';
 import VirtualList from './VirtualList.vue';
 

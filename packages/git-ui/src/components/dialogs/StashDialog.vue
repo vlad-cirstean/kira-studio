@@ -275,7 +275,12 @@ function onClose(): void {
 
     <template v-else-if="mode === 'branch'">
       <p class="kv-dialog-note">
-        From <code>{{ 'stash@{' + (branchTarget?.index ?? '') + '}' }}</code>:
+        From <code>{{
+          // A template literal here would put two closing braces back to back, which this Vue
+          // parser reads as the mustache's own closing delimiter mid-expression.
+          // biome-ignore lint/style/useTemplate: see above
+          'stash@{' + (branchTarget?.index ?? '') + '}'
+        }}</code>:
         {{ branchTarget?.message }}
       </p>
       <label class="kv-dialog-field">

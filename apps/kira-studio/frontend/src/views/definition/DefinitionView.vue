@@ -35,7 +35,7 @@ import ValidationSection from './ValidationSection.vue';
 // DataView.vue.
 const props = defineProps<{ tab: DefinitionTabRecord }>();
 
-const { connectionStatus, needsReconnect, onReconnectAndLoad } = useConnectionGate(
+const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => load(props.tab.id),
 );
