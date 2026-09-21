@@ -1,5 +1,6 @@
 import type { ShortcutId } from '@shared/domain/shortcuts';
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 
 export type MenuItem =
   | {
@@ -24,30 +25,34 @@ export type MenuItem =
   | { type: 'submenu'; id: string; label: string; icon?: string; items: MenuItem[] }
   | { type: 'separator' };
 
-export const contextMenuState = reactive({
-  open: false,
-  x: 0,
-  y: 0,
-  items: [] as MenuItem[],
+export const useContextMenuStore = defineStore('contextMenu', () => {
+  const state = reactive({
+    open: false,
+    x: 0,
+    y: 0,
+    items: [] as MenuItem[],
+  });
+
+  // P83 §9.2: a point, not an event — a dropdown anchored under a button (TabStrip.vue's "+") has
+  // no MouseEvent of its own to read clientX/clientY from. openContextMenu below is now this plus
+  // one destructure.
+  function openContextMenuAt(x: number, y: number, items: MenuItem[]): void {
+    state.items = items;
+    state.x = x;
+    state.y = y;
+    state.open = true;
+  }
+
+  function openContextMenu(ev: MouseEvent, items: MenuItem[]): void {
+    openContextMenuAt(ev.clientX, ev.clientY, items);
+  }
+
+  function closeContextMenu(): void {
+    state.open = false;
+  }
+
+  return { ...toRefs(state), openContextMenuAt, openContextMenu, closeContextMenu };
 });
-
-// P83 §9.2: a point, not an event — a dropdown anchored under a button (TabStrip.vue's "+") has
-// no MouseEvent of its own to read clientX/clientY from. openContextMenu below is now this plus
-// one destructure.
-export function openContextMenuAt(x: number, y: number, items: MenuItem[]): void {
-  contextMenuState.items = items;
-  contextMenuState.x = x;
-  contextMenuState.y = y;
-  contextMenuState.open = true;
-}
-
-export function openContextMenu(ev: MouseEvent, items: MenuItem[]): void {
-  openContextMenuAt(ev.clientX, ev.clientY, items);
-}
-
-export function closeContextMenu(): void {
-  contextMenuState.open = false;
-}
 
 // P21 D5: a new local keybinding dispatches through the same menu-builder function a right-click
 // would call, rather than a parallel handler — the printed shortcut and the executed action are

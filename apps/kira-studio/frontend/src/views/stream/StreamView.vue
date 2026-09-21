@@ -9,9 +9,9 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../state/cellSelection';
-import { confirmDialog } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import { settingsState } from '../../state/settings';
 import { patchStreamTabState } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
@@ -56,6 +56,9 @@ import {
   stop,
   toggleSearchOpen,
 } from './state';
+
+const confirmDialogStore = useConfirmDialogStore();
+const contextMenuStore = useContextMenuStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -138,7 +141,7 @@ const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compa
 
 function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void {
   e.preventDefault();
-  openContextMenu(e, rowMenu(key, body));
+  contextMenuStore.openContextMenu(e, rowMenu(key, body));
 }
 
 // Row click alone (gutter, empty row background) just selects the row for highlighting/delete-
@@ -436,7 +439,7 @@ async function onDeleteMessage(): Promise<void> {
   if (selectedRow === null || selectedRow === undefined) return;
   const row = rowAt(selectedRow);
   if (!row?.key) return;
-  if (!(await confirmDialog(`Delete this message (id: ${row.key})? This cannot be undone.`))) {
+  if (!(await confirmDialogStore.confirmDialog(`Delete this message (id: ${row.key})? This cannot be undone.`))) {
     return;
   }
   try {

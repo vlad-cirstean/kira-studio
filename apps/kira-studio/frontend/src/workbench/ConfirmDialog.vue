@@ -1,27 +1,29 @@
 <script setup lang="ts">
-import { confirmDialogState, settleConfirmDialog } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '../state/confirmDialog';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
+const confirmDialogStore = useConfirmDialogStore();
+
 function onCancel(): void {
-  settleConfirmDialog(false);
+  confirmDialogStore.settleConfirmDialog(false);
 }
 
 function onConfirm(): void {
-  settleConfirmDialog(true);
+  confirmDialogStore.settleConfirmDialog(true);
 }
 </script>
 
 <template>
   <DialogFrame
-    v-if="confirmDialogState.open"
+    v-if="confirmDialogStore.open"
     title="Confirm"
     :width="400"
     test-id="confirm-dialog"
     close-test-id="confirm-dialog-close"
     @close="onCancel"
   >
-    <p class="message" data-testid="confirm-dialog-message">{{ confirmDialogState.message }}</p>
+    <p class="message" data-testid="confirm-dialog-message">{{ confirmDialogStore.message }}</p>
 
     <template #footer>
       <span class="p-dialog-actions end footer-actions p-push">
@@ -30,11 +32,11 @@ function onConfirm(): void {
         </AppButton>
         <AppButton
           kind="dialog"
-          :variant="confirmDialogState.danger ? 'danger' : 'primary'"
+          :variant="confirmDialogStore.danger ? 'danger' : 'primary'"
           data-testid="confirm-dialog-confirm"
           @click="onConfirm"
         >
-          {{ confirmDialogState.danger ? 'Delete' : 'Continue' }}
+          {{ confirmDialogStore.danger ? 'Delete' : 'Continue' }}
         </AppButton>
       </span>
     </template>

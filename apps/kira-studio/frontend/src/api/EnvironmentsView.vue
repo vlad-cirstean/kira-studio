@@ -2,7 +2,7 @@
 import type { EnvironmentsTabRecord } from '@shared/domain/tabs';
 import type { ApiEnvironment } from '@shared/domain/variables';
 import { computed, reactive, ref, watch } from 'vue';
-import { confirmDialog } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '../state/confirmDialog';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -21,6 +21,8 @@ import {
   variablesState,
 } from './state/variables';
 import { openVariableSetTab } from './tabs';
+
+const confirmDialogStore = useConfirmDialogStore();
 
 // P28 D16(c): the environment list, re-hosted in a tab. Every behaviour below is
 // EnvironmentsDialog.vue's, ported unchanged — name/description inline editing committed together
@@ -102,7 +104,7 @@ async function onSetActive(id: string): Promise<void> {
 }
 
 async function onDelete(id: string, name: string): Promise<void> {
-  if (!(await confirmDialog(`Delete environment "${name}"? Its variables go with it.`))) return;
+  if (!(await confirmDialogStore.confirmDialog(`Delete environment "${name}"? Its variables go with it.`))) return;
   await deleteEnvironment(id);
 }
 

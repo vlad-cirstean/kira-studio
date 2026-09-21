@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { openContextMenu } from '../state/contextMenu';
+import { useContextMenuStore } from '../state/contextMenu';
 import { openRepoFileTab } from '../state/repoTabs';
 import { settingsState } from '../state/settings';
 import TreeHost from '../theme/primitives/TreeHost.vue';
@@ -12,6 +12,8 @@ import {
   toggleRepoDir,
   visibleRepoRows,
 } from './state/fileTree';
+
+const contextMenuStore = useContextMenuStore();
 
 const props = defineProps<{ repoId: string; search: string }>();
 
@@ -71,7 +73,7 @@ function onOpen(row: RepoTreeRowVm, preview: boolean): void {
 }
 
 function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
-  openContextMenu(event, menuForRepoRow(props.repoId, row));
+  contextMenuStore.openContextMenu(event, menuForRepoRow(props.repoId, row));
 }
 </script>
 

@@ -6,7 +6,7 @@ import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
 import { useAgentSessionsStore } from '../../state/agentSessions';
 import { useCodeReposStore } from '../../state/coderepos';
-import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
+import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { useCustomScriptsStore } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
 import { openRepoTerminalTab } from '../../state/repoTabs';
@@ -31,6 +31,8 @@ import { workspaceState } from '../../state/workspace';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
+
+const contextMenuStore = useContextMenuStore();
 
 const agentSessionsStore = useAgentSessionsStore();
 const codeReposStore = useCodeReposStore();
@@ -91,7 +93,7 @@ function onClose(e: MouseEvent, tab: TabRecord): void {
 // touch a pinned tab either way, but offering them here would read as an empty promise).
 function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   if (isPinned(tab)) {
-    openContextMenu(e, [
+    contextMenuStore.openContextMenu(e, [
       {
         type: 'item',
         id: 'copy-name',
@@ -102,7 +104,7 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
     ]);
     return;
   }
-  openContextMenu(e, [
+  contextMenuStore.openContextMenu(e, [
     {
       type: 'item',
       id: 'close',
@@ -235,7 +237,7 @@ function onNewTab(): void {
   const rect = btn.getBoundingClientRect();
   const items =
     workspaceState.active === 'terminal' ? terminalModuleMenuItems() : newTabMenuItems();
-  openContextMenuAt(rect.left, rect.bottom + 2, items);
+  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, items);
 }
 
 // P85 §6.4: every dropdown entry funnels through this — the active workspace's own repo, or the

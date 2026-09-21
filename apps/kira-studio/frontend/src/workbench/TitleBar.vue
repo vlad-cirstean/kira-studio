@@ -3,13 +3,15 @@ import type { AppMode } from '@shared/domain/mode';
 import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
-import { keepAwakeState, setKeepAwakeManual } from '../state/keepAwake';
+import { useKeepAwakeStore } from '../state/keepAwake';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { settingsOpen } from '../state/settings';
 import { activateWorkspace, workspaceState } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
+
+const keepAwakeStore = useKeepAwakeStore();
 
 // P67b §4.3: three peer modules — Studio, Api, Git. A repository is an instance inside Git, not a
 // fourth top-level tab of its own (§0's correction); the repo switcher lives in GitPanel.vue now.
@@ -35,7 +37,7 @@ function onNewWindow(): void {
 // third appearance is out of scope (§13). onNewWindow's own posture: no toast channel in the title
 // bar, a rejection is logged, not surfaced.
 function onToggleKeepAwake(): void {
-  setKeepAwakeManual(!keepAwakeState.status.manual).catch((err: unknown) => {
+  keepAwakeStore.setKeepAwakeManual(!keepAwakeStore.status.manual).catch((err: unknown) => {
     console.error('toggle keep-awake', err);
   });
 }
@@ -44,8 +46,8 @@ function onToggleKeepAwake(): void {
 // have — @vscode/codicons ships no such glyph, so the button can't also swap its icon the way the
 // Connections/Operations toggles do.
 const keepAwakeTooltip = computed(() => {
-  if (keepAwakeState.status.error) return `Keep awake failed: ${keepAwakeState.status.error}`;
-  return keepAwakeState.status.manual
+  if (keepAwakeStore.status.error) return `Keep awake failed: ${keepAwakeStore.status.error}`;
+  return keepAwakeStore.status.manual
     ? 'Keeping this Mac awake — click to stop'
     : 'Keep this Mac awake';
 });
@@ -118,11 +120,11 @@ const keepAwakeTooltip = computed(() => {
         <CodiconIcon name="settings-gear" :size="15" />
       </button>
       <button
-        v-if="keepAwakeState.status.supported"
+        v-if="keepAwakeStore.status.supported"
         type="button"
         class="title-action"
-        :class="{ 'is-on': keepAwakeState.status.manual }"
-        :aria-pressed="keepAwakeState.status.manual"
+        :class="{ 'is-on': keepAwakeStore.status.manual }"
+        :aria-pressed="keepAwakeStore.status.manual"
         v-tooltip="keepAwakeTooltip"
         data-testid="toggle-keep-awake"
         aria-label="Keep this Mac awake"

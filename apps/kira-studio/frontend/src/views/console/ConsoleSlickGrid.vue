@@ -12,7 +12,7 @@ import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 's
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { publishSelectedCell } from '../../state/cellSelection';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
@@ -48,6 +48,8 @@ import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } 
 import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { consoleColumnWidths, setConsoleColumnWidths } from './state';
+
+const contextMenuStore = useContextMenuStore();
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
 // same KiraSlickGrid/dataSource.ts/slickTheme.css layer views/grid/SlickGridHost.vue already uses
@@ -605,7 +607,7 @@ function onGridContextMenu(e: SlickEventData): void {
     // menu must not decode every selected row across every column before the user has picked one
     // of the three items that actually need it.
     let cachedSnapshots: RowSnapshot[] | null = null;
-    openContextMenu(
+    contextMenuStore.openContextMenu(
       nativeLike,
       tabularRowMenu({ snapshots: () => (cachedSnapshots ??= rows.map(rowSnapshotFor)) }),
     );
@@ -628,7 +630,7 @@ function onGridContextMenu(e: SlickEventData): void {
     pageRow <= sel.row
   ) {
     const cols = Array.from({ length: sel.col - sel.anchorCol + 1 }, (_, i) => sel.anchorCol + i);
-    openContextMenu(
+    contextMenuStore.openContextMenu(
       nativeLike,
       tabularRangeMenu({
         rows: visibleRowsInSpan(sel.anchorRow, sel.row),
@@ -640,7 +642,7 @@ function onGridContextMenu(e: SlickEventData): void {
     return;
   }
   if (sel?.kind === 'column' && sel.cols.includes(displayCol)) {
-    openContextMenu(
+    contextMenuStore.openContextMenu(
       nativeLike,
       tabularColumnMenu({
         columnName: column.name,
@@ -653,7 +655,7 @@ function onGridContextMenu(e: SlickEventData): void {
   }
 
   const dc = cellAt(pageRow, pageCol);
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     nativeLike,
     tabularCellMenu({ columnName: column.name, isNull: dc.isNull, text: dc.text }),
   );
@@ -672,7 +674,7 @@ function onGridHeaderContextMenu(e: SlickEventData, args: { column: KiraColumn }
   if (displayCol < 0) return;
   const column = page.columns[displayCol];
   if (!column) return;
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     e as unknown as MouseEvent,
     tabularColumnMenu({
       columnName: column.name,

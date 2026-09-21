@@ -8,7 +8,7 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes, formatRelative } from '../../format';
-import { confirmDialog } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { isIncognito } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
@@ -26,6 +26,7 @@ import {
 
 // P8 D15: the History pane's list — one row per response, capped at HISTORY_PER_SCOPE_LIMIT by
 // construction (P18 D4/D6), so no VirtualList/TreeHost involvement.
+const confirmDialogStore = useConfirmDialogStore();
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const emit = defineEmits<{ compare: [ids: [string, string]] }>();
 
@@ -94,7 +95,7 @@ function onCompare(): void {
 }
 
 async function onClear(): Promise<void> {
-  const ok = await confirmDialog('Clear this request’s response history? This cannot be undone.', {
+  const ok = await confirmDialogStore.confirmDialog('Clear this request’s response history? This cannot be undone.', {
     danger: true,
   });
   if (ok) await clearHistory(props.tab.id);

@@ -3,7 +3,7 @@ import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { openKeyValueTab, patchBrowseTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -35,6 +35,8 @@ import {
   selectRow,
   setFilter,
 } from './state';
+
+const contextMenuStore = useContextMenuStore();
 
 // MainView.vue keys this component by tab.id — same discipline as every other view.
 const props = defineProps<{ tab: BrowseTabRecord }>();
@@ -228,7 +230,7 @@ function onRowOpen(node: TreeNode): void {
 function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
   if (!props.tab.connectionId) return;
   selectRow(props.tab.id, node.path);
-  openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node));
+  contextMenuStore.openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node));
 }
 
 // P33 D3: the same caps.fileTransfer + canInsert + not-read-only gate uploadMenuItem applies,

@@ -44,9 +44,9 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../../state/cellSelection';
-import { confirmDialog } from '../../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../../state/connections';
-import { openContextMenu } from '../../../state/contextMenu';
+import { useContextMenuStore } from '../../../state/contextMenu';
 import { useObjectStoreStore } from '../../../state/objectStore';
 import { settingsState } from '../../../state/settings';
 import { browseInvalidate } from '../../../state/viewCommands';
@@ -89,12 +89,14 @@ import {
   toggleSearchOpen,
 } from './state';
 
+const confirmDialogStore = useConfirmDialogStore();
+const contextMenuStore = useContextMenuStore();
+const objectStoreStore = useObjectStoreStore();
+
 const props = defineProps<{
   viewKey: string;
   tab?: KeyValueTabRecord;
 }>();
-
-const objectStoreStore = useObjectStoreStore();
 
 const host = computed(() => keyValueHost(props.viewKey));
 
@@ -393,7 +395,7 @@ async function saveObjectEdit(): Promise<void> {
 }
 
 // --- delete: type-agnostic (DEL works for any of the six types) — confirmed inline, mirrors
-// documents/menu.ts's confirmDialog() precedent for a destructive, un-staged action. S3's object
+// documents/menu.ts's confirmDialogStore.confirmDialog() precedent for a destructive, un-staged action. S3's object
 // delete rides state/objectStore.ts's deleteObject() instead of mutations.ts's deleteKey(),
 // since it needs the object's whole path (not just its key name) to satisfy s3/mutate.ts's
 // bucket-rooted MutationPlan.path. ----------------------------------------------------------
@@ -401,7 +403,7 @@ async function onDeleteKey(): Promise<void> {
   if (!canDelete.value || !keyName.value) return;
   const label = isSingleObjectPage.value ? 'object' : 'key';
   if (
-    !(await confirmDialog(`Delete ${label} "${keyName.value}"? This removes the entire ${label}.`))
+    !(await confirmDialogStore.confirmDialog(`Delete ${label} "${keyName.value}"? This removes the entire ${label}.`))
   ) {
     return;
   }
@@ -480,7 +482,7 @@ function onRowContextMenu(e: MouseEvent, field: string, value: string): void {
   const p = page.value;
   if (!p) return;
   const isObject = p.redisType === 'object';
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     e,
     rowMenu({
       field,

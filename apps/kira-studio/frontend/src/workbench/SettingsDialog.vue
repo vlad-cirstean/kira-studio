@@ -23,17 +23,12 @@ import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts'
 import { formatBytes, formatRelative } from '../format';
 import { useAgentHooksStore } from '../state/agentHooks';
 import { useCacheStatsStore } from '../state/cacheStats';
-import { confirmDialog } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '../state/confirmDialog';
 import { connectionsState, setConnectionMcpEnabled } from '../state/connections';
 import { useCustomScriptsStore } from '../state/customScripts';
-import {
-  dbMcpState,
-  installDbMcpClaudeCode,
-  regenerateDbMcpToken,
-  setDbMcpEnabled,
-} from '../state/dbmcp';
-import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../state/gitClients';
-import { setKeepAwakeAgentAware } from '../state/keepAwake';
+import { useDbMcpStore } from '../state/dbmcp';
+import { useGitClientsStore } from '../state/gitClients';
+import { useKeepAwakeStore } from '../state/keepAwake';
 import { maskRulesState } from '../state/maskRules';
 import {
   patchSettings,
@@ -56,7 +51,11 @@ const emit = defineEmits<{ close: [] }>();
 
 const agentHooksStore = useAgentHooksStore();
 const cacheStatsStore = useCacheStatsStore();
+const confirmDialogStore = useConfirmDialogStore();
 const customScriptsStore = useCustomScriptsStore();
+const dbMcpStore = useDbMcpStore();
+const gitClientsStore = useGitClientsStore();
+const keepAwakeStore = useKeepAwakeStore();
 
 // P17 D1: everything the user touches lives in this draft until Save — settingsState (and
 // therefore every other window, the database, and the app's own rendering) sees nothing until
@@ -135,13 +134,13 @@ const activeSection = ref<Section>(settingsSection.value ?? 'Appearance');
 // D16: this section bypasses draft/pendingPatch entirely — a revoke must take effect immediately,
 // not wait for Save, and gitClientsState is a module-level store, not a settings leaf.
 async function onRevokeGitClient(id: string, label: string): Promise<void> {
-  const ok = await confirmDialog(
+  const ok = await confirmDialogStore.confirmDialog(
     `Revoke access for "${label || id}"? It will need to be re-approved.`,
     {
       danger: true,
     },
   );
-  if (ok) await revokeGitClient(id);
+  if (ok) await gitClientsStore.revokeGitClient(id);
 }
 
 // G10 D12/D14: the same bypass-draft-entirely posture as onRevokeGitClient above — an install is
@@ -151,7 +150,7 @@ const vsixInstalling = ref(false);
 async function onInstallVsCodeIntegration(): Promise<void> {
   vsixInstalling.value = true;
   try {
-    await installVsCodeIntegration();
+    await gitClientsStore.installVsCodeIntegration();
   } finally {
     vsixInstalling.value = false;
   }
@@ -160,7 +159,7 @@ async function onInstallVsCodeIntegration(): Promise<void> {
 // D12's own outcome copy, verbatim where it's a fixed string; installFailed/revealFailed weave in
 // the server's own bounded Detail/vsixPath.
 const vsixOutcomeMessage = computed(() => {
-  const result = gitClientsState.vsixInstallResult;
+  const result = gitClientsStore.vsixInstallResult;
   if (!result) return null;
   switch (result.outcome) {
     case 'installed':
@@ -197,7 +196,7 @@ const dbMcpToggling = ref(false);
 async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
   dbMcpToggling.value = true;
   try {
-    await setDbMcpEnabled(enabled);
+    await dbMcpStore.setDbMcpEnabled(enabled);
   } finally {
     dbMcpToggling.value = false;
   }
@@ -207,7 +206,7 @@ const dbMcpRegenerating = ref(false);
 async function onRegenerateDbMcpToken(): Promise<void> {
   dbMcpRegenerating.value = true;
   try {
-    await regenerateDbMcpToken();
+    await dbMcpStore.regenerateDbMcpToken();
   } finally {
     dbMcpRegenerating.value = false;
   }
@@ -217,7 +216,7 @@ const dbMcpInstalling = ref(false);
 async function onInstallDbMcpClaudeCode(): Promise<void> {
   dbMcpInstalling.value = true;
   try {
-    await installDbMcpClaudeCode();
+    await dbMcpStore.installDbMcpClaudeCode();
   } finally {
     dbMcpInstalling.value = false;
   }
@@ -241,14 +240,14 @@ const keepAwakeAgentAwareToggling = ref(false);
 async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
   keepAwakeAgentAwareToggling.value = true;
   try {
-    await setKeepAwakeAgentAware(enabled);
+    await keepAwakeStore.setKeepAwakeAgentAware(enabled);
   } finally {
     keepAwakeAgentAwareToggling.value = false;
   }
 }
 
 const dbMcpInstallMessage = computed(() => {
-  const result = dbMcpState.installResult;
+  const result = dbMcpStore.installResult;
   if (!result) return null;
   switch (result.outcome) {
     case 'installed':
@@ -262,7 +261,7 @@ const dbMcpInstallMessage = computed(() => {
   }
 });
 
-const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpState.status.expiresAt));
+const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpStore.status.expiresAt));
 
 // M1 §6.1: exposure itself (deny by default) stays an instant toggle here. M2 §7.3: the three
 // permission modes and the description are edited in the connection's own MCP tab, not here —
@@ -633,7 +632,7 @@ async function onScriptColorChange(script: CustomScript, color: PaletteColor): P
 }
 
 async function onRemoveScript(script: CustomScript): Promise<void> {
-  const ok = await confirmDialog(
+  const ok = await confirmDialogStore.confirmDialog(
     `Remove "${script.name}"? It will no longer launch from the tab strip or the Terminal panel.`,
     {
       danger: true,
@@ -1188,7 +1187,7 @@ async function onAddScript(): Promise<void> {
             <!-- G10 D14: the Install VS Code Integration entry point — advisory-rendered from
                  VsixStatus, but the click itself always re-resolves through Install. -->
             <div class="git-vsix-install">
-              <p v-if="!gitClientsState.vsix.bundled" class="muted-note" data-testid="git-vsix-not-bundled">
+              <p v-if="!gitClientsStore.vsix.bundled" class="muted-note" data-testid="git-vsix-not-bundled">
                 The extension ships inside the packaged app. This build has none.
               </p>
               <template v-else>
@@ -1196,7 +1195,7 @@ async function onAddScript(): Promise<void> {
                      tab's Claude Code flow uses, applied here too — unrelated feature, same
                      principle. -->
                 <p class="mono command-text" data-testid="git-vsix-command">
-                  {{ gitClientsState.vsix.command }}
+                  {{ gitClientsStore.vsix.command }}
                 </p>
                 <AppButton
                   kind="dialog"
@@ -1205,29 +1204,29 @@ async function onAddScript(): Promise<void> {
                   data-testid="git-vsix-install-button"
                   @click="onInstallVsCodeIntegration"
                 >
-                  {{ gitClientsState.vsix.codeAvailable ? 'Install VS Code Integration' : 'Reveal Extension in Finder' }}
+                  {{ gitClientsStore.vsix.codeAvailable ? 'Install VS Code Integration' : 'Reveal Extension in Finder' }}
                 </AppButton>
               </template>
               <p v-if="vsixOutcomeMessage" class="helper-text" data-testid="git-vsix-outcome">
                 {{ vsixOutcomeMessage }}
               </p>
               <p
-                v-if="gitClientsState.vsix.bundled && !gitClientsState.vsix.codeAvailable && gitClientsState.vsix.probed.length > 0"
+                v-if="gitClientsStore.vsix.bundled && !gitClientsStore.vsix.codeAvailable && gitClientsStore.vsix.probed.length > 0"
                 class="muted-note"
                 data-testid="git-vsix-probed"
               >
                 Looked for VS Code's <span class="mono">code</span> command at:
-                <span class="mono">{{ gitClientsState.vsix.probed.join(', ') }}</span>
+                <span class="mono">{{ gitClientsStore.vsix.probed.join(', ') }}</span>
               </p>
             </div>
 
-            <p v-if="gitClientsState.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
+            <p v-if="gitClientsStore.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
               No editors have been paired yet. A VS Code editor pairs by connecting to
               <span class="mono">~/.kira-studio/git.sock</span>.
             </p>
             <ul v-else class="git-clients-list">
               <li
-                v-for="client in gitClientsState.clients"
+                v-for="client in gitClientsStore.clients"
                 :key="client.id"
                 class="git-client-row"
                 :data-testid="`git-client-row-${client.id}`"
@@ -1554,12 +1553,12 @@ async function onAddScript(): Promise<void> {
             </label>
 
             <template v-if="settingsState.dbMcp.serverEnabled">
-              <p v-if="dbMcpState.status.error" class="muted-note" data-testid="db-mcp-error">
-                {{ dbMcpState.status.error }}
+              <p v-if="dbMcpStore.status.error" class="muted-note" data-testid="db-mcp-error">
+                {{ dbMcpStore.status.error }}
               </p>
-              <template v-else-if="dbMcpState.status.running && dbMcpState.status.command">
+              <template v-else-if="dbMcpStore.status.running && dbMcpStore.status.command">
                 <p class="mono command-text" data-testid="db-mcp-command">
-                  {{ dbMcpState.status.command }}
+                  {{ dbMcpStore.status.command }}
                 </p>
                 <AppButton
                   kind="dialog"
@@ -1568,13 +1567,13 @@ async function onAddScript(): Promise<void> {
                   data-testid="db-mcp-install-button"
                   @click="onInstallDbMcpClaudeCode"
                 >
-                  {{ dbMcpState.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
+                  {{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
                 </AppButton>
                 <p v-if="dbMcpInstallMessage" class="helper-text" data-testid="db-mcp-install-outcome">
                   {{ dbMcpInstallMessage }}
                 </p>
               </template>
-              <template v-else-if="dbMcpState.status.running">
+              <template v-else-if="dbMcpStore.status.running">
                 <p class="muted-note" data-testid="db-mcp-no-token">
                   This server restarted since it was last enabled; its registration command needs a
                   fresh token to show again.
@@ -1590,14 +1589,14 @@ async function onAddScript(): Promise<void> {
                 </AppButton>
               </template>
               <p
-                v-if="dbMcpState.status.running && dbMcpState.status.expiresAt"
+                v-if="dbMcpStore.status.running && dbMcpStore.status.expiresAt"
                 class="helper-text"
                 data-testid="db-mcp-token-expiry"
               >
                 {{
                   dbMcpTokenExpired
                     ? 'Token expired — regenerate it above.'
-                    : `Token valid until ${new Date(dbMcpState.status.expiresAt).toLocaleString()}.`
+                    : `Token valid until ${new Date(dbMcpStore.status.expiresAt).toLocaleString()}.`
                 }}
               </p>
             </template>

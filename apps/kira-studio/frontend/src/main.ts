@@ -14,9 +14,9 @@ import { useCacheStatsStore } from './state/cacheStats';
 import { useCodeReposStore } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
 import { useCustomScriptsStore } from './state/customScripts';
-import { hydrateDbMcp, hydrateDbMcpApprovals } from './state/dbmcp';
-import { hydrateGitClients } from './state/gitClients';
-import { initKeepAwake } from './state/keepAwake';
+import { useDbMcpStore } from './state/dbmcp';
+import { useGitClientsStore } from './state/gitClients';
+import { useKeepAwakeStore } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
 import { hydrateOps } from './state/ops';
 import { pinia } from './state/pinia';
@@ -300,6 +300,9 @@ async function bootstrap(): Promise<void> {
   const customScriptsStore = useCustomScriptsStore(pinia);
   const agentHooksStore = useAgentHooksStore(pinia);
   const agentSessionsStore = useAgentSessionsStore(pinia);
+  const gitClientsStore = useGitClientsStore(pinia);
+  const dbMcpStore = useDbMcpStore(pinia);
+  const keepAwakeStore = useKeepAwakeStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -319,12 +322,12 @@ async function bootstrap(): Promise<void> {
     codeReposStore.hydrateCodeRepos(),
     customScriptsStore.hydrateCustomScripts(),
     hydrateTerminalDefaults(),
-    hydrateGitClients(),
-    hydrateDbMcp(),
-    hydrateDbMcpApprovals(),
+    gitClientsStore.hydrateGitClients(),
+    dbMcpStore.hydrateDbMcp(),
+    dbMcpStore.hydrateDbMcpApprovals(),
     agentHooksStore.hydrateAgentHooks(),
     agentSessionsStore.initAgentSessions(),
-    initKeepAwake(),
+    keepAwakeStore.initKeepAwake(),
     hydrateOps(),
     hydrateTabs(),
   ]);

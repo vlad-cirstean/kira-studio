@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
-import { approveQuery, dbMcpState, denyQuery } from '../state/dbmcp';
+import { useDbMcpStore } from '../state/dbmcp';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
+
+const dbMcpStore = useDbMcpStore();
 
 // M2 §5.4/§7.4: a separate, always-mounted dialog at App.vue's root — GitPairingDialog.vue's own
 // precedent applied to run_query's prompt-mode gate. An AI client is blocked while the human
 // decides, the same semantics pairing's own trust prompt has, so this reuses that answer rather
-// than a dock or a notification queue. Renders nothing while dbMcpState.approval.pending is null.
+// than a dock or a notification queue. Renders nothing while dbMcpStore.approval.pending is null.
 
 const denyButton = ref<{ $el: HTMLElement } | null>(null);
 let ticking = 0;
@@ -16,7 +18,7 @@ const now = ref(Date.now());
 // Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
 // unmounted per approval), so a plain onMounted only ever fires once, at app boot — a 1s
 // setInterval started there ticked for the app's entire lifetime even though the dialog itself
-// renders nothing while dbMcpState.approval.pending is null (DialogFrame's own v-if below). Start
+// renders nothing while dbMcpStore.approval.pending is null (DialogFrame's own v-if below). Start
 // and stop the interval instead as pending flips non-null/null.
 //
 // This also fixes denyButton's own focus call: run from onMounted, it only ever executed once, at
@@ -24,7 +26,7 @@ const now = ref(Date.now());
 // denyButton.value was always null there and Deny was never actually focused. nextTick here runs
 // it after each approval's own DOM update instead, so it sticks for real.
 watch(
-  () => dbMcpState.approval.pending !== null,
+  () => dbMcpStore.approval.pending !== null,
   (isPending) => {
     if (isPending) {
       now.value = Date.now();
@@ -44,7 +46,7 @@ watch(
 onUnmounted(() => window.clearInterval(ticking));
 
 const remainingSeconds = computed(() => {
-  const expires = dbMcpState.approval.pending?.expiresAtMs;
+  const expires = dbMcpStore.approval.pending?.expiresAtMs;
   if (expires === undefined) return 0;
   return Math.max(0, Math.ceil((expires - now.value) / 1000));
 });
@@ -57,7 +59,7 @@ const CLASS_WORDS: Record<string, string> = {
 };
 
 const classWord = computed(() => {
-  const cls = dbMcpState.approval.pending?.class;
+  const cls = dbMcpStore.approval.pending?.class;
   return cls ? (CLASS_WORDS[cls] ?? 'a statement') : 'a statement';
 });
 
@@ -66,71 +68,71 @@ const classWord = computed(() => {
 // statement <pre>) stays exactly as M2 shipped it. A heavy query and a write are the same keyboard
 // interaction.
 const dialogTitle = computed(() =>
-  dbMcpState.approval.pending?.reason === 'heavy' ? 'Run this heavy query?' : 'Approve this query?',
+  dbMcpStore.approval.pending?.reason === 'heavy' ? 'Run this heavy query?' : 'Approve this query?',
 );
 
 const heavyLede = computed(() => {
-  const plan = dbMcpState.approval.pending?.plan;
-  const pending = dbMcpState.approval.pending;
+  const plan = dbMcpStore.approval.pending?.plan;
+  const pending = dbMcpStore.approval.pending;
   if (!pending || !plan || plan.estimatedRowsRead === null) return '';
   return `${pending.connectionName} (${pending.kind}) wants to run a query estimated to read ${plan.estimatedRowsRead.toLocaleString()} rows — over your threshold of ${plan.thresholdRows.toLocaleString()}.`;
 });
 
 async function onDeny(): Promise<void> {
-  const id = dbMcpState.approval.pending?.requestId;
-  if (id) await denyQuery(id);
+  const id = dbMcpStore.approval.pending?.requestId;
+  if (id) await dbMcpStore.denyQuery(id);
 }
 
 async function onApprove(): Promise<void> {
-  const id = dbMcpState.approval.pending?.requestId;
-  if (id) await approveQuery(id);
+  const id = dbMcpStore.approval.pending?.requestId;
+  if (id) await dbMcpStore.approveQuery(id);
 }
 </script>
 
 <template>
   <DialogFrame
-    v-if="dbMcpState.approval.pending"
+    v-if="dbMcpStore.approval.pending"
     :title="dialogTitle"
     :width="520"
     test-id="db-mcp-approval-dialog"
     @close="onDeny"
   >
-    <p v-if="dbMcpState.approval.pending.reason === 'heavy'" class="message">
+    <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="message">
       {{ heavyLede }}
     </p>
     <p v-else class="message">
-      <strong>{{ dbMcpState.approval.pending.connectionName }}</strong>
-      ({{ dbMcpState.approval.pending.kind }}) wants to run {{ classWord }} through the database
+      <strong>{{ dbMcpStore.approval.pending.connectionName }}</strong>
+      ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
       MCP server.
     </p>
     <pre class="mono statement" data-testid="db-mcp-approval-statement">{{
-      dbMcpState.approval.pending.statement
+      dbMcpStore.approval.pending.statement
     }}</pre>
 
-    <div v-if="dbMcpState.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
+    <div v-if="dbMcpStore.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
       <p class="detail" data-testid="db-mcp-approval-plan-rows">
-        <template v-if="dbMcpState.approval.pending.plan.estimatedRowsRead !== null">
-          Estimated {{ dbMcpState.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
-          read — threshold {{ dbMcpState.approval.pending.plan.thresholdRows.toLocaleString() }}.
+        <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
+          Estimated {{ dbMcpStore.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
+          read — threshold {{ dbMcpStore.approval.pending.plan.thresholdRows.toLocaleString() }}.
         </template>
         <template v-else> No row estimate available for this plan. </template>
       </p>
       <p
-        v-for="(issue, i) in dbMcpState.approval.pending.plan.issues"
+        v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
         :key="i"
         class="detail plan-issue"
         data-testid="db-mcp-approval-plan-issue"
       >
         <strong>{{ issue.severity }}</strong> {{ issue.message }}
       </p>
-      <p v-if="dbMcpState.approval.pending.plan.issuesOmitted > 0" class="detail">
-        +{{ dbMcpState.approval.pending.plan.issuesOmitted }} more
+      <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" class="detail">
+        +{{ dbMcpStore.approval.pending.plan.issuesOmitted }} more
       </p>
     </div>
 
     <p class="detail" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
-    <p v-if="dbMcpState.approval.queued > 1" class="detail" data-testid="db-mcp-approval-queue-count">
-      1 of {{ dbMcpState.approval.queued }} waiting
+    <p v-if="dbMcpStore.approval.queued > 1" class="detail" data-testid="db-mcp-approval-queue-count">
+      1 of {{ dbMcpStore.approval.queued }} waiting
     </p>
 
     <template #footer>

@@ -6,7 +6,7 @@ import {
   publishSelectedCell,
   type SelectedCell,
 } from '../../state/cellSelection';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import { settingsState } from '../../state/settings';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
@@ -28,6 +28,8 @@ import { mongoDocumentRowMenu, rowAsJsonMenu } from './resultMenu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
 import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded } from './state';
+
+const contextMenuStore = useContextMenuStore();
 
 // A three-way switch over a console result's own kind (P8) — tabular results render through
 // ConsoleSlickGrid.vue (P30 §3, the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
@@ -276,7 +278,7 @@ function onDocumentRowContextMenu(e: MouseEvent, index: number): void {
   const body = documentRow(props.pageKey, index)?.body ?? '';
   const allBodies = () =>
     documentRows.value.map((v) => documentRow(props.pageKey, v.index)?.body ?? '');
-  openContextMenu(e, mongoDocumentRowMenu({ body, allBodies, onError: onCopyError }));
+  contextMenuStore.openContextMenu(e, mongoDocumentRowMenu({ body, allBodies, onError: onCopyError }));
 }
 
 function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
@@ -288,7 +290,7 @@ function onKeyValueRowContextMenu(e: MouseEvent, row: number): void {
       const entry = kvRowAt(r);
       return JSON.stringify({ [entry.field]: entry.value }, null, 2);
     });
-  openContextMenu(e, rowAsJsonMenu({ json, allJson, onError: onCopyError }));
+  contextMenuStore.openContextMenu(e, rowAsJsonMenu({ json, allJson, onError: onCopyError }));
 }
 
 function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {

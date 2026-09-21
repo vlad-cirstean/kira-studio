@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { CustomScript } from '@shared/domain/scripts';
 import { computed, ref } from 'vue';
-import { confirmDialog } from '../state/confirmDialog';
-import { type MenuItem, openContextMenu } from '../state/contextMenu';
+import { useConfirmDialogStore } from '../state/confirmDialog';
+import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { openSettingsAt } from '../state/settings';
 import { terminalDefaults } from '../state/terminals';
@@ -14,6 +14,10 @@ import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PanelShell from '../theme/primitives/PanelShell.vue';
 import TextField from '../theme/primitives/TextField.vue';
+
+const confirmDialogStore = useConfirmDialogStore();
+
+const contextMenuStore = useContextMenuStore();
 
 // P91 §11: the Terminal module's own left panel — a second *view* over P85's custom_scripts store
 // (§10, decided against a second, module-scoped list), not a second data store. Add/remove are
@@ -86,7 +90,7 @@ function runScript(script: CustomScript): void {
 
 // §10.4: both surfaces named — a script removed here also stops launching from the tab strip.
 async function onRemove(script: CustomScript): Promise<void> {
-  const ok = await confirmDialog(
+  const ok = await confirmDialogStore.confirmDialog(
     `Remove "${script.name}"? It will no longer launch from the tab strip or the Terminal panel.`,
     { danger: true },
   );
@@ -113,7 +117,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
       run: () => onRemove(script),
     },
   ];
-  openContextMenu(e, items);
+  contextMenuStore.openContextMenu(e, items);
 }
 </script>
 

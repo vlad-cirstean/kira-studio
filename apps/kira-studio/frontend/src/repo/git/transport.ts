@@ -43,9 +43,14 @@ import { createRpcClient, createStreamChannel } from '@kira/git-ipc';
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Stream } from '/wails/runtime.js';
-import { dropCredentialRequests, enqueueCredentialRequest } from '../../state/gitCredential';
+import { useGitCredentialStore } from '../../state/gitCredential';
+import { pinia } from '../../state/pinia';
 import { forgetRepoOpen } from '../../state/repoOpenHold';
 import { createHostHandlers, gitRepoIdFor } from './hostHandlers';
+
+// Reached via state/workspace.ts's static import (main.ts imports it at module scope), before
+// app.use(pinia) runs — needs the explicit instance (state/pinia.ts's own header comment).
+const gitCredentialStore = useGitCredentialStore(pinia);
 
 /** The two `EventKey`s this host answers itself rather than forwarding to `remote.on` — never
  *  emitted by Go (§8.1). */
@@ -142,11 +147,11 @@ function createNativeGitTransport(codeRepoId: string): Transport {
   // tabs), not to whichever mount happened to trigger the remote op. remote.dispose() below
   // (disposeGitTransport) releases this subscription along with everything else on the client.
   remote.on('credential.request', (req) => {
-    enqueueCredentialRequest({
+    gitCredentialStore.enqueueCredentialRequest({
       codeRepoId,
       prompt: req.prompt,
       masked: req.masked,
-      answer: (secret) => {
+      answer: (secret: string | null) => {
         void remote
           .request('credential.provide', { requestId: req.requestId, secret })
           .catch(() => {
@@ -305,7 +310,7 @@ export function disposeGitTransport(codeRepoId: string): void {
   if (!shared) return;
   sharedClientsByCodeRepoId.delete(codeRepoId);
   localEmittersByCodeRepoId.delete(codeRepoId);
-  dropCredentialRequests(codeRepoId);
+  gitCredentialStore.dropCredentialRequests(codeRepoId);
   // blameAnnotation.ts's `repoOpenMemo` records a `repo.open` hold scoped to this shared
   // client's own Conn — a reopened workspace gets a new Conn, so the memo must not outlive this
   // one (Group 3, P69 review).

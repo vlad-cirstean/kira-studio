@@ -3,7 +3,7 @@ import { decodePath } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
 import { copyText } from '../clipboard';
-import { confirmDialog } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '../state/confirmDialog';
 import {
   connectConnection,
   connectionRecord,
@@ -225,7 +225,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       run: async () => {
         if (
           isLive &&
-          !(await confirmDialog(
+          !(await useConfirmDialogStore().confirmDialog(
             'This connection is live — changing read-only will reconnect it. Continue?',
             { danger: false },
           ))
@@ -244,7 +244,8 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       danger: true,
       shortcut: 'tree.delete',
       run: async () => {
-        if (!(await confirmDialog(`Delete connection "${row.name}"?`))) return;
+        if (!(await useConfirmDialogStore().confirmDialog(`Delete connection "${row.name}"?`)))
+          return;
         await deleteConnection(row.connectionId);
       },
     },

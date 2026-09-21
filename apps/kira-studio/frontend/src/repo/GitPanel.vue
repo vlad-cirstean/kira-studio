@@ -5,7 +5,7 @@ import { repoIdOfWorkspace, repoWorkspaceKey } from '@shared/domain/workspace';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
 import { useCodeReposStore } from '../state/coderepos';
-import { type MenuItem, openContextMenu } from '../state/contextMenu';
+import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { ensureReviewPanelWidth } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
 import { terminalCountAtPath } from '../state/terminals';
@@ -39,6 +39,8 @@ import {
   worktreesError,
   worktreesLoading,
 } from './state/worktrees';
+
+const contextMenuStore = useContextMenuStore();
 
 const codeReposStore = useCodeReposStore();
 
@@ -211,7 +213,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
     danger: true,
     run: () => onRemoveRepo(repo.id),
   });
-  openContextMenu(e, items);
+  contextMenuStore.openContextMenu(e, items);
 }
 
 // P83 §11.2: the indicator's own tooltip text — terminalCountAtPath is §11's whole signal (the
@@ -279,7 +281,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
       run: () => onRemoveRepo(record.id),
     });
   }
-  openContextMenu(e, items);
+  contextMenuStore.openContextMenu(e, items);
 }
 
 // C7 D9: lives in repo/state/search.ts, not component state, so switching workspaces and back

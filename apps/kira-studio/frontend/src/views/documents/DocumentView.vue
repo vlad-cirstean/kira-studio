@@ -6,9 +6,9 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { confirmDialog } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -81,6 +81,9 @@ import {
   toggleExpanded,
   toggleSearchOpen,
 } from './state';
+
+const confirmDialogStore = useConfirmDialogStore();
+const contextMenuStore = useContextMenuStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
@@ -552,7 +555,7 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
   e.preventDefault();
   const entry = rowAt(row);
   if (!entry) return;
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     e,
     rowMenu(
       props.tab.id,
@@ -568,7 +571,7 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
 // D6: the same confirm + deleteDocument path the context menu's own Delete item already uses
 // (documents/menu.ts) — one delete path, not two.
 async function onDeleteRow(id: string): Promise<void> {
-  if (!(await confirmDialog(`Delete this document (_id: ${id})?`))) return;
+  if (!(await confirmDialogStore.confirmDialog(`Delete this document (_id: ${id})?`))) return;
   deleteDocument(props.tab.id, id)
     .then(() => setActionError(props.tab.id, null))
     .catch((err: unknown) => {

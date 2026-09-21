@@ -7,7 +7,7 @@ import {
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref } from 'vue';
 import { formatRelative } from '../../format';
-import { confirmDialog } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { isIncognito } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -21,6 +21,8 @@ import {
   grpcHistoryRuntime,
   viewGrpcHistoryEntry,
 } from './history';
+
+const confirmDialogStore = useConfirmDialogStore();
 
 // P13 D12: extracted out of ResponsePane.vue's own history block, mirroring
 // views/httprequest/ResponseHistoryList.vue's shape exactly — a real toolbar (count + Clear,
@@ -69,7 +71,7 @@ function onDelete(id: string): void {
 }
 
 async function onClear(): Promise<void> {
-  const ok = await confirmDialog('Clear this request’s call history? This cannot be undone.', {
+  const ok = await confirmDialogStore.confirmDialog('Clear this request’s call history? This cannot be undone.', {
     danger: true,
   });
   if (ok) await clearGrpcHistory(props.tab.id);

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
 import { connectionsState } from '../state/connections';
-import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
+import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { initSchemaColumnsSync } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
 import { settingsState } from '../state/settings';
@@ -29,6 +29,8 @@ import {
   visibleRows,
 } from './state/tree';
 import TreeRow from './TreeRow.vue';
+
+const contextMenuStore = useContextMenuStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
@@ -135,13 +137,13 @@ async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
   // The "Saved filters ▸" submenu (Step 13) is built synchronously by menuForRow() from
   // treeState.savedQueries, so it must already be populated by the time the menu opens.
   if (OPENABLE_KINDS.has(row.kind)) await loadSavedQueries(row.connectionId, row.path);
-  openContextMenu(event, menuForRow(row));
+  contextMenuStore.openContextMenu(event, menuForRow(row));
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
   // TreeRow.vue stops propagation on its own contextmenu handler, so only a right-click on
   // the empty area below/around the rows (the virtual list's spacer divs) ever reaches here.
-  openContextMenu(event, emptyBackgroundMenu());
+  contextMenuStore.openContextMenu(event, emptyBackgroundMenu());
 }
 
 const TREE_SHORTCUTS = [

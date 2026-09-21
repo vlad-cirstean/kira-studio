@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
-import { approvePairing, denyPairing, gitClientsState } from '../state/gitClients';
+import { useGitClientsStore } from '../state/gitClients';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
+const gitClientsStore = useGitClientsStore();
+
 // G1 D17: a separate, always-mounted dialog at App.vue's root, the same precedent ConfirmDialog
 // sets — a pairing request must be able to appear with nothing else open. Renders nothing while
-// gitClientsState.pending is null.
+// gitClientsStore.pending is null.
 
 // Bare $el shape (SearchToolbar.vue's own precedent) so this ref doesn't read as a type-only use
 // of AppButton above — it's a real component, bound as a value by the template below.
@@ -17,7 +19,7 @@ const now = ref(Date.now());
 // Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
 // unmounted per pairing request), so a plain onMounted only ever fires once, at app boot — a 1s
 // setInterval started there ticked for the app's entire lifetime even though the dialog itself
-// renders nothing while gitClientsState.pending is null (DialogFrame's own v-if below). Start and
+// renders nothing while gitClientsStore.pending is null (DialogFrame's own v-if below). Start and
 // stop the interval instead as pending flips non-null/null.
 //
 // This also fixes denyButton's own focus call: run from onMounted, it only ever executed once, at
@@ -25,7 +27,7 @@ const now = ref(Date.now());
 // denyButton.value was always null there and Deny was never actually focused. nextTick here runs
 // it after each pairing request's own DOM update instead, so it sticks for real.
 watch(
-  () => gitClientsState.pending !== null,
+  () => gitClientsStore.pending !== null,
   (isPending) => {
     if (isPending) {
       now.value = Date.now();
@@ -45,38 +47,38 @@ watch(
 onUnmounted(() => window.clearInterval(ticking));
 
 const remainingSeconds = computed(() => {
-  const expires = gitClientsState.pending?.expiresAtMs;
+  const expires = gitClientsStore.pending?.expiresAtMs;
   if (expires === undefined) return 0;
   return Math.max(0, Math.ceil((expires - now.value) / 1000));
 });
 
 async function onDeny(): Promise<void> {
-  const id = gitClientsState.pending?.requestId;
-  if (id) await denyPairing(id);
+  const id = gitClientsStore.pending?.requestId;
+  if (id) await gitClientsStore.denyPairing(id);
 }
 
 async function onApprove(): Promise<void> {
-  const id = gitClientsState.pending?.requestId;
-  if (id) await approvePairing(id);
+  const id = gitClientsStore.pending?.requestId;
+  if (id) await gitClientsStore.approvePairing(id);
 }
 </script>
 
 <template>
   <DialogFrame
-    v-if="gitClientsState.pending"
+    v-if="gitClientsStore.pending"
     title="Editor wants to connect"
     :width="420"
     test-id="git-pairing-dialog"
     @close="onDeny"
   >
     <p class="message">
-      <strong>{{ gitClientsState.pending.label || 'A VS Code editor' }}</strong> wants to connect
+      <strong>{{ gitClientsStore.pending.label || 'A VS Code editor' }}</strong> wants to connect
       to this repository's git data over <span class="mono">~/.kira-studio/git.sock</span>.
       Approving lets it read and change git state in repositories it opens.
     </p>
     <p class="detail" data-testid="git-pairing-expires">Expires in {{ remainingSeconds }}s</p>
-    <p v-if="gitClientsState.queued > 1" class="detail" data-testid="git-pairing-queue-count">
-      1 of {{ gitClientsState.queued }} waiting
+    <p v-if="gitClientsStore.queued > 1" class="detail" data-testid="git-pairing-queue-count">
+      1 of {{ gitClientsStore.queued }} waiting
     </p>
 
     <template #footer>

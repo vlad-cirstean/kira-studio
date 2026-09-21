@@ -1,4 +1,5 @@
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 
 // P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D9) — the native counterpart to git's own
 // askpass prompt, relayed here for the first time now that the native mount can push a remote op
@@ -31,46 +32,46 @@ export interface PendingCredential {
   readonly answer: (secret: string | null) => void;
 }
 
-interface GitCredentialState {
-  active: PendingCredential | null;
-}
+export const useGitCredentialStore = defineStore('gitCredential', () => {
+  const state = reactive({
+    active: null as PendingCredential | null,
+  });
 
-export const gitCredentialState: GitCredentialState = reactive({
-  active: null,
+  /** Module-private FIFO for everything queued behind `active`. */
+  const queue: PendingCredential[] = [];
+
+  /** Becomes `active` immediately if nothing is showing, else queues behind whatever is. */
+  function enqueueCredentialRequest(pending: PendingCredential): void {
+    if (state.active === null) {
+      state.active = pending;
+    } else {
+      queue.push(pending);
+    }
+  }
+
+  /** Settles `active` (never a queued entry) and pumps the next one in, if any. A call with nothing
+   *  active is a no-op — answering twice must never double-pump the queue. */
+  function answerCredential(secret: string | null): void {
+    const current = state.active;
+    if (!current) return;
+    state.active = null;
+    current.answer(secret);
+    const next = queue.shift();
+    if (next) state.active = next;
+  }
+
+  /** Called from disposeGitTransport when a repo workspace closes. Removes that workspace's own
+   *  entries, active included — but never answers them: the transport is gone, so there is nothing
+   *  to send credential.provide on. The Go broker's own 120s bound and the op's own cancellation end
+   *  the server-side wait. */
+  function dropCredentialRequests(codeRepoId: string): void {
+    for (let i = queue.length - 1; i >= 0; i -= 1) {
+      if (queue[i]?.codeRepoId === codeRepoId) queue.splice(i, 1);
+    }
+    if (state.active?.codeRepoId === codeRepoId) {
+      state.active = queue.shift() ?? null;
+    }
+  }
+
+  return { ...toRefs(state), enqueueCredentialRequest, answerCredential, dropCredentialRequests };
 });
-
-/** Module-private FIFO for everything queued behind `active`. */
-const queue: PendingCredential[] = [];
-
-/** Becomes `active` immediately if nothing is showing, else queues behind whatever is. */
-export function enqueueCredentialRequest(pending: PendingCredential): void {
-  if (gitCredentialState.active === null) {
-    gitCredentialState.active = pending;
-  } else {
-    queue.push(pending);
-  }
-}
-
-/** Settles `active` (never a queued entry) and pumps the next one in, if any. A call with nothing
- *  active is a no-op — answering twice must never double-pump the queue. */
-export function answerCredential(secret: string | null): void {
-  const current = gitCredentialState.active;
-  if (!current) return;
-  gitCredentialState.active = null;
-  current.answer(secret);
-  const next = queue.shift();
-  if (next) gitCredentialState.active = next;
-}
-
-/** Called from disposeGitTransport when a repo workspace closes. Removes that workspace's own
- *  entries, active included — but never answers them: the transport is gone, so there is nothing
- *  to send credential.provide on. The Go broker's own 120s bound and the op's own cancellation end
- *  the server-side wait. */
-export function dropCredentialRequests(codeRepoId: string): void {
-  for (let i = queue.length - 1; i >= 0; i -= 1) {
-    if (queue[i]?.codeRepoId === codeRepoId) queue.splice(i, 1);
-  }
-  if (gitCredentialState.active?.codeRepoId === codeRepoId) {
-    gitCredentialState.active = queue.shift() ?? null;
-  }
-}

@@ -14,7 +14,7 @@ import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
-import { confirmDialog } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '../state/confirmDialog';
 import { closeDialog, connectionsState, saveDialog } from '../state/connections';
 import {
   loadMaskRules,
@@ -35,6 +35,8 @@ import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import SegmentedControl from '../theme/primitives/SegmentedControl.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
+
+const confirmDialogStore = useConfirmDialogStore();
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
@@ -276,7 +278,7 @@ async function requestReveal(id: string, confirmed: boolean): Promise<void> {
       return;
     case 'confirmation-required': {
       const name = draft.value?.name || 'this connection';
-      const ok = await confirmDialog(
+      const ok = await confirmDialogStore.confirmDialog(
         `Show the saved password for "${name}"? It will be displayed in plain text.`,
         { danger: false },
       );
@@ -497,7 +499,7 @@ async function onRemoveMaskRule(ruleId: string): Promise<void> {
 async function onRegenerateMaskKey(): Promise<void> {
   const connectionId = editingConnectionId.value;
   if (!connectionId) return;
-  const ok = await confirmDialog(
+  const ok = await confirmDialogStore.confirmDialog(
     'Regenerating the correlation key changes every masked correlation tag for this connection. ' +
       'Masked results already given to an AI client, or saved anywhere outside this app, will no ' +
       'longer correlate with results produced after the change. The real values are not affected, ' +

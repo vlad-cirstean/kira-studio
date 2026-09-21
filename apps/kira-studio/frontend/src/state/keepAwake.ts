@@ -1,4 +1,5 @@
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { settingsState } from './settings';
 
@@ -15,31 +16,35 @@ const DEFAULT_STATUS: KeepAwakeStatus = {
   error: '',
 };
 
-export const keepAwakeState = reactive({
-  status: DEFAULT_STATUS as KeepAwakeStatus,
-});
-
-let unsubscribeKeepAwake: (() => void) | null = null;
-
-// initKeepAwake both hydrates and subscribes — state/agentSessions.ts's own initAgentSessions
-// pattern, needed for the same reason: a window opened after another window toggled keep-awake
-// must not render stale (SetManual/SetAgentAware are process-wide, not window-scoped).
-export async function initKeepAwake(): Promise<void> {
-  keepAwakeState.status = await control.keepAwakeStatus();
-  unsubscribeKeepAwake?.();
-  unsubscribeKeepAwake = control.onKeepAwakeChanged((status) => {
-    keepAwakeState.status = status;
+export const useKeepAwakeStore = defineStore('keepAwake', () => {
+  const state = reactive({
+    status: DEFAULT_STATUS as KeepAwakeStatus,
   });
-}
 
-export async function setKeepAwakeManual(on: boolean): Promise<void> {
-  keepAwakeState.status = await control.keepAwakeSetManual(on);
-}
+  let unsubscribeKeepAwake: (() => void) | null = null;
 
-// setKeepAwakeAgentAware also writes settingsState.claudeCode.keepAwakeWithAgents directly,
-// mirroring setAgentHooksEnabled's own :32 — this leaf both persists and recomputes the live
-// assertion in one call, bypassing the Settings dialog's draft/Save flow entirely.
-export async function setKeepAwakeAgentAware(on: boolean): Promise<void> {
-  keepAwakeState.status = await control.keepAwakeSetAgentAware(on);
-  settingsState.claudeCode.keepAwakeWithAgents = on;
-}
+  // initKeepAwake both hydrates and subscribes — state/agentSessions.ts's own initAgentSessions
+  // pattern, needed for the same reason: a window opened after another window toggled keep-awake
+  // must not render stale (SetManual/SetAgentAware are process-wide, not window-scoped).
+  async function initKeepAwake(): Promise<void> {
+    state.status = await control.keepAwakeStatus();
+    unsubscribeKeepAwake?.();
+    unsubscribeKeepAwake = control.onKeepAwakeChanged((status) => {
+      state.status = status;
+    });
+  }
+
+  async function setKeepAwakeManual(on: boolean): Promise<void> {
+    state.status = await control.keepAwakeSetManual(on);
+  }
+
+  // setKeepAwakeAgentAware also writes settingsState.claudeCode.keepAwakeWithAgents directly,
+  // mirroring setAgentHooksEnabled's own :32 — this leaf both persists and recomputes the live
+  // assertion in one call, bypassing the Settings dialog's draft/Save flow entirely.
+  async function setKeepAwakeAgentAware(on: boolean): Promise<void> {
+    state.status = await control.keepAwakeSetAgentAware(on);
+    settingsState.claudeCode.keepAwakeWithAgents = on;
+  }
+
+  return { ...toRefs(state), initKeepAwake, setKeepAwakeManual, setKeepAwakeAgentAware };
+});

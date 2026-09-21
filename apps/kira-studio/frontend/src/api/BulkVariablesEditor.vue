@@ -3,10 +3,12 @@ import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-cor
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
 import { computed, ref } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
-import { confirmDialog } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '../state/confirmDialog';
 import AppButton from '../theme/primitives/AppButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { applyBulkVariables } from './state/variables';
+
+const confirmDialogStore = useConfirmDialogStore();
 
 // P17 D21/D22/D23, item 5: the `.env`-format bulk editor, hosted inside VariableSetView.vue's own
 // bulk-mode toggle (a component-local lens, never persisted to tab state — D16's own rule for the
@@ -80,7 +82,7 @@ async function onApply(): Promise<void> {
   if (!d || applying.value) return;
   if (d.removed.length > 0) {
     const names = d.removed.map((r) => `"${r.name}"`).join(', ');
-    const ok = await confirmDialog(
+    const ok = await confirmDialogStore.confirmDialog(
       `Remove ${d.removed.length === 1 ? 'variable' : 'variables'} ${names}? Its value history goes with it.`,
     );
     if (!ok) return;

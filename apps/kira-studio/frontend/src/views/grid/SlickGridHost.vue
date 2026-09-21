@@ -25,7 +25,7 @@ import {
   type SelectedCell,
 } from '../../state/cellSelection';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { type MenuItem, openContextMenu, runMenuShortcut } from '../../state/contextMenu';
+import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
 import {
   correlationKeyFor,
   loadMaskRules,
@@ -112,6 +112,8 @@ import {
 import { getPage, pageVersion, setVisibleWindow } from './page';
 import { parseTextSortTerms } from './sortTerms';
 import { runtime, type Selection, setActionError, setMaskPreview, setSort } from './state';
+
+const contextMenuStore = useContextMenuStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -1199,7 +1201,7 @@ function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
       if (item.type !== 'item' || !fk) return item;
       return { ...item, run: () => openPreview(fk, () => void item.run()) };
     });
-    openContextMenu(native, previewItems);
+    contextMenuStore.openContextMenu(native, previewItems);
     return;
   }
 
@@ -1210,7 +1212,7 @@ function onGridClick(e: SlickEventData, args: OnClickEventArgs): void {
     if (only?.type === 'item') void only.run();
     return;
   }
-  openContextMenu(native, entry.items);
+  contextMenuStore.openContextMenu(native, entry.items);
 }
 
 function currentWidths(): Record<string, number> {
@@ -1663,7 +1665,7 @@ function onGutterContextMenu(row: number, e: MouseEvent): void {
     grid.setActiveCell(displayPositionOf(idx, row), 0, false, false, false);
   }
   const rows = inSelection && sel.kind === 'row' ? sel.rows : [row];
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     e,
     rowMenu({
       tabId: props.tabId,
@@ -1707,7 +1709,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
     // onCellContextMenu always opened cellMenu() here regardless of what was actually selected, so
     // right-click Copy on a multi-row range silently copied one cell, and right-click Delete on a
     // column/whole-table selection deleted (at most) one row.
-    openContextMenu(
+    contextMenuStore.openContextMenu(
       e,
       rowMenu({
         tabId: props.tabId,
@@ -1724,7 +1726,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
   const dc = displayCell(row, displayCol);
   const name = order[displayCol] ?? '';
   const t = tab();
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     e,
     cellMenu({
       tabId: props.tabId,
@@ -1756,7 +1758,7 @@ function onCellContextMenu(row: number, displayCol: number, e: MouseEvent): void
 function onHeaderContextMenuHandler(displayCol: number, e: MouseEvent): void {
   const order = currentOrder();
   const name = order[displayCol] ?? '';
-  openContextMenu(
+  contextMenuStore.openContextMenu(
     e,
     headerMenu({
       tabId: props.tabId,

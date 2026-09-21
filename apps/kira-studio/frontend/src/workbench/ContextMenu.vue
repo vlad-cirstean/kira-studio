@@ -9,11 +9,13 @@ import {
   watch,
 } from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
-import { closeContextMenu, contextMenuState, type MenuItem } from '../state/contextMenu';
+import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import { computeFloatPosition, pointReference } from '../theme/floatingPosition';
 import { CONTEXT_MENU_KEY_HANDLERS, type ContextMenuKeyContext } from './contextMenuKeys';
+
+const contextMenuStore = useContextMenuStore();
 
 const SUBMENU_OPEN_DELAY_MS = 150;
 
@@ -25,7 +27,7 @@ const submenuStyle = ref({ left: '0px', top: '0px' });
 let submenuTimer: ReturnType<typeof setTimeout> | null = null;
 
 // A plain `ref="submenuRef"` on this element would silently do the wrong thing: it sits inside
-// this template's own `v-for="item in contextMenuState.items"`, and Vue collects any `ref` bound
+// this template's own `v-for="item in contextMenuStore.items"`, and Vue collects any `ref` bound
 // inside a `v-for` scope into an array — regardless of the inner `v-if` ever mounting at most one
 // of them — so `submenuRef.value` would be `[HTMLDivElement]`, not the element, and every DOM
 // read below it (`.parentElement` included) would silently return `undefined`. A function ref
@@ -49,7 +51,7 @@ const activeSubIndex = ref(-1);
 /** Every row a keyboard can land on at the top level, in render order: enabled `item`s and every
  *  `submenu` trigger. */
 const navigable = computed(() =>
-  contextMenuState.items.filter(
+  contextMenuStore.items.filter(
     (item) => item.type === 'submenu' || (item.type === 'item' && !item.disabled),
   ),
 );
@@ -81,7 +83,7 @@ async function position(): Promise<void> {
   const el = menuRef.value;
   if (!el) return;
   const { left, top } = await computeFloatPosition(
-    pointReference(contextMenuState.x, contextMenuState.y),
+    pointReference(contextMenuStore.x, contextMenuStore.y),
     el,
     { offset: 0, flip: false },
   );
@@ -107,7 +109,7 @@ async function positionSubmenu(): Promise<void> {
 }
 
 watch(
-  () => contextMenuState.open,
+  () => contextMenuStore.open,
   (open) => {
     if (!open) return;
     openSubmenuId.value = null;
@@ -122,7 +124,7 @@ watch(openSubmenuId, (id) => {
 });
 
 function onDocMouseDown(e: MouseEvent): void {
-  if (menuRef.value && !menuRef.value.contains(e.target as Node)) closeContextMenu();
+  if (menuRef.value && !menuRef.value.contains(e.target as Node)) contextMenuStore.closeContextMenu();
 }
 
 function clearSubmenuTimer(): void {
@@ -147,10 +149,10 @@ const keyCtx: ContextMenuKeyContext = {
 
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
-    closeContextMenu();
+    contextMenuStore.closeContextMenu();
     return;
   }
-  if (!contextMenuState.open) return;
+  if (!contextMenuStore.open) return;
   const handler = CONTEXT_MENU_KEY_HANDLERS[e.key];
   if (!handler) return;
   e.preventDefault();
@@ -160,12 +162,12 @@ function onKeydown(e: KeyboardEvent): void {
 onMounted(() => {
   document.addEventListener('mousedown', onDocMouseDown, true);
   document.addEventListener('keydown', onKeydown);
-  window.addEventListener('blur', closeContextMenu);
+  window.addEventListener('blur', contextMenuStore.closeContextMenu);
 });
 onUnmounted(() => {
   document.removeEventListener('mousedown', onDocMouseDown, true);
   document.removeEventListener('keydown', onKeydown);
-  window.removeEventListener('blur', closeContextMenu);
+  window.removeEventListener('blur', contextMenuStore.closeContextMenu);
   if (submenuTimer) clearTimeout(submenuTimer);
 });
 
@@ -191,7 +193,7 @@ function onSubRowEnter(sub: MenuItem): void {
 
 async function onItemClick(item: MenuItem): Promise<void> {
   if (item.type !== 'item' || item.disabled) return;
-  closeContextMenu();
+  contextMenuStore.closeContextMenu();
   await item.run();
 }
 </script>
@@ -199,13 +201,13 @@ async function onItemClick(item: MenuItem): Promise<void> {
 <template>
   <Teleport to="body">
     <div
-      v-if="contextMenuState.open"
+      v-if="contextMenuStore.open"
       ref="menuRef"
       class="context-menu p-float"
       data-testid="context-menu"
       :style="style"
     >
-      <template v-for="(item, idx) in contextMenuState.items" :key="item.type === 'separator' ? `sep-${idx}` : item.id">
+      <template v-for="(item, idx) in contextMenuStore.items" :key="item.type === 'separator' ? `sep-${idx}` : item.id">
         <div v-if="item.type === 'separator'" class="p-sep" />
 
         <div

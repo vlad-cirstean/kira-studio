@@ -2,8 +2,8 @@
 import { computed, ref } from 'vue';
 import { copyText } from '../clipboard';
 import { shortcutFor } from '../shortcuts/keys';
-import { confirmDialog } from '../state/confirmDialog';
-import { openContextMenu, runMenuShortcut } from '../state/contextMenu';
+import { useConfirmDialogStore } from '../state/confirmDialog';
+import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { settingsState } from '../state/settings';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
@@ -33,6 +33,9 @@ import { openImportCurlDialog } from './state/curl';
 import { openDynamicValuesDialog } from './state/dynamicValues';
 import { openEnvironments } from './state/variables';
 import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSetTab } from './tabs';
+
+const confirmDialogStore = useConfirmDialogStore();
+const contextMenuStore = useContextMenuStore();
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -106,17 +109,17 @@ async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
   // A folder and a collection take their whole subtree with them (the migration's own cascade),
   // which the prompt says out loud rather than leaving to be discovered.
   const suffix = row.kind === 'request' ? '' : ' and everything inside it';
-  if (!(await confirmDialog(`Delete ${what} "${row.name}"${suffix}?`))) return;
+  if (!(await confirmDialogStore.confirmDialog(`Delete ${what} "${row.name}"${suffix}?`))) return;
   await deleteRow(row);
 }
 
 function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
   selectRow(row.key);
-  openContextMenu(event, menuForRow(row, actions));
+  contextMenuStore.openContextMenu(event, menuForRow(row, actions));
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
-  openContextMenu(event, backgroundMenu(actions));
+  contextMenuStore.openContextMenu(event, backgroundMenu(actions));
 }
 
 function onRename(row: CollectionRowVm, name: string): void {

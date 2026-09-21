@@ -1,10 +1,12 @@
 import { beautifyJson } from '../../beautify';
 import { copyText } from '../../clipboard';
-import { confirmDialog } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../state/confirmDialog';
 import type { MenuItem } from '../../state/contextMenu';
 import { parseIdLabel, toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { setActionError, setAllExpanded, toggleExpanded } from './state';
+
+const confirmDialogStore = useConfirmDialogStore();
 
 // P19 D6 (parity half): the row's body is already canonical extended JSON (ejson.ts's own
 // header rule) — re-indented through beautify.ts's JSON scanner, falling back to the raw body if
@@ -141,7 +143,7 @@ export function rowMenu(
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
-        if (!(await confirmDialog(`Delete this document (_id: ${id})?`))) return;
+        if (!(await confirmDialogStore.confirmDialog(`Delete this document (_id: ${id})?`))) return;
         try {
           await deleteDocument(tabId, id);
           setActionError(tabId, null);

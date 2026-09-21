@@ -8,7 +8,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } fr
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { connectionRecord } from '../../state/connections';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import {
   cachedRelationsFor,
   containerPathFor,
@@ -57,6 +57,8 @@ import {
   stop,
   toggleSearchOpen,
 } from './state';
+
+const contextMenuStore = useContextMenuStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -510,7 +512,7 @@ function onResultMiddleClick(key: string): void {
 // instead of the app's whole tab list — disabled rather than hidden when they would be a no-op.
 function onResultContextMenu(e: MouseEvent, key: string, index: number): void {
   const total = rt.value?.results.length ?? 0;
-  openContextMenu(e, [
+  contextMenuStore.openContextMenu(e, [
     {
       type: 'item',
       id: 'close',

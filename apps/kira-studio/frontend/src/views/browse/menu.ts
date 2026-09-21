@@ -1,12 +1,14 @@
 import type { TreeNode } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
-import { confirmDialog } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import type { MenuItem } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { openKeyValueTab } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';
 import { reload, setActionError } from './state';
+
+const confirmDialogStore = useConfirmDialogStore();
 
 // P41 D10: the bodies of project/menus.ts's now-deleted namespaceMenu/prefixMenu (a container row
 // — redis 'namespace' / s3 'prefix') and keyMenu/objectMenu (a leaf row — redis 'key' / s3
@@ -131,7 +133,12 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       // P43 F6/D8: this runs inside contextMenu.ts's own `void item.run()` — an unhandled
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
-        if (!(await confirmDialog(`Delete object "${node.name}"? This cannot be undone.`))) return;
+        if (
+          !(await confirmDialogStore.confirmDialog(
+            `Delete object "${node.name}"? This cannot be undone.`,
+          ))
+        )
+          return;
         try {
           await useObjectStoreStore().deleteObject(connectionId, node.path, null);
           await reload(tabId);

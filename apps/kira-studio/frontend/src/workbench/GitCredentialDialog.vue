@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
-import { answerCredential, gitCredentialState } from '../state/gitCredential';
+import { useGitCredentialStore } from '../state/gitCredential';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import TextField from '../theme/primitives/TextField.vue';
+
+const gitCredentialStore = useGitCredentialStore();
 
 const codeReposStore = useCodeReposStore();
 
@@ -12,7 +14,7 @@ const codeReposStore = useCodeReposStore();
 // askpass prompt (fetch/pull/push against an HTTPS remote with no credential helper configured).
 // A separate, always-mounted dialog at App.vue's root, the same precedent GitPairingDialog.vue
 // sets: a pull started in the Git module must stay answerable after switching to Studio, so this
-// mounts once and self-gates on gitCredentialState.active rather than living inside whichever
+// mounts once and self-gates on gitCredentialStore.active rather than living inside whichever
 // repo tab happened to trigger the remote op. Renders nothing while active is null.
 //
 // The typed value never outlives this dialog: it lives only in `value` below, cleared in the same
@@ -25,7 +27,7 @@ const value = ref('');
 const inputField = ref<{ $el: HTMLElement } | null>(null);
 
 watch(
-  () => gitCredentialState.active,
+  () => gitCredentialStore.active,
   (active) => {
     value.value = '';
     if (active) {
@@ -35,21 +37,21 @@ watch(
 );
 
 function onSubmit(): void {
-  if (!gitCredentialState.active) return;
+  if (!gitCredentialStore.active) return;
   const secret = value.value;
   value.value = '';
-  answerCredential(secret);
+  gitCredentialStore.answerCredential(secret);
 }
 
 function onCancel(): void {
   value.value = '';
-  answerCredential(null);
+  gitCredentialStore.answerCredential(null);
 }
 </script>
 
 <template>
   <DialogFrame
-    v-if="gitCredentialState.active"
+    v-if="gitCredentialStore.active"
     title="Git credentials"
     :width="440"
     test-id="git-credential-dialog"
@@ -58,16 +60,16 @@ function onCancel(): void {
   >
     <div class="credential-form">
       <p class="subtitle" data-testid="git-credential-repo">
-        {{ codeReposStore.codeRepoRecord(gitCredentialState.active.codeRepoId)?.name }}
+        {{ codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name }}
       </p>
       <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
       <p class="prompt mono" data-testid="git-credential-prompt">
-        {{ gitCredentialState.active.prompt }}
+        {{ gitCredentialStore.active.prompt }}
       </p>
       <TextField
         ref="inputField"
         v-model="value"
-        :type="gitCredentialState.active.masked ? 'password' : 'text'"
+        :type="gitCredentialStore.active.masked ? 'password' : 'text'"
         size="md"
         data-testid="git-credential-input"
         @enter="onSubmit"

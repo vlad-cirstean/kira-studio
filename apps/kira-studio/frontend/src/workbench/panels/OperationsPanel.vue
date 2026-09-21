@@ -6,7 +6,7 @@ import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
-import { type MenuItem, openContextMenu } from '../../state/contextMenu';
+import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
@@ -19,6 +19,8 @@ import TextField from '../../theme/primitives/TextField.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { run as runConsole } from '../../views/console/state';
 import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../views/shared/sqlIdent';
+
+const contextMenuStore = useContextMenuStore();
 
 interface OpsListItem {
   key: string;
@@ -157,7 +159,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
       run: () => onCancel(record),
     },
   ];
-  openContextMenu(event, items);
+  contextMenuStore.openContextMenu(event, items);
 }
 </script>
 

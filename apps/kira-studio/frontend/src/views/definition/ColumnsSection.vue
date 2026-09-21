@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
-import { openContextMenu } from '../../state/contextMenu';
+import { useContextMenuStore } from '../../state/contextMenu';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';
+
+const contextMenuStore = useContextMenuStore();
 
 const props = defineProps<{
   columns: ColumnMeta[];
@@ -23,7 +25,7 @@ function keyLabel(col: ColumnMeta): 'PK' | 'FK' | null {
 // relocated here — the table path is `tablePath` directly, not derived from a tree row's path.
 function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
   ev.preventDefault();
-  openContextMenu(ev, columnsSectionMenu(props.connectionId, props.tablePath, col.name));
+  contextMenuStore.openContextMenu(ev, columnsSectionMenu(props.connectionId, props.tablePath, col.name));
 }
 </script>
 
