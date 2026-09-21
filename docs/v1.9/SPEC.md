@@ -205,6 +205,100 @@ intelligence" tab mentions) that the plan's own verification sweeps (§9) surfac
 individual commits had missed — folded into Part A's own verification pass rather than left as a
 lint-clean-but-stale comment.
 
+## P98 result
+
+Landed per plan (`docs/v1.9/plans/P98-vue-deps-conventions.md`), 6 commits plus this section's own,
+in order: `8bab5f6`, `1fa9f5d`, `f526ab2`, `00941e2`, `5a1061c`, `c4b3fef`.
+
+**Commit `8bab5f6` — deps only.** `pinia` 4.0.3, `@tanstack/vue-query` 5.103.2, `@vueuse/core`
+15.0.0 into root `package.json`, matching the `monaco-editor`/`slickgrid` precedent. `bun install`
+printed one peer-dependency warning, recorded verbatim rather than silenced: `warn: incorrect peer
+dependency "@vue/devtools-api@6.6.4"` (pinia's optional devtools peer; nothing in this app's
+bootstrap uses it). `knip.json` gained the `@vueuse/core` ignore entry.
+
+**Commit `1fa9f5d` — Pinia + TanStack Query bootstrap.** `state/pinia.ts` exports the one
+`createPinia()` instance; `state/queryClient.ts` exports one `QueryClient` (`retry: false`,
+`refetchOnWindowFocus: false` — every query resolves over the Wails bridge to the local Go process,
+never the network). `main.ts`'s single chained `createApp(App).directive(...).mount('#app')`
+became four statements registering both plugins before `directive`/`mount`. No store, no query call
+site moved.
+
+**Commit `f526ab2` — the `@/` alias.** `vite.config.ts`'s `resolve.alias` and `tsconfig.json`'s
+`compilerOptions.paths` both gained `@` → `./src`, beside the three existing aliases. Existing
+source keeps relative imports; `@/` is for shadcn-vue's own generated import specifier.
+
+**Commit `00941e2` — shadcn-vue bootstrap, hand-authored rather than CLI-generated (see deviation
+below).** `components.json`, `src/lib/utils.ts`, `src/theme/shadcn-bridge.css` — reka-ui base, nova
+style, neutral base color, lucide icons, CSS variables. Every shadcn-vue variable in the bridge
+file maps to an existing `--kira-*` token; the `--accent`/`--input` judgment calls are commented in
+the file per plan §4.3. No `.dark` block — `tokens.css` is a single `:root`, `index.html` hardcodes
+`class="dark"`. `base.css` gained one import line, placed after `./vscode-bridge.css`. `knip.json`
+gained the remaining six `ignoreDependencies` entries (`reka-ui`, `class-variance-authority`,
+`tw-animate-css`, `@lucide/vue`, `clsx`, `tailwind-merge`) plus the `src/lib/utils.ts` workspace
+ignore — `bun run lint:dead` confirmed clean of new findings. No component generated (P99's scope).
+
+**Commit `5a1061c` — `CLAUDE.md`.** Three bullets after the library-first rule, exactly as planned:
+lean on the P98-wired libraries rather than hand-rolling; every Vue component
+`<script setup lang="ts">`; one Pinia store, one concern.
+
+**Commit `c4b3fef` — `docs/ARCHITECTURE.md`.** One row added to the **Stack** table: the frontend
+library baseline (Vue/Vite/Tailwind v4/shadcn-vue-on-Reka/Pinia/TanStack Query/VueUse) and that P98
+wired them (bootstrap only) while P99 migrates the app's existing 39 `reactive()` modules and 200
+`.vue` files onto them. No **Known open items** entry — nothing here is a limitation.
+
+**Verification (§12).** `bun install` clean (peer warning above, not silenced). `bun run
+typecheck` clean across all five projects — proves the `@/` alias and `vue-tsc`'s view of it agree.
+`bun run build` clean, no new Vite warning beyond the pre-existing chunk-size one; the built CSS
+confirms the bridge applies (`--background:var(--kira-bg)` in `dist/assets/index-*.css`). `bun run
+build:vscode` clean and unchanged in content — `packages/git-ui` untouched. `bun run lint` — Biome
+0 errors/0 warnings/0 infos over 1178 files, `check-tokens.sh` confirms every `--kira-*`/`--kv-*`/
+`--kui-*` reference resolves. `bun run lint:dead` — knip clean but for the pre-existing declared
+`duplicates` warnings (unchanged), confirming §8's `ignoreDependencies`/`ignore` entries are
+correct. `bun run test:unit` 1535 passed, 0 failed (P97 baseline: 1535). `bun run test:webview` 55
+passed, 0 failed (baseline: 55). `bun run test:ui` 311 passed, 0 failed (baseline: 311 total).
+
+**Deviation — `bunx shadcn-vue@2.8.2 init` could not run in this sandbox; §4's files were
+hand-authored from the CLI's own real registry output and shipped source instead of its
+write-to-disk step.** Root-caused, not worked around: `init`'s registry fetch (`ofetch` calling a
+real `undici` `ProxyAgent` as `dispatcher`/`agent` against the runtime's own global `fetch`) throws
+a bare `TypeError: fetch failed` with no further cause, reproducibly, under both Bun (this
+container's runtime) and real Node 22.22.2 with `NODE_USE_ENV_PROXY=1` (the proxy README's own
+fix for a tool that ignores `HTTPS_PROXY` — this tool does not ignore it, it builds its own
+`ProxyAgent` from `https_proxy`, and that mechanism itself is what fails). Confirmed this is not a
+policy block or a misconfigured proxy on this repo's side: the same registry endpoints
+(`https://shadcn-vue.com/init?...`, `https://shadcn-vue.com/r/styles/reka-nova/utils.json`) are
+directly reachable via `curl` through the proxy and via a bare `fetch()`/`bun -e` call with no
+dispatcher at all — the failure is specific to passing a foreign `undici` package's `ProxyAgent`
+instance into `ofetch`'s call to the runtime's own global `fetch`. Did not unset `HTTPS_PROXY` to
+route around it (`docs/DEV_ENVIRONMENT.md`'s proxy guidance is explicit that this is never the
+fix), and the sandbox's own containment policy blocked writing a workaround patch into the CLI's
+vendored cache outside the repo. Instead traced the actual shipped 2.8.2 CLI source (`init`'s
+`-d`/`--defaults` auto-selecting the `nova` preset; `getProjectConfig`'s Tailwind-v4 file
+auto-detect; `promptForMinimalConfig`'s default resolution; the final `registryBaseConfig`
+deepmerge with override precedence) and fetched the same registry endpoints directly to get the
+CLI's real intended output, rather than the plan's illustrative shape:
+
+1. The resolved icon dependency is `@lucide/vue` 1.47.0 (ISC), not `lucide-vue-next` — the real
+   registry response for `--icon-library lucide` under this style names it. `package.json`,
+   `knip.json` and the plan's §2.1 table (superseded by this section) all reflect the real name.
+2. `components.json` carries real fields the plan's illustrative JSON didn't show: `style`
+   (`"reka-nova"`, from `-d`'s nova-preset auto-select composed with `--base reka`), `font`
+   (`"geist-sans"`), `rtl`, `pointer`, `menuColor`, `menuAccent`, `typescript`, `registries: {}` —
+   traced from `rawConfigSchema` plus the registry `registry:base` item's own `config` object,
+   merged onto the locally-resolved config with override precedence.
+3. `src/lib/utils.ts`'s real registry content is two separate `clsx` imports (`import type
+   { ClassValue } from "clsx"` + `import { clsx } from "clsx"`); combined into the repo's own
+   single-import style (matching `main.ts`'s own `import { type X, y } from 'pkg'` precedent) with
+   an explicit `: string` return type per plan §3.
+
+§12's two targeted checks both still ran, adapted for the same reason: the bridge-applies check
+used the real `bun run build` output directly (above). The alias/`cn()` check used `--dry-run`
+first — confirmed genuinely unsupported in 2.8.2 via the CLI's own message ("The --dry-run, --diff
+and --view options are not yet supported in shadcn-vue"), the exact fallback trigger plan §12
+names — then, since `add` needs the same broken registry fetch, proved `@/lib/utils` a different
+way: a throwaway file importing `cn` from `@/lib/utils` typechecked clean under `vue-tsc`, then was
+deleted (untracked, never committed, confirmed via `git status`).
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
