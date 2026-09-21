@@ -12,13 +12,14 @@ import {
 } from '@shared/domain/connection';
 import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
+import { useQuery } from '@tanstack/vue-query';
 import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import {
   loadMaskRules,
-  maskRulesFor,
+  maskRulesQueryKey,
   regenerateMaskKey,
   removeMaskRule,
   upsertMaskRule,
@@ -126,12 +127,6 @@ type DetailTab = 'General' | 'Advanced' | 'Pre-connect' | 'MCP' | 'Privacy';
 const activeTab = ref<DetailTab>('General');
 watch(step, (s) => {
   if (s === 'details') activeTab.value = 'General';
-});
-// M5 §7.2: lazily loaded the first time the Privacy tab is actually opened — a rule takes effect
-// immediately server-side, so unlike every other tab there is no draft to seed from `draft.value`
-// at mount; this just needs the current, real rule set on screen.
-watch(activeTab, (tab) => {
-  if (tab === 'Privacy') void ensureMaskRulesLoaded();
 });
 
 const showPassword = ref(false);
@@ -407,9 +402,17 @@ const isSqlKind = computed(() => !!draft.value && schemaDialectFor(draft.value.k
 // M5 §7: the Privacy tab's own state. A rule takes effect immediately (§7.2's own "not part of
 // the connection's save/cancel draft") — no local draft copy, this reads state/maskRules.ts
 // directly and every control here writes straight through it.
-const maskRules = computed(() =>
-  editingConnectionId.value ? maskRulesFor(editingConnectionId.value) : [],
-);
+// P99 §5.5: a reactive useQuery, `enabled` only once the Privacy tab is actually open — replaces
+// the old watch(activeTab)/ensureMaskRulesLoaded pair with TanStack Query's own lazy-fetch-on-
+// enable, and Query's in-flight dedupe means a caller elsewhere already loading this connection's
+// rules (SlickGridHost.vue's own mount-time load) is shared rather than re-fetched.
+const maskRulesQuery = useQuery(() => ({
+  queryKey: maskRulesQueryKey(editingConnectionId.value ?? ''),
+  queryFn: () => loadMaskRules(editingConnectionId.value ?? ''),
+  enabled: activeTab.value === 'Privacy' && !!editingConnectionId.value,
+  staleTime: Number.POSITIVE_INFINITY,
+}));
+const maskRules = computed(() => maskRulesQuery.data.value ?? []);
 
 // §7.4: table — placeholder `*`, column, kind. Reset after a successful Add.
 const newMaskTable = ref('');
@@ -436,10 +439,6 @@ const KEEP_HINT_LABEL: Partial<Record<MaskKind, string>> = {
   email: 'Keep domain',
   date: 'Keep year',
 };
-
-async function ensureMaskRulesLoaded(): Promise<void> {
-  if (editingConnectionId.value) await loadMaskRules(editingConnectionId.value);
-}
 
 async function onAddMaskRule(): Promise<void> {
   const connectionId = editingConnectionId.value;

@@ -17,6 +17,7 @@ import {
   type Settings,
   type SettingsPatch,
 } from '@shared/domain/settings';
+import { useQuery } from '@tanstack/vue-query';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
@@ -29,7 +30,7 @@ import { useCustomScriptsStore } from '../state/customScripts';
 import { useDbMcpStore } from '../state/dbmcp';
 import { useGitClientsStore } from '../state/gitClients';
 import { useKeepAwakeStore } from '../state/keepAwake';
-import { maskRulesState } from '../state/maskRules';
+import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../state/maskRules';
 import {
   patchSettings,
   type Section,
@@ -57,6 +58,11 @@ const dbMcpStore = useDbMcpStore();
 const gitClientsStore = useGitClientsStore();
 const keepAwakeStore = useKeepAwakeStore();
 const connectionsStore = useConnectionsStore();
+const maskRuleCountsQuery = useQuery({
+  queryKey: maskRuleCountsQueryKey,
+  queryFn: loadMaskRuleCounts,
+  staleTime: Number.POSITIVE_INFINITY,
+});
 
 // P17 D1: everything the user touches lives in this draft until Save — settingsState (and
 // therefore every other window, the database, and the app's own rendering) sees nothing until
@@ -1640,11 +1646,11 @@ async function onAddScript(): Promise<void> {
                        here (M2's own established split); editing lives in the connection's own
                        Privacy tab. -->
                   <span
-                    v-if="maskRulesState.counts[conn.id]"
+                    v-if="maskRuleCountsQuery.data.value?.[conn.id]"
                     class="helper-text"
                     :data-testid="`db-mcp-connection-masked-${conn.id}`"
-                    >{{ maskRulesState.counts[conn.id] }} masked column{{
-                      maskRulesState.counts[conn.id] === 1 ? '' : 's'
+                    >{{ maskRuleCountsQuery.data.value?.[conn.id] }} masked column{{
+                      maskRuleCountsQuery.data.value?.[conn.id] === 1 ? '' : 's'
                     }}</span
                   >
                 </div>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
+import { useQuery } from '@tanstack/vue-query';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
-import { maskRulesState } from '../../state/maskRules';
+import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import PagerControls from '../shared/page/PagerControls.vue';
@@ -67,7 +68,17 @@ const isWritable = computed(
 // M5 §6.2: rendered only when this tab's connection has at least one masked column — a
 // permanently inert toggle is worse than no toggle (deleteRowTooltip's own standing rule, just
 // below: name the condition, never a silently-disabled control with nothing to explain it).
-const hasMaskRules = computed(() => (maskRulesState.counts[props.tab.connectionId ?? ''] ?? 0) > 0);
+// P99 §5.5: reactive useQuery over the counts TanStack Query already warms at bootstrap
+// (main.ts's loadMaskRuleCounts) and keeps in lockstep on every loadMaskRules write, so this still
+// updates in the same tick menu.ts's markColumnMaskKind also calls setMaskPreview(tabId, true).
+const maskRuleCountsQuery = useQuery({
+  queryKey: maskRuleCountsQueryKey,
+  queryFn: loadMaskRuleCounts,
+  staleTime: Number.POSITIVE_INFINITY,
+});
+const hasMaskRules = computed(
+  () => (maskRuleCountsQuery.data.value?.[props.tab.connectionId ?? ''] ?? 0) > 0,
+);
 // §6.4: turning the preview on while something is staged would mask the very text the user
 // staged, with no way to tell staged text from stored text inside the transform — simpler to
 // forbid the combination outright than to build that distinction for a case nobody needs.

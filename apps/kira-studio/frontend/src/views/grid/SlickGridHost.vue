@@ -3,6 +3,7 @@ import { foldRulesByColumn, type MaskingRule } from '@shared/domain/mask';
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
+import { useQuery } from '@tanstack/vue-query';
 import type {
   Column,
   CustomDataView,
@@ -22,13 +23,7 @@ import { shortcutFor } from '../../shortcuts/keys';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
-import {
-  correlationKeyFor,
-  loadMaskRules,
-  maskRulesFor,
-  maskRulesLoaded,
-  maskRulesState,
-} from '../../state/maskRules';
+import { correlationKeyFor, loadMaskRules, maskRulesFor, maskRulesQueryKey } from '../../state/maskRules';
 import { appearanceVersion, settingsState } from '../../state/settings';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
@@ -591,9 +586,22 @@ let maskTagCache = new Map<string, string>();
 // memoizing nothing in) its own. displayCell alone runs once per visible cell on every render.
 let maskTransform = createMaskPreviewTransform(maskRulesByColumn, maskTagCache);
 
+// P99 §5.5: the sole reactive trigger for a refold — proactively enabled (not deferred to the
+// first preview toggle) so `refreshMaskFolding()` has real data the instant the user turns preview
+// on, and TanStack Query's own cache means a tab that's simply reactivating (remounting on
+// tab-switch, not a genuinely new table) does not re-fetch rules already cached for this
+// connection. `foldMaskRulesOnly` below still reads via the plain, non-reactive `maskRulesFor` —
+// only the watch below (M6 finding #7) needs this ref's reactivity, the D0 render path never does.
+const maskRulesQuery = useQuery(() => ({
+  queryKey: maskRulesQueryKey(tab()?.connectionId ?? ''),
+  queryFn: () => loadMaskRules(tab()?.connectionId ?? ''),
+  enabled: !!tab()?.connectionId,
+  staleTime: Number.POSITIVE_INFINITY,
+}));
+
 // Re-resolves maskRulesByColumn from this tab's own connection — cheap (state/maskRules.ts's own
-// in-memory store, no IPC round trip when already loaded). Split out from refreshMaskFolding below
-// so a caller about to rebuild maskTagCache too (refreshMaskTagCache always reassigns
+// TanStack Query cache, no IPC round trip when already loaded). Split out from refreshMaskFolding
+// below so a caller about to rebuild maskTagCache too (refreshMaskTagCache always reassigns
 // maskTransform itself) does not also construct one here, only to discard it unused a line later.
 function foldMaskRulesOnly(): void {
   const connectionId = tab()?.connectionId;
@@ -1968,13 +1976,8 @@ onMounted(() => {
   if (!el) return;
   gridRootEl = el;
 
-  // M5 §6.2: proactively loaded (not deferred to the first toggle) so `refreshMaskFolding()` has
-  // real data the instant the user actually turns the preview on, rather than an empty map.
-  // `maskRulesState` is module-level (not per-component), so a tab that's simply reactivating —
-  // its SlickGridHost remounting on tab-switch, not a genuinely new table — must not re-fetch
-  // rules already cached for this connection from an earlier mount.
-  const connectionId = tab()?.connectionId;
-  if (connectionId && !maskRulesLoaded(connectionId)) void loadMaskRules(connectionId);
+  // M5 §6.2: the proactive load itself now lives in `maskRulesQuery` above (enabled the instant
+  // this tab has a connectionId) — nothing to do here.
 
   const t = tab();
   const p = getPage(props.tabId);
@@ -2432,16 +2435,16 @@ watch(canEditTableReactive, (editable) => {
 // `shared/slick/dataSource.ts:174-183`'s own header comment says `setState` exists to be followed
 // by — the page store itself is never touched (a mask preview is a display-layer transform only).
 //
-// M6 finding #7: also watches this tab's own connection entry in `maskRulesState.byConnection` —
-// `refreshMaskFolding` was previously only ever re-run from this same watch, so marking (or
-// un-marking) a column PII via the header menu while preview was already on left
-// `maskRulesByColumn` stale: a newly-masked column kept showing real values, a newly-unmasked one
-// kept showing bulleted output, despite the header menu's own checkbox and the toolbar's "masked"
-// banner both already reflecting the change. `loadMaskRules` reassigns the array at this key on
-// every write, so watching it (rather than deep-watching its contents) is enough to catch every
-// upsert/remove for the tab's current connection.
+// M6 finding #7: also watches `maskRulesQuery.data` (this tab's own connection entry in the
+// `['maskRules', connectionId]` cache) — `refreshMaskFolding` was previously only ever re-run from
+// this same watch, so marking (or un-marking) a column PII via the header menu while preview was
+// already on left `maskRulesByColumn` stale: a newly-masked column kept showing real values, a
+// newly-unmasked one kept showing bulleted output, despite the header menu's own checkbox and the
+// toolbar's "masked" banner both already reflecting the change. `loadMaskRules` writes a fresh
+// array to the cache on every write, so watching the query's data ref (rather than deep-watching
+// its contents) is enough to catch every upsert/remove for the tab's current connection.
 watch(
-  [() => rt()?.maskPreview, () => maskRulesState.byConnection[tab()?.connectionId ?? '']],
+  [() => rt()?.maskPreview, () => maskRulesQuery.data.value],
   async () => {
     foldMaskRulesOnly();
     try {
