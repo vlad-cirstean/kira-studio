@@ -167,73 +167,31 @@ duplicated here; this file only points at them.
   choice) — see `docs/DEV_ENVIRONMENT.md`'s own section for the constraint and the
   `docs/pending-changes/`/`docs/pending-workflows/` workaround before touching a workflow file.
 
-## Repo-map MCP server
+## CodeGraph
 
-Code navigation over this repository's own tree-sitter graph (C3, `internal/repomap`), served as MCP
-tools: `find_definition`, `find_references`, `find_implementations`, `search_symbols`,
-`search_files`, `outline_file`, `read_symbol`, `list_repos`. Ask it instead of opening whole files to
-find a symbol or read one declaration — the tokens that saves are the point. Multi-repo attach is
-now the normal case (P67d), so every navigation tool other than `list_repos` itself takes an
-optional `repo` argument naming which attached repository to query — omit it when only one is
-attached; call `list_repos` first to see the names when unsure.
+Code navigation in this repo goes through [CodeGraph](https://github.com/colbymchenry/codegraph),
+not repo-map. Same job — symbol index, call graphs, blast radius — swapped in because repo-map's
+MCP tools never reached a harness session's tool manifest (fixed at session start, not read from
+MCP config at runtime) and needed a manual curl/JSON-RPC workaround for every call. CodeGraph's
+prompt hook sidesteps that: it queries the index on every message and injects matching symbols
+automatically, no explicit tool call needed.
 
-**Use it when working in this repository.** Standing expectation, not a demo: start it and navigate
-with it.
+**Use it when working in this repository.** Standing expectation, not a demo: read the injected
+context before opening whole files, query it before grepping for a symbol.
 
-Headless setup, for a session with no GUI:
+`.claude/hooks/session-start.sh` installs the CLI and builds/syncs the index on every session —
+nothing manual needed. Outside that hook (a shell with no Claude Code session): `npm install -g
+@colbymchenry/codegraph && codegraph install --yes --target=claude --init`.
 
-1. `bun run mcp:repo-map:build` — once per clone, since the first build is slow (cgo).
-2. `bun run mcp:repo-map` — rebuilds (cached, sub-second), then serves in the foreground; background
-   it, since the next steps need the same shell. It serves this worktree's root.
-   `bun run mcp:repo-map --repo <path>` serves another checkout instead. **If the startup banner
-   says "Using this repository's existing token" instead of printing a `claude mcp add` command**,
-   a prior session (in this container, within the last 7 days) already minted one — this session
-   has no way to know that plaintext and cannot call the server at all as-is. This is now the
-   common case in a multi-session container, not an edge case: delete that repository's
-   `mcp-repo-map-*-token.json` under `KIRA_HOME` and restart to mint a fresh one before continuing
-   to step 3/4, rather than debugging what looks like a 401.
-3. `claude mcp add --transport http --scope user kira-repo-map http://127.0.0.1:8765/mcp --header
-   "Authorization: Bearer <token>"` — the command it prints on startup; use the host and port from
-   that printed banner, not this literal — 8765 is only the first choice, and a second concurrent
-   instance lands on an OS-assigned ephemeral port. **In an agent-harness
-   session (this one, and every subagent spawned in it) this registers but never actually surfaces
-   the eight tools** — the tool manifest here is fixed when the session starts, not read from MCP
-   config at runtime, confirmed by checking a genuinely fresh sibling session: it saw zero MCP
-   servers configured, not just this one missing. Run the command anyway (`claude mcp list` then
-   reports "✓ Connected", useful as a smoke check the server itself is healthy) but don't expect
-   `ToolSearch` or a native `mcp__kira-repo-map__*` tool call to work.
-4. **Call it over plain HTTP/JSON-RPC instead** — the actual working path in this harness. Same
-   banner-port caveat as step 3 — `8765` below is illustrative, not a constant:
-   ```
-   curl -s http://127.0.0.1:8765/mcp -H "Authorization: Bearer <token>" \
-     -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
-     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
-          "params":{"name":"search_symbols","arguments":{"query":"<name>","limit":10}}}'
-   ```
-   Response arrives as one `event: message` / `data: {...}` line (SSE framing over a single
-   response, not a stream) — the payload is standard JSON-RPC, `result.content[0].text` is the
-   answer. `tools/list` (no `params` needed beyond `{}`) returns every tool's real name and
-   JSON Schema — read a tool's actual `inputSchema` before calling it rather than guessing a
-   parameter name (`search_symbols` takes `query`, not `symbol`, for instance). The same eight
-   tools as the native surface: `find_definition`, `find_references`, `find_implementations`,
-   `search_symbols`, `search_files`, `outline_file`, `read_symbol`, `list_repos`. The token savings
-   this server exists for come from the response being a targeted answer instead of a whole file,
-   which curl doesn't change — only the transport is manual, not the value.
+Two ways to use it, in order of preference:
 
-Each repository's token is stored hashed under `KIRA_HOME` and expires after 7 days (M1): a later
-run within that window reuses it and prints a note instead of a command; an already-registered
-client keeps working. Once it lapses, restart mints a fresh one automatically — no manual deletion
-needed — but the printed `claude mcp add` command must be re-run, since the old registration no
-longer authenticates. To force a fresh token before it lapses, delete that repository's
-`mcp-repo-map-*-token.json` and restart.
+1. **Automatic** — `codegraph prompt-hook` fires on every message and prints matching symbols as
+   `<codegraph_context>`. Read it before searching files.
+2. **Explicit** — `codegraph explore "<query>"` for source, call paths and blast radius in one
+   shot; `codegraph query <search>` to search symbols; `codegraph callers`/`codegraph impact
+   <symbol>` for call graphs. Same MCP-manifest timing gap repo-map had —
+   `mcp__codegraph__*` tools may not surface in a harness session — the CLI works regardless, so
+   default to it over hoping the MCP tool got registered.
 
-**Log what dogfooding finds** in the current chapter's own `mcp-repo-map-issues.md` (`docs/v1.8/`
-today). Trivial (config, registration, wiring): fix inline, log one line. Non-trivial (wrong result,
-missing tool, crash): log a full entry and fix nothing in that phase — the next phase waits for a
-dedicated fix pass to close it.
-
-Development use only. The shipped end-user surface — the Settings dialog's Code intelligence tab —
-is product, not process; `docs/ARCHITECTURE.md` describes it and how the server works,
-`docs/DEV_ENVIRONMENT.md` covers log level, cleanup and this container's own quirks. The app's other
-MCP server (database access, v1.7) is product too, not this section's tool — nothing here asks a
-session to run or dogfood it.
+Doesn't touch the shipped repo-map feature (Settings dialog's Code intelligence tab,
+`internal/repomap`) — that stays product, unrelated to this dev-tooling swap.
