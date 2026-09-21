@@ -9,6 +9,7 @@
    literals. Import order relative to kui-bridge.css above does not matter (disjoint property
    names); it is placed beside it because both exist for the same reason. */
 @import "./vscode-bridge.css";
+@import "./shadcn-bridge.css";
 @import "./primitives.css";
 @import "./review-decorations.css";
 @import "./blame-annotation.css";
