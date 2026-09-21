@@ -46,7 +46,7 @@ const emit = defineEmits<{
   /** P7 (item 2): the strip was clicked/activated — `App.vue` routes this to
    *  `WorkingDetailState.select(true)`, mirroring how a stash row's click routes to
    *  `stashState.select(sha)`. */
-  (e: 'select'): void;
+  select: [];
 }>();
 
 /** Cheap: the checked-out branch's own HEAD decoration is essentially always within the first
