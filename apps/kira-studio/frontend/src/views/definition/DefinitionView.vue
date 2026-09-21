@@ -27,7 +27,7 @@ import ColumnsSection from './ColumnsSection.vue';
 import ConstraintsSection from './ConstraintsSection.vue';
 import IndexesSection from './IndexesSection.vue';
 import PropertiesSection from './PropertiesSection.vue';
-import { load, runtime } from './state';
+import { useDefinitionViewStore } from './state';
 import { buildConstraintRows } from './structure';
 import ValidationSection from './ValidationSection.vue';
 
@@ -36,18 +36,19 @@ import ValidationSection from './ValidationSection.vue';
 const props = defineProps<{ tab: DefinitionTabRecord }>();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const definitionViewStore = useDefinitionViewStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
-  () => load(props.tab.id),
+  () => definitionViewStore.load(props.tab.id),
 );
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => definitionViewStore.runtime[props.tab.id]);
 const loading = computed(() => rt.value?.status === 'loading');
 
 function onRefresh(): void {
   refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
-    load(props.tab.id, { refresh: true }),
+    definitionViewStore.load(props.tab.id, { refresh: true }),
   );
 }
 
@@ -64,8 +65,8 @@ function onCopy(): void {
 let unregisterCommands: Array<() => void> = [];
 
 onMounted(() => {
-  if (!needsReconnect.value && !runtime[props.tab.id]) {
-    void load(props.tab.id);
+  if (!needsReconnect.value && !definitionViewStore.runtime[props.tab.id]) {
+    void definitionViewStore.load(props.tab.id);
   }
   unregisterCommands = [
     registerCommand('view.refresh', onRefresh),

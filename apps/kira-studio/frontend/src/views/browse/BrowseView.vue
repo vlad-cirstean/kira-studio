@@ -24,17 +24,7 @@ import {
 import KeyValuePane from '../shared/keyvalue/KeyValuePane.vue';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
 import { menuForNode } from './menu';
-import {
-  ascend,
-  descend,
-  ensureKeyTypes,
-  goToLevel,
-  load,
-  reload,
-  runtime,
-  selectRow,
-  setFilter,
-} from './state';
+import { useBrowseViewStore } from './state';
 
 const contextMenuStore = useContextMenuStore();
 
@@ -44,13 +34,14 @@ const props = defineProps<{ tab: BrowseTabRecord }>();
 const objectStoreStore = useObjectStoreStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const browseViewStore = useBrowseViewStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
-  () => load(props.tab.id),
+  () => browseViewStore.load(props.tab.id),
 );
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => browseViewStore.runtime[props.tab.id]);
 const loading = computed(() => rt.value?.status === 'loading');
 
 // P41 D14: '' in session state means "the tab's own container path".
@@ -78,21 +69,23 @@ const crumbs = computed(() => {
 
 function onCrumbClick(path: string): void {
   if (path === currentLevelPath.value) return;
-  void goToLevel(props.tab.id, path);
+  void browseViewStore.goToLevel(props.tab.id, path);
 }
 
 function onUp(): void {
-  void ascend(props.tab.id);
+  void browseViewStore.ascend(props.tab.id);
 }
 
 function onReload(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () =>
+    browseViewStore.reload(props.tab.id),
+  );
 }
 
 // D18: a plain substring filter over the loaded level, never a second server call.
 const filterText = computed({
   get: () => rt.value?.filter ?? '',
-  set: (v: string) => setFilter(props.tab.id, v),
+  set: (v: string) => browseViewStore.setFilter(props.tab.id, v),
 });
 
 // P22b D15: the app's own shared search idiom (HttpRequestView.vue's toggleFieldFilter) replaces
@@ -170,7 +163,7 @@ onUnmounted(() => unregisterKeyValueHost(previewKey));
 // pane above reacts to `rt.selected` on its own (KeyValuePane's own watch on its resolved host
 // path), so no separate "load into the right pane" call belongs here.
 function onRowClick(node: TreeNode): void {
-  selectRow(props.tab.id, node.path);
+  browseViewStore.selectRow(props.tab.id, node.path);
 }
 
 // P63 §4.3: gates the whole per-type fetch — an S3 browse tab (caps.keyTypes false) never issues
@@ -208,7 +201,7 @@ function onVisibleRange(range: { start: number; end: number }): void {
       const node = nodes[i];
       if (node && node.kind === 'key') paths.push(node.path);
     }
-    if (paths.length > 0) ensureKeyTypes(props.tab.id, paths);
+    if (paths.length > 0) browseViewStore.ensureKeyTypes(props.tab.id, paths);
   }, KEY_TYPES_DEBOUNCE_MS);
 }
 
@@ -220,7 +213,7 @@ onUnmounted(() => {
 // has always opened a redis key / s3 object into.
 function onRowOpen(node: TreeNode): void {
   if (node.hasChildren) {
-    void descend(props.tab.id, node.path);
+    void browseViewStore.descend(props.tab.id, node.path);
     return;
   }
   if (!props.tab.connectionId) return;
@@ -231,7 +224,7 @@ function onRowOpen(node: TreeNode): void {
 // instead of by tree row.
 function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
   if (!props.tab.connectionId) return;
-  selectRow(props.tab.id, node.path);
+  browseViewStore.selectRow(props.tab.id, node.path);
   contextMenuStore.openContextMenu(e, menuForNode(props.tab.id, props.tab.connectionId, node));
 }
 
@@ -251,8 +244,8 @@ function onUploadClick(): void {
 const rowHeight = 28;
 
 onMounted(() => {
-  if (!needsReconnect.value && !runtime[props.tab.id]) {
-    void load(props.tab.id);
+  if (!needsReconnect.value && !browseViewStore.runtime[props.tab.id]) {
+    void browseViewStore.load(props.tab.id);
   }
 });
 </script>

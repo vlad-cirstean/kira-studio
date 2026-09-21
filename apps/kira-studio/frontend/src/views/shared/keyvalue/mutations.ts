@@ -1,10 +1,11 @@
 import { decodePath, encodePath, pathParent } from '@shared/domain/tree';
 import { data } from '../../../bridge/data';
+import { pinia } from '../../../state/pinia';
 import { useTabsStore } from '../../../state/tabs';
 import { browseInvalidate } from '../../../state/viewCommands';
 import { createImmediateMutator } from '../immediateMutation';
 import { keyValueHost } from './host';
-import { reload } from './state';
+import { useKeyValueViewStore } from './state';
 
 // Keyvalue mutates immediately (mirrors views/documents/mutations.ts's discipline exactly) — no
 // pendingChanges.ts-style staged plan, no preview step.
@@ -17,7 +18,10 @@ const VALUE_SENTINEL = '$value';
 // P63: findTab reads through the host seam (host.ts) rather than state/tabs.ts's
 // findKeyValueTab directly — createImmediateMutator only needs {connectionId, path}, which
 // KeyValueHost already carries for either a real tab or the browse split's preview pane.
-const mutate = createImmediateMutator({ findTab: keyValueHost, reload });
+const mutate = createImmediateMutator({
+  findTab: keyValueHost,
+  reload: (viewKey: string) => useKeyValueViewStore(pinia).reload(viewKey),
+});
 
 export async function saveValueEdit(
   viewKey: string,

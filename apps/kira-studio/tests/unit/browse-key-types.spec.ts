@@ -15,12 +15,8 @@ const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const {
-  load: loadBrowse,
-  descend: descendBrowse,
-  ensureKeyTypes,
-  runtime: browseRuntime,
-} = await import('../../frontend/src/views/browse/state');
+const { useBrowseViewStore } = await import('../../frontend/src/views/browse/state');
+const browseViewStore = useBrowseViewStore();
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -44,7 +40,7 @@ async function openLoadedTab(connectionId: string, path: string): Promise<string
   const { id } = tabsStore.openBrowseTab(connectionId, path, { newTab: true });
   // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
   (control as any).treeChildren = async () => ({ nodes: [], truncated: false });
-  await loadBrowse(id);
+  await browseViewStore.load(id);
   return id;
 }
 
@@ -58,12 +54,12 @@ describe('views/browse/state.ts — ensureKeyTypes dedupe/supersede (P63 §4.3)'
       return paths.map(() => 'string');
     };
 
-    ensureKeyTypes(id, ['database:db0/key:a']);
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']);
     await flush();
-    expect(browseRuntime[id]?.keyTypes.get('database:db0/key:a')).toBe('string');
+    expect(browseViewStore.runtime[id]?.keyTypes.get('database:db0/key:a')).toBe('string');
     expect(calls).toBe(1);
 
-    ensureKeyTypes(id, ['database:db0/key:a']);
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']);
     await Promise.resolve();
     expect(calls).toBe(1); // already known — no second call
   });
@@ -78,13 +74,13 @@ describe('views/browse/state.ts — ensureKeyTypes dedupe/supersede (P63 §4.3)'
       return gate.promise;
     };
 
-    ensureKeyTypes(id, ['database:db0/key:a']);
-    ensureKeyTypes(id, ['database:db0/key:a']); // still in flight — must not start a second call
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']);
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']); // still in flight — must not start a second call
 
     expect(calls).toHaveLength(1);
     gate.resolve(['hash']);
     await flush();
-    expect(browseRuntime[id]?.keyTypes.get('database:db0/key:a')).toBe('hash');
+    expect(browseViewStore.runtime[id]?.keyTypes.get('database:db0/key:a')).toBe('hash');
   });
 
   test('3. a response that lands after a level change is discarded', async () => {
@@ -93,17 +89,17 @@ describe('views/browse/state.ts — ensureKeyTypes dedupe/supersede (P63 §4.3)'
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
     (control as any).treeKeyTypes = async () => gate.promise;
 
-    ensureKeyTypes(id, ['database:db0/key:a']);
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']);
 
     // The level changes (and so loadSeq bumps) while the batch above is still in flight.
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = async () => ({ nodes: [], truncated: false });
-    await descendBrowse(id, 'database:db0/namespace:ns');
+    await browseViewStore.descend(id, 'database:db0/namespace:ns');
 
     gate.resolve(['string']);
     await flush();
 
-    expect(browseRuntime[id]?.keyTypes.has('database:db0/key:a')).toBe(false);
+    expect(browseViewStore.runtime[id]?.keyTypes.has('database:db0/key:a')).toBe(false);
   });
 
   test('4. a failed batch is silent and leaves rows re-fetchable', async () => {
@@ -115,16 +111,16 @@ describe('views/browse/state.ts — ensureKeyTypes dedupe/supersede (P63 §4.3)'
       throw new Error('E_QUERY: boom');
     };
 
-    ensureKeyTypes(id, ['database:db0/key:a']);
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']);
     await flush();
-    expect(browseRuntime[id]?.keyTypes.has('database:db0/key:a')).toBe(false);
-    expect(browseRuntime[id]?.status).not.toBe('error'); // a decorative badge never raises the load strip
+    expect(browseViewStore.runtime[id]?.keyTypes.has('database:db0/key:a')).toBe(false);
+    expect(browseViewStore.runtime[id]?.status).not.toBe('error'); // a decorative badge never raises the load strip
 
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real bridge signature
     (control as any).treeKeyTypes = async (_cid: string, paths: string[]) => paths.map(() => 'set');
-    ensureKeyTypes(id, ['database:db0/key:a']); // the failed path is not stuck "pending" forever
+    browseViewStore.ensureKeyTypes(id, ['database:db0/key:a']); // the failed path is not stuck "pending" forever
     await flush();
-    expect(browseRuntime[id]?.keyTypes.get('database:db0/key:a')).toBe('set');
+    expect(browseViewStore.runtime[id]?.keyTypes.get('database:db0/key:a')).toBe('set');
     expect(calls).toBe(1);
   });
 });

@@ -6,7 +6,7 @@ import type { MenuItem } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { useTabsStore } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';
-import { reload, setActionError } from './state';
+import { useBrowseViewStore } from './state';
 
 const confirmDialogStore = useConfirmDialogStore();
 
@@ -23,7 +23,7 @@ function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): 
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => void reload(tabId),
+      run: () => void useBrowseViewStore().reload(tabId),
     },
     {
       type: 'item',
@@ -142,10 +142,13 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
           return;
         try {
           await useObjectStoreStore().deleteObject(connectionId, node.path, null);
-          await reload(tabId);
-          setActionError(tabId, null);
+          await useBrowseViewStore().reload(tabId);
+          useBrowseViewStore().setActionError(tabId, null);
         } catch (err) {
-          setActionError(tabId, err instanceof Error ? err.message : String(err));
+          useBrowseViewStore().setActionError(
+            tabId,
+            err instanceof Error ? err.message : String(err),
+          );
         }
       },
     });

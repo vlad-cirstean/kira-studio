@@ -71,19 +71,7 @@ import { rowMenu } from './menu';
 import { addKey, deleteKey, saveValueEdit } from './mutations';
 import { getPage, keyValueRow, pageVersion, setVisibleWindow } from './page';
 import { type Match, matchedRows, pageSearchApi, searchState } from './search';
-import {
-  goNext,
-  goPrev,
-  load,
-  reload,
-  runCount,
-  runtime,
-  setActionError,
-  setPageSize,
-  setSearchOpen,
-  stop,
-  toggleSearchOpen,
-} from './state';
+import { useKeyValueViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
@@ -92,6 +80,7 @@ const objectStoreStore = useObjectStoreStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const connectionsStore = useConnectionsStore();
 const settingsStore = useSettingsStore();
+const keyValueViewStore = useKeyValueViewStore();
 
 const props = defineProps<{
   viewKey: string;
@@ -105,7 +94,7 @@ const host = computed(() => keyValueHost(props.viewKey));
 const gate = props.tab
   ? useConnectionGate(
       () => props.tab as KeyValueTabRecord,
-      () => load(props.viewKey),
+      () => keyValueViewStore.load(props.viewKey),
     )
   : null;
 const needsReconnect = computed(() => gate?.needsReconnect.value ?? false);
@@ -113,7 +102,7 @@ function onReconnectAndLoad(): Promise<void> {
   return gate ? gate.onReconnectAndLoad() : Promise.resolve();
 }
 
-const rt = computed(() => runtime[props.viewKey]);
+const rt = computed(() => keyValueViewStore.runtime[props.viewKey]);
 const running = computed(() => rt.value?.status === 'loading');
 
 const targetTail = computed(() => pathTail(host.value?.path ?? ''));
@@ -201,7 +190,7 @@ function memoryText(bytes: number | null): string {
 // --- page size (P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap) -
 const PAGE_SIZE_OPTIONS = pageSizeOptions('keyvalue-');
 function onPageSize(size: PageSize): void {
-  void setPageSize(props.viewKey, size);
+  void keyValueViewStore.setPageSize(props.viewKey, size);
 }
 
 // --- write gating: the granular caps (§ caps.ts's canInsert/canUpdate/canDelete), narrowed by
@@ -412,15 +401,15 @@ async function onDeleteKey(): Promise<void> {
   try {
     if (isSingleObjectPage.value) {
       await objectStoreStore.deleteObject(h.connectionId, h.path, props.viewKey);
-      await reload(props.viewKey);
+      await keyValueViewStore.reload(props.viewKey);
       // P43 F11/D15: the deleted object's own container level just lost a member.
       browseInvalidate(h.connectionId, pathParent(h.path) ?? '');
     } else {
       await deleteKey(props.viewKey, keyName.value);
     }
-    setActionError(props.viewKey, null);
+    keyValueViewStore.setActionError(props.viewKey, null);
   } catch (err) {
-    setActionError(props.viewKey, err instanceof Error ? err.message : String(err));
+    keyValueViewStore.setActionError(props.viewKey, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -576,10 +565,10 @@ function onRowContextMenuFromEvent(e: MouseEvent): void {
 // --- search: filters the already-loaded page only, never a new query (mirrors
 // views/grid/search.ts's discipline exactly — see keyvalue/search.ts). ------------------------------
 function onToggleSearch(): void {
-  toggleSearchOpen(props.viewKey);
+  keyValueViewStore.toggleSearchOpen(props.viewKey);
 }
 function onCloseSearch(): void {
-  setSearchOpen(props.viewKey, false);
+  keyValueViewStore.setSearchOpen(props.viewKey, false);
 }
 
 // P49 F7/D5: rowIndices is the *filtered* array when the filter toggle is on, so a match's page-row
@@ -618,11 +607,11 @@ function isCurrentSearchMatch(row: number, col: 'field' | 'value'): boolean {
 }
 
 function onStop(): void {
-  stop(props.viewKey);
+  keyValueViewStore.stop(props.viewKey);
 }
 
 function onRefresh(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.viewKey));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => keyValueViewStore.reload(props.viewKey));
 }
 
 // "row(s)" doesn't fit a keyspace — these are keys/fields, not table rows — and cursor-based
@@ -651,7 +640,7 @@ watch(
   () => (needsReconnect.value ? undefined : host.value?.path),
   (path) => {
     if (path === undefined) return;
-    void load(props.viewKey);
+    void keyValueViewStore.load(props.viewKey);
   },
   { immediate: true },
 );
@@ -659,7 +648,7 @@ watch(
 onMounted(() => {
   if (!props.tab) return;
   // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
-  // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
+  // toolbar button uses — this used to call keyValueViewStore.reload() directly, a doomed no-op behind the gate.
   unregisterCommand = registerCommand('view.refresh', onRefresh);
   unregisterFindCommand = registerCommand('view.find', onToggleSearch);
 });
@@ -727,7 +716,7 @@ onUnmounted(() => {
             data-testid="keyvalue-prev"
             :disabled="prevDisabled"
             v-tooltip="'Previous page'"
-            @click="goPrev(viewKey)"
+            @click="keyValueViewStore.goPrev(viewKey)"
           />
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <IconButton
@@ -736,7 +725,7 @@ onUnmounted(() => {
             data-testid="keyvalue-next"
             :disabled="!rt?.hasMore"
             v-tooltip="'Next page'"
-            @click="goNext(viewKey)"
+            @click="keyValueViewStore.goNext(viewKey)"
           />
         </div>
 
@@ -762,7 +751,7 @@ onUnmounted(() => {
             icon="symbol-number"
             data-testid="keyvalue-count"
             v-tooltip="'Exact count'"
-            @click="runCount(viewKey)"
+            @click="keyValueViewStore.runCount(viewKey)"
           />
         </div>
 

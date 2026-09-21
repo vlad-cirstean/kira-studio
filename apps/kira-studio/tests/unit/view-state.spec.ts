@@ -27,18 +27,10 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const {
-  load: loadBrowse,
-  descend: descendBrowse,
-  setFilter: setBrowseFilter,
-  selectRow: selectBrowseRow,
-  runtime: browseRuntime,
-} = await import('../../frontend/src/views/browse/state');
-const {
-  load: loadKeyValue,
-  goNext: keyValueGoNext,
-  runtime: keyValueRuntime,
-} = await import('../../frontend/src/views/shared/keyvalue/state');
+const { useBrowseViewStore } = await import('../../frontend/src/views/browse/state');
+const browseViewStore = useBrowseViewStore();
+const { useKeyValueViewStore } = await import('../../frontend/src/views/shared/keyvalue/state');
+const keyValueViewStore = useKeyValueViewStore();
 const { setPage } = await import('../../frontend/src/views/shared/keyvalue/page');
 const {
   goNext: gridGoNext,
@@ -80,8 +72,8 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
       return d.promise;
     };
 
-    const older = loadBrowse(id); // loadSeq 1
-    const newer = loadBrowse(id); // loadSeq 2
+    const older = browseViewStore.load(id); // loadSeq 1
+    const newer = browseViewStore.load(id); // loadSeq 2
     expect(calls).toHaveLength(2);
 
     // The newer call lands first; the older one resolves after it.
@@ -90,7 +82,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
     calls[0]?.resolve({ nodes: [{ name: 'older' }], truncated: false });
     await older;
 
-    expect(browseRuntime[id]?.nodes.map((n) => n.name)).toEqual(['newer']);
+    expect(browseViewStore.runtime[id]?.nodes.map((n) => n.name)).toEqual(['newer']);
   });
 
   test('2. a superseded failure does not redden a level that loaded fine', async () => {
@@ -103,18 +95,18 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
       return d.promise;
     };
 
-    const older = loadBrowse(id); // loadSeq 1 — will fail
-    const newer = loadBrowse(id); // loadSeq 2 — will succeed
+    const older = browseViewStore.load(id); // loadSeq 1 — will fail
+    const newer = browseViewStore.load(id); // loadSeq 2 — will succeed
     calls[1]?.resolve({ nodes: [{ name: 'good' }], truncated: false });
     await newer;
-    expect(browseRuntime[id]?.status).toBe('idle');
+    expect(browseViewStore.runtime[id]?.status).toBe('idle');
 
     calls[0]?.reject(new Error('stale failure'));
     await older;
 
-    expect(browseRuntime[id]?.status).toBe('idle');
-    expect(browseRuntime[id]?.nodes.map((n) => n.name)).toEqual(['good']);
-    expect(browseRuntime[id]?.error).toBeNull();
+    expect(browseViewStore.runtime[id]?.status).toBe('idle');
+    expect(browseViewStore.runtime[id]?.nodes.map((n) => n.name)).toEqual(['good']);
+    expect(browseViewStore.runtime[id]?.error).toBeNull();
   });
 
   test('3. rt.truncated is reset to false the moment a new load starts, before the await settles', async () => {
@@ -123,11 +115,11 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = () => first.promise;
 
-    const pending = loadBrowse(id);
-    if (browseRuntime[id]) browseRuntime[id].truncated = true; // simulate a prior truncated level
-    const second = loadBrowse(id); // a new load starts — must reset truncated synchronously
+    const pending = browseViewStore.load(id);
+    if (browseViewStore.runtime[id]) browseViewStore.runtime[id].truncated = true; // simulate a prior truncated level
+    const second = browseViewStore.load(id); // a new load starts — must reset truncated synchronously
 
-    expect(browseRuntime[id]?.truncated).toBe(false);
+    expect(browseViewStore.runtime[id]?.truncated).toBe(false);
 
     first.resolve({ nodes: [], truncated: false });
     await Promise.all([pending, second]);
@@ -140,17 +132,17 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
     const { id } = tabsStore.openBrowseTab('conn4', 'bucket:four', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = async () => ({ nodes: [{ name: 'child' }], truncated: false });
-    await loadBrowse(id); // establishes the runtime record setFilter/selectRow write through
+    await browseViewStore.load(id); // establishes the runtime record setFilter/selectRow write through
 
-    setBrowseFilter(id, 'invoices');
-    selectBrowseRow(id, 'bucket:four/some-other-row');
-    expect(browseRuntime[id]?.filter).toBe('invoices');
-    expect(browseRuntime[id]?.selected).toBe('bucket:four/some-other-row');
+    browseViewStore.setFilter(id, 'invoices');
+    browseViewStore.selectRow(id, 'bucket:four/some-other-row');
+    expect(browseViewStore.runtime[id]?.filter).toBe('invoices');
+    expect(browseViewStore.runtime[id]?.selected).toBe('bucket:four/some-other-row');
 
-    await descendBrowse(id, 'bucket:four/invoices');
+    await browseViewStore.descend(id, 'bucket:four/invoices');
 
-    expect(browseRuntime[id]?.filter).toBe('');
-    expect(browseRuntime[id]?.selected).toBeNull();
+    expect(browseViewStore.runtime[id]?.filter).toBe('');
+    expect(browseViewStore.runtime[id]?.selected).toBeNull();
   });
 
   // P21 round 3 functional finding 14: a failed descend used to leave `nodes` holding the
@@ -164,17 +156,17 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
       nodes: [{ name: 'bucket-five-child' }],
       truncated: false,
     });
-    await loadBrowse(id);
-    expect(browseRuntime[id]?.nodes.map((n) => n.name)).toEqual(['bucket-five-child']);
+    await browseViewStore.load(id);
+    expect(browseViewStore.runtime[id]?.nodes.map((n) => n.name)).toEqual(['bucket-five-child']);
 
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = async () => {
       throw new Error('E_QUERY: token expired');
     };
-    await descendBrowse(id, 'bucket:five/sub');
+    await browseViewStore.descend(id, 'bucket:five/sub');
 
-    expect(browseRuntime[id]?.status).toBe('error');
-    expect(browseRuntime[id]?.nodes).toEqual([]);
+    expect(browseViewStore.runtime[id]?.status).toBe('error');
+    expect(browseViewStore.runtime[id]?.nodes).toEqual([]);
   });
 
   // P21 round 3 performance finding 8: `runtime` (viewOp.ts's createRuntimeStore) is a deep
@@ -191,9 +183,9 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
       nodes: [{ name: 'a' }, { name: 'b' }],
       truncated: false,
     });
-    await loadBrowse(id);
+    await browseViewStore.load(id);
 
-    const nodes = browseRuntime[id]?.nodes;
+    const nodes = browseViewStore.runtime[id]?.nodes;
     expect(nodes).toBeDefined();
     expect(isReactive(nodes)).toBe(false);
     expect(isReactive(nodes?.[0])).toBe(false);
@@ -234,7 +226,7 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
       return Promise.resolve({ page: makeKeyValuePage('cursor'), source: 'server' });
     };
 
-    await loadKeyValue(id);
+    await keyValueViewStore.load(id);
 
     expect(capturedCursor).toEqual({ mode: 'offset', offset: 0 });
     expect(tabsStore.findKeyValueTab(id)?.state.pageIndex).toBe(0);
@@ -253,7 +245,7 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
     if (!tab) throw new Error('expected the tab to exist');
     tab.state.pageIndex = 2;
 
-    await loadKeyValue(id);
+    await keyValueViewStore.load(id);
 
     expect(capturedCursor).toEqual({ mode: 'offset', offset: 2 * tab.state.pageSize });
     expect(tabsStore.findKeyValueTab(id)?.state.pageIndex).toBe(2);
@@ -338,9 +330,9 @@ describe('views/shared/keyvalue/state.ts — pageIndex reverts on a failed load 
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
 
-    await keyValueGoNext(id);
+    await keyValueViewStore.goNext(id);
 
     expect(tabsStore.findKeyValueTab(id)?.state.pageIndex).toBe(0);
-    expect(keyValueRuntime[id]?.status).toBe('error');
+    expect(keyValueViewStore.runtime[id]?.status).toBe('error');
   });
 });

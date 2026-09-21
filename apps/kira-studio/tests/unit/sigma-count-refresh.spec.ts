@@ -20,9 +20,8 @@ const tabsStore = useTabsStore();
 const { runCount: runDocumentCount, runtime: documentRuntime } = await import(
   '../../frontend/src/views/documents/state'
 );
-const { runCount: runKeyValueCount, runtime: keyValueRuntime } = await import(
-  '../../frontend/src/views/shared/keyvalue/state'
-);
+const { useKeyValueViewStore } = await import('../../frontend/src/views/shared/keyvalue/state');
+const keyValueViewStore = useKeyValueViewStore();
 const { runCount: runStreamCount, runtime: streamRuntime } = await import(
   '../../frontend/src/views/stream/state'
 );
@@ -45,8 +44,8 @@ const cases: Case[] = [
   {
     name: 'keyvalue',
     open: () => tabsStore.openKeyValueTab('conn-kv', 'db0/key:big', { newTab: true }).id,
-    runCount: runKeyValueCount,
-    runtime: keyValueRuntime,
+    runCount: (tabId: string) => keyValueViewStore.runCount(tabId),
+    runtime: keyValueViewStore.runtime,
   },
   {
     name: 'stream',
