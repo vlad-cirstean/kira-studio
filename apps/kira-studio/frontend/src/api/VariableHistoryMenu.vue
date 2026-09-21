@@ -4,13 +4,9 @@ import { formatRelative } from '../format';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
-import {
-  closeHistoryMenu,
-  historyMenuState,
-  restoreHistoryEntry,
-  revealedHistoryValues,
-  revealHistoryEntry,
-} from './state/variables';
+import { useVariableSetStore } from './state/variables';
+
+const variableSetStore = useVariableSetStore();
 
 // P5 D13: the per-row history popover, on the existing PopoverPanel, anchored to the row's own
 // history button. Each entry's relative recorded time, its value (masked for a secret, with its
@@ -20,21 +16,21 @@ import {
 const emit = defineEmits<{ close: [] }>();
 
 function displayValue(entry: ApiVariableHistoryEntry): string {
-  return entry.isSecret ? (revealedHistoryValues[entry.id] ?? '') : entry.value;
+  return entry.isSecret ? (variableSetStore.revealedHistoryValues[entry.id] ?? '') : entry.value;
 }
 function notYetRevealed(entry: ApiVariableHistoryEntry): boolean {
-  return entry.isSecret && revealedHistoryValues[entry.id] === undefined;
+  return entry.isSecret && variableSetStore.revealedHistoryValues[entry.id] === undefined;
 }
 
 function onReveal(id: string): void {
-  void revealHistoryEntry(id);
+  void variableSetStore.revealHistoryEntry(id);
 }
 function onRestore(entry: ApiVariableHistoryEntry): void {
-  void restoreHistoryEntry(entry);
+  void variableSetStore.restoreHistoryEntry(entry);
 }
 
 function close(): void {
-  closeHistoryMenu();
+  variableSetStore.closeHistoryMenu();
   emit('close');
 }
 </script>
@@ -49,13 +45,13 @@ function close(): void {
   >
     <div class="history-menu">
       <EmptyState
-        v-if="historyMenuState.entries.length === 0"
+        v-if="variableSetStore.entries.length === 0"
         icon="history"
         label="No previous values"
         data-testid="variable-history-empty"
       />
       <div
-        v-for="entry in historyMenuState.entries"
+        v-for="entry in variableSetStore.entries"
         :key="entry.id"
         class="history-entry"
         data-testid="variable-history-entry"

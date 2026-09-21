@@ -9,13 +9,17 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ApiVariable } from '@shared/domain/variables';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { ensureVariablesLoaded, mergedValuesAndSecrets } = await import(
-  '../../frontend/src/api/state/variables'
-);
+const { useVariableSetStore } = await import('../../frontend/src/api/state/variables');
+
+const variableSetStore = useVariableSetStore();
 
 function variable(overrides: Partial<ApiVariable>): ApiVariable {
   return {
@@ -52,8 +56,8 @@ describe('mergedValuesAndSecrets duplicate-name resolution (D12)', () => {
         }),
       ];
 
-    await ensureVariablesLoaded('collection', collectionId);
-    const { values } = mergedValuesAndSecrets(collectionId, '');
+    await variableSetStore.ensureVariablesLoaded('collection', collectionId);
+    const { values } = variableSetStore.mergedValuesAndSecrets(collectionId, '');
 
     expect(values.token).toBe('first-value');
   });
@@ -76,9 +80,9 @@ describe('mergedValuesAndSecrets duplicate-name resolution (D12)', () => {
       return [];
     };
 
-    await ensureVariablesLoaded('collection', collectionId);
-    await ensureVariablesLoaded('environment', environmentId);
-    const { values } = mergedValuesAndSecrets(collectionId, environmentId);
+    await variableSetStore.ensureVariablesLoaded('collection', collectionId);
+    await variableSetStore.ensureVariablesLoaded('environment', environmentId);
+    const { values } = variableSetStore.mergedValuesAndSecrets(collectionId, environmentId);
 
     expect(values.token).toBe('env-value');
   });

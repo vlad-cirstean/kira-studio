@@ -8,13 +8,17 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { revealVariable, revealedValues, clearRevealed } = await import(
-  '../../frontend/src/api/state/variables'
-);
+const { useVariableSetStore } = await import('../../frontend/src/api/state/variables');
+
+const variableSetStore = useVariableSetStore();
 
 function withCapturedTimeout<T>(run: (fire: () => void) => Promise<T>): Promise<T> {
   const realSetTimeout = globalThis.setTimeout;
@@ -34,23 +38,23 @@ function withCapturedTimeout<T>(run: (fire: () => void) => Promise<T>): Promise<
 
 describe('revealVariable grace-window expiry (finding 5)', () => {
   test('a revealed value is scheduled for re-masking at (roughly) the 5-minute auth grace', async () => {
-    clearRevealed();
+    variableSetStore.clearRevealed();
     (control as unknown as { variablesReveal: typeof control.variablesReveal }).variablesReveal =
       async () => ({ outcome: 'revealed', value: 'sk_live_super_secret', error: null });
 
     await withCapturedTimeout(async (fire) => {
-      const value = await revealVariable('var-1', () => {});
+      const value = await variableSetStore.revealVariable('var-1', () => {});
       expect(value).toBe('sk_live_super_secret');
-      expect(revealedValues['var-1']).toBe('sk_live_super_secret');
+      expect(variableSetStore.revealedValues['var-1']).toBe('sk_live_super_secret');
 
       fire();
 
-      expect(revealedValues['var-1']).toBeUndefined();
+      expect(variableSetStore.revealedValues['var-1']).toBeUndefined();
     });
   });
 
   test('clearRevealed cancels a still-pending expiry timer', async () => {
-    clearRevealed();
+    variableSetStore.clearRevealed();
     (control as unknown as { variablesReveal: typeof control.variablesReveal }).variablesReveal =
       async () => ({ outcome: 'revealed', value: 'sk_live_super_secret', error: null });
 
@@ -64,10 +68,10 @@ describe('revealVariable grace-window expiry (finding 5)', () => {
     }) as typeof clearTimeout;
 
     try {
-      await revealVariable('var-2', () => {});
-      expect(revealedValues['var-2']).toBe('sk_live_super_secret');
-      clearRevealed();
-      expect(revealedValues['var-2']).toBeUndefined();
+      await variableSetStore.revealVariable('var-2', () => {});
+      expect(variableSetStore.revealedValues['var-2']).toBe('sk_live_super_secret');
+      variableSetStore.clearRevealed();
+      expect(variableSetStore.revealedValues['var-2']).toBeUndefined();
       expect(cleared).toBeGreaterThan(0);
     } finally {
       globalThis.clearTimeout = realClearTimeout;

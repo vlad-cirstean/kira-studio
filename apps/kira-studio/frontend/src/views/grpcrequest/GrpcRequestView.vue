@@ -10,12 +10,7 @@ import {
   variableHoverSource,
   variableSupport,
 } from '../../api/state/variableCompletion';
-import {
-  ensureVariablesLoaded,
-  environmentColorForTab,
-  environmentIdForTab,
-  mergedValuesAndSecrets,
-} from '../../api/state/variables';
+import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
@@ -48,6 +43,8 @@ const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
 const tabIncognitoStore = useTabIncognitoStore();
 const collectionsStore = useCollectionsStore();
+const variablesStore = useVariablesStore();
+const variableSetStore = useVariableSetStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -59,7 +56,7 @@ const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 function toggleIncognito(): void {
   tabIncognitoStore.setIncognito(props.tab.id, !incognito.value);
 }
-const envId = computed(() => environmentIdForTab(props.tab.id));
+const envId = computed(() => variablesStore.environmentIdForTab(props.tab.id));
 
 const TLS_OPTIONS = [
   { value: 'tls' as const, label: 'TLS', testid: 'grpc-tls-tls' },
@@ -166,8 +163,8 @@ const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.s
 watch(
   [collectionId, envId],
   ([cid, eid]) => {
-    void ensureVariablesLoaded('collection', cid);
-    void ensureVariablesLoaded('environment', eid);
+    void variableSetStore.ensureVariablesLoaded('collection', cid);
+    void variableSetStore.ensureVariablesLoaded('environment', eid);
   },
   { immediate: true },
 );
@@ -177,7 +174,10 @@ watch(
 const variables = computed(() => variableSupport(collectionId.value, envId.value));
 
 const unresolvedRefs = computed(() => {
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId.value, envId.value);
+  const { values, secretNames } = variableSetStore.mergedValuesAndSecrets(
+    collectionId.value,
+    envId.value,
+  );
   const refs = resolveGrpcTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
     refs
@@ -274,7 +274,7 @@ onUnmounted(() => {
       refresh-testid="grpc-request-refresh"
       stop-testid="grpc-request-stop"
       :can-stop="running"
-      :env-color="environmentColorForTab(tab.id)"
+      :env-color="variablesStore.environmentColorForTab(tab.id)"
       @refresh="onCall"
       @stop="onStop"
     >

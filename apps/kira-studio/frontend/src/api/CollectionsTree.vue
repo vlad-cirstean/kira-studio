@@ -11,7 +11,7 @@ import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus'
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
-import { openEnvironments } from './state/variables';
+import { useVariablesStore } from './state/variables';
 import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSetTab } from './tabs';
 
 const confirmDialogStore = useConfirmDialogStore();
@@ -19,6 +19,7 @@ const contextMenuStore = useContextMenuStore();
 const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
+const variablesStore = useVariablesStore();
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -78,7 +79,7 @@ const actions: CollectionMenuActions = {
   importCurl: () => importCurlStore.openImportCurlDialog(),
   exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),
   variables: (row) => openVariableSetTab('collection', row.id, row.name),
-  environments: () => openEnvironments(),
+  environments: () => variablesStore.openEnvironments(),
   dynamicValues: () => dynamicValuesStore.openDynamicValuesDialog(),
 };
 

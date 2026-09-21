@@ -3,13 +3,9 @@ import { computed, onMounted, ref } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
-import {
-  environmentIdForTab,
-  initVariables,
-  openEnvironments,
-  selectEnvironmentForTab,
-  variablesState,
-} from './state/variables';
+import { useVariablesStore } from './state/variables';
+
+const variablesStore = useVariablesStore();
 
 // P5 D11: the switcher — mounted in both request views' existing `#toolbar-2` slot, right-aligned
 // via `.p-push` beside the request-pane SegmentedControl. The left panel's header and the title
@@ -35,7 +31,7 @@ import {
 // `appearance: base-select` and only where the engine implements it, and this control now needs a
 // colour dot per row (D17). The closed state stays `.p-select.bordered` either way, so its height/
 // border/padding do not change at all (P16 D6's rule, api-ui-consistency.spec.ts's own guard).
-onMounted(initVariables);
+onMounted(variablesStore.initVariables);
 
 // P71 §3.3: an optional tabId — present from both request views, so their own selection can be an
 // incognito tab's own in-memory override instead of the app-wide active environment.
@@ -47,24 +43,24 @@ const props = withDefaults(defineProps<{ tabId?: string }>(), { tabId: '' });
 
 const open = ref(false);
 
-const activeEnvironmentId = computed(() => environmentIdForTab(props.tabId));
+const activeEnvironmentId = computed(() => variablesStore.environmentIdForTab(props.tabId));
 const activeEnvironment = computed(
-  () => variablesState.environments.find((e) => e.id === activeEnvironmentId.value) ?? null,
+  () => variablesStore.environments.find((e) => e.id === activeEnvironmentId.value) ?? null,
 );
 
 function selectNone(): void {
   open.value = false;
-  void selectEnvironmentForTab(props.tabId, '');
+  void variablesStore.selectEnvironmentForTab(props.tabId, '');
 }
 
 function selectEnvironment(id: string): void {
   open.value = false;
-  void selectEnvironmentForTab(props.tabId, id);
+  void variablesStore.selectEnvironmentForTab(props.tabId, id);
 }
 
 function manage(): void {
   open.value = false;
-  openEnvironments();
+  variablesStore.openEnvironments();
 }
 </script>
 
@@ -108,7 +104,7 @@ function manage(): void {
           </span>
         </button>
         <button
-          v-for="env in variablesState.environments"
+          v-for="env in variablesStore.environments"
           :key="env.id"
           type="button"
           class="p-row row environment-menu-item"

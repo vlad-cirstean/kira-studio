@@ -11,18 +11,11 @@ import IconButton from '../theme/primitives/IconButton.vue';
 import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
-import {
-  createEnvironment,
-  deleteEnvironment,
-  duplicateEnvironment,
-  reorderEnvironmentsList,
-  setActiveEnvironment,
-  updateEnvironment,
-  variablesState,
-} from './state/variables';
+import { useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
 const confirmDialogStore = useConfirmDialogStore();
+const variablesStore = useVariablesStore();
 
 // P28 D16(c): the environment list, re-hosted in a tab. Every behaviour below is
 // EnvironmentsDialog.vue's, ported unchanged — name/description inline editing committed together
@@ -44,16 +37,16 @@ const order = ref<string[]>([]);
 function syncDrafts(): void {
   for (const key of Object.keys(nameDrafts)) delete nameDrafts[key];
   for (const key of Object.keys(descriptionDrafts)) delete descriptionDrafts[key];
-  for (const env of variablesState.environments) {
+  for (const env of variablesStore.environments) {
     nameDrafts[env.id] = env.name;
     descriptionDrafts[env.id] = env.description;
   }
-  order.value = variablesState.environments.map((env) => env.id);
+  order.value = variablesStore.environments.map((env) => env.id);
 }
-watch(() => variablesState.environments, syncDrafts, { immediate: true });
+watch(() => variablesStore.environments, syncDrafts, { immediate: true });
 
 const orderedEnvironments = computed<ApiEnvironment[]>(() => {
-  const byId = new Map(variablesState.environments.map((env) => [env.id, env]));
+  const byId = new Map(variablesStore.environments.map((env) => [env.id, env]));
   return order.value.flatMap((id) => {
     const env = byId.get(id);
     return env ? [env] : [];
@@ -76,7 +69,7 @@ const displayEnvironments = computed<ApiEnvironment[]>(() => {
 async function onFieldBlur(id: string): Promise<void> {
   const name = (nameDrafts[id] ?? '').trim();
   const description = descriptionDrafts[id] ?? '';
-  const current = variablesState.environments.find((e) => e.id === id);
+  const current = variablesStore.environments.find((e) => e.id === id);
   if (!current) return;
   if (name === '') {
     nameDrafts[id] = current.name;
@@ -86,11 +79,11 @@ async function onFieldBlur(id: string): Promise<void> {
   // updateEnvironment writes name/description/color as one row update (D19) — the colour picker
   // lives in VariableSetView.vue's own tab (P18 D17), so a blur here passes the colour through
   // unchanged.
-  await updateEnvironment(id, name, description, current.color);
+  await variablesStore.updateEnvironment(id, name, description, current.color);
 }
 
 async function onNewEnvironment(): Promise<void> {
-  await createEnvironment('New environment');
+  await variablesStore.createEnvironment('New environment');
 }
 
 // P17 D16: opens that environment's own variable-set tab. It no longer has a dialog to close
@@ -100,18 +93,18 @@ function onEditVariables(id: string, name: string): void {
 }
 
 async function onSetActive(id: string): Promise<void> {
-  await setActiveEnvironment(id);
+  await variablesStore.setActiveEnvironment(id);
 }
 
 async function onDelete(id: string, name: string): Promise<void> {
   if (!(await confirmDialogStore.confirmDialog(`Delete environment "${name}"? Its variables go with it.`))) return;
-  await deleteEnvironment(id);
+  await variablesStore.deleteEnvironment(id);
 }
 
 // P17 D17: "Duplicate" is this app's existing vocabulary (connections.Service.Duplicate, the
 // tree menu's own duplicate item) — not a synonym invented for this one surface.
 async function onDuplicate(id: string): Promise<void> {
-  await duplicateEnvironment(id);
+  await variablesStore.duplicateEnvironment(id);
 }
 
 // D14: the same drag/keyboard reorder the variable rows use — and the same refusal while filtered
@@ -138,7 +131,7 @@ async function onDragEnd(): Promise<void> {
     return;
   }
   dragIndex.value = null;
-  await reorderEnvironmentsList(order.value);
+  await variablesStore.reorderEnvironmentsList(order.value);
 }
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   if (isFiltered.value) return;
@@ -148,7 +141,7 @@ async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   const next = [...order.value];
   [next[from], next[to]] = [next[to], next[from]];
   order.value = next;
-  await reorderEnvironmentsList(order.value);
+  await variablesStore.reorderEnvironmentsList(order.value);
 }
 function onKeydown(e: KeyboardEvent, id: string): void {
   if (isFiltered.value || !e.altKey) return;
@@ -173,7 +166,7 @@ function onKeydown(e: KeyboardEvent, id: string): void {
     >
       <template #toolbar>
         <PanelSearchBox
-          v-if="variablesState.environments.length > 0"
+          v-if="variablesStore.environments.length > 0"
           v-model="filterQuery"
           placeholder="Filter by name"
           testid="environments-filter"
@@ -260,7 +253,7 @@ function onKeydown(e: KeyboardEvent, id: string): void {
           />
         </div>
         <EmptyState
-          v-if="variablesState.environments.length === 0"
+          v-if="variablesStore.environments.length === 0"
           icon="server-environment"
           label="No environments yet"
           data-testid="environments-empty"

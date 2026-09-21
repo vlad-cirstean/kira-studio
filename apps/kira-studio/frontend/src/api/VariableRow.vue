@@ -5,8 +5,10 @@ import CodiconIcon from '../theme/CodiconIcon.vue';
 import Checkbox from '../theme/primitives/Checkbox.vue';
 import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
-import { historyMenuState } from './state/variables';
+import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
+
+const variableSetStore = useVariableSetStore();
 
 // P5 D11/D12/D9/D13/D14: one row — a grip handle, a name field, a value field (masked for a
 // secret, until revealed), a secret checkbox, a history button/popover, a duplicate-name warning
@@ -185,7 +187,7 @@ function onKeydown(e: KeyboardEvent): void {
         @click="onHistoryClick"
       />
       <VariableHistoryMenu
-        v-if="showHistory && historyMenuState.variableId === row.id"
+        v-if="showHistory && variableSetStore.variableId === row.id"
         @close="onHistoryClose"
       />
     </div>

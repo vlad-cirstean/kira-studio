@@ -10,12 +10,13 @@ import ImportReportStrip from './ImportReportStrip.vue';
 import { useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
-import { initVariables, openEnvironments } from './state/variables';
+import { useVariablesStore } from './state/variables';
 import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
+const variablesStore = useVariablesStore();
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -38,7 +39,7 @@ onMounted(collectionsStore.initCollections);
 // The header's Environments action and the active-environment select both read this; initVariables()
 // is idempotent (state/variables.ts's own guard), so mounting it here as well as wherever else
 // needs it is safe.
-onMounted(initVariables);
+onMounted(variablesStore.initVariables);
 
 // P22b D8: runtime-only collapse state for the two categories — a panel section is not a
 // preference worth a storage round trip (ConsoleViewRuntime's own "runtime-only, never saved"
@@ -80,7 +81,7 @@ function onVariablesCommand(): void {
 }
 
 function onEnvironments(): void {
-  openEnvironments();
+  variablesStore.openEnvironments();
 }
 
 // P6 D11: the palette's own "Dynamic values…" entry — not scoped to any selection, unlike

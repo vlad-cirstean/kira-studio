@@ -6,10 +6,12 @@ import EmptyState from '../theme/primitives/EmptyState.vue';
 import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useCollectionsStore } from './state/collections';
-import { overviewRows, type VariableOverviewRow, variablesState } from './state/variables';
+import { useVariableSetStore, useVariablesStore, type VariableOverviewRow } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
 const collectionsStore = useCollectionsStore();
+const variablesStore = useVariablesStore();
+const variableSetStore = useVariableSetStore();
 
 // P17 D20/item 8: a read-only popover over the already-merged data (`overviewRows`) — one panel,
 // reachable from any request tab (HttpRequestView.vue and GrpcRequestView.vue both mount this
@@ -31,7 +33,7 @@ const props = withDefaults(
 const emit = defineEmits<{ close: [] }>();
 
 const rows = computed<VariableOverviewRow[]>(() =>
-  overviewRows(props.collectionId, props.environmentId),
+  variableSetStore.overviewRows(props.collectionId, props.environmentId),
 );
 
 // P16 D14's rule, restated here (D20): name-only, never value — a value-matching filter over a
@@ -54,12 +56,12 @@ function onCopy(name: string): void {
 
 const collectionName = computed(() => collectionsStore.collectionRecord(props.collectionId)?.name ?? '');
 const environmentName = computed(
-  () => variablesState.environments.find((e) => e.id === props.environmentId)?.name ?? '',
+  () => variablesStore.environments.find((e) => e.id === props.environmentId)?.name ?? '',
 );
 // P18 D17: the environment's own colour, beside "Edit environment variables…" — this panel
 // already names the environment there (P17 D20).
 const environmentColor = computed(
-  () => variablesState.environments.find((e) => e.id === props.environmentId)?.color ?? 'none',
+  () => variablesStore.environments.find((e) => e.id === props.environmentId)?.color ?? 'none',
 );
 
 function close(): void {

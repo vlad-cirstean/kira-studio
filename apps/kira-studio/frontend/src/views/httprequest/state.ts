@@ -16,7 +16,7 @@ import type {
   HttpTimeline,
 } from '@shared/domain/http';
 import { useCollectionsStore } from '../../api/state/collections';
-import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
+import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
@@ -181,8 +181,11 @@ export async function send(tabId: string): Promise<void> {
   rt.error = null;
 
   const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = environmentIdForTab(tabId);
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
+  const environmentId = useVariablesStore().environmentIdForTab(tabId);
+  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
+    collectionId,
+    environmentId,
+  );
   // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
   // no await, no dynamic-generators chunk fetched or parsed. Only a request that actually
   // references a dynamic value pays for a second pass (over a handful of short strings — the
@@ -267,8 +270,11 @@ export async function resolveForExport(tabId: string): Promise<ExportResolution 
   if (!tab) return null;
 
   const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = environmentIdForTab(tabId);
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
+  const environmentId = useVariablesStore().environmentIdForTab(tabId);
+  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
+    collectionId,
+    environmentId,
+  );
   const first = resolveTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
     ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())

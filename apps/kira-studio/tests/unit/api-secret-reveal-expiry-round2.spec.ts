@@ -17,11 +17,10 @@ setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { revealHistoryEntry, revealedHistoryValues, openHistoryMenu, closeHistoryMenu } =
-  await import('../../frontend/src/api/state/variables');
+const { useVariableSetStore } = await import('../../frontend/src/api/state/variables');
 const { useCopyAsCurlStore } = await import('../../frontend/src/api/state/curl');
-const { ensureVariablesLoaded } = await import('../../frontend/src/api/state/variables');
 
+const variableSetStore = useVariableSetStore();
 const copyAsCurlStore = useCopyAsCurlStore();
 
 function withCapturedTimeout<T>(run: (fire: () => void) => Promise<T>): Promise<T> {
@@ -42,7 +41,7 @@ function withCapturedTimeout<T>(run: (fire: () => void) => Promise<T>): Promise<
 
 describe('revealHistoryEntry grace-window expiry (round 2 finding 5)', () => {
   test('a revealed history value is scheduled for re-masking at the auth grace, not only on popover close', async () => {
-    closeHistoryMenu();
+    variableSetStore.closeHistoryMenu();
     (
       control as unknown as { variablesRevealHistory: typeof control.variablesRevealHistory }
     ).variablesRevealHistory = async () => ({
@@ -53,16 +52,16 @@ describe('revealHistoryEntry grace-window expiry (round 2 finding 5)', () => {
     (control as unknown as { variablesHistory: typeof control.variablesHistory }).variablesHistory =
       async () => [];
 
-    await openHistoryMenu('tab-1', 'environment', 'env-1', 'var-1');
+    await variableSetStore.openHistoryMenu('tab-1', 'environment', 'env-1', 'var-1');
 
     await withCapturedTimeout(async (fire) => {
-      const value = await revealHistoryEntry('hist-1');
+      const value = await variableSetStore.revealHistoryEntry('hist-1');
       expect(value).toBe('old_sk_live_secret');
-      expect(revealedHistoryValues['hist-1']).toBe('old_sk_live_secret');
+      expect(variableSetStore.revealedHistoryValues['hist-1']).toBe('old_sk_live_secret');
 
       fire();
 
-      expect(revealedHistoryValues['hist-1']).toBeUndefined();
+      expect(variableSetStore.revealedHistoryValues['hist-1']).toBeUndefined();
     });
   });
 });
@@ -85,7 +84,7 @@ describe('Copy-as-curl revealed secret grace-window expiry (round 2 finding 5)',
     (control as unknown as { variablesReveal: typeof control.variablesReveal }).variablesReveal =
       async () => ({ outcome: 'revealed', value: 'sk_live_curl_secret', error: null });
 
-    await ensureVariablesLoaded('environment', 'env-curl-1');
+    await variableSetStore.ensureVariablesLoaded('environment', 'env-curl-1');
 
     copyAsCurlStore.openCopyAsCurlDialog(
       'GET',

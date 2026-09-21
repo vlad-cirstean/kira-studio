@@ -14,7 +14,7 @@ import type { EditorCompletionSource } from '../../editor/completion';
 import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hoverInfo';
 import type { RangeHighlight } from '../../editor/ranges';
 import { type Completion, templateToken } from '../../theme/primitives/completion';
-import { cachedVariables, mergedValuesAndSecrets } from './variables';
+import { useVariableSetStore } from './variables';
 
 // P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's
 // own finding that mergedValuesAndSecrets is already synchronous, already cached, and already
@@ -86,7 +86,9 @@ function badTransformMessage(fullName: string): string {
  *  here, and widening a store function `send()` depends on for a tooltip caption is the wrong
  *  direction of dependency. */
 function scopeOf(name: string, environmentId: string): 'collection' | 'environment' {
-  return cachedVariables('environment', environmentId).some((v) => v.name === name)
+  return useVariableSetStore()
+    .cachedVariables('environment', environmentId)
+    .some((v) => v.name === name)
     ? 'environment'
     : 'collection';
 }
@@ -136,7 +138,10 @@ function isAfterPipe(text: string, from: number): boolean {
 }
 
 export function variableSupport(collectionId: string, environmentId: string): VariableSupport {
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
+  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
+    collectionId,
+    environmentId,
+  );
 
   function rangeHighlights(doc: string): readonly RangeHighlight[] {
     return splitTemplateSpans(doc)

@@ -6,9 +6,10 @@ import MonacoHost from '../editor/MonacoHost.vue';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import AppButton from '../theme/primitives/AppButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import { applyBulkVariables } from './state/variables';
+import { useVariableSetStore } from './state/variables';
 
 const confirmDialogStore = useConfirmDialogStore();
+const variableSetStore = useVariableSetStore();
 
 // P17 D21/D22/D23, item 5: the `.env`-format bulk editor, hosted inside VariableSetView.vue's own
 // bulk-mode toggle (a component-local lens, never persisted to tab state — D16's own rule for the
@@ -90,7 +91,7 @@ async function onApply(): Promise<void> {
   applying.value = true;
   applyError.value = null;
   try {
-    await applyBulkVariables(
+    await variableSetStore.applyBulkVariables(
       props.tabId,
       props.scope,
       props.ownerId,

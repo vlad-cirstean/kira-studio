@@ -22,12 +22,7 @@ import { useCollectionsStore } from '../../api/state/collections';
 import { applyCurlToTab, useCopyAsCurlStore } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
-import {
-  ensureVariablesLoaded,
-  environmentColorForTab,
-  environmentIdForTab,
-  mergedValuesAndSecrets,
-} from '../../api/state/variables';
+import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
@@ -64,6 +59,8 @@ const tabIncognitoStore = useTabIncognitoStore();
 const editRawStore = useEditRawStore();
 const collectionsStore = useCollectionsStore();
 const copyAsCurlStore = useCopyAsCurlStore();
+const variablesStore = useVariablesStore();
+const variableSetStore = useVariableSetStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -77,7 +74,7 @@ const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 function toggleIncognito(): void {
   tabIncognitoStore.setIncognito(props.tab.id, !incognito.value);
 }
-const envId = computed(() => environmentIdForTab(props.tab.id));
+const envId = computed(() => variablesStore.environmentIdForTab(props.tab.id));
 
 // D12/P17 D19: a method chip coloured per-method (not per-family any more — httpMethodToken
 // replaces httpMethodClass outright, F13/D19), over .p-method's new tinted-background rule. P4
@@ -254,8 +251,8 @@ const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.s
 watch(
   [collectionId, envId],
   ([cid, eid]) => {
-    void ensureVariablesLoaded('collection', cid);
-    void ensureVariablesLoaded('environment', eid);
+    void variableSetStore.ensureVariablesLoaded('collection', cid);
+    void variableSetStore.ensureVariablesLoaded('environment', eid);
   },
   { immediate: true },
 );
@@ -265,7 +262,10 @@ watch(
 const variables = computed(() => variableSupport(collectionId.value, envId.value));
 
 const unresolvedRefs = computed(() => {
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId.value, envId.value);
+  const { values, secretNames } = variableSetStore.mergedValuesAndSecrets(
+    collectionId.value,
+    envId.value,
+  );
   const refs = resolveTabState(props.tab.state, values, secretNames).refs;
   const byName = new Map(
     refs
@@ -447,7 +447,7 @@ onUnmounted(() => {
       refresh-testid="http-request-refresh"
       stop-testid="http-request-stop"
       :can-stop="running"
-      :env-color="environmentColorForTab(tab.id)"
+      :env-color="variablesStore.environmentColorForTab(tab.id)"
       @refresh="onSend"
       @stop="onStop"
     >

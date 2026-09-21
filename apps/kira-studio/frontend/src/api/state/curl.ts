@@ -12,7 +12,7 @@ import { reactive, toRefs } from 'vue';
 import { copyText } from '../../clipboard';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
 import { createRevealExpiry } from './revealExpiry';
-import { cachedVariables, clearRevealed, revealVariable } from './variables';
+import { useVariableSetStore } from './variables';
 
 const CODE_LABEL: Readonly<Record<HttpCodeLanguage, string>> = {
   javascript: 'JavaScript',
@@ -221,7 +221,7 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     // revealedSecretValues — closing only the latter left a stale entry there for
     // VariablesDialog.vue's own "already revealed" check to silently trust later, with no re-auth
     // prompt at all.
-    clearRevealed();
+    useVariableSetStore().clearRevealed();
   }
 
   /** D10 step 2/4: the command for the *current* reveal state — masked (every deferred span still
@@ -249,13 +249,14 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
     collectionId: string,
     environmentId: string,
   ): string | null {
-    const env = cachedVariables('environment', environmentId).find(
-      (v) => v.isSecret && v.name === name,
-    );
+    const variableSetStore = useVariableSetStore();
+    const env = variableSetStore
+      .cachedVariables('environment', environmentId)
+      .find((v) => v.isSecret && v.name === name);
     if (env) return env.id;
-    const col = cachedVariables('collection', collectionId).find(
-      (v) => v.isSecret && v.name === name,
-    );
+    const col = variableSetStore
+      .cachedVariables('collection', collectionId)
+      .find((v) => v.isSecret && v.name === name);
     return col?.id ?? null;
   }
 
@@ -276,7 +277,7 @@ export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
         // Finding 1 (v1.2 P14 round 2): branch on this call's own return value, not on the shared
         // revealedValues map — a cancelled/unavailable/errored outcome here must not be masked by a
         // stale success the map already holds from an earlier, unrelated reveal of the same id.
-        const value = await revealVariable(id, (message) => {
+        const value = await useVariableSetStore().revealVariable(id, (message) => {
           state.error = message;
         });
         if (value !== undefined) {

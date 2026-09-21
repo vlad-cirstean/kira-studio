@@ -14,23 +14,7 @@ import TextField from '../theme/primitives/TextField.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useCollectionsStore } from './state/collections';
-import {
-  deleteVariable,
-  duplicateEnvironment,
-  initVariables,
-  isDuplicateName,
-  loadVariableSetRows,
-  openHistoryMenu,
-  reorderVariables,
-  revealedValues,
-  revealVariable,
-  setVariableSetError,
-  updateEnvironment,
-  upsertVariable,
-  variableSetError,
-  variableSetRows,
-  variablesState,
-} from './state/variables';
+import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
 
 // P17 D16: VariablesDialog.vue's own replacement — the exact same per-row draft/blur/reorder
@@ -44,6 +28,8 @@ import VariableRow from './VariableRow.vue';
 const props = defineProps<{ tab: VariableSetTabRecord }>();
 
 const collectionsStore = useCollectionsStore();
+const variablesStore = useVariablesStore();
+const variableSetStore = useVariableSetStore();
 
 const scope = computed(() => props.tab.state.scope);
 const ownerId = computed(() => props.tab.state.ownerId);
@@ -53,14 +39,14 @@ const ownerId = computed(() => props.tab.state.ownerId);
 // freshly-mounted tab doesn't flash "no longer exists" before initCollections/initVariables ever
 // resolve.
 const ownersLoaded = computed(() =>
-  scope.value === 'collection' ? collectionsStore.loaded : variablesState.loaded,
+  scope.value === 'collection' ? collectionsStore.loaded : variablesStore.loaded,
 );
 const owningCollection = computed(() =>
   scope.value === 'collection' ? collectionsStore.collectionRecord(ownerId.value) : undefined,
 );
 const owningEnvironment = computed(() =>
   scope.value === 'environment'
-    ? variablesState.environments.find((e) => e.id === ownerId.value)
+    ? variablesStore.environments.find((e) => e.id === ownerId.value)
     : undefined,
 );
 const ownerExists = computed(() =>
@@ -69,12 +55,12 @@ const ownerExists = computed(() =>
 
 onMounted(() => {
   collectionsStore.initCollections();
-  initVariables();
-  void loadVariableSetRows(props.tab.id, scope.value, ownerId.value);
+  variablesStore.initVariables();
+  void variableSetStore.loadVariableSetRows(props.tab.id, scope.value, ownerId.value);
 });
 
-const rows = computed<ApiVariable[]>(() => variableSetRows(props.tab.id));
-const error = computed(() => variableSetError(props.tab.id));
+const rows = computed<ApiVariable[]>(() => variableSetStore.variableSetRows(props.tab.id));
+const error = computed(() => variableSetStore.variableSetError(props.tab.id));
 
 // ---- environment scope only: name + description + Duplicate (D16/D17) ----
 
@@ -100,7 +86,7 @@ async function onEnvFieldBlur(): Promise<void> {
   // updateEnvironment writes name/description/color as one row update (D19) — color has its own
   // immediate handler below, so a name/description blur passes the environment's own current
   // colour through unchanged rather than defaulting it back to 'none'.
-  await updateEnvironment(env.id, name, envDescriptionDraft.value, env.color);
+  await variablesStore.updateEnvironment(env.id, name, envDescriptionDraft.value, env.color);
 }
 // P18 D17/D19: a swatch click applies immediately, unlike name/description's blur-commit — a
 // colour choice is a discrete action with its own visible feedback (the swatch's own selection
@@ -108,10 +94,10 @@ async function onEnvFieldBlur(): Promise<void> {
 async function onEnvColorChange(color: PaletteColor): Promise<void> {
   const env = owningEnvironment.value;
   if (!env) return;
-  await updateEnvironment(env.id, env.name, env.description, color);
+  await variablesStore.updateEnvironment(env.id, env.name, env.description, color);
 }
 async function onDuplicateEnvironment(): Promise<void> {
-  if (owningEnvironment.value) await duplicateEnvironment(owningEnvironment.value.id);
+  if (owningEnvironment.value) await variablesStore.duplicateEnvironment(owningEnvironment.value.id);
 }
 
 // ---- the row table (VariablesDialog.vue's own mechanics, verbatim but tab-scoped) ----
@@ -152,7 +138,7 @@ watch(rows, syncDrafts, { immediate: true });
 // auth grace it came from, because closing the tab was the only thing that ever cleared it).
 const revealMirroredValue: Record<string, string> = {};
 
-watch(revealedValues, (values) => {
+watch(variableSetStore.revealedValues, (values) => {
   for (const [id, value] of Object.entries(values)) {
     const draft = drafts[id];
     if (draft && draft.value === '') draft.value = value;
@@ -215,7 +201,7 @@ function duplicateFor(row: ApiVariable): boolean {
   const full = [...allRealRows.value, trailingRow.value];
   const idx = row.id === '' ? full.length - 1 : allRealRows.value.findIndex((r) => r.id === row.id);
   if (idx === -1) return false;
-  return isDuplicateName(full, idx);
+  return variableSetStore.isDuplicateName(full, idx);
 }
 
 function draftFor(id: string): Draft {
@@ -244,7 +230,7 @@ async function commitDraft(id: string): Promise<void> {
     trailingDraft.value = '';
     trailingDraft.isSecret = false;
     trailingDraft.description = '';
-    await upsertVariable(props.tab.id, scope.value, ownerId.value, {
+    await variableSetStore.upsertVariable(props.tab.id, scope.value, ownerId.value, {
       id: '',
       name,
       value,
@@ -259,7 +245,7 @@ async function commitDraft(id: string): Promise<void> {
     draft.name = row.name;
     return;
   }
-  await upsertVariable(props.tab.id, scope.value, ownerId.value, {
+  await variableSetStore.upsertVariable(props.tab.id, scope.value, ownerId.value, {
     id,
     name: draft.name.trim(),
     value: draft.value,
@@ -291,7 +277,7 @@ async function onBlur(id: string): Promise<void> {
 }
 
 function onRevealError(message: string): void {
-  setVariableSetError(props.tab.id, message);
+  variableSetStore.setVariableSetError(props.tab.id, message);
 }
 
 async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
@@ -302,7 +288,7 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
     return;
   }
   if (id !== '') {
-    const value = await revealVariable(id, onRevealError);
+    const value = await variableSetStore.revealVariable(id, onRevealError);
     if (value === undefined) return;
     draft.value = value;
   }
@@ -311,7 +297,7 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
 }
 
 function onReveal(id: string): void {
-  void revealVariable(id, onRevealError);
+  void variableSetStore.revealVariable(id, onRevealError);
 }
 
 const dragIndex = ref<number | null>(null);
@@ -336,7 +322,7 @@ async function onDragEnd(): Promise<void> {
     return;
   }
   dragIndex.value = null;
-  await reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
+  await variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
 }
 
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
@@ -347,12 +333,12 @@ async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   const next = [...order.value];
   [next[from], next[to]] = [next[to], next[from]];
   order.value = next;
-  await reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
+  await variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
 }
 
 async function onRemove(id: string): Promise<void> {
   if (id === '') return;
-  await deleteVariable(props.tab.id, scope.value, ownerId.value, id);
+  await variableSetStore.deleteVariable(props.tab.id, scope.value, ownerId.value, id);
 }
 
 // P22b D16: FieldRowsTable.vue's own trailing-blank-row watcher, restated for this view's own
@@ -381,7 +367,7 @@ watch(
 );
 
 function onHistoryClickFor(row: ApiVariable): void {
-  void openHistoryMenu(props.tab.id, scope.value, ownerId.value, row.id);
+  void variableSetStore.openHistoryMenu(props.tab.id, scope.value, ownerId.value, row.id);
 }
 
 // ---- bulk `.env` mode (R11, item 5) ----

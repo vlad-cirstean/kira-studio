@@ -9,7 +9,7 @@ import type {
 } from '@shared/domain/grpc';
 import { markRaw } from 'vue';
 import { useCollectionsStore } from '../../api/state/collections';
-import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
+import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
@@ -155,8 +155,11 @@ async function resolveForDescribe(
   const tab = findGrpcRequestTab(tabId);
   if (!tab) return null;
   const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = environmentIdForTab(tabId);
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
+  const environmentId = useVariablesStore().environmentIdForTab(tabId);
+  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
+    collectionId,
+    environmentId,
+  );
   const first = resolveGrpcTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
     ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
@@ -177,7 +180,7 @@ export async function loadSchema(tabId: string, reload = false): Promise<void> {
   const myGen = ++rt.genId;
 
   const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = environmentIdForTab(tabId);
+  const environmentId = useVariablesStore().environmentIdForTab(tabId);
   try {
     let target = tab.state.target;
     let metadata: { name: string; value: string }[] = [];
@@ -297,8 +300,11 @@ export async function call(tabId: string): Promise<void> {
   rt.streaming = streaming;
 
   const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = environmentIdForTab(tabId);
-  const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
+  const environmentId = useVariablesStore().environmentIdForTab(tabId);
+  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
+    collectionId,
+    environmentId,
+  );
   const first = resolveGrpcTabState(tab.state, values, secretNames);
   const resolved = first.refs.some((r) => r.kind === 'dynamic')
     ? resolveGrpcTabState(tab.state, values, secretNames, await loadDynamicGenerator())
