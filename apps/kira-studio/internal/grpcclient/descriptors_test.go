@@ -263,5 +263,9 @@ func startStubReflectionServer(t *testing.T, stub *stubReflectionServer) string 
 	grpc_reflection_v1.RegisterServerReflectionServer(s, stub)
 	go func() { _ = s.Serve(lis) }()
 	t.Cleanup(s.Stop)
-	return lis.Addr().String()
+	addr := lis.Addr().String()
+	// P96 §4.4: the same net.Listen-returns-before-Serve-dispatches-a-connection race
+	// waitEchoServerReady exists to close — this fixture had no readiness wait at all.
+	waitEchoServerReady(t, addr)
+	return addr
 }
