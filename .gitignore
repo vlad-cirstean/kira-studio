@@ -173,3 +173,6 @@ scripts/demo-dbs/sqlite/*.sqlite
 # kira-repo-map headless dev binary — built on demand by scripts/mcp-repo-map.ts (C3 §3.1),
 # never packaged (the embedded instance is the app's own executable, C3 §3.2).
 apps/kira-studio/bin/
+
+# CodeGraph local index (machine-local, rebuilt by .claude/hooks/session-start.sh)
+.codegraph/
