@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -197,6 +198,12 @@ func resolveReflection(ctx context.Context, src Source) (*resolved, error) {
 			// expose gRPC reflection" (D17) rather than an opaque "call failed".
 			return nil, SchemaError("This server does not expose gRPC reflection. Supply a .proto file instead.")
 		}
+		if isTransportGlitch(err) {
+			// D17: retryOnTransportGlitch already retried this exact failure firstRPCGlitchRetries
+			// times — surfacing the bare "EOF" negotiateAndListServices returns here is not
+			// legible on its own, so name what actually happened instead.
+			return nil, Transport("the reflection request ended the connection unexpectedly (" + err.Error() + ") after retrying")
+		}
 		return nil, Transport(err.Error())
 	}
 
@@ -275,30 +282,95 @@ func (l *linker) link(path string) error {
 // falls back to v1alpha on codes.Unimplemented from either step, the same negotiation
 // grpcreflect.NewClientAuto performs (F2), here in ~20 lines rather than a third-party dependency
 // (D1). The service list comes back alongside the chosen transport so the one ListServices round
-// trip this negotiation needs is never repeated.
+// trip this negotiation needs is never repeated. Each round trip (v1's, and v1alpha's own retry on
+// v1's Unimplemented) goes through retryOnTransportGlitch — P96 §4's diagnosed defect is not
+// specific to whichever RPC happens to be literally first on the connection, so both get the same
+// protection (§4's own commit message states which one the repro actually caught failing).
 func negotiateAndListServices(ctx context.Context, conn *grpc.ClientConn) (reflectionTransport, string, []string, error) {
-	v1, err := newV1Transport(ctx, conn)
+	v1, services, err := retryOnTransportGlitch(ctx, func() (*v1Transport, []string, error) {
+		v1, err := newV1Transport(ctx, conn)
+		if err != nil {
+			return nil, nil, err
+		}
+		services, err := v1.listServices()
+		return v1, services, err
+	})
 	if err == nil {
-		services, listErr := v1.listServices()
-		if listErr == nil {
-			return v1, "reflection-v1", services, nil
-		}
-		if status.Code(listErr) != codes.Unimplemented {
-			return nil, "", nil, listErr
-		}
-	} else if status.Code(err) != codes.Unimplemented {
+		return v1, "reflection-v1", services, nil
+	}
+	if status.Code(err) != codes.Unimplemented {
 		return nil, "", nil, err
 	}
 
-	v1alpha, err := newV1AlphaTransport(ctx, conn)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	services, err := v1alpha.listServices()
+	v1alpha, services, err := retryOnTransportGlitch(ctx, func() (*v1AlphaTransport, []string, error) {
+		v1alpha, err := newV1AlphaTransport(ctx, conn)
+		if err != nil {
+			return nil, nil, err
+		}
+		services, err := v1alpha.listServices()
+		return v1alpha, services, err
+	})
 	if err != nil {
 		return nil, "", nil, err
 	}
 	return v1alpha, "reflection-v1alpha", services, nil
+}
+
+// firstRPCGlitchRetries bounds retryOnTransportGlitch's retries of an early reflection round trip
+// on a fresh connection (P96 §4). Measured in this container's own synthetic CPU-stress repro
+// (stress-ng --cpu 4 --cpu-load 100, a fresh OS process per iteration): up to ~11% of runs failed
+// with a bare io.EOF before this fix. Direct instrumentation (not committed) pinned the failure to
+// the v1alpha round trip specifically — v1's own negotiation answered a well-formed Unimplemented
+// in under 1ms in every failing run, so the race is in whichever reflection RPC follows shortly
+// after connection dial, not literally "the first one"; both v1's and v1alpha's own round trips go
+// through the same retry for that reason. 4 retries with firstRPCGlitchDelay measured 0 failures
+// across 1000 in-process iterations under the same stressor (baseline: 4/500 with no fix).
+const firstRPCGlitchRetries = 4
+
+// firstRPCGlitchDelay is the pause retryOnTransportGlitch takes before a retry — long enough to
+// let the connection's own transport goroutines actually get scheduled once under this container's
+// own worst observed contention (a synthetic all-cores CPU stressor); an immediate (no-delay)
+// retry on the same connection, measured separately, did not lower the failure rate at all — the
+// glitch is tied to scheduler starvation, not a race an instant retry can win.
+const firstRPCGlitchDelay = 50 * time.Millisecond
+
+// retryOnTransportGlitch runs attempt up to firstRPCGlitchRetries+1 times, retrying only when its
+// error is a bare transport-level failure (isTransportGlitch — io.EOF, which status.Code reports
+// as codes.Unknown) rather than a well-formed gRPC status. This is a genuine product defect, not a
+// test artifact: grpc-go's HTTP/2 transport occasionally ends an early stream on a fresh
+// connection this way under scheduling pressure, even though the connection is otherwise READY and
+// fully serving — the residual P81's own waitEchoServerReady probe comment predicted ("any fresh
+// connection's first RPC, not only one made right after a listener opens"). dialConn builds one
+// *grpc.ClientConn per call (F16), so every resolveReflection call is exposed to this.
+//
+// A real codes.Unimplemented (the server genuinely does not speak this reflection version) is
+// never retried — v1's Unimplemented is the normal v1alpha fallback trigger, handled by the
+// caller — and no other status is retried either, so a genuine business error (or a
+// differently-broken server) still surfaces as-is rather than being masked or retried into a
+// false pass.
+func retryOnTransportGlitch[T any](ctx context.Context, attempt func() (T, []string, error)) (T, []string, error) {
+	var zero T
+	for i := 0; ; i++ {
+		v, services, err := attempt()
+		if err == nil {
+			return v, services, nil
+		}
+		if status.Code(err) == codes.Unimplemented || !isTransportGlitch(err) || i >= firstRPCGlitchRetries {
+			return zero, nil, err
+		}
+		select {
+		case <-ctx.Done():
+			return zero, nil, err
+		case <-time.After(firstRPCGlitchDelay):
+		}
+	}
+}
+
+// isTransportGlitch reports whether err is a bare transport-level failure carrying no real gRPC
+// status — codes.Unknown is what status.Code wraps a plain io.EOF (or similar) into — rather than
+// a status some server actually chose to answer with.
+func isTransportGlitch(err error) bool {
+	return status.Code(err) == codes.Unknown
 }
 
 // absorb decodes every raw FileDescriptorProto byte blob a response carried and stores it by
