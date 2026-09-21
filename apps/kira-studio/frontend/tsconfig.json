@@ -19,6 +19,7 @@
     // ambient declaration, not a second, different fix for an identical need.
     "types": ["vite/client", "bun-types"],
     "paths": {
+      "@/*": ["./src/*"],
       "@shared/*": ["../../../packages/shared/*"],
       "@bindings/*": [
         "./bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/*"

@@ -26,6 +26,9 @@ export default defineConfig(({ command }) => {
     },
     resolve: {
       alias: {
+        // shadcn-vue's own generated-component alias (P98) — existing source keeps relative
+        // imports, this is for what `bunx shadcn-vue add` writes.
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
         '@shared': fileURLToPath(new URL('../../../packages/shared', import.meta.url)),
         '@bindings': fileURLToPath(
           new URL(
