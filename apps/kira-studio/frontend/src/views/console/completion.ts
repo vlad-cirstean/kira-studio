@@ -7,7 +7,7 @@ import {
   type RelationColumns,
 } from '@shared/domain/tree';
 import type { EditorCompletionSource } from '../../editor/completion';
-import { rowKey, treeState } from '../../project/state/tree';
+import { rowKey, useTreeStore } from '../../project/state/tree';
 import { useMongoFieldSampleStore } from '../shared/mongoFieldSample';
 import {
   MONGO_QUERY_OPERATORS,
@@ -42,7 +42,7 @@ function databaseSegment(path: string): string | null {
 function mongoCollectionNames(connectionId: string, path: string): string[] {
   const segment = databaseSegment(path);
   if (!segment) return [];
-  const nodes = treeState.children[rowKey(connectionId, segment)] ?? [];
+  const nodes = useTreeStore().children[rowKey(connectionId, segment)] ?? [];
   return nodes.filter((n) => n.kind === 'collection').map((n) => n.name);
 }
 
@@ -74,7 +74,7 @@ export function consoleRelationNames(connectionId: string, path: string): string
   }
   if (cut < 0) return path === '' ? rootRelationNames(connectionId) : [];
   const containerPath = encodePath(segments.slice(0, cut + 1));
-  const nodes = treeState.children[rowKey(connectionId, containerPath)] ?? [];
+  const nodes = useTreeStore().children[rowKey(connectionId, containerPath)] ?? [];
   return nodes.filter((n) => RELATION_NODE_KINDS.has(n.kind)).map((n) => n.name);
 }
 
@@ -86,11 +86,12 @@ export function consoleRelationNames(connectionId: string, path: string): string
  *  the user already expanded in the tree show up in a root console's completion even when
  *  rootContainerPathFor can't pick a single container to cache columns for. */
 function rootRelationNames(connectionId: string): string[] {
+  const treeStore = useTreeStore();
   const prefix = rowKey(connectionId, '');
   const names = new Set<string>();
-  for (const key of Object.keys(treeState.children)) {
+  for (const key of Object.keys(treeStore.children)) {
     if (!key.startsWith(prefix)) continue;
-    for (const node of treeState.children[key] ?? []) {
+    for (const node of treeStore.children[key] ?? []) {
       if (RELATION_NODE_KINDS.has(node.kind)) names.add(node.name);
     }
   }

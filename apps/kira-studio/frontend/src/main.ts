@@ -5,7 +5,7 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
-import { knownConnectionIds } from './project/state/tree';
+import { useTreeStore } from './project/state/tree';
 import { useAgentHooksStore } from './state/agentHooks';
 import { useAgentSessionsStore } from './state/agentSessions';
 import { useAppMetricsStore } from './state/appMetrics';
@@ -287,7 +287,7 @@ if (__KIRA_DEBUG_HOOKS__) {
   };
   window.__kiraCount = data.count;
   window.__kiraCacheStats = data.cacheStats;
-  window.__kiraTreeConnectionIds = () => Array.from(knownConnectionIds());
+  window.__kiraTreeConnectionIds = () => Array.from(useTreeStore().knownConnectionIds());
 }
 
 async function bootstrap(): Promise<void> {

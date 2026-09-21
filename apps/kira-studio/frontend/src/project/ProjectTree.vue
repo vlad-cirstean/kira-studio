@@ -10,18 +10,7 @@ import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
-import {
-  collapse,
-  expand,
-  initTreeSync,
-  loadSavedQueries,
-  searchIncomplete,
-  selectRow,
-  type TreeRowVm,
-  toggleGroup,
-  treeState,
-  visibleRows,
-} from './state/tree';
+import { type TreeRowVm, useTreeStore } from './state/tree';
 import TreeRow from './TreeRow.vue';
 
 const contextMenuStore = useContextMenuStore();
@@ -29,6 +18,7 @@ const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
+const treeStore = useTreeStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
@@ -56,38 +46,38 @@ const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compa
 const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
 
 onMounted(() => {
-  initTreeSync();
+  treeStore.initTreeSync();
   initSchemaSync();
   schemaColumnsStore.initSchemaColumnsSync();
 });
 
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
-// scrolling happens here, one tick later, once visibleRows reflects the newly expanded nodes —
+// scrolling happens here, one tick later, once treeStore.visibleRows reflects the newly expanded nodes —
 // TreeHost.revealKey() does the animation-frame wait, the index lookup and the band-inset scroll.
 watch(
-  () => treeState.pendingScrollKey,
+  () => treeStore.pendingScrollKey,
   async (key) => {
     if (!key) return;
-    treeState.pendingScrollKey = null;
+    treeStore.pendingScrollKey = null;
     await treeHostRef.value?.revealKey(key);
   },
 );
 
 function onSelect(row: TreeRowVm): void {
-  selectRow(row.key);
+  treeStore.selectRow(row.key);
 }
 
 // The twisty always expands/collapses. A group row (P19) has no adapter path behind it — it's a
-// pure view over its parent's already-fetched children — so it toggles treeState.expanded
-// directly rather than going through expand()/collapse(), which would connect the connection and
+// pure view over its parent's already-fetched children — so it toggles treeStore.expanded
+// directly rather than going through treeStore.expand()/treeStore.collapse(), which would connect the connection and
 // issue an IPC call for a synthetic path no adapter has ever heard of.
 function onToggle(row: TreeRowVm): void {
   if (row.kind === 'group') {
-    toggleGroup(row.connectionId, row.path);
+    treeStore.toggleGroup(row.connectionId, row.path);
     return;
   }
-  if (row.expanded) collapse(row.connectionId, row.path);
-  else void expand(row.connectionId, row.path);
+  if (row.expanded) treeStore.collapse(row.connectionId, row.path);
+  else void treeStore.expand(row.connectionId, row.path);
 }
 
 // Task 62: double-clicking a tree row that already has an open tab for the same
@@ -96,7 +86,7 @@ function onToggle(row: TreeRowVm): void {
 function onOpen(row: TreeRowVm): void {
   // A group folder only ever toggles on double-click — it opens nothing (P19 D4).
   if (row.kind === 'group') {
-    toggleGroup(row.connectionId, row.path);
+    treeStore.toggleGroup(row.connectionId, row.path);
     return;
   }
   if (OPENABLE_KINDS.has(row.kind)) {
@@ -127,14 +117,14 @@ function onOpen(row: TreeRowVm): void {
   // A childless, non-openable leaf (column, index) has nothing to open or expand — TreeRow.vue
   // now emits 'open' unconditionally (P9 fix), so this guard is what keeps dblclick a no-op there.
   if (!row.hasChildren) return;
-  if (row.expanded) collapse(row.connectionId, row.path);
-  else void expand(row.connectionId, row.path);
+  if (row.expanded) treeStore.collapse(row.connectionId, row.path);
+  else void treeStore.expand(row.connectionId, row.path);
 }
 
 async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
   // The "Saved filters ▸" submenu (Step 13) is built synchronously by menuForRow() from
-  // treeState.savedQueries, so it must already be populated by the time the menu opens.
-  if (OPENABLE_KINDS.has(row.kind)) await loadSavedQueries(row.connectionId, row.path);
+  // treeStore.savedQueries, so it must already be populated by the time the menu opens.
+  if (OPENABLE_KINDS.has(row.kind)) await treeStore.loadSavedQueries(row.connectionId, row.path);
   contextMenuStore.openContextMenu(event, menuForRow(row));
 }
 
@@ -163,7 +153,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
   const id = shortcutFor(e, TREE_SHORTCUTS);
   if (!id) return;
-  const row = visibleRows.value.find((r) => r.key === treeState.selected);
+  const row = treeStore.visibleRows.find((r) => r.key === treeStore.selected);
   if (!row) return;
   if (id === 'tree.open') {
     // Enter is the row's primary action, not a menu item — the same action double-click
@@ -181,9 +171,9 @@ function onTreeKeydown(e: KeyboardEvent): void {
     <TreeHost
       ref="treeHostRef"
       class="tree-body"
-      :rows="visibleRows"
+      :rows="treeStore.visibleRows"
       :row-height="rowHeight"
-      :selected-key="treeState.selected"
+      :selected-key="treeStore.selected"
       @background-contextmenu="onBackgroundContextMenu"
       @keydown="onTreeKeydown"
     >
@@ -192,7 +182,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
           :class="{ 'sticky-row': sticky }"
           :style="sticky ? { top: `${top}px`, height: `${rowHeight}px` } : undefined"
           :row="row"
-          :selected="treeState.selected === row.key"
+          :selected="treeStore.selected === row.key"
           :sticky="sticky"
           @select="onSelect"
           @toggle="onToggle"
@@ -202,7 +192,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
       </template>
     </TreeHost>
     <div
-      v-if="searchIncomplete"
+      v-if="treeStore.searchIncomplete"
       class="p-strip note search-incomplete-note"
       data-testid="search-incomplete-note"
     >

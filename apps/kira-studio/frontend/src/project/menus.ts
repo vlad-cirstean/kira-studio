@@ -13,16 +13,11 @@ import { useTabsStore } from '../state/tabs';
 import { countTab, dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
 import {
-  collapseAll,
   groupParentPath,
-  openFiltersDialog,
-  refresh,
-  refreshAllConnections,
-  refreshConnection,
-  refreshObject,
   rowKey,
   type TreeRowVm,
-  treeState,
+  useFiltersDialogStore,
+  useTreeStore,
 } from './state/tree';
 
 const QUALIFIED_KINDS = new Set([
@@ -117,7 +112,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refreshConnection(row.connectionId),
+      run: () => useTreeStore().refreshConnection(row.connectionId),
     },
     {
       type: 'item',
@@ -167,7 +162,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'filters',
       label: 'Filters…',
       icon: 'filter',
-      run: () => openFiltersDialog(row.connectionId, row.path),
+      run: () => useFiltersDialogStore().openFiltersDialog(row.connectionId, row.path),
     },
     // P18 (v1.1) D3: a SQL-only surface, same gate the console's own SQL behaviours use.
     ...(schemaDialectFor(record?.kind) !== undefined
@@ -283,7 +278,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refresh(row.connectionId, row.path),
+      run: () => useTreeStore().refresh(row.connectionId, row.path),
     },
     {
       type: 'item',
@@ -298,7 +293,7 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
       id: 'filters',
       label: 'Filters…',
       icon: 'filter',
-      run: () => openFiltersDialog(row.connectionId, row.path),
+      run: () => useFiltersDialogStore().openFiltersDialog(row.connectionId, row.path),
     },
     ...consoleMenuItem(row),
     ...setAsDefaultMenuItem(row),
@@ -360,7 +355,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refreshObject(row.connectionId, row.path),
+      run: () => useTreeStore().refreshObject(row.connectionId, row.path),
     },
     {
       type: 'item',
@@ -444,7 +439,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refreshObject(row.connectionId, row.path),
+      run: () => useTreeStore().refreshObject(row.connectionId, row.path),
     },
     {
       type: 'item',
@@ -486,14 +481,14 @@ function groupMenu(row: TreeRowVm): MenuItem[] {
       id: 'refresh',
       label: 'Refresh',
       icon: 'refresh',
-      run: () => refresh(row.connectionId, groupParentPath(row.path)),
+      run: () => useTreeStore().refresh(row.connectionId, groupParentPath(row.path)),
     },
     {
       type: 'item',
       id: 'collapse-all',
       label: 'Collapse all',
       icon: 'collapse-all',
-      run: () => collapseAll(),
+      run: () => useTreeStore().collapseAll(),
     },
   ];
 }
@@ -594,7 +589,7 @@ function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
 // (ProjectTree.vue's onContextMenu) — building this synchronously is what keeps menuForRow()
 // itself synchronous.
 function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
-  const saved = treeState.savedQueries[rowKey(row.connectionId, row.path)] ?? [];
+  const saved = useTreeStore().savedQueries[rowKey(row.connectionId, row.path)] ?? [];
   if (saved.length === 0) {
     return [
       {
@@ -654,14 +649,14 @@ export function emptyBackgroundMenu(): MenuItem[] {
       id: 'refresh-all',
       label: 'Refresh all',
       icon: 'refresh',
-      run: () => refreshAllConnections(),
+      run: () => useTreeStore().refreshAllConnections(),
     },
     {
       type: 'item',
       id: 'collapse-all',
       label: 'Collapse all',
       icon: 'collapse-all',
-      run: () => collapseAll(),
+      run: () => useTreeStore().collapseAll(),
     },
   ];
 }

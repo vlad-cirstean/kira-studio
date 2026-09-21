@@ -74,7 +74,7 @@ import {
 } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
-import { revealPath } from '../project/state/tree';
+import { useTreeStore } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
@@ -171,7 +171,7 @@ function revealInProjectPanel(tab: TabRecord): MenuItem[] {
       label: 'Reveal in project panel',
       icon: 'target',
       run: () => {
-        if (tab.connectionId) void revealPath(tab.connectionId, tab.path);
+        if (tab.connectionId) void useTreeStore().revealPath(tab.connectionId, tab.path);
       },
     },
   ];

@@ -19,7 +19,8 @@ setActivePinia(pinia);
 const { containerPathFor } = await import('../../frontend/src/state/schemaColumns');
 const { useConnectionsStore } = await import('../../frontend/src/state/connections');
 const connectionsStore = useConnectionsStore();
-const { treeState } = await import('../../frontend/src/project/state/tree');
+const { useTreeStore } = await import('../../frontend/src/project/state/tree');
+const treeStore = useTreeStore();
 const { consoleRelationNames } = await import('../../frontend/src/views/console/completion');
 
 function addConnection(id: string, kind: string, database: string | null): void {
@@ -52,8 +53,8 @@ describe('containerPathFor — root branch (P4)', () => {
   test('postgres: resolves via the "connected" marker + schema:public', () => {
     const id = 'conn-pg-connected';
     addConnection(id, 'postgres', 'other_db');
-    treeState.children[`${id}|`] = [dbNode('other_db', false), dbNode('kira_test', true)];
-    treeState.children[`${id}|database:kira_test`] = [schemaNode('internal'), schemaNode('public')];
+    treeStore.children[`${id}|`] = [dbNode('other_db', false), dbNode('kira_test', true)];
+    treeStore.children[`${id}|database:kira_test`] = [schemaNode('internal'), schemaNode('public')];
 
     expect(containerPathFor(id, '')).toBe('database:kira_test/schema:public');
   });
@@ -61,8 +62,8 @@ describe('containerPathFor — root branch (P4)', () => {
   test('postgres: falls back to the connection record\'s own database name with no "connected" marker', () => {
     const id = 'conn-pg-record-db';
     addConnection(id, 'postgres', 'kira_test');
-    treeState.children[`${id}|`] = [dbNode('other_db', false), dbNode('kira_test', false)];
-    treeState.children[`${id}|database:kira_test`] = [schemaNode('public')];
+    treeStore.children[`${id}|`] = [dbNode('other_db', false), dbNode('kira_test', false)];
+    treeStore.children[`${id}|database:kira_test`] = [schemaNode('public')];
 
     expect(containerPathFor(id, '')).toBe('database:kira_test/schema:public');
   });
@@ -70,7 +71,7 @@ describe('containerPathFor — root branch (P4)', () => {
   test('postgres: no "connected" marker and multiple non-matching databases -> null', () => {
     const id = 'conn-pg-ambiguous';
     addConnection(id, 'postgres', 'does_not_exist');
-    treeState.children[`${id}|`] = [dbNode('a', false), dbNode('b', false)];
+    treeStore.children[`${id}|`] = [dbNode('a', false), dbNode('b', false)];
 
     expect(containerPathFor(id, '')).toBeNull();
   });
@@ -78,8 +79,8 @@ describe('containerPathFor — root branch (P4)', () => {
   test('postgres: sole non-system schema is used when public is absent', () => {
     const id = 'conn-pg-sole-schema';
     addConnection(id, 'postgres', 'kira_test');
-    treeState.children[`${id}|`] = [dbNode('kira_test', true)];
-    treeState.children[`${id}|database:kira_test`] = [schemaNode('app')];
+    treeStore.children[`${id}|`] = [dbNode('kira_test', true)];
+    treeStore.children[`${id}|database:kira_test`] = [schemaNode('app')];
 
     expect(containerPathFor(id, '')).toBe('database:kira_test/schema:app');
   });
@@ -90,8 +91,8 @@ describe('containerPathFor — root branch (P4)', () => {
     // functionally dead container, not a partial win.
     const id = 'conn-pg-ambiguous-schema';
     addConnection(id, 'postgres', 'kira_test');
-    treeState.children[`${id}|`] = [dbNode('kira_test', true)];
-    treeState.children[`${id}|database:kira_test`] = [schemaNode('a'), schemaNode('b')];
+    treeStore.children[`${id}|`] = [dbNode('kira_test', true)];
+    treeStore.children[`${id}|database:kira_test`] = [schemaNode('a'), schemaNode('b')];
 
     expect(containerPathFor(id, '')).toBeNull();
   });
@@ -99,7 +100,7 @@ describe('containerPathFor — root branch (P4)', () => {
   test('mysql: resolves via the "connected" marker, one level, no schema', () => {
     const id = 'conn-mysql';
     addConnection(id, 'mysql', 'app');
-    treeState.children[`${id}|`] = [dbNode('sys', false), dbNode('app', true)];
+    treeStore.children[`${id}|`] = [dbNode('sys', false), dbNode('app', true)];
 
     expect(containerPathFor(id, '')).toBe('database:app');
   });
@@ -107,7 +108,7 @@ describe('containerPathFor — root branch (P4)', () => {
   test('clickhouse: no "connected" marker, resolves via the record\'s own database name', () => {
     const id = 'conn-clickhouse';
     addConnection(id, 'clickhouse', 'analytics');
-    treeState.children[`${id}|`] = [dbNode('default', false), dbNode('analytics', false)];
+    treeStore.children[`${id}|`] = [dbNode('default', false), dbNode('analytics', false)];
 
     expect(containerPathFor(id, '')).toBe('database:analytics');
   });
@@ -115,7 +116,7 @@ describe('containerPathFor — root branch (P4)', () => {
   test("sqlite: the record's database is a file path, resolved via the sole database child instead", () => {
     const id = 'conn-sqlite';
     addConnection(id, 'sqlite', '/Users/me/app.db');
-    treeState.children[`${id}|`] = [dbNode('main', false)];
+    treeStore.children[`${id}|`] = [dbNode('main', false)];
 
     expect(containerPathFor(id, '')).toBe('database:main');
   });
@@ -139,12 +140,12 @@ describe('containerPathFor — root branch (P4)', () => {
 describe('consoleRelationNames — root branch (P4)', () => {
   test('unions relation names across every already-loaded container for the connection, deduped', () => {
     const id = 'conn-union';
-    treeState.children[`${id}|`] = [dbNode('kira_test', true)];
-    treeState.children[`${id}|database:kira_test/schema:app`] = [
+    treeStore.children[`${id}|`] = [dbNode('kira_test', true)];
+    treeStore.children[`${id}|database:kira_test/schema:app`] = [
       tableNode('order_items'),
       tableNode('customers'),
     ];
-    treeState.children[`${id}|database:kira_test/schema:reporting`] = [
+    treeStore.children[`${id}|database:kira_test/schema:reporting`] = [
       tableNode('customers'), // same name, different container — deduped
       tableNode('daily_totals'),
     ];
@@ -160,17 +161,17 @@ describe('consoleRelationNames — root branch (P4)', () => {
 
   test('non-relation node kinds (database/schema) are never included', () => {
     const id = 'conn-kinds';
-    treeState.children[`${id}|`] = [dbNode('kira_test', true)];
-    treeState.children[`${id}|database:kira_test`] = [schemaNode('public')];
+    treeStore.children[`${id}|`] = [dbNode('kira_test', true)];
+    treeStore.children[`${id}|database:kira_test`] = [schemaNode('public')];
 
     expect(consoleRelationNames(id, '')).toEqual([]);
   });
 
   test('a non-root path is unaffected by the root branch (unchanged walk)', () => {
     const id = 'conn-relnames-non-root';
-    treeState.children[`${id}|database:x/schema:y`] = [tableNode('t1')];
+    treeStore.children[`${id}|database:x/schema:y`] = [tableNode('t1')];
     // A different, unrelated root entry for the same connection — must not leak in.
-    treeState.children[`${id}|`] = [dbNode('x', true)];
+    treeStore.children[`${id}|`] = [dbNode('x', true)];
 
     expect(consoleRelationNames(id, 'database:x/schema:y')).toEqual(['t1']);
   });

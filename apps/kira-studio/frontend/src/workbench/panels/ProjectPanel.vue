@@ -2,7 +2,7 @@
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
-import { treeState } from '../../project/state/tree';
+import { useTreeStore } from '../../project/state/tree';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useSchemaDialogStore } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -12,13 +12,14 @@ import PanelShell from '../../theme/primitives/PanelShell.vue';
 const connectionsStore = useConnectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 const schemaDialogStore = useSchemaDialogStore();
+const treeStore = useTreeStore();
 </script>
 
 <template>
   <PanelShell
-    :search="treeState.search"
+    :search="treeStore.search"
     :empty="connectionsStore.records.length === 0"
-    @update:search="treeState.search = $event"
+    @update:search="treeStore.search = $event"
   >
     <template #title>
       <span>Connections</span>

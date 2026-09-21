@@ -16,13 +16,15 @@ import {
   toggleKind,
   toggleNode,
 } from './filterTree';
-import { closeFiltersDialog, filtersDialogState, saveVisibility, treeState } from './state/tree';
+import { useFiltersDialogStore, useTreeStore } from './state/tree';
 
 // P28 D10-D19: checkboxes, not rules. Two sections over the same cached-node model — Object
 // types (kind, flat) and Objects (path, expandable) — plus a live-consequence strip. Nothing here
 // fetches; the dialog offers exactly what the tree has already cached (D21).
 
 const connectionsStore = useConnectionsStore();
+const filtersDialogStore = useFiltersDialogStore();
+const treeStore = useTreeStore();
 const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
 const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
@@ -41,13 +43,13 @@ function ancestorsOf(path: string): Set<string> {
 }
 
 watch(
-  () => filtersDialogState.connectionId,
+  () => filtersDialogStore.connectionId,
   async (connectionId) => {
-    const focusPath = filtersDialogState.focusPath;
+    const focusPath = filtersDialogStore.focusPath;
     expandedPaths.value = focusPath ? ancestorsOf(focusPath) : new Set();
     nameFilter.value = '';
     if (!connectionId) return;
-    const existing = treeState.visibility[connectionId] ?? EMPTY_VISIBILITY;
+    const existing = treeStore.visibility[connectionId] ?? EMPTY_VISIBILITY;
     draft.value = {
       hiddenKinds: [...existing.hiddenKinds],
       hiddenPaths: [...existing.hiddenPaths],
@@ -62,19 +64,19 @@ watch(
 );
 
 const kinds = computed(() =>
-  filtersDialogState.connectionId ? kindRows(filtersDialogState.connectionId, draft.value) : [],
+  filtersDialogStore.connectionId ? kindRows(filtersDialogStore.connectionId, draft.value) : [],
 );
 
 const objects = computed(() =>
-  filtersDialogState.connectionId
-    ? nodeRows(filtersDialogState.connectionId, draft.value, expandedPaths.value, nameFilter.value)
+  filtersDialogStore.connectionId
+    ? nodeRows(filtersDialogStore.connectionId, draft.value, expandedPaths.value, nameFilter.value)
     : { rows: [], truncated: false },
 );
 
 // A live preview computed from the same filterTree.ts previewCounts() the tree itself is
 // evaluated with, so this dialog cannot disagree with what the tree will actually show.
 const preview = computed(() => {
-  const connectionId = filtersDialogState.connectionId;
+  const connectionId = filtersDialogStore.connectionId;
   if (!connectionId) return { shown: 0, total: 0 };
   return previewCounts(connectionId, draft.value);
 });
@@ -122,28 +124,28 @@ function noneKinds(): void {
 }
 
 async function onSave(): Promise<void> {
-  const connectionId = filtersDialogState.connectionId;
+  const connectionId = filtersDialogStore.connectionId;
   if (!connectionId) return;
-  await saveVisibility(connectionId, draft.value);
-  closeFiltersDialog();
+  await treeStore.saveVisibility(connectionId, draft.value);
+  filtersDialogStore.closeFiltersDialog();
 }
 
 // Title identity (FiltersDialog.html: "Tree filters — prod-analytics") — reads the name off
 // the store that already has it, same as ConnectionDialog.vue does; adds no new state.
 const connectionName = computed(
-  () => connectionsStore.connectionRecord(filtersDialogState.connectionId)?.name ?? '',
+  () => connectionsStore.connectionRecord(filtersDialogStore.connectionId)?.name ?? '',
 );
 </script>
 
 <template>
   <DialogFrame
-    v-if="filtersDialogState.open"
+    v-if="filtersDialogStore.open"
     title="Tree filters"
     :width="560"
     max-height="80vh"
     test-id="filters-dialog"
     close-test-id="filters-dialog-close"
-    @close="closeFiltersDialog"
+    @close="filtersDialogStore.closeFiltersDialog"
   >
     <template #header>
       <span class="icon-box muted"><CodiconIcon name="filter" :size="13" /></span>
@@ -252,7 +254,7 @@ const connectionName = computed(
     <template #footer>
       <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" @click="closeFiltersDialog">Cancel</AppButton>
+        <AppButton kind="dialog" @click="filtersDialogStore.closeFiltersDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" @click="onSave">Save filters</AppButton>
       </span>
     </template>

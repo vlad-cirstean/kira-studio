@@ -13,7 +13,7 @@ import {
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { rowKey, treeState } from '../project/state/tree';
+import { rowKey, useTreeStore } from '../project/state/tree';
 import {
   type DdlColumn,
   type DdlSchema,
@@ -28,7 +28,7 @@ const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
  *  no database:/schema: segment to walk, but it is not scope-less at runtime: every SQL adapter's
  *  Execute resolves an empty path to the connection's own configured database
  *  (internal/adapters/*'s own primary-connection fallback). This resolves the SAME container from
- *  data already in treeState.children — no new IPC call, no Go change — in order:
+ *  data already in treeStore.children — no new IPC call, no Go change — in order:
  *  1. the root's own `detail === "connected"` database node (postgres/mysqlfamily both stamp this
  *     on the node matching the live connection);
  *  2. else the root database node whose name matches the connection record's own `database` field
@@ -42,11 +42,12 @@ const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
  *     functionally dead container, not a partial win.
  *  Returns null when nothing resolves (the connection was never expanded, or it's genuinely
  *  ambiguous) — the same honest degradation containerPathFor already had for every other
- *  unresolvable case, not a new failure mode. Reads treeState.children, so it's reactive: a console
+ *  unresolvable case, not a new failure mode. Reads treeStore.children, so it's reactive: a console
  *  opened before the connection was expanded self-warms the moment the user expands it, since
  *  containerPath is a computed in ConsoleView.vue and ensureSchemaColumns is single-flight. */
 function rootContainerPathFor(connectionId: string): string | null {
-  const roots = treeState.children[rowKey(connectionId, '')];
+  const treeStore = useTreeStore();
+  const roots = treeStore.children[rowKey(connectionId, '')];
   if (!roots || roots.length === 0) return null;
   const databases = roots.filter((n) => n.kind === 'database');
   if (databases.length === 0) return null;
@@ -65,7 +66,7 @@ function rootContainerPathFor(connectionId: string): string | null {
   // container-scoped call) — a database-only path is rejected outright, so stopping there would
   // be a functionally dead container, not a partial win. Resolve a path only once the schema is
   // unambiguous too; otherwise null, same honest degradation as every other unresolvable case.
-  const schemas = (treeState.children[rowKey(connectionId, encodePath([dbSegment]))] ?? []).filter(
+  const schemas = (treeStore.children[rowKey(connectionId, encodePath([dbSegment]))] ?? []).filter(
     (n) => n.kind === 'schema',
   );
   const schemaNode =

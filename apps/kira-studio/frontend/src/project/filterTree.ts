@@ -4,9 +4,9 @@ import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { useConnectionsStore } from '../state/connections';
 import { isVisible, toSets } from './filter';
 import { isLeafKind, labelForKind } from './grouping';
-import { rowKey, treeState } from './state/tree';
+import { rowKey, useTreeStore } from './state/tree';
 
-// The dialog's model, derived from the same treeState.children cache the tree renders from — no
+// The dialog's model, derived from the same treeStore.children cache the tree renders from — no
 // IPC, no fetch (§0, F9's "cached nodes").
 
 export interface FilterKindRow {
@@ -43,7 +43,7 @@ function connectionKindFor(connectionId: string): ConnectionKind | undefined {
 export function kindRows(connectionId: string, v: TreeVisibility): FilterKindRow[] {
   const counts = new Map<NodeKind, number>();
   const prefix = `${connectionId}|`;
-  for (const [key, nodes] of Object.entries(treeState.children)) {
+  for (const [key, nodes] of Object.entries(useTreeStore().children)) {
     if (!key.startsWith(prefix)) continue;
     for (const node of nodes) {
       counts.set(node.kind, (counts.get(node.kind) ?? 0) + 1);
@@ -85,12 +85,13 @@ export function nodeRows(
   // cached under one (F24), same as the tree itself.
   const keyBrowser = useConnectionsStore().states[connectionId]?.caps?.keyBrowser === true;
   const query = nameFilter.trim().toLowerCase();
-  const rootChildren = treeState.children[rowKey(connectionId, '')] ?? [];
+  const treeStore = useTreeStore();
+  const rootChildren = treeStore.children[rowKey(connectionId, '')] ?? [];
 
   const childrenOf = (node: TreeNode): TreeNode[] | undefined =>
     isLeafKind(node.kind, keyBrowser)
       ? undefined
-      : treeState.children[rowKey(connectionId, node.path)];
+      : treeStore.children[rowKey(connectionId, node.path)];
 
   // Whether `node` or anything cached beneath it matches the name filter — used only when a
   // filter is active, to decide which branches survive and are force-expanded (D17).
@@ -175,7 +176,7 @@ export function previewCounts(
   const prefix = `${connectionId}|`;
   let shown = 0;
   let total = 0;
-  for (const [key, nodes] of Object.entries(treeState.children)) {
+  for (const [key, nodes] of Object.entries(useTreeStore().children)) {
     if (!key.startsWith(prefix)) continue;
     for (const node of nodes) {
       total += 1;

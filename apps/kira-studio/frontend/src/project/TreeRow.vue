@@ -6,8 +6,7 @@ import { connColorVar } from '../theme/connColor';
 import EngineIcon from '../theme/EngineIcon.vue';
 import { columnTypeIcon, nodeIcon } from '../theme/icons';
 import ErrorPopover from './ErrorPopover.vue';
-import type { TreeRowVm } from './state/tree';
-import { activeSearchQuery } from './state/tree';
+import { type TreeRowVm, useTreeStore } from './state/tree';
 
 // P28 D7: `sticky` is the only difference between a normal row and a band-pinned one — a
 // different testid (so it can never double-count a `tree-row` locator) and a forced -1 tabindex
@@ -24,6 +23,7 @@ const emit = defineEmits<{
 }>();
 
 const connectionsStore = useConnectionsStore();
+const treeStore = useTreeStore();
 
 const icon = computed(() => {
   // P19: a group folder's icon reflects its own expand state, unlike every other kind.
@@ -53,7 +53,7 @@ const connectionKind = computed(() => {
 // Splits row.name on every case-insensitive occurrence of the live search query so only the
 // matched substring(s) get <mark>-ed, not the whole label.
 function highlightParts(): { text: string; hit: boolean }[] {
-  const query = activeSearchQuery.value;
+  const query = treeStore.activeSearchQuery;
   if (!props.row.matched || !query) return [{ text: props.row.name, hit: false }];
   const name = props.row.name;
   const lower = name.toLowerCase();
