@@ -1,6 +1,6 @@
 import { copyText } from '../../clipboard';
 import type { MenuItem } from '../../state/contextMenu';
-import { activeTab } from '../../state/mode';
+import { useModeStore } from '../../state/mode';
 import { findDataTab, openDataTab } from '../../state/tabs';
 import { dataQueryCommands } from '../../state/viewCommands';
 
@@ -8,7 +8,7 @@ import { dataQueryCommands } from '../../state/viewCommands';
 // already has the table's own path directly (`tab.path`) — no `pathParent()` needed the way the
 // tree's former column rows required.
 function targetTabForTable(connectionId: string, tablePath: string): string {
-  const active = activeTab.value;
+  const active = useModeStore().activeTab;
   // D9: this menu lives only in the Definition view's Columns section, so `active` here is
   // always that table's *definition* tab, never its data tab — matching on connectionId/path
   // alone would reuse the definition tab itself and silently no-op the projection/sort patch

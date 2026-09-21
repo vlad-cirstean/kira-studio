@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue';
-import { codeRepoRecord } from '../state/coderepos';
+import { useCodeReposStore } from '../state/coderepos';
 import { answerCredential, gitCredentialState } from '../state/gitCredential';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import TextField from '../theme/primitives/TextField.vue';
+
+const codeReposStore = useCodeReposStore();
 
 // P67e (docs/v1.6/plans/P67e-git-relax-read-only.md D10) — the native counterpart to git's own
 // askpass prompt (fetch/pull/push against an HTTPS remote with no credential helper configured).
@@ -56,7 +58,7 @@ function onCancel(): void {
   >
     <div class="credential-form">
       <p class="subtitle" data-testid="git-credential-repo">
-        {{ codeRepoRecord(gitCredentialState.active.codeRepoId)?.name }}
+        {{ codeReposStore.codeRepoRecord(gitCredentialState.active.codeRepoId)?.name }}
       </p>
       <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
       <p class="prompt mono" data-testid="git-credential-prompt">

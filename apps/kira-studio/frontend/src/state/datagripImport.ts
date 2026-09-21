@@ -1,27 +1,8 @@
 import type { DataGripPreview, DataGripPreviewRow, DataGripReport } from '@shared/domain/datagrip';
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { connectionsState } from './connections';
-
-export interface DataGripImportDialogState {
-  open: boolean;
-  busy: boolean;
-  projectPath: string;
-  preview: DataGripPreview | null;
-  selected: Set<string>; // data source uuids
-  error: string | null;
-  report: DataGripReport | null;
-}
-
-export const datagripImportState = reactive({
-  open: false,
-  busy: false,
-  projectPath: '',
-  preview: null as DataGripPreview | null,
-  selected: new Set<string>(),
-  error: null as string | null,
-  report: null as DataGripReport | null,
-}) as DataGripImportDialogState;
 
 /** D10: "looks like it's already imported" — a live comparison against connectionsState.records,
  *  matching on name+host+port+database. Nothing is persisted to detect this (§0.3). */
@@ -35,78 +16,98 @@ export function looksAlreadyImported(row: DataGripPreviewRow): boolean {
   );
 }
 
-// D10: everything that maps starts checked, except a probable re-import, which starts unchecked
-// so the user has to opt back in to a likely duplicate.
-function initialSelection(preview: DataGripPreview): Set<string> {
-  const selected = new Set<string>();
-  for (const row of preview.rows) {
-    if (row.importable && !looksAlreadyImported(row)) selected.add(row.uuid);
+export const useDatagripImportStore = defineStore('datagripImport', () => {
+  const state = reactive({
+    open: false,
+    busy: false,
+    projectPath: '',
+    preview: null as DataGripPreview | null,
+    selected: new Set<string>(),
+    error: null as string | null,
+    report: null as DataGripReport | null,
+  });
+
+  // D10: everything that maps starts checked, except a probable re-import, which starts unchecked
+  // so the user has to opt back in to a likely duplicate.
+  function initialSelection(preview: DataGripPreview): Set<string> {
+    const selected = new Set<string>();
+    for (const row of preview.rows) {
+      if (row.importable && !looksAlreadyImported(row)) selected.add(row.uuid);
+    }
+    return selected;
   }
-  return selected;
-}
 
-function resetDialogState(): void {
-  datagripImportState.open = false;
-  datagripImportState.projectPath = '';
-  datagripImportState.preview = null;
-  datagripImportState.selected = new Set();
-  datagripImportState.error = null;
-  datagripImportState.report = null;
-}
-
-/** Opens the native folder picker and scans the chosen project (D13/D9). Returns false when the
- *  picker was cancelled or the scan itself failed — the dialog only opens on a real preview. */
-export async function pickAndScanDataGripProject(): Promise<boolean> {
-  const chosen = await control.filesChooseFolder('Import from DataGrip');
-  if (chosen.canceled || !chosen.path) return false;
-  return scanDataGripProject(chosen.path);
-}
-
-async function scanDataGripProject(path: string): Promise<boolean> {
-  datagripImportState.busy = true;
-  datagripImportState.error = null;
-  try {
-    const preview = await control.datagripScan(path);
-    datagripImportState.projectPath = path;
-    datagripImportState.preview = preview;
-    datagripImportState.selected = initialSelection(preview);
-    datagripImportState.report = null;
-    datagripImportState.open = true;
-    return true;
-  } catch (err) {
-    datagripImportState.error = err instanceof Error ? err.message : String(err);
-    return false;
-  } finally {
-    datagripImportState.busy = false;
+  function resetDialogState(): void {
+    state.open = false;
+    state.projectPath = '';
+    state.preview = null;
+    state.selected = new Set();
+    state.error = null;
+    state.report = null;
   }
-}
 
-export function toggleDataGripRow(uuid: string): void {
-  if (datagripImportState.selected.has(uuid)) datagripImportState.selected.delete(uuid);
-  else datagripImportState.selected.add(uuid);
-}
-
-export function closeDataGripImportDialog(): void {
-  resetDialogState();
-}
-
-/** D9's second step: the dialog's own confirm action. Nothing is written before this runs — the
- *  preview is a real review step, not decoration (D10). The created connections themselves reach
- *  connectionsState.records through the existing connectionsChanged broadcast
- *  (connections.Service.emitListChanged), so nothing here has to re-fetch the list by hand. */
-export async function confirmDataGripImport(): Promise<DataGripReport | null> {
-  if (!datagripImportState.preview || datagripImportState.selected.size === 0) return null;
-  const uuids = [...datagripImportState.selected];
-  datagripImportState.busy = true;
-  datagripImportState.error = null;
-  try {
-    const report = await control.datagripImport(datagripImportState.projectPath, uuids);
-    datagripImportState.report = report;
-    return report;
-  } catch (err) {
-    datagripImportState.error = err instanceof Error ? err.message : String(err);
-    return null;
-  } finally {
-    datagripImportState.busy = false;
+  /** Opens the native folder picker and scans the chosen project (D13/D9). Returns false when the
+   *  picker was cancelled or the scan itself failed — the dialog only opens on a real preview. */
+  async function pickAndScanDataGripProject(): Promise<boolean> {
+    const chosen = await control.filesChooseFolder('Import from DataGrip');
+    if (chosen.canceled || !chosen.path) return false;
+    return scanDataGripProject(chosen.path);
   }
-}
+
+  async function scanDataGripProject(path: string): Promise<boolean> {
+    state.busy = true;
+    state.error = null;
+    try {
+      const preview = await control.datagripScan(path);
+      state.projectPath = path;
+      state.preview = preview;
+      state.selected = initialSelection(preview);
+      state.report = null;
+      state.open = true;
+      return true;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+      return false;
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  function toggleDataGripRow(uuid: string): void {
+    if (state.selected.has(uuid)) state.selected.delete(uuid);
+    else state.selected.add(uuid);
+  }
+
+  function closeDataGripImportDialog(): void {
+    resetDialogState();
+  }
+
+  /** D9's second step: the dialog's own confirm action. Nothing is written before this runs — the
+   *  preview is a real review step, not decoration (D10). The created connections themselves reach
+   *  connectionsState.records through the existing connectionsChanged broadcast
+   *  (connections.Service.emitListChanged), so nothing here has to re-fetch the list by hand. */
+  async function confirmDataGripImport(): Promise<DataGripReport | null> {
+    if (!state.preview || state.selected.size === 0) return null;
+    const uuids = [...state.selected];
+    state.busy = true;
+    state.error = null;
+    try {
+      const report = await control.datagripImport(state.projectPath, uuids);
+      state.report = report;
+      return report;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+      return null;
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  return {
+    ...toRefs(state),
+    pickAndScanDataGripProject,
+    toggleDataGripRow,
+    closeDataGripImportDialog,
+    confirmDataGripImport,
+  };
+});

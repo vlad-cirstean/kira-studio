@@ -4,7 +4,7 @@ import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { openContextMenu } from '../../state/contextMenu';
-import { openUploadDialog } from '../../state/objectStore';
+import { useObjectStoreStore } from '../../state/objectStore';
 import { openKeyValueTab, patchBrowseTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { nodeIcon, redisTypeIcon, redisTypeLabel } from '../../theme/icons';
@@ -38,6 +38,8 @@ import {
 
 // MainView.vue keys this component by tab.id — same discipline as every other view.
 const props = defineProps<{ tab: BrowseTabRecord }>();
+
+const objectStoreStore = useObjectStoreStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -239,7 +241,7 @@ const canUpload = computed(() => {
 });
 function onUploadClick(): void {
   if (!props.tab.connectionId) return;
-  openUploadDialog(props.tab.connectionId, currentLevelPath.value);
+  objectStoreStore.openUploadDialog(props.tab.connectionId, currentLevelPath.value);
 }
 
 const rowHeight = 28;

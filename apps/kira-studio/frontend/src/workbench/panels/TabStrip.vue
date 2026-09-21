@@ -4,10 +4,10 @@ import { isRepoWorkspace, repoIdOfWorkspace } from '@shared/domain/workspace';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
-import { agentActivityFor } from '../../state/agentSessions';
-import { codeRepoRecord, codeReposState } from '../../state/coderepos';
+import { useAgentSessionsStore } from '../../state/agentSessions';
+import { useCodeReposStore } from '../../state/coderepos';
 import { type MenuItem, openContextMenu, openContextMenuAt } from '../../state/contextMenu';
-import { customScriptsState } from '../../state/customScripts';
+import { useCustomScriptsStore } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
 import { openRepoTerminalTab } from '../../state/repoTabs';
 import { openSettingsAt } from '../../state/settings';
@@ -32,6 +32,10 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
 
+const agentSessionsStore = useAgentSessionsStore();
+const codeReposStore = useCodeReposStore();
+const customScriptsStore = useCustomScriptsStore();
+
 function isPinned(tab: TabRecord): boolean {
   return TAB_KINDS[tab.kind].pinned === true;
 }
@@ -44,7 +48,7 @@ function isAttention(tab: TabRecord): boolean {
     !tab.active &&
     tab.kind === 'terminal' &&
     tab.state.launchKind === 'claude-code' &&
-    agentActivityFor(tab.id)?.phase === 'attention'
+    agentSessionsStore.agentActivityFor(tab.id)?.phase === 'attention'
   );
 }
 
@@ -238,7 +242,7 @@ function onNewTab(): void {
 // script's own workingDir override (cwdOverride) when it has one (P85 §7).
 function launchInActiveWorkspace(launch?: TerminalLaunch, cwdOverride?: string): void {
   const repoId = repoIdOfWorkspace(workspaceState.active);
-  const repo = repoId ? codeRepoRecord(repoId) : undefined;
+  const repo = repoId ? codeReposStore.codeRepoRecord(repoId) : undefined;
   if (!repoId || !repo) return;
   openRepoTerminalTab(repoId, cwdOverride || repo.root, launch);
 }
@@ -269,9 +273,9 @@ function newTabMenuItems(): MenuItem[] {
         }),
     },
   ];
-  if (customScriptsState.records.length > 0) {
+  if (customScriptsStore.records.length > 0) {
     items.push({ type: 'separator' });
-    for (const script of customScriptsState.records) {
+    for (const script of customScriptsStore.records) {
       items.push({
         type: 'item',
         id: `script-${script.id}`,
@@ -319,9 +323,9 @@ function terminalModuleMenuItems(): MenuItem[] {
       },
     },
   ];
-  if (codeReposState.records.length > 0) {
+  if (codeReposStore.records.length > 0) {
     items.push({ type: 'separator' });
-    for (const repo of codeReposState.records) {
+    for (const repo of codeReposStore.records) {
       items.push({
         type: 'item',
         id: `repo-${repo.id}`,

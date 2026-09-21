@@ -4,30 +4,9 @@ import type {
   AgentSession,
   AgentSessionsEvent,
 } from '@shared/domain/agent';
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-
-// P86 §12: the running-agent-sessions widget's own store — state/cacheStats.ts's pushed-from-Go
-// shape (a reactive store, one subscription, nothing else), not state/blameStatus.ts's owner
-// token: the only writer here is Go, pushing over ChannelAgentSessions, so nothing needs
-// arbitrating between two same-window writers.
-export const agentSessionsState = reactive({
-  sessions: [] as AgentSession[],
-  // Keyed by terminalId. §13's reducer below is the only writer that ever adds an entry;
-  // applySessions only prunes it, so a killed tab's activity disappears even when SessionEnd
-  // never arrived (rule 5).
-  activity: new Map<string, AgentActivity>(),
-});
-
-// Replaces the session list wholesale and prunes activity of every terminal id no longer listed —
-// what makes a killed tab's activity disappear even when SessionEnd never arrived (§13 rule 5).
-function applySessions(event: AgentSessionsEvent): void {
-  agentSessionsState.sessions = event.sessions;
-  const live = new Set(event.sessions.map((s) => s.terminalId));
-  for (const terminalId of agentSessionsState.activity.keys()) {
-    if (!live.has(terminalId)) agentSessionsState.activity.delete(terminalId);
-  }
-}
 
 export const MAX_RUNNING_TOOLS = 64;
 
@@ -72,34 +51,60 @@ export function reduceAgentActivity(
   }
 }
 
-export function agentActivityFor(terminalId: string): AgentActivity | undefined {
-  return agentSessionsState.activity.get(terminalId);
-}
+// P86 §12: the running-agent-sessions widget's own store — state/cacheStats.ts's pushed-from-Go
+// shape (a reactive store, one subscription, nothing else), not state/blameStatus.ts's owner
+// token: the only writer here is Go, pushing over ChannelAgentSessions, so nothing needs
+// arbitrating between two same-window writers.
+export const useAgentSessionsStore = defineStore('agentSessions', () => {
+  const state = reactive({
+    sessions: [] as AgentSession[],
+    // Keyed by terminalId. §13's reducer above is the only writer that ever adds an entry;
+    // applySessions only prunes it, so a killed tab's activity disappears even when SessionEnd
+    // never arrived (rule 5).
+    activity: new Map<string, AgentActivity>(),
+  });
 
-// SessionEnd drops the entry outright rather than going through reduceAgentActivity — nothing in
-// AgentActivity's own shape can express "no entry", so the map write happens here.
-function applyEvent(event: AgentEvent): void {
-  if (event.event === 'SessionEnd') {
-    agentSessionsState.activity.delete(event.terminalId);
-    return;
+  // Replaces the session list wholesale and prunes activity of every terminal id no longer listed —
+  // what makes a killed tab's activity disappear even when SessionEnd never arrived (§13 rule 5).
+  function applySessions(event: AgentSessionsEvent): void {
+    state.sessions = event.sessions;
+    const live = new Set(event.sessions.map((s) => s.terminalId));
+    for (const terminalId of state.activity.keys()) {
+      if (!live.has(terminalId)) state.activity.delete(terminalId);
+    }
   }
-  agentSessionsState.activity.set(
-    event.terminalId,
-    reduceAgentActivity(agentSessionsState.activity.get(event.terminalId), event),
-  );
-}
 
-let unsubscribeSessions: (() => void) | null = null;
-let unsubscribeEvent: (() => void) | null = null;
+  function agentActivityFor(terminalId: string): AgentActivity | undefined {
+    return state.activity.get(terminalId);
+  }
 
-// main.ts's boot Promise.all: a window opened after every currently-live session already started
-// needs a snapshot, since ChannelAgentSessions only fires on change — dbmcp.ts's hydrateDbMcp
-// precedent. onAgentEvent has no boot-time hydrate of its own: activity is runtime-only, and a
-// session already in progress simply renders with no activity until its next hook fires.
-export async function initAgentSessions(): Promise<void> {
-  applySessions(await control.terminalAgentSessions());
-  unsubscribeSessions?.();
-  unsubscribeEvent?.();
-  unsubscribeSessions = control.onAgentSessions(applySessions);
-  unsubscribeEvent = control.onAgentEvent(applyEvent);
-}
+  // SessionEnd drops the entry outright rather than going through reduceAgentActivity — nothing in
+  // AgentActivity's own shape can express "no entry", so the map write happens here.
+  function applyEvent(event: AgentEvent): void {
+    if (event.event === 'SessionEnd') {
+      state.activity.delete(event.terminalId);
+      return;
+    }
+    state.activity.set(
+      event.terminalId,
+      reduceAgentActivity(state.activity.get(event.terminalId), event),
+    );
+  }
+
+  let unsubscribeSessions: (() => void) | null = null;
+  let unsubscribeEvent: (() => void) | null = null;
+
+  // main.ts's boot Promise.all: a window opened after every currently-live session already started
+  // needs a snapshot, since ChannelAgentSessions only fires on change — dbmcp.ts's hydrateDbMcp
+  // precedent. onAgentEvent has no boot-time hydrate of its own: activity is runtime-only, and a
+  // session already in progress simply renders with no activity until its next hook fires.
+  async function initAgentSessions(): Promise<void> {
+    applySessions(await control.terminalAgentSessions());
+    unsubscribeSessions?.();
+    unsubscribeEvent?.();
+    unsubscribeSessions = control.onAgentSessions(applySessions);
+    unsubscribeEvent = control.onAgentEvent(applyEvent);
+  }
+
+  return { ...toRefs(state), agentActivityFor, initAgentSessions };
+});

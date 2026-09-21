@@ -47,7 +47,7 @@ import {
 import { confirmDialog } from '../../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../../state/connections';
 import { openContextMenu } from '../../../state/contextMenu';
-import { deleteObject, downloadObject, openUploadDialog } from '../../../state/objectStore';
+import { useObjectStoreStore } from '../../../state/objectStore';
 import { settingsState } from '../../../state/settings';
 import { browseInvalidate } from '../../../state/viewCommands';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
@@ -93,6 +93,8 @@ const props = defineProps<{
   viewKey: string;
   tab?: KeyValueTabRecord;
 }>();
+
+const objectStoreStore = useObjectStoreStore();
 
 const host = computed(() => keyValueHost(props.viewKey));
 
@@ -407,7 +409,7 @@ async function onDeleteKey(): Promise<void> {
   if (!h?.connectionId) return;
   try {
     if (isSingleObjectPage.value) {
-      await deleteObject(h.connectionId, h.path, props.viewKey);
+      await objectStoreStore.deleteObject(h.connectionId, h.path, props.viewKey);
       await reload(props.viewKey);
       // P43 F11/D15: the deleted object's own container level just lost a member.
       browseInvalidate(h.connectionId, pathParent(h.path) ?? '');
@@ -425,7 +427,7 @@ async function onDeleteKey(): Promise<void> {
 async function onDownload(): Promise<void> {
   const h = host.value;
   if (!canDownload.value || !h?.connectionId) return;
-  await downloadObject(h.connectionId, h.path, props.viewKey);
+  await objectStoreStore.downloadObject(h.connectionId, h.path, props.viewKey);
 }
 
 // --- add key popover: name + initial value, string-typed only (same D2 as edit). On success
@@ -443,7 +445,7 @@ function openAdd(): void {
   const h = host.value;
   if (isSingleObjectPage.value) {
     if (!h?.connectionId) return;
-    openUploadDialog(h.connectionId, pathParent(h.path) ?? '');
+    objectStoreStore.openUploadDialog(h.connectionId, pathParent(h.path) ?? '');
     return;
   }
   addName.value = '';

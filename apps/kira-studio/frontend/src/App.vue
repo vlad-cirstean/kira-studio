@@ -12,11 +12,11 @@ import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { usePaletteStore } from './shortcuts/state';
 import { connectionsState, openCreateDialog } from './state/connections';
-import { datagripImportState, pickAndScanDataGripProject } from './state/datagripImport';
+import { useDatagripImportStore } from './state/datagripImport';
 import { fakeDataDialogState } from './state/fakeData';
 import { toggleOperationsPanel, toggleProjectPanel } from './state/layout';
-import { activeTab, setMode } from './state/mode';
-import { uploadDialogState } from './state/objectStore';
+import { useModeStore } from './state/mode';
+import { useObjectStoreStore } from './state/objectStore';
 import { settingsOpen } from './state/settings';
 import { activateNextTab, activatePrevTab, closeTab } from './state/tabs';
 import AppTooltip from './workbench/AppTooltip.vue';
@@ -35,12 +35,15 @@ import WorkbenchShell from './workbench/WorkbenchShell.vue';
 const engineStore = useEngineStore();
 const tooltipStore = useTooltipStore();
 const paletteStore = usePaletteStore();
+const modeStore = useModeStore();
+const datagripImportStore = useDatagripImportStore();
+const objectStoreStore = useObjectStoreStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
 
 function closeActiveTab(): void {
-  if (activeTab.value) closeTab(activeTab.value.id);
+  if (modeStore.activeTab) closeTab(modeStore.activeTab.id);
 }
 
 onMounted(() => {
@@ -54,16 +57,16 @@ onMounted(() => {
     // P28 D18: three menu-bar commands. Subscribed here rather than in the panels that used to
     // own the buttons, so they work with no panel mounted — which is the point of moving them.
     control.onNewRequest(() => {
-      setMode('api');
+      modeStore.setMode('api');
       openApiRequestTab();
     }),
     control.onImportPostman(() => {
-      setMode('api');
+      modeStore.setMode('api');
       void importCollection();
     }),
     control.onImportDataGrip(() => {
-      setMode('studio');
-      void pickAndScanDataGripProject();
+      modeStore.setMode('studio');
+      void datagripImportStore.pickAndScanDataGripProject();
     }),
     control.onToggleProjectPanel(toggleProjectPanel),
     control.onToggleOperationsPanel(toggleOperationsPanel),
@@ -92,9 +95,9 @@ onUnmounted(() => {
     <WorkbenchShell />
   </div>
   <ConnectionDialog v-if="connectionsState.dialog.open" />
-  <DataGripImportDialog v-if="datagripImportState.open" />
+  <DataGripImportDialog v-if="datagripImportStore.open" />
   <ApiDialogs />
-  <UploadObjectDialog v-if="uploadDialogState.open" />
+  <UploadObjectDialog v-if="objectStoreStore.open" />
   <GenerateDataDialog v-if="fakeDataDialogState.open" />
   <GitPairingDialog />
   <DbMcpApprovalDialog />

@@ -3,7 +3,7 @@ import { copyText } from '../../clipboard';
 import { confirmDialog } from '../../state/confirmDialog';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import type { MenuItem } from '../../state/contextMenu';
-import { deleteObject, downloadObject, uploadMenuItem } from '../../state/objectStore';
+import { useObjectStoreStore } from '../../state/objectStore';
 import { openKeyValueTab } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';
 import { reload, setActionError } from './state';
@@ -33,7 +33,7 @@ function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): 
     },
     // Gates itself on caps.fileTransfer/canInsert — a no-op list for redis's own 'namespace' rows
     // (P33 D3), the same as project/menus.ts's own namespaceMenu-vs-prefixMenu split used to be.
-    ...uploadMenuItem(connectionId, node.path),
+    ...useObjectStoreStore().uploadMenuItem(connectionId, node.path),
   ];
 }
 
@@ -115,7 +115,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       id: 'download-object',
       label: 'Download…',
       icon: 'cloud-download',
-      run: () => void downloadObject(connectionId, node.path, null),
+      run: () => void useObjectStoreStore().downloadObject(connectionId, node.path, null),
     });
   }
 
@@ -133,7 +133,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       run: async () => {
         if (!(await confirmDialog(`Delete object "${node.name}"? This cannot be undone.`))) return;
         try {
-          await deleteObject(connectionId, node.path, null);
+          await useObjectStoreStore().deleteObject(connectionId, node.path, null);
           await reload(tabId);
           setActionError(tabId, null);
         } catch (err) {

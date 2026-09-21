@@ -9,7 +9,7 @@ import { control } from '../bridge/control';
 import { disposeGitTransport } from '../repo/git/transport';
 import { dropRepoTree } from '../repo/state/fileTree';
 import { dropRepoSearch } from '../repo/state/search';
-import { setModule } from './mode';
+import { useModeStore } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
 import { closeWorkspaceTabs } from './tabs';
 
@@ -32,7 +32,7 @@ export const workspaceState = reactive({
 // `lastRepoKey` track "which repository was I last in" so returning to Git lands back on it.
 export function activateWorkspace(key: WorkspaceKey): void {
   const mode = moduleOfWorkspace(key);
-  setModule(mode);
+  useModeStore().setModule(mode);
   workspaceState.active = key;
   if (mode === 'git' && isRepoWorkspace(key)) workspaceState.lastRepoKey = key;
 }

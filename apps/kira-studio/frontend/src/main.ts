@@ -6,14 +6,14 @@ import App from './App.vue';
 import { control } from './bridge/control';
 import { data } from './bridge/data';
 import { knownConnectionIds } from './project/state/tree';
-import { hydrateAgentHooks } from './state/agentHooks';
-import { initAgentSessions } from './state/agentSessions';
-import { initAppMetrics } from './state/appMetrics';
-import { initAppUpdate } from './state/appUpdate';
-import { initCacheStats } from './state/cacheStats';
-import { codeReposState, hydrateCodeRepos } from './state/coderepos';
+import { useAgentHooksStore } from './state/agentHooks';
+import { useAgentSessionsStore } from './state/agentSessions';
+import { useAppMetricsStore } from './state/appMetrics';
+import { useAppUpdateStore } from './state/appUpdate';
+import { useCacheStatsStore } from './state/cacheStats';
+import { useCodeReposStore } from './state/coderepos';
 import { hydrateConnections } from './state/connections';
-import { hydrateCustomScripts } from './state/customScripts';
+import { useCustomScriptsStore } from './state/customScripts';
 import { hydrateDbMcp, hydrateDbMcpApprovals } from './state/dbmcp';
 import { hydrateGitClients } from './state/gitClients';
 import { initKeepAwake } from './state/keepAwake';
@@ -26,7 +26,7 @@ import { hydrateTabs } from './state/tabs';
 import { hydrateTerminalDefaults } from './state/terminals';
 import './theme/base.css';
 import { hydrateLayout } from './state/layout';
-import { hydrateMode } from './state/mode';
+import { useModeStore } from './state/mode';
 import { hydrateSettings } from './state/settings';
 import { closeRepoWorkspace, workspaceState } from './state/workspace';
 import { planCount as consolePlanCount } from './views/console/explainResults';
@@ -291,13 +291,23 @@ if (__KIRA_DEBUG_HOOKS__) {
 }
 
 async function bootstrap(): Promise<void> {
-  initCacheStats();
-  initAppMetrics();
+  // Every store used here runs before app.use(pinia) below, so each needs the module-level
+  // `pinia` instance passed explicitly (Pinia has no active instance yet at this point).
+  const cacheStatsStore = useCacheStatsStore(pinia);
+  const appMetricsStore = useAppMetricsStore(pinia);
+  const modeStore = useModeStore(pinia);
+  const codeReposStore = useCodeReposStore(pinia);
+  const customScriptsStore = useCustomScriptsStore(pinia);
+  const agentHooksStore = useAgentHooksStore(pinia);
+  const agentSessionsStore = useAgentSessionsStore(pinia);
+
+  cacheStatsStore.initCacheStats();
+  appMetricsStore.initAppMetrics();
   // Must complete before anything window-scoped below (hydrateTabs, in particular) — P8 D2:
   // always a no-op on the native shell, the only registration a `-tags server` browser tab ever
   // gets otherwise. P22 D12: also this window's own persisted mode — set once before the first
   // render, the same way hydrateLayout/hydrateSettings below hydrate their own state.
-  hydrateMode(await control.windowsEnsure());
+  modeStore.hydrateMode(await control.windowsEnsure());
   await Promise.all([
     hydrateLayout(),
     hydrateSettings(),
@@ -306,14 +316,14 @@ async function bootstrap(): Promise<void> {
     // the toolbar's own "does this connection have any masked columns at all" visibility check
     // (deleteRowTooltip's own standing rule: a permanently inert control is worse than no control).
     loadMaskRuleCounts(),
-    hydrateCodeRepos(),
-    hydrateCustomScripts(),
+    codeReposStore.hydrateCodeRepos(),
+    customScriptsStore.hydrateCustomScripts(),
     hydrateTerminalDefaults(),
     hydrateGitClients(),
     hydrateDbMcp(),
     hydrateDbMcpApprovals(),
-    hydrateAgentHooks(),
-    initAgentSessions(),
+    agentHooksStore.hydrateAgentHooks(),
+    agentSessionsStore.initAgentSessions(),
     initKeepAwake(),
     hydrateOps(),
     hydrateTabs(),
@@ -324,7 +334,7 @@ async function bootstrap(): Promise<void> {
   // hydrateCodeRepos() has resolved alongside it, drop an orphaned workspace outright and give
   // every surviving one its pinned graph tab (§6.1), exactly like openRepoWorkspace does for one
   // opened interactively.
-  const liveRepoIds = new Set(codeReposState.records.map((r) => r.id));
+  const liveRepoIds = new Set(codeReposStore.records.map((r) => r.id));
   for (const repoId of [...workspaceState.openRepos]) {
     if (liveRepoIds.has(repoId)) {
       ensureWorkspaceShell(repoId);
@@ -342,7 +352,7 @@ async function bootstrap(): Promise<void> {
   app.mount('#app');
   // Off the boot critical path (Promise.all above) — an update check gains nothing from blocking
   // first paint, and Go's own 6h cache floor (§3.3) decides what actually fetches.
-  initAppUpdate();
+  useAppUpdateStore().initAppUpdate();
 }
 
 void bootstrap();

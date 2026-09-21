@@ -3,7 +3,7 @@ import type { CustomScript } from '@shared/domain/scripts';
 import { computed, ref } from 'vue';
 import { confirmDialog } from '../state/confirmDialog';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
-import { createCustomScript, customScriptsState, removeCustomScript } from '../state/customScripts';
+import { useCustomScriptsStore } from '../state/customScripts';
 import { openSettingsAt } from '../state/settings';
 import { terminalDefaults } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
@@ -21,6 +21,8 @@ import TextField from '../theme/primitives/TextField.vue';
 // section P85 already built (§11.3) — a 180-480px panel cannot hold four labelled fields legibly,
 // and this stays the one place those rules live.
 
+const customScriptsStore = useCustomScriptsStore();
+
 const search = ref('');
 const adding = ref(false);
 const newName = ref('');
@@ -32,13 +34,13 @@ const canAdd = computed(() => newName.value.trim() !== '' && newCommand.value.tr
 // §11.1: panel search filters rows by name and command.
 const filteredRecords = computed(() => {
   const q = search.value.trim().toLowerCase();
-  if (q === '') return customScriptsState.records;
-  return customScriptsState.records.filter(
+  if (q === '') return customScriptsStore.records;
+  return customScriptsStore.records.filter(
     (s) => s.name.toLowerCase().includes(q) || s.command.toLowerCase().includes(q),
   );
 });
 
-const empty = computed(() => customScriptsState.records.length === 0 && !adding.value);
+const empty = computed(() => customScriptsStore.records.length === 0 && !adding.value);
 
 function openAddRow(): void {
   adding.value = true;
@@ -59,7 +61,7 @@ async function onAdd(): Promise<void> {
   if (!canAdd.value) return;
   addError.value = null;
   try {
-    await createCustomScript({
+    await customScriptsStore.createCustomScript({
       name: newName.value.trim(),
       command: newCommand.value.trim(),
       workingDir: '',
@@ -88,7 +90,7 @@ async function onRemove(script: CustomScript): Promise<void> {
     `Remove "${script.name}"? It will no longer launch from the tab strip or the Terminal panel.`,
     { danger: true },
   );
-  if (ok) await removeCustomScript(script.id);
+  if (ok) await customScriptsStore.removeCustomScript(script.id);
 }
 
 function onContextMenu(e: MouseEvent, script: CustomScript): void {

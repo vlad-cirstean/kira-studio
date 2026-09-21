@@ -1,15 +1,15 @@
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
 import { reactive, watch } from 'vue';
-import {
-  codeRepoRecord,
-  codeRepoRecordForPath,
-  codeReposState,
-  openRepoAtPath,
-} from '../../state/coderepos';
+import { useCodeReposStore } from '../../state/coderepos';
+import { pinia } from '../../state/pinia';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { workspaceState } from '../../state/workspace';
 import { disposeGitTransport, gitTransportFor } from '../git/transport';
 import { noteWorktreeLink, worktreeParentId } from './repoLinks';
+
+// Module-level `watch()` below runs at import time, before `app.use(pinia)` — the explicit
+// instance is required here (state/pinia.ts's own header comment).
+const codeReposStore = useCodeReposStore(pinia);
 
 // P82 §6: per-repo worktree disclosure state, session-scoped and module-level — same shape and
 // reasoning as fileTree.ts's byRepo/search.ts's repoSearchView. Not persisted (§0/§10): a future
@@ -70,7 +70,7 @@ export function worktreesError(codeRepoId: string): string | null {
  *  entries stay visible while loading, replaced only on success. */
 async function refresh(codeRepoId: string): Promise<void> {
   const state = stateFor(codeRepoId);
-  const record = codeRepoRecord(codeRepoId);
+  const record = codeReposStore.codeRepoRecord(codeRepoId);
   if (!record) return;
   const transport = leases.get(codeRepoId)?.transport;
   if (!transport) return;
@@ -116,7 +116,7 @@ export function toggleRepoWorktrees(codeRepoId: string): void {
   // §6.4: live refresh while expanded — the same repo.changed filter WorktreeState uses, so a
   // worktree created from the graph's own dialog appears without a collapse/expand round trip.
   const off = transport.on('repo.changed', (event) => {
-    const record = codeRepoRecord(codeRepoId);
+    const record = codeReposStore.codeRepoRecord(codeRepoId);
     if (!record || event.repoId !== record.repoId || event.kind !== 'refsChanged') return;
     void refresh(codeRepoId);
   });
@@ -140,9 +140,9 @@ export async function switchToWorktree(codeRepoId: string, wt: WorktreeEntry): P
   const state = stateFor(codeRepoId);
   state.error = null;
   try {
-    await openRepoAtPath(wt.path);
+    await codeReposStore.openRepoAtPath(wt.path);
     if (wt.isMain) return; // clicking the main worktree imports the *anchor*, which has no parent
-    const record = codeRepoRecordForPath(wt.path);
+    const record = codeReposStore.codeRepoRecordForPath(wt.path);
     if (record) noteWorktreeLink(record.id, worktreeParentId(codeRepoId) || codeRepoId);
   } catch (err) {
     state.error = err instanceof Error ? err.message : String(err);
@@ -176,7 +176,7 @@ watch(
 // removeCodeRepo reassigns `records` wholesale; a removed repository must not keep an entry (or a
 // lease) here. It also calls closeRepoWorkspace, but only the open case is covered by the watch above.
 watch(
-  () => codeReposState.records,
+  () => codeReposStore.records,
   (records) => {
     const live = new Set(records.map((r) => r.id));
     for (const id of [...byRepo.keys()]) if (!live.has(id)) collapseRepoWorktrees(id);

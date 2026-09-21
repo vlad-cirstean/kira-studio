@@ -3,7 +3,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
 import { formatRelative } from '../../format';
 import { connectionRecord, connectionsState, openCreateDialog } from '../../state/connections';
-import { pickAndScanDataGripProject } from '../../state/datagripImport';
+import { useDatagripImportStore } from '../../state/datagripImport';
 import {
   openDataTab,
   openDocumentTab,
@@ -20,6 +20,8 @@ import { connColorVar } from '../../theme/connColor';
 
 // P16 design system's FirstRun.html: one door, no vestibule. The engine grid lives only in
 // the New connection dialog, never repeated at the top level.
+const datagripImportStore = useDatagripImportStore();
+
 const hasConnections = computed(() => connectionsState.records.length > 0);
 
 function connectionFor(entry: RecentTableEntry) {
@@ -69,7 +71,7 @@ function openRecent(entry: RecentTableEntry): void {
           type="button"
           class="p-dlgbtn"
           data-testid="first-run-import-datagrip"
-          @click="pickAndScanDataGripProject"
+          @click="datagripImportStore.pickAndScanDataGripProject"
         >
           <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>
           Import from DataGrip

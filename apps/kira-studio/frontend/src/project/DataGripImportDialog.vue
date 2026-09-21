@@ -3,13 +3,7 @@ import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import { computed } from 'vue';
 import { connectionsState } from '../state/connections';
-import {
-  closeDataGripImportDialog,
-  confirmDataGripImport,
-  datagripImportState,
-  looksAlreadyImported,
-  toggleDataGripRow,
-} from '../state/datagripImport';
+import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -76,10 +70,12 @@ const REPORT_REASON_LABEL: Record<string, string> = {
   'secret-storage-unavailable': 'passwords cannot be saved on this machine',
 };
 
-const rows = computed(() => datagripImportState.preview?.rows ?? []);
-const checkedCount = computed(() => datagripImportState.selected.size);
+const datagripImportStore = useDatagripImportStore();
+
+const rows = computed(() => datagripImportStore.preview?.rows ?? []);
+const checkedCount = computed(() => datagripImportStore.selected.size);
 const secretStatus = computed(() => connectionsState.secretStorage);
-const report = computed(() => datagripImportState.report);
+const report = computed(() => datagripImportStore.report);
 const reportSummary = computed(() => {
   const r = report.value;
   if (!r) return '';
@@ -131,21 +127,21 @@ function reportOutcome(row: DataGripReportRow): { label: string; tone: 'ok' | 'w
 
 async function onConfirm(): Promise<void> {
   // Deliberately no auto-close here (review finding): confirmDataGripImport already stores its
-  // result on datagripImportState.report, which flips the template below into the results view —
+  // result on the store's own `report`, which flips the template below into the results view —
   // the user closes explicitly once they have seen it.
-  await confirmDataGripImport();
+  await datagripImportStore.confirmDataGripImport();
 }
 </script>
 
 <template>
   <DialogFrame
-    v-if="datagripImportState.open"
+    v-if="datagripImportStore.open"
     title="Import from DataGrip"
     :width="720"
     :height="560"
     test-id="datagrip-import-dialog"
     close-test-id="datagrip-import-dialog-close"
-    @close="closeDataGripImportDialog"
+    @close="datagripImportStore.closeDataGripImportDialog"
   >
     <template #header>
       <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
@@ -160,8 +156,8 @@ async function onConfirm(): Promise<void> {
       >
         {{ secretStatus.reason ?? 'Passwords cannot be saved on this machine, so every connection will import without one.' }}
       </MessageStrip>
-      <MessageStrip v-if="datagripImportState.error" tone="err" data-testid="datagrip-import-error">
-        {{ datagripImportState.error }}
+      <MessageStrip v-if="datagripImportStore.error" tone="err" data-testid="datagrip-import-error">
+        {{ datagripImportStore.error }}
       </MessageStrip>
 
       <div class="row-list" data-testid="datagrip-preview-rows">
@@ -176,8 +172,8 @@ async function onConfirm(): Promise<void> {
           <span class="row-check">
             <Checkbox
               v-if="row.importable"
-              :model-value="datagripImportState.selected.has(row.uuid)"
-              @update:model-value="toggleDataGripRow(row.uuid)"
+              :model-value="datagripImportStore.selected.has(row.uuid)"
+              @update:model-value="datagripImportStore.toggleDataGripRow(row.uuid)"
             />
           </span>
           <span v-if="row.importable" class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[row.kind as ConnectionKind]})` }">
@@ -260,16 +256,16 @@ async function onConfirm(): Promise<void> {
 
     <template #footer>
       <template v-if="!report">
-        <span class="help">{{ datagripImportState.projectPath }}</span>
+        <span class="help">{{ datagripImportStore.projectPath }}</span>
         <span class="p-dialog-actions p-push">
-          <AppButton kind="dialog" data-testid="datagrip-import-cancel" @click="closeDataGripImportDialog">
+          <AppButton kind="dialog" data-testid="datagrip-import-cancel" @click="datagripImportStore.closeDataGripImportDialog">
             Cancel
           </AppButton>
           <AppButton
             kind="dialog"
             variant="primary"
             data-testid="datagrip-import-confirm"
-            :disabled="checkedCount === 0 || datagripImportState.busy"
+            :disabled="checkedCount === 0 || datagripImportStore.busy"
             @click="onConfirm"
           >
             Import {{ checkedCount }} connection{{ checkedCount === 1 ? '' : 's' }}
@@ -282,7 +278,7 @@ async function onConfirm(): Promise<void> {
             kind="dialog"
             variant="primary"
             data-testid="datagrip-import-report-close"
-            @click="closeDataGripImportDialog"
+            @click="datagripImportStore.closeDataGripImportDialog"
           >
             Close
           </AppButton>

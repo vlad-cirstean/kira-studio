@@ -38,7 +38,7 @@ import { control } from '../bridge/control';
 import { clearPending } from '../views/grid/pendingChanges';
 import { clearSelectedCellFor } from './cellSelection';
 import { connectionsState } from './connections';
-import { consoleDefaultFor } from './consoleDefaults';
+import { useConsoleDefaultsStore } from './consoleDefaults';
 import { tabsForWorkspace, workspaceKeyOf } from './mode';
 import { settingsState } from './settings';
 import { isIncognito, registerIncognitoSetListener, setIncognito } from './tabIncognito';
@@ -511,7 +511,8 @@ export function openDefinitionTab(connectionId: string, path: string): string {
 // level way to redirect itself to a non-primary database — substituting a remembered "Set as
 // default" path here, before the path ever reaches the engine, needs no adapter change at all.
 export function openConsoleTab(connectionId: string, path: string): string {
-  const effectivePath = path === '' ? (consoleDefaultFor(connectionId) ?? path) : path;
+  const effectivePath =
+    path === '' ? (useConsoleDefaultsStore().consoleDefaultFor(connectionId) ?? path) : path;
   return openTab('console', connectionId, effectivePath, () => defaultConsoleTabState(), {
     reuse: false,
   }).id;

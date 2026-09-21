@@ -2,20 +2,25 @@
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
-import { agentActivityFor, agentSessionsState } from '../state/agentSessions';
-import { appMetricsState } from '../state/appMetrics';
-import { appUpdateState } from '../state/appUpdate';
-import { blameStatusState } from '../state/blameStatus';
-import { cacheStatsState } from '../state/cacheStats';
+import { useAgentSessionsStore } from '../state/agentSessions';
+import { useAppMetricsStore } from '../state/appMetrics';
+import { useAppUpdateStore } from '../state/appUpdate';
+import { useBlameStatusStore } from '../state/blameStatus';
+import { useCacheStatsStore } from '../state/cacheStats';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 import { useEngineStore } from './state/engine';
 
 const engineStore = useEngineStore();
+const agentSessionsStore = useAgentSessionsStore();
+const appMetricsStore = useAppMetricsStore();
+const appUpdateStore = useAppUpdateStore();
+const blameStatusStore = useBlameStatusStore();
+const cacheStatsStore = useCacheStatsStore();
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
 // a single app-wide figure, not a per-process breakdown. The whole segment is v-if-gated on
-// appMetricsState.sample below, so the '' fallback here never actually renders — it only satisfies
+// appMetricsStore.sample below, so the '' fallback here never actually renders — it only satisfies
 // the type checker.
 //
 // One decimal below 10% rather than Math.round: an idle app using e.g. 0.4% of the machine's whole
@@ -23,14 +28,14 @@ const engineStore = useEngineStore();
 // flat "0%" indistinguishable from truly idle, which is exactly the kind of thing that reads as
 // "this number is broken" (P7 F6).
 const cpuLabel = computed(() => {
-  const sample = appMetricsState.sample;
+  const sample = appMetricsStore.sample;
   if (!sample) return '';
   return sample.cpuPercent < 10
     ? `${sample.cpuPercent.toFixed(1)}%`
     : `${Math.round(sample.cpuPercent)}%`;
 });
 const memLabel = computed(() => {
-  const sample = appMetricsState.sample;
+  const sample = appMetricsStore.sample;
   return sample ? formatBytes(sample.memoryBytes) : '';
 });
 
@@ -40,7 +45,7 @@ const memLabel = computed(() => {
 // true and still the reason the CPU figure is shaped the way it is — it now lives in this comment
 // and in docs/ARCHITECTURE.md's metrics note, not in a five-line hover panel.
 const metricsTooltip = computed(() => {
-  const sample = appMetricsState.sample;
+  const sample = appMetricsStore.sample;
   if (!sample) return undefined;
   return (
     `${cpuLabel.value} of ${sample.logicalCPUs} cores · ${memLabel.value} across ` +
@@ -49,7 +54,7 @@ const metricsTooltip = computed(() => {
 });
 
 const cacheTitle = computed(() => {
-  const stats = cacheStatsState.stats;
+  const stats = cacheStatsStore.stats;
   if (!stats) return undefined;
   const total = stats.l2Hits + stats.l2Misses;
   const hitRate = total === 0 ? 0 : Math.round((stats.l2Hits / total) * 100);
@@ -57,13 +62,13 @@ const cacheTitle = computed(() => {
 });
 
 const cacheSizeLabel = computed(() => {
-  const stats = cacheStatsState.stats;
+  const stats = cacheStatsStore.stats;
   return stats ? formatBytes(stats.l2Bytes) : null;
 });
 
 const updateTooltip = computed(
   () =>
-    `Version ${appUpdateState.latestVersion} is available. You have ${appUpdateState.currentVersion}. ` +
+    `Version ${appUpdateStore.latestVersion} is available. You have ${appUpdateStore.currentVersion}. ` +
     `Opens GitHub in your browser.`,
 );
 
@@ -75,13 +80,13 @@ function onOpenReleasePage(): void {
 // is the extension's own choice; this bar hides items with nothing to say instead (app-metrics,
 // cache-size both do the same), so absent is the consistent answer here.
 const blame = computed(() =>
-  blameStatusState.status.kind === 'resolved' ? blameStatusState.status : null,
+  blameStatusStore.status.kind === 'resolved' ? blameStatusStore.status : null,
 );
 const blameText = computed(() => (blame.value ? blameLineText(blame.value) : ''));
 const blameTooltip = computed(() => (blame.value ? blameLineTooltip(blame.value).join(' — ') : ''));
 
 function onRevealBlameCommit(): void {
-  if (blame.value) blameStatusState.reveal?.(blame.value.sha);
+  if (blame.value) blameStatusStore.reveal?.(blame.value.sha);
 }
 
 // P86 §14.1: an app-wide fact like app-metrics/cache-size beside it, not a caret fact — §11's own
@@ -93,14 +98,14 @@ function basename(path: string): string {
   return slash === -1 ? path : path.slice(slash + 1);
 }
 
-const agentCount = computed(() => agentSessionsState.sessions.length);
+const agentCount = computed(() => agentSessionsStore.sessions.length);
 
 // §13's own activity text: 'waiting for you' (attention, plus the bounded message when present),
 // 'running <toolName>' (working with a tool), 'working' (working with none), 'idle', or null when
 // this window knows no activity for that session (hooks off, or another window's session) — the
 // tooltip line then falls back to basename(cwd) alone.
 function activityText(terminalId: string): string | null {
-  const activity = agentActivityFor(terminalId);
+  const activity = agentSessionsStore.agentActivityFor(terminalId);
   if (!activity) return null;
   if (activity.phase === 'attention') {
     return activity.message ? `waiting for you: ${activity.message}` : 'waiting for you';
@@ -112,7 +117,7 @@ function activityText(terminalId: string): string | null {
 }
 
 const agentTooltip = computed(() =>
-  agentSessionsState.sessions
+  agentSessionsStore.sessions
     .map((s) => {
       const text = activityText(s.terminalId);
       return text ? `${basename(s.cwd)} — ${text}` : basename(s.cwd);
@@ -135,7 +140,7 @@ const agentTooltip = computed(() =>
         v-if="blame"
         class="p-status blame"
         data-testid="blame-status"
-        :disabled="!blameStatusState.reveal"
+        :disabled="!blameStatusStore.reveal"
         v-tooltip="blameTooltip"
         @click="onRevealBlameCommit"
       >
@@ -146,14 +151,14 @@ const agentTooltip = computed(() =>
 
     <div class="side">
       <button
-        v-if="appUpdateState.available"
+        v-if="appUpdateStore.available"
         class="p-status update"
         data-testid="update-available"
         v-tooltip="updateTooltip"
         @click="onOpenReleasePage"
       >
         <CodiconIcon name="cloud-download" :size="13" />
-        Update {{ appUpdateState.latestVersion }}
+        Update {{ appUpdateStore.latestVersion }}
       </button>
       <span
         v-if="agentCount > 0"
@@ -165,7 +170,7 @@ const agentTooltip = computed(() =>
         {{ agentCount }}
       </span>
       <span
-        v-if="appMetricsState.sample"
+        v-if="appMetricsStore.sample"
         class="p-status"
         data-testid="app-metrics"
         v-tooltip="metricsTooltip"

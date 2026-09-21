@@ -26,7 +26,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { control } from '../../bridge/control';
-import { codeRepoRecord, codeReposState } from '../../state/coderepos';
+import { useCodeReposStore } from '../../state/coderepos';
 import { layoutState, toggleProjectPanel } from '../../state/layout';
 import {
   openRepoCommitDiffTab,
@@ -97,13 +97,13 @@ const EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 /** `code_repos.id` -> the git `repoId` git-ui and every `gitrpc` method actually speak, or
  *  `undefined` if this app has no record of that repository (never guessed). */
 export function gitRepoIdFor(codeRepoId: string): string | undefined {
-  return codeRepoRecord(codeRepoId)?.repoId;
+  return useCodeReposStore().codeRepoRecord(codeRepoId)?.repoId;
 }
 
 /** The reverse of `gitRepoIdFor` — a git `repoId` (from an inbound `editor.*` request's own
  *  params) back to the `code_repos.id` every native tab/workspace call needs, or `undefined`. */
 function codeRepoIdFor(gitRepoId: string): string | undefined {
-  return codeReposState.records.find((r) => r.repoId === gitRepoId)?.id;
+  return useCodeReposStore().records.find((r) => r.repoId === gitRepoId)?.id;
 }
 
 // D11's own shape, ported: the Go server's real app.init result is only these three fields
@@ -228,7 +228,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     // time. Scoping candidates to this transport's own repo makes the loop open the right one
     // unconditionally, with no change needed to the shared (VS Code too) bootstrap logic itself.
     'repo.list': async () => {
-      const own = codeRepoRecord(deps.codeRepoId);
+      const own = useCodeReposStore().codeRepoRecord(deps.codeRepoId);
       const candidates = own ? [{ path: own.root, label: own.name }] : [];
       return { candidates, activeRepoId: gitRepoIdFor(deps.codeRepoId) ?? null };
     },

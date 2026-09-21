@@ -4,13 +4,7 @@ import type { RepoSummary } from '@shared/domain/repo';
 import { repoIdOfWorkspace, repoWorkspaceKey } from '@shared/domain/workspace';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
-import {
-  codeRepoRecordForPath,
-  codeReposState,
-  importRepoViaDialog,
-  removeCodeRepo,
-  renameCodeRepo,
-} from '../state/coderepos';
+import { useCodeReposStore } from '../state/coderepos';
 import { type MenuItem, openContextMenu } from '../state/contextMenu';
 import { ensureReviewPanelWidth } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
@@ -45,6 +39,8 @@ import {
   worktreesError,
   worktreesLoading,
 } from './state/worktrees';
+
+const codeReposStore = useCodeReposStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -106,21 +102,21 @@ function onRowClick(id: string): void {
 /** P84 §6.1: the code_repos id backing a worktree path, once it has been opened in this app —
  *  '' before that (no row to mark open/active, no row to attach Rename/Close/Remove to yet). */
 function worktreeRecordId(path: string): string {
-  return codeRepoRecordForPath(path)?.id ?? '';
+  return codeReposStore.codeRepoRecordForPath(path)?.id ?? '';
 }
 
 // P84 §3: a row with a non-empty parentId never renders at the top level — only nested under its
 // anchor's twisty (`worktreeEntries` below). §4.4: reads this panel's own PanelShell search box
 // (`local.repoSearch`), not the Studio tree's own `treeState.search`.
 const filteredRepos = computed<RepoSummary[]>(() => {
-  const topLevel = codeReposState.records.filter((r) => !worktreeParentId(r.id));
+  const topLevel = codeReposStore.records.filter((r) => !worktreeParentId(r.id));
   const query = local.repoSearch.trim().toLowerCase();
   if (!query) return topLevel;
   return topLevel.filter((r) => r.name.toLowerCase().includes(query));
 });
 
 async function onImport(): Promise<void> {
-  await importRepoViaDialog();
+  await codeReposStore.importRepoViaDialog();
 }
 
 // Electron's renderer has no window.prompt() — the same in-app substitute
@@ -153,11 +149,11 @@ function cancelPrompt(): void {
 async function onRenameRepo(id: string, currentName: string): Promise<void> {
   const name = await promptText('Rename repository', currentName);
   if (!name || name.trim() === '') return;
-  await renameCodeRepo(id, name.trim());
+  await codeReposStore.renameCodeRepo(id, name.trim());
 }
 
 async function onRemoveRepo(id: string): Promise<void> {
-  await removeCodeRepo(id);
+  await codeReposStore.removeCodeRepo(id);
 }
 
 function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
@@ -250,7 +246,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
   // reachable from nowhere else — the same three items onRepoContextMenu builds, same handlers, no
   // second code path. Only offered once the worktree has its own code_repos row (it has been
   // opened in this app at least once); a worktree never opened here has nothing to rename or remove.
-  const record = codeRepoRecordForPath(wt.path);
+  const record = codeReposStore.codeRepoRecordForPath(wt.path);
   if (record) {
     items.push({ type: 'separator' as const });
     items.push({
@@ -350,7 +346,7 @@ onUnmounted(() => {
 <template>
   <PanelShell
     :search="tab === 'repos' ? local.repoSearch : local.fileSearch"
-    :empty="codeReposState.records.length === 0"
+    :empty="codeReposStore.records.length === 0"
     :searchable="tab !== 'review'"
     @update:search="tab === 'repos' ? (local.repoSearch = $event) : (local.fileSearch = $event)"
   >

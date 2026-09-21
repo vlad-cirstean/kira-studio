@@ -16,9 +16,9 @@ import {
   setConnectionColor,
   setConnectionReadOnly,
 } from '../state/connections';
-import { consoleDefaultFor, setConsoleDefault } from '../state/consoleDefaults';
+import { useConsoleDefaultsStore } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
-import { uploadMenuItem } from '../state/objectStore';
+import { useObjectStoreStore } from '../state/objectStore';
 import { openSchemaDialog, schemaDialectFor } from '../state/schemas';
 import {
   openBrowseTab,
@@ -263,8 +263,8 @@ function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
       id: 'set-as-default',
       label: 'Set as default',
       icon: 'star',
-      checked: consoleDefaultFor(row.connectionId) === row.path,
-      run: () => setConsoleDefault(row.connectionId, row.path),
+      checked: useConsoleDefaultsStore().consoleDefaultFor(row.connectionId) === row.path,
+      run: () => useConsoleDefaultsStore().setConsoleDefault(row.connectionId, row.path),
     },
   ];
 }
@@ -324,7 +324,10 @@ function containerMenu(row: TreeRowVm): MenuItem[] {
 // P41: uploadMenuItem now lives in state/objectStore.ts, shared with views/browse/menu.ts's own
 // container-row menu.
 function bucketMenu(row: TreeRowVm): MenuItem[] {
-  return [...containerMenu(row), ...uploadMenuItem(row.connectionId, row.path)];
+  return [
+    ...containerMenu(row),
+    ...useObjectStoreStore().uploadMenuItem(row.connectionId, row.path),
+  ];
 }
 
 // §8.10's own ordering: Open data / Open data in new tab come first, before Refresh.

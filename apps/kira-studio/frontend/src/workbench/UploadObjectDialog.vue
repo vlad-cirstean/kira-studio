@@ -4,13 +4,15 @@ import { decodePath } from '@shared/domain/tree';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
-import { closeUploadDialog, uploadDialogState, uploadObject } from '../state/objectStore';
+import { useObjectStoreStore } from '../state/objectStore';
 import { openKeyValueTab } from '../state/tabs';
 import { browseInvalidate } from '../state/viewCommands';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
+
+const objectStoreStore = useObjectStoreStore();
 
 // P33 D17: three entry points as of P41 (the Browse panel's own container rows/toolbar and — until
 // the tree stops rendering bucket/prefix rows, P41 D5 — the tree's own bucket/prefix menu) — driven
@@ -31,7 +33,7 @@ const error = ref<string | null>(null);
 // `prefixSegments.join('/') + '/'` reconstruction on the engine side, so the two agree by
 // construction rather than by coincidence.
 const containerPrefix = computed(() => {
-  const { connectionId, containerPath } = uploadDialogState;
+  const { connectionId, containerPath } = objectStoreStore;
   if (!connectionId || containerPath === '') return '';
   const prefixes = decodePath(connectionId, containerPath).segments.filter(
     (s) => s.kind === 'prefix',
@@ -49,26 +51,26 @@ async function chooseFile(): Promise<void> {
 }
 
 function onClose(): void {
-  closeUploadDialog();
+  objectStoreStore.closeUploadDialog();
 }
 
 async function onUpload(): Promise<void> {
-  const connectionId = uploadDialogState.connectionId;
+  const connectionId = objectStoreStore.connectionId;
   const file = chosenFile.value;
   if (!connectionId || !file || !key.value.trim()) return;
   saving.value = true;
   error.value = null;
   try {
-    const newPath = await uploadObject({
+    const newPath = await objectStoreStore.uploadObject({
       connectionId,
-      containerPath: uploadDialogState.containerPath,
+      containerPath: objectStoreStore.containerPath,
       key: key.value.trim(),
       sourcePath: file.path,
       contentType: contentType.value.trim() || 'application/octet-stream',
       tabId: null,
     });
-    browseInvalidate(connectionId, uploadDialogState.containerPath);
-    closeUploadDialog();
+    browseInvalidate(connectionId, objectStoreStore.containerPath);
+    objectStoreStore.closeUploadDialog();
     openKeyValueTab(connectionId, newPath, { newTab: true });
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -80,7 +82,7 @@ async function onUpload(): Promise<void> {
 // Reset every time the dialog opens — a stale chosen file from a previous open must never carry
 // over to a different bucket/prefix.
 watch(
-  () => uploadDialogState.open,
+  () => objectStoreStore.open,
   (open) => {
     if (!open) return;
     chosenFile.value = null;

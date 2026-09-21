@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { importRepoViaDialog } from '../state/coderepos';
+import { useCodeReposStore } from '../state/coderepos';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
+
+const codeReposStore = useCodeReposStore();
 
 // P67b §4.4: the Git module's own MainView fallback — reachable whenever Git is active with no
 // repo open, mirroring workbench/panels/StudioStart.vue / api/ApiStart.vue's own front-door shape
@@ -13,7 +15,7 @@ const importError = ref<string | null>(null);
 async function onImport(): Promise<void> {
   importError.value = null;
   try {
-    await importRepoViaDialog();
+    await codeReposStore.importRepoViaDialog();
   } catch (err) {
     importError.value = err instanceof Error ? err.message : String(err);
   }

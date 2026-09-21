@@ -81,7 +81,7 @@ import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
-import { codeRepoRecord } from './coderepos';
+import { useCodeReposStore } from './coderepos';
 import { connectionRecord } from './connections';
 import type { MenuItem } from './contextMenu';
 import { settingsState } from './settings';
@@ -432,7 +432,8 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
   'repo-graph': {
     mode: TAB_KIND_MODE['repo-graph'],
     title: (tab) =>
-      codeRepoRecord(repoIdOfWorkspace((tab.workspaceId as WorkspaceKey) ?? ''))?.name ?? 'Graph',
+      useCodeReposStore().codeRepoRecord(repoIdOfWorkspace((tab.workspaceId as WorkspaceKey) ?? ''))
+        ?.name ?? 'Graph',
     icon: () => 'source-control',
     railColor: () => undefined,
     defaultState: (): RepoGraphTabState => defaultRepoGraphTabState(),

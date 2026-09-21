@@ -1,9 +1,14 @@
 import type { HeadState, Transport } from '@kira/git-ipc';
 import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { codeRepoRecord, codeReposState } from '../../state/coderepos';
+import { useCodeReposStore } from '../../state/coderepos';
+import { pinia } from '../../state/pinia';
 import { workspaceState } from '../../state/workspace';
 import { gitTransportFor } from '../git/transport';
+
+// Module-level `watch()` below runs at import time, before `app.use(pinia)` — the explicit
+// instance is required here (state/pinia.ts's own header comment).
+const codeReposStore = useCodeReposStore(pinia);
 
 // P83 plan §12.3: every repo row's checked-out branch, session-scoped and module-level — same
 // shape as worktrees.ts's byRepo/search.ts's repoSearchView. `null` means "known, and there is
@@ -41,7 +46,7 @@ export async function refreshRepoHeads(ids?: string[]): Promise<void> {
 // §12.3 trigger 2: an import, a remove, or a P82 worktree switch changes the row set — a new row
 // must not render headless, and a removed one must not linger in the map.
 watch(
-  () => codeReposState.records,
+  () => codeReposStore.records,
   (records) => {
     const live = new Set(records.map((r) => r.id));
     for (const id of [...byRepoId.keys()]) if (!live.has(id)) byRepoId.delete(id);
@@ -64,7 +69,7 @@ watch(
       const transport = gitTransportFor(id);
       // A checkout is what actually changes a HEAD, and it happens in the workspace's own graph.
       const off = transport.on('repo.changed', (event) => {
-        const record = codeRepoRecord(id);
+        const record = codeReposStore.codeRepoRecord(id);
         if (!record || event.repoId !== record.repoId || event.kind !== 'refsChanged') return;
         void refreshRepoHeads([id]);
       });

@@ -21,16 +21,11 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
 import { formatBytes, formatRelative } from '../format';
-import { agentHooksState, setAgentHooksEnabled } from '../state/agentHooks';
-import { cacheStatsState } from '../state/cacheStats';
+import { useAgentHooksStore } from '../state/agentHooks';
+import { useCacheStatsStore } from '../state/cacheStats';
 import { confirmDialog } from '../state/confirmDialog';
 import { connectionsState, setConnectionMcpEnabled } from '../state/connections';
-import {
-  createCustomScript,
-  customScriptsState,
-  removeCustomScript,
-  updateCustomScript,
-} from '../state/customScripts';
+import { useCustomScriptsStore } from '../state/customScripts';
 import {
   dbMcpState,
   installDbMcpClaudeCode,
@@ -58,6 +53,10 @@ import TextField from '../theme/primitives/TextField.vue';
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 
 const emit = defineEmits<{ close: [] }>();
+
+const agentHooksStore = useAgentHooksStore();
+const cacheStatsStore = useCacheStatsStore();
+const customScriptsStore = useCustomScriptsStore();
 
 // P17 D1: everything the user touches lives in this draft until Save — settingsState (and
 // therefore every other window, the database, and the app's own rendering) sees nothing until
@@ -230,7 +229,7 @@ const claudeCodeHooksToggling = ref(false);
 async function onToggleAgentHooksEnabled(enabled: boolean): Promise<void> {
   claudeCodeHooksToggling.value = true;
   try {
-    await setAgentHooksEnabled(enabled);
+    await agentHooksStore.setAgentHooksEnabled(enabled);
   } finally {
     claudeCodeHooksToggling.value = false;
   }
@@ -509,7 +508,7 @@ const isValid = computed(
 );
 
 const hitRateLabel = computed(() => {
-  const stats = cacheStatsState.stats;
+  const stats = cacheStatsStore.stats;
   if (!stats) return '—';
   const total = stats.l2Hits + stats.l2Misses;
   if (total === 0) return '—';
@@ -517,7 +516,7 @@ const hitRateLabel = computed(() => {
 });
 
 const cacheSizeLabel = computed(() => {
-  const stats = cacheStatsState.stats;
+  const stats = cacheStatsStore.stats;
   if (!stats) return '—';
   return `${formatBytes(stats.l2Bytes)} / ${formatBytes(stats.l2BudgetBytes)}`;
 });
@@ -563,8 +562,8 @@ async function onSave(): Promise<void> {
 
 // P85 §10.2: the Scripts section — ConnectionDialog.vue's own Privacy-tab list-editing layout
 // (mask rules), restated for scripts. This section bypasses draft/pendingPatch entirely, the same
-// posture 'Connected editors'/'Database MCP' already take (§10.1) — customScriptsState is a
-// module-level store, not a settings leaf, and a script edited here must apply immediately so the
+// posture 'Connected editors'/'Database MCP' already take (§10.1) — the custom scripts store is a
+// Pinia store, not a settings leaf, and a script edited here must apply immediately so the
 // tab strip's own dropdown reflects it without a Save.
 interface ScriptDraft {
   name: string;
@@ -574,7 +573,7 @@ interface ScriptDraft {
 const scriptDrafts = reactive<Record<string, ScriptDraft>>({});
 function syncScriptDrafts(): void {
   for (const key of Object.keys(scriptDrafts)) delete scriptDrafts[key];
-  for (const script of customScriptsState.records) {
+  for (const script of customScriptsStore.records) {
     scriptDrafts[script.id] = {
       name: script.name,
       command: script.command,
@@ -582,7 +581,7 @@ function syncScriptDrafts(): void {
     };
   }
 }
-watch(() => customScriptsState.records, syncScriptDrafts, { immediate: true });
+watch(() => customScriptsStore.records, syncScriptDrafts, { immediate: true });
 
 // name/command commit on blur, not per keystroke (§10.2); a cleared field reverts rather than
 // saving an invalid row — VariableSetView.vue's own onEnvFieldBlur takes the same "empty reverts"
@@ -606,7 +605,7 @@ async function onScriptFieldBlur(script: CustomScript): Promise<void> {
     return;
   }
   try {
-    await updateCustomScript(script.id, {
+    await customScriptsStore.updateCustomScript(script.id, {
       name,
       command,
       workingDir: draft.workingDir,
@@ -625,7 +624,7 @@ async function onScriptFieldBlur(script: CustomScript): Promise<void> {
 // name/command's blur-commit — a colour choice is a discrete action with its own visible
 // feedback, not text a user is still composing.
 async function onScriptColorChange(script: CustomScript, color: PaletteColor): Promise<void> {
-  await updateCustomScript(script.id, {
+  await customScriptsStore.updateCustomScript(script.id, {
     name: script.name,
     command: script.command,
     workingDir: script.workingDir,
@@ -640,7 +639,7 @@ async function onRemoveScript(script: CustomScript): Promise<void> {
       danger: true,
     },
   );
-  if (ok) await removeCustomScript(script.id);
+  if (ok) await customScriptsStore.removeCustomScript(script.id);
 }
 
 const newScriptName = ref('');
@@ -665,7 +664,7 @@ async function onAddScript(): Promise<void> {
     color: newScriptColor.value,
   };
   try {
-    await createCustomScript(fields);
+    await customScriptsStore.createCustomScript(fields);
     newScriptName.value = '';
     newScriptCommand.value = '';
     newScriptWorkingDir.value = '';
@@ -1378,12 +1377,12 @@ async function onAddScript(): Promise<void> {
             </p>
 
             <div
-              v-if="customScriptsState.records.length"
+              v-if="customScriptsStore.records.length"
               class="custom-script-list"
               data-testid="custom-script-list"
             >
               <div
-                v-for="script in customScriptsState.records"
+                v-for="script in customScriptsStore.records"
                 :key="script.id"
                 class="custom-script-row"
                 :data-testid="`custom-script-${script.id}`"
@@ -1499,18 +1498,18 @@ async function onAddScript(): Promise<void> {
 
             <template v-if="settingsState.claudeCode.hooksEnabled">
               <p
-                v-if="agentHooksState.status.error"
+                v-if="agentHooksStore.status.error"
                 class="muted-note"
                 data-testid="claude-code-hooks-error"
               >
-                {{ agentHooksState.status.error }}
+                {{ agentHooksStore.status.error }}
               </p>
               <p
-                v-else-if="agentHooksState.status.running"
+                v-else-if="agentHooksStore.status.running"
                 class="mono command-text"
                 data-testid="claude-code-hooks-path"
               >
-                {{ agentHooksState.status.settingsPath }}
+                {{ agentHooksStore.status.settingsPath }}
               </p>
             </template>
 

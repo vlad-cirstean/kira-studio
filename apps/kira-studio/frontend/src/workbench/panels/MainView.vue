@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
-import { activeTab } from '../../state/mode';
+import { useModeStore } from '../../state/mode';
 import { workspaceState } from '../../state/workspace';
 import { MODES } from '../modes';
 import { TAB_VIEWS } from '../tabViews';
+
+const modeStore = useModeStore();
 
 // P1 D6/C6: no active tab in the current mode falls back to that mode's own start component
 // (StudioStart for Studio, api/ApiStart for Api, repo/GitStart for Git) instead of a hardcoded
@@ -28,7 +30,12 @@ const KEEP_ALIVE_MAX = 20;
 
 <template>
   <KeepAlive :include="KEEP_ALIVE_VIEWS" :max="KEEP_ALIVE_MAX">
-    <component :is="TAB_VIEWS[activeTab.kind]" v-if="activeTab" :key="activeTab.id" :tab="activeTab" />
+    <component
+      :is="TAB_VIEWS[modeStore.activeTab.kind]"
+      v-if="modeStore.activeTab"
+      :key="modeStore.activeTab.id"
+      :tab="modeStore.activeTab"
+    />
   </KeepAlive>
-  <component :is="modeStart" v-if="!activeTab" />
+  <component :is="modeStart" v-if="!modeStore.activeTab" />
 </template>

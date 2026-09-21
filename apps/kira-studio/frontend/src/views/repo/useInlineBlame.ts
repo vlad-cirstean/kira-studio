@@ -5,7 +5,7 @@
 // create-then-cleanup pairing exactly.
 import { watch } from 'vue';
 import { gitTransportFor } from '../../repo/git/transport';
-import { claimBlameStatus, publishBlameStatus, releaseBlameStatus } from '../../state/blameStatus';
+import { useBlameStatusStore } from '../../state/blameStatus';
 import { settingsState } from '../../state/settings';
 import { attachBlameAnnotation, type BlameAnnotationHandle } from './blameAnnotation';
 import { type BlameLineController, createBlameLineController } from './blameLine';
@@ -35,6 +35,7 @@ export interface InlineBlameHandle {
 }
 
 export function useInlineBlame(): InlineBlameHandle {
+  const blameStatusStore = useBlameStatusStore();
   let blameHandle: BlameAnnotationHandle | null = null;
   let blameController: BlameLineController | null = null;
   let blameToken: symbol | undefined;
@@ -57,14 +58,18 @@ export function useInlineBlame(): InlineBlameHandle {
     // P76 §5.3: resolved even when `inlineBlame` is off, to feed the status bar — the setting
     // governs the inline annotation only (its own label: "…in the repository file viewer"),
     // never blame resolution itself.
-    blameToken = claimBlameStatus((sha) => {
+    blameToken = blameStatusStore.claimBlameStatus((sha) => {
       void transport.request('graph.revealCommit', { repoId: gitRepoId, sha });
     });
     const controller = blameController;
     const token = blameToken;
-    stopBlamePublish = watch(controller.state, (s) => publishBlameStatus(token, s), {
-      immediate: true,
-    });
+    stopBlamePublish = watch(
+      controller.state,
+      (s) => blameStatusStore.publishBlameStatus(token, s),
+      {
+        immediate: true,
+      },
+    );
 
     function syncBlameAnnotation(): void {
       if (settingsState.appearance.inlineBlame && blameController) {
@@ -85,7 +90,7 @@ export function useInlineBlame(): InlineBlameHandle {
     blameHandle = null;
     stopBlamePublish?.();
     stopBlamePublish = undefined;
-    if (blameToken !== undefined) releaseBlameStatus(blameToken);
+    if (blameToken !== undefined) blameStatusStore.releaseBlameStatus(blameToken);
     blameToken = undefined;
     blameController?.dispose();
     blameController?.transport.dispose();

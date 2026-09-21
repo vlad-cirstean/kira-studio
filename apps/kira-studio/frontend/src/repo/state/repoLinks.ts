@@ -1,6 +1,11 @@
 import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { codeReposState } from '../../state/coderepos';
+import { useCodeReposStore } from '../../state/coderepos';
+import { pinia } from '../../state/pinia';
+
+// Module-level `watch()` below runs at import time, before `app.use(pinia)` — the explicit
+// instance is required here (state/pinia.ts's own header comment).
+const codeReposStore = useCodeReposStore(pinia);
 
 // P84 plan §4.4: every imported repository's worktree anchor, session-scoped and module-level —
 // the same shape repoHeads.ts's byRepoId already establishes for this panel. '' (the default for
@@ -31,7 +36,7 @@ export function noteWorktreeLink(childId: string, parentId: string): void {
 // §4.4 trigger 2: an import, a remove, or a P82 worktree switch changes the row set — a new row
 // must not render as a flash-then-vanish duplicate, and a removed one must not linger in the map.
 watch(
-  () => codeReposState.records,
+  () => codeReposStore.records,
   (records) => {
     const live = new Set(records.map((r) => r.id));
     for (const id of [...byRepoId.keys()]) if (!live.has(id)) byRepoId.delete(id);

@@ -7,6 +7,7 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
 import type { Transport } from '../../../../packages/git-ipc/src/transport';
 import { restoreAfterEach } from './support/restoreAfterEach';
 
@@ -16,7 +17,9 @@ restoreAfterEach(control);
 
 const { asRepoFileTab } = await import('../../../../packages/shared/domain/tabs');
 const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
-const { codeReposState } = await import('../../frontend/src/state/coderepos');
+const { pinia } = await import('../../frontend/src/state/pinia');
+setActivePinia(pinia);
+const { useCodeReposStore } = await import('../../frontend/src/state/coderepos');
 const { tabsState } = await import('../../frontend/src/state/tabs');
 const { createHostHandlers } = await import('../../frontend/src/repo/git/hostHandlers');
 
@@ -25,7 +28,7 @@ function freshRepoPair(): { codeRepoId: string; gitRepoId: string } {
   repoCounter += 1;
   const codeRepoId = `code-repo-${repoCounter}`;
   const gitRepoId = `/repos/git-repo-${repoCounter}`;
-  codeReposState.records.push({
+  useCodeReposStore().records.push({
     id: codeRepoId,
     name: `repo ${repoCounter}`,
     root: `/repos/root-${repoCounter}`,

@@ -24,7 +24,7 @@ function loadTerminalRenderer(): Promise<typeof import('./terminalRenderer')> {
 // already-live DOM subtree into this component's own container; it never calls term.open() twice.
 import type { TerminalTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { setAgentHooksEnabled } from '../../state/agentHooks';
+import { useAgentHooksStore } from '../../state/agentHooks';
 import { patchSettings, settingsState } from '../../state/settings';
 import { openTerminalSession, resizeTerminal, terminalSession } from '../../state/terminals';
 
@@ -115,7 +115,7 @@ const showHooksPrompt = computed(
 // Never types into the PTY (P83 §8.2, P85 §3.1) — the running session is not restarted and not
 // touched; the flag change applies to the next Claude Code tab opened.
 async function onEnableHooksPrompt(): Promise<void> {
-  await setAgentHooksEnabled(true);
+  await useAgentHooksStore().setAgentHooksEnabled(true);
   hooksJustEnabled.value = true;
 }
 
