@@ -109,12 +109,16 @@ duplicated here; this file only points at them.
   one cohesive subsystem. v1.5's `C` lettering and v1.7's `M` lettering predate this rule and stay
   as shipped, never renumbered after landing; every chapter from here on, cohesive-subsystem chapters
   included, uses `P`.
-- **Splitting a phase keeps its number — it doesn't consume a new one.** When a `SPEC.md` row turns
-  out to be two pieces of work (prep vs. the actual migration, backend vs. frontend, whatever the
-  split), rename it `P<n> Part 1: …` and add `P<n> Part 2: …` (`Part 3`, etc. if it splits further)
-  right after it, not `P<n>` and a freshly incremented `P<n+1>`. Each part still gets its own plan
-  under `plans/`, its own implementation pass, and its own result section — the split only changes
-  the numbering, not the loop each part goes through.
+- **Splitting a phase keeps its number — it doesn't consume a new one, when an agent is the one
+  deciding to split it.** A subagent (an Opus planning pass finding the scope is really two
+  pieces, or anyone else in the loop) that decides a `SPEC.md` row needs splitting renames it
+  `P<n> Part 1: …` and adds `P<n> Part 2: …` (`Part 3`, etc.) right after it — never `P<n>` plus a
+  freshly incremented `P<n+1>`. Each part still gets its own plan under `plans/`, its own
+  implementation pass, and its own result section — the split only changes the numbering, not the
+  loop each part goes through. This is the agent default, not an absolute: the user can still ask
+  for a split into new, separate `P` numbers directly (P98/P99 in v1.9 is exactly that, done at the
+  user's own request before this rule existed) — that call is the user's to make, not a subagent's
+  or the orchestrating session's own to infer.
 - **Best practices throughout, no shortcuts** — no stubbed error handling, no `TODO: fix later`, no
   skipped validation to make something demo. Scope left out of a phase stays out entirely, never
   half-implemented.
