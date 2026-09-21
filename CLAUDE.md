@@ -129,6 +129,20 @@ duplicated here; this file only points at them.
   spelling-preserving timestamp re-encoding, or the parse tree P60b's SQL tokenizer replaced after
   the library carrying it was removed app-wide) — name that requirement when declining a library,
   not just that existing code already works.
+- **Lean on the frontend libraries P98 wired in — shadcn-vue, Tailwind CSS, VueUse, Pinia, TanStack
+  Query — rather than hand-rolling an equivalent.** Every phase's planning pass adapts its design to
+  them, whether or not the spec row asking for the work says so: a new UI surface styles with
+  Tailwind utility classes, not a scoped `<style>` block; a component primitive (button, dialog,
+  dropdown, menu, popover) comes from shadcn-vue; a browser/DOM composable (debounce, resize and
+  intersection observers, event-listener wiring, local-storage sync, clipboard) comes from VueUse;
+  shared client state lives in a Pinia store; server state — anything fetched over the bridge with
+  loading, error and cache handling around it — goes through TanStack Query. Decline one only
+  against a real requirement it cannot meet, and name that requirement, same standard as the
+  library rule above.
+- **Every Vue component is `<script setup lang="ts">`.** Composition API only — no Options API, no
+  `defineComponent`, no second plain `<script>` block.
+- **One Pinia store, one concern.** A store owns a single subsystem's state; never a grab-bag
+  app-wide store. Split one that grows a second concern rather than widening it.
 - **Only fully open-source libraries** — no community edition of a dual-licensed product, no
   non-commercial-only tier, no functionality gated behind a paid/Enterprise tier. Check the license
   at the package level *and* for the specific feature used, not just the headline badge (AG Grid
