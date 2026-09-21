@@ -31,10 +31,11 @@ import {
   FORMAT_LANGUAGE,
 } from './formats';
 import { GENERATORS, type Generator } from './generate';
-import { overrideFor, readOnlyReasonFor, setOverride } from './state';
+import { useCellEditorFormatStore } from './state';
 import TimestampPane from './TimestampPane.vue';
 import { validateFormat } from './validate';
 
+const cellEditorFormatStore = useCellEditorFormatStore();
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 
@@ -54,7 +55,7 @@ const props = withDefaults(defineProps<{ cell: SelectedCell; readOnly?: boolean 
 const selectedCell = computed(() => props.cell);
 const viewerMode = computed(() => props.readOnly === true);
 
-const override = computed<CellFormat | null>(() => overrideFor(selectedCell.value));
+const override = computed<CellFormat | null>(() => cellEditorFormatStore.overrideFor(selectedCell.value));
 
 const isNullValue = computed(() => selectedCell.value.value === null);
 const isEmptyValue = computed(() => selectedCell.value.value === '');
@@ -98,13 +99,13 @@ const sqlDialect = computed(() => {
 // row to write back to at all), not an explanation of a refusal. `readOnlyChipText`/`Title` below
 // are unreachable once this is null, since the template's own v-if gates on `readOnlyReason`.
 const readOnlyReason = computed(() =>
-  viewerMode.value ? null : readOnlyReasonFor(selectedCell.value),
+  viewerMode.value ? null : cellEditorFormatStore.readOnlyReasonFor(selectedCell.value),
 );
 
 // D4 (revised): editable only when the cell is genuinely writable (`readOnlyReason === null`)
 // *and* whoever published it handed over a way to stage the write (`cell.onEdit`, today set only
 // by `SlickGridHost.vue`). A future publisher that never sets `onEdit` — Document/KeyValue/Stream/
-// Console — keeps its cells read-only here even once `readOnlyReasonFor()` says nothing's wrong,
+// Console — keeps its cells read-only here even once `cellEditorFormatStore.readOnlyReasonFor()` says nothing's wrong,
 // since there'd be nowhere for a save to go. `!viewerMode.value` is redundant with that (a viewer
 // mount never sets onEdit either) but stated explicitly so this can't drift if one ever did.
 const isEditable = computed(
@@ -366,7 +367,7 @@ function cellLintSource(): ConsoleDiagnostic[] {
 const formatHint = computed(() => FORMAT_HELP[effectiveFormat.value]);
 
 function setFormat(format: CellFormat | null): void {
-  setOverride(selectedCell.value, format);
+  cellEditorFormatStore.setOverride(selectedCell.value, format);
 }
 
 // P42 D27: an app-drawn picker, not a native <select> — the only way a per-row hover explanation
