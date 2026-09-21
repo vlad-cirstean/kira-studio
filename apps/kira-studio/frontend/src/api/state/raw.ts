@@ -1,6 +1,7 @@
 import { parseRawRequest, type RawWarning } from '@kira/api-core';
 import type { HttpBodyMode } from '@shared/domain/http';
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 import { patchHttpRequestTabState } from '../tabs';
 
 // P9 D8: the raw editor's own state — mirrors http/state/curl.ts's importCurlDialogState shape
@@ -16,31 +17,6 @@ interface EditRawDialogState {
   originalUrl: string;
 }
 
-export const editRawDialogState = reactive<EditRawDialogState>({
-  open: false,
-  tabId: '',
-  initialText: '',
-  originalBodyMode: 'none',
-  originalUrl: '',
-});
-
-export function openEditRawDialog(
-  tabId: string,
-  initialText: string,
-  originalBodyMode: HttpBodyMode,
-  originalUrl: string,
-): void {
-  editRawDialogState.open = true;
-  editRawDialogState.tabId = tabId;
-  editRawDialogState.initialText = initialText;
-  editRawDialogState.originalBodyMode = originalBodyMode;
-  editRawDialogState.originalUrl = originalUrl;
-}
-
-export function closeEditRawDialog(): void {
-  editRawDialogState.open = false;
-}
-
 export interface RawPreview {
   error: string | null;
   warnings: RawWarning[];
@@ -52,34 +28,63 @@ export interface RawPreview {
   modeChanged: { from: HttpBodyMode; to: HttpBodyMode } | null;
 }
 
-/** Pure and synchronous — safe to call as often as a caller likes. Round-2 review finding 7:
- *  EditRawRequestDialog.vue debounces its own calls into this (400ms, mirroring
- *  ImportCurlDialog.vue's identical debounce over previewCurl below) rather than calling it
- *  straight from the editor's `@update:doc`, since the raw buffer here is always the full
- *  generated request, not something typically hand-typed short. */
-export function previewRaw(text: string): RawPreview {
-  const result = parseRawRequest(text, editRawDialogState.originalUrl);
-  if ('error' in result) {
-    return { error: result.error, warnings: [], modeChanged: null };
-  }
-  const modeChanged =
-    result.state.bodyMode !== editRawDialogState.originalBodyMode
-      ? { from: editRawDialogState.originalBodyMode, to: result.state.bodyMode }
-      : null;
-  return { error: null, warnings: result.warnings, modeChanged };
-}
+export const useEditRawStore = defineStore('editRaw', () => {
+  const state = reactive<EditRawDialogState>({
+    open: false,
+    tabId: '',
+    initialText: '',
+    originalBodyMode: 'none',
+    originalUrl: '',
+  });
 
-/** D8/D9: Apply patches the *current* tab — never a fresh one (submitImportCurl's own
- *  openApiRequestTab is deliberately not called here), because this is the current request being
- *  re-authored, not a new one. Substitution still applies at send, unchanged: after this, the tab
- *  is an ordinary tab, and send() runs its usual two-stage resolution over whatever `{{name}}`
- *  references the hand-edited text carried (D9's whole point of parsing back into the model rather
- *  than sending the buffer verbatim). Returns false (leaving the dialog open) only for a parse
- *  error the Apply button should already have disabled against. */
-export function applyEditRaw(text: string): boolean {
-  const result = parseRawRequest(text, editRawDialogState.originalUrl);
-  if ('error' in result) return false;
-  patchHttpRequestTabState(editRawDialogState.tabId, result.state);
-  closeEditRawDialog();
-  return true;
-}
+  function openEditRawDialog(
+    tabId: string,
+    initialText: string,
+    originalBodyMode: HttpBodyMode,
+    originalUrl: string,
+  ): void {
+    state.open = true;
+    state.tabId = tabId;
+    state.initialText = initialText;
+    state.originalBodyMode = originalBodyMode;
+    state.originalUrl = originalUrl;
+  }
+
+  function closeEditRawDialog(): void {
+    state.open = false;
+  }
+
+  /** Pure and synchronous — safe to call as often as a caller likes. Round-2 review finding 7:
+   *  EditRawRequestDialog.vue debounces its own calls into this (400ms, mirroring
+   *  ImportCurlDialog.vue's identical debounce over previewCurl below) rather than calling it
+   *  straight from the editor's `@update:doc`, since the raw buffer here is always the full
+   *  generated request, not something typically hand-typed short. */
+  function previewRaw(text: string): RawPreview {
+    const result = parseRawRequest(text, state.originalUrl);
+    if ('error' in result) {
+      return { error: result.error, warnings: [], modeChanged: null };
+    }
+    const modeChanged =
+      result.state.bodyMode !== state.originalBodyMode
+        ? { from: state.originalBodyMode, to: result.state.bodyMode }
+        : null;
+    return { error: null, warnings: result.warnings, modeChanged };
+  }
+
+  /** D8/D9: Apply patches the *current* tab — never a fresh one (submitImportCurl's own
+   *  openApiRequestTab is deliberately not called here), because this is the current request being
+   *  re-authored, not a new one. Substitution still applies at send, unchanged: after this, the tab
+   *  is an ordinary tab, and send() runs its usual two-stage resolution over whatever `{{name}}`
+   *  references the hand-edited text carried (D9's whole point of parsing back into the model rather
+   *  than sending the buffer verbatim). Returns false (leaving the dialog open) only for a parse
+   *  error the Apply button should already have disabled against. */
+  function applyEditRaw(text: string): boolean {
+    const result = parseRawRequest(text, state.originalUrl);
+    if ('error' in result) return false;
+    patchHttpRequestTabState(state.tabId, result.state);
+    closeEditRawDialog();
+    return true;
+  }
+
+  return { ...toRefs(state), openEditRawDialog, closeEditRawDialog, previewRaw, applyEditRaw };
+});

@@ -6,7 +6,9 @@ import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
-import { closeDynamicValuesDialog } from './state/dynamicValues';
+import { useDynamicValuesStore } from './state/dynamicValues';
+
+const dynamicValuesStore = useDynamicValuesStore();
 
 // P6 D11: a read-only discovery surface for the dynamic-value catalogue — nothing here edits,
 // saves, or reaches Go. `catalog.ts` carries names only (no description strings, D11: "the sample
@@ -55,7 +57,7 @@ function onCopy(name: string): void {
 }
 
 function close(): void {
-  closeDynamicValuesDialog();
+  dynamicValuesStore.closeDynamicValuesDialog();
 }
 </script>
 

@@ -30,12 +30,13 @@ import {
   visibleRows,
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
-import { openDynamicValuesDialog } from './state/dynamicValues';
+import { useDynamicValuesStore } from './state/dynamicValues';
 import { openEnvironments } from './state/variables';
 import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSetTab } from './tabs';
 
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
+const dynamicValuesStore = useDynamicValuesStore();
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -96,7 +97,7 @@ const actions: CollectionMenuActions = {
   exportCollection: (row) => void exportCollection(row.id, row.name),
   variables: (row) => openVariableSetTab('collection', row.id, row.name),
   environments: () => openEnvironments(),
-  dynamicValues: () => openDynamicValuesDialog(),
+  dynamicValues: () => dynamicValuesStore.openDynamicValuesDialog(),
 };
 
 /** Creating *into* a collection row means the root; into a folder row means that folder. */

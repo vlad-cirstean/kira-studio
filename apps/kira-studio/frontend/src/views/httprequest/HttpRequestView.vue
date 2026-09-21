@@ -25,7 +25,7 @@ import {
   saveRequest,
 } from '../../api/state/collections';
 import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
-import { openEditRawDialog } from '../../api/state/raw';
+import { useEditRawStore } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
   ensureVariablesLoaded,
@@ -66,6 +66,7 @@ import { onSendCompleted, resolveForExport, resolveTabState, runtime, send, stop
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 const tabIncognitoStore = useTabIncognitoStore();
+const editRawStore = useEditRawStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -229,7 +230,12 @@ function onEditRaw(): void {
     props.tab.state,
     defaultContentTypeFor(props.tab.state.bodyMode, props.tab.state.codeLanguage),
   );
-  openEditRawDialog(props.tab.id, initialText, props.tab.state.bodyMode, props.tab.state.url);
+  editRawStore.openEditRawDialog(
+    props.tab.id,
+    initialText,
+    props.tab.state.bodyMode,
+    props.tab.state.url,
+  );
 }
 
 // P5 D6/D7/D17: the same resolution send() runs, over the tab's *current* state — a live preview

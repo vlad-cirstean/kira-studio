@@ -11,14 +11,17 @@ import ImportCurlDialog from './ImportCurlDialog.vue';
 import SaveRequestDialog from './SaveRequestDialog.vue';
 import { saveDialogState } from './state/collections';
 import { copyAsCurlDialogState, importCurlDialogState } from './state/curl';
-import { dynamicValuesDialogState } from './state/dynamicValues';
-import { editRawDialogState } from './state/raw';
+import { useDynamicValuesStore } from './state/dynamicValues';
+import { useEditRawStore } from './state/raw';
+
+const dynamicValuesStore = useDynamicValuesStore();
+const editRawStore = useEditRawStore();
 </script>
 
 <template>
   <SaveRequestDialog v-if="saveDialogState.open" />
-  <DynamicValuesDialog v-if="dynamicValuesDialogState.open" />
+  <DynamicValuesDialog v-if="dynamicValuesStore.open" />
   <ImportCurlDialog v-if="importCurlDialogState.open" />
   <CopyAsCurlDialog v-if="copyAsCurlDialogState.open" />
-  <EditRawRequestDialog v-if="editRawDialogState.open" />
+  <EditRawRequestDialog v-if="editRawStore.open" />
 </template>

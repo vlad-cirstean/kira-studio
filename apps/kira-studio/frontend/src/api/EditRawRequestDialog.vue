@@ -4,7 +4,9 @@ import MonacoHost from '../editor/MonacoHost.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import { applyEditRaw, closeEditRawDialog, editRawDialogState, previewRaw } from './state/raw';
+import { useEditRawStore } from './state/raw';
+
+const editRawStore = useEditRawStore();
 
 // P9 D8/D9: a raw HTTP/1.1 text buffer the user hand-edits, parsed back into the structured model
 // on Apply — never a second send path (there is exactly one, and it takes tab state). MonacoHost
@@ -24,12 +26,12 @@ let previewTimer: ReturnType<typeof setTimeout> | undefined;
 onBeforeUnmount(() => clearTimeout(previewTimer));
 
 watch(
-  () => editRawDialogState.open,
+  () => editRawStore.open,
   (open) => {
     if (!open) return;
-    text.value = editRawDialogState.initialText;
+    text.value = editRawStore.initialText;
     clearTimeout(previewTimer);
-    debouncedText.value = editRawDialogState.initialText;
+    debouncedText.value = editRawStore.initialText;
   },
   { immediate: true },
 );
@@ -40,7 +42,7 @@ watch(text, (value) => {
   }, 400);
 });
 
-const preview = computed(() => previewRaw(debouncedText.value));
+const preview = computed(() => editRawStore.previewRaw(debouncedText.value));
 
 // Built in script rather than the template: a literal '{{variables}}' inside a template mustache
 // would be misread by the Vue compiler as the interpolation's own closing '}}' — CopyAsCurlDialog.vue's
@@ -53,11 +55,11 @@ function onDocChange(value: string): void {
 }
 
 function onApply(): void {
-  applyEditRaw(text.value);
+  editRawStore.applyEditRaw(text.value);
 }
 
 function close(): void {
-  closeEditRawDialog();
+  editRawStore.closeEditRawDialog();
 }
 </script>
 

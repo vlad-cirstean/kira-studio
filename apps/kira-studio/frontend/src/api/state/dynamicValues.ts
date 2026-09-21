@@ -1,4 +1,5 @@
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 
 // P6 D11: the dynamic-values reference dialog's own open/close state — mirrors
 // state/fakeData.ts's fakeDataDialogState shape (P15 D11), minus the tab identity that dialog
@@ -7,12 +8,16 @@ export interface DynamicValuesDialogState {
   open: boolean;
 }
 
-export const dynamicValuesDialogState = reactive<DynamicValuesDialogState>({ open: false });
+export const useDynamicValuesStore = defineStore('dynamicValues', () => {
+  const state = reactive<DynamicValuesDialogState>({ open: false });
 
-export function openDynamicValuesDialog(): void {
-  dynamicValuesDialogState.open = true;
-}
+  function openDynamicValuesDialog(): void {
+    state.open = true;
+  }
 
-export function closeDynamicValuesDialog(): void {
-  dynamicValuesDialogState.open = false;
-}
+  function closeDynamicValuesDialog(): void {
+    state.open = false;
+  }
+
+  return { ...toRefs(state), openDynamicValuesDialog, closeDynamicValuesDialog };
+});

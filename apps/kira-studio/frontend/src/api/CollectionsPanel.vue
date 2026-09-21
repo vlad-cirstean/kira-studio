@@ -16,9 +16,11 @@ import {
   itemRecord,
 } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
-import { openDynamicValuesDialog } from './state/dynamicValues';
+import { useDynamicValuesStore } from './state/dynamicValues';
 import { initVariables, openEnvironments } from './state/variables';
 import { openApiRequestTab, openVariableSetTab } from './tabs';
+
+const dynamicValuesStore = useDynamicValuesStore();
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -89,7 +91,7 @@ function onEnvironments(): void {
 // P6 D11: the palette's own "Dynamic values…" entry — not scoped to any selection, unlike
 // Variables… above.
 function onDynamicValues(): void {
-  openDynamicValuesDialog();
+  dynamicValuesStore.openDynamicValuesDialog();
 }
 
 // P7 D12: the palette's own "Import from curl…" entry — same shape as the three above, not
