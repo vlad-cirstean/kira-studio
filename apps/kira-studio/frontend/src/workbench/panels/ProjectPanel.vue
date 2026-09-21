@@ -4,13 +4,14 @@ import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
 import { treeState } from '../../project/state/tree';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
-import { schemaDialogState } from '../../state/schemas';
+import { useSchemaDialogStore } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelShell from '../../theme/primitives/PanelShell.vue';
 
 const connectionsStore = useConnectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
+const schemaDialogStore = useSchemaDialogStore();
 </script>
 
 <template>
@@ -46,7 +47,7 @@ const connectionDialogStore = useConnectionDialogStore();
     </template>
   </PanelShell>
   <FiltersDialog />
-  <SchemaDialog v-if="schemaDialogState.open" />
+  <SchemaDialog v-if="schemaDialogStore.open" />
 </template>
 
 <style scoped>

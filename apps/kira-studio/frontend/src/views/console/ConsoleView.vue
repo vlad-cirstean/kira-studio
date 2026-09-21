@@ -4,13 +4,14 @@ import type { EditorLanguageId } from '@shared/domain/editor';
 import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { useQuery } from '@tanstack/vue-query';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
-import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
+import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -99,14 +100,16 @@ const language = computed<EditorLanguageId>(() => {
 // (a non-SQL console) never fires the load at all. `documentDdlSchema` is the hand-authored
 // document alone — D4's completion still takes it as a separate, first-priority argument, so it
 // must not be pre-merged with the cache the way `ddlSchema` below is for lint/hover.
-watch(
-  () => [props.tab.connectionId, dialect.value] as const,
-  ([connectionId, d]) => {
-    if (connectionId && d) void ensureDdl(connectionId);
-  },
-  { immediate: true },
+// P99 §5.5: a reactive useQuery (not the imperative ensureDdl) so a remote onSchemaChanged
+// broadcast's invalidateQueries (state/schemas.ts) refetches and this recomputes — the old
+// version read a reactive field a broadcast wrote directly, and must keep updating the same way.
+const ddlQuery = useQuery(() => ({
+  ...schemaQueryOptions(props.tab.connectionId ?? ''),
+  enabled: !!props.tab.connectionId && dialect.value !== undefined,
+}));
+const documentDdlSchema = computed(() =>
+  ddlSchemaFor(props.tab.connectionId ?? '', ddlQuery.data.value, dialect.value),
 );
-const documentDdlSchema = computed(() => ddlSchemaFor(props.tab.connectionId ?? '', dialect.value));
 
 // P22c D3: this console's own container (the schema/database its path resolves to) — the same
 // container consoleRelationNames (completion.ts) already resolves relation names against.

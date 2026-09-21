@@ -1,84 +1,110 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { ConnectionDdl } from '@shared/domain/schema';
-import { reactive } from 'vue';
+import { useMutation } from '@tanstack/vue-query';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import type { EditorCompletionSource } from '../editor/completion';
 import { type DdlSchema, EMPTY_DDL_SCHEMA, parseDdl } from '../views/console/ddl';
 import { sqlKeywordCompletionSource } from '../views/console/sqlKeywordCompletion';
 import { type SqlDialect, sqlDialectFor } from '../views/shared/sqlIdent';
+import { queryClient } from './queryClient';
 
-// P18 (v1.1) D2/D4: the renderer-side store for each connection's pasted DDL document — app-wide
-// like connections/settings/layout (docs/ARCHITECTURE.md's Multi-window section), keyed by
+// P18 (v1.1) D2/D4: each connection's own pasted DDL document — app-wide like
+// connections/settings/layout (docs/ARCHITECTURE.md's Multi-window section), keyed by
 // connectionId. A connection with no saved document simply has no entry, matching D2's "absent
 // until the user writes one" (never an error, never a placeholder row).
-export const schemasState = reactive({
-  byConnection: {} as Record<string, string>, // connectionId -> raw DDL text
-});
-
-export const schemaDialogState = reactive({
-  open: false,
-  connectionId: null as string | null,
-});
-
-export function openSchemaDialog(connectionId: string): void {
-  schemaDialogState.open = true;
-  schemaDialogState.connectionId = connectionId;
+//
+// P99 §5.5: the text itself lives in TanStack Query's cache under this key, not in a reactive —
+// ensureQueryData's own in-flight dedupe replaces the old hand-written pendingLoads map, and its
+// cache replaces the old byConnection. A rejection is not cached, matching the old `finally` evict.
+export function schemaQueryKey(connectionId: string): readonly ['schema', string] {
+  return ['schema', connectionId] as const;
 }
 
-export function closeSchemaDialog(): void {
-  schemaDialogState.open = false;
-  schemaDialogState.connectionId = null;
+export function schemaQueryOptions(connectionId: string): {
+  queryKey: readonly ['schema', string];
+  queryFn: () => Promise<string>;
+  staleTime: number;
+} {
+  return {
+    queryKey: schemaQueryKey(connectionId),
+    // P12 round 2 finding #14, carried over: whichever caller's fetch resolves (ensureDdl below,
+    // or useQuery's own auto-fetch in a component), TanStack Query commits this function's return
+    // value to the cache unconditionally — there is no hook to skip that commit short of
+    // cancelling the fetch, and cancelling rejects every caller currently awaiting it (verified
+    // empirically; see saveDdl's own comment), which is not what a caller of ensureDdl expects.
+    // Returning whatever is already cached, once fetched, instead of the fetched text itself, is
+    // what makes that unconditional commit safe: a saveDdl or a remote onSchemaChanged write that
+    // landed while this was in flight is picked up here and effectively re-committed (a no-op),
+    // rather than clobbered by the now-stale fetch result.
+    queryFn: async () => {
+      const ddl = await control.schemaGet(connectionId).then((r) => r.ddl);
+      return queryClient.getQueryData<string>(schemaQueryKey(connectionId)) ?? ddl;
+    },
+    staleTime: Number.POSITIVE_INFINITY, // the Go side pushes onSchemaChanged — never stale silently
+  };
 }
 
-const pendingLoads = new Map<string, Promise<string>>();
-
-// Memoised per connectionId (D3's dialog and C5's completion source both call this) — a fetch
-// only ever happens once per connection per session; a Save (below) and a remote broadcast both
-// write straight into `byConnection` without going through this again.
-export async function ensureDdl(connectionId: string): Promise<string> {
-  const cached = schemasState.byConnection[connectionId];
-  if (cached !== undefined) return cached;
-  let pending = pendingLoads.get(connectionId);
-  if (!pending) {
-    pending = control.schemaGet(connectionId).then((r) => r.ddl);
-    pendingLoads.set(connectionId, pending);
-  }
-  try {
-    const ddl = await pending;
-    // P12 round 2 finding #14: a slow initial fetch must not overwrite a fresher write that
-    // landed while it was in flight — saveDdl (a real user Save) or applyRemote (another
-    // window's broadcast) both write straight into `byConnection`, bypassing this function
-    // entirely, so by the time this await resolves the store may already hold text newer than
-    // what this fetch just returned. Write only when nothing else has written a value yet, and
-    // return whatever the store actually holds either way, so a caller never sees the stale
-    // fetch result after losing this race.
-    if (schemasState.byConnection[connectionId] === undefined) {
-      schemasState.byConnection[connectionId] = ddl;
-    }
-    return schemasState.byConnection[connectionId] ?? ddl;
-  } finally {
-    // A rejection must clear this too — otherwise one transient failure (a backend error, a
-    // disconnect mid-boot) caches the rejected promise forever, and every later caller
-    // (completion, diagnostics, hover, the Schema dialog) re-awaits and re-throws the same
-    // stale rejection instead of getting a fresh attempt.
-    pendingLoads.delete(connectionId);
-  }
+/** Memoised per connectionId (D3's dialog and C5's completion source both call this) — Query's own
+ *  in-flight dedupe means a fetch only ever happens once per connection per session, shared with
+ *  any component's own `useQuery` for the same key (schemaQueryOptions above). */
+export function ensureDdl(connectionId: string): Promise<string> {
+  return queryClient.ensureQueryData(schemaQueryOptions(connectionId));
 }
 
-export async function saveDdl(connectionId: string, ddl: string): Promise<void> {
+/** SchemaDialog.vue's own Save — writes the saved text straight into the same query cache entry
+ *  ensureDdl reads, which is what schemaQueryOptions's own queryFn comment above protects: a save
+ *  landing while a fetch is still in flight is picked up by that fetch's own resolution instead of
+ *  being clobbered by it. A plain function (not just a `useMutation` `mutationFn`) so it stays
+ *  directly callable/testable outside a component, the same way `ensureDdl` already is. */
+export async function saveDdl(connectionId: string, ddl: string): Promise<string> {
   const result = await control.schemaSet(connectionId, ddl);
-  schemasState.byConnection[connectionId] = result.ddl;
+  queryClient.setQueryData(schemaQueryKey(connectionId), result.ddl);
+  return result.ddl;
 }
+
+export function useSaveDdlMutation() {
+  return useMutation({
+    mutationFn: ({ connectionId, ddl }: { connectionId: string; ddl: string }) =>
+      saveDdl(connectionId, ddl),
+  });
+}
+
+export const useSchemaDialogStore = defineStore('schemaDialog', () => {
+  const dialog = reactive({
+    open: false,
+    connectionId: null as string | null,
+  });
+
+  function openSchemaDialog(connectionId: string): void {
+    dialog.open = true;
+    dialog.connectionId = connectionId;
+  }
+
+  function closeSchemaDialog(): void {
+    dialog.open = false;
+    dialog.connectionId = null;
+  }
+
+  return { ...toRefs(dialog), openSchemaDialog, closeSchemaDialog };
+});
 
 // C3's plan comment: memoised per (connectionId, textHash) so a keystroke in the console never
 // re-parses the DDL — keyed here by the raw text itself rather than a hash, since the whole point
-// is a cheap `===` check against the one string this module already holds per connection.
+// is a cheap `===` check against the one string per connection the caller already holds (its own
+// `useQuery`/`ensureDdl` result).
 const parsedCache = new Map<string, { text: string; schema: DdlSchema }>();
 
-/** The parsed DdlSchema for `connectionId`'s current DDL text, empty when there is none (D5) or
- *  when `dialect` is undefined (a non-SQL console never calls this). */
-export function ddlSchemaFor(connectionId: string, dialect: SqlDialect | undefined): DdlSchema {
-  const text = schemasState.byConnection[connectionId];
+/** The parsed DdlSchema for `connectionId`'s current DDL `text`, empty when there is none (D5) or
+ *  when `dialect` is undefined (a non-SQL console never calls this). Takes `text` directly (the
+ *  caller's own query cache read) rather than looking it up itself, so this stays a plain
+ *  memoised parse with no TanStack Query dependency of its own. */
+export function ddlSchemaFor(
+  connectionId: string,
+  text: string | undefined,
+  dialect: SqlDialect | undefined,
+): DdlSchema {
   if (!text || !dialect) return EMPTY_DDL_SCHEMA;
   const cached = parsedCache.get(connectionId);
   if (cached?.text === text) return cached.schema;
@@ -125,7 +151,10 @@ export function ddlParseSummary(kind: ConnectionKind | undefined, text: string):
 }
 
 function applyRemote(ddl: ConnectionDdl): void {
-  schemasState.byConnection[ddl.connectionId] = ddl.ddl;
+  // P99 §5.4: a broadcast invalidating TanStack Query data invalidates rather than writing a
+  // reactive field directly — an active observer (an open SchemaDialog on this connection)
+  // refetches; an inactive one just drops its stale cache entry.
+  queryClient.invalidateQueries({ queryKey: schemaQueryKey(ddl.connectionId) });
 }
 
 let unsubscribeChanged: (() => void) | null = null;
@@ -141,12 +170,13 @@ export function initSchemaSync(): void {
   unsubscribeConnectionsChanged?.();
   unsubscribeConnectionsChanged = control.onConnectionsChanged((records) => {
     const liveIds = new Set(records.map((r) => r.id));
-    for (const id of Object.keys(schemasState.byConnection)) {
+    for (const query of queryClient.getQueryCache().findAll({ queryKey: ['schema'] })) {
+      const id = query.queryKey[1] as string;
       if (!liveIds.has(id)) {
-        delete schemasState.byConnection[id];
         // P12 round 1 finding #11: parsedCache is keyed on connectionId too, and this module's
         // own comment above claims dropping a deleted connection's entry is the only cleanup it
         // owns — measured ~521 KiB per stale entry left behind without this.
+        queryClient.removeQueries({ queryKey: query.queryKey });
         parsedCache.delete(id);
       }
     }

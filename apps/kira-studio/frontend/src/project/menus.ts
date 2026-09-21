@@ -8,7 +8,7 @@ import { useConnectionDialogStore, useConnectionsStore } from '../state/connecti
 import { useConsoleDefaultsStore } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
 import { useObjectStoreStore } from '../state/objectStore';
-import { openSchemaDialog, schemaDialectFor } from '../state/schemas';
+import { schemaDialectFor, useSchemaDialogStore } from '../state/schemas';
 import {
   openBrowseTab,
   openConsoleTab,
@@ -184,7 +184,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
             id: 'schema',
             label: 'Schema (DDL)…',
             icon: 'symbol-structure',
-            run: () => openSchemaDialog(row.connectionId),
+            run: () => useSchemaDialogStore().openSchemaDialog(row.connectionId),
           },
         ]
       : []),

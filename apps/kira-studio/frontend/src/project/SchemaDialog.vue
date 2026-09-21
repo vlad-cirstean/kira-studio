@@ -3,13 +3,12 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../state/connections';
 import {
-  closeSchemaDialog,
   ddlParseSummary,
   ensureDdl,
-  saveDdl,
   schemaDialectFor,
-  schemaDialogState,
   sqlKeywordCompletionSourceFor,
+  useSaveDdlMutation,
+  useSchemaDialogStore,
 } from '../state/schemas';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -29,8 +28,9 @@ import DialogFrame from '../theme/primitives/DialogFrame.vue';
 // introspect. The dialog, saveDdl/ensureDdl and the connection-row menu entry are unchanged.
 
 const connectionsStore = useConnectionsStore();
+const schemaDialogStore = useSchemaDialogStore();
+const { mutateAsync: saveDdl, isPending: saving } = useSaveDdlMutation();
 const draft = ref('');
-const saving = ref(false);
 
 // P12 round 1 finding #12: `draft` (the editor's own live doc) updates every keystroke, but the
 // parse summary below reads this instead — a full Lezer parse of the whole document (measured up
@@ -42,7 +42,7 @@ const debouncedDraft = ref('');
 let parseSummaryTimer: ReturnType<typeof setTimeout> | undefined;
 onBeforeUnmount(() => clearTimeout(parseSummaryTimer));
 
-const connectionId = computed(() => schemaDialogState.connectionId);
+const connectionId = computed(() => schemaDialogStore.connectionId);
 const connectionKind = computed(() => connectionsStore.connectionRecord(connectionId.value)?.kind);
 const connectionName = computed(() => connectionsStore.connectionRecord(connectionId.value)?.name ?? '');
 const dialect = computed(() => schemaDialectFor(connectionKind.value));
@@ -60,7 +60,7 @@ const completionSources = computed(() => {
 // resolves would let A's stale DDL text land in B's (still fully editable) draft, and Save would
 // write it into B's connection_ddl row.
 watch(
-  () => schemaDialogState.connectionId,
+  () => schemaDialogStore.connectionId,
   async (id) => {
     // P12 round 2 finding #12: the dialog only unmounts on close (ProjectPanel.vue's `v-if`
     // gates on `open`, not `connectionId`) — switching connections while it stays open reuses
@@ -71,7 +71,7 @@ watch(
     debouncedDraft.value = '';
     if (!id) return;
     const ddl = await ensureDdl(id);
-    if (schemaDialogState.connectionId !== id) return; // superseded by a later open
+    if (schemaDialogStore.connectionId !== id) return; // superseded by a later open
     draft.value = ddl;
     debouncedDraft.value = ddl;
   },
@@ -102,15 +102,12 @@ const saveError = ref<string | null>(null);
 async function onSave(): Promise<void> {
   const id = connectionId.value;
   if (!id) return;
-  saving.value = true;
   saveError.value = null;
   try {
-    await saveDdl(id, draft.value);
-    closeSchemaDialog();
+    await saveDdl({ connectionId: id, ddl: draft.value });
+    schemaDialogStore.closeSchemaDialog();
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    saving.value = false;
   }
 }
 </script>
@@ -122,7 +119,7 @@ async function onSave(): Promise<void> {
     max-height="80vh"
     test-id="schema-dialog"
     close-test-id="schema-dialog-close"
-    @close="closeSchemaDialog"
+    @close="schemaDialogStore.closeSchemaDialog"
   >
     <template #header>
       <span>Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></span>
@@ -166,7 +163,7 @@ async function onSave(): Promise<void> {
       }}</span>
       <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" :disabled="saving" @click="closeSchemaDialog">Cancel</AppButton>
+        <AppButton kind="dialog" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" :disabled="saving" @click="onSave">
           Save schema
         </AppButton>

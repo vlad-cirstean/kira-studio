@@ -12,7 +12,8 @@ import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { ensureDdl, saveDdl, schemasState } = await import('../../frontend/src/state/schemas');
+const { ensureDdl, saveDdl, schemaQueryKey } = await import('../../frontend/src/state/schemas');
+const { queryClient } = await import('../../frontend/src/state/queryClient');
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -31,7 +32,7 @@ function deferred<T>(): {
 describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', () => {
   test('a rejected load does not poison later calls for the same connection', async () => {
     const connectionId = 'conn-ensure-ddl-retry';
-    delete schemasState.byConnection[connectionId];
+    queryClient.removeQueries({ queryKey: schemaQueryKey(connectionId) });
 
     const first = deferred<{ connectionId: string; ddl: string; updatedAt: string }>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaGet.
@@ -56,7 +57,9 @@ describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', (
     const ddl = await ensureDdl(connectionId);
     expect(ddl).toBe('create table t (id int);');
     expect(secondCallCount).toBe(1);
-    expect(schemasState.byConnection[connectionId]).toBe('create table t (id int);');
+    expect(queryClient.getQueryData<string>(schemaQueryKey(connectionId))).toBe(
+      'create table t (id int);',
+    );
   });
 
   // P12 round 2 finding #14: ensureDdl wrote `schemasState.byConnection[connectionId] = ddl`
@@ -65,7 +68,7 @@ describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', (
   // stale fetched value, with nothing left to notice until the next relaunch.
   test('a slow initial fetch does not clobber a faster concurrent saveDdl (P12 round 2 F14)', async () => {
     const connectionId = 'conn-ensure-ddl-race';
-    delete schemasState.byConnection[connectionId];
+    queryClient.removeQueries({ queryKey: schemaQueryKey(connectionId) });
 
     const slowFetch = deferred<{ connectionId: string; ddl: string; updatedAt: string }>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real schemaGet.
@@ -78,16 +81,22 @@ describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', (
     const loading = ensureDdl(connectionId);
 
     // A faster concurrent Save (e.g. the user typed and saved before the slow load returned)
-    // writes fresh text straight into the store, bypassing ensureDdl/pendingLoads entirely.
+    // writes fresh text straight into the cache, bypassing ensureDdl entirely — and cancels the
+    // still-in-flight fetch above so its own (now-stale) resolution can't land after it.
     await saveDdl(connectionId, 'create table fresh (id int);');
-    expect(schemasState.byConnection[connectionId]).toBe('create table fresh (id int);');
+    expect(queryClient.getQueryData<string>(schemaQueryKey(connectionId))).toBe(
+      'create table fresh (id int);',
+    );
 
-    // The slow fetch *now* resolves with the stale pre-save text — it must not overwrite the
-    // fresher save, and the still-pending ensureDdl call must resolve to the fresh text too.
+    // The slow fetch *now* resolves with the stale pre-save text — cancelled, so it must not
+    // overwrite the fresher save either in the cache or in what the still-pending ensureDdl call
+    // itself resolves to.
     slowFetch.resolve({ connectionId, ddl: 'create table stale (id int);', updatedAt: '' });
     const loaded = await loading;
 
-    expect(schemasState.byConnection[connectionId]).toBe('create table fresh (id int);');
+    expect(queryClient.getQueryData<string>(schemaQueryKey(connectionId))).toBe(
+      'create table fresh (id int);',
+    );
     expect(loaded).toBe('create table fresh (id int);');
   });
 });

@@ -2,6 +2,10 @@ import { QueryClient } from '@tanstack/vue-query';
 
 // P98: exported so non-component code can invalidate (P99's migration target) — main.ts hands it
 // to VueQueryPlugin rather than letting the plugin construct its own.
+//
+// P99 §5.5 query key convention: a flat `[domain, ...ids]` tuple — `['schema', connectionId]`
+// (state/schemas.ts), `['maskRules', connectionId]` (state/maskRules.ts). Keep new query keys to
+// this shape rather than inventing a second one.
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
