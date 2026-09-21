@@ -21,9 +21,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { applyStreamFilter, runCount, runtime } = await import(
-  '../../frontend/src/views/stream/state'
-);
+const { useStreamViewStore } = await import('../../frontend/src/views/stream/state');
+const streamViewStore = useStreamViewStore();
 
 type Caps = NonNullable<ConnectionState['caps']>;
 
@@ -83,7 +82,7 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
       });
     };
 
-    await runCount(id);
+    await streamViewStore.runCount(id);
 
     expect(captured?.filter).toBeNull();
   });
@@ -104,7 +103,11 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
         },
       });
 
-    await applyStreamFilter(id, { offset: null, partitions: [0, 1], timestamp: null });
+    await streamViewStore.applyStreamFilter(id, {
+      offset: null,
+      partitions: [0, 1],
+      timestamp: null,
+    });
 
     let captured: { filter?: string | null } | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
@@ -119,7 +122,7 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
       });
     };
 
-    await runCount(id);
+    await streamViewStore.runCount(id);
 
     expect(captured?.filter).not.toBeNull();
     const parsed = JSON.parse(captured?.filter as string);
@@ -145,11 +148,11 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
     (data as any).count = () =>
       Promise.resolve({ value: 6, exact: true, at: Date.now(), stale: false, source: 'server' });
 
-    await runCount(id);
-    expect(runtime[id]?.count?.value).toBe(6);
+    await streamViewStore.runCount(id);
+    expect(streamViewStore.runtime[id]?.count?.value).toBe(6);
 
-    await applyStreamFilter(id, { offset: null, partitions: [0], timestamp: null });
+    await streamViewStore.applyStreamFilter(id, { offset: null, partitions: [0], timestamp: null });
 
-    expect(runtime[id]?.count).toBeNull();
+    expect(streamViewStore.runtime[id]?.count).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
+import { pinia } from '../../state/pinia';
 import { useTabsStore } from '../../state/tabs';
 import { createImmediateMutator } from '../shared/immediateMutation';
-import { reload } from './state';
+import { useStreamViewStore } from './state';
 
 // Item 3/4: mutate immediately, no staging/preview step — documents/mutations.ts's precedent
 // (P8's ground rules), extended to streams. Each op uses the `$`-prefixed sentinel fields
@@ -9,7 +10,7 @@ import { reload } from './state';
 // own comment (this module evaluates before `app.use(pinia)` too).
 const mutate = createImmediateMutator({
   findTab: (tabId: string) => useTabsStore().findStreamTab(tabId),
-  reload,
+  reload: (tabId: string) => useStreamViewStore(pinia).reload(tabId),
 });
 
 export async function produceKafkaMessage(

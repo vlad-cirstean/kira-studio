@@ -22,9 +22,8 @@ const { runCount: runDocumentCount, runtime: documentRuntime } = await import(
 );
 const { useKeyValueViewStore } = await import('../../frontend/src/views/shared/keyvalue/state');
 const keyValueViewStore = useKeyValueViewStore();
-const { runCount: runStreamCount, runtime: streamRuntime } = await import(
-  '../../frontend/src/views/stream/state'
-);
+const { useStreamViewStore } = await import('../../frontend/src/views/stream/state');
+const streamViewStore = useStreamViewStore();
 
 interface Case {
   name: string;
@@ -50,8 +49,8 @@ const cases: Case[] = [
   {
     name: 'stream',
     open: () => tabsStore.openStreamTab('conn-strm', 'topic:events', { newTab: true }).id,
-    runCount: runStreamCount,
-    runtime: streamRuntime,
+    runCount: (tabId: string) => streamViewStore.runCount(tabId),
+    runtime: streamViewStore.runtime,
   },
 ];
 

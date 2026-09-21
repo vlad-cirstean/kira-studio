@@ -23,7 +23,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { reload, runtime } = await import('../../frontend/src/views/stream/state');
+const { useStreamViewStore } = await import('../../frontend/src/views/stream/state');
+const streamViewStore = useStreamViewStore();
 const { reloadTabsForTarget } = await import('../../frontend/src/state/viewCommands');
 const { registerTabRuntimeCleanup } = await import('../../frontend/src/state/tabRuntime');
 void registerTabRuntimeCleanup;
@@ -72,7 +73,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
     const connectionId = 'sqs-conn-1';
     markConnected(connectionId, sqsCaps);
     const { id } = tabsStore.openStreamTab(connectionId, 'queue:orders', { newTab: true });
-    runtime[id] = {
+    streamViewStore.runtime[id] = {
       status: 'idle',
       error: null,
       actionError: null,
@@ -101,13 +102,13 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       throw new Error('reload() must never issue a real read for a batch (SQS) tab');
     };
 
-    await reload(id);
+    await streamViewStore.reload(id);
 
     expect(invalidated).toBe(true); // the stale page is still dropped
     expect(readCalled).toBe(false); // but nothing re-reads it — no ReceiveMessage
-    expect(runtime[id]?.polled).toBe(false); // falls back to the "click Poll" placeholder
-    expect(runtime[id]?.rowCount).toBe(0);
-    expect(runtime[id]?.selectedRow).toBeNull();
+    expect(streamViewStore.runtime[id]?.polled).toBe(false); // falls back to the "click Poll" placeholder
+    expect(streamViewStore.runtime[id]?.rowCount).toBe(0);
+    expect(streamViewStore.runtime[id]?.selectedRow).toBeNull();
   });
 
   test('reloadTabsForTarget fanning out to a sibling SQS stream tab does not poll it either', async () => {
@@ -115,7 +116,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
     markConnected(connectionId, sqsCaps);
     const mutatingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true });
     const siblingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true });
-    runtime[siblingTab.id] = {
+    streamViewStore.runtime[siblingTab.id] = {
       status: 'idle',
       error: null,
       actionError: null,
@@ -147,14 +148,14 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
     await Promise.resolve();
 
     expect(readCalled).toBe(false);
-    expect(runtime[siblingTab.id]?.polled).toBe(false);
+    expect(streamViewStore.runtime[siblingTab.id]?.polled).toBe(false);
   });
 
   test('a non-batch (Kafka) stream tab still reloads normally', async () => {
     const connectionId = 'kafka-conn-1';
     markConnected(connectionId, { ...sqsCaps, pagination: 'offsetWindow', canDelete: false });
     const { id } = tabsStore.openStreamTab(connectionId, 'topic:events', { newTab: true });
-    runtime[id] = {
+    streamViewStore.runtime[id] = {
       status: 'idle',
       error: null,
       actionError: null,
@@ -191,9 +192,9 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
       });
     };
 
-    await reload(id);
+    await streamViewStore.reload(id);
 
     expect(readCalled).toBe(true);
-    expect(runtime[id]?.polled).toBe(true);
+    expect(streamViewStore.runtime[id]?.polled).toBe(true);
   });
 });

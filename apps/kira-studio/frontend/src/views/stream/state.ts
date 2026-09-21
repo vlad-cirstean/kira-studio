@@ -1,8 +1,10 @@
 import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
+import { defineStore } from 'pinia';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
+import { pinia } from '../../state/pinia';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
@@ -65,20 +67,6 @@ function defaultRuntime(): StreamViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
-  createRuntimeStore<StreamViewRuntime>(defaultRuntime);
-
-export { runtime, setSearchOpen, toggleSearchOpen };
-
-// D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
-/** P43 F6/D7: written by StreamView.vue's own catch around onDeleteMessage (SQS only — Kafka
- *  has no addressable delete). */
-export { setActionError };
-
 // currentStreamFilter is load()'s own filter encoding, factored out so runCount (P21 round 2
 // functional finding 7) can send the *same* filter a browse under this tab is actually scoped to,
 // rather than re-deriving (or, before this fix, simply not deriving) it. Kafka-only in effect;
@@ -100,193 +88,219 @@ function currentStreamFilter(tab: StreamTabRecord): string | null {
   });
 }
 
-export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
-  const tab = useTabsStore().findStreamTab(tabId);
-  if (!tab?.connectionId) return;
-  const rt = ensureRuntime(tabId);
-  const effectiveCursor: PageCursor = cursor ?? { mode: 'offset', offset: 0 };
-  const opId = beginOp(rt);
-  rt.polled = true;
-
-  const filter = currentStreamFilter(tab);
-
-  try {
-    const response = await data.read({
-      opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
-      projection: null,
-      filter,
-      sort: null,
-      pageSize: tab.state.pageSize,
-      cursor: effectiveCursor,
-    });
-    // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
-    // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
-    // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
-    if (!runtime[tabId]) return;
-    if (rt.opId !== opId) return;
-    if (response.page.kind !== 'stream') {
-      throw new Error(`unexpected page kind for a stream tab: ${response.page.kind}`);
-    }
-
-    setPage(tabId, response.page);
-    rt.status = 'idle';
-    rt.opId = null;
-    rt.rowCount = response.page.rowCount;
-    rt.hasMore = response.page.position.hasMore;
-    rt.nextToken = response.page.position.nextToken;
-    rt.visibilityTimeoutSeconds = response.page.visibilityTimeoutSeconds;
-    rt.selectedRow = null; // a fresh page invalidates whatever row index used to be selected
-  } catch (err) {
-    applyLoadFailure(rt, opId, err, tabId);
-  }
-}
-
-export async function reload(tabId: string): Promise<void> {
-  const tab = useTabsStore().findStreamTab(tabId);
-  if (!tab?.connectionId) return;
-  await data.invalidate(tab.connectionId, tab.path);
-  // P21 round 2 functional finding 1: reload() is reached from three paths that are not the
-  // explicit Poll button — a Send/Delete-message mutation's own reload-self, that same
-  // mutation's fan-out to sibling tabs on the same queue (reloadTabsForTarget), and a
-  // project-tree double-click on an already-open tab (ProjectTree.vue's `reused` branch). None
-  // of those is the user asking to poll, so for a batch (SQS) tab this must behave like a
-  // no-op read rather than a real ReceiveMessage: drop the now-invalidated page and return the
-  // tab to its "click Poll" placeholder instead of loading a fresh one.
-  if (isBatchPagination(tab.connectionId)) {
-    const rt = ensureRuntime(tabId);
-    drop(tabId);
-    rt.polled = false;
-    rt.rowCount = 0;
-    rt.hasMore = false;
-    rt.nextToken = null;
-    rt.selectedRow = null;
-    return;
-  }
-  await load(tabId);
-}
-
-export async function runCount(tabId: string): Promise<void> {
-  const tab = useTabsStore().findStreamTab(tabId);
-  if (!tab?.connectionId) return;
-  const rt = ensureRuntime(tabId);
-  const opId = crypto.randomUUID();
-  rt.countOpId = opId;
-  try {
-    const response = await data.count({
-      opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
-      // P21 round 2 functional finding 7: this used to hard-code `filter: null`, so the Σ
-      // readout answered a different question than the rows beside it — the high-low watermark
-      // summed across *every* partition, printed next to a page that load() had already scoped
-      // to the selected partition/offset/timestamp filter. Sending the same encoded filter here
-      // scopes the count identically (kafka/count.go's countTopic now shares load's own
-      // freshWindows, so "N total" and the browse agree on what they are counting).
-      filter: currentStreamFilter(tab),
-      // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
-      refresh: rt.count?.stale === true,
-    });
-    // A Refresh since this count started already stamped a newer countOpId — an answer to the
-    // previous request landing now would resurrect a stale total.
-    if (rt.countOpId !== opId) return;
-    rt.count = { value: response.value, exact: response.exact, stale: response.stale };
-  } catch {
-    // Leave the previous count (if any) rather than blanking it on a failed refresh.
-  }
-}
-
-export function stop(tabId: string): void {
-  stopOp(runtime[tabId]);
-}
-
-// D10: SQS's toolbar calls this directly from an explicit "Poll" click — same operation as
-// `load`, named separately so the view never has to explain why a batch-strategy tab "loads".
-//
-// P2 R1: SQS has no addressable position (read.go's own comment: "every poll is an independent,
-// non-resumable snapshot"), so every poll's data:read carries the identical connectionId/path/
-// pageSize/cursor — the exact same enginecache.PageCacheKey as the poll before it. Without
-// invalidating first, a second Poll click would silently be served the first poll's cached page
-// and never reach the adapter's real ReceiveMessage call — same fix as reload()'s own invalidate,
-// same default scope (ipcfixture/sqs_test.go already recorded this exact call for this exact
-// scenario, anticipating this fix).
-export async function poll(tabId: string): Promise<void> {
-  const tab = useTabsStore().findStreamTab(tabId);
-  if (!tab?.connectionId) return;
-  await data.invalidate(tab.connectionId, tab.path);
-  await load(tabId);
-}
-
-// Kafka's offsetWindow strategy is always token-driven (no plain-offset fallback — a browse
-// tab has no addressable position to go back to, per the ground rules' forward-only browsing).
-export async function goNext(tabId: string): Promise<void> {
-  const rt = runtime[tabId];
-  if (!rt?.nextToken) return;
-  await load(tabId, { mode: 'after', token: rt.nextToken });
-}
-
-// Item 1: mirrors grid/state.ts's/keyvalue/state.ts's own setPageSize — reset whatever
-// continuation token was held for the old size (never valid against a different one), persist the
-// new size, and start over from the top. SQS's `batch` pagination has no continuation to reset and
-// is never auto-loaded (D10/D12) — changing the size there just takes effect on the next Poll.
-export async function setPageSize(tabId: string, pageSize: PageSize): Promise<void> {
-  const tabsStore = useTabsStore();
-  const tab = tabsStore.findStreamTab(tabId);
-  if (!tab) return;
-  const rt = ensureRuntime(tabId);
-  rt.nextToken = null;
-  tabsStore.patchStreamTabState(tabId, { pageSize });
-  const caps = tab.connectionId ? useConnectionsStore().states[tab.connectionId]?.caps : null;
-  if (caps?.pagination === 'batch') return;
-  if (!rt.polled) return; // mirrors onMounted's own guard — never auto-load before the first view
-  await load(tabId, { mode: 'offset', offset: 0 });
-}
-
 export interface StreamFilterInput {
   offset: string | null;
   partitions: number[];
   timestamp: string | null;
 }
 
-// Item 2 — Kafka-only (StreamView.vue only renders the filter row, and thus only ever calls this,
-// when connection.kind === 'kafka'). Mirrors grid/state.ts's setFilter: reset the continuation
-// token, persist, record it in the (session-only) filter history, and restart the browse fresh —
-// a filter changes which messages a *new* browse would see, so continuing an old token under it
-// would silently ignore it.
-export async function applyStreamFilter(tabId: string, filter: StreamFilterInput): Promise<void> {
-  const tabsStore = useTabsStore();
-  const tab = tabsStore.findStreamTab(tabId);
-  if (!tab?.connectionId) return;
-  const rt = ensureRuntime(tabId);
-  rt.nextToken = null;
-  // P21 round 2 functional finding 7: now that runCount sends this same filter, a count taken
-  // under the *previous* filter answers a different question than the browse this narrows to —
-  // grid/state.ts's own setFilter clears rather than stales its count for the identical reason
-  // ("an answer to the previous WHERE is an answer to a different question, not a drifted answer
-  // to this one"). Cleared, not staled, so the toolbar returns to "no total" rather than showing a
-  // wrong one under a `stale` label that would still be visible until the next Σ click.
-  rt.count = null;
-  rt.countOpId = null;
-  tabsStore.patchStreamTabState(tabId, {
-    offsetFilter: filter.offset,
-    partitions: filter.partitions,
-    timestampFilter: filter.timestamp,
-  });
-  useStreamFilterHistoryStore().recordStreamFilterUse(tab.connectionId, tab.path, filter);
-  await load(tabId, { mode: 'offset', offset: 0 });
-}
+export const useStreamViewStore = defineStore('streamView', () => {
+  const { runtime, ensureRuntime, setActionError, toggleSearchOpen, setSearchOpen } =
+    createRuntimeStore<StreamViewRuntime>(defaultRuntime);
 
-// Item 6: the row last clicked — StreamView.vue pairs this with cellSelection.ts's
-// publishSelectedCell(). Kept here (rather than only local component state) so SQS's Delete
-// message toolbar action, which lives beside the row list but isn't itself a per-row control, can
-// read the same target.
-export function selectRow(tabId: string, row: number | null): void {
-  ensureRuntime(tabId).selectedRow = row;
-}
+  // D4: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+  registerTabRuntimeCleanup((tabId) => {
+    delete runtime[tabId];
+  });
+
+  async function load(tabId: string, cursor?: PageCursor): Promise<void> {
+    const tab = useTabsStore().findStreamTab(tabId);
+    if (!tab?.connectionId) return;
+    const rt = ensureRuntime(tabId);
+    const effectiveCursor: PageCursor = cursor ?? { mode: 'offset', offset: 0 };
+    const opId = beginOp(rt);
+    rt.polled = true;
+
+    const filter = currentStreamFilter(tab);
+
+    try {
+      const response = await data.read({
+        opId,
+        tabId,
+        connectionId: tab.connectionId,
+        path: tab.path,
+        projection: null,
+        filter,
+        sort: null,
+        pageSize: tab.state.pageSize,
+        cursor: effectiveCursor,
+      });
+      // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
+      // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
+      // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
+      if (!runtime[tabId]) return;
+      if (rt.opId !== opId) return;
+      if (response.page.kind !== 'stream') {
+        throw new Error(`unexpected page kind for a stream tab: ${response.page.kind}`);
+      }
+
+      setPage(tabId, response.page);
+      rt.status = 'idle';
+      rt.opId = null;
+      rt.rowCount = response.page.rowCount;
+      rt.hasMore = response.page.position.hasMore;
+      rt.nextToken = response.page.position.nextToken;
+      rt.visibilityTimeoutSeconds = response.page.visibilityTimeoutSeconds;
+      rt.selectedRow = null; // a fresh page invalidates whatever row index used to be selected
+    } catch (err) {
+      applyLoadFailure(rt, opId, err, tabId);
+    }
+  }
+
+  async function reload(tabId: string): Promise<void> {
+    const tab = useTabsStore().findStreamTab(tabId);
+    if (!tab?.connectionId) return;
+    await data.invalidate(tab.connectionId, tab.path);
+    // P21 round 2 functional finding 1: reload() is reached from three paths that are not the
+    // explicit Poll button — a Send/Delete-message mutation's own reload-self, that same
+    // mutation's fan-out to sibling tabs on the same queue (reloadTabsForTarget), and a
+    // project-tree double-click on an already-open tab (ProjectTree.vue's `reused` branch). None
+    // of those is the user asking to poll, so for a batch (SQS) tab this must behave like a
+    // no-op read rather than a real ReceiveMessage: drop the now-invalidated page and return the
+    // tab to its "click Poll" placeholder instead of loading a fresh one.
+    if (isBatchPagination(tab.connectionId)) {
+      const rt = ensureRuntime(tabId);
+      drop(tabId);
+      rt.polled = false;
+      rt.rowCount = 0;
+      rt.hasMore = false;
+      rt.nextToken = null;
+      rt.selectedRow = null;
+      return;
+    }
+    await load(tabId);
+  }
+
+  async function runCount(tabId: string): Promise<void> {
+    const tab = useTabsStore().findStreamTab(tabId);
+    if (!tab?.connectionId) return;
+    const rt = ensureRuntime(tabId);
+    const opId = crypto.randomUUID();
+    rt.countOpId = opId;
+    try {
+      const response = await data.count({
+        opId,
+        tabId,
+        connectionId: tab.connectionId,
+        path: tab.path,
+        // P21 round 2 functional finding 7: this used to hard-code `filter: null`, so the Σ
+        // readout answered a different question than the rows beside it — the high-low watermark
+        // summed across *every* partition, printed next to a page that load() had already scoped
+        // to the selected partition/offset/timestamp filter. Sending the same encoded filter here
+        // scopes the count identically (kafka/count.go's countTopic now shares load's own
+        // freshWindows, so "N total" and the browse agree on what they are counting).
+        filter: currentStreamFilter(tab),
+        // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
+        refresh: rt.count?.stale === true,
+      });
+      // A Refresh since this count started already stamped a newer countOpId — an answer to the
+      // previous request landing now would resurrect a stale total.
+      if (rt.countOpId !== opId) return;
+      rt.count = { value: response.value, exact: response.exact, stale: response.stale };
+    } catch {
+      // Leave the previous count (if any) rather than blanking it on a failed refresh.
+    }
+  }
+
+  function stop(tabId: string): void {
+    stopOp(runtime[tabId]);
+  }
+
+  // D10: SQS's toolbar calls this directly from an explicit "Poll" click — same operation as
+  // `load`, named separately so the view never has to explain why a batch-strategy tab "loads".
+  //
+  // P2 R1: SQS has no addressable position (read.go's own comment: "every poll is an independent,
+  // non-resumable snapshot"), so every poll's data:read carries the identical connectionId/path/
+  // pageSize/cursor — the exact same enginecache.PageCacheKey as the poll before it. Without
+  // invalidating first, a second Poll click would silently be served the first poll's cached page
+  // and never reach the adapter's real ReceiveMessage call — same fix as reload()'s own invalidate,
+  // same default scope (ipcfixture/sqs_test.go already recorded this exact call for this exact
+  // scenario, anticipating this fix).
+  async function poll(tabId: string): Promise<void> {
+    const tab = useTabsStore().findStreamTab(tabId);
+    if (!tab?.connectionId) return;
+    await data.invalidate(tab.connectionId, tab.path);
+    await load(tabId);
+  }
+
+  // Kafka's offsetWindow strategy is always token-driven (no plain-offset fallback — a browse
+  // tab has no addressable position to go back to, per the ground rules' forward-only browsing).
+  async function goNext(tabId: string): Promise<void> {
+    const rt = runtime[tabId];
+    if (!rt?.nextToken) return;
+    await load(tabId, { mode: 'after', token: rt.nextToken });
+  }
+
+  // Item 1: mirrors grid/state.ts's/keyvalue/state.ts's own setPageSize — reset whatever
+  // continuation token was held for the old size (never valid against a different one), persist the
+  // new size, and start over from the top. SQS's `batch` pagination has no continuation to reset and
+  // is never auto-loaded (D10/D12) — changing the size there just takes effect on the next Poll.
+  async function setPageSize(tabId: string, pageSize: PageSize): Promise<void> {
+    const tabsStore = useTabsStore();
+    const tab = tabsStore.findStreamTab(tabId);
+    if (!tab) return;
+    const rt = ensureRuntime(tabId);
+    rt.nextToken = null;
+    tabsStore.patchStreamTabState(tabId, { pageSize });
+    const caps = tab.connectionId ? useConnectionsStore().states[tab.connectionId]?.caps : null;
+    if (caps?.pagination === 'batch') return;
+    if (!rt.polled) return; // mirrors onMounted's own guard — never auto-load before the first view
+    await load(tabId, { mode: 'offset', offset: 0 });
+  }
+
+  // Item 2 — Kafka-only (StreamView.vue only renders the filter row, and thus only ever calls
+  // this, when connection.kind === 'kafka'). Mirrors grid/state.ts's setFilter: reset the
+  // continuation token, persist, record it in the (session-only) filter history, and restart the
+  // browse fresh — a filter changes which messages a *new* browse would see, so continuing an old
+  // token under it would silently ignore it.
+  async function applyStreamFilter(tabId: string, filter: StreamFilterInput): Promise<void> {
+    const tabsStore = useTabsStore();
+    const tab = tabsStore.findStreamTab(tabId);
+    if (!tab?.connectionId) return;
+    const rt = ensureRuntime(tabId);
+    rt.nextToken = null;
+    // P21 round 2 functional finding 7: now that runCount sends this same filter, a count taken
+    // under the *previous* filter answers a different question than the browse this narrows to —
+    // grid/state.ts's own setFilter clears rather than stales its count for the identical reason
+    // ("an answer to the previous WHERE is an answer to a different question, not a drifted answer
+    // to this one"). Cleared, not staled, so the toolbar returns to "no total" rather than showing a
+    // wrong one under a `stale` label that would still be visible until the next Σ click.
+    rt.count = null;
+    rt.countOpId = null;
+    tabsStore.patchStreamTabState(tabId, {
+      offsetFilter: filter.offset,
+      partitions: filter.partitions,
+      timestampFilter: filter.timestamp,
+    });
+    useStreamFilterHistoryStore().recordStreamFilterUse(tab.connectionId, tab.path, filter);
+    await load(tabId, { mode: 'offset', offset: 0 });
+  }
+
+  // Item 6: the row last clicked — StreamView.vue pairs this with cellSelection.ts's
+  // publishSelectedCell(). Kept here (rather than only local component state) so SQS's Delete
+  // message toolbar action, which lives beside the row list but isn't itself a per-row control,
+  // can read the same target.
+  function selectRow(tabId: string, row: number | null): void {
+    ensureRuntime(tabId).selectedRow = row;
+  }
+
+  return {
+    runtime,
+    load,
+    reload,
+    runCount,
+    stop,
+    poll,
+    goNext,
+    setPageSize,
+    applyStreamFilter,
+    selectRow,
+    setActionError,
+    toggleSearchOpen,
+    setSearchOpen,
+  };
+});
 
 // D5/D6: project/ no longer imports this module directly — it reaches reload through
 // state/viewCommands.ts's registry instead.
-registerTabReload('stream', reload);
+registerTabReload('stream', (tabId) => useStreamViewStore(pinia).reload(tabId));

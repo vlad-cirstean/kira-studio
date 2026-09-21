@@ -37,21 +37,7 @@ import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
 import StreamSearchToolbar from './StreamSearchToolbar.vue';
 import { useStreamSearchStore } from './search';
-import {
-  applyStreamFilter,
-  goNext,
-  load,
-  poll,
-  reload,
-  runCount,
-  runtime,
-  selectRow,
-  setActionError,
-  setPageSize,
-  setSearchOpen,
-  stop,
-  toggleSearchOpen,
-} from './state';
+import { useStreamViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
@@ -61,6 +47,7 @@ const streamSearchStore = useStreamSearchStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
+const streamViewStore = useStreamViewStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -106,11 +93,11 @@ const canDelete = computed(() => (caps.value?.canDelete ?? false) && !connRecord
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
   () => {
-    if (!isBatch.value) return load(props.tab.id);
+    if (!isBatch.value) return streamViewStore.load(props.tab.id);
   },
 );
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => streamViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
 
 const targetTail = computed(() => pathTail(props.tab.path));
@@ -150,7 +137,7 @@ function onRowContextMenu(e: MouseEvent, key: string | null, body: string): void
 // eligibility — it does not touch the cell editor. Publishing there is per-column, via
 // onCellClick below.
 function onRowClick(i: number): void {
-  selectRow(props.tab.id, i);
+  streamViewStore.selectRow(props.tab.id, i);
 }
 
 // Item 6 (widened, task #75): publishes into cellSelection.ts's shared slot (the same one
@@ -159,7 +146,7 @@ function onRowClick(i: number): void {
 // stands in for the grid's real per-table columns, since a stream row has no catalog-described
 // schema at all (§8.9 has no column navigation for streams).
 function onCellClick(i: number, name: string, value: string | null, truncated = false): void {
-  selectRow(props.tab.id, i);
+  streamViewStore.selectRow(props.tab.id, i);
   const selected: SelectedCell = {
     tabId: props.tab.id,
     connectionId: props.tab.connectionId,
@@ -230,7 +217,7 @@ watch(
 );
 
 function onStop(): void {
-  stop(props.tab.id);
+  streamViewStore.stop(props.tab.id);
 }
 
 // D10/D12: same "never auto-loads" rule as mount/reconnect above — SQS's Refresh affordance
@@ -240,11 +227,11 @@ function onStop(): void {
 // which reaches onRefresh directly regardless of what's rendered.
 function onRefresh(): void {
   if (isBatch.value) return;
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => streamViewStore.reload(props.tab.id));
 }
 
 function onPoll(): void {
-  void poll(props.tab.id);
+  void streamViewStore.poll(props.tab.id);
 }
 
 // Item 2 (task #61): the bottom-of-view full-width status bar was redundant with the toolbar per
@@ -270,7 +257,7 @@ const statusLine = computed(() => {
 // once caps has actually arrived for this tab's connection.
 const PAGE_SIZE_OPTIONS = computed(() => pageSizeOptions('stream-', caps.value?.maxPageSize));
 function onPageSize(size: PageSize): void {
-  void setPageSize(props.tab.id, size);
+  void streamViewStore.setPageSize(props.tab.id, size);
 }
 
 // P43 iter3 D46: a tab whose persisted pageSize predates this cap (or was set on a different
@@ -334,7 +321,7 @@ function validateTimestamp(): boolean {
 
 async function onApplyFilter(): Promise<void> {
   if (!validateTimestamp()) return;
-  await applyStreamFilter(props.tab.id, currentFilterInput());
+  await streamViewStore.applyStreamFilter(props.tab.id, currentFilterInput());
 }
 
 async function onClearFilter(): Promise<void> {
@@ -342,7 +329,7 @@ async function onClearFilter(): Promise<void> {
   selectedPartitions.value = [];
   timestampText.value = '';
   timestampError.value = null;
-  await applyStreamFilter(props.tab.id, { offset: null, partitions: [], timestamp: null });
+  await streamViewStore.applyStreamFilter(props.tab.id, { offset: null, partitions: [], timestamp: null });
 }
 
 function onApplyFromHistory(
@@ -354,7 +341,7 @@ function onApplyFromHistory(
   selectedPartitions.value = [...partitions];
   timestampText.value = timestamp ?? '';
   timestampError.value = null;
-  void applyStreamFilter(props.tab.id, { offset, partitions, timestamp });
+  void streamViewStore.applyStreamFilter(props.tab.id, { offset, partitions, timestamp });
 }
 
 // P31 D12/D13: the same trigger arrangement TimestampPane.vue:117-134 already uses (calendar
@@ -446,15 +433,15 @@ async function onDeleteMessage(): Promise<void> {
   }
   try {
     await deleteSqsMessage(props.tab.id, row.key);
-    setActionError(props.tab.id, null);
+    streamViewStore.setActionError(props.tab.id, null);
   } catch (err) {
-    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    streamViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
 }
 
 // Item 5: toggles the client-side, current-page-only search bar (DataView.vue's same pattern).
 function onToggleSearch(): void {
-  toggleSearchOpen(props.tab.id);
+  streamViewStore.toggleSearchOpen(props.tab.id);
 }
 
 const matchSet = computed(
@@ -475,7 +462,7 @@ function onGoToMatch(row: number): void {
   if (index >= 0) listRef.value?.scrollToIndex(index);
 }
 function onCloseSearch(): void {
-  setSearchOpen(props.tab.id, false);
+  streamViewStore.setSearchOpen(props.tab.id, false);
 }
 
 // P5 C3/F5: this view never reported a visible window before — page.ts's decode cache (five
@@ -550,8 +537,8 @@ let unregisterCommand: (() => void) | null = null;
 let unregisterFindCommand: (() => void) | null = null;
 
 onMounted(() => {
-  if (!needsReconnect.value && !isBatch.value && !runtime[props.tab.id]) {
-    void load(props.tab.id);
+  if (!needsReconnect.value && !isBatch.value && !streamViewStore.runtime[props.tab.id]) {
+    void streamViewStore.load(props.tab.id);
   }
   // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
   // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
@@ -608,7 +595,7 @@ onUnmounted(() => {
             icon="symbol-number"
             data-testid="stream-count"
             v-tooltip="'Count'"
-            @click="runCount(tab.id)"
+            @click="streamViewStore.runCount(tab.id)"
           />
           <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
           <AppButton
@@ -627,7 +614,7 @@ onUnmounted(() => {
             data-testid="stream-next"
             :disabled="!rt?.hasMore"
             v-tooltip="'Next page'"
-            @click="goNext(tab.id)"
+            @click="streamViewStore.goNext(tab.id)"
           />
         </div>
 
