@@ -1,5 +1,6 @@
 import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
 import { pageChunks } from '@shared/protocol/page';
+import { VueQueryPlugin } from '@tanstack/vue-query';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { control } from './bridge/control';
@@ -18,6 +19,8 @@ import { hydrateGitClients } from './state/gitClients';
 import { initKeepAwake } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
 import { hydrateOps } from './state/ops';
+import { pinia } from './state/pinia';
+import { queryClient } from './state/queryClient';
 import { ensureWorkspaceShell } from './state/repoTabs';
 import { hydrateTabs } from './state/tabs';
 import { hydrateTerminalDefaults } from './state/terminals';
@@ -332,7 +335,11 @@ async function bootstrap(): Promise<void> {
       closeRepoWorkspace(repoId);
     }
   }
-  createApp(App).directive('tooltip', vTooltip).mount('#app');
+  const app = createApp(App);
+  app.use(pinia);
+  app.use(VueQueryPlugin, { queryClient });
+  app.directive('tooltip', vTooltip);
+  app.mount('#app');
   // Off the boot critical path (Promise.all above) — an update check gains nothing from blocking
   // first paint, and Go's own 6h cache floor (§3.3) decides what actually fetches.
   initAppUpdate();
