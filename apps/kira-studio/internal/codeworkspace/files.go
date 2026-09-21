@@ -169,10 +169,10 @@ func ReadFile(absPath, relPath string) (FileContent, error) {
 
 // languageFor resolves this app's own language id from relPath's extension only (§8.1: "never
 // sniffed") — the exact vocabulary §9.4 registers as a Monarch contribution, plus 'plaintext' for
-// everything else. Independent of codeparse's own (Go-side, parse-coverage) table and of
-// views/repo/language.ts (frontend-side, by design — §9.4: "different sets for different
-// purposes... pretending otherwise would drag one to the other's shape"); this is a third,
-// intentionally small copy that exists only to answer this one wire field.
+// everything else. Independent of views/repo/language.ts (frontend-side, by design — §9.4:
+// "different sets for different purposes... pretending otherwise would drag one to the other's
+// shape"); this is a second, intentionally small copy that exists only to answer this one wire
+// field.
 func languageFor(relPath string) string {
 	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(relPath), "."))
 	base := strings.ToLower(filepath.Base(relPath))

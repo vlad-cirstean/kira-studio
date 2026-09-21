@@ -11,8 +11,8 @@
     // downgrade — see `editor/monaco.ts`.
     "duplicates": "warn"
   },
-  // `go` is the system Go toolchain, invoked by six scripts in this file's own package.json
-  // (`dev`, `mcp:repo-map:build`, `lint:go`, `package`, `test:go`, `typecheck` via `go env`).
+  // `go` is the system Go toolchain, invoked by five scripts in this file's own package.json
+  // (`dev`, `lint:go`, `package`, `test:go`, `typecheck` via `go env`).
   // It is not an npm bin and never will be. Gated only from pass 3, when `lint:dead` dropped
   // its `--include` filter and turned the `binaries` rule on.
   "ignoreBinaries": ["go"],

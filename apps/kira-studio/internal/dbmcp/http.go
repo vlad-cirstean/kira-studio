@@ -23,12 +23,10 @@ import (
 // grace-then-force shape.
 const closeHTTPGraceTimeout = 5 * time.Second
 
-// mcpPath mirrors repomap/http.go's own choice — every `claude mcp add --transport http` example
-// ends in "/mcp".
+// mcpPath is every `claude mcp add --transport http` example's own convention — ends in "/mcp".
 const mcpPath = "/mcp"
 
-// httpState is server.go's own Server struct split out for this file's cohesion — repomap/http.go's
-// identical layout.
+// httpState is server.go's own Server struct split out for this file's cohesion.
 type httpState struct {
 	listener net.Listener
 	http     *http.Server
@@ -55,15 +53,14 @@ func (s *Server) bindHTTP() error {
 		// mcpauth.Check does its own expiry test and reports OutcomeExpired with an actionable
 		// message (M1 §2.5); the SDK's own Expiration-based check would only ever see a zero
 		// TokenInfo.Expiration (deliberately left empty, see tokenVerifier below) and produce its
-		// own flat "token missing expiration" body instead, so that check stays opted out here —
-		// repomap/http.go's identical reasoning, applied to this server's own token.
+		// own flat "token missing expiration" body instead, so that check stays opted out here.
 		AllowMissingExpiration: true,
 	})(handler)
 
 	// The go-sdk applies DNS-rebinding protection by default but explicitly does not apply
-	// cross-origin protection unless the caller wraps the handler itself — repomap/http.go's
-	// identical reasoning, applied to this server: a browser tab on an unrelated origin must not be
-	// able to reach it just because it happens to be running on loopback.
+	// cross-origin protection unless the caller wraps the handler itself: a browser tab on an
+	// unrelated origin must not be able to reach it just because it happens to be running on
+	// loopback.
 	mux := http.NewServeMux()
 	mux.Handle(mcpPath, http.NewCrossOriginProtection().Handler(protected))
 
@@ -71,7 +68,7 @@ func (s *Server) bindHTTP() error {
 	s.http = &http.Server{
 		Handler: mux,
 		// ReadHeaderTimeout bounds a slowloris-shaped client; IdleTimeout reclaims a connection
-		// that never issues a second request — repomap/http.go's identical values and reasoning.
+		// that never issues a second request.
 		// WriteTimeout/ReadTimeout stay unset: the Streamable HTTP transport holds long-lived
 		// server-to-client streams, and a slow client body on a long POST is not a threat on
 		// loopback the way a slow header is.

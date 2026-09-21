@@ -1,11 +1,10 @@
-// Package mcpauth mints, persists and verifies both local MCP servers' static bearer tokens
-// (docs/v1.5/plans/C3-mcp-repo-map-server.md §0 D8, docs/v1.7/plans/M1-db-mcp-server-core.md §2).
-// Same crypto shape as internal/gitsock's own git_clients trust store (32 crypto/rand bytes,
-// base64url on the wire, sha256(salt‖token) at rest) but one token per server instance, persisted
-// as one small JSON file rather than a database table: the caller supplies the file's own
-// identifying name (the repo-map server's own repo_id-derived slug, or the DB server's fixed
-// name), so this package stays storage-shape-agnostic and importable from both internal/repomap
-// and internal/dbmcp (verify) and internal/bridge (mint) with no shared database dependency.
+// Package mcpauth mints, persists and verifies the DB MCP server's static bearer token
+// (docs/v1.7/plans/M1-db-mcp-server-core.md §2). Same crypto shape as internal/gitsock's own
+// git_clients trust store (32 crypto/rand bytes, base64url on the wire, sha256(salt‖token) at
+// rest) but one token per server instance, persisted as one small JSON file rather than a database
+// table: the caller supplies the file's own identifying name (the DB server's fixed name), so this
+// package stays storage-shape-agnostic and importable from both internal/dbmcp (verify) and
+// internal/bridge (mint) with no shared database dependency.
 //
 // Every token now carries a 7-day expiry (TTL), rotated by remint — never mid-flight, only at a
 // moment a human can read the fresh plaintext (server start, or an explicit Regenerate). See
@@ -113,10 +112,9 @@ func Check(presented string, rec Record, now time.Time) Outcome {
 	return OutcomeValid
 }
 
-// TokenVerifier is the auth.TokenVerifier both servers mount. load reads the server's own current
-// record under its own lock, so a Regenerate mid-flight is picked up by the very next request.
-// label distinguishes the two servers in the lapsed-token error text ("kira-repo-map" or
-// "kira-db").
+// TokenVerifier is the auth.TokenVerifier the DB MCP server mounts. load reads the server's own
+// current record under its own lock, so a Regenerate mid-flight is picked up by the very next
+// request. label names the server in the lapsed-token error text ("kira-db").
 func TokenVerifier(label string, load func() Record) auth.TokenVerifier {
 	return func(_ context.Context, token string, _ *http.Request) (*auth.TokenInfo, error) {
 		rec := load()
@@ -135,13 +133,6 @@ func TokenVerifier(label string, load func() Record) auth.TokenVerifier {
 // PathNamed returns name's token file location under home — home is normally KIRA_HOME.
 func PathNamed(home, name string) string {
 	return filepath.Join(home, name+"-token.json")
-}
-
-// Path returns the repo-map server's per-instance token file's location under home; slug is the
-// caller's own stable identifier for this server instance (internal/repomap's repo_id-derived
-// slug, shared with its sync-lock file's own naming, §5).
-func Path(home, slug string) string {
-	return PathNamed(home, "mcp-repo-map-"+slug)
 }
 
 // Load reads path's Record. A missing file returns ok=false with no error — there is nothing wrong
@@ -241,11 +232,3 @@ func LoadOrMintTTL(path string, ttl time.Duration) (plain string, rec Record, mi
 	return plain, rec, true, nil
 }
 
-// Slug returns the first 12 hex characters of sha256(id) — the naming convention
-// `codeindex-sync-<…>.lock` already established (§5) and now owned by
-// internal/codeindex.SyncLockPath (C6 S1), reused verbatim here so both names derive from one
-// repo_id the same way. Keep this comment and SyncLockPath's own in sync if either changes.
-func Slug(id string) string {
-	sum := sha256.Sum256([]byte(id))
-	return fmt.Sprintf("%x", sum[:6])
-}

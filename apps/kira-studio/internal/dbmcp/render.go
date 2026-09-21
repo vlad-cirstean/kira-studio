@@ -39,9 +39,8 @@ func newMaskingRefusedError(pageKind, bodyNoun string) error {
 	)}
 }
 
-// textResult wraps text as a successful *mcp.CallToolResult — repomap/tools.go's own shape (Out is
-// any everywhere here too, so the SDK publishes no output schema and every answer is one
-// TextContent).
+// textResult wraps text as a successful *mcp.CallToolResult — Out is any everywhere here, so the
+// SDK publishes no output schema and every answer is one TextContent.
 func textResult(text string) (*mcp.CallToolResult, any, error) {
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil, nil
 }

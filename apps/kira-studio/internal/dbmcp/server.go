@@ -1,16 +1,13 @@
 // Package dbmcp is the local DB MCP server (docs/v1.7/plans/M1-db-mcp-server-core.md): a protocol
 // front end that lists this app's own connections, browses their metadata and runs a query —
 // through the existing adapter layer (internal/adapterhost, internal/tree, internal/connections),
-// never a parallel path. Sibling to internal/repomap, same transport pattern (go-sdk/mcp,
-// loopback-only Streamable HTTP, mcpauth for the bearer token) but a separate package, a separate
-// mcp.Server, a separate listener (DefaultPort 8766) and a separate token file — the two servers
-// serve unrelated things with opposite trust postures (§3.1), so nothing is shared beyond the
-// token mechanism and KIRA_HOME itself.
+// never a parallel path. Transport is go-sdk/mcp over a loopback-only Streamable HTTP listener
+// (DefaultPort 8766), with mcpauth minting and verifying its own bearer token and its own token
+// file, independent of the rest of the app beyond KIRA_HOME itself.
 //
-// Unlike internal/repomap there is no headless binary (cmd/kira-db-mcp): the DB server needs the
-// app's own live adapters, keychain-backed secrets and op-log/throttle/cancel machinery (§3.1),
-// none of which a second process could reach without duplicating them. It runs when Kira Studio
-// runs, embedded only (internal/bridge/dbmcp.go).
+// There is no headless binary: the DB server needs the app's own live adapters, keychain-backed
+// secrets and op-log/throttle/cancel machinery (§3.1), none of which a second process could reach
+// without duplicating them. It runs when Kira Studio runs, embedded only (internal/bridge/dbmcp.go).
 //
 // This package imports nothing from internal/bridge (internal/layering_test.go enforces it).
 package dbmcp
@@ -32,14 +29,14 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// DefaultPort is the port this instance tries first — adjacent to repo-map's 8765 (§3.2); a second
-// instance on one machine (there is at most one per KIRA_HOME in practice) falls back to an
-// OS-assigned ephemeral one automatically (http.go).
+// DefaultPort is the port this instance tries first (§3.2); a second instance on one machine
+// (there is at most one per KIRA_HOME in practice) falls back to an OS-assigned ephemeral one
+// automatically (http.go).
 const DefaultPort = 8766
 
-// TokenProvider resolves this instance's own 7-day-rotating token — the DB server's analogue of
-// repomap.TokenProvider, same seam, but no repo-id slug to key on: one DB MCP instance exists per
-// app process per KIRA_HOME, with no second identity to key several apart by (§2.2).
+// TokenProvider resolves this instance's own 7-day-rotating token — no repo-id slug to key on: one
+// DB MCP instance exists per app process per KIRA_HOME, with no second identity to key several
+// apart by (§2.2).
 type TokenProvider func() (rec mcpauth.Record, plain string, minted bool, err error)
 
 // ConnectionsReader is dbmcp's own consumer-declared interface (A11) over *connections.Service —
@@ -86,8 +83,7 @@ type MaskRules interface {
 // Config is everything New needs. Zero-value Home takes the documented default; every other field
 // is required.
 type Config struct {
-	// Home overrides KIRA_HOME (a debugging seam, mirroring repomap.Config's own) — empty means
-	// config.KiraHome().
+	// Home overrides KIRA_HOME (a debugging seam) — empty means config.KiraHome().
 	Home string
 	// Token resolves this instance's own auth record — required.
 	Token TokenProvider
@@ -113,17 +109,16 @@ type Config struct {
 	Logger *slog.Logger
 }
 
-// Server is the DB MCP server's one embedded instance — no index to build, so unlike
-// repomap.Server it needs no readiness gate, sync lock or watcher (§3.3): New binds and returns,
-// Close shuts the listener down.
+// Server is the DB MCP server's one embedded instance — no index to build, so it needs no
+// readiness gate, sync lock or watcher (§3.3): New binds and returns, Close shuts the listener
+// down.
 type Server struct {
 	cfg Config
 	log *slog.Logger
 
 	// tokenMu guards token/tokenPlain/tokenMinted: Regenerate (bridge.DbMcpService's own
 	// restart-recovery action) mutates these on a live, already-serving instance, concurrently with
-	// tokenVerifier reading them on every in-flight request (http.go) — repomap.Server's identical
-	// discipline.
+	// tokenVerifier reading them on every in-flight request (http.go).
 	tokenMu     sync.RWMutex
 	token       mcpauth.Record
 	tokenPlain  string
@@ -137,7 +132,7 @@ type Server struct {
 }
 
 // serverVersion mirrors the app's own declared version — no ldflags plumbing invented for this
-// phase alone, the same call repomap/server.go's own serverVersion makes.
+// phase alone.
 const serverVersion = "0.0.0"
 
 // instructions is §4's own one paragraph: the steer that decides whether any of this pays off.

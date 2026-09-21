@@ -265,10 +265,9 @@ const dbMcpInstallMessage = computed(() => {
 
 const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpState.status.expiresAt));
 
-// M1 §6.1: exposure itself (deny by default) stays an instant toggle here, P67d's own shape for
-// the same problem on the repo-map side. M2 §7.3: the three permission modes and the description
-// are edited in the connection's own MCP tab, not here — this list stays a read-only glance plus
-// the one control it already had.
+// M1 §6.1: exposure itself (deny by default) stays an instant toggle here. M2 §7.3: the three
+// permission modes and the description are edited in the connection's own MCP tab, not here —
+// this list stays a read-only glance plus the one control it already had.
 async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promise<void> {
   await setConnectionMcpEnabled(id, enabled);
 }

@@ -1,9 +1,8 @@
-// Package mcpinstall registers the repo-map MCP server's embedded instance with Claude Code's own
-// CLI (docs/v1.5/plans/C3-mcp-repo-map-server.md §7.2) — the one client this phase installs for
-// (§0 D6's correction: an earlier draft also proposed VS Code MCP registration; dropped outright).
-// Argv-only, never a shell, never writes another program's config file directly — the same
-// discipline internal/gitvsix already applies to its own `code` spawn, though the two packages
-// share no code (§2's own note: unrelated problems, no probe order worth factoring out).
+// Package mcpinstall registers the DB MCP server's embedded instance with Claude Code's own CLI
+// (docs/v1.7/plans/M1-db-mcp-server-core.md) — the one client this app installs for. Argv-only,
+// never a shell, never writes another program's config file directly — the same discipline
+// internal/gitvsix already applies to its own `code` spawn, though the two packages share no code
+// (unrelated problems, no probe order worth factoring out).
 package mcpinstall
 
 import (

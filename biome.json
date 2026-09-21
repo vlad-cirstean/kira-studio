@@ -16,8 +16,7 @@
       "!.claude",
       "!packages/shared/protocol/wire.ts",
       "!packages/shared/protocol/wire",
-      "!packages/git-ipc/src/generated",
-      "!apps/kira-studio/internal/codeparse/testdata"
+      "!packages/git-ipc/src/generated"
     ]
   },
   "formatter": {

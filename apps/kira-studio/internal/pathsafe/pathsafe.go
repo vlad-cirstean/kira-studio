@@ -1,9 +1,7 @@
 // Package pathsafe is a leaf package (zero internal imports, internal/gitpath's own precedent):
 // the repository-relative path-containment check several otherwise-unrelated packages need and
-// share no sane common import for (C8 plan D6). codeworkspace.ValidateRelPath delegates here;
-// internal/repomap's source-line reader (source.go) calls it directly rather than importing all of
-// codeworkspace (its gitclient/porcelain/catfile graph and the whole Session type) into the
-// headless cmd/kira-repo-map binary for one pure function.
+// share no sane common import for (C8 plan D6). codeworkspace/paths.go's ValidateRelPath delegates
+// here; codeworkspace/search.go calls it directly for its own per-match path check.
 package pathsafe
 
 import (

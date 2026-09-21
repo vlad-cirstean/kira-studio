@@ -109,21 +109,6 @@ func TestSaveIsAtomicAndLeavesNoTempFile(t *testing.T) {
 	}
 }
 
-func TestSlugIsStableAndTwelveHexChars(t *testing.T) {
-	a := Slug("repo-a")
-	b := Slug("repo-a")
-	c := Slug("repo-b")
-	if a != b {
-		t.Fatalf("Slug is not stable: %q != %q", a, b)
-	}
-	if a == c {
-		t.Fatal("Slug collided for two different ids")
-	}
-	if len(a) != 12 {
-		t.Fatalf("Slug length = %d, want 12", len(a))
-	}
-}
-
 // TestExpiredBoundaryIsInclusive: exactly-at-ExpiresAt must read as expired (M1 §8 — "exactly-at
 // must read as expired"), not one tick shy of it.
 func TestExpiredBoundaryIsInclusive(t *testing.T) {

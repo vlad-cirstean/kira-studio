@@ -24,8 +24,6 @@
     "build:test": "cd apps/kira-studio/frontend && bun run build:test",
     "build:vscode": "bun run scripts/build-vscode.ts",
     "package:vscode": "bun run scripts/package-vscode.ts",
-    "mcp:repo-map": "bun run scripts/mcp-repo-map.ts",
-    "mcp:repo-map:build": "go build -o apps/kira-studio/bin/kira-repo-map ./apps/kira-studio/cmd/kira-repo-map",
     "lint": "biome check . && sh scripts/check-tokens.sh",
     "lint:go": "sh scripts/install-golangci-lint.sh && \"$(go env GOPATH)/bin/golangci-lint\" run",
     "lint:dead": "knip",
