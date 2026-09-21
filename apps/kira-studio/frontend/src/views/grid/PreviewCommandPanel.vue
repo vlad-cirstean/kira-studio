@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
+import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
@@ -15,9 +16,25 @@ const emit = defineEmits<{ close: [] }>();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
 
-const statements = ref<string[]>([]);
-const loading = ref(true);
-const error = ref<string | null>(null);
+// P99 §5.5: a plain preview of the *currently staged* edits — nothing pushes a change event for
+// it, and it must reflect this open's own pending state, so default staleTime (always refetch on
+// mount) replaces the old ref([])/loading/error triple rather than staleTime: Infinity.
+const { data, isLoading, error } = useQuery(() => ({
+  queryKey: ['previewPending', props.tabId] as const,
+  queryFn: () => {
+    const tab = findDataTab(props.tabId);
+    if (!tab?.connectionId) return Promise.resolve([]);
+    return pendingChangesStore.previewPending(tab.connectionId, tab.path, props.tabId);
+  },
+  enabled: !!findDataTab(props.tabId)?.connectionId,
+}));
+
+const statements = computed(() => data.value ?? []);
+const errorMessage = computed(() => {
+  const err = error.value;
+  if (!err) return null;
+  return err instanceof Error ? err.message : String(err);
+});
 
 // P31 D40/F36: a blank line between statements — the trailing `;` on the last one is unchanged.
 const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
@@ -25,21 +42,6 @@ const doc = computed(() => statements.value.join(';\n\n') + (statements.value.le
 const sqlDialect = computed(() =>
   sqlDialectFor(connectionsStore.connectionRecord(findDataTab(props.tabId)?.connectionId)?.kind),
 );
-
-onMounted(async () => {
-  const tab = findDataTab(props.tabId);
-  if (!tab?.connectionId) {
-    loading.value = false;
-    return;
-  }
-  try {
-    statements.value = await pendingChangesStore.previewPending(tab.connectionId, tab.path, props.tabId);
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
-  } finally {
-    loading.value = false;
-  }
-});
 
 function close(): void {
   emit('close');
@@ -66,9 +68,13 @@ function close(): void {
           @click="close"
         />
       </div>
-      <div v-if="loading" class="preview-panel-loading p-sm muted">Loading…</div>
-      <div v-else-if="error" class="preview-panel-error p-sm" data-testid="preview-command-error">
-        {{ error }}
+      <div v-if="isLoading" class="preview-panel-loading p-sm muted">Loading…</div>
+      <div
+        v-else-if="errorMessage"
+        class="preview-panel-error p-sm"
+        data-testid="preview-command-error"
+      >
+        {{ errorMessage }}
       </div>
       <div v-else-if="statements.length === 0" class="preview-panel-empty p-sm muted">
         No pending changes.
