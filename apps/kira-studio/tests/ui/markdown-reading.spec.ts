@@ -97,8 +97,37 @@ test('a repo workspace: a markdown file opens on Source with a Reading toggle, a
   for (let i = 0; i < 20; i++) {
     await page.keyboard.press('PageDown');
   }
-  await expect.poll(() => linesContent.evaluate((el) => el.style.top)).not.toBe('0px');
-  const scrollTopBeforeToggle = await linesContent.evaluate((el) => el.style.top);
+  // P96 §7: Monaco applies each PageDown's scroll through its own internal command dispatch,
+  // not synchronously with the CDP keypress round trip — under contention the `.lines-content`
+  // top can still be mid-catch-up when read. Poll in-page until it stops moving across several
+  // consecutive frames (same quiescence idiom as support/grid.ts's mutationsForScroll, P81 §7.2)
+  // before treating it as the settled "before" snapshot, rather than only checking it moved off
+  // 0px at all — the removable timing proxy that let this sample a transient mid-scroll value.
+  const scrollTopBeforeToggle = await linesContent.evaluate(async (el) => {
+    const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const read = () => (el as HTMLElement).style.top;
+    const quietFrames = 6;
+    const timeoutMs = 10_000;
+    const deadline = Date.now() + timeoutMs;
+    let last = read();
+    let stable = 0;
+    while (stable < quietFrames) {
+      await frame();
+      const next = read();
+      if (next === last && next !== '0px') {
+        stable += 1;
+      } else {
+        stable = 0;
+        last = next;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(
+          `markdown-reading: scroll position never settled within ${timeoutMs}ms (stuck at ${last})`,
+        );
+      }
+    }
+    return last;
+  });
 
   // Click Reading — a real <h1>/<ul> renders, the Monaco container is hidden but still in the DOM.
   await page.locator('[data-testid="repo-file-view-reading"]').click();
