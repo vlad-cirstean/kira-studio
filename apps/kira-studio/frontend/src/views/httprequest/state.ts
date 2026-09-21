@@ -15,6 +15,7 @@ import type {
   HttpResponseWire,
   HttpTimeline,
 } from '@shared/domain/http';
+import { defineStore } from 'pinia';
 import { useCollectionsStore } from '../../api/state/collections';
 import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
@@ -132,14 +133,6 @@ function defaultRuntime(): HttpRequestViewRuntime {
   return { status: 'idle', opId: null, error: null, response: null };
 }
 
-const { runtime, ensureRuntime } = createRuntimeStore<HttpRequestViewRuntime>(defaultRuntime);
-
-export { runtime };
-
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
 // P90 §2.8: drops every null (inherit) leaf, so Go's Options only ever sees what this request
 // actually overrides — the assertion that makes an all-inherit request send `{}`, not a
 // seven-key payload of nulls.
@@ -164,92 +157,102 @@ function noteSendCompleted(tabId: string): void {
   for (const cb of sendCompletedListeners) cb(tabId);
 }
 
-/** D3: one Send op, run through HttpService.Send → the existing op scheduler — mirrors
- *  console/state.ts's own run() (manual status/opId preamble, no beginOp/applyLoadFailure — D8:
- *  an HTTP failure never touches tabsState.hydrated, since there is no connection to reconnect).
- *  P5 D6: stage 1 (this function) resolves every non-secret reference before the wire args are
- *  built; collectionId/environmentId travel alongside so Go's stage 2 can finish the rest. */
-export async function send(tabId: string): Promise<void> {
-  const tab = findHttpRequestTab(tabId);
-  if (!tab) return;
-  const rt = ensureRuntime(tabId);
-  if (rt.status === 'running') return;
+export const useHttpRequestViewStore = defineStore('httpRequestView', () => {
+  const { runtime, ensureRuntime } = createRuntimeStore<HttpRequestViewRuntime>(defaultRuntime);
 
-  const opId = crypto.randomUUID();
-  rt.status = 'running';
-  rt.opId = opId;
-  rt.error = null;
+  registerTabRuntimeCleanup((tabId) => {
+    delete runtime[tabId];
+  });
 
-  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
-  const environmentId = useVariablesStore().environmentIdForTab(tabId);
-  const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
-    collectionId,
-    environmentId,
-  );
-  // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
-  // no await, no dynamic-generators chunk fetched or parsed. Only a request that actually
-  // references a dynamic value pays for a second pass (over a handful of short strings — the
-  // identical computation the live-preview chip already runs on every keystroke, F2) and the one
-  // memoised chunk load (paid once per session, views/grid/fakeData/generate.ts's own technique).
-  const first = resolveTabState(tab.state, values, secretNames);
-  const resolved = first.refs.some((r) => r.kind === 'dynamic')
-    ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
-    : first;
+  /** D3: one Send op, run through HttpService.Send → the existing op scheduler — mirrors
+   *  console/state.ts's own run() (manual status/opId preamble, no beginOp/applyLoadFailure — D8:
+   *  an HTTP failure never touches tabsState.hydrated, since there is no connection to reconnect).
+   *  P5 D6: stage 1 (this function) resolves every non-secret reference before the wire args are
+   *  built; collectionId/environmentId travel alongside so Go's stage 2 can finish the rest. */
+  async function send(tabId: string): Promise<void> {
+    const tab = findHttpRequestTab(tabId);
+    if (!tab) return;
+    const rt = ensureRuntime(tabId);
+    if (rt.status === 'running') return;
 
-  try {
-    const response = await control.httpSend({
-      opId,
-      tabId,
-      method: tab.state.method,
-      url: resolved.url,
-      headers: resolved.headers,
-      body: resolved.body,
+    const opId = crypto.randomUUID();
+    rt.status = 'running';
+    rt.opId = opId;
+    rt.error = null;
+
+    const collectionId = useCollectionsStore().collectionIdFor(tab.state);
+    const environmentId = useVariablesStore().environmentIdForTab(tabId);
+    const { values, secretNames } = useVariableSetStore().mergedValuesAndSecrets(
       collectionId,
       environmentId,
-      // P8 D2: the tab already knows it (http.ts:208) — '' for a scratch tab, exactly like
-      // collectionId's own "possibly empty" shape above.
-      itemId: tab.state.itemId ?? '',
-      incognito: useTabIncognitoStore().isIncognito(tabId),
-      options: buildSettingsWire(tab.state.settings),
-    });
-    if (rt.opId !== opId) return; // superseded by a newer send
-    rt.status = 'idle';
-    rt.opId = null;
-    rt.response = response;
-    // P8 D11: refetches the History pane's list when it's the one showing, otherwise just marks
-    // it stale — a user who never opens the pane pays no IPC per send.
-    noteSendRecorded(tabId);
-    // P90 item 2: lets a mounted CookiesPane (request mode) refetch so a Set-Cookie shows up
-    // without the user re-navigating.
-    noteSendCompleted(tabId);
-  } catch (err) {
-    if (rt.opId !== opId) return;
-    rt.opId = null;
-    const failure = classifyLoadError(err);
-    if (failure.kind === 'cancelled') {
-      rt.status = 'cancelled';
-      return;
-    }
-    // D8: httpclient's own error codes never land in viewOp.ts's DISCONNECTED_CODES, so this is
-    // never actually 'disconnected' — but even if it were, applyLoadFailure/unmarkHydrated are
-    // deliberately not called here: a Reconnect gate has nothing to gate on a connectionless tab.
-    rt.status = 'error';
-    // P10 D15: classifyLoadError (viewOp.ts) is shared by every view's own load path and stays at
-    // {kind, code, message} — widening it app-wide for one HTTP-only field would reach five other
-    // views that have no use for it. `err.details` is control.ts's own unwrap() addition, read
-    // directly here instead.
-    const details = (err as { details?: unknown } | undefined)?.details;
-    rt.error = {
-      code: failure.code,
-      message: failure.message,
-      timeline: details as HttpTimeline | undefined,
-    };
-  }
-}
+    );
+    // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
+    // no await, no dynamic-generators chunk fetched or parsed. Only a request that actually
+    // references a dynamic value pays for a second pass (over a handful of short strings — the
+    // identical computation the live-preview chip already runs on every keystroke, F2) and the one
+    // memoised chunk load (paid once per session, views/grid/fakeData/generate.ts's own technique).
+    const first = resolveTabState(tab.state, values, secretNames);
+    const resolved = first.refs.some((r) => r.kind === 'dynamic')
+      ? resolveTabState(tab.state, values, secretNames, await loadDynamicGenerator())
+      : first;
 
-export function stop(tabId: string): void {
-  stopOp(runtime[tabId]);
-}
+    try {
+      const response = await control.httpSend({
+        opId,
+        tabId,
+        method: tab.state.method,
+        url: resolved.url,
+        headers: resolved.headers,
+        body: resolved.body,
+        collectionId,
+        environmentId,
+        // P8 D2: the tab already knows it (http.ts:208) — '' for a scratch tab, exactly like
+        // collectionId's own "possibly empty" shape above.
+        itemId: tab.state.itemId ?? '',
+        incognito: useTabIncognitoStore().isIncognito(tabId),
+        options: buildSettingsWire(tab.state.settings),
+      });
+      if (rt.opId !== opId) return; // superseded by a newer send
+      rt.status = 'idle';
+      rt.opId = null;
+      rt.response = response;
+      // P8 D11: refetches the History pane's list when it's the one showing, otherwise just marks
+      // it stale — a user who never opens the pane pays no IPC per send.
+      noteSendRecorded(tabId);
+      // P90 item 2: lets a mounted CookiesPane (request mode) refetch so a Set-Cookie shows up
+      // without the user re-navigating.
+      noteSendCompleted(tabId);
+    } catch (err) {
+      if (rt.opId !== opId) return;
+      rt.opId = null;
+      const failure = classifyLoadError(err);
+      if (failure.kind === 'cancelled') {
+        rt.status = 'cancelled';
+        return;
+      }
+      // D8: httpclient's own error codes never land in viewOp.ts's DISCONNECTED_CODES, so this is
+      // never actually 'disconnected' — but even if it were, applyLoadFailure/unmarkHydrated are
+      // deliberately not called here: a Reconnect gate has nothing to gate on a connectionless tab.
+      rt.status = 'error';
+      // P10 D15: classifyLoadError (viewOp.ts) is shared by every view's own load path and stays at
+      // {kind, code, message} — widening it app-wide for one HTTP-only field would reach five other
+      // views that have no use for it. `err.details` is control.ts's own unwrap() addition, read
+      // directly here instead.
+      const details = (err as { details?: unknown } | undefined)?.details;
+      rt.error = {
+        code: failure.code,
+        message: failure.message,
+        timeline: details as HttpTimeline | undefined,
+      };
+    }
+  }
+
+  function stop(tabId: string): void {
+    stopOp(runtime[tabId]);
+  }
+
+  return { runtime, send, stop };
+});
 
 // P7 D10: the *Copy as curl* dialog's own frozen resolution — computed once on open, the same
 // shape send() already demonstrates (P6 D7's short-circuit: only a request that actually

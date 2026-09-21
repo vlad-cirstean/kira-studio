@@ -24,12 +24,13 @@ import { backToLatest, ensureHistoryFresh, historyRuntime } from './history';
 import RawExchangePane from './RawExchangePane.vue';
 import ResponseDiffDialog from './ResponseDiffDialog.vue';
 import ResponseHistoryList from './ResponseHistoryList.vue';
-import { runtime } from './state';
+import { useHttpRequestViewStore } from './state';
 import TimelinePane from './TimelinePane.vue';
 
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const httpRequestViewStore = useHttpRequestViewStore();
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
 const historyRt = computed(() => historyRuntime[props.tab.id]);
 
 // P8 C6/D12: the dialog mounts only while a compare is in flight — the same "reached only from an

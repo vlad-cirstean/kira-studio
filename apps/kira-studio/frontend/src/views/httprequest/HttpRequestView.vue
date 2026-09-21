@@ -50,7 +50,7 @@ import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
 import RequestSettingsPane from './RequestSettingsPane.vue';
 import ResponsePane from './ResponsePane.vue';
-import { onSendCompleted, resolveForExport, resolveTabState, runtime, send, stop } from './state';
+import { onSendCompleted, resolveForExport, resolveTabState, useHttpRequestViewStore } from './state';
 
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
@@ -63,8 +63,9 @@ const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
 const cookiesStore = useCookiesStore();
 const settingsStore = useSettingsStore();
+const httpRequestViewStore = useHttpRequestViewStore();
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
 const title = computed(() => httpRequestTitle(props.tab.state));
@@ -190,7 +191,7 @@ function onSaveAs(): void {
 }
 
 function onSend(): void {
-  void send(props.tab.id);
+  void httpRequestViewStore.send(props.tab.id);
 }
 
 // P7 D10: computes the frozen resolution exactly as send() does (resolveForExport — this file's
@@ -292,7 +293,7 @@ const unresolvedTooltip = computed(() =>
 );
 
 function onStop(): void {
-  stop(props.tab.id);
+  httpRequestViewStore.stop(props.tab.id);
 }
 
 const paramsCount = computed(() => parseQuery(splitUrl(props.tab.state.url).query).length);

@@ -11,7 +11,7 @@ import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import type { FindBarHost } from '../shared/ResponseFindBar.vue';
 import { historyRuntime } from './history';
-import { runtime } from './state';
+import { useHttpRequestViewStore } from './state';
 
 // P9 D12/D14/D15: the inspector — the SPEC's own "view the exact bytes sent and received", with
 // its fidelity stated rather than assumed. F16: lives here (views/httprequest/), not http/, because
@@ -29,7 +29,8 @@ const props = defineProps<{
 // P8 D10's own source swap, duplicated here rather than threaded down as props — the same
 // "each pane computes its own runtime over the tab id" shape ResponseHistoryList.vue already
 // uses, so a future pane needs no prop-plumbing change to this component's siblings.
-const rt = computed(() => runtime[props.tab.id]);
+const httpRequestViewStore = useHttpRequestViewStore();
+const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
 const historyRt = computed(() => historyRuntime[props.tab.id]);
 const viewingStored = computed(() => historyRt.value?.viewing ?? null);
 const response = computed(

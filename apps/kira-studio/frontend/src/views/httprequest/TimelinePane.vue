@@ -6,16 +6,17 @@ import { computed } from 'vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { historyRuntime } from './history';
-import { runtime } from './state';
+import { useHttpRequestViewStore } from './state';
 
 // P10 D11/D12/D13/F18: the waterfall and the per-hop detail — a fifth response-pane segment,
 // mounted here (not http/) for the same reason RawExchangePane.vue is (P9 F16): it needs
 // theme/primitives/ and views/**'s own import rights, which http/** does not have (biome.json).
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
+const httpRequestViewStore = useHttpRequestViewStore();
 
 // P8 D10's own source swap, duplicated exactly as RawExchangePane.vue does — each pane computes
 // its own runtime over the tab id rather than threading it down as props.
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
 const historyRt = computed(() => historyRuntime[props.tab.id]);
 const viewingStored = computed(() => historyRt.value?.viewing ?? null);
 const response = computed(
