@@ -9,7 +9,7 @@ import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
-import { openImportCurlDialog } from './state/curl';
+import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
 import { openEnvironments } from './state/variables';
 import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSetTab } from './tabs';
@@ -18,6 +18,7 @@ const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
+const importCurlStore = useImportCurlStore();
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -74,7 +75,7 @@ const actions: CollectionMenuActions = {
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) => void copyText(row.url),
   importCollection: () => void collectionsStore.importCollection(),
-  importCurl: () => openImportCurlDialog(),
+  importCurl: () => importCurlStore.openImportCurlDialog(),
   exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),
   variables: (row) => openVariableSetTab('collection', row.id, row.name),
   environments: () => openEnvironments(),

@@ -8,13 +8,14 @@ import PanelShell from '../theme/primitives/PanelShell.vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import { useCollectionsStore } from './state/collections';
-import { openImportCurlDialog } from './state/curl';
+import { useImportCurlStore } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
 import { initVariables, openEnvironments } from './state/variables';
 import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 const dynamicValuesStore = useDynamicValuesStore();
 const collectionsStore = useCollectionsStore();
+const importCurlStore = useImportCurlStore();
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -91,7 +92,7 @@ function onDynamicValues(): void {
 // P7 D12: the palette's own "Import from curl…" entry — same shape as the three above, not
 // tab-scoped.
 function onImportCurl(): void {
-  openImportCurlDialog();
+  importCurlStore.openImportCurlDialog();
 }
 
 // D15: the palette's Import collection…, Variables…, Environments…, (P6) Dynamic values… and

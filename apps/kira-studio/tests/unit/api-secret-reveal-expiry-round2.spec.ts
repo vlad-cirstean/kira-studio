@@ -9,15 +9,20 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { revealHistoryEntry, revealedHistoryValues, openHistoryMenu, closeHistoryMenu } =
   await import('../../frontend/src/api/state/variables');
-const { copyAsCurlDialogState, openCopyAsCurlDialog, revealSecretValues, currentCurlCommand } =
-  await import('../../frontend/src/api/state/curl');
+const { useCopyAsCurlStore } = await import('../../frontend/src/api/state/curl');
 const { ensureVariablesLoaded } = await import('../../frontend/src/api/state/variables');
+
+const copyAsCurlStore = useCopyAsCurlStore();
 
 function withCapturedTimeout<T>(run: (fire: () => void) => Promise<T>): Promise<T> {
   const realSetTimeout = globalThis.setTimeout;
@@ -82,7 +87,7 @@ describe('Copy-as-curl revealed secret grace-window expiry (round 2 finding 5)',
 
     await ensureVariablesLoaded('environment', 'env-curl-1');
 
-    openCopyAsCurlDialog(
+    copyAsCurlStore.openCopyAsCurlDialog(
       'GET',
       {
         url: 'https://api.example.com/{{apiToken}}',
@@ -105,15 +110,15 @@ describe('Copy-as-curl revealed secret grace-window expiry (round 2 finding 5)',
     );
 
     await withCapturedTimeout(async (fire) => {
-      await revealSecretValues();
-      expect(copyAsCurlDialogState.revealedSecretValues.apiToken).toBe('sk_live_curl_secret');
-      expect(currentCurlCommand()).toContain('sk_live_curl_secret');
+      await copyAsCurlStore.revealSecretValues();
+      expect(copyAsCurlStore.revealedSecretValues.apiToken).toBe('sk_live_curl_secret');
+      expect(copyAsCurlStore.currentCurlCommand()).toContain('sk_live_curl_secret');
 
       fire();
 
-      expect(copyAsCurlDialogState.revealedSecretValues.apiToken).toBeUndefined();
-      expect(currentCurlCommand()).not.toContain('sk_live_curl_secret');
-      expect(currentCurlCommand()).toContain('{{apiToken}}');
+      expect(copyAsCurlStore.revealedSecretValues.apiToken).toBeUndefined();
+      expect(copyAsCurlStore.currentCurlCommand()).not.toContain('sk_live_curl_secret');
+      expect(copyAsCurlStore.currentCurlCommand()).toContain('{{apiToken}}');
     });
   });
 });

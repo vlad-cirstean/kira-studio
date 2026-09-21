@@ -19,7 +19,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
 import { useCollectionsStore } from '../../api/state/collections';
-import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
+import { applyCurlToTab, useCopyAsCurlStore } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
 import {
@@ -63,6 +63,7 @@ const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const tabIncognitoStore = useTabIncognitoStore();
 const editRawStore = useEditRawStore();
 const collectionsStore = useCollectionsStore();
+const copyAsCurlStore = useCopyAsCurlStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -200,7 +201,7 @@ function onSend(): void {
 async function onCopyAsCurl(): Promise<void> {
   const resolution = await resolveForExport(props.tab.id);
   if (!resolution) return;
-  openCopyAsCurlDialog(
+  copyAsCurlStore.openCopyAsCurlDialog(
     resolution.method,
     resolution.resolved,
     resolution.deferredNames,

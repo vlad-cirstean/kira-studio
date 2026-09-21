@@ -7,26 +7,12 @@ import {
   toCurl,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
-import { reactive } from 'vue';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
 import { copyText } from '../../clipboard';
 import { openApiRequestTab, patchHttpRequestTabState } from '../tabs';
 import { createRevealExpiry } from './revealExpiry';
 import { cachedVariables, clearRevealed, revealVariable } from './variables';
-
-// P7 D12: the Import-from-curl dialog's own state — mirrors http/state/dynamicValues.ts's shape
-// (one `open` flag, nothing tab-scoped). The pasted text itself is deliberately not stored here:
-// nothing outside ImportCurlDialog.vue needs to read it, so it stays a local ref there, the same
-// way SaveRequestDialog.vue keeps its own name/target refs local rather than in saveDialogState.
-
-export const importCurlDialogState = reactive({ open: false });
-
-export function openImportCurlDialog(): void {
-  importCurlDialogState.open = true;
-}
-
-export function closeImportCurlDialog(): void {
-  importCurlDialogState.open = false;
-}
 
 const CODE_LABEL: Readonly<Record<HttpCodeLanguage, string>> = {
   javascript: 'JavaScript',
@@ -81,28 +67,53 @@ export interface CurlPreview {
   error: string | null;
 }
 
-/** D12: parseCurl is pure and synchronous, so there is nothing to cache — but not free enough to
- *  call on every keystroke unthrottled (finding 15): ImportCurlDialog.vue debounces its own calls
- *  into this (400ms). An empty paste is neither an error nor a preview: the dialog just shows
- *  nothing yet. */
-export function previewCurl(text: string): CurlPreview {
-  if (text.trim() === '') return { summary: '', warnings: [], error: null };
-  const parsed = parseCurl(text);
-  if ('error' in parsed) return { summary: '', warnings: [], error: parsed.error };
-  return { summary: summarizeParsed(parsed.state), warnings: parsed.warnings, error: null };
-}
+// P7 D12: the Import-from-curl dialog's own store — mirrors http/state/dynamicValues.ts's shape
+// (one `open` flag, nothing tab-scoped). The pasted text itself is deliberately not stored here:
+// nothing outside ImportCurlDialog.vue needs to read it, so it stays a local ref there, the same
+// way SaveRequestDialog.vue keeps its own name/target refs local rather than in the save dialog
+// store's own state.
+export const useImportCurlStore = defineStore('importCurl', () => {
+  const state = reactive({ open: false });
 
-/** D12/F14: opens a fresh 'http-request' tab and patches it — never the tab the user might already
- *  be mid-edit on. Returns false (and leaves the dialog open) only for a parse error the Import
- *  button should already have disabled against. */
-export function submitImportCurl(text: string): boolean {
-  const parsed = parseCurl(text);
-  if ('error' in parsed) return false;
-  const id = openApiRequestTab();
-  patchHttpRequestTabState(id, parsed.state);
-  closeImportCurlDialog();
-  return true;
-}
+  function openImportCurlDialog(): void {
+    state.open = true;
+  }
+
+  function closeImportCurlDialog(): void {
+    state.open = false;
+  }
+
+  /** D12: parseCurl is pure and synchronous, so there is nothing to cache — but not free enough to
+   *  call on every keystroke unthrottled (finding 15): ImportCurlDialog.vue debounces its own calls
+   *  into this (400ms). An empty paste is neither an error nor a preview: the dialog just shows
+   *  nothing yet. */
+  function previewCurl(text: string): CurlPreview {
+    if (text.trim() === '') return { summary: '', warnings: [], error: null };
+    const parsed = parseCurl(text);
+    if ('error' in parsed) return { summary: '', warnings: [], error: parsed.error };
+    return { summary: summarizeParsed(parsed.state), warnings: parsed.warnings, error: null };
+  }
+
+  /** D12/F14: opens a fresh 'http-request' tab and patches it — never the tab the user might already
+   *  be mid-edit on. Returns false (and leaves the dialog open) only for a parse error the Import
+   *  button should already have disabled against. */
+  function submitImportCurl(text: string): boolean {
+    const parsed = parseCurl(text);
+    if ('error' in parsed) return false;
+    const id = openApiRequestTab();
+    patchHttpRequestTabState(id, parsed.state);
+    closeImportCurlDialog();
+    return true;
+  }
+
+  return {
+    ...toRefs(state),
+    openImportCurlDialog,
+    closeImportCurlDialog,
+    previewCurl,
+    submitImportCurl,
+  };
+});
 
 /** P28 D12: the paste path's own sibling to submitImportCurl above. Same parser, different target:
  *  this patches the tab the user pasted into, because that is what they aimed at — a paste into
@@ -111,7 +122,8 @@ export function submitImportCurl(text: string): boolean {
  *
  *  Returns false on a parse error, which the caller treats as "not a curl command after all" and
  *  lets the ordinary paste proceed — so a string that survives looksLikeCurlCommand but that
- *  parseCurl cannot make sense of is never silently swallowed. */
+ *  parseCurl cannot make sense of is never silently swallowed. No state of its own, so this stays a
+ *  plain exported function rather than a store method. */
 export function applyCurlToTab(tabId: string, text: string): boolean {
   const parsed = parseCurl(text);
   if ('error' in parsed) return false;
@@ -125,6 +137,10 @@ export function applyCurlToTab(tabId: string, text: string): boolean {
 // (views/httprequest/state.ts's own resolveForExport — a views/ file may import http/, not the
 // reverse, §0.3), and hands the plain result to openCopyAsCurlDialog below. This module never
 // reaches into views/** to get it.
+//
+// A separate store from the import dialog above rather than folded together: the two dialogs share
+// no state and nothing calls from one into the other — "curl" is the file's own topic, not the
+// stores' own concern.
 
 interface CopyAsCurlDialogState {
   open: boolean;
@@ -144,136 +160,147 @@ interface CopyAsCurlDialogState {
   error: string | null;
 }
 
-export const copyAsCurlDialogState = reactive<CopyAsCurlDialogState>({
-  open: false,
-  method: 'GET',
-  resolved: null,
-  defaultContentType: '',
-  collectionId: '',
-  environmentId: '',
-  deferredNames: [],
-  revealedSecretValues: {},
-  revealing: false,
-  error: null,
-});
-
-// Finding 5: this dialog's own revealed-secret map used to be dropped only by
-// openCopyAsCurlDialog/closeCopyAsCurlDialog — nothing here re-masked a revealed value once the
-// grace it came from had actually expired, and this is the more serious of the two remaining
-// unbounded maps: currentCurlCommand() renders the *fully substituted* command with the real
-// secret inline, and the dialog can sit open on screen indefinitely, long past the 5-minute
-// localauth grace that authorised the reveal. Dropping an expired entry here automatically
-// re-masks the rendered command, since currentCurlCommand() is already pure over this reactive
-// map.
-const revealedSecretValuesExpiry = createRevealExpiry(copyAsCurlDialogState.revealedSecretValues);
-
-export function openCopyAsCurlDialog(
-  method: string,
-  resolved: ResolvedRequest,
-  deferredNames: readonly string[],
-  defaultContentType: string,
-  collectionId: string,
-  environmentId: string,
-): void {
-  copyAsCurlDialogState.open = true;
-  copyAsCurlDialogState.method = method;
-  copyAsCurlDialogState.resolved = resolved;
-  copyAsCurlDialogState.defaultContentType = defaultContentType;
-  copyAsCurlDialogState.collectionId = collectionId;
-  copyAsCurlDialogState.environmentId = environmentId;
-  copyAsCurlDialogState.deferredNames = [...deferredNames];
-  copyAsCurlDialogState.revealing = false;
-  copyAsCurlDialogState.error = null;
-  for (const key of Object.keys(copyAsCurlDialogState.revealedSecretValues)) {
-    delete copyAsCurlDialogState.revealedSecretValues[key];
-  }
-  revealedSecretValuesExpiry.clearAll();
-}
-
-export function closeCopyAsCurlDialog(): void {
-  copyAsCurlDialogState.open = false;
-  copyAsCurlDialogState.resolved = null;
-  // D10: nothing generated is ever persisted — dropped on close, the same discipline
-  // `revealedValues` follows.
-  for (const key of Object.keys(copyAsCurlDialogState.revealedSecretValues)) {
-    delete copyAsCurlDialogState.revealedSecretValues[key];
-  }
-  revealedSecretValuesExpiry.clearAll();
-  // Finding 5: revealSecretValues below calls the *shared* revealVariable (state/variables.ts),
-  // which writes into variables.ts's own revealedValues map, not this dialog's own
-  // revealedSecretValues — closing only the latter left a stale entry there for
-  // VariablesDialog.vue's own "already revealed" check to silently trust later, with no re-auth
-  // prompt at all.
-  clearRevealed();
-}
-
-/** D10 step 2/4: the command for the *current* reveal state — masked (every deferred span still
- *  literal `{{name}}`) until revealSecretValues() has filled some or all of them in. Pure over the
- *  store's own reactive fields, so a `computed()` wrapping this in the dialog re-renders exactly
- *  when one of them changes. */
-export function currentCurlCommand(): string {
-  const { resolved, method, defaultContentType, revealedSecretValues } = copyAsCurlDialogState;
-  if (!resolved) return '';
-  const hasRevealed = Object.keys(revealedSecretValues).length > 0;
-  const effective = hasRevealed ? applySecretValues(resolved, revealedSecretValues) : resolved;
-  return toCurl({
-    method,
-    url: effective.url,
-    headers: effective.headers,
-    body: effective.body,
-    defaultContentType,
+export const useCopyAsCurlStore = defineStore('copyAsCurl', () => {
+  const state = reactive<CopyAsCurlDialogState>({
+    open: false,
+    method: 'GET',
+    resolved: null,
+    defaultContentType: '',
+    collectionId: '',
+    environmentId: '',
+    deferredNames: [],
+    revealedSecretValues: {},
+    revealing: false,
+    error: null,
   });
-}
 
-/** D10 step 1's precedence, over the id a deferred *name* actually belongs to — environment wins
- *  over collection, mirroring mergedValuesAndSecrets' own merge order (./variables.ts). */
-function findSecretVariableId(
-  name: string,
-  collectionId: string,
-  environmentId: string,
-): string | null {
-  const env = cachedVariables('environment', environmentId).find(
-    (v) => v.isSecret && v.name === name,
-  );
-  if (env) return env.id;
-  const col = cachedVariables('collection', collectionId).find(
-    (v) => v.isSecret && v.name === name,
-  );
-  return col?.id ?? null;
-}
+  // Finding 5: this dialog's own revealed-secret map used to be dropped only by
+  // openCopyAsCurlDialog/closeCopyAsCurlDialog — nothing here re-masked a revealed value once the
+  // grace it came from had actually expired, and this is the more serious of the two remaining
+  // unbounded maps: currentCurlCommand() renders the *fully substituted* command with the real
+  // secret inline, and the dialog can sit open on screen indefinitely, long past the 5-minute
+  // localauth grace that authorised the reveal. Dropping an expired entry here automatically
+  // re-masks the rendered command, since currentCurlCommand() is already pure over this reactive
+  // map.
+  const revealedSecretValuesExpiry = createRevealExpiry(state.revealedSecretValues);
 
-/** D10 step 3: one `revealVariable` call per deferred name — the existing function, the existing
- *  four outcomes, the existing `confirmDialog` fallback and 5-minute grace. D10 step 5: a
- *  cancelled, unavailable-and-declined, or errored reveal simply leaves that name out of
- *  `revealedSecretValues`, so its `{{name}}` span stays literal — nothing throws, nothing is
- *  refused. */
-export async function revealSecretValues(): Promise<void> {
-  const { deferredNames, collectionId, environmentId } = copyAsCurlDialogState;
-  copyAsCurlDialogState.revealing = true;
-  copyAsCurlDialogState.error = null;
-  try {
-    for (const name of deferredNames) {
-      if (copyAsCurlDialogState.revealedSecretValues[name] !== undefined) continue;
-      const id = findSecretVariableId(name, collectionId, environmentId);
-      if (!id) continue;
-      // Finding 1 (v1.2 P14 round 2): branch on this call's own return value, not on the shared
-      // revealedValues map — a cancelled/unavailable/errored outcome here must not be masked by a
-      // stale success the map already holds from an earlier, unrelated reveal of the same id.
-      const value = await revealVariable(id, (message) => {
-        copyAsCurlDialogState.error = message;
-      });
-      if (value !== undefined) {
-        copyAsCurlDialogState.revealedSecretValues[name] = value;
-        revealedSecretValuesExpiry.schedule(name);
-      }
+  function openCopyAsCurlDialog(
+    method: string,
+    resolved: ResolvedRequest,
+    deferredNames: readonly string[],
+    defaultContentType: string,
+    collectionId: string,
+    environmentId: string,
+  ): void {
+    state.open = true;
+    state.method = method;
+    state.resolved = resolved;
+    state.defaultContentType = defaultContentType;
+    state.collectionId = collectionId;
+    state.environmentId = environmentId;
+    state.deferredNames = [...deferredNames];
+    state.revealing = false;
+    state.error = null;
+    for (const key of Object.keys(state.revealedSecretValues)) {
+      delete state.revealedSecretValues[key];
     }
-  } finally {
-    copyAsCurlDialogState.revealing = false;
+    revealedSecretValuesExpiry.clearAll();
   }
-}
 
-/** D10: copy is available in both states — the masked form is a legal, useful, non-runnable
- *  command; the revealed form requires having passed the gate above first. */
-export function copyCurlCommand(): void {
-  void copyText(currentCurlCommand());
-}
+  function closeCopyAsCurlDialog(): void {
+    state.open = false;
+    state.resolved = null;
+    // D10: nothing generated is ever persisted — dropped on close, the same discipline
+    // `revealedValues` follows.
+    for (const key of Object.keys(state.revealedSecretValues)) {
+      delete state.revealedSecretValues[key];
+    }
+    revealedSecretValuesExpiry.clearAll();
+    // Finding 5: revealSecretValues below calls the *shared* revealVariable (state/variables.ts),
+    // which writes into variables.ts's own revealedValues map, not this dialog's own
+    // revealedSecretValues — closing only the latter left a stale entry there for
+    // VariablesDialog.vue's own "already revealed" check to silently trust later, with no re-auth
+    // prompt at all.
+    clearRevealed();
+  }
+
+  /** D10 step 2/4: the command for the *current* reveal state — masked (every deferred span still
+   *  literal `{{name}}`) until revealSecretValues() has filled some or all of them in. Pure over the
+   *  store's own reactive fields, so a `computed()` wrapping this in the dialog re-renders exactly
+   *  when one of them changes. */
+  function currentCurlCommand(): string {
+    const { resolved, method, defaultContentType, revealedSecretValues } = state;
+    if (!resolved) return '';
+    const hasRevealed = Object.keys(revealedSecretValues).length > 0;
+    const effective = hasRevealed ? applySecretValues(resolved, revealedSecretValues) : resolved;
+    return toCurl({
+      method,
+      url: effective.url,
+      headers: effective.headers,
+      body: effective.body,
+      defaultContentType,
+    });
+  }
+
+  /** D10 step 1's precedence, over the id a deferred *name* actually belongs to — environment wins
+   *  over collection, mirroring mergedValuesAndSecrets' own merge order (./variables.ts). */
+  function findSecretVariableId(
+    name: string,
+    collectionId: string,
+    environmentId: string,
+  ): string | null {
+    const env = cachedVariables('environment', environmentId).find(
+      (v) => v.isSecret && v.name === name,
+    );
+    if (env) return env.id;
+    const col = cachedVariables('collection', collectionId).find(
+      (v) => v.isSecret && v.name === name,
+    );
+    return col?.id ?? null;
+  }
+
+  /** D10 step 3: one `revealVariable` call per deferred name — the existing function, the existing
+   *  four outcomes, the existing `confirmDialog` fallback and 5-minute grace. D10 step 5: a
+   *  cancelled, unavailable-and-declined, or errored reveal simply leaves that name out of
+   *  `revealedSecretValues`, so its `{{name}}` span stays literal — nothing throws, nothing is
+   *  refused. */
+  async function revealSecretValues(): Promise<void> {
+    const { deferredNames, collectionId, environmentId } = state;
+    state.revealing = true;
+    state.error = null;
+    try {
+      for (const name of deferredNames) {
+        if (state.revealedSecretValues[name] !== undefined) continue;
+        const id = findSecretVariableId(name, collectionId, environmentId);
+        if (!id) continue;
+        // Finding 1 (v1.2 P14 round 2): branch on this call's own return value, not on the shared
+        // revealedValues map — a cancelled/unavailable/errored outcome here must not be masked by a
+        // stale success the map already holds from an earlier, unrelated reveal of the same id.
+        const value = await revealVariable(id, (message) => {
+          state.error = message;
+        });
+        if (value !== undefined) {
+          state.revealedSecretValues[name] = value;
+          revealedSecretValuesExpiry.schedule(name);
+        }
+      }
+    } finally {
+      state.revealing = false;
+    }
+  }
+
+  /** D10: copy is available in both states — the masked form is a legal, useful, non-runnable
+   *  command; the revealed form requires having passed the gate above first. */
+  function copyCurlCommand(): void {
+    void copyText(currentCurlCommand());
+  }
+
+  return {
+    ...toRefs(state),
+    openCopyAsCurlDialog,
+    closeCopyAsCurlDialog,
+    currentCurlCommand,
+    revealSecretValues,
+    copyCurlCommand,
+  };
+});

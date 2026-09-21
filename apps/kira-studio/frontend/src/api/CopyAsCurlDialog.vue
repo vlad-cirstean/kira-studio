@@ -3,28 +3,24 @@ import { computed } from 'vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import {
-  closeCopyAsCurlDialog,
-  copyAsCurlDialogState,
-  copyCurlCommand,
-  currentCurlCommand,
-  revealSecretValues,
-} from './state/curl';
+import { useCopyAsCurlStore } from './state/curl';
+
+const copyAsCurlStore = useCopyAsCurlStore();
 
 // P7 D10: the generated command, masked by default. Secrets are still {{token}} until Show secret
 // values is pressed — the gate is `revealSecretValues`'s own `revealVariable` calls
 // (http/state/variables.ts's existing four-outcome flow), not anything here. Built on DialogFrame
 // + the existing `.p-strip note`/`.p-strip warn` shape (ImportReportStrip.vue's own technique) —
 // no new theme/primitives/ component (§0.2).
-const command = computed(() => currentCurlCommand());
+const command = computed(() => copyAsCurlStore.currentCurlCommand());
 
 const maskedNames = computed(() =>
-  copyAsCurlDialogState.deferredNames.filter(
-    (name) => copyAsCurlDialogState.revealedSecretValues[name] === undefined,
+  copyAsCurlStore.deferredNames.filter(
+    (name) => copyAsCurlStore.revealedSecretValues[name] === undefined,
   ),
 );
 const hasRevealedAny = computed(
-  () => Object.keys(copyAsCurlDialogState.revealedSecretValues).length > 0,
+  () => Object.keys(copyAsCurlStore.revealedSecretValues).length > 0,
 );
 
 const stripTone = computed<'note' | 'warn'>(() => (hasRevealedAny.value ? 'warn' : 'note'));
@@ -45,7 +41,7 @@ const stripText = computed(() => {
 // a `resolved` ref whose name still starts with '$' is exactly a generated dynamic value, since a
 // deferred (secret) ref never reaches 'resolved' until applySecretValues fills it in later.
 const hasDynamicValue = computed(() =>
-  (copyAsCurlDialogState.resolved?.refs ?? []).some(
+  (copyAsCurlStore.resolved?.refs ?? []).some(
     (r) => r.kind === 'resolved' && r.name.startsWith('$'),
   ),
 );
@@ -55,15 +51,15 @@ const dynamicNote =
   '{{$…}} values are generated once for this command; running it twice sends the same values.';
 
 function onReveal(): void {
-  void revealSecretValues();
+  void copyAsCurlStore.revealSecretValues();
 }
 
 function onCopy(): void {
-  copyCurlCommand();
+  copyAsCurlStore.copyCurlCommand();
 }
 
 function close(): void {
-  closeCopyAsCurlDialog();
+  copyAsCurlStore.closeCopyAsCurlDialog();
 }
 </script>
 
@@ -86,7 +82,7 @@ function close(): void {
       />
 
       <MessageStrip
-        v-if="copyAsCurlDialogState.deferredNames.length > 0"
+        v-if="copyAsCurlStore.deferredNames.length > 0"
         :tone="stripTone"
         data-testid="copy-as-curl-strip"
       >
@@ -95,7 +91,7 @@ function close(): void {
           v-if="maskedNames.length > 0"
           class="strip-action"
           kind="dialog"
-          :disabled="copyAsCurlDialogState.revealing"
+          :disabled="copyAsCurlStore.revealing"
           data-testid="copy-as-curl-reveal"
           @click="onReveal"
         >
@@ -107,8 +103,8 @@ function close(): void {
         {{ dynamicNote }}
       </div>
 
-      <MessageStrip v-if="copyAsCurlDialogState.error" tone="err" data-testid="copy-as-curl-error">
-        {{ copyAsCurlDialogState.error }}
+      <MessageStrip v-if="copyAsCurlStore.error" tone="err" data-testid="copy-as-curl-error">
+        {{ copyAsCurlStore.error }}
       </MessageStrip>
     </div>
 

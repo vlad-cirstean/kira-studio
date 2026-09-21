@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { useCollectionsStore } from './state/collections';
-import { openImportCurlDialog } from './state/curl';
+import { useImportCurlStore } from './state/curl';
 import { openApiRequestTab, openGrpcRequestTab } from './tabs';
 
 const collectionsStore = useCollectionsStore();
+const importCurlStore = useImportCurlStore();
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
 // line of copy, one p-dlgbtn primary button), the same `api/ -> state/` edge
@@ -20,7 +21,7 @@ function onImport(): void {
 // P7 D12: a third front-door button — pasting a curl command is the other common way someone
 // arrives with a request already in hand.
 function onImportCurl(): void {
-  openImportCurlDialog();
+  importCurlStore.openImportCurlDialog();
 }
 </script>
 

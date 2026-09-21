@@ -3,7 +3,9 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import { closeImportCurlDialog, previewCurl, submitImportCurl } from './state/curl';
+import { useImportCurlStore } from './state/curl';
+
+const importCurlStore = useImportCurlStore();
 
 // P7 D12: paste, live preview, live warnings, Import. A plain <textarea> rather than CodeMirror —
 // there is no grammar to highlight and P3 D1's bundle argument applies. Everything below the
@@ -28,14 +30,14 @@ watch(text, (value) => {
   }, 400);
 });
 
-const preview = computed(() => previewCurl(debouncedText.value));
+const preview = computed(() => importCurlStore.previewCurl(debouncedText.value));
 
 function onImport(): void {
-  submitImportCurl(text.value);
+  importCurlStore.submitImportCurl(text.value);
 }
 
 function close(): void {
-  closeImportCurlDialog();
+  importCurlStore.closeImportCurlDialog();
 }
 </script>
 
