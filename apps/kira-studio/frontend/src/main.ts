@@ -28,7 +28,7 @@ import './theme/base.css';
 import { hydrateLayout } from './state/layout';
 import { useModeStore } from './state/mode';
 import { hydrateSettings } from './state/settings';
-import { closeRepoWorkspace, workspaceState } from './state/workspace';
+import { useWorkspaceStore } from './state/workspace';
 import { planCount as consolePlanCount } from './views/console/explainResults';
 import {
   pageStoreEntries as consolePageStoreEntries,
@@ -303,6 +303,7 @@ async function bootstrap(): Promise<void> {
   const gitClientsStore = useGitClientsStore(pinia);
   const dbMcpStore = useDbMcpStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
+  const workspaceStore = useWorkspaceStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -331,21 +332,21 @@ async function bootstrap(): Promise<void> {
     hydrateOps(),
     hydrateTabs(),
   ]);
-  // C5 §4.2: hydrateTabs() already derived workspaceState.openRepos from the restored tabs
+  // C5 §4.2: hydrateTabs() already derived workspaceStore.openRepos from the restored tabs
   // themselves, but it cannot yet tell a live repo from one removed since this window last saved
   // (state/tabs.ts has no reason to depend on state/coderepos.ts otherwise) — now that
   // hydrateCodeRepos() has resolved alongside it, drop an orphaned workspace outright and give
   // every surviving one its pinned graph tab (§6.1), exactly like openRepoWorkspace does for one
   // opened interactively.
   const liveRepoIds = new Set(codeReposStore.records.map((r) => r.id));
-  for (const repoId of [...workspaceState.openRepos]) {
+  for (const repoId of [...workspaceStore.openRepos]) {
     if (liveRepoIds.has(repoId)) {
       ensureWorkspaceShell(repoId);
       // C6 §8.5: a restored session indexes what it restored — same fire-and-forget posture as
       // openRepoWorkspace's own call.
       void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
     } else {
-      closeRepoWorkspace(repoId);
+      workspaceStore.closeRepoWorkspace(repoId);
     }
   }
   const app = createApp(App);

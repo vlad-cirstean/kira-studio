@@ -6,7 +6,7 @@ import { computed, reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { TAB_KINDS } from './tabKinds';
 import { tabsState } from './tabs';
-import { workspaceState } from './workspace';
+import { useWorkspaceStore } from './workspace';
 
 // P22 D12: which module a window was in, so it reopens into the same one. `windows.bounds_json`'s
 // own persistence (internal/shell/window.go's Attach) is entirely native-event-driven
@@ -26,6 +26,10 @@ const MODE_WRITE_DEBOUNCE_MS = 150;
 // switching writes nothing" case still passes unchanged, since it counts tabsSave calls, not this.
 export const useModeStore = defineStore('mode', () => {
   const state = reactive({ active: 'studio' as AppMode });
+  // The outer useModeStore(pinia) call in main.ts's bootstrap() sets the active Pinia instance
+  // before this setup body runs, so this nested call correctly resolves to it without needing its
+  // own explicit instance (state/pinia.ts's own header comment).
+  const workspaceStore = useWorkspaceStore();
 
   let writeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -42,14 +46,14 @@ export const useModeStore = defineStore('mode', () => {
    *  (hydration is not a user action, and must not re-schedule a write of the value it just read). */
   function hydrateMode(mode: AppMode): void {
     state.active = mode;
-    // C5 §4.2: "workspaceState.active starts at the window's already-persisted mode" — a repo
+    // C5 §4.2: "workspaceStore.active starts at the window's already-persisted mode" — a repo
     // workspace is never persisted, so boot always resolves to whichever of studio/api was stored.
-    workspaceState.active = mode;
+    workspaceStore.active = mode;
   }
 
   // P67b §4.2: persistence only — modeState/windows.mode (a three-value column since 'git' joined
   // AppMode). Split out of setMode so a repo activation (state/workspace.ts's activateWorkspace) can
-  // persist 'git' as the window's module without also clobbering workspaceState.active back to the
+  // persist 'git' as the window's module without also clobbering workspaceStore.active back to the
   // bare 'git' key and losing which repository was open.
   function setModule(mode: AppMode): void {
     state.active = mode;
@@ -60,11 +64,11 @@ export const useModeStore = defineStore('mode', () => {
   // studio/api/git are all valid WorkspaceKeys in their own right (git's bare form: no repo active).
   function setMode(mode: AppMode): void {
     setModule(mode);
-    workspaceState.active = mode;
+    workspaceStore.active = mode;
   }
 
   const activeTab = computed<TabRecord | null>(() => {
-    const id = tabsState.activeIdByWorkspace[workspaceState.active];
+    const id = tabsState.activeIdByWorkspace[workspaceStore.active];
     return tabsState.tabs.find((t) => t.id === id) ?? null;
   });
 

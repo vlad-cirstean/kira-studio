@@ -9,12 +9,7 @@ import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { ensureReviewPanelWidth } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
 import { terminalCountAtPath } from '../state/terminals';
-import {
-  activateWorkspace,
-  closeRepoWorkspace,
-  openRepoWorkspace,
-  workspaceState,
-} from '../state/workspace';
+import { useWorkspaceStore } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
@@ -43,6 +38,7 @@ import {
 const contextMenuStore = useContextMenuStore();
 
 const codeReposStore = useCodeReposStore();
+const workspaceStore = useWorkspaceStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -50,7 +46,7 @@ const codeReposStore = useCodeReposStore();
 // repo switcher, relocated and widened, sitting directly above whichever repo workspace's own
 // Files/Search/Review body is active. `repoId` is still derived from the active workspace (never a
 // prop) — '' when the bare 'git' key is active, which is exactly the "list only" state.
-const repoId = computed(() => repoIdOfWorkspace(workspaceState.active) ?? '');
+const repoId = computed(() => repoIdOfWorkspace(workspaceStore.active) ?? '');
 
 // P84 §8.4: two independent queries — one string would mean a filter typed on one tab silently
 // hides rows on the other. Each keeps its own text across tab switches.
@@ -89,16 +85,16 @@ watch(
 function isOpen(id: string): boolean {
   if (!id) return false;
   return (
-    workspaceState.openRepos.includes(id) ||
-    workspaceState.openRepos.some((o) => worktreeParentId(o) === id)
+    workspaceStore.openRepos.includes(id) ||
+    workspaceStore.openRepos.some((o) => worktreeParentId(o) === id)
   );
 }
 function isActive(id: string): boolean {
-  return workspaceState.active === repoWorkspaceKey(id);
+  return workspaceStore.active === repoWorkspaceKey(id);
 }
 function onRowClick(id: string): void {
-  if (isOpen(id)) activateWorkspace(repoWorkspaceKey(id));
-  else openRepoWorkspace(id);
+  if (isOpen(id)) workspaceStore.activateWorkspace(repoWorkspaceKey(id));
+  else workspaceStore.openRepoWorkspace(id);
 }
 
 /** P84 §6.1: the code_repos id backing a worktree path, once it has been opened in this app —
@@ -201,7 +197,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       // own watch. The §6.6 watch would collapse it anyway.
       run: () => {
         collapseRepoWorktrees(repo.id);
-        closeRepoWorkspace(repo.id);
+        workspaceStore.closeRepoWorkspace(repo.id);
       },
     });
   }
@@ -266,7 +262,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
         icon: 'close',
         run: () => {
           collapseRepoWorktrees(record.id);
-          closeRepoWorkspace(record.id);
+          workspaceStore.closeRepoWorkspace(record.id);
         },
       });
     }

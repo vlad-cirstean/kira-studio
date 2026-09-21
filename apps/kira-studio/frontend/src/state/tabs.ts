@@ -44,7 +44,7 @@ import { settingsState } from './settings';
 import { isIncognito, registerIncognitoSetListener, setIncognito } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
-import { activateWorkspace, workspaceState } from './workspace';
+import { useWorkspaceStore } from './workspace';
 
 // Frees whichever page store(s) a tab could have populated (§2.2) — a plain no-op lookup miss
 // for the stores a tab's own kind never touches, same discipline as calling
@@ -281,7 +281,7 @@ export async function hydrateTabs(): Promise<void> {
     const repoId = key.slice('repo:'.length);
     if (!openRepos.includes(repoId)) openRepos.push(repoId);
   }
-  workspaceState.openRepos = openRepos;
+  useWorkspaceStore().openRepos = openRepos;
   // P22 D12: the boot mode used to be derived here, from whichever tab was active app-wide
   // before mode ever had its own persistence ("there is at most one such tab in a pre-P1
   // session, so this is unambiguous" — its own comment already flagged this as a stand-in,
@@ -307,7 +307,7 @@ function setActiveTabId(id: string, key: WorkspaceKey): void {
     if (workspaceKeyOf(t) === key) t.active = t.id === id;
   }
   tabsState.activeIdByWorkspace[key] = id;
-  activateWorkspace(key);
+  useWorkspaceStore().activateWorkspace(key);
 }
 
 // P74 §5.2: removes `id` from workspace `key`'s preview cohort if it is there, a no-op otherwise
@@ -759,7 +759,7 @@ export function closeAll(): void {
   // "Close all" always means "in the workspace whose strip this menu opened from" (D5,
   // generalised) — the current workspace, since a tab's context menu can only ever come from a
   // tab actually rendered there. §6.1: a pinned tab survives "Close all".
-  const key = workspaceState.active;
+  const key = useWorkspaceStore().active;
   const closeIds = new Set(
     tabsState.tabs
       .filter((t) => workspaceKeyOf(t) === key && !TAB_KINDS[t.kind].pinned)
@@ -823,7 +823,7 @@ export function moveTab(fromId: string, toId: string): void {
 // D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's own
 // left-to-right visual order, scoped to the current workspace's own tabs (D5, generalised).
 function stepTab(delta: 1 | -1): void {
-  const key = workspaceState.active;
+  const key = useWorkspaceStore().active;
   const tabs = tabsForWorkspace(key);
   if (tabs.length === 0) return;
   const idx = tabs.findIndex((t) => t.id === tabsState.activeIdByWorkspace[key]);

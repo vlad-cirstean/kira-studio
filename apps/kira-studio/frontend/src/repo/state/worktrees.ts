@@ -3,13 +3,14 @@ import { reactive, watch } from 'vue';
 import { useCodeReposStore } from '../../state/coderepos';
 import { pinia } from '../../state/pinia';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
-import { workspaceState } from '../../state/workspace';
+import { useWorkspaceStore } from '../../state/workspace';
 import { disposeGitTransport, gitTransportFor } from '../git/transport';
 import { noteWorktreeLink, worktreeParentId } from './repoLinks';
 
 // Module-level `watch()` below runs at import time, before `app.use(pinia)` — the explicit
 // instance is required here (state/pinia.ts's own header comment).
 const codeReposStore = useCodeReposStore(pinia);
+const workspaceStore = useWorkspaceStore(pinia);
 
 // P82 §6: per-repo worktree disclosure state, session-scoped and module-level — same shape and
 // reasoning as fileTree.ts's byRepo/search.ts's repoSearchView. Not persisted (§0/§10): a future
@@ -101,7 +102,7 @@ function release(codeRepoId: string): void {
   held.transport.dispose();
   // Nothing else holds a client for a repo with no open workspace — no tabs exist for one — so
   // this expansion is what opened the socket and the repo hold, and must be what ends them.
-  if (!workspaceState.openRepos.includes(codeRepoId)) disposeGitTransport(codeRepoId);
+  if (!workspaceStore.openRepos.includes(codeRepoId)) disposeGitTransport(codeRepoId);
 }
 
 export function toggleRepoWorktrees(codeRepoId: string): void {
@@ -166,7 +167,7 @@ export function worktreeLabel(entry: WorktreeEntry): string {
 // so collapse here rather than leave a row expanded over a dead subscription. openRepos is always
 // reassigned wholesale, so a plain watch sees the pre-close membership as `previous`.
 watch(
-  () => workspaceState.openRepos,
+  () => workspaceStore.openRepos,
   (openRepos, previous) => {
     if (!previous) return;
     for (const id of previous) if (!openRepos.includes(id)) collapseRepoWorktrees(id);

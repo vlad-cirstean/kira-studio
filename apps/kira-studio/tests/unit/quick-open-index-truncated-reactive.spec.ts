@@ -7,17 +7,23 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
 import { computed } from 'vue';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 
 const { refreshRepoTree } = await import('../../frontend/src/repo/state/fileTree');
-const { openRepoWorkspace } = await import('../../frontend/src/state/workspace');
+const { useWorkspaceStore } = await import('../../frontend/src/state/workspace');
 const { openQuickOpen, quickOpenIndexTruncated, QUICK_OPEN_MAX_CANDIDATES } = await import(
   '../../frontend/src/repo/state/quickOpen'
 );
+
+const workspaceStore = useWorkspaceStore();
 
 let repoCounter = 0;
 function freshRepoId() {
@@ -43,7 +49,7 @@ describe('C13-7: quickOpenIndexTruncated stays reactive across a later tree refr
     ).codeWorkspaceOpenWorkspace = async () => {};
     (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = async () => {};
 
-    openRepoWorkspace(repoId);
+    workspaceStore.openRepoWorkspace(repoId);
     await Promise.resolve();
     await Promise.resolve();
 

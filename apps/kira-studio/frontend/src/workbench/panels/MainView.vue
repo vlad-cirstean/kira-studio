@@ -2,11 +2,12 @@
 import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { useModeStore } from '../../state/mode';
-import { workspaceState } from '../../state/workspace';
+import { useWorkspaceStore } from '../../state/workspace';
 import { MODES } from '../modes';
 import { TAB_VIEWS } from '../tabViews';
 
 const modeStore = useModeStore();
+const workspaceStore = useWorkspaceStore();
 
 // P1 D6/C6: no active tab in the current mode falls back to that mode's own start component
 // (StudioStart for Studio, api/ApiStart for Api, repo/GitStart for Git) instead of a hardcoded
@@ -14,7 +15,7 @@ const modeStore = useModeStore();
 // GitStart.vue via moduleOfWorkspace, in practice unreachable (every repo workspace always has at
 // least its pinned graph tab, ensureWorkspaceShell's own guarantee), kept for the same reason
 // MainView keeps a fallback for studio/api at all.
-const modeStart = computed(() => MODES[moduleOfWorkspace(workspaceState.active)].start);
+const modeStart = computed(() => MODES[moduleOfWorkspace(workspaceStore.active)].start);
 
 // P72 §3: an explicit `include`, not a blanket `KeepAlive` — the graph tab's own layout is what
 // tearing down loses (RepoGraphView.vue's own doc comment: a mere tab switch destroys git-ui's

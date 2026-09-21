@@ -6,12 +6,13 @@ import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { layoutState, toggleOperationsPanel, toggleProjectPanel } from '../state/layout';
 import { settingsOpen } from '../state/settings';
-import { activateWorkspace, workspaceState } from '../state/workspace';
+import { useWorkspaceStore } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
 const keepAwakeStore = useKeepAwakeStore();
+const workspaceStore = useWorkspaceStore();
 
 // P67b §4.3: three peer modules — Studio, Api, Git. A repository is an instance inside Git, not a
 // fourth top-level tab of its own (§0's correction); the repo switcher lives in GitPanel.vue now.
@@ -19,10 +20,10 @@ const keepAwakeStore = useKeepAwakeStore();
 const MODE_ORDER: AppMode[] = ['studio', 'api', 'git', 'terminal'];
 
 // P67b §4.2: clicking Git returns to whichever repository was last active there
-// (workspaceState.lastRepoKey), not to a bare generic landing page — the same "return to where you
+// (workspaceStore.lastRepoKey), not to a bare generic landing page — the same "return to where you
 // were" behaviour the repo tabs this replaces used to give for free.
 function onClick(mode: AppMode): void {
-  activateWorkspace(mode === 'git' ? (workspaceState.lastRepoKey ?? 'git') : mode);
+  workspaceStore.activateWorkspace(mode === 'git' ? (workspaceStore.lastRepoKey ?? 'git') : mode);
 }
 
 // P92 item 3: no toast channel in the title bar — a rejection (e.g. a `-tags server` build) is
@@ -61,7 +62,7 @@ const keepAwakeTooltip = computed(() => {
         :key="mode"
         type="button"
         class="p-tab mode-tab"
-        :class="{ 'is-active': moduleOfWorkspace(workspaceState.active) === mode }"
+        :class="{ 'is-active': moduleOfWorkspace(workspaceStore.active) === mode }"
         data-testid="mode-tab"
         :data-mode="mode"
         @click="onClick(mode)"

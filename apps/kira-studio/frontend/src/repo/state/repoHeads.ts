@@ -3,12 +3,13 @@ import { reactive, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useCodeReposStore } from '../../state/coderepos';
 import { pinia } from '../../state/pinia';
-import { workspaceState } from '../../state/workspace';
+import { useWorkspaceStore } from '../../state/workspace';
 import { gitTransportFor } from '../git/transport';
 
 // Module-level `watch()` below runs at import time, before `app.use(pinia)` — the explicit
 // instance is required here (state/pinia.ts's own header comment).
 const codeReposStore = useCodeReposStore(pinia);
+const workspaceStore = useWorkspaceStore(pinia);
 
 // P83 plan §12.3: every repo row's checked-out branch, session-scoped and module-level — same
 // shape as worktrees.ts's byRepo/search.ts's repoSearchView. `null` means "known, and there is
@@ -62,7 +63,7 @@ watch(
 const leases = new Map<string, { transport: Transport; off: () => void }>();
 
 watch(
-  () => workspaceState.openRepos,
+  () => workspaceStore.openRepos,
   (openRepos, previous) => {
     for (const id of openRepos) {
       if (leases.has(id)) continue;

@@ -27,7 +27,7 @@ import {
 } from '../../state/tabs';
 import { terminalDefaults } from '../../state/terminals';
 import { openTerminalTab, type TerminalLaunch } from '../../state/terminalTabs';
-import { workspaceState } from '../../state/workspace';
+import { useWorkspaceStore } from '../../state/workspace';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
@@ -37,6 +37,7 @@ const contextMenuStore = useContextMenuStore();
 const agentSessionsStore = useAgentSessionsStore();
 const codeReposStore = useCodeReposStore();
 const customScriptsStore = useCustomScriptsStore();
+const workspaceStore = useWorkspaceStore();
 
 function isPinned(tab: TabRecord): boolean {
   return TAB_KINDS[tab.kind].pinned === true;
@@ -150,7 +151,7 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
 // C5 §4.3: the active workspace's own tabs (pinned first, §6.1) — studio/api behave exactly as
 // tabsForMode(modeState.active) always did (no pinned kind exists in either), a repo workspace
 // additionally always shows its pinned graph tab first.
-const tabs = computed(() => tabsForWorkspace(workspaceState.active));
+const tabs = computed(() => tabsForWorkspace(workspaceStore.active));
 
 // P72 §7: split out of `tabs` so the template can render the pinned tab in a fixed leading slot,
 // outside `.tab-strip`'s own `overflow-x: auto` — previously it scrolled away with everything
@@ -174,7 +175,7 @@ const scrollingTabs = computed(() =>
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
 // active tab could be selected yet scrolled out of view, with nothing on screen indicating a
 // selection had even happened until the user scrolled the strip by hand to go find it.
-const activeTabId = computed(() => tabsState.activeIdByWorkspace[workspaceState.active]);
+const activeTabId = computed(() => tabsState.activeIdByWorkspace[workspaceStore.active]);
 const stripRef = ref<HTMLElement | null>(null);
 
 watch(
@@ -228,7 +229,7 @@ const newTabBtn = ref<HTMLButtonElement | null>(null);
 // has its pinned graph tab, so this gap never showed before a module whose normal initial state
 // is zero tabs existed.
 const showNewTab = computed(
-  () => isRepoWorkspace(workspaceState.active) || workspaceState.active === 'terminal',
+  () => isRepoWorkspace(workspaceStore.active) || workspaceStore.active === 'terminal',
 );
 
 function onNewTab(): void {
@@ -236,14 +237,14 @@ function onNewTab(): void {
   if (!btn) return;
   const rect = btn.getBoundingClientRect();
   const items =
-    workspaceState.active === 'terminal' ? terminalModuleMenuItems() : newTabMenuItems();
+    workspaceStore.active === 'terminal' ? terminalModuleMenuItems() : newTabMenuItems();
   contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, items);
 }
 
 // P85 §6.4: every dropdown entry funnels through this — the active workspace's own repo, or the
 // script's own workingDir override (cwdOverride) when it has one (P85 §7).
 function launchInActiveWorkspace(launch?: TerminalLaunch, cwdOverride?: string): void {
-  const repoId = repoIdOfWorkspace(workspaceState.active);
+  const repoId = repoIdOfWorkspace(workspaceStore.active);
   const repo = repoId ? codeReposStore.codeRepoRecord(repoId) : undefined;
   if (!repoId || !repo) return;
   openRepoTerminalTab(repoId, cwdOverride || repo.root, launch);

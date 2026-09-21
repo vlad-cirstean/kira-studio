@@ -1,13 +1,18 @@
 import { repoIdOfWorkspace } from '@shared/domain/workspace';
 import fuzzysort, { type KeysResult, type Result, type SnapshotKeys } from 'fuzzysort';
 import { reactive, watch } from 'vue';
-import { workspaceState } from '../../state/workspace';
+import { pinia } from '../../state/pinia';
+import { useWorkspaceStore } from '../../state/workspace';
 import {
   ensureRepoTreeLoaded,
   isRepoTreeLoaded,
   repoTreePaths,
   repoTreeTruncated,
 } from './fileTree';
+
+// Module-level `watch()` calls below run at import time, before `app.use(pinia)` — the explicit
+// instance is required here (state/pinia.ts's own header comment).
+const workspaceStore = useWorkspaceStore(pinia);
 
 // C9 §3.4: limit bounds sort work (fuzzysort's own `limit`), not just render work; candidates
 // bounds the per-keystroke matching cost itself (D3's measured knee — 34.78ms worst query at 50k,
@@ -97,7 +102,7 @@ export const quickOpenState = reactive({ open: false, repoId: '', query: '' });
 // D6: gated on the active workspace, not on a mounted component — reachable with the project panel
 // collapsed. D8: loads the tree itself, since byRepo may have no entry yet.
 export function openQuickOpen(): void {
-  const repoId = repoIdOfWorkspace(workspaceState.active);
+  const repoId = repoIdOfWorkspace(workspaceStore.active);
   if (repoId === null) return;
   quickOpenState.repoId = repoId;
   quickOpenState.query = '';
@@ -173,7 +178,7 @@ export function quickOpenResults(): QuickOpenRow[] {
 // removeCodeRepo included, since it calls closeRepoWorkspace itself) and directly wherever a caller
 // wants the eviction to happen synchronously rather than on the watcher's next flush. Also closes
 // the palette if it happened to be showing repoId (the ordinary case is already covered by the
-// workspaceState.active watch below, since closeRepoWorkspace always clears `active` first when the
+// workspaceStore.active watch below, since closeRepoWorkspace always clears `active` first when the
 // closed workspace was the active one).
 function dropQuickOpen(repoId: string): void {
   snapshotCache.delete(repoId);
@@ -185,7 +190,7 @@ function dropQuickOpen(repoId: string): void {
 // state/workspace.ts's closeRepoWorkspace, to keep the import direction one-way (this module
 // imports state/workspace.ts, never the reverse, per §5's own check).
 watch(
-  () => workspaceState.active,
+  () => workspaceStore.active,
   (active) => {
     if (quickOpenState.open && repoIdOfWorkspace(active) !== quickOpenState.repoId)
       closeQuickOpen();
@@ -194,11 +199,11 @@ watch(
 
 // C13-3: closeRepoWorkspace (state/workspace.ts) drops this repo's own tree/search caches directly,
 // but can't call dropQuickOpen the same way without violating the one-way import direction above —
-// so it's watched here instead. workspaceState.openRepos is always reassigned wholesale (never
+// so it's watched here instead. workspaceStore.openRepos is always reassigned wholesale (never
 // mutated in place, both call sites), so a plain (non-deep) watch sees the pre-close membership as
 // `previous` and evicts whichever repoId(s) just dropped out.
 watch(
-  () => workspaceState.openRepos,
+  () => workspaceStore.openRepos,
   (openRepos, previous) => {
     if (!previous) return;
     for (const repoId of previous) {

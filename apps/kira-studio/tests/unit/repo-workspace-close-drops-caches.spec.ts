@@ -7,7 +7,11 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
@@ -20,9 +24,9 @@ const { ensureRepoTreeLoaded, isRepoTreeLoaded, repoTreePaths } = await import(
 const { repoSearchQuery, setRepoSearchQuery } = await import(
   '../../frontend/src/repo/state/search'
 );
-const { workspaceState, openRepoWorkspace, closeRepoWorkspace } = await import(
-  '../../frontend/src/state/workspace'
-);
+const { useWorkspaceStore } = await import('../../frontend/src/state/workspace');
+
+const workspaceStore = useWorkspaceStore();
 
 let repoCounter = 0;
 function freshRepoId() {
@@ -52,8 +56,8 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
     ).codeWorkspaceCloseWorkspace = async () => {};
     (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = async () => {};
 
-    openRepoWorkspace(repoId);
-    expect(workspaceState.openRepos).toContain(repoId);
+    workspaceStore.openRepoWorkspace(repoId);
+    expect(workspaceStore.openRepos).toContain(repoId);
 
     ensureRepoTreeLoaded(repoId);
     // ensureRepoTreeLoaded fires refreshRepoTree without awaiting it — drain the microtask queue so
@@ -66,9 +70,9 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
     setRepoSearchQuery(repoId, 'needle');
     expect(repoSearchQuery(repoId)).toBe('needle');
 
-    closeRepoWorkspace(repoId);
+    workspaceStore.closeRepoWorkspace(repoId);
 
-    expect(workspaceState.openRepos).not.toContain(repoId);
+    expect(workspaceStore.openRepos).not.toContain(repoId);
     expect(isRepoTreeLoaded(repoId)).toBe(false);
     expect(repoTreePaths(repoId)).toEqual([]);
     expect(repoSearchQuery(repoId)).toBe('');
@@ -78,7 +82,7 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
 
     // Reopening the same repo in the same session must rebuild cleanly rather than surface stale
     // (already-dropped) cache state.
-    openRepoWorkspace(repoId);
+    workspaceStore.openRepoWorkspace(repoId);
     ensureRepoTreeLoaded(repoId);
     await Promise.resolve();
     await Promise.resolve();

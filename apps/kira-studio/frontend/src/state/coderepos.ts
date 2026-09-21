@@ -2,7 +2,7 @@ import type { RepoSummary } from '@shared/domain/repo';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { closeRepoWorkspace, openRepoWorkspace } from './workspace';
+import { useWorkspaceStore } from './workspace';
 
 /** P82: canonicalized the way gitpath.CleanNFC canonicalizes a repository root
  *  (internal/gitpath/gitpath.go:46) — `git worktree list` reports paths verbatim, while
@@ -21,6 +21,10 @@ export const useCodeReposStore = defineStore('coderepos', () => {
   const state = reactive({
     records: [] as RepoSummary[],
   });
+  // The outer useCodeReposStore(pinia) call in main.ts's bootstrap() sets the active Pinia
+  // instance before this setup body runs, so this nested call correctly resolves to it without
+  // needing its own explicit instance (state/pinia.ts's own header comment).
+  const workspaceStore = useWorkspaceStore();
 
   function codeRepoRecord(id: string | null | undefined): RepoSummary | undefined {
     if (!id) return undefined;
@@ -55,7 +59,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
   async function removeCodeRepo(id: string): Promise<void> {
     await control.codeWorkspaceRemoveRepo(id);
     state.records = state.records.filter((r) => r.id !== id);
-    closeRepoWorkspace(id);
+    workspaceStore.closeRepoWorkspace(id);
   }
 
   /** P84 §4.5: exported under a name that says what it matches on — the same lookup
@@ -75,13 +79,13 @@ export const useCodeReposStore = defineStore('coderepos', () => {
   async function openRepoAtPath(path: string): Promise<void> {
     const existing = codeRepoRecordForPath(path);
     if (existing) {
-      openRepoWorkspace(existing.id);
+      workspaceStore.openRepoWorkspace(existing.id);
       return;
     }
     try {
       const imported = await control.codeWorkspaceImportRepo(path);
       state.records = [...state.records, imported];
-      openRepoWorkspace(imported.id);
+      workspaceStore.openRepoWorkspace(imported.id);
     } catch (err) {
       // Another window imported this root between the lookup above and this call — re-read the list
       // and use the row that now exists. Anything else propagates to the caller's own error surface.
@@ -89,7 +93,7 @@ export const useCodeReposStore = defineStore('coderepos', () => {
       await hydrateCodeRepos();
       const row = codeRepoRecordForPath(path);
       if (!row) throw err;
-      openRepoWorkspace(row.id);
+      workspaceStore.openRepoWorkspace(row.id);
     }
   }
 

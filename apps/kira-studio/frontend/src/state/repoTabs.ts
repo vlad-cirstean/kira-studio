@@ -20,7 +20,7 @@ import {
   tabsState,
 } from './tabs';
 import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
-import { openRepoWorkspace } from './workspace';
+import { useWorkspaceStore } from './workspace';
 
 // P91 §6: moved to state/terminalTabs.ts, which openTerminalTab below now shares with the
 // Terminal module's own (non-repo-scoped) opener — re-exported so no importer of this module
@@ -256,7 +256,7 @@ export function openRepoTerminalTab(
   cwd: string,
   launch?: TerminalLaunch,
 ): OpenTabResult {
-  openRepoWorkspace(codeRepoId);
+  useWorkspaceStore().openRepoWorkspace(codeRepoId);
   return openTerminalTab({ workspaceId: repoWorkspaceKey(codeRepoId), cwd, codeRepoId, launch });
 }
 
