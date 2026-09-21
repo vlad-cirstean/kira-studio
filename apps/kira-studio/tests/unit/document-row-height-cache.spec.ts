@@ -11,7 +11,12 @@
 // rows.ts imports vue's reactive() and state/tabRuntime.ts (registerTabRuntimeCleanup), neither of
 // which reach window/bridge, so no window stub is needed here.
 import { describe, expect, test } from 'bun:test';
-import {
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
+import { useDocumentRowsStore } from '../../frontend/src/views/shared/document/rows';
+
+setActivePinia(pinia);
+const {
   dropRows,
   pruneRows,
   registerDocumentRows,
@@ -19,7 +24,7 @@ import {
   rowHeight,
   togglePath,
   unregisterDocumentRows,
-} from '../../frontend/src/views/shared/document/rows';
+} = useDocumentRowsStore();
 
 let parseCalls = 0;
 const originalJSONParse = JSON.parse;

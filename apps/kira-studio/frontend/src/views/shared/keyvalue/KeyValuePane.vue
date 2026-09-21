@@ -62,7 +62,7 @@ import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { datasetNumber } from '../eventCoords';
 import SearchToolbar from '../page/SearchToolbar.vue';
 import { createMatchIndex } from '../page/search';
-import { setSearchFiltering } from '../page/searchFilter';
+import { usePageSearchFilterStore } from '../page/searchFilter';
 import { pageSizeOptions } from '../page/sizes';
 import { setVisibleRows } from '../page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../useConnectionGate';
@@ -89,6 +89,7 @@ const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const objectStoreStore = useObjectStoreStore();
+const pageSearchFilterStore = usePageSearchFilterStore();
 
 const props = defineProps<{
   viewKey: string;
@@ -945,7 +946,10 @@ onUnmounted(() => {
             label="No matching rows"
             data-testid="keyvalue-no-matching-rows"
           >
-            <AppButton data-testid="keyvalue-show-all-rows" @click="setSearchFiltering(viewKey, false)">
+            <AppButton
+              data-testid="keyvalue-show-all-rows"
+              @click="pageSearchFilterStore.setSearchFiltering(viewKey, false)"
+            >
               Show all rows
             </AppButton>
           </EmptyState>

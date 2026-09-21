@@ -8,14 +8,7 @@ import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
-import {
-  type DocumentRowView,
-  rowHeight as documentRowHeight,
-  pruneRows,
-  rowsVersion,
-  rowView,
-  togglePath,
-} from '../shared/document/rows';
+import { type DocumentRowView, useDocumentRowsStore } from '../shared/document/rows';
 import { datasetNumber } from '../shared/eventCoords';
 import { createMatchIndex } from '../shared/page/search';
 import { setVisibleRows } from '../shared/page/visibleRows';
@@ -27,6 +20,7 @@ import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded 
 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
+const documentRowsStore = useDocumentRowsStore();
 
 // A three-way switch over a console result's own kind (P8) — tabular results render through
 // ConsoleSlickGrid.vue (P30 §3, the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
@@ -99,7 +93,7 @@ function onVisibleRangeDocs(range: { start: number; end: number }): void {
   // (DocumentView.vue's own onVisibleRange) but had no call site here at all — a Mongo console
   // result's parsed node trees stayed resident for the life of the result instead of the rendered
   // window docs/ARCHITECTURE.md's Caching section already documents for this tier.
-  pruneRows(props.pageKey, from, to + 1);
+  documentRowsStore.pruneRows(props.pageKey, from, to + 1);
 }
 
 // P42 D11: the same head-row/DocumentTree pair the Mongo data tab renders (rowView/rowHeight —
@@ -110,7 +104,7 @@ const documentRows = computed<DocumentRowView[]>(() => {
   void pageVersion.n;
   const out: DocumentRowView[] = [];
   for (const i of rowIndices.value) {
-    const view = rowView(props.pageKey, i);
+    const view = documentRowsStore.rowView(props.pageKey, i);
     if (view) out.push(view);
   }
   return out;
@@ -118,9 +112,9 @@ const documentRows = computed<DocumentRowView[]>(() => {
 
 const documentRowHeights = computed<number[]>(() => {
   void pageVersion.n;
-  void rowsVersion.n;
+  void documentRowsStore.rowsVersion.n;
   return documentRows.value.map((view) =>
-    documentRowHeight(
+    documentRowsStore.rowHeight(
       props.pageKey,
       view.index,
       null,
@@ -350,7 +344,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
                 v-if="view.root"
                 :tab-id="pageKey"
                 :row="view.index"
-                @toggle-path="(path) => togglePath(pageKey, view.index, path)"
+                @toggle-path="(path) => documentRowsStore.togglePath(pageKey, view.index, path)"
               />
               <pre v-else class="doc-body-text">{{ documentRow(pageKey, view.index)?.body }}</pre>
             </div>

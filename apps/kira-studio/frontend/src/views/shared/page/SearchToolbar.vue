@@ -5,7 +5,7 @@ import IconButton from '../../../theme/primitives/IconButton.vue';
 import TextField from '../../../theme/primitives/TextField.vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
-import { isSearchFiltering, setSearchFiltering } from './searchFilter';
+import { usePageSearchFilterStore } from './searchFilter';
 
 // P39 D9: replaces grid/SearchToolbar.vue, documents/DocumentSearchToolbar.vue and
 // keyvalue/KeyValueSearchToolbar.vue — same markup, same classes, same testids (testidPrefix is
@@ -25,6 +25,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{ goToMatch: [match: M]; close: [] }>();
 
+const pageSearchFilterStore = usePageSearchFilterStore();
+
 // P31 D22/F24: `api.pageVersion.n` is the explicit dependency — the page stores read a plain,
 // non-reactive Map.
 const loadedRowCount = computed(() => {
@@ -34,11 +36,11 @@ const loadedRowCount = computed(() => {
 
 // P24 D9: the scope label gains a filtered form ("showing N of M loaded …") whenever the toggle
 // is on and a scan has completed.
-const filtering = computed(() => isSearchFiltering(props.tabId));
+const filtering = computed(() => pageSearchFilterStore.isSearchFiltering(props.tabId));
 const filteredRowCount = computed(() => props.api.matchedRows(props.tabId)?.length ?? null);
 
 function toggleFilter(): void {
-  setSearchFiltering(props.tabId, !filtering.value);
+  pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
 // Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
@@ -211,7 +213,7 @@ function close(): void {
   handle = null;
   props.api.clearSearchState(props.tabId);
   // P24 D7: a closed toolbar must never leave rows hidden with no visible cause.
-  setSearchFiltering(props.tabId, false);
+  pageSearchFilterStore.setSearchFiltering(props.tabId, false);
   emit('close');
 }
 
@@ -239,7 +241,7 @@ onUnmounted(() => {
   props.api.clearSearchState(props.tabId);
   // P24 D7: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too.
-  setSearchFiltering(props.tabId, false);
+  pageSearchFilterStore.setSearchFiltering(props.tabId, false);
 });
 </script>
 

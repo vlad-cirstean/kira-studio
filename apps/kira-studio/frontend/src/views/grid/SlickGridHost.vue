@@ -53,7 +53,7 @@ import {
   resetMeasureCtx,
   resolveColumnOrder,
 } from '../shared/page/columns';
-import { setSearchFiltering } from '../shared/page/searchFilter';
+import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
@@ -111,6 +111,7 @@ import { runtime, type Selection, setActionError, setMaskPreview, setSort } from
 
 const contextMenuStore = useContextMenuStore();
 const cellSelectionStore = useCellSelectionStore();
+const pageSearchFilterStore = usePageSearchFilterStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -2681,7 +2682,10 @@ defineExpose({
       label="No matching rows"
       data-testid="grid-no-matching-rows"
     >
-      <AppButton data-testid="grid-show-all-rows" @click="setSearchFiltering(props.tabId, false)">
+      <AppButton
+        data-testid="grid-show-all-rows"
+        @click="pageSearchFilterStore.setSearchFiltering(props.tabId, false)"
+      >
         Show all rows
       </AppButton>
     </EmptyState>

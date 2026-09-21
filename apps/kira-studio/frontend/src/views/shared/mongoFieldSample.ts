@@ -15,6 +15,7 @@
 // collection has no declared field set to cache, adapters/mongo/adapter.go's own Columns: [] for
 // the identical reason).
 
+import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { rowKey } from '../../project/state/tree';
 import type { Completion } from '../../theme/primitives/completion';
@@ -67,28 +68,30 @@ export function mongoSortCandidates(fieldNames: readonly string[]): Completion[]
   return fieldCompletions(fieldNames);
 }
 
-// P22c D8: connectionId + the collection's own tree path (e.g. "database:db/collection:widgets")
-// -> every field name any document tab for that collection has loaded, unioned across tabs.
-// rowKey (project/state/tree.ts) is reused verbatim for the key shape, not because this is tree
-// state, but so the two can never disagree about what "this collection" means.
-const fieldSampleState = reactive({ byCollection: {} as Record<string, string[]> });
+export const useMongoFieldSampleStore = defineStore('mongoFieldSample', () => {
+  // P22c D8: connectionId + the collection's own tree path (e.g. "database:db/collection:widgets")
+  // -> every field name any document tab for that collection has loaded, unioned across tabs.
+  // rowKey (project/state/tree.ts) is reused verbatim for the key shape, not because this is tree
+  // state, but so the two can never disagree about what "this collection" means. Returned as a
+  // named property directly (not toRefs) — a Record with dynamic keys.
+  const byCollection = reactive<Record<string, string[]>>({});
 
-/** Called by DocumentView.vue whenever its own loaded page changes — never by a CompletionSource,
- *  mirroring the language layer's own "receives data, never fetches" rule (P22c D5): this is a
- *  push from a view that already has the data, not a pull that could trigger one. */
-export function registerMongoFieldSample(
-  connectionId: string,
-  collectionPath: string,
-  fieldNames: readonly string[],
-): void {
-  fieldSampleState.byCollection[rowKey(connectionId, collectionPath)] = [...fieldNames];
-}
+  /** Called by DocumentView.vue whenever its own loaded page changes — never by a CompletionSource,
+   *  mirroring the language layer's own "receives data, never fetches" rule (P22c D5): this is a
+   *  push from a view that already has the data, not a pull that could trigger one. */
+  function registerMongoFieldSample(
+    connectionId: string,
+    collectionPath: string,
+    fieldNames: readonly string[],
+  ): void {
+    byCollection[rowKey(connectionId, collectionPath)] = [...fieldNames];
+  }
 
-/** A plain property lookup — [] when nothing has been loaded yet, the honest degradation D8 names
- *  rather than an error. */
-export function mongoFieldNamesFor(
-  connectionId: string,
-  collectionPath: string,
-): readonly string[] {
-  return fieldSampleState.byCollection[rowKey(connectionId, collectionPath)] ?? [];
-}
+  /** A plain property lookup — [] when nothing has been loaded yet, the honest degradation D8 names
+   *  rather than an error. */
+  function mongoFieldNamesFor(connectionId: string, collectionPath: string): readonly string[] {
+    return byCollection[rowKey(connectionId, collectionPath)] ?? [];
+  }
+
+  return { byCollection, registerMongoFieldSample, mongoFieldNamesFor };
+});

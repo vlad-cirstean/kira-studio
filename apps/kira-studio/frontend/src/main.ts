@@ -42,7 +42,7 @@ import {
 import { searchState as documentSearchState } from './views/documents/search';
 import { pageStoreEntries as gridPageStoreEntries, totalRetainedBytes } from './views/grid/page';
 import { searchState as gridSearchState } from './views/grid/search';
-import { retentionSnapshot as documentRowsRetention } from './views/shared/document/rows';
+import { useDocumentRowsStore } from './views/shared/document/rows';
 import {
   pageStoreEntries as keyValuePageStoreEntries,
   totalRetainedBytes as keyValueRetainedBytes,
@@ -57,7 +57,7 @@ import {
   pageStoreEntries as streamPageStoreEntries,
   totalRetainedBytes as streamRetainedBytes,
 } from './views/stream/page';
-import { searchState as streamSearchState } from './views/stream/search';
+import { useStreamSearchStore } from './views/stream/search';
 import { useTooltipStore } from './workbench/state/tooltip';
 
 /** P5 C1: what `window.__kiraRetention` reports for one of the five page stores — the decode/view
@@ -267,13 +267,13 @@ if (__KIRA_DEBUG_HOOKS__) {
         stream: storeStats(streamEntries),
         console: storeStats(consoleEntries),
       },
-      documentRows: documentRowsRetention(),
+      documentRows: useDocumentRowsStore().retentionSnapshot(),
       searchMatches: {
         grid: sumMatches(gridSearchState),
         documents: sumMatches(documentSearchState),
         keyvalue: sumMatches(keyValueSearchState),
         console: sumMatches(consoleSearchState),
-        stream: sumMatches(streamSearchState),
+        stream: sumMatches(useStreamSearchStore().searchState),
       },
       frameBuffers: frameBufferStats([
         ...gridEntries,

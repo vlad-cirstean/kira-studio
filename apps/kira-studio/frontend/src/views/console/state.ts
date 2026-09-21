@@ -7,7 +7,7 @@ import { connectionRecord } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
-import { dropRows, registerDocumentRows, unregisterDocumentRows } from '../shared/document/rows';
+import { useDocumentRowsStore } from '../shared/document/rows';
 import { applyLoadFailure, classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { explainStatementsFor, isExplainable } from './explain';
 import { dropPlan, setPlan } from './explainResults';
@@ -188,10 +188,11 @@ export function resultPageKey(tabId: string, seq: number): string {
  *  that removes a result from `rt.results` — a full clear, a strip ×, closeOthers/closeToTheRight,
  *  and evictOldestResults below — goes through this one release path. */
 function releaseResult(rt: ConsoleViewRuntime, result: ConsoleResult): void {
+  const documentRowsStore = useDocumentRowsStore();
   dropPage(result.key);
   dropPlan(result.key);
-  unregisterDocumentRows(result.key);
-  dropRows(result.key);
+  documentRowsStore.unregisterDocumentRows(result.key);
+  documentRowsStore.dropRows(result.key);
   pruneExpandedDocIds(rt, result.key);
 }
 
@@ -449,7 +450,9 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
       // P42 D11: a document-kind result renders through views/shared/document/'s row model,
       // which resolves a scope key through a registered source rather than an import — this
       // result's own key is that scope, and resultPages.ts's documentRow is its source.
-      if (page.kind === 'document') registerDocumentRows(key, (row) => documentRow(key, row));
+      if (page.kind === 'document') {
+        useDocumentRowsStore().registerDocumentRows(key, (row) => documentRow(key, row));
+      }
       return { key, rowCount: page.rowCount, kind: 'page' as const };
     });
     rt.results.push(...newResults);

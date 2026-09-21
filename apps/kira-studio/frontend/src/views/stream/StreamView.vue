@@ -26,7 +26,7 @@ import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { datasetNumber } from '../shared/eventCoords';
-import { setSearchFiltering } from '../shared/page/searchFilter';
+import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { refreshOrReconnect, useConnectionGate } from '../shared/useConnectionGate';
@@ -36,7 +36,7 @@ import { getPage, pageVersion, setVisibleWindow, streamRow } from './page';
 import StreamComposeMessage from './StreamComposeMessage.vue';
 import StreamFilterHistoryMenu from './StreamFilterHistoryMenu.vue';
 import StreamSearchToolbar from './StreamSearchToolbar.vue';
-import { matchedRows, searchState } from './search';
+import { useStreamSearchStore } from './search';
 import {
   applyStreamFilter,
   goNext,
@@ -56,6 +56,8 @@ import {
 const cellSelectionStore = useCellSelectionStore();
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
+const pageSearchFilterStore = usePageSearchFilterStore();
+const streamSearchStore = useStreamSearchStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -117,7 +119,7 @@ const page = computed(() => {
 
 // P31 D17/D18: the same "hide non-matching rows" toggle grid/keyvalue/documents share (P24 D2) —
 // filtered rows keep their real row number (the `i + 1` gutter below), same as those views.
-const displayRows = computed<number[] | null>(() => matchedRows(props.tab.id));
+const displayRows = computed<number[] | null>(() => streamSearchStore.matchedRows(props.tab.id));
 const rowIndices = computed(() => {
   void pageVersion.n;
   if (displayRows.value) return displayRows.value;
@@ -452,9 +454,11 @@ function onToggleSearch(): void {
   toggleSearchOpen(props.tab.id);
 }
 
-const matchSet = computed(() => new Set(searchState[props.tab.id]?.matches ?? []));
+const matchSet = computed(
+  () => new Set(streamSearchStore.searchState[props.tab.id]?.matches ?? []),
+);
 const currentMatchRow = computed(() => {
-  const s = searchState[props.tab.id];
+  const s = streamSearchStore.searchState[props.tab.id];
   return s && s.index >= 0 ? (s.matches[s.index] ?? null) : null;
 });
 
@@ -847,7 +851,10 @@ onUnmounted(() => {
           label="No matching rows"
           data-testid="stream-no-matching-rows"
         >
-          <AppButton data-testid="stream-show-all-rows" @click="setSearchFiltering(tab.id, false)">
+          <AppButton
+            data-testid="stream-show-all-rows"
+            @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
+          >
             Show all rows
           </AppButton>
         </EmptyState>

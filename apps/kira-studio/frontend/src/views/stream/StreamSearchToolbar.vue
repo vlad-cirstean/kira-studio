@@ -3,19 +3,15 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import TextField from '../../theme/primitives/TextField.vue';
-import { isSearchFiltering, setSearchFiltering } from '../shared/page/searchFilter';
+import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
-import {
-  clearSearchState,
-  goToNextMatch,
-  goToPrevMatch,
-  matchedRows,
-  runSearch,
-  searchState,
-} from './search';
+import { useStreamSearchStore } from './search';
 
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ goToMatch: [row: number]; close: [] }>();
+
+const pageSearchFilterStore = usePageSearchFilterStore();
+const streamSearchStore = useStreamSearchStore();
 
 // README's own "search walks the loaded rows only and never issues a query" wording, borrowed
 // verbatim from views/shared/page/SearchToolbar.vue's precedent — applies here too (item 5).
@@ -26,14 +22,16 @@ const loadedRowCount = computed(() => {
 });
 
 // P31 D17: the same filter-mode toggle views/shared/page/SearchToolbar.vue has (P24 D1/D9).
-const filtering = computed(() => isSearchFiltering(props.tabId));
-const filteredRowCount = computed(() => matchedRows(props.tabId)?.length ?? null);
+const filtering = computed(() => pageSearchFilterStore.isSearchFiltering(props.tabId));
+const filteredRowCount = computed(
+  () => streamSearchStore.matchedRows(props.tabId)?.length ?? null,
+);
 function toggleFilter(): void {
-  setSearchFiltering(props.tabId, !filtering.value);
+  pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
 const query = ref('');
-const entry = computed(() => searchState[props.tabId]);
+const entry = computed(() => streamSearchStore.searchState[props.tabId]);
 
 // See views/shared/page/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
 // target (TextField wraps its <input> in its own root <span>, P4) and why onMounted is the
@@ -41,8 +39,8 @@ const entry = computed(() => searchState[props.tabId]);
 const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 watch(query, (q) => {
-  runSearch(props.tabId, q);
-  const e = searchState[props.tabId];
+  streamSearchStore.runSearch(props.tabId, q);
+  const e = streamSearchStore.searchState[props.tabId];
   if (e && e.matches.length > 0) emit('goToMatch', e.matches[0]);
 });
 
@@ -52,23 +50,23 @@ watch(query, (q) => {
 watch(
   () => pageVersion.n,
   () => {
-    if (query.value !== '') runSearch(props.tabId, query.value);
+    if (query.value !== '') streamSearchStore.runSearch(props.tabId, query.value);
   },
 );
 
 function next(): void {
-  const row = goToNextMatch(props.tabId);
+  const row = streamSearchStore.goToNextMatch(props.tabId);
   if (row !== null) emit('goToMatch', row);
 }
 function prev(): void {
-  const row = goToPrevMatch(props.tabId);
+  const row = streamSearchStore.goToPrevMatch(props.tabId);
   if (row !== null) emit('goToMatch', row);
 }
 
 function close(): void {
-  clearSearchState(props.tabId);
+  streamSearchStore.clearSearchState(props.tabId);
   // P24 D7/P31 D18: a closed toolbar must never leave rows hidden with no visible cause.
-  setSearchFiltering(props.tabId, false);
+  pageSearchFilterStore.setSearchFiltering(props.tabId, false);
   emit('close');
 }
 
@@ -86,10 +84,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  clearSearchState(props.tabId);
+  streamSearchStore.clearSearchState(props.tabId);
   // P31 D18: Cmd+F toggling the toolbar off unmounts this component without ever calling close()
   // above — the toggle must reset here too (mirrors views/shared/page/SearchToolbar.vue's own note).
-  setSearchFiltering(props.tabId, false);
+  pageSearchFilterStore.setSearchFiltering(props.tabId, false);
 });
 </script>
 

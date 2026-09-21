@@ -22,26 +22,17 @@ import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
-import {
-  type DocumentRowView,
-  pruneRows,
-  registerDocumentRows,
-  rowHeight,
-  rowsVersion,
-  rowView,
-  togglePath,
-  unregisterDocumentRows,
-} from '../shared/document/rows';
+import { type DocumentRowView, useDocumentRowsStore } from '../shared/document/rows';
 import EditBufferActions from '../shared/EditBufferActions.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import {
   mongoFilterCandidates,
   mongoSortCandidates,
-  registerMongoFieldSample,
+  useMongoFieldSampleStore,
 } from '../shared/mongoFieldSample';
 import PagerControls from '../shared/page/PagerControls.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
-import { setSearchFiltering } from '../shared/page/searchFilter';
+import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { pageSizeOptions } from '../shared/page/sizes';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { ancestorPathPrefix } from '../shared/targetPath';
@@ -84,6 +75,9 @@ import {
 
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
+const documentRowsStore = useDocumentRowsStore();
+const mongoFieldSampleStore = useMongoFieldSampleStore();
+const pageSearchFilterStore = usePageSearchFilterStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
@@ -96,7 +90,7 @@ const props = defineProps<{ tab: DocumentTabRecord }>();
 // its first, empty-sourced result cached for good. A restored tab returning empty on reopen was
 // the reported symptom (never a fresh load — this only shows up once a tab is loaded and remounts
 // without reloading, so the fresh-open path this comment used to describe never hit it).
-registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
+documentRowsStore.registerDocumentRows(props.tab.id, (row) => documentRow(props.tab.id, row));
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -226,7 +220,7 @@ watch(
   () => [pageVersion.n, props.tab.connectionId, props.tab.path] as const,
   ([, connectionId, path]) => {
     if (!connectionId) return;
-    registerMongoFieldSample(connectionId, path, fieldNamesOnPage(props.tab.id));
+    mongoFieldSampleStore.registerMongoFieldSample(connectionId, path, fieldNamesOnPage(props.tab.id));
   },
   { immediate: true },
 );
@@ -384,7 +378,7 @@ const rows = computed<number[]>(() => {
  *  calls for the same row within one render are cheap Map lookups, not a re-decode/re-parse. */
 function rowAt(row: number): DocumentRowEntry | null {
   const doc = documentRow(props.tab.id, row);
-  const view = rowView(props.tab.id, row);
+  const view = documentRowsStore.rowView(props.tab.id, row);
   if (!doc || !view) return null;
   return { view, body: doc.body };
 }
@@ -419,7 +413,7 @@ function onVisibleRange(range: { start: number; end: number }): void {
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tab.id, from, to + 1);
   setVisibleWindow(props.tab.id, from, to + 1);
-  pruneRows(props.tab.id, from, to + 1);
+  documentRowsStore.pruneRows(props.tab.id, from, to + 1);
 }
 
 // P31 D20: real match highlighting — .search-match/.search-match-current on the row, and the
@@ -494,11 +488,11 @@ function previewSegments(row: number, body: string): PreviewSegment[] {
 // unedited, non-preview row, which is the common case for every row outside the rendered window.
 const rowHeights = computed<number[]>(() => {
   void pageVersion.n;
-  void rowsVersion.n;
+  void documentRowsStore.rowsVersion.n;
   return rows.value.map((row) => {
     const id = documentRow(props.tab.id, row)?.id ?? null;
     const expanded = id !== null && isDocumentExpanded(props.tab.id, id);
-    return rowHeight(
+    return documentRowsStore.rowHeight(
       props.tab.id,
       row,
       editingRow.value,
@@ -516,7 +510,7 @@ const rowHeights = computed<number[]>(() => {
 // filter toggle (D17) is off, so this always looks the position up rather than assuming they match.
 function onGoToMatch(match: Match): void {
   const row = match.row;
-  const view = rowView(props.tab.id, row);
+  const view = documentRowsStore.rowView(props.tab.id, row);
   if (!view) return;
   if (!isDocumentExpanded(props.tab.id, view.id)) toggleExpanded(props.tab.id, view.id);
   void nextTick(() => {
@@ -618,7 +612,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  unregisterDocumentRows(props.tab.id);
+  documentRowsStore.unregisterDocumentRows(props.tab.id);
   unregisterCommand?.();
   unregisterFindCommand?.();
 });
@@ -860,7 +854,10 @@ onUnmounted(() => {
           label="No matching rows"
           data-testid="document-no-matching-rows"
         >
-          <AppButton data-testid="document-show-all-rows" @click="setSearchFiltering(tab.id, false)">
+          <AppButton
+            data-testid="document-show-all-rows"
+            @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
+          >
             Show all rows
           </AppButton>
         </EmptyState>
@@ -965,7 +962,7 @@ onUnmounted(() => {
                     v-else-if="rowAt(item)!.view.root"
                     :tab-id="tab.id"
                     :row="item"
-                    @toggle-path="(path) => togglePath(tab.id, item, path)"
+                    @toggle-path="(path) => documentRowsStore.togglePath(tab.id, item, path)"
                   />
                   <!-- D22: a body that doesn't parse (truncated mid-token, or genuinely not an
                        object) falls back to raw text rather than a tree that has nothing to walk. -->

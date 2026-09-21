@@ -8,7 +8,7 @@ import {
 } from '@shared/domain/tree';
 import type { EditorCompletionSource } from '../../editor/completion';
 import { rowKey, treeState } from '../../project/state/tree';
-import { mongoFieldNamesFor } from '../shared/mongoFieldSample';
+import { useMongoFieldSampleStore } from '../shared/mongoFieldSample';
 import {
   MONGO_QUERY_OPERATORS,
   MONGO_VALUE_CONSTRUCTORS,
@@ -155,7 +155,9 @@ function mongoCompletionSource(connectionId: string, path: string): EditorComple
     // Monaco's own default matching narrows the combined list as more is typed.
     if (/^[A-Za-z]/.test(wordText)) {
       const collectionPath = enclosingCollectionPath(path, before);
-      const fields = collectionPath ? mongoFieldNamesFor(connectionId, collectionPath) : [];
+      const fields = collectionPath
+        ? useMongoFieldSampleStore().mongoFieldNamesFor(connectionId, collectionPath)
+        : [];
       return {
         from,
         options: [

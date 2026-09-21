@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import { wheelToHorizontal } from '../../../wheelScroll';
-import { rowsVersion, visibleLines } from './rows';
+import { useDocumentRowsStore } from './rows';
 
 // One expanded document's body, rendered as flat indented key/value lines out of visibleLines()
 // (P27 D19) — no CodeMirror, no per-node component recursion, so the DOM cost here is linear in
@@ -10,9 +10,11 @@ import { rowsVersion, visibleLines } from './rows';
 const props = defineProps<{ tabId: string; row: number }>();
 const emit = defineEmits<{ 'toggle-path': [path: string] }>();
 
+const documentRowsStore = useDocumentRowsStore();
+
 const lines = computed(() => {
-  void rowsVersion.n;
-  return visibleLines(props.tabId, props.row);
+  void documentRowsStore.rowsVersion.n;
+  return documentRowsStore.visibleLines(props.tabId, props.row);
 });
 
 // P43 iter3 D42/F31: a long scalar value is revealed by scrolling this list sideways rather than

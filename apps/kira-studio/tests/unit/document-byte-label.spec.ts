@@ -8,11 +8,14 @@
 // "some number came back".
 import { describe, expect, test } from 'bun:test';
 import { createDocumentPageBuilder, unpagedPosition } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
+
+setActivePinia(pinia);
 
 const documentsPage = await import('../../frontend/src/views/documents/page');
-const { registerDocumentRows, rowView, unregisterDocumentRows, resetRows } = await import(
-  '../../frontend/src/views/shared/document/rows'
-);
+const { useDocumentRowsStore } = await import('../../frontend/src/views/shared/document/rows');
+const documentRowsStore = useDocumentRowsStore();
 
 describe('document byteLabel (P2 R2 #99)', () => {
   test('1. byteLabel reflects the raw UTF-8 byte length, not the UTF-16 string length', () => {
@@ -29,14 +32,14 @@ describe('document byteLabel (P2 R2 #99)', () => {
     builder.push('{"$oid":"abc"}', body);
     const page = builder.finish(unpagedPosition(1));
     documentsPage.setPage(tabId, page);
-    registerDocumentRows(tabId, (row) => documentsPage.documentRow(tabId, row));
+    documentRowsStore.registerDocumentRows(tabId, (row) => documentsPage.documentRow(tabId, row));
 
     try {
-      const view = rowView(tabId, 0);
+      const view = documentRowsStore.rowView(tabId, 0);
       expect(view?.byteLabel).toBe(`${expectedBytes} bytes`);
     } finally {
-      unregisterDocumentRows(tabId);
-      resetRows(tabId);
+      documentRowsStore.unregisterDocumentRows(tabId);
+      documentRowsStore.resetRows(tabId);
     }
   });
 
@@ -47,14 +50,14 @@ describe('document byteLabel (P2 R2 #99)', () => {
     builder.push('{"$oid":"def"}', body);
     const page = builder.finish(unpagedPosition(1));
     documentsPage.setPage(tabId, page);
-    registerDocumentRows(tabId, (row) => documentsPage.documentRow(tabId, row));
+    documentRowsStore.registerDocumentRows(tabId, (row) => documentsPage.documentRow(tabId, row));
 
     try {
-      const view = rowView(tabId, 0);
+      const view = documentRowsStore.rowView(tabId, 0);
       expect(view?.byteLabel).toBe(`${body.length} bytes`);
     } finally {
-      unregisterDocumentRows(tabId);
-      resetRows(tabId);
+      documentRowsStore.unregisterDocumentRows(tabId);
+      documentRowsStore.resetRows(tabId);
     }
   });
 });

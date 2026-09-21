@@ -1,7 +1,7 @@
 import { type ComputedRef, computed, shallowReactive } from 'vue';
 import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 import type { SearchHandle, SearchQuery } from './scan';
-import { matchedRowsOf } from './searchFilter';
+import { usePageSearchFilterStore } from './searchFilter';
 
 // P39 D9: what views/shared/page/SearchToolbar.vue is bound to. Each of grid/search.ts,
 // documents/search.ts and keyvalue/search.ts exports one literal of this shape, built from
@@ -62,7 +62,7 @@ function createSearchState<M extends { row: number }>(): {
   function matchedRows(tabId: string): number[] | null {
     const entry = searchState[tabId];
     if (entry?.pending) return null;
-    return matchedRowsOf(tabId, entry?.matches);
+    return usePageSearchFilterStore().matchedRowsOf(tabId, entry?.matches);
   }
 
   return { searchState, clearSearchState, matchedRows };
