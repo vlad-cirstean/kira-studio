@@ -37,26 +37,12 @@ import { consoleLintSource } from './lint';
 import { getPage } from './resultPages';
 import { type Match, pageSearchApi } from './search';
 import { sqlHoverSource } from './sqlHover';
-import {
-  clearAutoExplain,
-  closeOtherResults,
-  closeResult,
-  closeResultsToTheRight,
-  explain,
-  run,
-  runtime,
-  setActiveResult,
-  setNewResultSet,
-  setSearchOpen,
-  setText,
-  showAutoExplainPlan,
-  stop,
-  toggleSearchOpen,
-} from './state';
+import { setNewResultSet, setText, useConsoleViewStore } from './state';
 
 const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
+const consoleViewStore = useConsoleViewStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -65,7 +51,7 @@ const props = defineProps<{ tab: ConsoleTabRecord }>();
 // runs), so no onLoad is passed.
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(() => props.tab);
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => consoleViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
 const targetTail = computed(() => pathTail(props.tab.path));
@@ -265,7 +251,7 @@ const autoExplainMessage = computed(() => {
 const canShowAutoExplainPlan = computed(() => rt.value?.autoExplain?.kind === 'plans');
 
 function onShowAutoExplainPlan(): void {
-  showAutoExplainPlan(props.tab.id);
+  consoleViewStore.showAutoExplainPlan(props.tab.id);
 }
 // Typed as the bare exposed shape (rather than InstanceType<typeof MonacoHost>) so this ref
 // doesn't read as a type-only use of the MonacoHost import — same convention as
@@ -304,7 +290,7 @@ function resetStalePreviewState(): void {
   formatNote.value = null;
   explainError.value = null;
   // D19: the auto-explain strip clears on the next document edit, same as the two above.
-  clearAutoExplain(props.tab.id);
+  consoleViewStore.clearAutoExplain(props.tab.id);
 }
 
 function onDocChange(text: string): void {
@@ -348,7 +334,7 @@ function runStatement(): void {
   if (!stmt) return;
   void (async () => {
     await ensureConnectedForRun();
-    await run(props.tab.id, [stmt.text]);
+    await consoleViewStore.run(props.tab.id, [stmt.text]);
   })();
 }
 
@@ -360,12 +346,12 @@ function runAll(): void {
   if (statements.length === 0) return;
   void (async () => {
     await ensureConnectedForRun();
-    await run(props.tab.id, statements);
+    await consoleViewStore.run(props.tab.id, statements);
   })();
 }
 
 function onStop(): void {
-  stop(props.tab.id);
+  consoleViewStore.stop(props.tab.id);
 }
 
 // P19 D12(3): maps the caret across the reformat by statement INDEX, not offset — formatting
@@ -433,7 +419,7 @@ function onExplain(): void {
   if (!kind || !stmt || !canExplain.value) return;
   void (async () => {
     await ensureConnectedForRun();
-    const result = await explain(props.tab.id, kind, stmt);
+    const result = await consoleViewStore.explain(props.tab.id, kind, stmt);
     explainError.value = result.ok ? null : result.reason;
   })();
 }
@@ -441,10 +427,10 @@ function onExplain(): void {
 // --- search: the shared find toolbar over the active result set (P40 D8/D9). Mirrors
 // KeyValueView.vue's own onToggleSearch/onCloseSearch discipline exactly. -----------------------
 function onToggleSearch(): void {
-  toggleSearchOpen(props.tab.id);
+  consoleViewStore.toggleSearchOpen(props.tab.id);
 }
 function onCloseSearch(): void {
-  setSearchOpen(props.tab.id, false);
+  consoleViewStore.setSearchOpen(props.tab.id, false);
 }
 
 const resultGridRef = ref<{
@@ -505,7 +491,7 @@ function iconForResult(key: string): string {
 }
 
 function onResultMiddleClick(key: string): void {
-  closeResult(props.tab.id, key);
+  consoleViewStore.closeResult(props.tab.id, key);
 }
 
 // P42 D8: the same three items TabStrip.vue's own tab row leads with, over one tab's result sets
@@ -518,21 +504,21 @@ function onResultContextMenu(e: MouseEvent, key: string, index: number): void {
       id: 'close',
       label: 'Close',
       icon: 'close',
-      run: () => closeResult(props.tab.id, key),
+      run: () => consoleViewStore.closeResult(props.tab.id, key),
     },
     {
       type: 'item',
       id: 'close-other-results',
       label: 'Close others',
       disabled: total <= 1,
-      run: () => closeOtherResults(props.tab.id, key),
+      run: () => consoleViewStore.closeOtherResults(props.tab.id, key),
     },
     {
       type: 'item',
       id: 'close-results-to-the-right',
       label: 'Close to the right',
       disabled: index >= total - 1,
-      run: () => closeResultsToTheRight(props.tab.id, key),
+      run: () => consoleViewStore.closeResultsToTheRight(props.tab.id, key),
     },
   ]);
 }
@@ -745,7 +731,7 @@ const statusLine = computed(() => {
               :class="{ 'is-active': result.key === rt.activeKey }"
               data-testid="console-result-tab"
               :data-active="result.key === rt.activeKey"
-              @click="setActiveResult(tab.id, result.key)"
+              @click="consoleViewStore.setActiveResult(tab.id, result.key)"
               @auxclick.middle="onResultMiddleClick(result.key)"
               @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
             >
@@ -756,7 +742,7 @@ const statusLine = computed(() => {
                 role="button"
                 aria-label="Close result"
                 data-testid="console-result-close"
-                @click.stop="closeResult(tab.id, result.key)"
+                @click.stop="consoleViewStore.closeResult(tab.id, result.key)"
               >
                 <CodiconIcon name="close" :size="11" />
               </span>

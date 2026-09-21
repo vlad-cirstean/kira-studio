@@ -14,49 +14,55 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 
-const { consoleColumnWidths, setConsoleColumnWidths, runtime } = await import(
-  '../../frontend/src/views/console/state'
-);
+setActivePinia(pinia);
+
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 describe('consoleColumnWidths / setConsoleColumnWidths (console/state.ts)', () => {
   test('1. a tab with no runtime yet reads as empty — never throws', () => {
-    expect(consoleColumnWidths('never-touched-console-tab')).toEqual({});
+    expect(consoleViewStore.consoleColumnWidths('never-touched-console-tab')).toEqual({});
   });
 
   test('2. a width set for one tab is read back exactly, unaffected by other tabs', () => {
     const tabId = 'console-widths-tab-1';
-    setConsoleColumnWidths(tabId, { id: 80, name: 220 });
-    expect(consoleColumnWidths(tabId)).toEqual({ id: 80, name: 220 });
-    expect(consoleColumnWidths('a-different-tab')).toEqual({});
+    consoleViewStore.setConsoleColumnWidths(tabId, { id: 80, name: 220 });
+    expect(consoleViewStore.consoleColumnWidths(tabId)).toEqual({ id: 80, name: 220 });
+    expect(consoleViewStore.consoleColumnWidths('a-different-tab')).toEqual({});
   });
 
   test('3. survives across separate calls — the same tab reused for a later "query run" sees the width a prior one committed', () => {
     const tabId = 'console-widths-tab-2';
     // First query's grid mount measures `id` and commits it as the tab's sticky width.
-    setConsoleColumnWidths(tabId, { id: 64 });
+    consoleViewStore.setConsoleColumnWidths(tabId, { id: 64 });
     // A second query in the same tab (a fresh ConsoleSlickGrid.vue mount, new pageKey) reads it
     // back before deciding whether to measure `id` fresh — this is the read that must see 64,
     // not fall through to a new measurement.
-    expect(consoleColumnWidths(tabId).id).toBe(64);
+    expect(consoleViewStore.consoleColumnWidths(tabId).id).toBe(64);
 
     // The second query's result also introduces a column `id` never had a width for — the sticky
     // store gains it without disturbing `id`'s own already-committed width (buildColumns' own
     // merge logic, `{ ...stored, [newName]: measuredWidth }`).
-    setConsoleColumnWidths(tabId, { ...consoleColumnWidths(tabId), status: 96 });
-    expect(consoleColumnWidths(tabId)).toEqual({ id: 64, status: 96 });
+    consoleViewStore.setConsoleColumnWidths(tabId, {
+      ...consoleViewStore.consoleColumnWidths(tabId),
+      status: 96,
+    });
+    expect(consoleViewStore.consoleColumnWidths(tabId)).toEqual({ id: 64, status: 96 });
   });
 
   test('4. only reset when the tab runtime itself is gone (a genuinely new session), not by anything else touching that runtime record', () => {
     const tabId = 'console-widths-tab-3';
-    setConsoleColumnWidths(tabId, { id: 64 });
+    consoleViewStore.setConsoleColumnWidths(tabId, { id: 64 });
     // Some unrelated runtime field changing (e.g. a new result set becoming active) must not
     // reset the width store — it's a distinct field on the same record.
-    runtime[tabId].activeKey = 'some-other-result-key';
-    expect(consoleColumnWidths(tabId)).toEqual({ id: 64 });
+    consoleViewStore.runtime[tabId].activeKey = 'some-other-result-key';
+    expect(consoleViewStore.consoleColumnWidths(tabId)).toEqual({ id: 64 });
 
     // Only deleting the whole runtime record (what tab close does) clears it.
-    delete runtime[tabId];
-    expect(consoleColumnWidths(tabId)).toEqual({});
+    delete consoleViewStore.runtime[tabId];
+    expect(consoleViewStore.consoleColumnWidths(tabId)).toEqual({});
   });
 });

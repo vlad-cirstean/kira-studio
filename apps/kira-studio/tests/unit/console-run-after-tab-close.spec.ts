@@ -26,7 +26,10 @@ restoreAfterEach(data);
 const { cleanupTabRuntime } = await import('../../frontend/src/state/tabRuntime');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, runtime, resultPageKey } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore, resultPageKey } = await import(
+  '../../frontend/src/views/console/state'
+);
+const consoleViewStore = useConsoleViewStore();
 const { getPage } = await import('../../frontend/src/views/console/resultPages');
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
@@ -49,16 +52,16 @@ describe('console run() after the tab closes mid-run (P12 round 2 finding #3)', 
     // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
     (data as any).execute = (): Promise<ExecuteResponse> => call.promise;
 
-    const running = run(tabId, ['SELECT 1']);
+    const running = consoleViewStore.run(tabId, ['SELECT 1']);
     await Promise.resolve(); // let run() reach the await inside data.execute
 
     cleanupTabRuntime(tabId); // the real closeTab-time signal — deletes runtime[tabId]
-    expect(runtime[tabId]).toBeUndefined();
+    expect(consoleViewStore.runtime[tabId]).toBeUndefined();
 
     call.resolve({ pages: [fakePage()] });
     await running;
 
-    expect(runtime[tabId]).toBeUndefined();
+    expect(consoleViewStore.runtime[tabId]).toBeUndefined();
     // The leaked key run() would otherwise have written under, had it ignored the closed tab.
     expect(getPage(resultPageKey(tabId, 0))).toBeNull();
   });

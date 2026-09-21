@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import type { Page } from '@shared/protocol/page';
+import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
@@ -95,55 +96,6 @@ function defaultRuntime(): ConsoleViewRuntime {
   };
 }
 
-const { runtime, ensureRuntime, toggleSearchOpen, setSearchOpen } =
-  createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
-
-export { runtime, setSearchOpen, toggleSearchOpen };
-
-export function isResultDocExpanded(tabId: string, resultKey: string, id: string): boolean {
-  return runtime[tabId]?.expandedDocIds.has(`${resultKey}:${id}`) ?? false;
-}
-
-// Real-interaction fix — ConsoleSlickGrid.vue's own onMounted/onColumnsResized read and write
-// through these two rather than reaching into `runtime[tabId]` directly, mirroring
-// grid/SlickGridHost.vue's own `currentWidths()`/`onColumnsResized` pair (tab.state.columnWidths)
-// as closely as a runtime-only, no-tab-state console result can.
-export function consoleColumnWidths(tabId: string): Record<string, number> {
-  return runtime[tabId]?.columnWidths ?? {};
-}
-
-export function setConsoleColumnWidths(tabId: string, widths: Record<string, number>): void {
-  ensureRuntime(tabId).columnWidths = widths;
-}
-
-export function toggleResultDocExpanded(tabId: string, resultKey: string, id: string): void {
-  const rt = ensureRuntime(tabId);
-  const key = `${resultKey}:${id}`;
-  if (rt.expandedDocIds.has(key)) rt.expandedDocIds.delete(key);
-  else rt.expandedDocIds.add(key);
-}
-
-// Item (regression pass, task batch P46-4): the expand-all/collapse-all toolbar pair
-// DocumentView.vue's own document tab has (its own state.ts's setAllExpanded) — added here once
-// the console's document results lost their other way to see a whole document at a glance (the
-// cell editor dock, now removed as a redundant second copy of the same DocumentTree, P42 D11).
-// Unlike that tab's map (absent = expanded, D2/D32's own comment), this Set's model is the
-// opposite — absent = collapsed (this file's own defaultRuntime comment) — so *expand* all adds
-// every id instead of clearing the set, and *collapse* all prunes by prefix same as a result close.
-export function setAllResultDocsExpanded(
-  tabId: string,
-  resultKey: string,
-  ids: string[],
-  expand: boolean,
-): void {
-  const rt = ensureRuntime(tabId);
-  if (!expand) {
-    pruneExpandedDocIds(rt, resultKey);
-    return;
-  }
-  for (const id of ids) rt.expandedDocIds.add(`${resultKey}:${id}`);
-}
-
 // P43 iter2 F23a: `rt.expandedDocIds` is keyed `${resultKey}:${docId}` — a result's own keys are
 // contiguous under one prefix by construction (resultPageKey's `seq` never repeats), so pruning
 // by prefix is correct without touching any other result's entries.
@@ -153,28 +105,6 @@ function pruneExpandedDocIds(rt: ConsoleViewRuntime, key: string): void {
     if (id.startsWith(prefix)) rt.expandedDocIds.delete(id);
   }
 }
-
-// D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
-// state/tabs.ts's dropAllPagesForTab already frees this tab's entries in resultPages.ts's own
-// `pages` map directly (P40 D1: rt.results holds only { key, rowCount } now, never a Page, so
-// there is no second reference here left to release before the record itself is dropped).
-// P43 iter2 F23/D32: dropRows(result.key) is the same release for views/shared/document/rows.ts's
-// own per-result parse cache — unregisterDocumentRows alone only drops the *source* pointer
-// (rows.ts:25-27's own `rowSources.delete`), leaving every already-parsed document tree for that
-// result retained under a key `nextSeq` guarantees is never reused, for the life of the process.
-registerTabRuntimeCleanup((tabId) => {
-  const rt = runtime[tabId];
-  if (rt) {
-    // P12 round 1 finding #10: routed through the one release path every user-driven removal
-    // (closeResult, closeOtherResults, closeResultsToTheRight, dropResults, evictOldestResults)
-    // already uses — this used to call unregisterDocumentRows/dropRows directly and skip dropPage
-    // and dropPlan, so a closed tab's decoded pages and (especially) its explainResults.ts plan
-    // entries — QueryPlan.raw alone tens of KB each, nextSeq never reused — were retained in their
-    // module-level maps for the life of the process.
-    for (const result of rt.results) releaseResult(rt, result);
-  }
-  delete runtime[tabId];
-});
 
 /** `views/grid/page.ts`-style key for one result set. `seq` is the tab's own monotonic
  *  `nextSeq` (P40 D1), not an array index — a result keeps the same key for its whole lifetime
@@ -196,14 +126,6 @@ function releaseResult(rt: ConsoleViewRuntime, result: ConsoleResult): void {
   pruneExpandedDocIds(rt, result.key);
 }
 
-function dropResults(tabId: string): void {
-  const rt = runtime[tabId];
-  if (!rt) return;
-  for (const result of rt.results) releaseResult(rt, result);
-  rt.results = [];
-  rt.activeKey = null;
-}
-
 // P2 R1: append mode (the default, D6 below) never otherwise frees an old result's page — nothing
 // short of the user's own close/close-others action or closing the tab did before this. A session
 // of many small runs in one left-open tab would retain every one of their full decoded pages
@@ -216,65 +138,6 @@ function evictOldestResults(rt: ConsoleViewRuntime, protectedCount: number): voi
   const overflow = Math.min(maxEvictable, rt.results.length - MAX_RESULTS_PER_TAB);
   if (overflow <= 0) return;
   for (const result of rt.results.splice(0, overflow)) releaseResult(rt, result);
-}
-
-/** The strip's ×  (P40 D5) — drops the result's page (so the retained-byte guard, F21, sees it
- *  freed), removes its entry, and re-selects a neighbour: the next result, else the previous,
- *  else none, mirroring what happens today when a tab ends up with zero results. */
-export function closeResult(tabId: string, key: string): void {
-  const rt = runtime[tabId];
-  if (!rt) return;
-  const index = rt.results.findIndex((r) => r.key === key);
-  if (index === -1) return;
-  releaseResult(rt, rt.results[index]);
-  rt.results.splice(index, 1);
-  if (rt.activeKey === key) {
-    rt.activeKey = (rt.results[index] ?? rt.results[index - 1])?.key ?? null;
-  }
-}
-
-/** Result-strip context menu (P42 D8), mirroring TabStrip.vue's own closeOthers/closeToTheRight
- *  over one tab's result sets rather than the app's whole tab list. Keeps `key` active if it
- *  survives; re-selects the last survivor otherwise. */
-export function closeOtherResults(tabId: string, key: string): void {
-  const rt = runtime[tabId];
-  if (!rt) return;
-  const keep = rt.results.find((r) => r.key === key);
-  if (!keep) return;
-  for (const result of rt.results) {
-    if (result.key !== key) releaseResult(rt, result);
-  }
-  rt.results = [keep];
-  rt.activeKey = key;
-}
-
-export function closeResultsToTheRight(tabId: string, key: string): void {
-  const rt = runtime[tabId];
-  if (!rt) return;
-  const index = rt.results.findIndex((r) => r.key === key);
-  if (index === -1) return;
-  const dropped = rt.results.slice(index + 1);
-  for (const result of dropped) releaseResult(rt, result);
-  rt.results = rt.results.slice(0, index + 1);
-  if (dropped.some((r) => r.key === rt.activeKey)) rt.activeKey = key;
-}
-
-/** Selects which result set the single mounted grid shows (P40 D2). Bumps resultPages'
- *  pageVersion (D9): to every reader of that store — the find toolbar above all — "the page this
- *  scope resolves to has changed" is the same event as a page being replaced under a key. */
-export function setActiveResult(tabId: string, key: string): void {
-  const rt = runtime[tabId];
-  if (!rt) return;
-  rt.activeKey = key;
-  bumpPageVersion();
-}
-
-/** The page the tab's active result set holds — the console's answer to the other three views'
- *  `getPage(tabId)`, and the one place "which of this tab's N pages" is resolved (D9). */
-export function activePage(tabId: string): Page | null {
-  const rt = runtime[tabId];
-  if (!rt?.activeKey) return null;
-  return getPage(rt.activeKey);
 }
 
 export function setText(tabId: string, text: string): void {
@@ -372,209 +235,369 @@ async function autoExplainCheck(
   }
 }
 
-// One execute() call per run, covering both "Run statement" (one-element array) and "Run all"
-// (the caller pre-splits via sql-split.ts) — the adapter's own all-or-nothing semantics (P5.5
-// D-plan) mean there is exactly one op-log row and one success/failure outcome per call.
-export async function run(tabId: string, statements: string[]): Promise<void> {
-  if (statements.length === 0) return;
-  const tab = useTabsStore().findConsoleTab(tabId);
-  if (!tab?.connectionId) return;
-  const rt = ensureRuntime(tabId);
-  const opId = crypto.randomUUID();
-  rt.status = 'running';
-  rt.opId = opId;
-  rt.error = null;
-  // D19: cleared on every new run, the same "next action supersedes the last one" discipline
-  // ConsoleView.vue's own formatError/explainError already follow on a document edit.
-  rt.autoExplain = null;
+export const useConsoleViewStore = defineStore('consoleView', () => {
+  const { runtime, ensureRuntime, toggleSearchOpen, setSearchOpen } =
+    createRuntimeStore<ConsoleViewRuntime>(defaultRuntime);
 
-  // D19 rules 1-5: issued and awaited *before* the real run — the query still runs regardless of
-  // what this finds (rule 5: warn, never block) — and only when the connection has opted in.
-  const connection = useConnectionsStore().connectionRecord(tab.connectionId);
-  if (connection?.autoExplain) {
-    const explainOpId = crypto.randomUUID();
-    rt.explainOpId = explainOpId;
-    let autoExplainResult: AutoExplainState | null;
-    try {
-      autoExplainResult = await autoExplainCheck(tab, connection.kind, statements, explainOpId);
-    } catch (err) {
-      // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else)
-      // — Stop was pressed while this batch was the only op registered on the backend, so the
-      // real run must not fire at all, not just lose its warning.
-      // P12 round 2 finding #4: guarded by identity, not a bare clear — a second, overlapping run
-      // (runStatement/runAll have no `running` guard against each other) may have already stamped
-      // its own explainOpId here by the time this catch runs; clearing unconditionally would
-      // discard *that* run's id, leaving Stop with nothing registered on the backend to cancel.
+  // D4/D5: closeTab has no way to import this leaf module directly (reality 18) — registers here.
+  // state/tabs.ts's dropAllPagesForTab already frees this tab's entries in resultPages.ts's own
+  // `pages` map directly (P40 D1: rt.results holds only { key, rowCount } now, never a Page, so
+  // there is no second reference here left to release before the record itself is dropped).
+  // P43 iter2 F23/D32: dropRows(result.key) is the same release for views/shared/document/rows.ts's
+  // own per-result parse cache — unregisterDocumentRows alone only drops the *source* pointer
+  // (rows.ts:25-27's own `rowSources.delete`), leaving every already-parsed document tree for that
+  // result retained under a key `nextSeq` guarantees is never reused, for the life of the process.
+  registerTabRuntimeCleanup((tabId) => {
+    const rt = runtime[tabId];
+    if (rt) {
+      // P12 round 1 finding #10: routed through the one release path every user-driven removal
+      // (closeResult, closeOtherResults, closeResultsToTheRight, dropResults, evictOldestResults)
+      // already uses — this used to call unregisterDocumentRows/dropRows directly and skip dropPage
+      // and dropPlan, so a closed tab's decoded pages and (especially) its explainResults.ts plan
+      // entries — QueryPlan.raw alone tens of KB each, nextSeq never reused — were retained in their
+      // module-level maps for the life of the process.
+      for (const result of rt.results) releaseResult(rt, result);
+    }
+    delete runtime[tabId];
+  });
+
+  function isResultDocExpanded(tabId: string, resultKey: string, id: string): boolean {
+    return runtime[tabId]?.expandedDocIds.has(`${resultKey}:${id}`) ?? false;
+  }
+
+  // Real-interaction fix — ConsoleSlickGrid.vue's own onMounted/onColumnsResized read and write
+  // through these two rather than reaching into `runtime[tabId]` directly, mirroring
+  // grid/SlickGridHost.vue's own `currentWidths()`/`onColumnsResized` pair (tab.state.columnWidths)
+  // as closely as a runtime-only, no-tab-state console result can.
+  function consoleColumnWidths(tabId: string): Record<string, number> {
+    return runtime[tabId]?.columnWidths ?? {};
+  }
+
+  function setConsoleColumnWidths(tabId: string, widths: Record<string, number>): void {
+    ensureRuntime(tabId).columnWidths = widths;
+  }
+
+  function toggleResultDocExpanded(tabId: string, resultKey: string, id: string): void {
+    const rt = ensureRuntime(tabId);
+    const key = `${resultKey}:${id}`;
+    if (rt.expandedDocIds.has(key)) rt.expandedDocIds.delete(key);
+    else rt.expandedDocIds.add(key);
+  }
+
+  // Item (regression pass, task batch P46-4): the expand-all/collapse-all toolbar pair
+  // DocumentView.vue's own document tab has (its own state.ts's setAllExpanded) — added here once
+  // the console's document results lost their other way to see a whole document at a glance (the
+  // cell editor dock, now removed as a redundant second copy of the same DocumentTree, P42 D11).
+  // Unlike that tab's map (absent = expanded, D2/D32's own comment), this Set's model is the
+  // opposite — absent = collapsed (this file's own defaultRuntime comment) — so *expand* all adds
+  // every id instead of clearing the set, and *collapse* all prunes by prefix same as a result close.
+  function setAllResultDocsExpanded(
+    tabId: string,
+    resultKey: string,
+    ids: string[],
+    expand: boolean,
+  ): void {
+    const rt = ensureRuntime(tabId);
+    if (!expand) {
+      pruneExpandedDocIds(rt, resultKey);
+      return;
+    }
+    for (const id of ids) rt.expandedDocIds.add(`${resultKey}:${id}`);
+  }
+
+  function dropResults(tabId: string): void {
+    const rt = runtime[tabId];
+    if (!rt) return;
+    for (const result of rt.results) releaseResult(rt, result);
+    rt.results = [];
+    rt.activeKey = null;
+  }
+
+  /** The strip's ×  (P40 D5) — drops the result's page (so the retained-byte guard, F21, sees it
+   *  freed), removes its entry, and re-selects a neighbour: the next result, else the previous,
+   *  else none, mirroring what happens today when a tab ends up with zero results. */
+  function closeResult(tabId: string, key: string): void {
+    const rt = runtime[tabId];
+    if (!rt) return;
+    const index = rt.results.findIndex((r) => r.key === key);
+    if (index === -1) return;
+    releaseResult(rt, rt.results[index]);
+    rt.results.splice(index, 1);
+    if (rt.activeKey === key) {
+      rt.activeKey = (rt.results[index] ?? rt.results[index - 1])?.key ?? null;
+    }
+  }
+
+  /** Result-strip context menu (P42 D8), mirroring TabStrip.vue's own closeOthers/closeToTheRight
+   *  over one tab's result sets rather than the app's whole tab list. Keeps `key` active if it
+   *  survives; re-selects the last survivor otherwise. */
+  function closeOtherResults(tabId: string, key: string): void {
+    const rt = runtime[tabId];
+    if (!rt) return;
+    const keep = rt.results.find((r) => r.key === key);
+    if (!keep) return;
+    for (const result of rt.results) {
+      if (result.key !== key) releaseResult(rt, result);
+    }
+    rt.results = [keep];
+    rt.activeKey = key;
+  }
+
+  function closeResultsToTheRight(tabId: string, key: string): void {
+    const rt = runtime[tabId];
+    if (!rt) return;
+    const index = rt.results.findIndex((r) => r.key === key);
+    if (index === -1) return;
+    const dropped = rt.results.slice(index + 1);
+    for (const result of dropped) releaseResult(rt, result);
+    rt.results = rt.results.slice(0, index + 1);
+    if (dropped.some((r) => r.key === rt.activeKey)) rt.activeKey = key;
+  }
+
+  /** Selects which result set the single mounted grid shows (P40 D2). Bumps resultPages'
+   *  pageVersion (D9): to every reader of that store — the find toolbar above all — "the page this
+   *  scope resolves to has changed" is the same event as a page being replaced under a key. */
+  function setActiveResult(tabId: string, key: string): void {
+    const rt = runtime[tabId];
+    if (!rt) return;
+    rt.activeKey = key;
+    bumpPageVersion();
+  }
+
+  /** The page the tab's active result set holds — the console's answer to the other three views'
+   *  `getPage(tabId)`, and the one place "which of this tab's N pages" is resolved (D9). */
+  function activePage(tabId: string): Page | null {
+    const rt = runtime[tabId];
+    if (!rt?.activeKey) return null;
+    return getPage(rt.activeKey);
+  }
+
+  /** D17: pushes one plan result the same way `run()` pushes a page result — same append/replace
+   *  toggle, same eviction, same close/close-others machinery. Reused by D19's auto-explain
+   *  "Show plan" action (below, same file) so it can push a plan it already parsed without a second
+   *  round trip. */
+  function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
+    const tab = useTabsStore().findConsoleTab(tabId);
+    if (!tab) return;
+    const rt = ensureRuntime(tabId);
+    if (!tab.state.newResultSet) dropResults(tabId);
+    const key = resultPageKey(tabId, rt.nextSeq++);
+    setPlan(key, { plan, statement });
+    rt.results.push({ key, rowCount: 0, kind: 'plan' });
+    evictOldestResults(rt, 1);
+    rt.activeKey = key;
+  }
+
+  // One execute() call per run, covering both "Run statement" (one-element array) and "Run all"
+  // (the caller pre-splits via sql-split.ts) — the adapter's own all-or-nothing semantics (P5.5
+  // D-plan) mean there is exactly one op-log row and one success/failure outcome per call.
+  async function run(tabId: string, statements: string[]): Promise<void> {
+    if (statements.length === 0) return;
+    const tab = useTabsStore().findConsoleTab(tabId);
+    if (!tab?.connectionId) return;
+    const rt = ensureRuntime(tabId);
+    const opId = crypto.randomUUID();
+    rt.status = 'running';
+    rt.opId = opId;
+    rt.error = null;
+    // D19: cleared on every new run, the same "next action supersedes the last one" discipline
+    // ConsoleView.vue's own formatError/explainError already follow on a document edit.
+    rt.autoExplain = null;
+
+    // D19 rules 1-5: issued and awaited *before* the real run — the query still runs regardless of
+    // what this finds (rule 5: warn, never block) — and only when the connection has opted in.
+    const connection = useConnectionsStore().connectionRecord(tab.connectionId);
+    if (connection?.autoExplain) {
+      const explainOpId = crypto.randomUUID();
+      rt.explainOpId = explainOpId;
+      let autoExplainResult: AutoExplainState | null;
+      try {
+        autoExplainResult = await autoExplainCheck(tab, connection.kind, statements, explainOpId);
+      } catch (err) {
+        // Only a cancellation reaches here (autoExplainCheck's own catch swallows everything else)
+        // — Stop was pressed while this batch was the only op registered on the backend, so the
+        // real run must not fire at all, not just lose its warning.
+        // P12 round 2 finding #4: guarded by identity, not a bare clear — a second, overlapping run
+        // (runStatement/runAll have no `running` guard against each other) may have already stamped
+        // its own explainOpId here by the time this catch runs; clearing unconditionally would
+        // discard *that* run's id, leaving Stop with nothing registered on the backend to cancel.
+        if (rt.explainOpId === explainOpId) rt.explainOpId = null;
+        applyLoadFailure(rt, opId, err, tabId, {
+          onDisconnected: () => {
+            rt.status = 'idle';
+          },
+        });
+        return;
+      }
+      // P12 round 2 finding #4: same identity guard as above — an overlapping run's own explainOpId
+      // must survive this run's clear.
       if (rt.explainOpId === explainOpId) rt.explainOpId = null;
+      // Not only opId (a newer run superseding this one) — status too, since a Stop press during
+      // this batch is only visible through status, not through opId changing (finding #5).
+      if (rt.opId !== opId || rt.status !== 'running') return;
+      // P12 round 1 finding #6: assigned only after the supersession check above, not before —
+      // a superseded run's own (possibly slower) EXPLAIN result must never overwrite whatever the
+      // run that actually superseded it already put here (including having cleared it to null).
+      rt.autoExplain = autoExplainResult;
+    }
+
+    try {
+      const response = await data.execute({
+        opId,
+        tabId,
+        connectionId: tab.connectionId,
+        path: tab.path,
+        statements,
+      });
+      // P12 round 2 finding #3: the tab may have closed while this run was in flight — `rt` is
+      // still a live reference to the detached runtime object (deleting `runtime[tabId]` doesn't
+      // touch it), so `rt.opId !== opId` alone doesn't catch this and every write below would leak
+      // a result nothing can ever reach again (resultPages.ts's `nextSeq` never repeats).
+      if (!runtime[tabId]) return;
+      if (rt.opId !== opId) return; // superseded by a newer run
+
+      // P40 D6, default re-flipped back on P46-2: the toolbar toggle decides append vs. replace — on
+      // (the default, shown unpressed — see ConsoleView.vue) keeps stacking each run's result
+      // set(s) on top of the last; pressing it drops what came before so every run starts fresh.
+      if (!tab.state.newResultSet) dropResults(tabId);
+      const newResults = response.pages.map((page) => {
+        const key = resultPageKey(tabId, rt.nextSeq++);
+        setPage(key, page);
+        // P42 D11: a document-kind result renders through views/shared/document/'s row model,
+        // which resolves a scope key through a registered source rather than an import — this
+        // result's own key is that scope, and resultPages.ts's documentRow is its source.
+        if (page.kind === 'document') {
+          useDocumentRowsStore().registerDocumentRows(key, (row) => documentRow(key, row));
+        }
+        return { key, rowCount: page.rowCount, kind: 'page' as const };
+      });
+      rt.results.push(...newResults);
+      evictOldestResults(rt, newResults.length);
+      rt.activeKey = newResults[0]?.key ?? rt.activeKey;
+      rt.status = 'idle';
+      rt.opId = null;
+    } catch (err) {
+      // Cancelled: same discipline as the data grid's stop button — the previous results stay
+      // exactly as they were rather than being blanked. Disconnected: `status` has to drop out of
+      // 'running' before unmarkHydrated swaps ViewChrome out for ReconnectGate — ConsoleView's
+      // `running`/`canStop` read it directly, and onReconnectAndLoad only ever calls
+      // markHydrated(), never touches `rt`. Left as 'running', the Stop button would come back
+      // permanently enabled (and, since it now tints red while live) permanently red the moment the
+      // tab reconnects, for as long as the tab stays open.
       applyLoadFailure(rt, opId, err, tabId, {
         onDisconnected: () => {
           rt.status = 'idle';
         },
       });
-      return;
     }
-    // P12 round 2 finding #4: same identity guard as above — an overlapping run's own explainOpId
-    // must survive this run's clear.
-    if (rt.explainOpId === explainOpId) rt.explainOpId = null;
-    // Not only opId (a newer run superseding this one) — status too, since a Stop press during
-    // this batch is only visible through status, not through opId changing (finding #5).
-    if (rt.opId !== opId || rt.status !== 'running') return;
-    // P12 round 1 finding #6: assigned only after the supersession check above, not before —
-    // a superseded run's own (possibly slower) EXPLAIN result must never overwrite whatever the
-    // run that actually superseded it already put here (including having cleared it to null).
-    rt.autoExplain = autoExplainResult;
   }
 
-  try {
-    const response = await data.execute({
-      opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
-      statements,
-    });
-    // P12 round 2 finding #3: the tab may have closed while this run was in flight — `rt` is
-    // still a live reference to the detached runtime object (deleting `runtime[tabId]` doesn't
-    // touch it), so `rt.opId !== opId` alone doesn't catch this and every write below would leak
-    // a result nothing can ever reach again (resultPages.ts's `nextSeq` never repeats).
-    if (!runtime[tabId]) return;
-    if (rt.opId !== opId) return; // superseded by a newer run
-
-    // P40 D6, default re-flipped back on P46-2: the toolbar toggle decides append vs. replace — on
-    // (the default, shown unpressed — see ConsoleView.vue) keeps stacking each run's result
-    // set(s) on top of the last; pressing it drops what came before so every run starts fresh.
-    if (!tab.state.newResultSet) dropResults(tabId);
-    const newResults = response.pages.map((page) => {
-      const key = resultPageKey(tabId, rt.nextSeq++);
-      setPage(key, page);
-      // P42 D11: a document-kind result renders through views/shared/document/'s row model,
-      // which resolves a scope key through a registered source rather than an import — this
-      // result's own key is that scope, and resultPages.ts's documentRow is its source.
-      if (page.kind === 'document') {
-        useDocumentRowsStore().registerDocumentRows(key, (row) => documentRow(key, row));
-      }
-      return { key, rowCount: page.rowCount, kind: 'page' as const };
-    });
-    rt.results.push(...newResults);
-    evictOldestResults(rt, newResults.length);
-    rt.activeKey = newResults[0]?.key ?? rt.activeKey;
-    rt.status = 'idle';
-    rt.opId = null;
-  } catch (err) {
-    // Cancelled: same discipline as the data grid's stop button — the previous results stay
-    // exactly as they were rather than being blanked. Disconnected: `status` has to drop out of
-    // 'running' before unmarkHydrated swaps ViewChrome out for ReconnectGate — ConsoleView's
-    // `running`/`canStop` read it directly, and onReconnectAndLoad only ever calls
-    // markHydrated(), never touches `rt`. Left as 'running', the Stop button would come back
-    // permanently enabled (and, since it now tints red while live) permanently red the moment the
-    // tab reconnects, for as long as the tab stays open.
-    applyLoadFailure(rt, opId, err, tabId, {
-      onDisconnected: () => {
-        rt.status = 'idle';
-      },
-    });
+  function stop(tabId: string): void {
+    const rt = runtime[tabId];
+    // P12 round 2 finding #5: set synchronously, not left to the in-flight promise's own eventual
+    // rejection — if the auto-explain batch happens to resolve normally before the cancel signal
+    // reaches it (rather than rejecting with E_CANCELLED), rt.status would otherwise still read
+    // 'running' when run()'s post-await guard checks it, and the real (possibly expensive) query
+    // would fire anyway despite the Stop press. Marking it here makes that guard see the Stop
+    // regardless of how the batch's own promise happens to settle.
+    if (rt?.status === 'running') rt.status = 'cancelled';
+    // The auto-explain batch's own op id — the real run's opId isn't registered on the backend yet
+    // while this batch is in flight, so cancelling only opId (below) would be a no-op (finding #5).
+    if (rt?.explainOpId) void control.opsCancel(rt.explainOpId);
+    stopOp(rt);
   }
-}
 
-export function stop(tabId: string): void {
-  const rt = runtime[tabId];
-  // P12 round 2 finding #5: set synchronously, not left to the in-flight promise's own eventual
-  // rejection — if the auto-explain batch happens to resolve normally before the cancel signal
-  // reaches it (rather than rejecting with E_CANCELLED), rt.status would otherwise still read
-  // 'running' when run()'s post-await guard checks it, and the real (possibly expensive) query
-  // would fire anyway despite the Stop press. Marking it here makes that guard see the Stop
-  // regardless of how the batch's own promise happens to settle.
-  if (rt?.status === 'running') rt.status = 'cancelled';
-  // The auto-explain batch's own op id — the real run's opId isn't registered on the backend yet
-  // while this batch is in flight, so cancelling only opId (below) would be a no-op (finding #5).
-  if (rt?.explainOpId) void control.opsCancel(rt.explainOpId);
-  stopOp(rt);
-}
+  /** D19: the strip clears on the next run (already handled inside `run()` itself) and on the next
+   *  document edit — ConsoleView.vue's own onDocChange calls this alongside its formatError/
+   *  explainError resets, the same "next action supersedes the last one" discipline. */
+  function clearAutoExplain(tabId: string): void {
+    const rt = runtime[tabId];
+    if (rt) rt.autoExplain = null;
+  }
 
-/** D19: the strip clears on the next run (already handled inside `run()` itself) and on the next
- *  document edit — ConsoleView.vue's own onDocChange calls this alongside its formatError/
- *  explainError resets, the same "next action supersedes the last one" discipline. */
-export function clearAutoExplain(tabId: string): void {
-  const rt = runtime[tabId];
-  if (rt) rt.autoExplain = null;
-}
+  /** D19's own "Show plan" action: the plan is already parsed (it was needed to decide whether to
+   *  warn at all), so this is `pushPlanResult` over the one that triggered the warning — no second
+   *  round trip. */
+  function showAutoExplainPlan(tabId: string): void {
+    const rt = runtime[tabId];
+    const state = rt?.autoExplain;
+    if (state?.kind !== 'plans') return; // 'truncated' has no plan to show
+    const worst = state.plans[state.worstIndex];
+    if (!worst) return;
+    pushPlanResult(tabId, worst.statement, worst.plan);
+  }
 
-/** D19's own "Show plan" action: the plan is already parsed (it was needed to decide whether to
- *  warn at all), so this is `pushPlanResult` over the one that triggered the warning — no second
- *  round trip. */
-export function showAutoExplainPlan(tabId: string): void {
-  const rt = runtime[tabId];
-  const state = rt?.autoExplain;
-  if (state?.kind !== 'plans') return; // 'truncated' has no plan to show
-  const worst = state.plans[state.worstIndex];
-  if (!worst) return;
-  pushPlanResult(tabId, worst.statement, worst.plan);
-}
+  /** C12/D11/D13: composes `kind`'s own EXPLAIN for `statement`, issues it through the same
+   *  `data:execute` op *Run statement* uses, parses the result, and pushes it as a plan result set.
+   *  Unlike `run()`, a failure here is returned rather than written into `rt.error` — D19's silent-
+   *  degrade rule is for auto-explain specifically; the manual Explain button surfaces its own
+   *  failure the same way Format does (P13's own component-local strip, ConsoleView.vue). */
+  async function explain(
+    tabId: string,
+    kind: ConnectionKind,
+    statement: string,
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const tab = useTabsStore().findConsoleTab(tabId);
+    if (!tab?.connectionId) return { ok: false, reason: 'no active connection' };
+    const statements = explainStatementsFor(kind, statement);
+    if (statements.length === 0)
+      return { ok: false, reason: 'this console has nothing to explain' };
 
-/** D17: pushes one plan result the same way `run()` pushes a page result — same append/replace
- *  toggle, same eviction, same close/close-others machinery. Reused by D19's auto-explain
- *  "Show plan" action (below, same file) so it can push a plan it already parsed without a second
- *  round trip. */
-function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
-  const tab = useTabsStore().findConsoleTab(tabId);
-  if (!tab) return;
-  const rt = ensureRuntime(tabId);
-  if (!tab.state.newResultSet) dropResults(tabId);
-  const key = resultPageKey(tabId, rt.nextSeq++);
-  setPlan(key, { plan, statement });
-  rt.results.push({ key, rowCount: 0, kind: 'plan' });
-  evictOldestResults(rt, 1);
-  rt.activeKey = key;
-}
+    // P12 round 1 finding #5: the same opId/status bookkeeping run() uses, so Explain is cancellable
+    // via Stop and shows the same busy state — before, this had no opId registered on the runtime at
+    // all, so Stop was inert against it and nothing in the UI showed it was in flight. rt.error is
+    // deliberately left untouched either way (see the docstring above): a failure here is reported
+    // through this function's own return value, not the shared error strip.
+    const rt = ensureRuntime(tabId);
+    const opId = crypto.randomUUID();
+    rt.status = 'running';
+    rt.opId = opId;
 
-/** C12/D11/D13: composes `kind`'s own EXPLAIN for `statement`, issues it through the same
- *  `data:execute` op *Run statement* uses, parses the result, and pushes it as a plan result set.
- *  Unlike `run()`, a failure here is returned rather than written into `rt.error` — D19's silent-
- *  degrade rule is for auto-explain specifically; the manual Explain button surfaces its own
- *  failure the same way Format does (P13's own component-local strip, ConsoleView.vue). */
-export async function explain(
-  tabId: string,
-  kind: ConnectionKind,
-  statement: string,
-): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const tab = useTabsStore().findConsoleTab(tabId);
-  if (!tab?.connectionId) return { ok: false, reason: 'no active connection' };
-  const statements = explainStatementsFor(kind, statement);
-  if (statements.length === 0) return { ok: false, reason: 'this console has nothing to explain' };
-
-  // P12 round 1 finding #5: the same opId/status bookkeeping run() uses, so Explain is cancellable
-  // via Stop and shows the same busy state — before, this had no opId registered on the runtime at
-  // all, so Stop was inert against it and nothing in the UI showed it was in flight. rt.error is
-  // deliberately left untouched either way (see the docstring above): a failure here is reported
-  // through this function's own return value, not the shared error strip.
-  const rt = ensureRuntime(tabId);
-  const opId = crypto.randomUUID();
-  rt.status = 'running';
-  rt.opId = opId;
-
-  try {
-    const response = await data.execute({
-      opId,
-      tabId,
-      connectionId: tab.connectionId,
-      path: tab.path,
-      statements,
-    });
-    if (rt.opId !== opId) return { ok: true }; // superseded by a newer op — nothing left to report into
-    const plan = parseExplainPages(
-      kind,
-      response.pages,
-      useSettingsStore().advanced.expensiveQueryRows,
-    );
-    pushPlanResult(tabId, statement, plan);
-    rt.status = 'idle';
-    rt.opId = null;
-    return { ok: true };
-  } catch (err) {
-    if (rt.opId === opId) {
+    try {
+      const response = await data.execute({
+        opId,
+        tabId,
+        connectionId: tab.connectionId,
+        path: tab.path,
+        statements,
+      });
+      if (rt.opId !== opId) return { ok: true }; // superseded by a newer op — nothing left to report into
+      const plan = parseExplainPages(
+        kind,
+        response.pages,
+        useSettingsStore().advanced.expensiveQueryRows,
+      );
+      pushPlanResult(tabId, statement, plan);
+      rt.status = 'idle';
       rt.opId = null;
-      rt.status = classifyLoadError(err).kind === 'cancelled' ? 'cancelled' : 'idle';
+      return { ok: true };
+    } catch (err) {
+      if (rt.opId === opId) {
+        rt.opId = null;
+        rt.status = classifyLoadError(err).kind === 'cancelled' ? 'cancelled' : 'idle';
+      }
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
-    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
-}
+
+  return {
+    runtime,
+    toggleSearchOpen,
+    setSearchOpen,
+    isResultDocExpanded,
+    consoleColumnWidths,
+    setConsoleColumnWidths,
+    toggleResultDocExpanded,
+    setAllResultDocsExpanded,
+    closeResult,
+    closeOtherResults,
+    closeResultsToTheRight,
+    setActiveResult,
+    activePage,
+    run,
+    stop,
+    clearAutoExplain,
+    showAutoExplainPlan,
+    explain,
+  };
+});

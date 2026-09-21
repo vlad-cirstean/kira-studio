@@ -24,7 +24,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -77,13 +78,13 @@ describe('console Stop wins even when the in-flight EXPLAIN batch resolves anywa
       return explainCall.promise;
     };
 
-    const running = run(tabId, ['SELECT * FROM big']);
+    const running = consoleViewStore.run(tabId, ['SELECT * FROM big']);
     await sleep(10);
-    expect(runtime[tabId]?.explainOpId).not.toBeNull();
+    expect(consoleViewStore.runtime[tabId]?.explainOpId).not.toBeNull();
 
-    stop(tabId);
+    consoleViewStore.stop(tabId);
     // Set synchronously, not left to the batch's own eventual rejection.
-    expect(runtime[tabId]?.status).toBe('cancelled');
+    expect(consoleViewStore.runtime[tabId]?.status).toBe('cancelled');
 
     // The batch resolves successfully instead of rejecting with E_CANCELLED — the race finding #5
     // describes: the cancel signal lost to the backend actually finishing the EXPLAIN in time.
@@ -91,7 +92,7 @@ describe('console Stop wins even when the in-flight EXPLAIN batch resolves anywa
     await running;
 
     expect(executeCalls).toHaveLength(1); // the real run's own execute() must never have fired
-    expect(runtime[tabId]?.status).toBe('cancelled');
-    expect(runtime[tabId]?.autoExplain).toBeNull();
+    expect(consoleViewStore.runtime[tabId]?.status).toBe('cancelled');
+    expect(consoleViewStore.runtime[tabId]?.autoExplain).toBeNull();
   });
 });

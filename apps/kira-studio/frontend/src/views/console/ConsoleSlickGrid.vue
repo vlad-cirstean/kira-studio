@@ -47,11 +47,12 @@ import 'slickgrid/dist/styles/css/slick.grid.css';
 import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './resultMenu';
 import { cell, getPage, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
-import { consoleColumnWidths, setConsoleColumnWidths } from './state';
+import { useConsoleViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 const settingsStore = useSettingsStore();
+const consoleViewStore = useConsoleViewStore();
 
 // P30 §3 — the console result grid's tabular branch, migrated off @tanstack/vue-virtual onto the
 // same KiraSlickGrid/dataSource.ts/slickTheme.css layer views/grid/SlickGridHost.vue already uses
@@ -197,7 +198,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
   // same-named columns, same tradeoff SlickGridHost.vue's own tab.state.columnWidths already
   // accepts (it just never sees a duplicate, a real table's columns being unique by construction).
   const measured = initialWidthsByIndex(page);
-  const stored = consoleColumnWidths(props.tabId);
+  const stored = consoleViewStore.consoleColumnWidths(props.tabId);
   const nextStored: Record<string, number> = { ...stored };
   let storedChanged = false;
   page.columns.forEach((col, i) => {
@@ -244,7 +245,7 @@ function buildColumns(page: TabularPage): KiraColumn[] {
       },
     });
   });
-  if (storedChanged) setConsoleColumnWidths(props.tabId, nextStored);
+  if (storedChanged) consoleViewStore.setConsoleColumnWidths(props.tabId, nextStored);
   return cols;
 }
 
@@ -481,12 +482,12 @@ function onSelectedRangesChanged(_e: unknown, ranges: SlickRange[]): void {
 // (and doesn't need to) which one produced the width it's now honouring.
 function onColumnsResized(): void {
   if (!grid) return;
-  const widths: Record<string, number> = { ...consoleColumnWidths(props.tabId) };
+  const widths: Record<string, number> = { ...consoleViewStore.consoleColumnWidths(props.tabId) };
   for (const col of grid.getColumns()) {
     if (col.id === GUTTER_FIELD || col.width === undefined) continue;
     widths[String(col.name)] = col.width;
   }
-  setConsoleColumnWidths(props.tabId, widths);
+  consoleViewStore.setConsoleColumnWidths(props.tabId, widths);
 }
 
 // F15: no `.header-select-zone`, no `onHeaderCellRendered` subscription — a console result has no

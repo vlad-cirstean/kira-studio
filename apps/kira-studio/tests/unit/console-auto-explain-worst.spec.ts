@@ -22,7 +22,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, runtime } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 // Both clear the default 100,000-row threshold (packages/shared/domain/settings.ts) — flagged, but
 // by a wide margin apart, so worstIndex has a real "which one is actually worse" to get right.
@@ -70,9 +71,9 @@ describe('auto-explain worstIndex points at the worst flagged plan, not the firs
         ],
       });
 
-    await run(tabId, ['SELECT * FROM small_but_over', 'SELECT * FROM huge']);
+    await consoleViewStore.run(tabId, ['SELECT * FROM small_but_over', 'SELECT * FROM huge']);
 
-    const state = runtime[tabId]?.autoExplain;
+    const state = consoleViewStore.runtime[tabId]?.autoExplain;
     expect(state?.kind).toBe('plans');
     if (state?.kind !== 'plans') throw new Error('expected a plans state');
     expect(state.plans).toHaveLength(2);

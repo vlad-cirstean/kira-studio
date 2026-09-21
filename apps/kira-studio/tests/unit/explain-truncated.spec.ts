@@ -21,7 +21,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, runtime, explain } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 const PLAN_COLUMN = [
   {
@@ -80,10 +81,10 @@ describe('a truncated plan end to end (P12 round 1 F8)', () => {
       return Promise.resolve({ pages: [{ kind: 'tabular', rowCount: 0 }] });
     };
 
-    await run(tabId, ['SELECT * FROM big']);
+    await consoleViewStore.run(tabId, ['SELECT * FROM big']);
 
-    expect(runtime[tabId]?.autoExplain).toEqual({ kind: 'truncated' });
-    expect(runtime[tabId]?.status).toBe('idle'); // the real query still ran
+    expect(consoleViewStore.runtime[tabId]?.autoExplain).toEqual({ kind: 'truncated' });
+    expect(consoleViewStore.runtime[tabId]?.status).toBe('idle'); // the real query still ran
     expect(call).toBe(2);
   });
 
@@ -99,7 +100,7 @@ describe('a truncated plan end to end (P12 round 1 F8)', () => {
     // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
     (data as any).execute = () => Promise.resolve({ pages: [truncatedPlanPage()] });
 
-    const result = await explain(tabId, 'postgres', 'SELECT * FROM big');
+    const result = await consoleViewStore.explain(tabId, 'postgres', 'SELECT * FROM big');
     expect(result).toEqual({ ok: false, reason: 'The query plan was too large to display.' });
   });
 });

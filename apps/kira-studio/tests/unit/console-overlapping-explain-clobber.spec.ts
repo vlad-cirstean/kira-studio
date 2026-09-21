@@ -25,7 +25,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -75,30 +76,30 @@ describe("console overlapping runs must not clobber each other's explainOpId (P1
     };
 
     // Run A starts first — its own EXPLAIN batch is issued and left unresolved.
-    const runA = run(tabId, ['SELECT * FROM a']);
+    const runA = consoleViewStore.run(tabId, ['SELECT * FROM a']);
     await sleep(10);
     expect(calls).toHaveLength(1);
     const explainOpIdA = calls[0]?.opId as string;
-    expect(runtime[tabId]?.explainOpId).toBe(explainOpIdA);
+    expect(consoleViewStore.runtime[tabId]?.explainOpId).toBe(explainOpIdA);
 
     // Run B starts before A settles — genuinely overlapping (neither the toolbar's `running` guard
     // nor a re-entrancy guard inside run() itself exists at this layer), so B stamps its own,
     // later explainOpId over A's.
-    const runB = run(tabId, ['SELECT * FROM b']);
+    const runB = consoleViewStore.run(tabId, ['SELECT * FROM b']);
     await sleep(10);
     expect(calls).toHaveLength(2);
     const explainOpIdB = calls[1]?.opId as string;
     expect(explainOpIdB).not.toBe(explainOpIdA);
-    expect(runtime[tabId]?.explainOpId).toBe(explainOpIdB);
+    expect(consoleViewStore.runtime[tabId]?.explainOpId).toBe(explainOpIdB);
 
     // A's own EXPLAIN batch now settles (successfully — not a cancellation). Before the fix this
     // unconditionally wiped rt.explainOpId to null, discarding B's still-in-flight id.
     calls[0]?.resolve({ pages: [] });
     await sleep(10);
-    expect(runtime[tabId]?.explainOpId).toBe(explainOpIdB);
+    expect(consoleViewStore.runtime[tabId]?.explainOpId).toBe(explainOpIdB);
 
     // Stop, pressed during B's still-in-flight EXPLAIN batch, must still find B's id to cancel.
-    stop(tabId);
+    consoleViewStore.stop(tabId);
     expect(cancelledOpIds).toContain(explainOpIdB);
 
     // Simulates the backend's cancellation response reaching B's own EXPLAIN batch.

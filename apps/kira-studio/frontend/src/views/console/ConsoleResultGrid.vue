@@ -16,12 +16,13 @@ import ConsoleSlickGrid from './ConsoleSlickGrid.vue';
 import { mongoDocumentRowMenu, rowAsJsonMenu } from './resultMenu';
 import { documentRow, getPage, keyValueRow, pageVersion, setVisibleWindow } from './resultPages';
 import { type Match, matchedRows, searchState } from './search';
-import { isResultDocExpanded, setAllResultDocsExpanded, toggleResultDocExpanded } from './state';
+import { useConsoleViewStore } from './state';
 
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
 const documentRowsStore = useDocumentRowsStore();
 const settingsStore = useSettingsStore();
+const consoleViewStore = useConsoleViewStore();
 
 // A three-way switch over a console result's own kind (P8) — tabular results render through
 // ConsoleSlickGrid.vue (P30 §3, the same KiraSlickGrid/dataSource.ts/slickTheme.css layer
@@ -119,13 +120,13 @@ const documentRowHeights = computed<number[]>(() => {
       props.pageKey,
       view.index,
       null,
-      isResultDocExpanded(props.tabId, props.pageKey, view.id),
+      consoleViewStore.isResultDocExpanded(props.tabId, props.pageKey, view.id),
     ),
   );
 });
 
 function onToggleDocExpanded(id: string): void {
-  toggleResultDocExpanded(props.tabId, props.pageKey, id);
+  consoleViewStore.toggleResultDocExpanded(props.tabId, props.pageKey, id);
 }
 
 // Item (regression pass, task batch P46-4): DocumentView.vue's own expand-all/collapse-all pair,
@@ -133,7 +134,7 @@ function onToggleDocExpanded(id: string): void {
 // toolbar lives one level up since these two buttons only make sense while the active result is
 // document-shaped, a fact ConsoleView.vue's own getPage(activeKey) check decides, not this panel.
 function expandAll(): void {
-  setAllResultDocsExpanded(
+  consoleViewStore.setAllResultDocsExpanded(
     props.tabId,
     props.pageKey,
     documentRows.value.map((v) => v.id),
@@ -141,7 +142,7 @@ function expandAll(): void {
   );
 }
 function collapseAll(): void {
-  setAllResultDocsExpanded(props.tabId, props.pageKey, [], false);
+  consoleViewStore.setAllResultDocsExpanded(props.tabId, props.pageKey, [], false);
 }
 
 function kvRowAt(row: number) {
@@ -327,7 +328,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           :data-row="view.index"
           :view="view"
           :scope="pageKey"
-          :expanded="isResultDocExpanded(tabId, pageKey, view.id)"
+          :expanded="consoleViewStore.isResultDocExpanded(tabId, pageKey, view.id)"
           :selected="isSelected(view.index, 0)"
           :search-match="isSearchMatch(view.index, 0)"
           :search-match-current="isCurrentSearchMatch(view.index, 0)"
@@ -337,7 +338,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
         >
           <template #body>
             <div
-              v-if="isResultDocExpanded(tabId, pageKey, view.id)"
+              v-if="consoleViewStore.isResultDocExpanded(tabId, pageKey, view.id)"
               class="doc-body-tree"
               data-testid="document-body"
             >

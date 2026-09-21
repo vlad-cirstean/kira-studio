@@ -24,7 +24,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -69,14 +70,14 @@ describe('console Stop during the auto-explain pre-run batch (P12 round 1 F5)', 
       return Promise.resolve(true);
     };
 
-    const running = run(tabId, ['SELECT 1']);
+    const running = consoleViewStore.run(tabId, ['SELECT 1']);
     // Let run() reach the point where the EXPLAIN batch's own op id is registered.
     await sleep(10);
-    expect(runtime[tabId]?.explainOpId).not.toBeNull();
-    const explainOpId = runtime[tabId]?.explainOpId as string;
+    expect(consoleViewStore.runtime[tabId]?.explainOpId).not.toBeNull();
+    const explainOpId = consoleViewStore.runtime[tabId]?.explainOpId as string;
 
-    const runOpId = runtime[tabId]?.opId as string;
-    stop(tabId);
+    const runOpId = consoleViewStore.runtime[tabId]?.opId as string;
+    consoleViewStore.stop(tabId);
     // Both the EXPLAIN batch's own op id and the real run's (not-yet-issued, unregistered on the
     // backend) opId are cancelled, best-effort — the explain one is what actually stops anything.
     expect(cancelledOpIds).toEqual([explainOpId, runOpId]);
@@ -86,8 +87,8 @@ describe('console Stop during the auto-explain pre-run batch (P12 round 1 F5)', 
     await running;
 
     expect(executeCalls).toEqual([explainOpId]); // the real run's own execute() never fired
-    expect(runtime[tabId]?.status).toBe('cancelled');
-    expect(runtime[tabId]?.opId).toBeNull();
-    expect(runtime[tabId]?.explainOpId).toBeNull();
+    expect(consoleViewStore.runtime[tabId]?.status).toBe('cancelled');
+    expect(consoleViewStore.runtime[tabId]?.opId).toBeNull();
+    expect(consoleViewStore.runtime[tabId]?.explainOpId).toBeNull();
   });
 });

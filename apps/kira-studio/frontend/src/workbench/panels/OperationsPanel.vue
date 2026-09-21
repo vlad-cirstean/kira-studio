@@ -17,13 +17,14 @@ import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import TextField from '../../theme/primitives/TextField.vue';
 import VirtualList from '../../theme/primitives/VirtualList.vue';
-import { run as runConsole } from '../../views/console/state';
+import { useConsoleViewStore } from '../../views/console/state';
 import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../views/shared/sqlIdent';
 
 const contextMenuStore = useContextMenuStore();
 const opsStore = useOpsStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const consoleViewStore = useConsoleViewStore();
 
 interface OpsListItem {
   key: string;
@@ -113,7 +114,7 @@ function onRerun(record: OpRecord): void {
   }).map((s) => s.text);
   if (statements.length === 0) return;
   const tabId = tabsStore.openConsoleTab(record.connectionId, '');
-  void runConsole(tabId, statements);
+  void consoleViewStore.run(tabId, statements);
 }
 
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {

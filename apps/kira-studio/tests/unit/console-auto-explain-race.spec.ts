@@ -26,7 +26,8 @@ const { useConnectionsStore } = await import('../../frontend/src/state/connectio
 const connectionsStore = useConnectionsStore();
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, runtime } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -93,28 +94,28 @@ describe('console auto-explain: a superseded run must not overwrite the current 
     };
 
     // Run A: explainable, slow — its own EXPLAIN batch is issued but deliberately left unresolved.
-    const runA = run(tabId, ['SELECT * FROM big']);
+    const runA = consoleViewStore.run(tabId, ['SELECT * FROM big']);
     await sleep(10);
     expect(calls).toHaveLength(1); // A's own EXPLAIN batch, in flight
 
     // Run B: not explainable (isExplainable requires a leading SELECT/WITH) — its own explain
     // check resolves null with no data.execute call at all, so it reaches the real run
     // immediately, superseding A.
-    const runB = run(tabId, ['UPDATE big SET x = 1']);
+    const runB = consoleViewStore.run(tabId, ['UPDATE big SET x = 1']);
     await sleep(10);
     expect(calls).toHaveLength(2); // B's own real run, the only second call
     calls[1]?.resolve({ pages: [fakeResultPage()] });
     await runB;
 
-    expect(runtime[tabId]?.status).toBe('idle');
-    expect(runtime[tabId]?.autoExplain).toBeNull(); // B was never explainable — nothing to warn about
+    expect(consoleViewStore.runtime[tabId]?.status).toBe('idle');
+    expect(consoleViewStore.runtime[tabId]?.autoExplain).toBeNull(); // B was never explainable — nothing to warn about
 
     // A's slow EXPLAIN finally settles, long after B has already finished and shown its own
     // (warning-free) state — this must not resurrect a warning for a statement that never ran.
     calls[0]?.resolve({ pages: [explainPage(WIDE_SCAN_PLAN)] });
     await runA;
 
-    expect(runtime[tabId]?.autoExplain).toBeNull();
+    expect(consoleViewStore.runtime[tabId]?.autoExplain).toBeNull();
     expect(calls).toHaveLength(2); // A's own real run must never have been issued either
   });
 });

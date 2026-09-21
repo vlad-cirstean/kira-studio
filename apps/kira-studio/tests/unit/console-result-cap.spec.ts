@@ -21,7 +21,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { run, runtime } = await import('../../frontend/src/views/console/state');
+const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
+const consoleViewStore = useConsoleViewStore();
 const { getPage } = await import('../../frontend/src/views/console/resultPages');
 
 // A minimal fake — state.ts's run() only reads page.kind and page.rowCount, never anything
@@ -38,9 +39,9 @@ describe('console result cap (P2 R1)', () => {
     (data as any).execute = (): Promise<ExecuteResponse> =>
       Promise.resolve({ pages: [fakePage()] });
 
-    for (let i = 0; i < 55; i++) await run(tabId, [`SELECT ${i}`]);
+    for (let i = 0; i < 55; i++) await consoleViewStore.run(tabId, [`SELECT ${i}`]);
 
-    const results = runtime[tabId]?.results ?? [];
+    const results = consoleViewStore.runtime[tabId]?.results ?? [];
     expect(results.length).toBeLessThanOrEqual(50);
 
     // The very first run's result must be gone from both the list and the underlying page store —
@@ -60,20 +61,20 @@ describe('console result cap (P2 R1)', () => {
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ExecuteResponse
     (data as any).execute = (): Promise<ExecuteResponse> =>
       Promise.resolve({ pages: [fakePage()] });
-    for (let i = 0; i < 10; i++) await run(tabId, [`SELECT ${i}`]);
-    expect(runtime[tabId]?.results.length).toBe(10);
+    for (let i = 0; i < 10; i++) await consoleViewStore.run(tabId, [`SELECT ${i}`]);
+    expect(consoleViewStore.runtime[tabId]?.results.length).toBe(10);
 
     // One "Run all" producing more result sets in a single call than the cap itself.
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ExecuteResponse
     (data as any).execute = (): Promise<ExecuteResponse> =>
       Promise.resolve({ pages: Array.from({ length: 60 }, () => fakePage()) });
-    await run(
+    await consoleViewStore.run(
       tabId,
       Array.from({ length: 60 }, (_, i) => `SELECT ${i}`),
     );
 
     // All 10 pre-existing results are evicted to make room, but none of this run's own 60 are —
     // the cap only ever trims *earlier* runs, never truncates the run that just completed.
-    expect(runtime[tabId]?.results.length).toBe(60);
+    expect(consoleViewStore.runtime[tabId]?.results.length).toBe(60);
   });
 });

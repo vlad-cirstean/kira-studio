@@ -12,7 +12,7 @@ import {
 import { createPageSearch } from '../shared/page/search';
 import { visibleRowsOf } from '../shared/page/visibleRows';
 import { pageVersion } from './resultPages';
-import { activePage } from './state';
+import { useConsoleViewStore } from './state';
 
 // P40 D9: the search scope stays the *tab id*, same as grid/documents/keyvalue's own
 // PageSearchApi — this file alone resolves "which of the tab's N result sets is active" via
@@ -39,7 +39,7 @@ function runSearch(
     soFar: readonly Match[],
   ) => void,
 ): SearchHandle<Match> {
-  const page = activePage(tabId);
+  const page = useConsoleViewStore().activePage(tabId);
   if (!page || q.text === '') return emptyScan();
 
   // P42 D39: the rows ConsoleResultGrid.vue's VirtualList currently has on screen (D37) — keyed
@@ -95,7 +95,7 @@ const {
 } = createPageSearch<Match>({
   runSearch,
   pageVersion,
-  loadedRowCount: (tabId) => activePage(tabId)?.rowCount ?? 0,
+  loadedRowCount: (tabId) => useConsoleViewStore().activePage(tabId)?.rowCount ?? 0,
 });
 
 export { matchedRows, pageSearchApi, searchState };
