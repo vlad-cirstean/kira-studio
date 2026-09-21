@@ -373,8 +373,8 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 // this is what flips it on afterward, once the mask rule copy that must precede any live MCP
 // exposure has actually succeeded. A narrow single-column UPDATE rather than a full Update() call
 // with a stale field snapshot, so it can't stomp a concurrent edit made in the brief window between
-// the two writes. Mirrors CodeReposRepo's own SetMcpEnabled (P67d) — same RowsAffected check, same
-// sql.ErrNoRows sentinel for "not found" rather than silently no-op-succeeding.
+// the two writes. Checks RowsAffected and returns the wrapped sql.ErrNoRows sentinel for "not
+// found" rather than silently no-op-succeeding.
 func (r *ConnectionsRepo) SetMcpEnabled(connID string, enabled bool, updatedAt string) error {
 	res, err := r.DB.Exec(`UPDATE connections SET mcp_enabled = ?, updated_at = ? WHERE id = ?`,
 		boolToInt(enabled), updatedAt, connID)

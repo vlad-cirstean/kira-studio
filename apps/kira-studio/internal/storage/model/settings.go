@@ -52,15 +52,8 @@ type GitSettings struct {
 	GraphFontSize int `json:"graphFontSize"`
 }
 
-// CodeIntelSettings mirrors C3 §7.1's one leaf — the embedded repo-map MCP server instance's
-// persisted on/off record (internal/bridge/repomap.go owns the actual start/stop side effect).
-type CodeIntelSettings struct {
-	McpServerEnabled bool `json:"mcpServerEnabled"`
-}
-
-// DbMcpSettings mirrors CodeIntelSettings exactly (M1 §6.2) — the embedded DB MCP server
-// instance's persisted on/off record (internal/bridge/dbmcp.go owns the actual start/stop side
-// effect).
+// DbMcpSettings is the embedded DB MCP server instance's persisted on/off record
+// (internal/bridge/dbmcp.go owns the actual start/stop side effect).
 type DbMcpSettings struct {
 	ServerEnabled bool `json:"serverEnabled"`
 }
@@ -101,7 +94,6 @@ type Settings struct {
 	Advanced   AdvancedSettings   `json:"advanced"`
 	Git        GitSettings        `json:"git"`
 	Api        ApiSettings        `json:"api"`
-	CodeIntel  CodeIntelSettings  `json:"codeIntel"`
 	DbMcp      DbMcpSettings      `json:"dbMcp"`
 	ClaudeCode ClaudeCodeSettings `json:"claudeCode"`
 }
@@ -144,7 +136,6 @@ func DefaultSettings() Settings {
 			MaxRedirects:     10,
 			DisableCookieJar: true,
 		},
-		CodeIntel:  CodeIntelSettings{McpServerEnabled: false},
 		DbMcp:      DbMcpSettings{ServerEnabled: false},
 		ClaudeCode: ClaudeCodeSettings{HooksEnabled: false, HooksPromptDismissed: false, KeepAwakeWithAgents: false},
 	}
@@ -196,11 +187,6 @@ type ApiPatch struct {
 	DisableCookieJar *bool   `json:"disableCookieJar,omitempty"`
 }
 
-// CodeIntelPatch mirrors CodeIntelSettings' own `.partial()` shape (C3 §7.1).
-type CodeIntelPatch struct {
-	McpServerEnabled *bool `json:"mcpServerEnabled,omitempty"`
-}
-
 // DbMcpPatch mirrors DbMcpSettings' own `.partial()` shape (M1 §6.2).
 type DbMcpPatch struct {
 	ServerEnabled *bool `json:"serverEnabled,omitempty"`
@@ -220,7 +206,6 @@ type SettingsPatch struct {
 	Advanced   *AdvancedPatch   `json:"advanced,omitempty"`
 	Git        *GitPatch        `json:"git,omitempty"`
 	Api        *ApiPatch        `json:"api,omitempty"`
-	CodeIntel  *CodeIntelPatch  `json:"codeIntel,omitempty"`
 	DbMcp      *DbMcpPatch      `json:"dbMcp,omitempty"`
 	ClaudeCode *ClaudeCodePatch `json:"claudeCode,omitempty"`
 }
@@ -349,8 +334,8 @@ func validateApiSection(a *ApiPatch) error {
 
 // Validate checks every leaf the caller actually patched against settings.ts's bounds, naming
 // the offending leaf in the error — fontFamily and fontSize have no bounds in the TS schema
-// either, so they are accepted as-is. CodeIntel/DbMcp/ClaudeCode have no bounds either and so no
-// validateX of their own.
+// either, so they are accepted as-is. DbMcp/ClaudeCode have no bounds either and so no validateX
+// of their own.
 func (p SettingsPatch) Validate() error {
 	if err := validateAppearanceSection(p.Appearance); err != nil {
 		return err

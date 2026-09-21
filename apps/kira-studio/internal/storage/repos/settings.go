@@ -74,7 +74,6 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	leaf(stored, "api.followRedirects", &result.Api.FollowRedirects)
 	leafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, model.InRange(0, 100))
 	leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
-	leaf(stored, "codeIntel.mcpServerEnabled", &result.CodeIntel.McpServerEnabled)
 	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
 	leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
 	leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
@@ -229,13 +228,6 @@ func upsertApiSection(tx *sql.Tx, a *model.ApiPatch) error {
 	return nil
 }
 
-func upsertCodeIntelSection(tx *sql.Tx, ci *model.CodeIntelPatch) error {
-	if ci == nil || ci.McpServerEnabled == nil {
-		return nil
-	}
-	return upsertSettingsLeaf(tx, "codeIntel.mcpServerEnabled", *ci.McpServerEnabled)
-}
-
 func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
 	if dm == nil || dm.ServerEnabled == nil {
 		return nil
@@ -294,9 +286,6 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		return model.Settings{}, err
 	}
 	if err := upsertApiSection(tx, patch.Api); err != nil {
-		return model.Settings{}, err
-	}
-	if err := upsertCodeIntelSection(tx, patch.CodeIntel); err != nil {
 		return model.Settings{}, err
 	}
 	if err := upsertDbMcpSection(tx, patch.DbMcp); err != nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-const codeReposSelectColumns = `id, name, root, repo_id, sort_order, created_at, mcp_enabled`
+const codeReposSelectColumns = `id, name, root, repo_id, sort_order, created_at`
 
 // CodeReposRepo reads and writes the `code_repos` table (C5 §3.1) — the repo-import store beside
 // ConnectionsRepo, never an extension of it (D1).
@@ -17,7 +17,7 @@ type CodeReposRepo struct {
 
 func scanCodeRepoRow(row rowScanner) (model.CodeRepo, error) {
 	var r model.CodeRepo
-	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.CreatedAt, &r.McpEnabled); err != nil {
+	if err := row.Scan(&r.ID, &r.Name, &r.Root, &r.RepoID, &r.SortOrder, &r.CreatedAt); err != nil {
 		return model.CodeRepo{}, err
 	}
 	return r, nil
@@ -73,36 +73,13 @@ func (r *CodeReposRepo) Create(rec model.CodeRepo) (model.CodeRepo, error) {
 		return model.CodeRepo{}, fmt.Errorf("repos/coderepos: max sort_order: %w", err)
 	}
 	rec.SortOrder = int(maxOrder.Int64) + 1
-	// mcp_enabled is inserted explicitly as 0 — a fresh import is never granted MCP access by
-	// import alone (P67d §5's own "fail-closed, always explicit").
 	if _, err := r.DB.Exec(
-		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, created_at, mcp_enabled) VALUES (?, ?, ?, ?, ?, ?, 0)`,
+		`INSERT INTO code_repos (id, name, root, repo_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		rec.ID, rec.Name, rec.Root, rec.RepoID, rec.SortOrder, rec.CreatedAt,
 	); err != nil {
 		return model.CodeRepo{}, fmt.Errorf("repos/coderepos: insert: %w", err)
 	}
-	rec.McpEnabled = false
 	return rec, nil
-}
-
-// SetMcpEnabled persists P67d's own per-repository MCP grant/revoke — bridge.RepoMapService's
-// SetRepoEnabled, the storage half. Returns sql.ErrNoRows (wrapped) when id matches no row, the same
-// sentinel this package's own read paths already use for "not found" (gitclients.go's ByID) —
-// unlike every sibling write method here, this used to never check RowsAffected at all, silently
-// "succeeding" for a nonexistent id.
-func (r *CodeReposRepo) SetMcpEnabled(id string, enabled bool) error {
-	res, err := r.DB.Exec(`UPDATE code_repos SET mcp_enabled = ? WHERE id = ?`, enabled, id)
-	if err != nil {
-		return fmt.Errorf("repos/coderepos: set mcp_enabled %s: %w", id, err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("repos/coderepos: set mcp_enabled %s: rows affected: %w", id, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("repos/coderepos: set mcp_enabled %s: %w", id, sql.ErrNoRows)
-	}
-	return nil
 }
 
 // Rename updates only the label — root/repoId are the checkout's own identity, never user-edited.

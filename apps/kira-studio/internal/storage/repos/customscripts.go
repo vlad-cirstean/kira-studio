@@ -96,7 +96,7 @@ func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.Custo
 
 // Update writes fields onto id — name/command/workingDir/color only; id, sort_order and
 // created_at are untouched. Returns a wrapped sql.ErrNoRows for an unknown id
-// (CodeReposRepo.SetMcpEnabled's own recorded fix, applied here from the start).
+// (ConnectionsRepo.SetMcpEnabled's own recorded fix, applied here from the start).
 func (r *CustomScriptsRepo) Update(id string, fields model.CustomScriptFields) (model.CustomScript, error) {
 	if err := fields.Validate(); err != nil {
 		return model.CustomScript{}, fmt.Errorf("repos/customscripts: %w", err)
