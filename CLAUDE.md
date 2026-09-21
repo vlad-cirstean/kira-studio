@@ -65,6 +65,12 @@ duplicated here; this file only points at them.
 - **The loop per phase:** check for a plan, spawn an Opus subagent to write one if missing, spawn
   a Sonnet subagent (or several, only if genuinely parallelizable) to implement the whole phase, and
   wait for it before moving on. One phase at a time, in order — never parallelize or batch phases.
+  **A phase isn't done until it's both planned and implemented.** Don't start the next phase's
+  plan — don't even spawn its Opus subagent — until the current phase's Sonnet implementer has
+  finished and its work is committed. This applies across phases only: the "parallel subagents
+  only when genuinely independent" allowance above is scoped to splitting one phase's own
+  implementation work, never to running two different phases (or their planning and
+  implementation) at the same time.
 - **A failing test, lint finding, typecheck error, or any other code-quality/hook check gets fixed
   on the spot, pre-existing or not.** "Pre-existing" justifies skipping root-cause investigation of
   whether *this phase* caused it, never skipping the fix itself. Confirm it predates the phase (e.g.
