@@ -3,7 +3,7 @@
 // separate stand-in file view ever ships in between).
 import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
@@ -22,7 +22,6 @@ import {
   repoFileUri,
   repoRevisionFileUri,
 } from './monaco';
-import { ensureNavigationRegistered } from './navigation';
 import { consumeReveal } from './reveal';
 import { useInlineBlame } from './useInlineBlame';
 
@@ -149,7 +148,6 @@ async function mount(): Promise<void> {
   }
 
   const mod = await loadMonaco();
-  ensureNavigationRegistered(mod);
   // Unmounted (tab closed/switched away) while the read/import above was in flight.
   if (!container.value) return;
 
@@ -158,15 +156,7 @@ async function mount(): Promise<void> {
       ? repoFileUri(mod, repoId, props.tab.path)
       : repoRevisionFileUri(mod, repoId, props.tab.path, rev);
   const language = monacoLanguageFor(props.tab.path);
-  // C6 D7's own rule, carried over from RepoDiffView.vue's HEAD side: a revision-pinned read is
-  // never byte-identical to what the index describes, so it is never registered as navigable.
-  const model = getOrCreateModel(
-    mod,
-    uri,
-    result.text,
-    language,
-    rev === null ? { repoId, path: props.tab.path } : undefined,
-  );
+  const model = getOrCreateModel(mod, uri, result.text, language);
 
   const editor = mod.editor.create(container.value, {
     model,
@@ -181,18 +171,6 @@ async function mount(): Promise<void> {
     codeLens: false,
     renderValidationDecorations: 'off',
     scrollBeyondLastLine: false,
-    // P78 §8.3: 'goto' for a multi-candidate definition is no longer a standalone-Monaco
-    // workaround (§1.4's kira-repo-aware ITextModelService now resolves any repo file on demand,
-    // preview tab or not) — kept because the hover already lists every candidate with its own
-    // rule/confidence, so jumping straight to the best-ranked one loses nothing, and a peek would
-    // put a second candidate list behind an extra dismissal. References/implementations are a
-    // different shape (occurrences to browse, not one name to resolve), so they default to
-    // Monaco's own peek instead, stated explicitly rather than left to Monaco's own default.
-    gotoLocation: {
-      multipleDefinitions: 'goto',
-      multipleReferences: 'peek',
-      multipleImplementations: 'peek',
-    },
     fontFamily: settingsState.appearance.fontFamily,
     fontSize: settingsState.appearance.fontSize,
   });

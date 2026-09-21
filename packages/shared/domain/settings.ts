@@ -150,17 +150,10 @@ export const apiSettingsSchema = /*#__PURE__*/ z.object({
 });
 export type ApiSettings = z.infer<typeof apiSettingsSchema>;
 
-// C3 §7.1: one leaf, default false. The embedded repo-map MCP server instance's own on/off switch
-// (internal/bridge/repomap.go owns the actual start/stop side effect; this leaf is only the
-// persisted, cross-restart record of "should it be on"). A new section on its own, not folded into
-// `advanced` or `git` — C5-C7 add their own code-intelligence leaves beside it.
-export const codeIntelSettingsSchema = /*#__PURE__*/ z.object({
-  mcpServerEnabled: z.boolean().default(false),
-});
-export type CodeIntelSettings = z.infer<typeof codeIntelSettingsSchema>;
-
-// M1 §6.2: mirrors codeIntelSettingsSchema exactly — the embedded DB MCP server instance's own
-// on/off switch (internal/bridge/dbmcp.go owns the actual start/stop side effect).
+// M1 §6.2: one leaf, default false. The embedded DB MCP server instance's own on/off switch
+// (internal/bridge/dbmcp.go owns the actual start/stop side effect; this leaf is only the
+// persisted, cross-restart record of "should it be on"). A section on its own, not folded into
+// `advanced` or `git`.
 export const dbMcpSettingsSchema = /*#__PURE__*/ z.object({
   serverEnabled: z.boolean().default(false),
 });
@@ -181,7 +174,7 @@ export const claudeCodeSettingsSchema = /*#__PURE__*/ z.object({
 export type ClaudeCodeSettings = z.infer<typeof claudeCodeSettingsSchema>;
 
 // `.default(...)` on every new section is load-bearing: an older kira.sqlite has a settings
-// row with no `data`/`cache`/`advanced`/`git`/`codeIntel` keys, and that row must still parse on
+// row with no `data`/`cache`/`advanced`/`git`/`dbMcp` keys, and that row must still parse on
 // next launch.
 export const settingsSchema = /*#__PURE__*/ z.object({
   appearance: appearanceSettingsSchema,
@@ -207,7 +200,6 @@ export const settingsSchema = /*#__PURE__*/ z.object({
     maxRedirects: 10,
     disableCookieJar: true,
   }),
-  codeIntel: codeIntelSettingsSchema.default({ mcpServerEnabled: false }),
   dbMcp: dbMcpSettingsSchema.default({ serverEnabled: false }),
   claudeCode: claudeCodeSettingsSchema.default({
     hooksEnabled: false,
@@ -224,7 +216,6 @@ export const settingsPatchSchema = /*#__PURE__*/ z.object({
   advanced: advancedSettingsSchema.partial().optional(),
   git: gitSettingsSchema.partial().optional(),
   api: apiSettingsSchema.partial().optional(),
-  codeIntel: codeIntelSettingsSchema.partial().optional(),
   dbMcp: dbMcpSettingsSchema.partial().optional(),
   claudeCode: claudeCodeSettingsSchema.partial().optional(),
 });
@@ -265,9 +256,6 @@ export const defaultSettings: Settings = {
     followRedirects: true,
     maxRedirects: 10,
     disableCookieJar: true,
-  },
-  codeIntel: {
-    mcpServerEnabled: false,
   },
   dbMcp: {
     serverEnabled: false,

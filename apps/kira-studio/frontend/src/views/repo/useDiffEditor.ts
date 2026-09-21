@@ -26,7 +26,6 @@ import {
   repoDiffUris,
   repoRevisionDiffUris,
 } from './monaco';
-import { ensureNavigationRegistered } from './navigation';
 
 // C10 §6.1: file.read's own four-way result, reshaped into DiffSide — the same classification
 // codeWorkspaceReadDiff's own two sides already use, so the binary/tooLarge/bothMissing branches
@@ -197,7 +196,6 @@ export function useDiffEditor(
     }
 
     const mod = await loadMonaco();
-    ensureNavigationRegistered(mod);
     // Unmounted (tab closed/switched away, or the section collapsed) while the read/import above
     // was in flight.
     if (!container.value) return;
@@ -217,19 +215,8 @@ export function useDiffEditor(
       ));
     }
     const language = monacoLanguageFor(path);
-    // D7: the HEAD side is deliberately never recorded as navigable — its content is a different
-    // revision than the index describes, so answering a definition there would be a lie. The
-    // worktree side is, since it's byte-identical to what the index parsed. C10: for a commit
-    // diff, NEITHER side is on disk, so neither is registered — this extends D7's own rule rather
-    // than special-casing it.
     const original = getOrCreateModel(mod, headUri.toString(), diff.head.text, language);
-    const modified = getOrCreateModel(
-      mod,
-      worktreeUri.toString(),
-      diff.worktree.text,
-      language,
-      left === null ? { repoId, path } : undefined,
-    );
+    const modified = getOrCreateModel(mod, worktreeUri.toString(), diff.worktree.text, language);
 
     const created = mod.editor.createDiffEditor(container.value, {
       theme: KIRA_EDITOR_THEME,
@@ -251,12 +238,6 @@ export function useDiffEditor(
       ...(review ? { glyphMargin: true } : {}),
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      // P78 §8.3: RepoFileView.vue's own identical options, same reasoning.
-      gotoLocation: {
-        multipleDefinitions: 'goto',
-        multipleReferences: 'peek',
-        multipleImplementations: 'peek',
-      },
       fontFamily: settingsState.appearance.fontFamily,
       fontSize: settingsState.appearance.fontSize,
     });

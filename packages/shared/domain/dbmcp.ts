@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 // M1 §6.2: the Database MCP section's own domain — bridge/dbmcp.go's DbMcpStatus/
-// DbMcpInstallResult wire projections. Command carries the plaintext token exactly once, mirroring
-// repomap.ts's own repoMapStatusSchema — this is the one place in the whole system it ever appears
-// at rest in the renderer, never persisted (no localStorage, no settings leaf).
+// DbMcpInstallResult wire projections. Command carries the plaintext token exactly once — this is
+// the one place in the whole system it ever appears at rest in the renderer, never persisted (no
+// localStorage, no settings leaf).
 export const dbMcpStatusSchema = /*#__PURE__*/ z.object({
   running: z.boolean(),
   command: z.string(),
@@ -16,8 +16,7 @@ export const dbMcpStatusSchema = /*#__PURE__*/ z.object({
 });
 export type DbMcpStatus = z.infer<typeof dbMcpStatusSchema>;
 
-// "installed" | "notFound" | "installFailed" — mcpinstall.Install's own outcome vocabulary,
-// mirroring repoMapInstallResultSchema's own.
+// "installed" | "notFound" | "installFailed" — mcpinstall.Install's own outcome vocabulary.
 export const dbMcpInstallResultSchema = /*#__PURE__*/ z.object({
   outcome: /*#__PURE__*/ z.enum(['installed', 'notFound', 'installFailed']),
   detail: z.string(),

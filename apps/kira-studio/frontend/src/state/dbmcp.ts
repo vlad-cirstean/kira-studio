@@ -3,8 +3,8 @@ import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { settingsState } from './settings';
 
-// M1 §6.2: the Database MCP section's own store — repomap.ts's own status-plus-last-action shape,
-// hydrated at boot alongside it (main.ts).
+// M1 §6.2: the Database MCP section's own store — a status-plus-last-action shape, hydrated at
+// boot (main.ts).
 const DEFAULT_STATUS: DbMcpStatus = {
   running: false,
   command: '',
@@ -54,9 +54,9 @@ export async function denyQuery(requestId: string): Promise<void> {
   applyApprovalSnapshot(await control.dbMcpDenyQuery(requestId));
 }
 
-// repomap.ts's own D7/§7.1 rationale applies verbatim: the toggle applies immediately, bypassing
-// the dialog's draft/Save flow entirely, since SetEnabled both persists the leaf and starts/stops
-// the embedded instance in one call. settingsState.dbMcp.serverEnabled is set directly from the
+// C3 §7.1/D7: the toggle applies immediately, bypassing the dialog's draft/Save flow entirely,
+// since SetEnabled both persists the leaf and starts/stops the embedded instance in one call.
+// settingsState.dbMcp.serverEnabled is set directly from the
 // confirmed `enabled` argument rather than waited-for through the separate kira:settings:changed
 // broadcast SetEnabled also emits server-side — this window's own toggle must never lag its own
 // click, and a later broadcast arrival (this window's own echo, or another window's) reapplies the

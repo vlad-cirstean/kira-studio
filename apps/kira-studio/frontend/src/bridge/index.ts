@@ -18,7 +18,6 @@ import * as MaskRulesService from '@bindings/maskrulesservice.js';
 import type * as WailsModels from '@bindings/models.js';
 import * as OpsService from '@bindings/opsservice.js';
 import * as QueriesService from '@bindings/queriesservice.js';
-import * as RepoMapService from '@bindings/repomapservice.js';
 import * as SchemaService from '@bindings/schemaservice.js';
 import * as SettingsService from '@bindings/settingsservice.js';
 import * as TabsService from '@bindings/tabsservice.js';
@@ -62,12 +61,9 @@ import type {
   DiffContent,
   FileContent,
   FileListing,
-  NavResult,
-  RefResult,
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
-import type { RepoMapInstallResult, RepoMapStatus } from '@shared/domain/repomap';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -343,17 +339,6 @@ const studioControl = {
       trust<GitVsixInstallResult>(r),
     ),
 
-  repoMapStatus: (): Promise<RepoMapStatus> =>
-    unwrap(RepoMapService.Status()).then((r) => trust<RepoMapStatus>(r)),
-  repoMapSetEnabled: (enabled: boolean): Promise<RepoMapStatus> =>
-    unwrap(RepoMapService.SetEnabled({ enabled })).then((r) => trust<RepoMapStatus>(r)),
-  repoMapSetRepoEnabled: (id: string, enabled: boolean): Promise<RepoMapStatus> =>
-    unwrap(RepoMapService.SetRepoEnabled({ id, enabled })).then((r) => trust<RepoMapStatus>(r)),
-  repoMapRegenerate: (): Promise<RepoMapStatus> =>
-    unwrap(RepoMapService.Regenerate()).then((r) => trust<RepoMapStatus>(r)),
-  repoMapInstallClaudeCode: (): Promise<RepoMapInstallResult> =>
-    unwrap(RepoMapService.InstallClaudeCode()).then((r) => trust<RepoMapInstallResult>(r)),
-
   dbMcpStatus: (): Promise<DbMcpStatus> =>
     unwrap(DbMcpService.Status()).then((r) => trust<DbMcpStatus>(r)),
   dbMcpSetEnabled: (enabled: boolean): Promise<DbMcpStatus> =>
@@ -513,46 +498,13 @@ const studioControl = {
     unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
 
   // C6 §7/§8.5: the index lifecycle (fire-and-forget from the renderer's own point of view — a
-  // failed start/stop must never block opening or leaving a workspace) plus the diff/navigation
-  // reads.
+  // failed start/stop must never block opening or leaving a workspace) plus the diff read.
   codeWorkspaceOpenWorkspace: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.OpenWorkspace({ id })),
   codeWorkspaceCloseWorkspace: (id: string): Promise<void> =>
     unwrap(CodeWorkspaceService.CloseWorkspace({ id })),
   codeWorkspaceReadDiff: (id: string, path: string): Promise<DiffContent> =>
     unwrap(CodeWorkspaceService.ReadDiff({ id, path })).then((r) => trust<DiffContent>(r)),
-  codeWorkspaceDefinitions: (
-    id: string,
-    path: string,
-    line: number,
-    column: number,
-  ): Promise<NavResult> =>
-    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.Definitions>>>(
-      CodeWorkspaceService.Definitions({ id, path, line, column }),
-    ).then((r) => trust<NavResult>({ ...r, targets: r.targets ?? [] })),
-  // P78 §7.2/§8.2: Definitions's own structural sibling — Implementations answers the same wire
-  // shape (NavResult), Go included now that Part B's method-set matching lands.
-  codeWorkspaceImplementations: (
-    id: string,
-    path: string,
-    line: number,
-    column: number,
-  ): Promise<NavResult> =>
-    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.Implementations>>>(
-      CodeWorkspaceService.Implementations({ id, path, line, column }),
-    ).then((r) => trust<NavResult>({ ...r, targets: r.targets ?? [] })),
-  // P78 §7.2/§8.1: includeDeclaration maps straight to Monaco's own
-  // ReferenceContext.includeDeclaration.
-  codeWorkspaceReferences: (
-    id: string,
-    path: string,
-    line: number,
-    column: number,
-    includeDeclaration: boolean,
-  ): Promise<RefResult> =>
-    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.References>>>(
-      CodeWorkspaceService.References({ id, path, line, column, includeDeclaration }),
-    ).then((r) => trust<RefResult>({ ...r, sites: r.sites ?? [] })),
 
   // C7 §5/D7: StartSearch returns as soon as the background scan starts — its own searchId is how
   // the renderer matches a later onCodeSearch event to the run that's waiting on it. windowKey

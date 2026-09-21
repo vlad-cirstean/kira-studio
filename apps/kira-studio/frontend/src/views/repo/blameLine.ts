@@ -123,11 +123,11 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
   // (untracked path, line past EOF, a real RPC error) — not retried on every revisit.
   //
   // P79 review fix (Performance, LOW): capped, not unbounded — holding the down-arrow through a
-  // very large file could otherwise grow this to one entry per line in the file. Same LRU idiom
-  // textModels.ts's own preview-model registry uses: a plain Map's insertion order doubles as
-  // recency (touching a key deletes then re-inserts it), so the least-recently-touched key is
-  // always whatever `cache.keys().next()` yields. A few thousand is a generous cap for a per-mount
-  // line-blame cache — a session rarely visits more than a few hundred distinct lines.
+  // very large file could otherwise grow this to one entry per line in the file. A plain Map's
+  // insertion order doubles as recency (touching a key deletes then re-inserts it), so the
+  // least-recently-touched key is always whatever `cache.keys().next()` yields. A few thousand is a
+  // generous cap for a per-mount line-blame cache — a session rarely visits more than a few hundred
+  // distinct lines.
   const CACHE_LIMIT = 2000;
   const cache = new Map<number, BlameResult | null>();
 

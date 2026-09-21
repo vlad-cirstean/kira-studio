@@ -41,14 +41,6 @@ import { gitClientsState, installVsCodeIntegration, revokeGitClient } from '../s
 import { setKeepAwakeAgentAware } from '../state/keepAwake';
 import { maskRulesState } from '../state/maskRules';
 import {
-  hydrateRepoMap,
-  installRepoMapClaudeCode,
-  regenerateRepoMapToken,
-  repoMapState,
-  setRepoMapEnabled,
-  setRepoMapRepoEnabled,
-} from '../state/repomap';
-import {
   patchSettings,
   type Section,
   sections,
@@ -187,122 +179,21 @@ const vsixOutcomeMessage = computed(() => {
   }
 });
 
-// C3 §7.1/D7: same instant-action posture as onRevokeGitClient/onInstallVsCodeIntegration above —
-// the toggle bypasses draft/Save entirely, since SetEnabled both persists the leaf and starts/stops
-// the embedded instance in one call.
-const repoMapToggling = ref(false);
-async function onToggleRepoMapEnabled(enabled: boolean): Promise<void> {
-  repoMapToggling.value = true;
-  try {
-    await setRepoMapEnabled(enabled);
-  } finally {
-    repoMapToggling.value = false;
-  }
-}
-
-// P67d §7.4: the "Repository access" list's own per-row toggle — keyed by code_repos.id so two
-// rows can never step on each other's disabled state while both are mid-flight.
-const repoMapRepoToggling = ref<string | null>(null);
-async function onToggleRepoMapRepo(id: string, enabled: boolean): Promise<void> {
-  repoMapRepoToggling.value = id;
-  try {
-    await setRepoMapRepoEnabled(id, enabled);
-  } finally {
-    repoMapRepoToggling.value = null;
-  }
-}
-
-const repoMapRegenerating = ref(false);
-async function onRegenerateRepoMapToken(): Promise<void> {
-  repoMapRegenerating.value = true;
-  try {
-    await regenerateRepoMapToken();
-  } finally {
-    repoMapRegenerating.value = false;
-  }
-}
-
-// P69 review, Group 2: repoMapState.status was otherwise only written at boot and by this
-// dialog's own mutation calls above — nothing re-fetched it when the Code intelligence section
-// became active, so a repository imported elsewhere while Settings sat open stayed invisible,
-// and a row stuck on "indexing" never advanced to "ready" without an unrelated refetch. Refresh
-// on entering the section, then poll a short interval while any listed row is still indexing.
-const REPOMAP_POLL_INTERVAL_MS = 3000;
-let repoMapPollTimer: ReturnType<typeof setInterval> | null = null;
-
-function repoMapStillIndexing(): boolean {
-  return repoMapState.status.repos.some((r) => r.serving && !r.ready);
-}
-
-function stopRepoMapPoll(): void {
-  if (repoMapPollTimer === null) return;
-  clearInterval(repoMapPollTimer);
-  repoMapPollTimer = null;
-}
-
-function startRepoMapPollIfNeeded(): void {
-  if (repoMapPollTimer !== null || !repoMapStillIndexing()) return;
-  repoMapPollTimer = setInterval(() => {
-    void hydrateRepoMap().then(() => {
-      if (!repoMapStillIndexing()) stopRepoMapPoll();
-    });
-  }, REPOMAP_POLL_INTERVAL_MS);
-}
-
-watch(
-  activeSection,
-  (section) => {
-    if (section !== 'Code intelligence') {
-      stopRepoMapPoll();
-      return;
-    }
-    void hydrateRepoMap().then(startRepoMapPollIfNeeded);
-  },
-  { immediate: true },
-);
 onBeforeUnmount(() => {
-  stopRepoMapPoll();
   // §10.1: a later plain open (TitleBar.vue's gear icon, the command palette) must not inherit a
   // deep link this instance was opened with.
   settingsSection.value = null;
 });
 
-const repoMapInstalling = ref(false);
-async function onInstallRepoMapClaudeCode(): Promise<void> {
-  repoMapInstalling.value = true;
-  try {
-    await installRepoMapClaudeCode();
-  } finally {
-    repoMapInstalling.value = false;
-  }
-}
-
-// §7.2's own outcome copy — mcpinstall's three-value vocabulary, verbatim where it's a fixed
-// string.
-const repoMapInstallMessage = computed(() => {
-  const result = repoMapState.installResult;
-  if (!result) return null;
-  switch (result.outcome) {
-    case 'installed':
-      return 'Registered with Claude Code.';
-    case 'notFound':
-      return "Claude Code's CLI isn't available. Copy the command above and run it yourself once it is installed.";
-    case 'installFailed':
-      return `Claude Code refused the registration: ${result.detail}. Copy the command above and run it yourself.`;
-    default:
-      return null;
-  }
-});
-
-// M1 §6.2: repo-map's own token-expiry line, on both servers now that both rotate — "expired,
-// regenerate" rather than a stale-looking date once the instant has passed.
+// M1 §6.2: the DB MCP token's own expiry line — "expired, regenerate" rather than a stale-looking
+// date once the instant has passed.
 function tokenExpired(expiresAt: string): boolean {
   return !!expiresAt && new Date(expiresAt).getTime() <= Date.now();
 }
-const repoMapTokenExpired = computed(() => tokenExpired(repoMapState.status.expiresAt));
 
-// M1 §6.2: same instant-action posture as onToggleRepoMapEnabled — dbMcp.serverEnabled both
-// persists and starts/stops the embedded DB MCP server in one call.
+// C3 §7.1/D7: same instant-action posture as onRevokeGitClient/onInstallVsCodeIntegration above —
+// the toggle bypasses draft/Save entirely, since SetEnabled both persists the leaf and starts/stops
+// the embedded DB MCP server in one call.
 const dbMcpToggling = ref(false);
 async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
   dbMcpToggling.value = true;
@@ -673,7 +564,7 @@ async function onSave(): Promise<void> {
 
 // P85 §10.2: the Scripts section — ConnectionDialog.vue's own Privacy-tab list-editing layout
 // (mask rules), restated for scripts. This section bypasses draft/pendingPatch entirely, the same
-// posture 'Connected editors'/'Code intelligence' already take (§10.1) — customScriptsState is a
+// posture 'Connected editors'/'Database MCP' already take (§10.1) — customScriptsState is a
 // module-level store, not a settings leaf, and a script edited here must apply immediately so the
 // tab strip's own dropdown reflects it without a Save.
 interface ScriptDraft {
@@ -1303,7 +1194,7 @@ async function onAddScript(): Promise<void> {
                 The extension ships inside the packaged app. This build has none.
               </p>
               <template v-else>
-                <!-- C3 §7.5: the same command-before-button transparency the Code intelligence
+                <!-- C3 §7.5: the same command-before-button transparency the Database MCP
                      tab's Claude Code flow uses, applied here too — unrelated feature, same
                      principle. -->
                 <p class="mono command-text" data-testid="git-vsix-command">
@@ -1588,7 +1479,7 @@ async function onAddScript(): Promise<void> {
           </template>
 
           <template v-else-if="activeSection === 'Claude Code'">
-            <!-- P86 §9.3: instant-action only, same posture as Code intelligence/Database MCP —
+            <!-- P86 §9.3: instant-action only, same posture as Connected editors/Database MCP —
                  this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
                  hook listener in one call, so it belongs on the action side of the draft/Save
                  line, never mixed with it. -->
@@ -1643,128 +1534,8 @@ async function onAddScript(): Promise<void> {
             </label>
           </template>
 
-          <template v-else-if="activeSection === 'Code intelligence'">
-            <!-- C3 §7.1/§7.4: instant-action only, same posture as Connected editors — this leaf
-                 (codeIntel.mcpServerEnabled) both persists and starts/stops the embedded repo-map
-                 MCP server in one call, so it belongs on the action side of the draft/Save line,
-                 never mixed with it. Toggle, then command, then button, strictly in that DOM order
-                 (§11.4/SPEC's own "enabling is never a silent action"). -->
-            <label class="field checkbox">
-              <Checkbox
-                :model-value="settingsState.codeIntel.mcpServerEnabled"
-                :disabled="repoMapToggling"
-                data-testid="settings-code-intel-enabled"
-                @update:model-value="onToggleRepoMapEnabled"
-              />
-              <span>Enable the repository-map MCP server</span>
-              <span class="helper-text"
-                >Starts a local MCP server so an AI coding assistant can navigate your code
-                (definitions, references, file outlines) from a pre-built index instead of reading
-                every file. Grant it access to individual repositories below.</span
-              >
-            </label>
-
-            <template v-if="settingsState.codeIntel.mcpServerEnabled">
-              <p v-if="repoMapState.status.error" class="muted-note" data-testid="repomap-error">
-                {{ repoMapState.status.error }}
-              </p>
-              <template v-else-if="repoMapState.status.running && repoMapState.status.command">
-                <p class="mono command-text" data-testid="repomap-command">
-                  {{ repoMapState.status.command }}
-                </p>
-                <AppButton
-                  kind="dialog"
-                  class="action-button"
-                  :disabled="repoMapInstalling"
-                  data-testid="repomap-install-button"
-                  @click="onInstallRepoMapClaudeCode"
-                >
-                  {{ repoMapState.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
-                </AppButton>
-                <p v-if="repoMapInstallMessage" class="helper-text" data-testid="repomap-install-outcome">
-                  {{ repoMapInstallMessage }}
-                </p>
-              </template>
-              <template v-else-if="repoMapState.status.running">
-                <!-- P67d §6.3 (D2): one app-scoped token now covers every granted repository, so an
-                     enable no longer mints unconditionally — this is also what an app restart looks
-                     like (the existing token's hash+salt loaded, but the plaintext itself unknown to
-                     this process; a hash cannot be reversed). -->
-                <p class="muted-note" data-testid="repomap-no-token">
-                  Using the registration from last time — it's still valid. Regenerate only if it
-                  was never registered with Claude Code, or you want to invalidate it.
-                </p>
-                <AppButton
-                  kind="dialog"
-                  class="action-button"
-                  :disabled="repoMapRegenerating"
-                  data-testid="repomap-regenerate-button"
-                  @click="onRegenerateRepoMapToken"
-                >
-                  Regenerate token
-                </AppButton>
-              </template>
-
-              <!-- M1 §6.2: the 7-day rotation retrofit is otherwise a silent trap — a registered
-                   client just starts getting 401s a week after upgrade with no visible cause. -->
-              <p
-                v-if="repoMapState.status.running && repoMapState.status.expiresAt"
-                class="helper-text"
-                data-testid="repomap-token-expiry"
-              >
-                {{
-                  repoMapTokenExpired
-                    ? 'Token expired — regenerate it above.'
-                    : `Token valid until ${new Date(repoMapState.status.expiresAt).toLocaleString()}.`
-                }}
-              </p>
-
-              <h3 class="section-subhead">Repository access</h3>
-              <p class="muted-note">
-                An assistant can navigate only the repositories granted here. Nothing is shared by
-                default.
-              </p>
-              <p
-                v-if="repoMapState.status.repos.length === 0"
-                class="muted-note"
-                data-testid="repomap-repos-empty"
-              >
-                No repositories imported yet. Import one from the Git module's panel.
-              </p>
-              <ul v-else class="repomap-repos-list" data-testid="repomap-repos-list">
-                <li
-                  v-for="repo in repoMapState.status.repos"
-                  :key="repo.id"
-                  class="repomap-repo-row"
-                  :data-testid="`repomap-repo-row-${repo.id}`"
-                >
-                  <div class="repomap-repo-info">
-                    <span class="repomap-repo-name">{{ repo.name }}</span>
-                    <span class="helper-text mono">{{ repo.root }}</span>
-                    <span
-                      v-if="repo.error"
-                      class="field-error"
-                      :data-testid="`repomap-repo-error-${repo.id}`"
-                    >
-                      {{ repo.error }}
-                    </span>
-                    <span v-else-if="repo.serving" class="helper-text">
-                      {{ repo.ready ? `Shared as "${repo.key}"` : 'Indexing…' }}
-                    </span>
-                  </div>
-                  <Checkbox
-                    :model-value="repo.enabled"
-                    :disabled="repoMapRepoToggling === repo.id"
-                    :data-testid="`repomap-repo-toggle-${repo.id}`"
-                    @update:model-value="(v) => onToggleRepoMapRepo(repo.id, v)"
-                  />
-                </li>
-              </ul>
-            </template>
-          </template>
-
           <template v-else-if="activeSection === 'Database MCP'">
-            <!-- M1 §6.2: same instant-action posture as Code intelligence just above — this leaf
+            <!-- M1 §6.2: same instant-action posture as Connected editors above — this leaf
                  (dbMcp.serverEnabled) both persists and starts/stops the embedded DB MCP server in
                  one call, so it belongs on the action side of the draft/Save line, never mixed with
                  it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
@@ -2238,41 +2009,8 @@ async function onAddScript(): Promise<void> {
   white-space: nowrap;
 }
 
-/* P67d §7.4: the "Repository access" list — .git-clients-list/.git-client-row's own pattern, with
-   the info column allowed to wrap the root path instead of eliding it. */
-.repomap-repos-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.repomap-repo-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-}
-
-.repomap-repo-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
-  min-width: 0;
-}
-
-.repomap-repo-name {
-  color: var(--kira-fg);
-  font-size: var(--kira-t-sm);
-  overflow-wrap: break-word;
-}
-
-/* M2 §7.3: the "Exposed connections" list's own per-row glance — repomap-repo-row's own shape. */
+/* M2 §7.3: the "Exposed connections" list's own per-row glance — .git-clients-list/.git-client-row's
+   own pattern, with the info column allowed to wrap instead of eliding it. */
 .db-mcp-connections-list {
   display: flex;
   flex-direction: column;

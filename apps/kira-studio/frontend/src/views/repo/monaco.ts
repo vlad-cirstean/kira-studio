@@ -2,7 +2,7 @@
 // URI/model-cache machinery. P60a §2.1/D2 moved the engine-generic bootstrap (`loadMonaco`,
 // `MonacoModule`, the theme definition) into `editor/monaco.ts`, shared by every editor surface in
 // the app — re-exported here unchanged so this file's own consumers (RepoFileView.vue,
-// RepoDiffView.vue, navigation.ts) need no edit.
+// RepoDiffView.vue) need no edit.
 // P94: `REPO_THEME_NAME` was P60a's own "kept as an alias for one phase... P60b drops this" —
 // overdue, dropped here (knip's duplicates check). Consumers now import KIRA_EDITOR_THEME.
 export { KIRA_EDITOR_THEME, loadMonaco, type MonacoModule } from '../../editor/monaco';
@@ -14,11 +14,10 @@ import type { MonacoModule } from '../../editor/monaco';
 // every registered kind), so model disposal needs no new lifecycle.
 const modelCache = new Map<string, import('monaco-editor').editor.ITextModel>();
 
-// C6 D6: built with `Uri.from`, not string interpolation — the editor opener (navigation.ts) has
-// to recover (repoId, path) from a Uri the *other* direction, and a path containing a space, '#',
-// '?' or '%' does not survive a plain template-literal round trip. `Uri.from` escapes correctly
-// and `uri.authority`/`uri.path` give the decoded values straight back.
-export function repoFileUriObject(
+// C6 D6: built with `Uri.from`, not string interpolation — a path containing a space, '#', '?' or
+// '%' does not survive a plain template-literal round trip. `Uri.from` escapes correctly and
+// `uri.authority`/`uri.path` give the decoded values straight back.
+function repoFileUriObject(
   mod: MonacoModule,
   repoId: string,
   path: string,
@@ -99,56 +98,24 @@ export function repoRevisionDiffUris(
   };
 }
 
-// C6 D7: navigability is a WeakMap keyed by the model object, not a URI-shape check — the diff
-// editor's HEAD side is deliberately never recorded here (its content is a different revision than
-// the index describes, so answering a definition there would be a lie); the diff's worktree side
-// and every plain file-tab model are, since both are byte-identical to what the index parsed.
-const repoLocations = new WeakMap<
-  import('monaco-editor').editor.ITextModel,
-  { repoId: string; path: string }
->();
-
-export function repoLocationOf(
-  model: import('monaco-editor').editor.ITextModel,
-): { repoId: string; path: string } | undefined {
-  return repoLocations.get(model);
-}
-
-// P78 §1.4: the new kira-repo ITextModelService's own reverse mapping — repoLocationOf above reads
-// an already-created model's own WeakMap entry; this reads straight off the Uri Monaco's own
-// peek/hover machinery hands the service before any model for it exists. A query string (a
-// revision pin, a diff side) is rejected exactly like repoLocations already excludes the diff's
-// own HEAD side (C6 D7) and a revision-pinned tab (P76 §2) — neither is byte-identical to what the
-// index parsed.
-export function repoLocationFromUri(
-  uri: import('monaco-editor').Uri,
-): { repoId: string; path: string } | undefined {
-  if (uri.scheme !== 'kira-repo' || uri.query !== '') return undefined;
-  return { repoId: uri.authority, path: uri.path.slice(1) };
-}
-
 export function getOrCreateModel(
   mod: MonacoModule,
   uri: string,
   text: string,
   language: string,
-  location?: { repoId: string; path: string },
 ): import('monaco-editor').editor.ITextModel {
   const existing = modelCache.get(uri);
   if (existing && !existing.isDisposed()) {
     // P79 review fix (Functional, MEDIUM): a cache hit used to hand back whatever content the
-    // model already held, silently ignoring the fresh text the caller just read — harmless before
-    // P78 (a model only ever existed while a tab owned it, so any open always meant a fresh model),
-    // but a tab-less preview model (textModels.ts) can now outlive an external change (a `git
-    // pull`) with nothing to invalidate it: opening the file as a real tab afterward would read the
-    // new bytes from disk and then get the stale preview-era model back. setValue only touches the
-    // model when content actually differs, so the common case (nothing changed) is a cheap compare.
+    // model already held, silently ignoring the fresh text the caller just read. A cached model can
+    // outlive an external change (a `git pull`) with nothing else to invalidate it, so reopening the
+    // same URI must not resurrect stale bytes. setValue only touches the model when content actually
+    // differs, so the common case (nothing changed) is a cheap compare.
     if (existing.getValue() !== text) existing.setValue(text);
     return existing;
   }
   const model = mod.editor.createModel(text, language, mod.Uri.parse(uri));
   modelCache.set(uri, model);
-  if (location) repoLocations.set(model, location);
   return model;
 }
 

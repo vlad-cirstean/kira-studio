@@ -12,10 +12,10 @@ export const settingsOpen = ref(false);
 // P85 §10.1: moved out of SettingsDialog.vue so `Manage scripts…` (TabStrip.vue, workbench/) can
 // deep-link to the Scripts section without SettingsDialog.vue itself in scope — a workbench/ ->
 // state/ read, the direction this app's layering already permits. G12 D9's own reasoning for the
-// list is unchanged: 'Connected editors' and 'Code intelligence'/'Database MCP' each bypass
-// draft/Save for their own stated reason; 'Scripts' joins them for the same reason (§10.1: a CRUD
-// section, not a staged leaf); P86 §9.3's 'Claude Code' joins them too, an instant on/off switch
-// exactly like 'Code intelligence'/'Database MCP'.
+// list is unchanged: 'Connected editors' and 'Database MCP' each bypass draft/Save for their own
+// stated reason; 'Scripts' joins them for the same reason (§10.1: a CRUD section, not a staged
+// leaf); P86 §9.3's 'Claude Code' joins them too, an instant on/off switch exactly like
+// 'Database MCP'.
 export const sections = [
   'Appearance',
   'Data',
@@ -25,7 +25,6 @@ export const sections = [
   'Git',
   'Scripts',
   'Claude Code',
-  'Code intelligence',
   'Database MCP',
   'Advanced',
 ] as const;
@@ -76,7 +75,6 @@ function applySettings(settings: Settings): void {
   Object.assign(settingsState.advanced, settings.advanced);
   Object.assign(settingsState.git, settings.git);
   Object.assign(settingsState.api, settings.api);
-  Object.assign(settingsState.codeIntel, settings.codeIntel);
   Object.assign(settingsState.dbMcp, settings.dbMcp);
   Object.assign(settingsState.claudeCode, settings.claudeCode);
   applyAppearance();
