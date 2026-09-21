@@ -85,7 +85,7 @@ import { useCodeReposStore } from './coderepos';
 import { connectionRecord } from './connections';
 import type { MenuItem } from './contextMenu';
 import { settingsState } from './settings';
-import { isIncognito, setIncognito } from './tabIncognito';
+import { useTabIncognitoStore } from './tabIncognito';
 import { closeTerminalSession } from './terminals';
 
 // P1 D4/F19: the tab-kind registry, split from workbench/tabViews.ts (C4) by the lint rules —
@@ -149,13 +149,14 @@ function basename(path: string): string {
 // P71 §5.2: both request kinds' own tab context-menu entry — `setIncognito`'s own listener
 // (state/tabs.ts) flushes the tab's existing row immediately on the on-transition.
 function incognitoMenuExtras(tab: TabRecord): MenuItem[] {
+  const tabIncognitoStore = useTabIncognitoStore();
   return [
     {
       type: 'item',
       id: 'incognito',
-      label: isIncognito(tab.id) ? 'Turn off incognito' : 'Incognito',
+      label: tabIncognitoStore.isIncognito(tab.id) ? 'Turn off incognito' : 'Incognito',
       icon: 'eye-closed',
-      run: () => setIncognito(tab.id, !isIncognito(tab.id)),
+      run: () => tabIncognitoStore.setIncognito(tab.id, !tabIncognitoStore.isIncognito(tab.id)),
     },
   ];
 }

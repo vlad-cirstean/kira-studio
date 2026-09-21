@@ -1,3 +1,4 @@
+import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { registerTabRuntimeCleanup } from './tabRuntime';
 
@@ -14,30 +15,34 @@ import { registerTabRuntimeCleanup } from './tabRuntime';
 //
 // Standing rule for later phases: any new bridge write reachable from a request tab must consult
 // isIncognito first.
-const incognitoState = reactive({ ids: new Set<string>() });
+export const useTabIncognitoStore = defineStore('tabIncognito', () => {
+  const state = reactive({ ids: new Set<string>() });
 
-export function isIncognito(tabId: string): boolean {
-  return incognitoState.ids.has(tabId);
-}
+  function isIncognito(tabId: string): boolean {
+    return state.ids.has(tabId);
+  }
 
-// P71 §3.1: turning incognito on must flush the tab's existing row immediately rather than at
-// whatever unrelated state change saves next — state/tabs.ts registers a listener below (rather
-// than this module calling into tabs.ts directly, which would recreate the cycle the module
-// comment above avoids) that does exactly that.
-const onSetListeners = new Set<(tabId: string, on: boolean) => void>();
+  // P71 §3.1: turning incognito on must flush the tab's existing row immediately rather than at
+  // whatever unrelated state change saves next — state/tabs.ts registers a listener below (rather
+  // than this module calling into tabs.ts directly, which would recreate the cycle the module
+  // comment above avoids) that does exactly that.
+  const onSetListeners = new Set<(tabId: string, on: boolean) => void>();
 
-export function registerIncognitoSetListener(fn: (tabId: string, on: boolean) => void): void {
-  onSetListeners.add(fn);
-}
+  function registerIncognitoSetListener(fn: (tabId: string, on: boolean) => void): void {
+    onSetListeners.add(fn);
+  }
 
-export function setIncognito(tabId: string, on: boolean): void {
-  if (on) incognitoState.ids.add(tabId);
-  else incognitoState.ids.delete(tabId);
-  for (const fn of onSetListeners) fn(tabId, on);
-}
+  function setIncognito(tabId: string, on: boolean): void {
+    if (on) state.ids.add(tabId);
+    else state.ids.delete(tabId);
+    for (const fn of onSetListeners) fn(tabId, on);
+  }
 
-// Closing a tab drops its flag through the same cleanup path every other per-tab runtime uses
-// (dropAllPagesForTab, state/tabs.ts).
-registerTabRuntimeCleanup((tabId) => {
-  incognitoState.ids.delete(tabId);
+  // Closing a tab drops its flag through the same cleanup path every other per-tab runtime uses
+  // (dropAllPagesForTab, state/tabs.ts).
+  registerTabRuntimeCleanup((tabId) => {
+    state.ids.delete(tabId);
+  });
+
+  return { isIncognito, registerIncognitoSetListener, setIncognito };
 });

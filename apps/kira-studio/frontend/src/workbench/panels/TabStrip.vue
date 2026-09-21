@@ -11,7 +11,7 @@ import { useCustomScriptsStore } from '../../state/customScripts';
 import { tabsForWorkspace } from '../../state/mode';
 import { openRepoTerminalTab } from '../../state/repoTabs';
 import { openSettingsAt } from '../../state/settings';
-import { isIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import {
   activateTab,
@@ -37,6 +37,7 @@ const contextMenuStore = useContextMenuStore();
 const agentSessionsStore = useAgentSessionsStore();
 const codeReposStore = useCodeReposStore();
 const customScriptsStore = useCustomScriptsStore();
+const tabIncognitoStore = useTabIncognitoStore();
 const workspaceStore = useWorkspaceStore();
 
 function isPinned(tab: TabRecord): boolean {
@@ -398,7 +399,7 @@ function terminalModuleMenuItems(): MenuItem[] {
           'is-active': tab.active,
           'is-dragging': dragId === tab.id,
           'is-preview': isPreview(tab.id),
-          'is-incognito': isIncognito(tab.id),
+          'is-incognito': tabIncognitoStore.isIncognito(tab.id),
           'is-attention': isAttention(tab),
         }"
         data-testid="tab"
@@ -407,7 +408,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         :data-active="tab.active"
         :data-preview="isPreview(tab.id)"
         data-pinned="false"
-        :data-incognito="isIncognito(tab.id)"
+        :data-incognito="tabIncognitoStore.isIncognito(tab.id)"
         :data-attention="isAttention(tab)"
         :data-color="colorFor(tab)"
         :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
@@ -429,7 +430,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         />
         <CodiconIcon v-else :name="icon" :size="13" class="tab-icon" />
         <CodiconIcon
-          v-if="isIncognito(tab.id)"
+          v-if="tabIncognitoStore.isIncognito(tab.id)"
           name="eye-closed"
           :size="12"
           class="tab-incognito"

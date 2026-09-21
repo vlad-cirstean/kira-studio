@@ -8,7 +8,7 @@ import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, ref } from 'vue';
 import { formatRelative } from '../../format';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
-import { isIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -23,6 +23,7 @@ import {
 } from './history';
 
 const confirmDialogStore = useConfirmDialogStore();
+const tabIncognitoStore = useTabIncognitoStore();
 
 // P13 D12: extracted out of ResponsePane.vue's own history block, mirroring
 // views/httprequest/ResponseHistoryList.vue's shape exactly — a real toolbar (count + Clear,
@@ -40,7 +41,7 @@ const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 // P18 D6: HTTP's own "the list is full" predicate, restated for gRPC's cap.
 const atCap = computed(() => entries.value.length >= GRPC_HISTORY_PER_SCOPE_LIMIT);
 // P71 §3.5: ResponseHistoryList.vue's own explanation for the silence, restated for gRPC.
-const incognito = computed(() => isIncognito(props.tab.id));
+const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 
 onMounted(() => {
   ensureGrpcHistoryFresh(props.tab.id);

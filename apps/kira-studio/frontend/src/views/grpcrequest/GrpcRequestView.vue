@@ -26,7 +26,7 @@ import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { isIncognito, setIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
@@ -51,15 +51,17 @@ import {
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
+const tabIncognitoStore = useTabIncognitoStore();
+
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
 
 // P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
 // environment id it reads through while incognito.
-const incognito = computed(() => isIncognito(props.tab.id));
+const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 function toggleIncognito(): void {
-  setIncognito(props.tab.id, !incognito.value);
+  tabIncognitoStore.setIncognito(props.tab.id, !incognito.value);
 }
 const envId = computed(() => environmentIdForTab(props.tab.id));
 

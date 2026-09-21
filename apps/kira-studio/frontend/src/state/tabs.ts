@@ -40,11 +40,16 @@ import { useCellSelectionStore } from './cellSelection';
 import { connectionsState } from './connections';
 import { useConsoleDefaultsStore } from './consoleDefaults';
 import { tabsForWorkspace, workspaceKeyOf } from './mode';
+import { pinia } from './pinia';
 import { settingsState } from './settings';
-import { isIncognito, registerIncognitoSetListener, setIncognito } from './tabIncognito';
+import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
 import { useWorkspaceStore } from './workspace';
+
+// Module-level `registerIncognitoSetListener` call below runs at import time, before
+// `app.use(pinia)` — the explicit instance is required here (state/pinia.ts's own header comment).
+const tabIncognitoStore = useTabIncognitoStore(pinia);
 
 // Frees whichever page store(s) a tab could have populated (§2.2) — a plain no-op lookup miss
 // for the stores a tab's own kind never touches, same discipline as calling
@@ -132,7 +137,9 @@ let pendingSnapshot: string | null = null;
 // P83 §7.5: a terminal tab's whole content is a live process — a restored row would be an empty
 // terminal wired to a PTY that died with the last run. Same filter shape as incognito above.
 function persistableTabs(): TabRecord[] {
-  return tabsState.tabs.filter((t) => !isIncognito(t.id) && t.kind !== 'terminal');
+  return tabsState.tabs.filter(
+    (t) => !tabIncognitoStore.isIncognito(t.id) && t.kind !== 'terminal',
+  );
 }
 
 function saveIfChanged(): void {
@@ -206,7 +213,7 @@ control.onWindowFlushBeforeClose(() => flushPendingTabState(control.windowFlushe
 // setIncognito (tabIncognito.ts) already updates incognitoState.ids before firing this listener,
 // so persistableTabs()'s own isIncognito filter already sees the new state either direction; the
 // old on-only guard left a tab switched back to normal unpersisted until some unrelated save.
-registerIncognitoSetListener((_tabId, _on) => {
+tabIncognitoStore.registerIncognitoSetListener((_tabId, _on) => {
   saveNow();
 });
 
@@ -632,7 +639,7 @@ export function duplicateTab(id: string): string {
   tabsState.tabs.push(record);
   // P71 §3.1: duplicating an incognito tab to try a variant must not silently start persisting
   // it — the copy carries the flag too.
-  if (isIncognito(source.id)) setIncognito(newId, true);
+  if (tabIncognitoStore.isIncognito(source.id)) tabIncognitoStore.setIncognito(newId, true);
   setActiveTabId(newId, workspaceKeyOf(source));
   tabsState.hydrated.add(newId);
   saveNow();

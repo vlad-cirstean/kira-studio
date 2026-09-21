@@ -39,7 +39,7 @@ import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor
 import type { RangeHighlight } from '../../editor/ranges';
 import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
-import { isIncognito, setIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -65,6 +65,8 @@ import { onSendCompleted, resolveForExport, resolveTabState, runtime, send, stop
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
+const tabIncognitoStore = useTabIncognitoStore();
+
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
@@ -73,9 +75,9 @@ const title = computed(() => httpRequestTitle(props.tab.state));
 // P71 §5/§3.1: the tab's own incognito state, and the per-tab environment id it reads through
 // while incognito (api/state/variables.ts's own override) — every other caller of
 // collectionId/environmentId in this file goes through envId, never activeEnvironmentId directly.
-const incognito = computed(() => isIncognito(props.tab.id));
+const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 function toggleIncognito(): void {
-  setIncognito(props.tab.id, !incognito.value);
+  tabIncognitoStore.setIncognito(props.tab.id, !incognito.value);
 }
 const envId = computed(() => environmentIdForTab(props.tab.id));
 

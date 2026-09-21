@@ -9,7 +9,7 @@ import type {
 } from '@shared/domain/variables';
 import { computed, reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { isIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { runReveal } from '../reveal';
 import { closeVariableSetTabsForOwner, openEnvironmentsTab, renameVariableSetTabs } from '../tabs';
@@ -85,21 +85,22 @@ export async function setActiveEnvironment(id: string): Promise<void> {
 const incognitoEnvByTab = new Map<string, string>(); // tabId → environment id ('' = none)
 
 export function environmentIdForTab(tabId: string): string {
-  if (isIncognito(tabId) && incognitoEnvByTab.has(tabId)) {
+  if (useTabIncognitoStore().isIncognito(tabId) && incognitoEnvByTab.has(tabId)) {
     return incognitoEnvByTab.get(tabId) as string;
   }
   return activeEnvironmentId.value;
 }
 
 export function environmentColorForTab(tabId: string): PaletteColor {
-  if (!isIncognito(tabId) || !incognitoEnvByTab.has(tabId)) return activeEnvironmentColor.value;
+  if (!useTabIncognitoStore().isIncognito(tabId) || !incognitoEnvByTab.has(tabId))
+    return activeEnvironmentColor.value;
   const id = incognitoEnvByTab.get(tabId);
   return variablesState.environments.find((e) => e.id === id)?.color ?? 'none';
 }
 
 /** In-memory when the tab is incognito, else the ordinary app-wide write (setActiveEnvironment). */
 export async function selectEnvironmentForTab(tabId: string, id: string): Promise<void> {
-  if (isIncognito(tabId)) {
+  if (useTabIncognitoStore().isIncognito(tabId)) {
     incognitoEnvByTab.set(tabId, id);
     return;
   }

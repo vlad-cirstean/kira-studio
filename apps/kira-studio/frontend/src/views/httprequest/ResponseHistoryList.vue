@@ -9,7 +9,7 @@ import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes, formatRelative } from '../../format';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
-import { isIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -27,6 +27,7 @@ import {
 // P8 D15: the History pane's list — one row per response, capped at HISTORY_PER_SCOPE_LIMIT by
 // construction (P18 D4/D6), so no VirtualList/TreeHost involvement.
 const confirmDialogStore = useConfirmDialogStore();
+const tabIncognitoStore = useTabIncognitoStore();
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const emit = defineEmits<{ compare: [ids: [string, string]] }>();
 
@@ -37,7 +38,7 @@ const viewingId = computed(() => rt.value?.viewing?.id ?? null);
 const isScratch = computed(() => !props.tab.state.itemId);
 // P71 §3.5: nothing is suppressed here — with nothing recorded, historyList simply returns the
 // empty set, so this only exists to explain the silence rather than leave it looking broken.
-const incognito = computed(() => isIncognito(props.tab.id));
+const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
 // P18 D6: the list is ≤ HISTORY_PER_SCOPE_LIMIT by construction (Record's own trim), so "the list
 // is full" is exactly this predicate — not a stored eviction count (rejected in the plan: List can
 // never say more than "the list is full" without a new column and write path). Not suppressed by

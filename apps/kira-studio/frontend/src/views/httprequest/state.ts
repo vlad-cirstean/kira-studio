@@ -19,7 +19,7 @@ import { collectionIdFor } from '../../api/state/collections';
 import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { isIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteSendRecorded } from './history';
@@ -206,7 +206,7 @@ export async function send(tabId: string): Promise<void> {
       // P8 D2: the tab already knows it (http.ts:208) — '' for a scratch tab, exactly like
       // collectionId's own "possibly empty" shape above.
       itemId: tab.state.itemId ?? '',
-      incognito: isIncognito(tabId),
+      incognito: useTabIncognitoStore().isIncognito(tabId),
       options: buildSettingsWire(tab.state.settings),
     });
     if (rt.opId !== opId) return; // superseded by a newer send

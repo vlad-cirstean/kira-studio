@@ -12,7 +12,7 @@ import { collectionIdFor } from '../../api/state/collections';
 import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import { isIncognito } from '../../state/tabIncognito';
+import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { noteGrpcCallRecorded } from './history';
@@ -325,7 +325,7 @@ export async function call(tabId: string): Promise<void> {
       collectionId,
       environmentId,
       itemId: tab.state.itemId ?? '',
-      incognito: isIncognito(tabId),
+      incognito: useTabIncognitoStore().isIncognito(tabId),
     });
     if (rt.opId !== opId) return; // superseded, or the streaming subscription already finished it
     rt.status = 'idle';
