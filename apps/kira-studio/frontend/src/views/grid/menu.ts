@@ -15,7 +15,7 @@ import {
 import { quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
 import { requestCellFocus } from './focusRequest';
 import { usePendingChangesStore } from './pendingChanges';
-import { setActionError, setFilter, setMaskPreview, setProjection, setSort } from './state';
+import { useGridViewStore } from './state';
 
 // F1/P21 round 1: the pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
 // the table/view's primary-key columns, which is empty for any relation with no primary key (every
@@ -105,7 +105,7 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
   const { id: tabId } = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
     newTab: true,
   });
-  void setFilter(tabId, filter);
+  void useGridViewStore().setFilter(tabId, filter);
 }
 
 /** P67: the same jump navigateForeignKey performs, then a request to land the caret in the
@@ -131,7 +131,7 @@ async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Prom
   const { id: tabId } = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
     newTab: true,
   });
-  await setFilter(tabId, filter);
+  await useGridViewStore().setFilter(tabId, filter);
   requestCellFocus(tabId, { row: 0, prefer: 'first-non-key', edit: true });
 }
 
@@ -336,7 +336,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       icon: 'filter',
       // Replaces (not appends to) the current filter — a deliberate narrowing action, not an
       // accumulating AND-chain (D5).
-      run: () => void setFilter(ctx.tabId, filterExpr),
+      run: () => void useGridViewStore().setFilter(ctx.tabId, filterExpr),
     },
     ...(fkItems.length ? [{ type: 'separator' } as const, ...fkItems] : []),
   ];
@@ -519,8 +519,11 @@ async function markColumnMaskKind(ctx: HeaderMenuContext, kind: MaskKind): Promi
   // only while an edit or insert row is staged (setMaskPreview's own pending-changes guard); the
   // rule itself is still saved either way, so say why the preview did not also turn on rather than
   // leaving it looking like the menu action had no effect (M7 finding).
-  if (!setMaskPreview(ctx.tabId, true)) {
-    setActionError(ctx.tabId, 'Marked as PII. Commit or discard pending changes to preview it.');
+  if (!useGridViewStore().setMaskPreview(ctx.tabId, true)) {
+    useGridViewStore().setActionError(
+      ctx.tabId,
+      'Marked as PII. Commit or discard pending changes to preview it.',
+    );
   }
 }
 
@@ -541,7 +544,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       id: 'sort-asc',
       label: 'Sort asc',
       run: () =>
-        void setSort(ctx.tabId, {
+        void useGridViewStore().setSort(ctx.tabId, {
           kind: 'structured',
           terms: [{ column: ctx.columnName, direction: 'asc' }],
         }),
@@ -551,7 +554,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       id: 'sort-desc',
       label: 'Sort desc',
       run: () =>
-        void setSort(ctx.tabId, {
+        void useGridViewStore().setSort(ctx.tabId, {
           kind: 'structured',
           terms: [{ column: ctx.columnName, direction: 'desc' }],
         }),
@@ -561,7 +564,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       id: 'clear-sort',
       label: 'Clear sort',
       disabled: ctx.currentSort === null,
-      run: () => void setSort(ctx.tabId, null),
+      run: () => void useGridViewStore().setSort(ctx.tabId, null),
     },
     { type: 'separator' },
     {
@@ -576,7 +579,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       // projection down to zero columns) is closed below by falling back to null instead, not by
       // forbidding every PK column outright.
       run: () => {
-        void setProjection(
+        void useGridViewStore().setProjection(
           ctx.tabId,
           nextProjectionAfterHidingColumn(
             ctx.currentProjection,
@@ -590,7 +593,7 @@ export function headerMenu(ctx: HeaderMenuContext): MenuItem[] {
       type: 'item',
       id: 'show-all-columns',
       label: 'Show all columns',
-      run: () => void setProjection(ctx.tabId, null),
+      run: () => void useGridViewStore().setProjection(ctx.tabId, null),
     },
     { type: 'separator' },
     {

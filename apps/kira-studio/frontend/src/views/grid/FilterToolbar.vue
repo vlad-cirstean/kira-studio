@@ -13,13 +13,14 @@ import {
   orderByCandidates as buildOrderByCandidates,
   whereCandidates as buildWhereCandidates,
 } from './filterCompletion';
-import { runtime, setFilter, setSort } from './state';
+import { useGridViewStore } from './state';
 
 // P48 D10: takes `tab` as a prop like every other view's toolbar — see DataToolbar.vue's own note.
 const props = defineProps<{ tab: DataTabRecord }>();
 const connectionsStore = useConnectionsStore();
+const gridViewStore = useGridViewStore();
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 
 // A query that failed is shown by the WHERE field turning error-red — the failure itself is
 // already reported by DataView.vue's error strip, this just points at the field that caused it.
@@ -75,14 +76,14 @@ async function applyWhere(): Promise<void> {
   // A blur fires on every focus loss, not just an edit — re-applying an unchanged WHERE would
   // reset paging/count for no reason (and, worse, race an in-flight runCount for this same filter).
   if (value === (props.tab.state.filter ?? null)) return;
-  await setFilter(props.tab.id, value);
+  await gridViewStore.setFilter(props.tab.id, value);
   recordHistory(value, props.tab.state.sort);
 }
 
 async function applyOrderBy(): Promise<void> {
   const text = orderByText.value.trim();
   const sort: SortSpec | null = text === '' ? null : { kind: 'text', text };
-  await setSort(props.tab.id, sort);
+  await gridViewStore.setSort(props.tab.id, sort);
   recordHistory(props.tab.state.filter, sort);
 }
 
@@ -92,8 +93,8 @@ async function applyOrderBy(): Promise<void> {
 async function onClear(): Promise<void> {
   whereText.value = '';
   orderByText.value = '';
-  await setFilter(props.tab.id, null);
-  await setSort(props.tab.id, null);
+  await gridViewStore.setFilter(props.tab.id, null);
+  await gridViewStore.setSort(props.tab.id, null);
   recordHistory(null, null);
 }
 
@@ -115,7 +116,7 @@ const historyOpen = ref(false);
 function applyFromHistory(where: string | null, orderBy: SortSpec | null): void {
   whereText.value = where ?? '';
   orderByText.value = sortToText(orderBy);
-  void setFilter(props.tab.id, where).then(() => setSort(props.tab.id, orderBy));
+  void gridViewStore.setFilter(props.tab.id, where).then(() => gridViewStore.setSort(props.tab.id, orderBy));
 }
 </script>
 

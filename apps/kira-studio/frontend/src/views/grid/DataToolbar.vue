@@ -15,18 +15,7 @@ import { getPage, pageVersion } from './page';
 import { usePendingChangesStore } from './pendingChanges';
 import { matchedRows } from './search';
 import { rowsForSelection } from './slick/rowValues';
-import {
-  goFirst,
-  goLast,
-  goNext,
-  goPrev,
-  goToPage,
-  runCount,
-  runtime,
-  setPageSize,
-  toggleMaskPreview,
-  toggleSearchOpen,
-} from './state';
+import { useGridViewStore } from './state';
 
 // P48 D10: takes `tab` as a prop like every other view's toolbar, rather than reading the
 // nullable, globally-computed activeDataTab — this component only ever renders while its tab is
@@ -36,13 +25,14 @@ import {
 const fakeDataStore = useFakeDataStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
+const gridViewStore = useGridViewStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
 // (kept only because two leaks.spec.ts assertions read .active, since fixed) can be the primitive.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('');
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
@@ -89,7 +79,7 @@ const maskPreviewTooltip = computed(() => {
 });
 function onToggleMaskPreview(): void {
   if (hasPendingChanges.value) return;
-  toggleMaskPreview(props.tab.id);
+  gridViewStore.toggleMaskPreview(props.tab.id);
 }
 
 // P36 D26: the − row button's own gate — ClickHouse is writable (canInsert: true) but has no
@@ -103,7 +93,7 @@ function onToggleMaskPreview(): void {
 // grid's own context menu does not (it acts on the row that was right-clicked).
 // `runtime` is a real reactive() map (views/shared/viewOp.ts), so this needs no version read —
 // unlike hasPrimaryKey below, whose getPage() reads a plain Map and depends on pageVersion.n.
-const hasSelection = computed(() => !!runtime[props.tab.id]?.selection);
+const hasSelection = computed(() => !!gridViewStore.runtime[props.tab.id]?.selection);
 const hasPrimaryKey = computed(() => {
   void pageVersion.n;
   return getPage(props.tab.id)?.columns.some((c) => c.isPrimaryKey) ?? false;
@@ -141,28 +131,28 @@ const generateDataTooltip = computed(() => {
 });
 
 function onFirst(): void {
-  void goFirst(props.tab.id);
+  void gridViewStore.goFirst(props.tab.id);
 }
 function onPrev(): void {
-  void goPrev(props.tab.id);
+  void gridViewStore.goPrev(props.tab.id);
 }
 function onNext(): void {
-  void goNext(props.tab.id);
+  void gridViewStore.goNext(props.tab.id);
 }
 function onLast(): void {
-  void goLast(props.tab.id);
+  void gridViewStore.goLast(props.tab.id);
 }
 function onJump(pageIndex: number): void {
-  void goToPage(props.tab.id, pageIndex);
+  void gridViewStore.goToPage(props.tab.id, pageIndex);
 }
 function onCount(): void {
-  void runCount(props.tab.id);
+  void gridViewStore.runCount(props.tab.id);
 }
 function onPageSize(size: PageSize): void {
-  void setPageSize(props.tab.id, size);
+  void gridViewStore.setPageSize(props.tab.id, size);
 }
 function onToggleSearch(): void {
-  toggleSearchOpen(props.tab.id);
+  gridViewStore.toggleSearchOpen(props.tab.id);
 }
 function onGenerateData(): void {
   if (!canGenerateData.value) return;
@@ -215,7 +205,7 @@ function onAddRow(): void {
 // same one every other "act on the current selection" call site uses, so a selection kind newly
 // needs coverage exactly once, not here as well.
 function onDeleteRow(): void {
-  const r = runtime[props.tab.id];
+  const r = gridViewStore.runtime[props.tab.id];
   const sel = r?.selection;
   if (!sel) return;
   const p = getPage(props.tab.id);

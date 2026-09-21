@@ -24,7 +24,8 @@ import { restoreAfterEach } from './support/restoreAfterEach';
 setActivePinia(pinia);
 
 const { setPage } = await import('../../frontend/src/views/grid/page');
-const { runtime } = await import('../../frontend/src/views/grid/state');
+const { useGridViewStore } = await import('../../frontend/src/views/grid/state');
+const gridViewStore = useGridViewStore();
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { usePendingChangesStore } = await import('../../frontend/src/views/grid/pendingChanges');
@@ -70,7 +71,7 @@ function compositeKeyPageWithOneColumnHidden() {
 describe('a staged change against a partially-hidden composite primary key fails loudly (P21 round 2 functional finding 2)', () => {
   test('commitPending throws UnaddressableRowError naming the hidden PK column, instead of staging a partial key', async () => {
     const tabId = 'composite-pk-tab-1';
-    runtime[tabId] = {
+    gridViewStore.runtime[tabId] = {
       status: 'idle',
       error: null,
       actionError: null,
@@ -103,7 +104,7 @@ describe('a staged change against a partially-hidden composite primary key fails
 
   test('a staged delete against the same partial key also throws, naming the hidden column', async () => {
     const tabId = 'composite-pk-tab-2';
-    runtime[tabId] = {
+    gridViewStore.runtime[tabId] = {
       status: 'idle',
       error: null,
       actionError: null,
@@ -136,7 +137,7 @@ describe('a staged change against a partially-hidden composite primary key fails
 
   test('a complete composite key (both columns projected) still commits normally', async () => {
     const tabId = 'composite-pk-tab-3';
-    runtime[tabId] = {
+    gridViewStore.runtime[tabId] = {
       status: 'idle',
       error: null,
       actionError: null,

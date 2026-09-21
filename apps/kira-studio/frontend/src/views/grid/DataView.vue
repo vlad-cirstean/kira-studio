@@ -21,16 +21,7 @@ import PreviewCommandPanel from './PreviewCommandPanel.vue';
 import { usePendingChangesStore } from './pendingChanges';
 import SlickGridHost from './SlickGridHost.vue';
 import { type Match, pageSearchApi } from './search';
-import {
-  load,
-  reload,
-  reloadAfterMutation,
-  runtime,
-  setActionError,
-  setSearchOpen,
-  stop,
-  toggleSearchOpen,
-} from './state';
+import { useGridViewStore } from './state';
 
 // MainView.vue keys this component by tab.id, so one instance <-> one tab: onMounted below
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
@@ -38,14 +29,15 @@ import {
 const fakeDataStore = useFakeDataStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
+const gridViewStore = useGridViewStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
-  () => load(props.tab.id),
+  () => gridViewStore.load(props.tab.id),
 );
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 
@@ -106,10 +98,10 @@ async function onCommit(): Promise<void> {
   if (!props.tab.connectionId) return;
   try {
     await pendingChangesStore.commitPending(props.tab.connectionId, props.tab.path, props.tab.id);
-    setActionError(props.tab.id, null);
-    await reloadAfterMutation(props.tab.id);
+    gridViewStore.setActionError(props.tab.id, null);
+    await gridViewStore.reloadAfterMutation(props.tab.id);
   } catch (err) {
-    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    gridViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -117,14 +109,14 @@ function onDiscard(): void {
   pendingChangesStore.discardPending(props.tab.id);
   // P43 F5/D7: a discard resolves the very staging that a prior actionError was about — an error
   // strip surviving it would be pointing at a change that no longer exists.
-  setActionError(props.tab.id, null);
+  gridViewStore.setActionError(props.tab.id, null);
 }
 
 function onRefresh(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => gridViewStore.reload(props.tab.id));
 }
 function onStop(): void {
-  stop(props.tab.id);
+  gridViewStore.stop(props.tab.id);
 }
 
 // P15 D1/D11: the palette's own gate, since the palette entry has no disabled-button affordance
@@ -140,14 +132,14 @@ function onGenerateData(): void {
 let unregisterCommands: Array<() => void> = [];
 
 onMounted(() => {
-  if (!needsReconnect.value && !runtime[props.tab.id]) {
-    void load(props.tab.id);
+  if (!needsReconnect.value && !gridViewStore.runtime[props.tab.id]) {
+    void gridViewStore.load(props.tab.id);
   }
   // D11: this component is mounted only while its tab is the active one (MainView.vue's
   // `v-else-if` chain), so registering here — rather than switching on tab kind in a global
   // dispatcher — is what makes Find/Refresh always act on the currently visible data tab.
   unregisterCommands = [
-    registerCommand('view.find', () => toggleSearchOpen(props.tab.id)),
+    registerCommand('view.find', () => gridViewStore.toggleSearchOpen(props.tab.id)),
     // Item 4 (regression pass, task batch P46-4): this used to call reload() directly, a doomed
     // no-op while the tab sits behind the reconnect gate (same bug the toolbar's own Refresh
     // button had, item 4's first pass) — the keyboard-shortcut/command-palette path needs the
@@ -167,7 +159,7 @@ function onGoToMatch(match: Match): void {
   dataGridRef.value?.scrollCellIntoView(match.row, match.col);
 }
 function onCloseSearch(): void {
-  setSearchOpen(props.tab.id, false);
+  gridViewStore.setSearchOpen(props.tab.id, false);
 }
 </script>
 

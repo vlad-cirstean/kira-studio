@@ -32,11 +32,8 @@ const browseViewStore = useBrowseViewStore();
 const { useKeyValueViewStore } = await import('../../frontend/src/views/shared/keyvalue/state');
 const keyValueViewStore = useKeyValueViewStore();
 const { setPage } = await import('../../frontend/src/views/shared/keyvalue/page');
-const {
-  goNext: gridGoNext,
-  goPrev: gridGoPrev,
-  runtime: gridRuntime,
-} = await import('../../frontend/src/views/grid/state');
+const { useGridViewStore } = await import('../../frontend/src/views/grid/state');
+const gridViewStore = useGridViewStore();
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -263,10 +260,10 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
 
-    await gridGoNext(id);
+    await gridViewStore.goNext(id);
 
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(0);
-    expect(gridRuntime[id]?.status).toBe('error');
+    expect(gridViewStore.runtime[id]?.status).toBe('error');
   });
 
   test('7. goNext reverts pageIndex to the previous page when the load is cancelled', async () => {
@@ -275,10 +272,10 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('cancelled'), { code: 'E_CANCELLED' }));
 
-    await gridGoNext(id);
+    await gridViewStore.goNext(id);
 
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(0);
-    expect(gridRuntime[id]?.status).toBe('cancelled');
+    expect(gridViewStore.runtime[id]?.status).toBe('cancelled');
   });
 
   test('8. goPrev reverts pageIndex to the previous page when the load fails', async () => {
@@ -290,7 +287,7 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
 
-    await gridGoPrev(id);
+    await gridViewStore.goPrev(id);
 
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(3);
   });
@@ -304,9 +301,9 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () => reads[call++]?.promise;
 
-    const older = gridGoNext(id); // page 0 -> 1, opId A
+    const older = gridViewStore.goNext(id); // page 0 -> 1, opId A
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1);
-    const newer = gridGoNext(id); // page 1 -> 2, opId B (supersedes A)
+    const newer = gridViewStore.goNext(id); // page 1 -> 2, opId B (supersedes A)
     expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(2);
 
     // A's request fails after B has already taken over — its failure must not stomp on B's

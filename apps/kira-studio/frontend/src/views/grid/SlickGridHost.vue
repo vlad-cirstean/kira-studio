@@ -102,7 +102,7 @@ import {
 } from '../shared/slick/selection';
 import { getPage, pageVersion, setVisibleWindow } from './page';
 import { parseTextSortTerms } from './sortTerms';
-import { runtime, type Selection, setActionError, setMaskPreview, setSort } from './state';
+import { type Selection, useGridViewStore } from './state';
 
 const contextMenuStore = useContextMenuStore();
 const cellSelectionStore = useCellSelectionStore();
@@ -111,6 +111,7 @@ const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
 const settingsStore = useSettingsStore();
+const gridViewStore = useGridViewStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -221,7 +222,7 @@ function cellFormatter(
 }
 
 function rt() {
-  return runtime[props.tabId];
+  return gridViewStore.runtime[props.tabId];
 }
 
 // P22 Pass B, C3 — the row-shortcut/copy/paste plumbing needs the same writability/identity
@@ -650,8 +651,8 @@ function refreshMaskTagsAndRerender(): void {
       grid.render();
     },
     (err: unknown) => {
-      setMaskPreview(props.tabId, false);
-      setActionError(props.tabId, err instanceof Error ? err.message : String(err));
+      gridViewStore.setMaskPreview(props.tabId, false);
+      gridViewStore.setActionError(props.tabId, err instanceof Error ? err.message : String(err));
       if (!grid || !dataSource) return;
       dataSource.setState(dataSourceState(getPage(props.tabId), currentOrder()));
       grid.invalidateAllRows();
@@ -1370,11 +1371,17 @@ function syncSortIndicators(): void {
 function cycleSortFor(name: string): void {
   const current = currentSortTerms().find((t) => t.column === name);
   if (!current) {
-    void setSort(props.tabId, { kind: 'structured', terms: [{ column: name, direction: 'asc' }] });
+    void gridViewStore.setSort(props.tabId, {
+      kind: 'structured',
+      terms: [{ column: name, direction: 'asc' }],
+    });
   } else if (current.direction === 'asc') {
-    void setSort(props.tabId, { kind: 'structured', terms: [{ column: name, direction: 'desc' }] });
+    void gridViewStore.setSort(props.tabId, {
+      kind: 'structured',
+      terms: [{ column: name, direction: 'desc' }],
+    });
   } else {
-    void setSort(props.tabId, null);
+    void gridViewStore.setSort(props.tabId, null);
   }
 }
 
@@ -2458,8 +2465,8 @@ watch(
       // grid. setMaskPreview(false) is a no-op guard-wise (its pending-changes guard only blocks
       // turning preview ON), and reassigning this watch's own `rt().maskPreview` dependency to the
       // same false-vs-already-false value it may already hold means this fires at most once more.
-      setMaskPreview(props.tabId, false);
-      setActionError(props.tabId, err instanceof Error ? err.message : String(err));
+      gridViewStore.setMaskPreview(props.tabId, false);
+      gridViewStore.setActionError(props.tabId, err instanceof Error ? err.message : String(err));
     }
     if (!grid || !dataSource) return;
     const p = getPage(props.tabId);

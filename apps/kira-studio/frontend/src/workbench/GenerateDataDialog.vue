@@ -20,7 +20,7 @@ import {
 import { planWarnings, RECIPE_CATALOG, recipeFor } from '../views/grid/fakeData/recipes';
 import type { ColumnPlan, GeneratorId, Recipe } from '../views/grid/fakeData/types';
 import { getPage } from '../views/grid/page';
-import { reloadAfterMutation, runtime } from '../views/grid/state';
+import { useGridViewStore } from '../views/grid/state';
 import { sqlDialectFor } from '../views/shared/sqlIdent';
 
 // P15 D11: driven by state/fakeData.ts's own open/close state, mounted in App.vue beside
@@ -31,13 +31,16 @@ import { sqlDialectFor } from '../views/shared/sqlIdent';
 const fakeDataStore = useFakeDataStore();
 const connectionsStore = useConnectionsStore();
 const tabsStore = useTabsStore();
+const gridViewStore = useGridViewStore();
 const tabId = computed(() => fakeDataStore.tabId);
 const tab = computed(() => (tabId.value ? tabsStore.findDataTab(tabId.value) : null));
 const connRecord = computed(() => connectionsStore.connectionRecord(tab.value?.connectionId));
 const caps = computed(() =>
   tab.value?.connectionId ? (connectionsStore.states[tab.value.connectionId]?.caps ?? null) : null,
 );
-const meta = computed(() => (tabId.value ? (runtime[tabId.value]?.meta ?? null) : null));
+const meta = computed(() =>
+  tabId.value ? (gridViewStore.runtime[tabId.value]?.meta ?? null) : null,
+);
 
 const rowCount = ref(100);
 const seed = ref(0);
@@ -141,7 +144,7 @@ async function onGenerate(): Promise<void> {
     running.value = false;
     currentOpId.value = null;
     fakeDataStore.closeGenerateDataDialog();
-    await reloadAfterMutation(t.id);
+    await gridViewStore.reloadAfterMutation(t.id);
   } catch (err) {
     running.value = false;
     currentOpId.value = null;
@@ -159,7 +162,7 @@ async function onGenerate(): Promise<void> {
     } else {
       runError.value = err instanceof Error ? err.message : String(err);
     }
-    if (committedRows.value > 0) await reloadAfterMutation(t.id);
+    if (committedRows.value > 0) await gridViewStore.reloadAfterMutation(t.id);
   }
 }
 

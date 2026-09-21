@@ -7,12 +7,13 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { nextProjectionFromSelectedColumns } from './menu';
-import { runtime, setColumnOrder, setProjection } from './state';
+import { useGridViewStore } from './state';
 
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
 const emit = defineEmits<{ close: [] }>();
+const gridViewStore = useGridViewStore();
 
-const meta = computed(() => runtime[props.tabId]?.meta ?? null);
+const meta = computed(() => gridViewStore.runtime[props.tabId]?.meta ?? null);
 const columnNames = computed(() => meta.value?.columns.map((c) => c.name) ?? []);
 // PK columns can't be hidden — a row can't be identified/edited without it, and the grid's own
 // mutation path assumes every visible PK column is present.
@@ -86,7 +87,7 @@ function onDragEnd(): void {
 function close(): void {
   const nextProjection = nextProjectionFromSelectedColumns([...selected.value], columnNames.value);
   if (!sameProjection(nextProjection, currentProjection())) {
-    void setProjection(props.tabId, nextProjection);
+    void gridViewStore.setProjection(props.tabId, nextProjection);
   }
   // A columnOrder is only ever stored non-null when it actually diverges from the column set's
   // own natural order. Comparing only against currentColumnOrder() (as this used to) meant simply
@@ -100,7 +101,7 @@ function close(): void {
     (nextOrder === null) !== (current === null) ||
     (nextOrder !== null && !sameOrder(nextOrder, current));
   if (orderChanged) {
-    setColumnOrder(props.tabId, nextOrder);
+    gridViewStore.setColumnOrder(props.tabId, nextOrder);
   }
   emit('close');
 }

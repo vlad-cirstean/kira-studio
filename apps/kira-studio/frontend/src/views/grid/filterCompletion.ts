@@ -2,7 +2,7 @@
 import type { Completion } from '../../theme/primitives/completion';
 import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import { getPage } from './page';
-import { runtime } from './state';
+import { useGridViewStore } from './state';
 
 // Curated, not exhaustive (ground rules) — a WHERE box has no use for CREATE/GRANT/VACUUM, and
 // including the dialect word list's hundreds of entries would crowd out the column names that
@@ -32,7 +32,7 @@ function columnCompletions(tabId: string): Completion[] {
   // page's own columns does not (ColumnsMenu.vue reads it exactly this way). The page's columns
   // is the fallback for loadMeta()'s own deliberately silent failure path, so completion still
   // works on a connection whose describe() errored.
-  const metaColumns = runtime[tabId]?.meta?.columns;
+  const metaColumns = useGridViewStore().runtime[tabId]?.meta?.columns;
   if (metaColumns) {
     return metaColumns.map((c) => ({ label: c.name, detail: c.dataType, icon: 'symbol-field' }));
   }
