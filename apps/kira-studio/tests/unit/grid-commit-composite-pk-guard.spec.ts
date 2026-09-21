@@ -12,20 +12,23 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ObjectMeta } from '@shared/domain/tree';
+import { setActivePinia } from 'pinia';
 import {
   type ColumnDescriptor,
   createTabularPageBuilder,
   unpagedPosition,
 } from '../../../../packages/shared/protocol/page';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { setPage } = await import('../../frontend/src/views/grid/page');
 const { runtime } = await import('../../frontend/src/views/grid/state');
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { stageEdit, stageDelete, commitPending, previewPending } = await import(
-  '../../frontend/src/views/grid/pendingChanges'
-);
+const { usePendingChangesStore } = await import('../../frontend/src/views/grid/pendingChanges');
+const { stageEdit, stageDelete, commitPending, previewPending } = usePendingChangesStore();
 
 function pkColumn(name: string): ColumnDescriptor {
   return {

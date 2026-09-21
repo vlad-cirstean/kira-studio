@@ -8,7 +8,7 @@ import { findStreamTab, patchStreamTabState } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { drop, setPage } from './page';
-import { recordStreamFilterUse } from './streamFilterHistory';
+import { useStreamFilterHistoryStore } from './streamFilterHistory';
 
 // D10/D12: SQS's 'batch' pagination must never be re-read except on an explicit Poll press —
 // every read is a real ReceiveMessage against the live queue. StreamView.vue's own isBatch
@@ -273,7 +273,7 @@ export async function applyStreamFilter(tabId: string, filter: StreamFilterInput
     partitions: filter.partitions,
     timestampFilter: filter.timestamp,
   });
-  recordStreamFilterUse(tab.connectionId, tab.path, filter);
+  useStreamFilterHistoryStore().recordStreamFilterUse(tab.connectionId, tab.path, filter);
   await load(tabId, { mode: 'offset', offset: 0 });
 }
 

@@ -2,12 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { findStreamTab } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
-import {
-  deleteStreamFilterHistoryEntry,
-  listStreamFilterHistory,
-  type StreamFilterHistoryEntry,
-  toggleStreamFilterHistoryPin,
-} from './streamFilterHistory';
+import { type StreamFilterHistoryEntry, useStreamFilterHistoryStore } from './streamFilterHistory';
 
 // A lean sibling of views/shared/FilterHistoryMenu.vue/console/ConsoleSavedMenu.vue: this one has no
 // "Recent" section at all (SavedListMenu's `recent` prop is optional exactly so a caller can omit
@@ -20,6 +15,8 @@ const emit = defineEmits<{
   close: [];
 }>();
 
+const streamFilterHistoryStore = useStreamFilterHistoryStore();
+
 function target(): { connectionId: string; path: string } | null {
   const tab = findStreamTab(props.tabId);
   return tab?.connectionId ? { connectionId: tab.connectionId, path: tab.path } : null;
@@ -29,7 +26,7 @@ const entries = ref<StreamFilterHistoryEntry[]>([]);
 
 function reload(): void {
   const t = target();
-  entries.value = t ? listStreamFilterHistory(t.connectionId, t.path) : [];
+  entries.value = t ? streamFilterHistoryStore.listStreamFilterHistory(t.connectionId, t.path) : [];
 }
 onMounted(reload);
 
@@ -55,14 +52,14 @@ function apply(entry: StreamFilterHistoryEntry): void {
 function togglePin(entry: StreamFilterHistoryEntry): void {
   const t = target();
   if (!t) return;
-  toggleStreamFilterHistoryPin(t.connectionId, t.path, entry.id);
+  streamFilterHistoryStore.toggleStreamFilterHistoryPin(t.connectionId, t.path, entry.id);
   reload();
 }
 
 function remove(entry: StreamFilterHistoryEntry): void {
   const t = target();
   if (!t) return;
-  deleteStreamFilterHistoryEntry(t.connectionId, t.path, entry.id);
+  streamFilterHistoryStore.deleteStreamFilterHistoryEntry(t.connectionId, t.path, entry.id);
   reload();
 }
 </script>

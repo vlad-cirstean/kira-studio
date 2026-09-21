@@ -35,7 +35,7 @@ import {
 import { isRepoWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
-import { clearPending } from '../views/grid/pendingChanges';
+import { usePendingChangesStore } from '../views/grid/pendingChanges';
 import { useCellSelectionStore } from './cellSelection';
 import { connectionsState } from './connections';
 import { useConsoleDefaultsStore } from './consoleDefaults';
@@ -668,7 +668,7 @@ function closeTabInternal(id: string): void {
   tabsState.hydrated.delete(id);
   dropAllPagesForTab(id); // §2.2: closing a tab frees its cached page(s) immediately.
   useCellSelectionStore().clearSelectedCellFor(id);
-  clearPending(id);
+  usePendingChangesStore().clearPending(id);
   // §5.2 rule 5: closing a preview tab removes it from the cohort.
   removeFromPreviewCohort(key, id);
 
@@ -699,7 +699,7 @@ export function closeWorkspaceTabs(key: WorkspaceKey): void {
     tabsState.hydrated.delete(id);
     dropAllPagesForTab(id);
     useCellSelectionStore().clearSelectedCellFor(id);
-    clearPending(id);
+    usePendingChangesStore().clearPending(id);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => workspaceKeyOf(t) !== key);
   delete tabsState.activeIdByWorkspace[key];
@@ -722,7 +722,7 @@ export function closeOthers(id: string): void {
     tabsState.hydrated.delete(tabId);
     dropAllPagesForTab(tabId);
     useCellSelectionStore().clearSelectedCellFor(tabId);
-    clearPending(tabId);
+    usePendingChangesStore().clearPending(tabId);
     removeFromPreviewCohort(key, tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
@@ -750,7 +750,7 @@ export function closeToTheRight(id: string): void {
     tabsState.hydrated.delete(tabId);
     dropAllPagesForTab(tabId);
     useCellSelectionStore().clearSelectedCellFor(tabId);
-    clearPending(tabId);
+    usePendingChangesStore().clearPending(tabId);
     removeFromPreviewCohort(key, tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
@@ -776,7 +776,7 @@ export function closeAll(): void {
     tabsState.hydrated.delete(tabId);
     dropAllPagesForTab(tabId);
     useCellSelectionStore().clearSelectedCellFor(tabId);
-    clearPending(tabId);
+    usePendingChangesStore().clearPending(tabId);
   }
   tabsState.tabs = tabsState.tabs.filter((t) => !closeIds.has(t.id));
   tabsState.previewIdsByWorkspace[key] = [];

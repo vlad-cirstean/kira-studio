@@ -6,7 +6,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import { clearCookies, cookiesRuntime, deleteCookie, fetchCookiesNow } from './cookies';
+import { useCookiesStore } from './cookies';
 
 // P90 item 2 (§3): one component, two hosts — HttpRequestView.vue's request segment (what the
 // jar would send next) and ResponsePane.vue's response segment (what one exchange actually sent
@@ -20,6 +20,8 @@ const props = defineProps<{
   /** response mode only — null when there is no response to show cookies for yet. */
   response?: HttpResponseWire | null;
 }>();
+
+const cookiesStore = useCookiesStore();
 
 const filter = ref('');
 
@@ -44,7 +46,7 @@ function attributeLine(c: HttpCookieWire): string {
 
 // --- request mode ---
 
-const rt = computed(() => (props.tabId ? cookiesRuntime[props.tabId] : undefined));
+const rt = computed(() => (props.tabId ? cookiesStore.cookiesRuntime[props.tabId] : undefined));
 const requestCookies = computed(() => rt.value?.cookies ?? []);
 const filteredRequestCookies = computed(() => {
   const q = filter.value.trim().toLowerCase();
@@ -53,15 +55,15 @@ const filteredRequestCookies = computed(() => {
 
 async function onRemove(name: string): Promise<void> {
   if (!props.tabId || !props.url) return;
-  await deleteCookie(props.tabId, props.url, name);
+  await cookiesStore.deleteCookie(props.tabId, props.url, name);
 }
 async function onClearAll(): Promise<void> {
   if (!props.tabId || !props.url) return;
-  await clearCookies(props.tabId, props.url);
+  await cookiesStore.clearCookies(props.tabId, props.url);
 }
 async function onRetry(): Promise<void> {
   if (!props.tabId || !props.url) return;
-  await fetchCookiesNow(props.tabId, props.url);
+  await cookiesStore.fetchCookiesNow(props.tabId, props.url);
 }
 
 function onEditGlobalDefaults(): void {

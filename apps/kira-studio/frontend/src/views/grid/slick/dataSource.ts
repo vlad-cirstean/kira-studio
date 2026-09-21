@@ -2,7 +2,7 @@ import type { TabularPage } from '@shared/protocol/page';
 import { pageColumnIndexFor } from '../../shared/page/columns';
 import type { RowHandle } from '../../shared/slick/dataSource';
 import { type CellView, cell } from '../page';
-import { rawPendingFor } from '../pendingChanges';
+import { usePendingChangesStore } from '../pendingChanges';
 
 // P30 §3 prerequisite: the generic display-position/`CustomDataView` core that used to live in
 // this one file moved to `views/shared/slick/dataSource.ts` (SPEC §11 — `views/console/*` may not
@@ -59,7 +59,7 @@ export function createDisplayValueExtractor(
   // `.changes` field wrapper), leaving only the one unavoidable top-level `pendingState[tabId]`
   // read that must stay live for correctness.
   return (item, field) => {
-    const pending = rawPendingFor(tabId);
+    const pending = usePendingChangesStore().rawPendingFor(tabId);
     if (item.insertId !== undefined) {
       const value = pending?.inserts.find((i) => i.id === item.insertId)?.values[field];
       return { text: value ?? '', isNull: value === null || value === undefined, truncated: false };
@@ -94,7 +94,7 @@ export function pendingRowClasses(
   pageRowCount: number,
 ): string | undefined {
   if (row >= pageRowCount) return 'kira-row-inserted';
-  const p = rawPendingFor(tabId);
+  const p = usePendingChangesStore().rawPendingFor(tabId);
   if (!p) return undefined;
   if (p.deletes.has(row)) return 'kira-row-deleted pending-delete';
   if (p.edits.has(row)) return 'kira-row-dirty';

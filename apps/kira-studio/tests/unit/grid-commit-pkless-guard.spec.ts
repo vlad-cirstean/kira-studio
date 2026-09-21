@@ -12,18 +12,21 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
 import {
   createTabularPageBuilder,
   unpagedPosition,
 } from '../../../../packages/shared/protocol/page';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { setPage } = await import('../../frontend/src/views/grid/page');
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { stageNull, commitPending, previewPending } = await import(
-  '../../frontend/src/views/grid/pendingChanges'
-);
+const { usePendingChangesStore } = await import('../../frontend/src/views/grid/pendingChanges');
+const { stageNull, commitPending, previewPending } = usePendingChangesStore();
 
 function pkLessPage() {
   const columns = [

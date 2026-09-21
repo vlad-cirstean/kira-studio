@@ -14,13 +14,7 @@ import {
 } from '../shared/clipboardFormats';
 import { quoteIdent, quoteLiteral, type SqlDialect } from '../shared/sqlIdent';
 import { requestCellFocus } from './focusRequest';
-import {
-  discardRowChange,
-  duplicateAsInsert,
-  pendingFor,
-  stageDelete,
-  stageNull,
-} from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 import { setActionError, setFilter, setMaskPreview, setProjection, setSort } from './state';
 
 // F1/P21 round 1: the pure half of ColumnsMenu.vue's own close() — "None" seeds `selected` from
@@ -315,7 +309,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       id: 'set-null',
       label: 'Set NULL',
       disabled: editDisabled,
-      run: () => stageNull(ctx.tabId, ctx.row, ctx.columnName),
+      run: () => usePendingChangesStore().stageNull(ctx.tabId, ctx.row, ctx.columnName),
     },
     {
       // P31 D33/F32: singular "row" (not rowMenu's "row(s)") — a cell selection is one row by
@@ -329,7 +323,7 @@ export function cellMenu(ctx: CellMenuContext): MenuItem[] {
       danger: true,
       disabled: !ctx.canDelete,
       shortcut: 'grid.deleteRows',
-      run: () => stageDelete(ctx.tabId, [ctx.row]),
+      run: () => usePendingChangesStore().stageDelete(ctx.tabId, [ctx.row]),
     },
     {
       type: 'item',
@@ -366,7 +360,7 @@ function snapshotsThunk(ctx: RowMenuContext): () => RowSnapshot[] {
 }
 
 function hasPendingChange(ctx: RowMenuContext): boolean {
-  const p = pendingFor(ctx.tabId);
+  const p = usePendingChangesStore().pendingFor(ctx.tabId);
   if (!p) return false;
   return ctx.rows.some((row) => p.edits.has(row) || p.deletes.has(row));
 }
@@ -426,7 +420,8 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       disabled: !ctx.canEdit,
       shortcut: 'grid.duplicateRows',
       run: () => {
-        for (const row of ctx.rows) duplicateAsInsert(ctx.tabId, row);
+        const pendingChangesStore = usePendingChangesStore();
+        for (const row of ctx.rows) pendingChangesStore.duplicateAsInsert(ctx.tabId, row);
       },
     },
     {
@@ -438,7 +433,8 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       // (an edit and/or a pending delete) — otherwise "Revert" would be a no-op every time.
       disabled: !hasPendingChange(ctx),
       run: () => {
-        for (const row of ctx.rows) discardRowChange(ctx.tabId, row);
+        const pendingChangesStore = usePendingChangesStore();
+        for (const row of ctx.rows) pendingChangesStore.discardRowChange(ctx.tabId, row);
       },
     },
     {
@@ -449,7 +445,7 @@ export function rowMenu(ctx: RowMenuContext): MenuItem[] {
       danger: true,
       disabled: !ctx.canDelete,
       shortcut: 'grid.deleteRows',
-      run: () => stageDelete(ctx.tabId, ctx.rows),
+      run: () => usePendingChangesStore().stageDelete(ctx.tabId, ctx.rows),
     },
   ];
 }

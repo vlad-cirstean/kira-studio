@@ -21,11 +21,16 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
 import type { TabularPage } from '../../../../packages/shared/protocol/page';
+import { pinia } from '../../frontend/src/state/pinia';
 
+setActivePinia(pinia);
+
+const { usePendingChangesStore } = await import('../../frontend/src/views/grid/pendingChanges');
 const { addInsertRow, clearPending, rawPendingFor, stageEdit, stageInsertValue, stageNull } =
-  await import('../../frontend/src/views/grid/pendingChanges');
+  usePendingChangesStore();
 const { createDisplayValueExtractor, pendingRowClasses } = await import(
   '../../frontend/src/views/grid/slick/dataSource'
 );

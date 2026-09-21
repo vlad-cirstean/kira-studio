@@ -18,7 +18,7 @@ import DataToolbar from './DataToolbar.vue';
 import FilterToolbar from './FilterToolbar.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import PreviewCommandPanel from './PreviewCommandPanel.vue';
-import { commitPending, discardPending, hasPending, pendingFor } from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 import SlickGridHost from './SlickGridHost.vue';
 import { type Match, pageSearchApi } from './search';
 import {
@@ -36,6 +36,7 @@ import {
 // fires fresh on every tab switch, which is what makes per-tab load-on-activate and scroll
 // restore (SlickGridHost's own onMounted) work without a manual watcher.
 const fakeDataStore = useFakeDataStore();
+const pendingChangesStore = usePendingChangesStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
@@ -88,9 +89,9 @@ const caps = computed(() => {
   const connectionId = props.tab.connectionId;
   return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
 });
-const tabHasPending = computed(() => hasPending(props.tab.id));
+const tabHasPending = computed(() => pendingChangesStore.hasPending(props.tab.id));
 const pendingCount = computed(() => {
-  const p = pendingFor(props.tab.id);
+  const p = pendingChangesStore.pendingFor(props.tab.id);
   if (!p) return 0;
   return p.edits.size + p.deletes.size + p.inserts.length;
 });
@@ -103,7 +104,7 @@ const previewOpen = ref(false);
 async function onCommit(): Promise<void> {
   if (!props.tab.connectionId) return;
   try {
-    await commitPending(props.tab.connectionId, props.tab.path, props.tab.id);
+    await pendingChangesStore.commitPending(props.tab.connectionId, props.tab.path, props.tab.id);
     setActionError(props.tab.id, null);
     await reloadAfterMutation(props.tab.id);
   } catch (err) {
@@ -112,7 +113,7 @@ async function onCommit(): Promise<void> {
 }
 
 function onDiscard(): void {
-  discardPending(props.tab.id);
+  pendingChangesStore.discardPending(props.tab.id);
   // P43 F5/D7: a discard resolves the very staging that a prior actionError was about — an error
   // strip surviving it would be pointing at a change that no longer exists.
   setActionError(props.tab.id, null);

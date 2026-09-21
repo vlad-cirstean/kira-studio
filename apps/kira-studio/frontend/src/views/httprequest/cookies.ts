@@ -1,4 +1,5 @@
 import type { HttpCookieWire } from '@shared/domain/http';
+import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
@@ -14,53 +15,55 @@ interface CookiesRuntime {
   loading: boolean;
 }
 
-const runtime: Record<string, CookiesRuntime> = reactive({});
+export const useCookiesStore = defineStore('cookies', () => {
+  const cookiesRuntime: Record<string, CookiesRuntime> = reactive({});
 
-export { runtime as cookiesRuntime };
+  registerTabRuntimeCleanup((tabId) => {
+    delete cookiesRuntime[tabId];
+  });
 
-registerTabRuntimeCleanup((tabId) => {
-  delete runtime[tabId];
-});
-
-function ensure(tabId: string): CookiesRuntime {
-  if (!runtime[tabId]) runtime[tabId] = { cookies: [], loading: false };
-  return runtime[tabId];
-}
-
-/** A URL that fails to parse (e.g. still carries an unresolved `{{host}}` template) is not an
- *  error state worth surfacing here — the pane just shows no cookies until the URL resolves to
- *  something real, exactly like an empty jar. */
-export async function fetchCookiesNow(tabId: string, url: string): Promise<void> {
-  const rt = ensure(tabId);
-  rt.loading = true;
-  try {
-    rt.cookies = await control.httpCookies(url);
-  } catch {
-    rt.cookies = [];
-  } finally {
-    rt.loading = false;
+  function ensure(tabId: string): CookiesRuntime {
+    if (!cookiesRuntime[tabId]) cookiesRuntime[tabId] = { cookies: [], loading: false };
+    return cookiesRuntime[tabId];
   }
-}
 
-const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+  /** A URL that fails to parse (e.g. still carries an unresolved `{{host}}` template) is not an
+   *  error state worth surfacing here — the pane just shows no cookies until the URL resolves to
+   *  something real, exactly like an empty jar. */
+  async function fetchCookiesNow(tabId: string, url: string): Promise<void> {
+    const rt = ensure(tabId);
+    rt.loading = true;
+    try {
+      rt.cookies = await control.httpCookies(url);
+    } catch {
+      rt.cookies = [];
+    } finally {
+      rt.loading = false;
+    }
+  }
 
-/** §3.1: the URL field fires per keystroke — SearchToolbar.vue's own debounce is the in-repo shape
- *  this copies. */
-export function scheduleCookiesFetch(tabId: string, url: string): void {
-  const existing = debounceTimers[tabId];
-  if (existing) clearTimeout(existing);
-  debounceTimers[tabId] = setTimeout(() => {
-    delete debounceTimers[tabId];
-    void fetchCookiesNow(tabId, url);
-  }, 300);
-}
+  const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
-export async function deleteCookie(tabId: string, url: string, name: string): Promise<void> {
-  const rt = ensure(tabId);
-  rt.cookies = await control.httpDeleteCookie(url, name);
-}
+  /** §3.1: the URL field fires per keystroke — SearchToolbar.vue's own debounce is the in-repo shape
+   *  this copies. */
+  function scheduleCookiesFetch(tabId: string, url: string): void {
+    const existing = debounceTimers[tabId];
+    if (existing) clearTimeout(existing);
+    debounceTimers[tabId] = setTimeout(() => {
+      delete debounceTimers[tabId];
+      void fetchCookiesNow(tabId, url);
+    }, 300);
+  }
 
-export async function clearCookies(tabId: string, url: string): Promise<void> {
-  await control.httpClearCookies();
-  await fetchCookiesNow(tabId, url);
-}
+  async function deleteCookie(tabId: string, url: string, name: string): Promise<void> {
+    const rt = ensure(tabId);
+    rt.cookies = await control.httpDeleteCookie(url, name);
+  }
+
+  async function clearCookies(tabId: string, url: string): Promise<void> {
+    await control.httpClearCookies();
+    await fetchCookiesNow(tabId, url);
+  }
+
+  return { cookiesRuntime, fetchCookiesNow, scheduleCookiesFetch, deleteCookie, clearCookies };
+});

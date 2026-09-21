@@ -44,7 +44,7 @@ import ResponseFindBar, {
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
 import CookiesPane from './CookiesPane.vue';
-import { cookiesRuntime, scheduleCookiesFetch } from './cookies';
+import { useCookiesStore } from './cookies';
 import QueryParamsTable from './QueryParamsTable.vue';
 import RequestBodyPane from './RequestBodyPane.vue';
 import RequestHeadersTable from './RequestHeadersTable.vue';
@@ -61,6 +61,7 @@ const collectionsStore = useCollectionsStore();
 const copyAsCurlStore = useCopyAsCurlStore();
 const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
+const cookiesStore = useCookiesStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -304,7 +305,9 @@ const settingsOverrideCount = computed(
 
 // P90 §3.1: the Cookies segment's own count badge — populated by cookies.ts's shared runtime, kept
 // fresh by the watcher below regardless of which pane is currently showing.
-const requestCookiesCount = computed(() => cookiesRuntime[props.tab.id]?.cookies.length ?? 0);
+const requestCookiesCount = computed(
+  () => cookiesStore.cookiesRuntime[props.tab.id]?.cookies.length ?? 0,
+);
 
 // D12: a count badge per segment — SegmentedControl has no dedicated count slot, so it is baked
 // into the label text instead of widening that shared primitive for one caller.
@@ -381,13 +384,13 @@ watch(
   () => props.tab.state.url,
   (url) => {
     if (effectiveDisableCookieJar.value) return;
-    scheduleCookiesFetch(props.tab.id, url);
+    cookiesStore.scheduleCookiesFetch(props.tab.id, url);
   },
   { immediate: true },
 );
 const unsubscribeSendCompleted = onSendCompleted((tabId) => {
   if (tabId !== props.tab.id || effectiveDisableCookieJar.value) return;
-  scheduleCookiesFetch(props.tab.id, props.tab.state.url);
+  cookiesStore.scheduleCookiesFetch(props.tab.id, props.tab.state.url);
 });
 onUnmounted(unsubscribeSendCompleted);
 function toggleFieldFilter(): void {

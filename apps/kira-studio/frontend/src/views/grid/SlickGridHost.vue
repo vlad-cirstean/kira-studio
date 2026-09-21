@@ -69,7 +69,7 @@ import {
 import { buildMaskTagCache, createMaskPreviewTransform } from './maskPreview';
 import { cellMenu, type FkNavContext, headerMenu, rowMenu } from './menu';
 import { applyPastedCells, resolvePasteTarget } from './paste';
-import { discardCellEdit, pendingFor, stageEdit, stageInsertValue } from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 import { matchedRows, searchState } from './search';
 import {
   createDisplayValueExtractor,
@@ -112,6 +112,7 @@ import { runtime, type Selection, setActionError, setMaskPreview, setSort } from
 const contextMenuStore = useContextMenuStore();
 const cellSelectionStore = useCellSelectionStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
+const pendingChangesStore = usePendingChangesStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -309,7 +310,11 @@ const showNoMatchingRows = computed(() => {
   const p = getPage(props.tabId);
   if (!p) return false;
   const rows = matchedRows(props.tabId);
-  return rows !== null && rows.length === 0 && (pendingFor(props.tabId)?.inserts.length ?? 0) === 0;
+  return (
+    rows !== null &&
+    rows.length === 0 &&
+    (pendingChangesStore.pendingFor(props.tabId)?.inserts.length ?? 0) === 0
+  );
 });
 
 // Produced locally from the path, never round-tripped to the engine for a string join — the same
@@ -382,7 +387,7 @@ function currentDialect() {
 }
 
 function isDeleted(row: number): boolean {
-  return !!pendingFor(props.tabId)?.deletes.has(row);
+  return !!pendingChangesStore.pendingFor(props.tabId)?.deletes.has(row);
 }
 
 // C7/§5 D7 — rowsForColumnOps/columnValuesFor bound to this file's own displayRows/tabId/page/
@@ -650,7 +655,7 @@ function refreshMaskTagsAndRerender(): void {
 // reason. `p`/`order` are passed in rather than re-derived, since every call site has already
 // resolved them for its own other purposes (formatterCtx, buildColumns, ...).
 function dataSourceState(p: ReturnType<typeof getPage>, order: string[]): GridDataSourceState {
-  const inserts = pendingFor(props.tabId)?.inserts ?? [];
+  const inserts = pendingChangesStore.pendingFor(props.tabId)?.inserts ?? [];
   const insertColumns = inserts.length > 0 ? insertRowColumns(order) : undefined;
   // M5 §6.2: `undefined` when mask preview is off (or this tab has no masked columns at all) —
   // the extractor is then byte-for-byte what it was before M5.
@@ -980,7 +985,7 @@ function onCellRangeSelecting(_e: unknown, args: { range: SlickRange }): void {
 function computeStagedHash(): Record<number, Record<string, string>> {
   const hash: Record<number, Record<string, string>> = {};
   if (!grid || !dataSource) return hash;
-  const p = pendingFor(props.tabId);
+  const p = pendingChangesStore.pendingFor(props.tabId);
   if (!p || p.edits.size === 0) return hash;
   const { start, end } = grid.lastRenderedRowBounds;
   if (end < start) return hash;
@@ -1635,7 +1640,7 @@ function insertInputTarget(
 function onInsertGridInput(e: Event): void {
   const hit = insertInputTarget(e);
   if (!hit) return;
-  stageInsertValue(props.tabId, hit.insertId, hit.column, hit.input.value);
+  pendingChangesStore.stageInsertValue(props.tabId, hit.insertId, hit.column, hit.input.value);
 }
 
 function onInsertGridKeydown(e: KeyboardEvent): void {
@@ -2005,7 +2010,8 @@ onMounted(() => {
   // unlike `dataItemColumnValueExtractor`'s own captured-closure trap noted just above — this
   // assignment is correct for the tab's whole lifetime and needs no pageVersion-watch counterpart.
   editorCtx.readValue = (row, name) => displayCell(row, currentOrder().indexOf(name));
-  editorCtx.commit = (row, name, value) => stageEdit(props.tabId, row, name, value);
+  editorCtx.commit = (row, name, value) =>
+    pendingChangesStore.stageEdit(props.tabId, row, name, value);
 
   // getCellValue's return type is a compatibility shim only (F1's own insurance, never the real
   // render path — dataItemColumnValueExtractor, below, is) so it deliberately returns `unknown`
@@ -2379,7 +2385,7 @@ watch(
 // "never invalidate a focused insert row" rule (D9) has nothing to protect against on this path.
 let lastInsertCount = 0;
 watch(
-  () => pendingFor(props.tabId)?.inserts.length ?? 0,
+  () => pendingChangesStore.pendingFor(props.tabId)?.inserts.length ?? 0,
   (count) => {
     if (!grid || !dataSource) return;
     const p = getPage(props.tabId);
@@ -2523,11 +2529,12 @@ watch(
       // masked-ness can never disagree.
       onEdit:
         canEditTable() && !isDeleted(targetRow)
-          ? (newValue: string) => stageEdit(props.tabId, targetRow, column.name, newValue)
+          ? (newValue: string) =>
+              pendingChangesStore.stageEdit(props.tabId, targetRow, column.name, newValue)
           : undefined,
       onRevert:
         canEditTable() && !isDeleted(targetRow)
-          ? () => discardCellEdit(props.tabId, targetRow, column.name)
+          ? () => pendingChangesStore.discardCellEdit(props.tabId, targetRow, column.name)
           : undefined,
     };
     cellSelectionStore.publishSelectedCell(selected);
@@ -2598,7 +2605,7 @@ let lastPendingRows = new Set<number>();
 // same-column value edit (no key added/removed) correctly does not re-trigger this.
 watch(
   () => {
-    const p = pendingFor(props.tabId);
+    const p = pendingChangesStore.pendingFor(props.tabId);
     if (!p) return '';
     let sig = '';
     for (const [row, edit] of p.edits) sig += `e${row}:${Object.keys(edit.changes).length};`;
@@ -2616,7 +2623,7 @@ watch(
     // happens to re-render it. Invalidate the union of this row's newly- and previously-staged
     // state (not just the new set — a discard's new set is empty) and re-render.
     if (!grid || !dataSource) return;
-    const p = pendingFor(props.tabId);
+    const p = pendingChangesStore.pendingFor(props.tabId);
     const rows = new Set<number>();
     if (p) {
       for (const row of p.edits.keys()) rows.add(row);

@@ -7,10 +7,12 @@ import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
-import { previewPending } from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 
 const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ close: [] }>();
+
+const pendingChangesStore = usePendingChangesStore();
 
 const statements = ref<string[]>([]);
 const loading = ref(true);
@@ -30,7 +32,7 @@ onMounted(async () => {
     return;
   }
   try {
-    statements.value = await previewPending(tab.connectionId, tab.path, props.tabId);
+    statements.value = await pendingChangesStore.previewPending(tab.connectionId, tab.path, props.tabId);
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {

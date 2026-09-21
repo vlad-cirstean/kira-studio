@@ -7,7 +7,7 @@ import type { Selection } from '../../shared/slick/selection';
 import type { SqlDialect } from '../../shared/sqlIdent';
 import { type FkNavContext, foreignKeyNavItems, referencedByItems } from '../menu';
 import { cell } from '../page';
-import { stagedValue } from '../pendingChanges';
+import { usePendingChangesStore } from '../pendingChanges';
 
 // P22 Pass B, C7/§5 D7 — the small module DataGrid.vue kept inline, extracted so both the three
 // context menus and the clipboard (this commit) and the FK/PK nav button (C11) can share one copy
@@ -33,7 +33,7 @@ export function displayCell(
   displayCol: number,
 ): DisplayCellView {
   const name = order[displayCol];
-  const staged = name ? stagedValue(tabId, row, name) : undefined;
+  const staged = name ? usePendingChangesStore().stagedValue(tabId, row, name) : undefined;
   if (staged !== undefined) {
     return { text: staged ?? '', isNull: staged === null, truncated: false, staged: true };
   }

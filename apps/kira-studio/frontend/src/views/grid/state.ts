@@ -4,6 +4,7 @@ import type { ObjectMeta } from '@shared/domain/tree';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
+import { pinia } from '../../state/pinia';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findDataTab, patchDataTabState } from '../../state/tabs';
 import {
@@ -16,7 +17,7 @@ import type { Selection } from '../shared/slick/selection';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { clearCellFocus } from './focusRequest';
 import { setPage } from './page';
-import { clearPending, hasPending, registerFullPrimaryKeyAccessor } from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 
 // P19 D7: the type itself moved to views/shared/slick/selection.ts (the file that already owns
 // its geometry, and which views/console/ now needs too) — re-exported here so every existing
@@ -86,13 +87,13 @@ export { runtime, setSearchOpen, toggleSearchOpen };
  *  didn't (M7 finding): `markColumnMaskKind` silently swallowed that outcome, so a column marked
  *  PII while an edit was staged looked like nothing happened at all, with no feedback anywhere. */
 export function setMaskPreview(tabId: string, on: boolean): boolean {
-  if (on && hasPending(tabId)) return false;
+  if (on && usePendingChangesStore().hasPending(tabId)) return false;
   ensureRuntime(tabId).maskPreview = on;
   return true;
 }
 export function toggleMaskPreview(tabId: string): void {
   const rt = ensureRuntime(tabId);
-  if (!rt.maskPreview && hasPending(tabId)) return;
+  if (!rt.maskPreview && usePendingChangesStore().hasPending(tabId)) return;
   rt.maskPreview = !rt.maskPreview;
 }
 
@@ -108,7 +109,9 @@ registerTabRuntimeCleanup((tabId) => {
 // module, so importing `runtime` back from there would be a cycle — it registers an accessor
 // instead (the same registry-inversion shape as the cleanup above and state/viewCommands.ts's
 // registerTabReload), so buildPlan can tell a partial composite-key projection from a complete one.
-registerFullPrimaryKeyAccessor((tabId) => runtime[tabId]?.meta?.primaryKey ?? null);
+usePendingChangesStore(pinia).registerFullPrimaryKeyAccessor(
+  (tabId) => runtime[tabId]?.meta?.primaryKey ?? null,
+);
 
 /** P43 F5/D7: written by DataToolbar.vue's own catch around commitPending — see actionError's own
  *  doc comment above for why this is a sibling of `error`, not a reuse of it. */
@@ -144,7 +147,7 @@ export async function load(
   // D3: a pending-change set is scoped to the page it was staged against — paging, filtering,
   // sorting or refreshing all replace that page, so whatever was staged no longer identifies
   // anything real and must not silently reappear against different rows.
-  clearPending(tabId);
+  usePendingChangesStore().clearPending(tabId);
 
   const effectiveCursor: PageCursor = cursor ?? {
     mode: 'offset',

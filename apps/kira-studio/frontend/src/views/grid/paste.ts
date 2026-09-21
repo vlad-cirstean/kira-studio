@@ -4,7 +4,7 @@
 // clipboard read, and these two calls.
 import type { TabularPage } from '@shared/protocol/page';
 import type { Selection } from '../shared/slick/selection';
-import { addInsertRow, pendingFor, stageEdit, stageInsertValue } from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 import { pasteTargetRows } from './slick/rowValues';
 
 export interface PasteTarget {
@@ -55,15 +55,16 @@ function stagePastedRow(
   insertId: string | undefined,
   cols: readonly string[],
 ): void {
+  const pendingChangesStore = usePendingChangesStore();
   for (let ci = 0; ci < cols.length; ci++) {
     const name = columns[startCol + ci];
     if (!name) continue;
     if (isNewRow) {
       if (insertId && !columnIsGenerated(page, name)) {
-        stageInsertValue(tabId, insertId, name, cols[ci] as string);
+        pendingChangesStore.stageInsertValue(tabId, insertId, name, cols[ci] as string);
       }
     } else {
-      stageEdit(tabId, row, name, cols[ci] as string);
+      pendingChangesStore.stageEdit(tabId, row, name, cols[ci] as string);
     }
   }
 }
@@ -86,7 +87,8 @@ export function applyPastedCells(
   // silently dropped rather than staged into an insert the server would then reject outright.
   const insertColumns = columns.filter((name) => !columnIsGenerated(page, name));
   const insertIds = new Map<number, string>();
-  const pending = pendingFor(tabId);
+  const pendingChangesStore = usePendingChangesStore();
+  const pending = pendingChangesStore.pendingFor(tabId);
 
   for (let ri = 0; ri < parsed.length; ri++) {
     const row = target.rowAt(ri);
@@ -94,7 +96,9 @@ export function applyPastedCells(
     const isNewRow = row >= page.rowCount;
     let insertId = insertIds.get(row);
     if (isNewRow && insertId === undefined) {
-      insertId = pending?.inserts[row - page.rowCount]?.id ?? addInsertRow(tabId, insertColumns);
+      insertId =
+        pending?.inserts[row - page.rowCount]?.id ??
+        pendingChangesStore.addInsertRow(tabId, insertColumns);
       insertIds.set(row, insertId);
     }
     stagePastedRow(tabId, page, columns, target.startCol, row, isNewRow, insertId, parsed[ri]);

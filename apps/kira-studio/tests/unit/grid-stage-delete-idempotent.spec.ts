@@ -14,10 +14,13 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 
-const { isPendingDelete, stageDelete, stageEdit } = await import(
-  '../../frontend/src/views/grid/pendingChanges'
-);
+setActivePinia(pinia);
+
+const { usePendingChangesStore } = await import('../../frontend/src/views/grid/pendingChanges');
+const { isPendingDelete, stageDelete, stageEdit } = usePendingChangesStore();
 
 describe('stageDelete (grid/pendingChanges.ts)', () => {
   test('1. marks a row for delete', () => {

@@ -1,3 +1,4 @@
+import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 
 // Item 2's "with history": mirrors views/shared/FilterHistoryMenu.vue's *shape* (a recency-ordered list,
@@ -24,81 +25,83 @@ interface StreamFilterInput {
   timestamp: string | null;
 }
 
-const HISTORY_LIMIT = 20;
-
-// Keyed by connectionId+path (not tabId): two tabs open on the same topic/queue share one
-// history, mirroring the SQL grid's own filter_history table (keyed the same way).
-const store = reactive(new Map<string, StreamFilterHistoryEntry[]>());
-
-function storeKey(connectionId: string, path: string): string {
-  return `${connectionId}\0${path}`;
-}
-
-function isEmpty(filter: StreamFilterInput): boolean {
-  return filter.offset === null && filter.partitions.length === 0 && filter.timestamp === null;
-}
-
-function samePartitions(a: number[], b: number[]): boolean {
-  if (a.length !== b.length) return false;
-  const as = [...a].sort((x, y) => x - y);
-  const bs = [...b].sort((x, y) => x - y);
-  return as.every((v, i) => v === bs[i]);
-}
-
-function sameFilter(a: StreamFilterInput, b: StreamFilterEntryLike): boolean {
-  return (
-    a.offset === b.offset &&
-    samePartitions(a.partitions, b.partitions) &&
-    a.timestamp === b.timestamp
-  );
-}
-
 type StreamFilterEntryLike = Pick<StreamFilterHistoryEntry, 'offset' | 'partitions' | 'timestamp'>;
 
-/** "I cleared the filter" is not history — mirrors main/storage/repos/filter-history.ts's own
- *  early return for a fully-null (where, orderBy). */
-export function recordStreamFilterUse(
-  connectionId: string,
-  path: string,
-  filter: StreamFilterInput,
-): void {
-  if (isEmpty(filter)) return;
-  const key = storeKey(connectionId, path);
-  const existing = store.get(key) ?? [];
-  // Re-applying the same filter moves it to the top rather than duplicating it (same rule as the
-  // SQL grid's recordFilterUse).
-  const deduped = existing.filter((e) => !sameFilter(filter, e));
-  deduped.unshift({ id: crypto.randomUUID(), ...filter, pinned: false, usedAt: Date.now() });
+const HISTORY_LIMIT = 20;
 
-  const pinned = deduped.filter((e) => e.pinned);
-  const rest = deduped
-    .filter((e) => !e.pinned)
-    .slice(0, Math.max(0, HISTORY_LIMIT - pinned.length));
-  store.set(key, [...pinned, ...rest]);
-}
+export const useStreamFilterHistoryStore = defineStore('streamFilterHistory', () => {
+  // Keyed by connectionId+path (not tabId): two tabs open on the same topic/queue share one
+  // history, mirroring the SQL grid's own filter_history table (keyed the same way).
+  const store = reactive(new Map<string, StreamFilterHistoryEntry[]>());
 
-export function listStreamFilterHistory(
-  connectionId: string,
-  path: string,
-): StreamFilterHistoryEntry[] {
-  return store.get(storeKey(connectionId, path)) ?? [];
-}
+  function storeKey(connectionId: string, path: string): string {
+    return `${connectionId}\0${path}`;
+  }
 
-export function toggleStreamFilterHistoryPin(connectionId: string, path: string, id: string): void {
-  const entry = store.get(storeKey(connectionId, path))?.find((e) => e.id === id);
-  if (entry) entry.pinned = !entry.pinned;
-}
+  function isEmpty(filter: StreamFilterInput): boolean {
+    return filter.offset === null && filter.partitions.length === 0 && filter.timestamp === null;
+  }
 
-export function deleteStreamFilterHistoryEntry(
-  connectionId: string,
-  path: string,
-  id: string,
-): void {
-  const key = storeKey(connectionId, path);
-  const list = store.get(key);
-  if (!list) return;
-  store.set(
-    key,
-    list.filter((e) => e.id !== id),
-  );
-}
+  function samePartitions(a: number[], b: number[]): boolean {
+    if (a.length !== b.length) return false;
+    const as = [...a].sort((x, y) => x - y);
+    const bs = [...b].sort((x, y) => x - y);
+    return as.every((v, i) => v === bs[i]);
+  }
+
+  function sameFilter(a: StreamFilterInput, b: StreamFilterEntryLike): boolean {
+    return (
+      a.offset === b.offset &&
+      samePartitions(a.partitions, b.partitions) &&
+      a.timestamp === b.timestamp
+    );
+  }
+
+  /** "I cleared the filter" is not history — mirrors main/storage/repos/filter-history.ts's own
+   *  early return for a fully-null (where, orderBy). */
+  function recordStreamFilterUse(
+    connectionId: string,
+    path: string,
+    filter: StreamFilterInput,
+  ): void {
+    if (isEmpty(filter)) return;
+    const key = storeKey(connectionId, path);
+    const existing = store.get(key) ?? [];
+    // Re-applying the same filter moves it to the top rather than duplicating it (same rule as the
+    // SQL grid's recordFilterUse).
+    const deduped = existing.filter((e) => !sameFilter(filter, e));
+    deduped.unshift({ id: crypto.randomUUID(), ...filter, pinned: false, usedAt: Date.now() });
+
+    const pinned = deduped.filter((e) => e.pinned);
+    const rest = deduped
+      .filter((e) => !e.pinned)
+      .slice(0, Math.max(0, HISTORY_LIMIT - pinned.length));
+    store.set(key, [...pinned, ...rest]);
+  }
+
+  function listStreamFilterHistory(connectionId: string, path: string): StreamFilterHistoryEntry[] {
+    return store.get(storeKey(connectionId, path)) ?? [];
+  }
+
+  function toggleStreamFilterHistoryPin(connectionId: string, path: string, id: string): void {
+    const entry = store.get(storeKey(connectionId, path))?.find((e) => e.id === id);
+    if (entry) entry.pinned = !entry.pinned;
+  }
+
+  function deleteStreamFilterHistoryEntry(connectionId: string, path: string, id: string): void {
+    const key = storeKey(connectionId, path);
+    const list = store.get(key);
+    if (!list) return;
+    store.set(
+      key,
+      list.filter((e) => e.id !== id),
+    );
+  }
+
+  return {
+    recordStreamFilterUse,
+    listStreamFilterHistory,
+    toggleStreamFilterHistoryPin,
+    deleteStreamFilterHistoryEntry,
+  };
+});

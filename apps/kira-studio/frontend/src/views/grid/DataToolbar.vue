@@ -11,13 +11,7 @@ import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
 import { canGenerateDataFor } from './fakeData/generate';
 import { getPage, pageVersion } from './page';
-import {
-  addInsertRow,
-  discardInsertRow,
-  hasPending,
-  pendingFor,
-  stageDelete,
-} from './pendingChanges';
+import { usePendingChangesStore } from './pendingChanges';
 import { matchedRows } from './search';
 import { rowsForSelection } from './slick/rowValues';
 import {
@@ -39,6 +33,7 @@ import {
 // nullable-tab plumbing this used to need (fourteen `if (!tab.value) return` guards) existed only
 // because of the divergence, not a real case.
 const fakeDataStore = useFakeDataStore();
+const pendingChangesStore = usePendingChangesStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
@@ -75,7 +70,7 @@ const hasMaskRules = computed(() => (maskRulesState.counts[props.tab.connectionI
 // §6.4: turning the preview on while something is staged would mask the very text the user
 // staged, with no way to tell staged text from stored text inside the transform — simpler to
 // forbid the combination outright than to build that distinction for a case nobody needs.
-const hasPendingChanges = computed(() => hasPending(props.tab.id));
+const hasPendingChanges = computed(() => pendingChangesStore.hasPending(props.tab.id));
 const maskPreviewTooltip = computed(() => {
   if (hasPendingChanges.value) return 'Commit or discard pending changes first';
   return rt.value?.maskPreview ? 'Turn off the masking preview' : 'Preview masked values';
@@ -191,7 +186,7 @@ function onAddRow(): void {
   if (!p) return;
   // P36 D28: a generated column is never seeded — the server computes it, and an explicit NULL
   // for it would make the insert fail outright on an engine that enforces this (F18).
-  addInsertRow(
+  pendingChangesStore.addInsertRow(
     props.tab.id,
     p.columns.filter((c) => !c.generated).map((c) => c.name),
   );
@@ -216,12 +211,12 @@ function onDeleteRow(): void {
   const rows = rowsForSelection(sel, matchedRows(props.tab.id), rowCount);
 
   const realRows = rows.filter((row) => row < rowCount);
-  if (realRows.length) stageDelete(props.tab.id, realRows);
+  if (realRows.length) pendingChangesStore.stageDelete(props.tab.id, realRows);
 
-  const inserts = pendingFor(props.tab.id)?.inserts ?? [];
+  const inserts = pendingChangesStore.pendingFor(props.tab.id)?.inserts ?? [];
   for (const row of rows.filter((row) => row >= rowCount)) {
     const insert = inserts[row - rowCount];
-    if (insert) discardInsertRow(props.tab.id, insert.id);
+    if (insert) pendingChangesStore.discardInsertRow(props.tab.id, insert.id);
   }
 }
 </script>
