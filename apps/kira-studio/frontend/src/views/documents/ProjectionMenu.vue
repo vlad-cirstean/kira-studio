@@ -6,7 +6,7 @@ import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { fieldNamesOnPage } from './page';
-import { setProjection } from './state';
+import { useDocumentViewStore } from './state';
 
 // Mirrors views/grid/ColumnsMenu.vue's UI pattern exactly (same header buttons, same list, same
 // footer line), but a document collection has no catalog to list fields from (§0 note: "Documents'
@@ -15,6 +15,7 @@ import { setProjection } from './state';
 // badge so the two can't drift on how a body is parsed into field names.
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
 const emit = defineEmits<{ close: [] }>();
+const documentViewStore = useDocumentViewStore();
 
 // A snapshot, not a computed: the picker's checkbox list shouldn't reshuffle under the user's
 // cursor if a background refresh lands while the popover is open (ColumnsMenu.vue's own
@@ -41,7 +42,7 @@ function selectNone(): void {
 
 function close(): void {
   const isEverything = selected.value.size === fieldNames.length;
-  setProjection(props.tabId, isEverything ? null : [...selected.value]);
+  documentViewStore.setProjection(props.tabId, isEverything ? null : [...selected.value]);
   emit('close');
 }
 </script>

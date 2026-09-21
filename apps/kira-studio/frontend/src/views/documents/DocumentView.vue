@@ -50,28 +50,7 @@ import {
   previewLineFor,
 } from './search';
 import { parseSortText, sortSpecToText } from './sortDocument';
-import {
-  goFirst,
-  goLast,
-  goNext,
-  goPrev,
-  goToPage,
-  isDocumentExpanded,
-  load,
-  reload,
-  runCount,
-  runtime,
-  selectRow,
-  setActionError,
-  setAllExpanded,
-  setPageSize,
-  setSearch,
-  setSearchOpen,
-  setSort,
-  stop,
-  toggleExpanded,
-  toggleSearchOpen,
-} from './state';
+import { useDocumentViewStore } from './state';
 
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
@@ -79,6 +58,7 @@ const documentRowsStore = useDocumentRowsStore();
 const mongoFieldSampleStore = useMongoFieldSampleStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const connectionsStore = useConnectionsStore();
+const documentViewStore = useDocumentViewStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
@@ -95,10 +75,10 @@ documentRowsStore.registerDocumentRows(props.tab.id, (row) => documentRow(props.
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
-  () => load(props.tab.id),
+  () => documentViewStore.load(props.tab.id),
 );
 
-const rt = computed(() => runtime[props.tab.id]);
+const rt = computed(() => documentViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'loading');
 
 // DataToolbar.vue's own gate, narrowed to the one flag this view's Add-document button reads
@@ -184,7 +164,7 @@ function onSearchInput(): void {
   // A blur fires on every focus loss, not just an edit — re-applying an unchanged filter would
   // reset paging/count for no reason (FilterToolbar.applyWhere's own guard and reason).
   if (searchText.value.trim() === props.tab.state.search.trim()) return;
-  setSearch(props.tab.id, searchText.value);
+  documentViewStore.setSearch(props.tab.id, searchText.value);
   recordFilterHistory(searchText.value, props.tab.state.sort);
 }
 
@@ -241,7 +221,7 @@ function onSortInput(): void {
   // Comparing the *text* form, not the object — SortSpec is a structure and Object.is would
   // never match (FilterToolbar.applyWhere's own guard, adapted).
   if (sortSpecToText(sort) === sortSpecToText(props.tab.state.sort)) return;
-  setSort(props.tab.id, sort);
+  documentViewStore.setSort(props.tab.id, sort);
   recordFilterHistory(props.tab.state.search, sort);
 }
 
@@ -267,27 +247,27 @@ function recordFilterHistory(search: string, sort: SortSpec | null): void {
 // The two watchers above pick up whatever this writes to tab.state — no need to also assign
 // searchText/sortText by hand, which would be the one place the two could drift.
 function onClearFilter(): void {
-  setSearch(props.tab.id, '');
-  setSort(props.tab.id, null);
+  documentViewStore.setSearch(props.tab.id, '');
+  documentViewStore.setSort(props.tab.id, null);
   recordFilterHistory('', null);
 }
 
 const filterHistoryOpen = ref(false);
 
 function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null): void {
-  setSearch(props.tab.id, where ?? '');
-  setSort(props.tab.id, orderBy);
+  documentViewStore.setSearch(props.tab.id, where ?? '');
+  documentViewStore.setSort(props.tab.id, orderBy);
 }
 
 // P24 D30: <SegmentedControl>, mirroring views/grid/DataToolbar.vue's own swap.
 const PAGE_SIZE_OPTIONS = pageSizeOptions('document-');
 
 function onPageSize(size: PageSize): void {
-  setPageSize(props.tab.id, size);
+  documentViewStore.setPageSize(props.tab.id, size);
 }
 
 function onJump(pageIndex: number): void {
-  void goToPage(props.tab.id, pageIndex);
+  void documentViewStore.goToPage(props.tab.id, pageIndex);
 }
 
 const projectionOpen = ref(false);
@@ -323,20 +303,20 @@ function cancelCreate(): void {
 async function commitCreate(): Promise<void> {
   try {
     await saveNewDocument(props.tab.id, newBuffer.doc.value);
-    setActionError(props.tab.id, null);
+    documentViewStore.setActionError(props.tab.id, null);
     creatingNew.value = false;
     newBuffer.reseed();
   } catch (err) {
-    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
 }
 
 function onToggleSearch(): void {
-  toggleSearchOpen(props.tab.id);
+  documentViewStore.toggleSearchOpen(props.tab.id);
 }
 
 function onCloseSearch(): void {
-  setSearchOpen(props.tab.id, false);
+  documentViewStore.setSearchOpen(props.tab.id, false);
 }
 
 const virtualListRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
@@ -492,7 +472,7 @@ const rowHeights = computed<number[]>(() => {
   void documentRowsStore.rowsVersion.n;
   return rows.value.map((row) => {
     const id = documentRow(props.tab.id, row)?.id ?? null;
-    const expanded = id !== null && isDocumentExpanded(props.tab.id, id);
+    const expanded = id !== null && documentViewStore.isDocumentExpanded(props.tab.id, id);
     return documentRowsStore.rowHeight(
       props.tab.id,
       row,
@@ -513,7 +493,7 @@ function onGoToMatch(match: Match): void {
   const row = match.row;
   const view = documentRowsStore.rowView(props.tab.id, row);
   if (!view) return;
-  if (!isDocumentExpanded(props.tab.id, view.id)) toggleExpanded(props.tab.id, view.id);
+  if (!documentViewStore.isDocumentExpanded(props.tab.id, view.id)) documentViewStore.toggleExpanded(props.tab.id, view.id);
   void nextTick(() => {
     const index = rows.value.indexOf(row);
     if (index >= 0) virtualListRef.value?.scrollToIndex(index);
@@ -538,11 +518,11 @@ async function commitEdit(): Promise<void> {
   if (id === null) return;
   try {
     await saveDocumentEdit(props.tab.id, id, editBuffer.doc.value);
-    setActionError(props.tab.id, null);
+    documentViewStore.setActionError(props.tab.id, null);
     editingRow.value = null;
     editingId.value = null;
   } catch (err) {
-    setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+    documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -568,32 +548,32 @@ function onRowContextMenu(e: MouseEvent, row: number): void {
 async function onDeleteRow(id: string): Promise<void> {
   if (!(await confirmDialogStore.confirmDialog(`Delete this document (_id: ${id})?`))) return;
   deleteDocument(props.tab.id, id)
-    .then(() => setActionError(props.tab.id, null))
+    .then(() => documentViewStore.setActionError(props.tab.id, null))
     .catch((err: unknown) => {
-      setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
+      documentViewStore.setActionError(props.tab.id, err instanceof Error ? err.message : String(err));
     });
 }
 
 function onStop(): void {
-  stop(props.tab.id);
+  documentViewStore.stop(props.tab.id);
 }
 
 function onRefresh(): void {
-  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => reload(props.tab.id));
+  refreshOrReconnect(needsReconnect.value, onReconnectAndLoad, () => documentViewStore.reload(props.tab.id));
 }
 
 function onExpandAll(): void {
   // P21 round 2 performance finding 2: setAllExpanded's own `true` branch never reads `ids` — no
   // reason to pay for a whole-page idsOf(rows.value) decode just to hand it an argument it drops.
-  setAllExpanded(props.tab.id, [], true);
+  documentViewStore.setAllExpanded(props.tab.id, [], true);
 }
 
 function onCollapseAll(): void {
-  setAllExpanded(props.tab.id, idsOf(rows.value), false);
+  documentViewStore.setAllExpanded(props.tab.id, idsOf(rows.value), false);
 }
 
 function onRowClick(i: number): void {
-  selectRow(props.tab.id, i);
+  documentViewStore.selectRow(props.tab.id, i);
 }
 
 let unregisterCommand: (() => void) | null = null;
@@ -603,8 +583,8 @@ onMounted(() => {
   // P42 D9: this tab's own page.ts documentRow is where views/shared/document/rows.ts's
   // functions resolve `props.tab.id` to actual rows — now registered at setup's own top level
   // (see the comment up there for why), not here.
-  if (!needsReconnect.value && !runtime[props.tab.id]) {
-    void load(props.tab.id);
+  if (!needsReconnect.value && !documentViewStore.runtime[props.tab.id]) {
+    void documentViewStore.load(props.tab.id);
   }
   // Item 4 (regression pass, task batch P46-4): route through the same gate-aware onRefresh the
   // toolbar button uses — this used to call reload() directly, a doomed no-op behind the gate.
@@ -665,10 +645,10 @@ onUnmounted(() => {
           :has-more="!!rt?.hasMore"
           testid-prefix="document-"
           last-tooltip="Count documents first"
-          @first="goFirst(tab.id)"
-          @prev="goPrev(tab.id)"
-          @next="goNext(tab.id)"
-          @last="goLast(tab.id)"
+          @first="documentViewStore.goFirst(tab.id)"
+          @prev="documentViewStore.goPrev(tab.id)"
+          @next="documentViewStore.goNext(tab.id)"
+          @last="documentViewStore.goLast(tab.id)"
           @jump="onJump"
         />
         <SegmentedControl
@@ -685,7 +665,7 @@ onUnmounted(() => {
             icon="symbol-number"
             data-testid="document-count"
             v-tooltip="'Run an exact countDocuments() — the estimate above is metadata'"
-            @click="runCount(tab.id)"
+            @click="documentViewStore.runCount(tab.id)"
           />
           <div class="projection-anchor">
             <IconButton
@@ -895,11 +875,11 @@ onUnmounted(() => {
               @contextmenu="onRowContextMenu($event, item)"
               :view="rowAt(item)!.view"
               :scope="tab.id"
-              :expanded="isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
+              :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
               :selected="rt?.selectedRow === index"
               :search-match="isSearchMatch(item)"
               :search-match-current="isCurrentSearchMatch(item)"
-              @toggle="toggleExpanded(tab.id, rowAt(item)!.view.id)"
+              @toggle="documentViewStore.toggleExpanded(tab.id, rowAt(item)!.view.id)"
               @select="onRowClick(index)"
             >
               <template #actions>
@@ -930,7 +910,7 @@ onUnmounted(() => {
                      against, so it cannot disagree with the offsets. Only while collapsed: an
                      expanded document's own body is out of scope (§6). -->
                 <div
-                  v-if="isSearchMatch(item) && !isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
+                  v-if="isSearchMatch(item) && !documentViewStore.isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
                   class="doc-preview-match"
                   data-testid="document-search-preview"
                 >
@@ -940,7 +920,7 @@ onUnmounted(() => {
                   </template>
                 </div>
                 <div
-                  v-if="isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
+                  v-if="documentViewStore.isDocumentExpanded(tab.id, rowAt(item)!.view.id)"
                   class="doc-body"
                   data-testid="document-body"
                 >

@@ -4,7 +4,7 @@ import { useConfirmDialogStore } from '../../state/confirmDialog';
 import type { MenuItem } from '../../state/contextMenu';
 import { parseIdLabel, toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
-import { setActionError, setAllExpanded, toggleExpanded } from './state';
+import { useDocumentViewStore } from './state';
 
 const confirmDialogStore = useConfirmDialogStore();
 
@@ -23,9 +23,9 @@ function prettyJson(text: string): string {
 async function copyOrReportError(tabId: string, text: string): Promise<void> {
   try {
     await copyText(text);
-    setActionError(tabId, null);
+    useDocumentViewStore().setActionError(tabId, null);
   } catch (err) {
-    setActionError(tabId, err instanceof Error ? err.message : String(err));
+    useDocumentViewStore().setActionError(tabId, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -54,20 +54,20 @@ export function rowMenu(
       label: 'Expand all',
       // setAllExpanded's own `true` branch never reads its ids argument — no reason to force
       // allIds()'s whole-page decode just to hand it a value it drops.
-      run: () => setAllExpanded(tabId, [], true),
+      run: () => useDocumentViewStore().setAllExpanded(tabId, [], true),
     },
     {
       type: 'item',
       id: 'collapse-all',
       label: 'Collapse all',
-      run: () => setAllExpanded(tabId, allIds(), false),
+      run: () => useDocumentViewStore().setAllExpanded(tabId, allIds(), false),
     },
     { type: 'separator' },
     {
       type: 'item',
       id: 'toggle-expanded',
       label: 'Expand/collapse',
-      run: () => toggleExpanded(tabId, id),
+      run: () => useDocumentViewStore().toggleExpanded(tabId, id),
     },
     { type: 'separator' },
     {
@@ -146,9 +146,12 @@ export function rowMenu(
         if (!(await confirmDialogStore.confirmDialog(`Delete this document (_id: ${id})?`))) return;
         try {
           await deleteDocument(tabId, id);
-          setActionError(tabId, null);
+          useDocumentViewStore().setActionError(tabId, null);
         } catch (err) {
-          setActionError(tabId, err instanceof Error ? err.message : String(err));
+          useDocumentViewStore().setActionError(
+            tabId,
+            err instanceof Error ? err.message : String(err),
+          );
         }
       },
     },

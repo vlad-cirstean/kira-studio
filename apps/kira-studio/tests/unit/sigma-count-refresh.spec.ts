@@ -17,9 +17,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { runCount: runDocumentCount, runtime: documentRuntime } = await import(
-  '../../frontend/src/views/documents/state'
-);
+const { useDocumentViewStore } = await import('../../frontend/src/views/documents/state');
+const documentViewStore = useDocumentViewStore();
 const { useKeyValueViewStore } = await import('../../frontend/src/views/shared/keyvalue/state');
 const keyValueViewStore = useKeyValueViewStore();
 const { useStreamViewStore } = await import('../../frontend/src/views/stream/state');
@@ -37,8 +36,8 @@ const cases: Case[] = [
   {
     name: 'documents',
     open: () => tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id,
-    runCount: runDocumentCount,
-    runtime: documentRuntime,
+    runCount: (tabId: string) => documentViewStore.runCount(tabId),
+    runtime: documentViewStore.runtime,
   },
   {
     name: 'keyvalue',

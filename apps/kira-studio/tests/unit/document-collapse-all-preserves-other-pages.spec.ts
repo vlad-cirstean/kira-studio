@@ -13,52 +13,51 @@ setActivePinia(pinia);
 
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
-const { isDocumentExpanded, setAllExpanded, toggleExpanded } = await import(
-  '../../frontend/src/views/documents/state'
-);
+const { useDocumentViewStore } = await import('../../frontend/src/views/documents/state');
+const documentViewStore = useDocumentViewStore();
 
 describe('setAllExpanded merges rather than replaces state.expanded (finding 13)', () => {
   test('collapsing page 2 does not re-expand documents collapsed on page 1', () => {
     const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id;
 
-    setAllExpanded(tabId, ['p1-a', 'p1-b'], false); // collapse all on page 1
-    expect(isDocumentExpanded(tabId, 'p1-a')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p1-b')).toBe(false);
+    documentViewStore.setAllExpanded(tabId, ['p1-a', 'p1-b'], false); // collapse all on page 1
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-b')).toBe(false);
 
-    setAllExpanded(tabId, ['p2-a', 'p2-b'], false); // collapse all on page 2
+    documentViewStore.setAllExpanded(tabId, ['p2-a', 'p2-b'], false); // collapse all on page 2
 
     // Page 1's own collapsed documents must still be collapsed — the pre-fix bug replaced the
     // whole map with only page 2's ids, silently re-expanding page 1.
-    expect(isDocumentExpanded(tabId, 'p1-a')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p1-b')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p2-a')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p2-b')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-b')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p2-a')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p2-b')).toBe(false);
   });
 
   test('a single per-document collapse on page 1 survives a "collapse all" on page 2', () => {
     const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id;
 
-    toggleExpanded(tabId, 'p1-a'); // collapse just this one document, on page 1
-    expect(isDocumentExpanded(tabId, 'p1-a')).toBe(false);
+    documentViewStore.toggleExpanded(tabId, 'p1-a'); // collapse just this one document, on page 1
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
 
-    setAllExpanded(tabId, ['p2-a', 'p2-b'], false); // collapse all on page 2
+    documentViewStore.setAllExpanded(tabId, ['p2-a', 'p2-b'], false); // collapse all on page 2
 
-    expect(isDocumentExpanded(tabId, 'p1-a')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p2-a')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p2-b')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p2-a')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p2-b')).toBe(false);
   });
 
   test('"expand all" still clears the whole map — every page, not just the current one', () => {
     const tabId = tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id;
 
-    setAllExpanded(tabId, ['p1-a'], false);
-    setAllExpanded(tabId, ['p2-a'], false);
-    expect(isDocumentExpanded(tabId, 'p1-a')).toBe(false);
-    expect(isDocumentExpanded(tabId, 'p2-a')).toBe(false);
+    documentViewStore.setAllExpanded(tabId, ['p1-a'], false);
+    documentViewStore.setAllExpanded(tabId, ['p2-a'], false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(false);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p2-a')).toBe(false);
 
-    setAllExpanded(tabId, ['p2-a'], true); // "Expand all", called only with the current page's ids
+    documentViewStore.setAllExpanded(tabId, ['p2-a'], true); // "Expand all", called only with the current page's ids
 
-    expect(isDocumentExpanded(tabId, 'p1-a')).toBe(true);
-    expect(isDocumentExpanded(tabId, 'p2-a')).toBe(true);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p1-a')).toBe(true);
+    expect(documentViewStore.isDocumentExpanded(tabId, 'p2-a')).toBe(true);
   });
 });
