@@ -37,7 +37,7 @@ import { reactive } from 'vue';
 import { control } from '../bridge/control';
 import { usePendingChangesStore } from '../views/grid/pendingChanges';
 import { useCellSelectionStore } from './cellSelection';
-import { connectionsState } from './connections';
+import { useConnectionsStore } from './connections';
 import { useConsoleDefaultsStore } from './consoleDefaults';
 import { tabsForWorkspace, workspaceKeyOf } from './mode';
 import { pinia } from './pinia';
@@ -411,7 +411,7 @@ export function openTab<S>(
       // left unhydrated by an earlier disconnect (or never hydrated after a session restore)
       // stays stuck behind the reconnect gate until its own button is clicked, even though the
       // very re-open that just happened proves the connection needs no reconnecting at all.
-      if (connectionId && connectionsState.states[connectionId]?.status === 'connected') {
+      if (connectionId && useConnectionsStore().states[connectionId]?.status === 'connected') {
         tabsState.hydrated.add(existing.id);
       }
       return { id: existing.id, reused: true };

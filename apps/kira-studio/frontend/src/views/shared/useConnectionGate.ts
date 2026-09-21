@@ -1,6 +1,6 @@
 import type { ConnectionStatus } from '@shared/domain/connection';
 import { type ComputedRef, computed } from 'vue';
-import { connectConnection, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { isHydrated, markHydrated } from '../../state/tabs';
 
 /**
@@ -21,7 +21,7 @@ export function useConnectionGate(
   const connectionStatus = computed<ConnectionStatus>(() => {
     const connectionId = tab().connectionId;
     return connectionId
-      ? (connectionsState.states[connectionId]?.status ?? 'disconnected')
+      ? (useConnectionsStore().states[connectionId]?.status ?? 'disconnected')
       : 'disconnected';
   });
 
@@ -34,7 +34,7 @@ export function useConnectionGate(
     const connectionId = tab().connectionId;
     if (!connectionId) return;
     if (connectionStatus.value !== 'connected') {
-      await connectConnection(connectionId);
+      await useConnectionsStore().connectConnection(connectionId);
     }
     markHydrated(tab().id);
     await onLoad?.();

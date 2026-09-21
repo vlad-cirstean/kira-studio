@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
 import { computed, ref } from 'vue';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
 import { maskRulesState } from '../../state/maskRules';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -34,6 +34,7 @@ import {
 // because of the divergence, not a real case.
 const fakeDataStore = useFakeDataStore();
 const pendingChangesStore = usePendingChangesStore();
+const connectionsStore = useConnectionsStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 // P24 D30: SegmentedControl's generic now covers a numeric union too, so this hand-rolled .p-seg
@@ -44,7 +45,7 @@ const rt = computed(() => runtime[props.tab.id]);
 
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
-  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+  return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
 });
 
 // Add is gated on writability alone — never on whether the table has a primary key. A no-PK table
@@ -59,7 +60,7 @@ const caps = computed(() => {
 const isWritable = computed(
   () =>
     !!caps.value?.writable &&
-    !connectionRecord(props.tab.connectionId)?.readOnly &&
+    !connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly &&
     !rt.value?.maskPreview,
 );
 
@@ -118,13 +119,13 @@ const deleteRowTooltip = computed(() => {
 // named ahead of every reason that predicate itself covers.
 const canGenerateData = computed(
   () =>
-    canGenerateDataFor(caps.value, connectionRecord(props.tab.connectionId)?.readOnly) &&
+    canGenerateDataFor(caps.value, connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly) &&
     !rt.value?.maskPreview,
 );
 const generateDataTooltip = computed(() => {
   if (canGenerateData.value) return 'Generate data…';
   if (rt.value?.maskPreview) return 'Values are masked — turn the preview off to edit';
-  if (connectionRecord(props.tab.connectionId)?.readOnly) return 'Connection is read-only';
+  if (connectionsStore.connectionRecord(props.tab.connectionId)?.readOnly) return 'Connection is read-only';
   return 'This connection does not support generating rows';
 });
 

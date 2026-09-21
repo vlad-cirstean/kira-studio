@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { connectionRecord } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { connColorVar } from '../theme/connColor';
 import EngineIcon from '../theme/EngineIcon.vue';
@@ -23,6 +23,8 @@ const emit = defineEmits<{
   contextmenu: [row: TreeRowVm, event: MouseEvent];
 }>();
 
+const connectionsStore = useConnectionsStore();
+
 const icon = computed(() => {
   // P19: a group folder's icon reflects its own expand state, unlike every other kind.
   if (props.row.kind === 'group') return props.row.expanded ? 'folder-opened' : 'folder';
@@ -39,13 +41,13 @@ const statusTitle = computed(() => {
 // of the connection's whole group in the tree, not a badge on one row — so it
 // is looked up per-row from the connection record (row.color is only ever set
 // on the connection row itself) and drawn at every depth.
-const railColor = computed(() => connectionRecord(props.row.connectionId)?.color);
+const railColor = computed(() => connectionsStore.connectionRecord(props.row.connectionId)?.color);
 
 // The connection row's own kind ("postgres", "mongodb", ...), shown as a badge
 // instead of a second icon — the state dot already occupies the icon-box slot.
 const connectionKind = computed(() => {
   if (props.row.kind !== 'connection') return undefined;
-  return connectionRecord(props.row.connectionId)?.kind;
+  return connectionsStore.connectionRecord(props.row.connectionId)?.kind;
 });
 
 // Splits row.name on every case-insensitive occurrence of the live search query so only the

@@ -12,7 +12,7 @@ import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCacheStatsStore } from './state/cacheStats';
 import { useCodeReposStore } from './state/coderepos';
-import { hydrateConnections } from './state/connections';
+import { useConnectionsStore } from './state/connections';
 import { useCustomScriptsStore } from './state/customScripts';
 import { useDbMcpStore } from './state/dbmcp';
 import { useGitClientsStore } from './state/gitClients';
@@ -306,6 +306,7 @@ async function bootstrap(): Promise<void> {
   const workspaceStore = useWorkspaceStore(pinia);
   const opsStore = useOpsStore(pinia);
   const layoutStore = useLayoutStore(pinia);
+  const connectionsStore = useConnectionsStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -317,7 +318,7 @@ async function bootstrap(): Promise<void> {
   await Promise.all([
     layoutStore.hydrateLayout(),
     hydrateSettings(),
-    hydrateConnections(),
+    connectionsStore.hydrateConnections(),
     // M5 §7.5/§6.2: every connection's own masked-column count — the Settings glance's data, and
     // the toolbar's own "does this connection have any masked columns at all" visibility check
     // (deleteRowTooltip's own standing rule: a permanently inert control is worse than no control).

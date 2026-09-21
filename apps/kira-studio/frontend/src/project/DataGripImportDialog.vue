@@ -2,7 +2,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import { computed } from 'vue';
-import { connectionsState } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
@@ -71,10 +71,11 @@ const REPORT_REASON_LABEL: Record<string, string> = {
 };
 
 const datagripImportStore = useDatagripImportStore();
+const connectionsStore = useConnectionsStore();
 
 const rows = computed(() => datagripImportStore.preview?.rows ?? []);
 const checkedCount = computed(() => datagripImportStore.selected.size);
-const secretStatus = computed(() => connectionsState.secretStorage);
+const secretStatus = computed(() => connectionsStore.secretStorage);
 const report = computed(() => datagripImportStore.report);
 const reportSummary = computed(() => {
   const r = report.value;

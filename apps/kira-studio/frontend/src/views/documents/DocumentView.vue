@@ -7,7 +7,7 @@ import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -78,6 +78,7 @@ const contextMenuStore = useContextMenuStore();
 const documentRowsStore = useDocumentRowsStore();
 const mongoFieldSampleStore = useMongoFieldSampleStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
+const connectionsStore = useConnectionsStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/ConsoleView.vue.
 const props = defineProps<{ tab: DocumentTabRecord }>();
@@ -104,7 +105,7 @@ const running = computed(() => rt.value?.status === 'loading');
 // (§0 note: "A renderer gating a single action ... reads the matching flag instead of `writable`").
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
-  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+  return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
 });
 
 // P21 round 2 functional finding 3: Caps is a static per-adapter literal (internal/adapters/*/
@@ -112,7 +113,7 @@ const caps = computed(() => {
 // write gates already combine the two (KeyValueView.vue's own canUpdate/canDelete/canInsert);
 // this view read caps alone, so Add/Edit/Delete stayed enabled on a read-only MongoDB connection
 // and only failed server-side with a raw E_UNSUPPORTED.
-const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const canInsert = computed(() => !!caps.value?.canInsert && !connRecord.value?.readOnly);
 const canDelete = computed(() => !!caps.value?.canDelete && !connRecord.value?.readOnly);
 // "Connection is read-only" only actually explains the disabled state when the connection's own
@@ -157,7 +158,7 @@ const editGate = computed<{ editable: boolean; label: string }>(() => {
 // toolbar cap and the view-head dot) — never a tint or a full border on the panel itself.
 // No colour assigned leaves the rail slot unpainted rather than unrendered, so nothing shifts
 // when a colour is set later. Mirrors Toolbar.vue's `color`/`railStyle` computed pair.
-const connectionColor = computed(() => connectionRecord(props.tab.connectionId)?.color);
+const connectionColor = computed(() => connectionsStore.connectionRecord(props.tab.connectionId)?.color);
 
 const iconColor = computed(() => connColorVar(connectionColor.value) ?? 'var(--kira-fg-muted)');
 

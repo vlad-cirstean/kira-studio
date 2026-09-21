@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import { connectionRecord } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { findDataTab } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -13,6 +13,7 @@ const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 const pendingChangesStore = usePendingChangesStore();
+const connectionsStore = useConnectionsStore();
 
 const statements = ref<string[]>([]);
 const loading = ref(true);
@@ -22,7 +23,7 @@ const error = ref<string | null>(null);
 const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
 
 const sqlDialect = computed(() =>
-  sqlDialectFor(connectionRecord(findDataTab(props.tabId)?.connectionId)?.kind),
+  sqlDialectFor(connectionsStore.connectionRecord(findDataTab(props.tabId)?.connectionId)?.kind),
 );
 
 onMounted(async () => {

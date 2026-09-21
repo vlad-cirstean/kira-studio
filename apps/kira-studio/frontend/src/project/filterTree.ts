@@ -1,7 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { NodeKind, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import { connectionRecord, connectionsState } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import { isVisible, toSets } from './filter';
 import { isLeafKind, labelForKind } from './grouping';
 import { rowKey, treeState } from './state/tree';
@@ -37,7 +37,7 @@ export interface FilterNodeRow {
 }
 
 function connectionKindFor(connectionId: string): ConnectionKind | undefined {
-  return connectionRecord(connectionId)?.kind;
+  return useConnectionsStore().connectionRecord(connectionId)?.kind;
 }
 
 export function kindRows(connectionId: string, v: TreeVisibility): FilterKindRow[] {
@@ -83,7 +83,7 @@ export function nodeRows(
   // P41 D7: a keyBrowser connection's database/bucket rows are leaves here too — its Objects
   // section stops at the container, and its Object types section only ever lists kinds still
   // cached under one (F24), same as the tree itself.
-  const keyBrowser = connectionsState.states[connectionId]?.caps?.keyBrowser === true;
+  const keyBrowser = useConnectionsStore().states[connectionId]?.caps?.keyBrowser === true;
   const query = nameFilter.trim().toLowerCase();
   const rootChildren = treeState.children[rowKey(connectionId, '')] ?? [];
 

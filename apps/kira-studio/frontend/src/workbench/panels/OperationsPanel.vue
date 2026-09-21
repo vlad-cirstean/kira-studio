@@ -5,7 +5,7 @@ import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
@@ -22,6 +22,7 @@ import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../view
 
 const contextMenuStore = useContextMenuStore();
 const opsStore = useOpsStore();
+const connectionsStore = useConnectionsStore();
 
 interface OpsListItem {
   key: string;
@@ -54,7 +55,7 @@ const listItems = computed<OpsListItem[]>(() => {
 });
 
 function connectionFor(record: OpRecord) {
-  return connectionRecord(record.connectionId);
+  return connectionsStore.connectionRecord(record.connectionId);
 }
 
 function formatTime(iso: string): string {
@@ -116,7 +117,7 @@ function onRerun(record: OpRecord): void {
 
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   const hasTab = record.tabId !== null && tabsState.tabs.some((t) => t.id === record.tabId);
-  const canSql = !!record.connectionId && connectionsState.states[record.connectionId]?.caps?.sql;
+  const canSql = !!record.connectionId && connectionsStore.states[record.connectionId]?.caps?.sql;
   const items: MenuItem[] = [
     {
       type: 'item',

@@ -41,7 +41,7 @@ import { formatBytes } from '../../../format';
 import { registerCommand } from '../../../shortcuts/commands';
 import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConfirmDialogStore } from '../../../state/confirmDialog';
-import { connectionRecord, connectionsState } from '../../../state/connections';
+import { useConnectionsStore } from '../../../state/connections';
 import { useContextMenuStore } from '../../../state/contextMenu';
 import { useObjectStoreStore } from '../../../state/objectStore';
 import { settingsState } from '../../../state/settings';
@@ -90,6 +90,7 @@ const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const objectStoreStore = useObjectStoreStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
+const connectionsStore = useConnectionsStore();
 
 const props = defineProps<{
   viewKey: string;
@@ -121,7 +122,7 @@ const targetTail = computed(() => pathTail(host.value?.path ?? ''));
 // row's own `field`.
 const keyName = computed(() => targetTail.value?.name ?? '');
 
-const connRecord = computed(() => connectionRecord(host.value?.connectionId ?? null));
+const connRecord = computed(() => connectionsStore.connectionRecord(host.value?.connectionId ?? null));
 
 // P16 design system LAW: connection colour reaches the view as a 2px rail (the toolbar cap)
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
@@ -207,7 +208,7 @@ function onPageSize(size: PageSize): void {
 // applies, just per-action instead of one coarse boolean. ------------------------------------
 const caps = computed(() =>
   host.value?.connectionId
-    ? (connectionsState.states[host.value.connectionId]?.caps ?? null)
+    ? (connectionsStore.states[host.value.connectionId]?.caps ?? null)
     : null,
 );
 const canUpdate = computed(() => !!caps.value?.canUpdate && !connRecord.value?.readOnly);

@@ -2,12 +2,12 @@ import type { DataGripPreview, DataGripPreviewRow, DataGripReport } from '@share
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { connectionsState } from './connections';
+import { useConnectionsStore } from './connections';
 
 /** D10: "looks like it's already imported" — a live comparison against connectionsState.records,
  *  matching on name+host+port+database. Nothing is persisted to detect this (§0.3). */
 export function looksAlreadyImported(row: DataGripPreviewRow): boolean {
-  return connectionsState.records.some(
+  return useConnectionsStore().records.some(
     (r) =>
       r.name === row.name &&
       (r.host ?? null) === (row.host ?? null) &&

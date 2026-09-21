@@ -3,7 +3,7 @@ import type { DataTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
 import { connColorVar } from '../../theme/connColor';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -37,6 +37,7 @@ import {
 // restore (SlickGridHost's own onMounted) work without a manual watcher.
 const fakeDataStore = useFakeDataStore();
 const pendingChangesStore = usePendingChangesStore();
+const connectionsStore = useConnectionsStore();
 const props = defineProps<{ tab: DataTabRecord }>();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
@@ -46,7 +47,7 @@ const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
 
 const rt = computed(() => runtime[props.tab.id]);
 
-const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 
 const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
 
@@ -87,7 +88,7 @@ const primaryKeyLabel = computed(() => {
 // slot of its parent.
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
-  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+  return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
 });
 const tabHasPending = computed(() => pendingChangesStore.hasPending(props.tab.id));
 const pendingCount = computed(() => {

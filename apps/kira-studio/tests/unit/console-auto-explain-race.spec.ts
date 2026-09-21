@@ -14,11 +14,16 @@ import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { connectionsState } = await import('../../frontend/src/state/connections');
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { openConsoleTab } = await import('../../frontend/src/state/tabs');
 const { run, runtime } = await import('../../frontend/src/views/console/state');
 
@@ -70,7 +75,7 @@ function fakeResultPage(): Page {
 describe('console auto-explain: a superseded run must not overwrite the current warning (P12 round 1 F6)', () => {
   test('a slow wide-scan run resolving after a fast cheap run leaves the cheap run own state alone', async () => {
     const connectionId = 'conn-auto-explain-race';
-    connectionsState.records.push({
+    connectionsStore.records.push({
       id: connectionId,
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),

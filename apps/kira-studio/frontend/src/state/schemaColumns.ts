@@ -20,7 +20,7 @@ import {
   type DdlTable,
   EMPTY_DDL_SCHEMA,
 } from '../views/console/ddl';
-import { connectionRecord } from './connections';
+import { useConnectionsStore } from './connections';
 
 const RELATION_CONTAINER_KINDS = new Set(['database', 'schema']);
 
@@ -51,7 +51,7 @@ function rootContainerPathFor(connectionId: string): string | null {
   const databases = roots.filter((n) => n.kind === 'database');
   if (databases.length === 0) return null;
 
-  const record = connectionRecord(connectionId);
+  const record = useConnectionsStore().connectionRecord(connectionId);
   const dbNode =
     databases.find((n) => n.detail === 'connected') ??
     databases.find((n) => n.name === record?.database) ??

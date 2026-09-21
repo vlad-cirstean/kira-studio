@@ -8,12 +8,17 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { createTabularPageBuilder, MAX_CELL_BYTES } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { ExplainTruncatedError, parseExplainPages } from '../../frontend/src/views/console/plan';
 import { restoreAfterEach } from './support/restoreAfterEach';
 
+setActivePinia(pinia);
+
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { connectionsState } = await import('../../frontend/src/state/connections');
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { openConsoleTab } = await import('../../frontend/src/state/tabs');
 const { run, runtime, explain } = await import('../../frontend/src/views/console/state');
 
@@ -57,7 +62,7 @@ describe('parseExplainPages — truncated cell (P12 round 1 F8)', () => {
 describe('a truncated plan end to end (P12 round 1 F8)', () => {
   test('auto-explain shows a "could not check" strip instead of nothing, and the real run still executes', async () => {
     const connectionId = 'conn-explain-truncated-auto';
-    connectionsState.records.push({
+    connectionsStore.records.push({
       id: connectionId,
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),
@@ -83,7 +88,7 @@ describe('a truncated plan end to end (P12 round 1 F8)', () => {
 
   test('the manual Explain button surfaces a real message, not a raw JSON parse error', async () => {
     const connectionId = 'conn-explain-truncated-manual';
-    connectionsState.records.push({
+    connectionsStore.records.push({
       id: connectionId,
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: false, name: 'y', color: 'blue' } as any),

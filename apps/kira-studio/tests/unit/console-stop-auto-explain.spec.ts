@@ -10,13 +10,18 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { connectionsState } = await import('../../frontend/src/state/connections');
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { openConsoleTab } = await import('../../frontend/src/state/tabs');
 const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
 
@@ -41,7 +46,7 @@ function sleep(ms: number): Promise<void> {
 describe('console Stop during the auto-explain pre-run batch (P12 round 1 F5)', () => {
   test('cancels the EXPLAIN batch and never issues the real run', async () => {
     const connectionId = 'conn-stop-auto-explain';
-    connectionsState.records.push({
+    connectionsStore.records.push({
       id: connectionId,
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),

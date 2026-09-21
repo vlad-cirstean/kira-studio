@@ -6,7 +6,7 @@ import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { settingsState } from '../../state/settings';
 import { patchStreamTabState } from '../../state/tabs';
@@ -58,20 +58,21 @@ const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const streamSearchStore = useStreamSearchStore();
+const connectionsStore = useConnectionsStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
 
 const caps = computed(() => {
   const connectionId = props.tab.connectionId;
-  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+  return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
 });
 
 // P16 design system LAW: connection colour is a 2px rail — here capping the toolbar and as a
 // dot in the view header — never a background tint. Mirrors Toolbar.vue's `color`/`railStyle`
 // pair exactly. No colour assigned leaves `--kira-rail` unset, so the reserved slot stays blank
 // instead of shifting anything.
-const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
 
 const pathPrefix = computed(() => (connRecord.value ? `${connRecord.value.name} / ` : ''));

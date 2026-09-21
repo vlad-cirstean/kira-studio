@@ -7,7 +7,7 @@ import { findRanges } from '../../../editor/findRanges';
 import MonacoHost from '../../../editor/MonacoHost.vue';
 import { formatBytes } from '../../../format';
 import { cellKey, type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
-import { connectionRecord } from '../../../state/connections';
+import { useConnectionsStore } from '../../../state/connections';
 import { type MenuItem, useContextMenuStore } from '../../../state/contextMenu';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import { typeClassColor } from '../../../theme/icons';
@@ -38,6 +38,7 @@ import { validateFormat } from './validate';
 const cellEditorFormatStore = useCellEditorFormatStore();
 const cellSelectionStore = useCellSelectionStore();
 const contextMenuStore = useContextMenuStore();
+const connectionsStore = useConnectionsStore();
 
 // P24 D23: hoisted out of statusLine's own recompute — this sits on the 50 ms cell-selection
 // path (§2.1), and a stateless TextEncoder never needs to be reallocated per keystroke.
@@ -90,7 +91,7 @@ const effectiveFormat = computed<CellFormat>(() => override.value ?? detectedFor
 const language = computed<EditorLanguageId>(() => FORMAT_LANGUAGE[effectiveFormat.value]);
 
 const sqlDialect = computed(() => {
-  const record = connectionRecord(selectedCell.value.connectionId);
+  const record = connectionsStore.connectionRecord(selectedCell.value.connectionId);
   return sqlDialectFor(record?.kind);
 });
 

@@ -4,18 +4,7 @@ import { formatConnectionUri } from '@shared/domain/uri';
 import { control } from '../bridge/control';
 import { copyText } from '../clipboard';
 import { useConfirmDialogStore } from '../state/confirmDialog';
-import {
-  connectConnection,
-  connectionRecord,
-  connectionsState,
-  deleteConnection,
-  disconnectConnection,
-  duplicateConnection,
-  openCreateDialog,
-  openEditDialog,
-  setConnectionColor,
-  setConnectionReadOnly,
-} from '../state/connections';
+import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import { useConsoleDefaultsStore } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
 import { useObjectStoreStore } from '../state/objectStore';
@@ -95,7 +84,7 @@ export function menuForRow(row: TreeRowVm): MenuItem[] {
 // D5: offered only when the connection's caps say so, same discipline as "Open definition" — shared by
 // all three menu builders below rather than repeated per-row-kind gating logic.
 function consoleMenuItem(row: TreeRowVm): MenuItem[] {
-  if (connectionsState.states[row.connectionId]?.caps?.sql !== true) return [];
+  if (useConnectionsStore().states[row.connectionId]?.caps?.sql !== true) return [];
   return [
     {
       type: 'item',
@@ -110,8 +99,8 @@ function consoleMenuItem(row: TreeRowVm): MenuItem[] {
 }
 
 function connectionMenu(row: TreeRowVm): MenuItem[] {
-  const status = connectionsState.states[row.connectionId]?.status ?? 'disconnected';
-  const record = connectionRecord(row.connectionId);
+  const status = useConnectionsStore().states[row.connectionId]?.status ?? 'disconnected';
+  const record = useConnectionsStore().connectionRecord(row.connectionId);
   const isLive = status === 'connected' || status === 'connecting';
 
   const items: MenuItem[] = [
@@ -121,14 +110,14 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
           id: 'disconnect',
           label: 'Disconnect',
           icon: 'debug-disconnect',
-          run: () => disconnectConnection(row.connectionId),
+          run: () => useConnectionsStore().disconnectConnection(row.connectionId),
         }
       : {
           type: 'item',
           id: 'connect',
           label: 'Connect',
           icon: 'plug',
-          run: () => connectConnection(row.connectionId),
+          run: () => useConnectionsStore().connectConnection(row.connectionId),
         },
     {
       type: 'item',
@@ -143,7 +132,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       label: 'Edit…',
       icon: 'edit',
       shortcut: 'tree.rename',
-      run: () => openEditDialog(row.connectionId),
+      run: () => useConnectionDialogStore().openEditDialog(row.connectionId),
     },
     {
       type: 'item',
@@ -152,7 +141,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       icon: 'copy',
       shortcut: 'tree.duplicate',
       run: async () => {
-        await duplicateConnection(row.connectionId);
+        await useConnectionsStore().duplicateConnection(row.connectionId);
       },
     },
     {
@@ -214,7 +203,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
         label: color,
         swatch: color,
         checked: record?.color === color,
-        run: () => setConnectionColor(row.connectionId, color),
+        run: () => useConnectionsStore().setConnectionColor(row.connectionId, color),
       })),
     },
     {
@@ -232,7 +221,10 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
         ) {
           return;
         }
-        await setConnectionReadOnly(row.connectionId, !(record?.readOnly ?? false));
+        await useConnectionsStore().setConnectionReadOnly(
+          row.connectionId,
+          !(record?.readOnly ?? false),
+        );
       },
     },
     { type: 'separator' },
@@ -246,7 +238,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
       run: async () => {
         if (!(await useConfirmDialogStore().confirmDialog(`Delete connection "${row.name}"?`)))
           return;
-        await deleteConnection(row.connectionId);
+        await useConnectionsStore().deleteConnection(row.connectionId);
       },
     },
   ];
@@ -256,7 +248,7 @@ function connectionMenu(row: TreeRowVm): MenuItem[] {
 // D9: Postgres-only — MariaDB's console can already switch database with its own `USE db;` as
 // the console's first statement, so there is nothing for this item to do there.
 function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
-  const record = connectionRecord(row.connectionId);
+  const record = useConnectionsStore().connectionRecord(row.connectionId);
   if (record?.kind !== 'postgres') return [];
   return [
     {
@@ -275,7 +267,7 @@ function setAsDefaultMenuItem(row: TreeRowVm): MenuItem[] {
 // (ProjectTree.vue's onOpen(row) is what Enter actually dispatches, same as relationMenu's own).
 function browseMenuItem(row: TreeRowVm): MenuItem[] {
   if (row.kind !== 'database' && row.kind !== 'bucket') return [];
-  if (connectionsState.states[row.connectionId]?.caps?.keyBrowser !== true) return [];
+  if (useConnectionsStore().states[row.connectionId]?.caps?.keyBrowser !== true) return [];
   return [
     {
       type: 'item',
@@ -356,7 +348,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       },
     },
     // D5: offered only when the connection's caps say so — never a permanently disabled row.
-    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
       ? [
           {
             type: 'item' as const,
@@ -440,7 +432,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       },
     },
     // D5: offered only when the connection's caps say so — never a permanently disabled row.
-    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
       ? [
           {
             type: 'item' as const,
@@ -544,7 +536,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
         openStreamTab(row.connectionId, row.path, { newTab: true });
       },
     },
-    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
       ? [
           {
             type: 'item' as const,
@@ -574,7 +566,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
 // errors. A consumer group had no definition at all before this phase (F10).
 function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
   return [
-    ...(connectionsState.states[row.connectionId]?.caps?.definition === true
+    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
       ? [
           {
             type: 'item' as const,
@@ -662,7 +654,7 @@ export function emptyBackgroundMenu(): MenuItem[] {
       label: 'New connection',
       icon: 'add',
       shortcut: 'app.newConnection',
-      run: () => openCreateDialog(),
+      run: () => useConnectionDialogStore().openCreateDialog(),
     },
     {
       type: 'item',

@@ -24,7 +24,7 @@ import { formatBytes, formatRelative } from '../format';
 import { useAgentHooksStore } from '../state/agentHooks';
 import { useCacheStatsStore } from '../state/cacheStats';
 import { useConfirmDialogStore } from '../state/confirmDialog';
-import { connectionsState, setConnectionMcpEnabled } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useDbMcpStore } from '../state/dbmcp';
 import { useGitClientsStore } from '../state/gitClients';
@@ -56,6 +56,7 @@ const customScriptsStore = useCustomScriptsStore();
 const dbMcpStore = useDbMcpStore();
 const gitClientsStore = useGitClientsStore();
 const keepAwakeStore = useKeepAwakeStore();
+const connectionsStore = useConnectionsStore();
 
 // P17 D1: everything the user touches lives in this draft until Save — settingsState (and
 // therefore every other window, the database, and the app's own rendering) sees nothing until
@@ -267,7 +268,7 @@ const dbMcpTokenExpired = computed(() => tokenExpired(dbMcpStore.status.expiresA
 // permission modes and the description are edited in the connection's own MCP tab, not here —
 // this list stays a read-only glance plus the one control it already had.
 async function onToggleConnectionMcpEnabled(id: string, enabled: boolean): Promise<void> {
-  await setConnectionMcpEnabled(id, enabled);
+  await connectionsStore.setConnectionMcpEnabled(id, enabled);
 }
 
 // M2 §7.3: the row's own description glance — first line only, "" when unset.
@@ -1614,12 +1615,12 @@ async function onAddScript(): Promise<void> {
               expensive-query threshold pauses for approval.
             </p>
             <ul
-              v-if="connectionsState.records.length"
+              v-if="connectionsStore.records.length"
               class="db-mcp-connections-list"
               data-testid="db-mcp-connections-list"
             >
               <li
-                v-for="conn in connectionsState.records"
+                v-for="conn in connectionsStore.records"
                 :key="conn.id"
                 class="db-mcp-connection-row"
                 :data-testid="`db-mcp-connection-row-${conn.id}`"

@@ -3,7 +3,7 @@ import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import type { Page } from '@shared/protocol/page';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
-import { connectionRecord } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
@@ -390,7 +390,7 @@ export async function run(tabId: string, statements: string[]): Promise<void> {
 
   // D19 rules 1-5: issued and awaited *before* the real run — the query still runs regardless of
   // what this finds (rule 5: warn, never block) — and only when the connection has opted in.
-  const connection = connectionRecord(tab.connectionId);
+  const connection = useConnectionsStore().connectionRecord(tab.connectionId);
   if (connection?.autoExplain) {
     const explainOpId = crypto.randomUUID();
     rt.explainOpId = explainOpId;

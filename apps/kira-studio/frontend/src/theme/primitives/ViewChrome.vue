@@ -2,7 +2,7 @@
 import type { PaletteColor } from '@shared/domain/color';
 import type { TabRecord } from '@shared/domain/tabs';
 import { computed } from 'vue';
-import { connectionRecord } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useRunState } from '../../state/runState';
 import { connColorVar } from '../connColor';
 import IconButton from './IconButton.vue';
@@ -59,10 +59,12 @@ const props = withDefaults(
 
 const emit = defineEmits<{ refresh: []; stop: [] }>();
 
+const connectionsStore = useConnectionsStore();
+
 // P2 D14/F8: `connection?.color ?? null` used to fold "no connection at all" (an HTTP request
 // tab) and "a connection with no colour assigned" into the same `null` — ViewHeader's own
 // `connColor !== undefined` guard then rendered a dot for both. `undefined` only for the former.
-const connection = computed(() => connectionRecord(props.tab.connectionId));
+const connection = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 
 // P18 D19: the merged rail/dot colour — envColor (an Api view) when given, else the tab's own
 // connection colour (a Studio view, preserving F8's own null-vs-undefined distinction: `null` for

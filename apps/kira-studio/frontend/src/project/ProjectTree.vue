@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
-import { connectionsState } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { useSchemaColumnsStore } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
@@ -32,6 +32,7 @@ import TreeRow from './TreeRow.vue';
 
 const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
+const connectionsStore = useConnectionsStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
@@ -52,7 +53,7 @@ const STREAM_OPENABLE_KINDS = new Set(['topic', 'queue']);
 // that stay expand-only, F13) or the connection kind (Caps is the only thing the UI reads, ARCHITECTURE.md).
 function isKeyBrowserRow(row: TreeRowVm): boolean {
   if (row.kind !== 'database' && row.kind !== 'bucket') return false;
-  return connectionsState.states[row.connectionId]?.caps?.keyBrowser === true;
+  return connectionsStore.states[row.connectionId]?.caps?.keyBrowser === true;
 }
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));

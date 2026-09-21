@@ -1,7 +1,7 @@
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { ObjectMeta } from '@shared/domain/tree';
 import { control } from '../../bridge/control';
-import { connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { tabsState } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
@@ -47,7 +47,7 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
   // E_UNSUPPORTED from describe() (P31 F5), so calling it for them only ever produces the error
   // this phase exists to stop. `meta` stays null exactly as it did after that failure, so the
   // Structure body renders identically either way (P23 D8's own `meta: null` state, unchanged).
-  const canDescribe = connectionsState.states[tab.connectionId]?.caps?.describe === true;
+  const canDescribe = useConnectionsStore().states[tab.connectionId]?.caps?.describe === true;
 
   // P23 D8: describe() is allowed to fail independently — the definition load's own describe
   // this view never required for its Structure body's PropertiesSection rows; a failed describe

@@ -2,7 +2,7 @@ import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { PageSize } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
-import { connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { findStreamTab, patchStreamTabState } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
@@ -15,7 +15,7 @@ import { useStreamFilterHistoryStore } from './streamFilterHistory';
 // computed reads this same field off caps; mirrored here (rather than imported) because state.ts
 // has no dependency on the view layer.
 function isBatchPagination(connectionId: string): boolean {
-  return connectionsState.states[connectionId]?.caps?.pagination === 'batch';
+  return useConnectionsStore().states[connectionId]?.caps?.pagination === 'batch';
 }
 
 // Mirrors views/keyvalue/state.ts's KeyValueViewRuntime shape, minus pageIndex (StreamTabState
@@ -238,7 +238,7 @@ export async function setPageSize(tabId: string, pageSize: PageSize): Promise<vo
   const rt = ensureRuntime(tabId);
   rt.nextToken = null;
   patchStreamTabState(tabId, { pageSize });
-  const caps = tab.connectionId ? connectionsState.states[tab.connectionId]?.caps : null;
+  const caps = tab.connectionId ? useConnectionsStore().states[tab.connectionId]?.caps : null;
   if (caps?.pagination === 'batch') return;
   if (!rt.polled) return; // mirrors onMounted's own guard — never auto-load before the first view
   await load(tabId, { mode: 'offset', offset: 0 });

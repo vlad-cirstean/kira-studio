@@ -2,7 +2,7 @@ import type { OpRecord } from '@shared/domain/ops';
 import { defineStore } from 'pinia';
 import { computed, markRaw, reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { connectionRecord } from './connections';
+import { useConnectionsStore } from './connections';
 
 const MAX_RECORDS = 500;
 const HYDRATE_LIMIT = 200;
@@ -55,7 +55,7 @@ export const useOpsStore = defineStore('ops', () => {
         // command/kind/error. The one real gap the row's "op label and its connection name" asks
         // for was the connection's own name — added here rather than duplicating the box with a
         // second, toggle-based one.
-        const connName = connectionRecord(record.connectionId)?.name ?? '';
+        const connName = useConnectionsStore().connectionRecord(record.connectionId)?.name ?? '';
         const haystack =
           `${record.command ?? ''} ${record.kind} ${record.error ?? ''} ${connName}`.toLowerCase();
         if (!haystack.includes(text)) return false;

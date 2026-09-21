@@ -2,7 +2,7 @@
 import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { openKeyValueTab, patchBrowseTabState } from '../../state/tabs';
@@ -42,6 +42,7 @@ const contextMenuStore = useContextMenuStore();
 const props = defineProps<{ tab: BrowseTabRecord }>();
 
 const objectStoreStore = useObjectStoreStore();
+const connectionsStore = useConnectionsStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -60,7 +61,7 @@ const atRoot = computed(() => currentLevelPath.value === props.tab.path);
 const targetTail = computed(() => pathTail(props.tab.path));
 const targetName = computed(() => targetTail.value?.name ?? props.tab.path);
 const headerIcon = computed(() => nodeIcon(targetTail.value?.kind ?? 'database'));
-const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const pathPrefix = computed(() => (connRecord.value?.name ? `${connRecord.value.name} / ` : ''));
 
 // The breadcrumb: one crumb per path segment from the current level, each a jump target for
@@ -174,7 +175,7 @@ function onRowClick(node: TreeNode): void {
 // P63 §4.3: gates the whole per-type fetch — an S3 browse tab (caps.keyTypes false) never issues
 // treeKeyTypes at all, not just gets an empty answer from it.
 const supportsKeyTypes = computed(
-  () => !!connectionsState.states[props.tab.connectionId ?? '']?.caps?.keyTypes,
+  () => !!connectionsStore.states[props.tab.connectionId ?? '']?.caps?.keyTypes,
 );
 
 // Reads through `keyTypesVersion` so this re-renders when ensureKeyTypes below fills in a path —
@@ -237,8 +238,8 @@ function onRowContextMenu(e: MouseEvent, node: TreeNode): void {
 // surfaced as a toolbar button too (Console.html-style primary action) rather than only reachable
 // through a container row's own context menu.
 const canUpload = computed(() => {
-  const caps = connectionsState.states[props.tab.connectionId ?? '']?.caps;
-  const record = connectionRecord(props.tab.connectionId);
+  const caps = connectionsStore.states[props.tab.connectionId ?? '']?.caps;
+  const record = connectionsStore.connectionRecord(props.tab.connectionId);
   return !!caps?.fileTransfer && !!caps.canInsert && !record?.readOnly;
 });
 function onUploadClick(): void {

@@ -11,7 +11,7 @@ import { useQuickOpenStore } from './repo/state/quickOpen';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { usePaletteStore } from './shortcuts/state';
-import { connectionsState, openCreateDialog } from './state/connections';
+import { useConnectionDialogStore } from './state/connections';
 import { useDatagripImportStore } from './state/datagripImport';
 import { useFakeDataStore } from './state/fakeData';
 import { useLayoutStore } from './state/layout';
@@ -42,6 +42,7 @@ const objectStoreStore = useObjectStoreStore();
 const layoutStore = useLayoutStore();
 const quickOpenStore = useQuickOpenStore();
 const collectionsStore = useCollectionsStore();
+const connectionDialogStore = useConnectionDialogStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
@@ -57,7 +58,7 @@ onMounted(() => {
     control.onOpenSettings(() => {
       settingsOpen.value = true;
     }),
-    control.onNewConnection(() => openCreateDialog()),
+    control.onNewConnection(() => connectionDialogStore.openCreateDialog()),
     // P28 D18: three menu-bar commands. Subscribed here rather than in the panels that used to
     // own the buttons, so they work with no panel mounted — which is the point of moving them.
     control.onNewRequest(() => {
@@ -98,7 +99,7 @@ onUnmounted(() => {
     <TitleBar />
     <WorkbenchShell />
   </div>
-  <ConnectionDialog v-if="connectionsState.dialog.open" />
+  <ConnectionDialog v-if="connectionDialogStore.open" />
   <DataGripImportDialog v-if="datagripImportStore.open" />
   <ApiDialogs />
   <UploadObjectDialog v-if="objectStoreStore.open" />

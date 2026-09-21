@@ -10,14 +10,20 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { TreeNode } from '@shared/domain/tree';
+import { setActivePinia } from 'pinia';
+
+import { pinia } from '../../frontend/src/state/pinia';
+
+setActivePinia(pinia);
 
 const { containerPathFor } = await import('../../frontend/src/state/schemaColumns');
-const { connectionsState } = await import('../../frontend/src/state/connections');
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { treeState } = await import('../../frontend/src/project/state/tree');
 const { consoleRelationNames } = await import('../../frontend/src/views/console/completion');
 
 function addConnection(id: string, kind: string, database: string | null): void {
-  connectionsState.records.push({
+  connectionsStore.records.push({
     id,
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
     ...({ kind, database, name: id, color: 'blue' } as any),

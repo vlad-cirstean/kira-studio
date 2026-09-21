@@ -2,7 +2,7 @@
 import { pathTail } from '@shared/domain/tree';
 import { computed } from 'vue';
 import { formatRelative } from '../../format';
-import { connectionRecord, connectionsState, openCreateDialog } from '../../state/connections';
+import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useDatagripImportStore } from '../../state/datagripImport';
 import {
   openDataTab,
@@ -21,11 +21,13 @@ import { connColorVar } from '../../theme/connColor';
 // P16 design system's FirstRun.html: one door, no vestibule. The engine grid lives only in
 // the New connection dialog, never repeated at the top level.
 const datagripImportStore = useDatagripImportStore();
+const connectionsStore = useConnectionsStore();
+const connectionDialogStore = useConnectionDialogStore();
 
-const hasConnections = computed(() => connectionsState.records.length > 0);
+const hasConnections = computed(() => connectionsStore.records.length > 0);
 
 function connectionFor(entry: RecentTableEntry) {
-  return connectionRecord(entry.connectionId);
+  return connectionsStore.connectionRecord(entry.connectionId);
 }
 
 function iconFor(entry: RecentTableEntry): string {
@@ -63,7 +65,7 @@ function openRecent(entry: RecentTableEntry): void {
         Kira Studio needs somewhere to connect before it can show you anything.
       </div>
       <span class="first-run-actions">
-        <button type="button" class="p-dlgbtn primary" @click="openCreateDialog">
+        <button type="button" class="p-dlgbtn primary" @click="connectionDialogStore.openCreateDialog">
           <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
           New connection
         </button>

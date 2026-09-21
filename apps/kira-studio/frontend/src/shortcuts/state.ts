@@ -2,7 +2,7 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
 import { useQuickOpenStore } from '../repo/state/quickOpen';
-import { openCreateDialog } from '../state/connections';
+import { useConnectionDialogStore } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { settingsOpen } from '../state/settings';
@@ -24,7 +24,11 @@ export const usePaletteStore = defineStore('palette', () => {
   // worth a name in the palette. No fuzzy scoring, no "go to anything" navigation (§8.15 calls
   // for "minimal").
   const paletteCommands: PaletteCommand[] = [
-    { id: 'new-connection', label: 'New connection', run: () => openCreateDialog() },
+    {
+      id: 'new-connection',
+      label: 'New connection',
+      run: () => useConnectionDialogStore().openCreateDialog(),
+    },
     // D13: a one-click action worth a name, the same bar this list's own comment states — no menu
     // or accelerator change (ApiStart.vue/CollectionsPanel.vue's own buttons are the other two).
     { id: 'api.newRequest', label: 'New request', run: () => void openApiRequestTab() },

@@ -8,7 +8,7 @@ import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, reactive, ref, shallowReactive, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { connectConnection, connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useSchemaColumnsStore } from '../../state/schemaColumns';
 import { reloadTabsForTarget } from '../../state/viewCommands';
 import { isVisible, toSets, type VisibilitySets } from '../filter';
@@ -156,15 +156,15 @@ export async function expand(connectionId: string, path: string): Promise<void> 
   // Expanding a disconnected connection's node connects it first, rather than surfacing
   // E_DISCONNECTED — the twisty is the primary way users browse, so it shouldn't require a
   // separate explicit Connect click first.
-  if (connectionsState.states[connectionId]?.status !== 'connected') {
+  if (useConnectionsStore().states[connectionId]?.status !== 'connected') {
     treeState.loading.add(k);
     try {
-      await connectConnection(connectionId);
+      await useConnectionsStore().connectConnection(connectionId);
     } finally {
       treeState.loading.delete(k);
     }
   }
-  if (connectionsState.states[connectionId]?.status !== 'connected') return;
+  if (useConnectionsStore().states[connectionId]?.status !== 'connected') return;
   await loadVisibility(connectionId);
   treeState.expanded.add(k);
   if (treeState.children[k]) return;
@@ -258,7 +258,7 @@ export async function revealPath(connectionId: string, path: string): Promise<vo
   if (!treeState.expanded.has(rowKey(connectionId, ''))) {
     await expand(connectionId, '');
   }
-  const keyBrowser = connectionsState.states[connectionId]?.caps?.keyBrowser === true;
+  const keyBrowser = useConnectionsStore().states[connectionId]?.caps?.keyBrowser === true;
   const segments = path.split('/').filter(Boolean);
   let ancestor = '';
   for (let i = 0; i < segments.length - 1; i++) {
@@ -280,7 +280,7 @@ export async function revealPath(connectionId: string, path: string): Promise<vo
 }
 
 export async function refreshAllConnections(): Promise<void> {
-  for (const conn of connectionsState.records) {
+  for (const conn of useConnectionsStore().records) {
     await refreshConnection(conn.id);
   }
 }
@@ -464,7 +464,7 @@ function buildRows(
   }
 
   if (groups.length === 0) return anyMatch;
-  const connectionKind = connectionRecord(connectionId)?.kind;
+  const connectionKind = useConnectionsStore().connectionRecord(connectionId)?.kind;
   for (const group of groups) {
     const path = groupPath(parentPath, group.kind);
     const k = rowKey(connectionId, path);
@@ -524,7 +524,7 @@ export const activeSearchQuery = computed(() => debouncedQuery.value);
 
 // P94 pass 3 §4.3/§6 item 3: one connection's own row plus its (possibly search-filtered)
 // expanded children — moved out of searchResult's own computed body, but every reactive read
-// inside it (connectionsState.states, treeState.expanded/children/visibility/loading/errors)
+// inside it (useConnectionsStore().states, treeState.expanded/children/visibility/loading/errors)
 // still runs inside searchResult's dependency tracking, because searchResult calls this
 // SYNCHRONOUSLY, from inside its own computed callback (below) — never hoisted out or memoized
 // separately. `null` means this connection is filtered out entirely (a search query matched
@@ -535,7 +535,7 @@ function connectionRow(
   stats: SearchStats,
 ): { row: TreeRowVm; children: readonly TreeRowVm[] } | null {
   const connKey = rowKey(conn.id, '');
-  const state = connectionsState.states[conn.id];
+  const state = useConnectionsStore().states[conn.id];
   const naturallyExpanded = treeState.expanded.has(connKey);
   const childNodes = treeState.children[connKey];
   const view: ConnectionView = {
@@ -580,7 +580,7 @@ const searchResult = computed(() => {
   const stats: SearchStats = { incomplete: false };
   const query = debouncedQuery.value;
 
-  for (const conn of connectionsState.records) {
+  for (const conn of useConnectionsStore().records) {
     const result = connectionRow(conn, query, stats);
     if (!result) continue;
     rows.push(result.row);

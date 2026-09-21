@@ -9,11 +9,16 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionState } from '@shared/domain/connection';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { connectionsState } = await import('../../frontend/src/state/connections');
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { openStreamTab } = await import('../../frontend/src/state/tabs');
 const { applyStreamFilter, runCount, runtime } = await import(
   '../../frontend/src/views/stream/state'
@@ -48,7 +53,7 @@ const kafkaCaps: Caps = {
 };
 
 function markConnected(connectionId: string, caps: Caps): void {
-  connectionsState.states[connectionId] = {
+  connectionsStore.states[connectionId] = {
     connectionId,
     status: 'connected',
     serverVersion: 'Kafka',

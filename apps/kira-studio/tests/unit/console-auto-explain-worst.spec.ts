@@ -10,11 +10,16 @@ import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { connectionsState } = await import('../../frontend/src/state/connections');
+const { useConnectionsStore } = await import('../../frontend/src/state/connections');
+const connectionsStore = useConnectionsStore();
 const { openConsoleTab } = await import('../../frontend/src/state/tabs');
 const { run, runtime } = await import('../../frontend/src/views/console/state');
 
@@ -47,7 +52,7 @@ function fakeResultPage(): Page {
 describe('auto-explain worstIndex points at the worst flagged plan, not the first (P12 round 2 F13)', () => {
   test('a cheap-but-flagged statement first, a far more expensive one second', async () => {
     const connectionId = 'conn-auto-explain-worst';
-    connectionsState.records.push({
+    connectionsStore.records.push({
       id: connectionId,
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),

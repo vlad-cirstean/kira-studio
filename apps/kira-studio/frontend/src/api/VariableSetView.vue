@@ -3,7 +3,7 @@ import type { PaletteColor } from '@shared/domain/color';
 import type { VariableSetTabRecord } from '@shared/domain/tabs';
 import type { ApiVariable } from '@shared/domain/variables';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
-import { connectionsState } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import AppButton from '../theme/primitives/AppButton.vue';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import EmptyState from '../theme/primitives/EmptyState.vue';
@@ -30,6 +30,7 @@ const props = defineProps<{ tab: VariableSetTabRecord }>();
 const collectionsStore = useCollectionsStore();
 const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
+const connectionsStore = useConnectionsStore();
 
 const scope = computed(() => props.tab.state.scope);
 const ownerId = computed(() => props.tab.state.ownerId);
@@ -436,11 +437,11 @@ function onBulkClose(): void {
           {{ error }}
         </MessageStrip>
         <MessageStrip
-          v-else-if="connectionsState.secretStorage && !connectionsState.secretStorage.available"
+          v-else-if="connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
           tone="warn"
           data-testid="variables-secrets-unavailable"
         >
-          {{ connectionsState.secretStorage.reason }}
+          {{ connectionsStore.secretStorage.reason }}
         </MessageStrip>
 
         <div v-if="scope === 'environment' && owningEnvironment" class="env-fields">
@@ -498,7 +499,7 @@ function onBulkClose(): void {
           :duplicate="duplicateFor(row)"
           :trailing="row.id === ''"
           :filtered="isFiltered"
-          :secrets-unavailable="!!connectionsState.secretStorage && !connectionsState.secretStorage.available"
+          :secrets-unavailable="!!connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
           @update:name="onUpdateName(row.id, $event)"
           @update:value="onUpdateValue(row.id, $event)"
           @update:is-secret="onUpdateSecret(row.id, $event)"

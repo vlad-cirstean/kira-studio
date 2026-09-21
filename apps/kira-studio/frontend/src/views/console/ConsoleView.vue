@@ -7,7 +7,7 @@ import { pathTail } from '@shared/domain/tree';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionRecord } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
 import { ddlSchemaFor, ensureDdl } from '../../state/schemas';
@@ -55,6 +55,7 @@ import {
 
 const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
+const connectionsStore = useConnectionsStore();
 
 // MainView.vue keys this component by tab.id — same discipline as DefinitionView.vue/DataView.vue.
 const props = defineProps<{ tab: ConsoleTabRecord }>();
@@ -69,7 +70,7 @@ const running = computed(() => rt.value?.status === 'running');
 const targetTail = computed(() => pathTail(props.tab.path));
 
 const connectionKind = computed<ConnectionKind | undefined>(
-  () => connectionRecord(props.tab.connectionId)?.kind,
+  () => connectionsStore.connectionRecord(props.tab.connectionId)?.kind,
 );
 
 const dialect = computed(() => sqlDialectFor(connectionKind.value));

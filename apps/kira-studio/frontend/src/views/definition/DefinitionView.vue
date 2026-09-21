@@ -7,7 +7,7 @@ import { copyText } from '../../clipboard';
 import { findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { openConsoleTab, patchDefinitionTabState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -34,6 +34,7 @@ import ValidationSection from './ValidationSection.vue';
 // MainView.vue keys this component by tab.id, so one instance <-> one tab — same discipline as
 // DataView.vue.
 const props = defineProps<{ tab: DefinitionTabRecord }>();
+const connectionsStore = useConnectionsStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -162,7 +163,7 @@ const docHighlights = computed(() => {
   return (doc: string) => findRanges(doc, query, currentGlobal);
 });
 
-const dialect = computed(() => sqlDialectFor(connectionRecord(props.tab.connectionId)?.kind));
+const dialect = computed(() => sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind));
 
 const originPhrase = computed(() =>
   definition.value?.origin === 'server' ? 'server definition' : 'composed from catalog metadata',
@@ -173,13 +174,13 @@ const originPhrase = computed(() =>
 // break that coincidence (caps.sql is false for both, P10's D13) — same gate project/menus.ts's
 // own consoleMenuItem() already uses for the tree's context-menu equivalent.
 const canOpenConsole = computed(
-  () => connectionsState.states[props.tab.connectionId ?? '']?.caps?.sql === true,
+  () => connectionsStore.states[props.tab.connectionId ?? '']?.caps?.sql === true,
 );
 
 // P16 design system LAW: connection colour reaches a view as a 2px rail (tree, tab, toolbar
 // cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
 // use for the rail elsewhere, just aimed at the dot instead.
-const connRecord = computed(() => connectionRecord(props.tab.connectionId));
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 // Produced locally from the path — the same discipline SlickGridHost.vue's own qualifiedName()
 // uses (never round-tripped to the engine for a string join): connection name plus every
 // segment above the target, joined for the view header's breadcrumb.

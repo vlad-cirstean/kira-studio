@@ -8,7 +8,7 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
-import { connectionRecord, connectionsState } from './connections';
+import { useConnectionsStore } from './connections';
 import type { MenuItem } from './contextMenu';
 
 // P33 D17: lives in state/ (not views/keyvalue/) because project/menus.ts must be able to open
@@ -34,8 +34,9 @@ export const useObjectStoreStore = defineStore('objectStore', () => {
   // which sit on opposite sides of the project/ -> views/ layering rule, so the item itself lives
   // here rather than in either caller.
   function uploadMenuItem(connectionId: string, containerPath: string): MenuItem[] {
-    const caps = connectionsState.states[connectionId]?.caps;
-    const record = connectionRecord(connectionId);
+    const connectionsStore = useConnectionsStore();
+    const caps = connectionsStore.states[connectionId]?.caps;
+    const record = connectionsStore.connectionRecord(connectionId);
     if (!caps?.fileTransfer || !caps.canInsert || record?.readOnly) return [];
     return [
       {

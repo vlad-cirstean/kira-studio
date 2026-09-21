@@ -3,17 +3,20 @@ import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
 import { treeState } from '../../project/state/tree';
-import { connectionsState, openCreateDialog } from '../../state/connections';
+import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { schemaDialogState } from '../../state/schemas';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PanelShell from '../../theme/primitives/PanelShell.vue';
+
+const connectionsStore = useConnectionsStore();
+const connectionDialogStore = useConnectionDialogStore();
 </script>
 
 <template>
   <PanelShell
     :search="treeState.search"
-    :empty="connectionsState.records.length === 0"
+    :empty="connectionsStore.records.length === 0"
     @update:search="treeState.search = $event"
   >
     <template #title>
@@ -29,7 +32,7 @@ import PanelShell from '../../theme/primitives/PanelShell.vue';
         aria-label="Add connection"
         v-tooltip="'New connection'"
         data-testid="add-connection"
-        @click="openCreateDialog"
+        @click="connectionDialogStore.openCreateDialog"
       />
     </template>
     <template #body>

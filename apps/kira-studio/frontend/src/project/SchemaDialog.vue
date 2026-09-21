@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
-import { connectionRecord } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import {
   closeSchemaDialog,
   ddlParseSummary,
@@ -28,6 +28,7 @@ import DialogFrame from '../theme/primitives/DialogFrame.vue';
 // exist yet, an engine with no SchemaColumns capability, or a connection this app cannot
 // introspect. The dialog, saveDdl/ensureDdl and the connection-row menu entry are unchanged.
 
+const connectionsStore = useConnectionsStore();
 const draft = ref('');
 const saving = ref(false);
 
@@ -42,8 +43,8 @@ let parseSummaryTimer: ReturnType<typeof setTimeout> | undefined;
 onBeforeUnmount(() => clearTimeout(parseSummaryTimer));
 
 const connectionId = computed(() => schemaDialogState.connectionId);
-const connectionKind = computed(() => connectionRecord(connectionId.value)?.kind);
-const connectionName = computed(() => connectionRecord(connectionId.value)?.name ?? '');
+const connectionKind = computed(() => connectionsStore.connectionRecord(connectionId.value)?.kind);
+const connectionName = computed(() => connectionsStore.connectionRecord(connectionId.value)?.name ?? '');
 const dialect = computed(() => schemaDialectFor(connectionKind.value));
 // P60b §6.2: MonacoHost has no equivalent of CodeMirror's own implicit language-data keyword
 // source — `:autocomplete="true"` alone offered dialect-correct keyword/type completion before

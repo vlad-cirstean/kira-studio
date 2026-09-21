@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
 import MonacoHost from '../editor/MonacoHost.vue';
-import { connectionRecord, connectionsState } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import { useFakeDataStore } from '../state/fakeData';
 import { findDataTab } from '../state/tabs';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -29,11 +29,12 @@ import { sqlDialectFor } from '../views/shared/sqlIdent';
 // is the one and only place a run's fields get their starting values (D8).
 
 const fakeDataStore = useFakeDataStore();
+const connectionsStore = useConnectionsStore();
 const tabId = computed(() => fakeDataStore.tabId);
 const tab = computed(() => (tabId.value ? findDataTab(tabId.value) : null));
-const connRecord = computed(() => connectionRecord(tab.value?.connectionId));
+const connRecord = computed(() => connectionsStore.connectionRecord(tab.value?.connectionId));
 const caps = computed(() =>
-  tab.value?.connectionId ? (connectionsState.states[tab.value.connectionId]?.caps ?? null) : null,
+  tab.value?.connectionId ? (connectionsStore.states[tab.value.connectionId]?.caps ?? null) : null,
 );
 const meta = computed(() => (tabId.value ? (runtime[tabId.value]?.meta ?? null) : null));
 

@@ -20,7 +20,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { shortcutFor } from '../../shortcuts/keys';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
 import {
   correlationKeyFor,
@@ -113,6 +113,7 @@ const contextMenuStore = useContextMenuStore();
 const cellSelectionStore = useCellSelectionStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const pendingChangesStore = usePendingChangesStore();
+const connectionsStore = useConnectionsStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -236,11 +237,11 @@ function hasPrimaryKey(): boolean {
 function isWritable(): boolean {
   const t = tab();
   if (!t?.connectionId) return false;
-  return !connectionRecord(t.connectionId)?.readOnly;
+  return !connectionsStore.connectionRecord(t.connectionId)?.readOnly;
 }
 function caps() {
   const connectionId = tab()?.connectionId;
-  return connectionId ? (connectionsState.states[connectionId]?.caps ?? null) : null;
+  return connectionId ? (connectionsStore.states[connectionId]?.caps ?? null) : null;
 }
 // M5 §6.4: this tab's own masking preview toggle. A plain function, not a computed — the same
 // "every other call site is an event handler outside SlickGrid's own render path" reasoning
@@ -383,7 +384,7 @@ function rowSnapshot(row: number): RowSnapshot {
 }
 
 function currentDialect() {
-  return sqlDialectFor(connectionRecord(tab()?.connectionId)?.kind);
+  return sqlDialectFor(connectionsStore.connectionRecord(tab()?.connectionId)?.kind);
 }
 
 function isDeleted(row: number): boolean {

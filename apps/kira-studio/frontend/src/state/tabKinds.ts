@@ -82,7 +82,7 @@ import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { useCodeReposStore } from './coderepos';
-import { connectionRecord } from './connections';
+import { useConnectionsStore } from './connections';
 import type { MenuItem } from './contextMenu';
 import { settingsState } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
@@ -136,7 +136,7 @@ const KIND_ICON: Record<string, string> = {
 };
 
 function railColor(tab: TabRecord): ConnectionColor | undefined {
-  return connectionRecord(tab.connectionId)?.color;
+  return useConnectionsStore().connectionRecord(tab.connectionId)?.color;
 }
 
 // P83 §7.2: a filesystem basename (state.cwd is an absolute path, not an encoded NodePath — this

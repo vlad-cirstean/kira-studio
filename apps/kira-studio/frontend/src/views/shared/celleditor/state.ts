@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import type { SelectedCell } from '../../../state/cellSelection';
-import { connectionRecord } from '../../../state/connections';
+import { useConnectionsStore } from '../../../state/connections';
 import type { CellFormat } from './formats';
 
 /** P5 adds 'no-primary-key' — a table with no primary key can't identify a row to write. P24 D27
@@ -43,7 +43,7 @@ export const useCellEditorFormatStore = defineStore('cellEditorFormat', () => {
    *  (D4), but no chip is shown for it. */
   function readOnlyReasonFor(cell: SelectedCell): ReadOnlyReason | null {
     if (cell.masked) return 'masked';
-    const record = connectionRecord(cell.connectionId);
+    const record = useConnectionsStore().connectionRecord(cell.connectionId);
     if (record?.readOnly) return 'connection-read-only';
     if (cell.truncated) return 'value-truncated';
     if (!cell.hasPrimaryKey) return 'no-primary-key';

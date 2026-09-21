@@ -2,7 +2,7 @@
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import { computed, nextTick, ref, watch } from 'vue';
-import { connectionRecord } from '../state/connections';
+import { useConnectionsStore } from '../state/connections';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import Checkbox from '../theme/primitives/Checkbox.vue';
@@ -22,6 +22,7 @@ import { closeFiltersDialog, filtersDialogState, saveVisibility, treeState } fro
 // types (kind, flat) and Objects (path, expandable) — plus a live-consequence strip. Nothing here
 // fetches; the dialog offers exactly what the tree has already cached (D21).
 
+const connectionsStore = useConnectionsStore();
 const draft = ref<TreeVisibility>(EMPTY_VISIBILITY);
 const expandedPaths = ref<Set<string>>(new Set());
 const nameFilter = ref('');
@@ -130,7 +131,7 @@ async function onSave(): Promise<void> {
 // Title identity (FiltersDialog.html: "Tree filters — prod-analytics") — reads the name off
 // the store that already has it, same as ConnectionDialog.vue does; adds no new state.
 const connectionName = computed(
-  () => connectionRecord(filtersDialogState.connectionId)?.name ?? '',
+  () => connectionsStore.connectionRecord(filtersDialogState.connectionId)?.name ?? '',
 );
 </script>
 

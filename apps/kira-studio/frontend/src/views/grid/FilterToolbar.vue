@@ -3,7 +3,7 @@ import type { SortSpec } from '@shared/domain/queries';
 import type { DataTabRecord } from '@shared/domain/tabs';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
-import { connectionRecord } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -17,6 +17,7 @@ import { runtime, setFilter, setSort } from './state';
 
 // P48 D10: takes `tab` as a prop like every other view's toolbar — see DataToolbar.vue's own note.
 const props = defineProps<{ tab: DataTabRecord }>();
+const connectionsStore = useConnectionsStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 
@@ -27,7 +28,7 @@ const hasError = computed(() => rt.value?.status === 'error');
 // Mirrors PreviewCommandPanel.vue's/ConsoleView.vue's own three-line dialect computed exactly —
 // undefined for every non-SQL connection kind, which filterCompletion.ts's dialect-conditional
 // vocabularies (ILIKE, NULLS FIRST/LAST) already treat as "the non-Postgres list".
-const dialect = computed(() => sqlDialectFor(connectionRecord(props.tab.connectionId)?.kind));
+const dialect = computed(() => sqlDialectFor(connectionsStore.connectionRecord(props.tab.connectionId)?.kind));
 const whereCandidates = computed(() => buildWhereCandidates(props.tab.id, dialect.value));
 const orderByCandidates = computed(() => buildOrderByCandidates(props.tab.id, dialect.value));
 

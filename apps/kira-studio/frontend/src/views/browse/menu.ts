@@ -1,7 +1,7 @@
 import type { TreeNode } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
-import { connectionRecord, connectionsState } from '../../state/connections';
+import { useConnectionsStore } from '../../state/connections';
 import type { MenuItem } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { openKeyValueTab } from '../../state/tabs';
@@ -78,8 +78,9 @@ function keyRowMenu(connectionId: string, node: TreeNode): MenuItem[] {
 // Delete, each gated on the connection's own caps/read-only state rather than shown permanently
 // disabled.
 function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): MenuItem[] {
-  const caps = connectionsState.states[connectionId]?.caps;
-  const record = connectionRecord(connectionId);
+  const connectionsStore = useConnectionsStore();
+  const caps = connectionsStore.states[connectionId]?.caps;
+  const record = connectionsStore.connectionRecord(connectionId);
   const items: MenuItem[] = [
     {
       type: 'item',

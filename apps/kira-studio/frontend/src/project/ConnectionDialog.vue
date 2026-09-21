@@ -15,7 +15,7 @@ import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@
 import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useConfirmDialogStore } from '../state/confirmDialog';
-import { closeDialog, connectionsState, saveDialog } from '../state/connections';
+import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import {
   loadMaskRules,
   maskRulesFor,
@@ -37,6 +37,8 @@ import TextField from '../theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '../theme/wrapSelection';
 
 const confirmDialogStore = useConfirmDialogStore();
+const connectionsStore = useConnectionsStore();
+const connectionDialogStore = useConnectionDialogStore();
 
 const KIND_LABEL: Record<ConnectionKind, string> = {
   postgres: 'PostgreSQL',
@@ -95,11 +97,11 @@ function mcpModeOptions(
   ];
 }
 
-const draft = computed(() => connectionsState.dialog.draft);
-const isEdit = computed(() => connectionsState.dialog.mode === 'edit');
+const draft = computed(() => connectionDialogStore.draft);
+const isEdit = computed(() => connectionDialogStore.mode === 'edit');
 // M5 §7: the Privacy tab operates against the real, saved connection — a brand-new (unsaved)
 // connection has no id yet, so its own pane shows a "save first" message instead (below).
-const editingConnectionId = computed(() => connectionsState.dialog.editingId);
+const editingConnectionId = computed(() => connectionDialogStore.editingId);
 // M3 §9.1: whether this kind has an EXPLAIN this app can parse at all — the auto-explain checkbox
 // is disabled (never hidden) for the rest, since the setting is visible where it's set rather than
 // discovered missing.
@@ -108,7 +110,7 @@ const mcpExplainSupported = computed(
 );
 // P25 D8: reported once at startup (state/connections.ts's hydrateConnections()), never changes
 // for the life of the process.
-const secretStatus = computed(() => connectionsState.secretStorage);
+const secretStatus = computed(() => connectionsStore.secretStorage);
 
 // P16 design system: NewConnection.html (step 1, pick the engine) and ConnectionDialog.html
 // (step 2, only that engine's fields) are two mockups for this one dialog — both steps live
@@ -256,7 +258,7 @@ async function onTest(): Promise<void> {
   // P14 D3: editingId (empty for a brand-new connection) lets the backend fill in the stored
   // secret when the draft carries none, so testing an existing connection whose password was
   // never revealed still probes with the real credential rather than none at all.
-  const result = await control.connectionsTest(d, connectionsState.dialog.editingId ?? '');
+  const result = await control.connectionsTest(d, connectionDialogStore.editingId ?? '');
   testState.value = result.ok
     ? { status: 'ok', message: result.serverVersion }
     : { status: 'error', message: result.error };
@@ -286,12 +288,12 @@ async function requestReveal(id: string, confirmed: boolean): Promise<void> {
       return;
     }
     default:
-      connectionsState.dialog.error = result.error ?? 'Could not reveal the saved password.';
+      connectionDialogStore.error = result.error ?? 'Could not reveal the saved password.';
   }
 }
 
 function onReveal(): void {
-  const id = connectionsState.dialog.editingId;
+  const id = connectionDialogStore.editingId;
   if (!id) return;
   void requestReveal(id, false);
 }
@@ -350,11 +352,11 @@ async function onSave(): Promise<void> {
   // P25 D7: cleared before every attempt so a retry doesn't show a stale failure from the last
   // one while the new one is in flight; saveDialog() throws rather than returning null on
   // failure (see its own comment), so catching here is the one place a failed save is handled.
-  connectionsState.dialog.error = null;
+  connectionDialogStore.error = null;
   try {
-    await saveDialog();
+    await connectionDialogStore.saveDialog();
   } catch (err) {
-    connectionsState.dialog.error = err instanceof Error ? err.message : String(err);
+    connectionDialogStore.error = err instanceof Error ? err.message : String(err);
   }
 }
 
@@ -548,7 +550,7 @@ const preconnectText = computed({
     :height="520"
     test-id="connection-dialog"
     close-test-id="connection-dialog-close"
-    @close="closeDialog"
+    @close="connectionDialogStore.closeDialog"
   >
     <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
     <template v-if="step === 'engine'" #header>
@@ -1077,13 +1079,13 @@ const preconnectText = computed({
           </div>
 
           <span
-            v-if="connectionsState.dialog.error"
+            v-if="connectionDialogStore.error"
             class="field-error"
             data-testid="connection-save-error"
-            >{{ connectionsState.dialog.error }}</span
+            >{{ connectionDialogStore.error }}</span
           >
 
-          <!-- P25 D8: three states driven by connectionsState.secretStorage, replacing the old
+          <!-- P25 D8: three states driven by connectionsStore.secretStorage, replacing the old
                unconditional plaintext warning — a null secretStatus (not hydrated yet) renders
                none of them rather than guessing. P35 D14: a file kind has no credentials at all,
                so none of the three states apply — the note would be describing something that
@@ -1115,7 +1117,7 @@ const preconnectText = computed({
 
     <template v-if="step === 'engine'" #footer>
       <span class="p-dialog-actions footer-actions p-push">
-        <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
+        <AppButton kind="dialog" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</AppButton>
         <AppButton kind="dialog" variant="primary" @click="continueToDetails">
           Continue
           <span class="icon-box"><CodiconIcon name="chevron-right" :size="13" /></span>
@@ -1144,7 +1146,7 @@ const preconnectText = computed({
         </span>
       </div>
       <div class="p-dialog-actions footer-actions">
-        <AppButton kind="dialog" data-testid="connection-cancel" @click="closeDialog">Cancel</AppButton>
+        <AppButton kind="dialog" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</AppButton>
         <AppButton
           kind="dialog"
           variant="primary"
