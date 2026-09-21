@@ -36,7 +36,7 @@ import {
   openRepoReviewDiffTab,
 } from '../../state/repoTabs';
 import { activateTab } from '../../state/tabs';
-import { setRepoPanelTab } from '../state/search';
+import { useRepoPanelTabStore } from '../state/search';
 import { loadReviewSession, pinnedGraphTabId, saveReviewSession } from './reviewSession';
 
 // C11 §8.2/§8.4 (S13): review.open's own cold-mount hand-off. The local event bus (S4) only
@@ -371,7 +371,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
         throw new Error(`hostHandlers: review.open: unknown git repoId ${gitRepoId}`);
       }
       pendingReviewTargetByCodeRepoId.set(codeRepoId, { repoId: gitRepoId, branch });
-      setRepoPanelTab('review');
+      useRepoPanelTabStore().setRepoPanelTab('review');
       const layoutStore = useLayoutStore();
       if (!layoutStore.panel.project.visible) layoutStore.toggleProjectPanel();
       deps.emitLocal('review.target', { repoId: gitRepoId, branch });

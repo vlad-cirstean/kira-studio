@@ -1,4 +1,5 @@
 import type { FileStatusCode } from '@shared/domain/repo';
+import { defineStore } from 'pinia';
 import { markRaw, reactive } from 'vue';
 import { control } from '../../bridge/control';
 import type { StickyRowLike } from '../../theme/primitives/stickyBand';
@@ -141,93 +142,107 @@ function emptyTreeState(): RepoTreeState {
   };
 }
 
-// One entry per open repo workspace. The Map itself must be `reactive()`, not just each value —
-// visibleRepoRows' first read (from RepoFileTree.vue's `rows` computed, evaluated on initial
-// render before ensureRepoTreeLoaded's onMounted has run) hits `byRepo.get(repoId)` while the
-// entry doesn't exist yet and returns `[]` early, without ever touching a `.tree` property to
-// depend on. A plain (non-reactive) Map makes that `.get()` itself untracked, so Vue never
-// reruns the computed once `stateFor` later creates the entry and `refreshRepoTree` populates it
-// — the tree would silently never render. Wrapping the Map in `reactive()` makes `.get()` itself
-// a tracked read (Vue 3's native Map/Set support), so the computed correctly reruns once the
-// entry is set.
-const byRepo = reactive(new Map<string, RepoTreeState>());
+export const useFileTreeStore = defineStore('fileTree', () => {
+  // One entry per open repo workspace. The Map itself must be `reactive()`, not just each value —
+  // visibleRepoRows' first read (from RepoFileTree.vue's `rows` computed, evaluated on initial
+  // render before ensureRepoTreeLoaded's onMounted has run) hits `byRepo.get(repoId)` while the
+  // entry doesn't exist yet and returns `[]` early, without ever touching a `.tree` property to
+  // depend on. A plain (non-reactive) Map makes that `.get()` itself untracked, so Vue never
+  // reruns the computed once `stateFor` later creates the entry and `refreshRepoTree` populates it
+  // — the tree would silently never render. Wrapping the Map in `reactive()` makes `.get()` itself
+  // a tracked read (Vue 3's native Map/Set support), so the computed correctly reruns once the
+  // entry is set.
+  const byRepo = reactive(new Map<string, RepoTreeState>());
 
-function stateFor(repoId: string): RepoTreeState {
-  let state = byRepo.get(repoId);
-  if (!state) {
-    state = reactive(emptyTreeState()) as RepoTreeState;
-    byRepo.set(repoId, state);
-  }
-  return state;
-}
-
-/** True once repoId's listing has loaded at least once — GitPanel.vue's own loading gate. */
-export function isRepoTreeLoaded(repoId: string): boolean {
-  return byRepo.get(repoId)?.loaded ?? false;
-}
-
-export function repoTreeTruncated(repoId: string): boolean {
-  return byRepo.get(repoId)?.truncated ?? false;
-}
-
-// C9 D1: quick open's own candidate list — the same flat array the tree already holds, so quick
-// open inherits its snapshot exactly rather than re-enumerating.
-export function repoTreePaths(repoId: string): readonly string[] {
-  return byRepo.get(repoId)?.paths ?? [];
-}
-
-export function repoTreeError(repoId: string): string | null {
-  return byRepo.get(repoId)?.error ?? null;
-}
-
-// C5 §7.1: refresh on workspace open and on an explicit Refresh action — nothing live (recorded in
-// docs/ARCHITECTURE.md's Known open items).
-export async function refreshRepoTree(repoId: string): Promise<void> {
-  const state = stateFor(repoId);
-  state.loading = true;
-  state.error = null;
-  try {
-    const listing = await control.codeWorkspaceListFiles(repoId);
-    state.paths = listing.paths;
-    state.status = listing.status;
-    state.truncated = listing.truncated;
-    state.tree = buildTree(listing.paths);
-    // §7.2: "the repo root's own children expanded on first open" — only on the very first load,
-    // so a later Refresh never re-expands whatever the user has since collapsed.
-    if (!state.loaded) {
-      for (const node of state.tree) if (node.isDir) state.expanded.add(node.path);
+  function stateFor(repoId: string): RepoTreeState {
+    let state = byRepo.get(repoId);
+    if (!state) {
+      state = reactive(emptyTreeState()) as RepoTreeState;
+      byRepo.set(repoId, state);
     }
-    state.loaded = true;
-  } catch (err) {
-    state.error = err instanceof Error ? err.message : String(err);
-  } finally {
-    state.loading = false;
+    return state;
   }
-}
 
-export function ensureRepoTreeLoaded(repoId: string): void {
-  const state = stateFor(repoId);
-  if (state.loaded || state.loading) return;
-  void refreshRepoTree(repoId);
-}
+  /** True once repoId's listing has loaded at least once — GitPanel.vue's own loading gate. */
+  function isRepoTreeLoaded(repoId: string): boolean {
+    return byRepo.get(repoId)?.loaded ?? false;
+  }
 
-export function toggleRepoDir(repoId: string, path: string): void {
-  const state = byRepo.get(repoId);
-  if (!state) return;
-  if (state.expanded.has(path)) state.expanded.delete(path);
-  else state.expanded.add(path);
-}
+  function repoTreeTruncated(repoId: string): boolean {
+    return byRepo.get(repoId)?.truncated ?? false;
+  }
 
-export function visibleRepoRows(repoId: string, search: string): RepoTreeRowVm[] {
-  const state = byRepo.get(repoId);
-  if (!state) return [];
-  const rows: RepoTreeRowVm[] = [];
-  flatten(state.tree, 0, state.expanded, state.status, search.trim().toLowerCase(), rows);
-  return rows;
-}
+  // C9 D1: quick open's own candidate list — the same flat array the tree already holds, so quick
+  // open inherits its snapshot exactly rather than re-enumerating.
+  function repoTreePaths(repoId: string): readonly string[] {
+    return byRepo.get(repoId)?.paths ?? [];
+  }
 
-/** Drops repoId's own cached tree — RemoveRepo's own cleanup (a removed repo's tree state must not
- *  outlive it, however briefly, in this module-level map). */
-export function dropRepoTree(repoId: string): void {
-  byRepo.delete(repoId);
-}
+  function repoTreeError(repoId: string): string | null {
+    return byRepo.get(repoId)?.error ?? null;
+  }
+
+  // C5 §7.1: refresh on workspace open and on an explicit Refresh action — nothing live (recorded
+  // in docs/ARCHITECTURE.md's Known open items).
+  async function refreshRepoTree(repoId: string): Promise<void> {
+    const state = stateFor(repoId);
+    state.loading = true;
+    state.error = null;
+    try {
+      const listing = await control.codeWorkspaceListFiles(repoId);
+      state.paths = listing.paths;
+      state.status = listing.status;
+      state.truncated = listing.truncated;
+      state.tree = buildTree(listing.paths);
+      // §7.2: "the repo root's own children expanded on first open" — only on the very first
+      // load, so a later Refresh never re-expands whatever the user has since collapsed.
+      if (!state.loaded) {
+        for (const node of state.tree) if (node.isDir) state.expanded.add(node.path);
+      }
+      state.loaded = true;
+    } catch (err) {
+      state.error = err instanceof Error ? err.message : String(err);
+    } finally {
+      state.loading = false;
+    }
+  }
+
+  function ensureRepoTreeLoaded(repoId: string): void {
+    const state = stateFor(repoId);
+    if (state.loaded || state.loading) return;
+    void refreshRepoTree(repoId);
+  }
+
+  function toggleRepoDir(repoId: string, path: string): void {
+    const state = byRepo.get(repoId);
+    if (!state) return;
+    if (state.expanded.has(path)) state.expanded.delete(path);
+    else state.expanded.add(path);
+  }
+
+  function visibleRepoRows(repoId: string, search: string): RepoTreeRowVm[] {
+    const state = byRepo.get(repoId);
+    if (!state) return [];
+    const rows: RepoTreeRowVm[] = [];
+    flatten(state.tree, 0, state.expanded, state.status, search.trim().toLowerCase(), rows);
+    return rows;
+  }
+
+  /** Drops repoId's own cached tree — RemoveRepo's own cleanup (a removed repo's tree state must
+   *  not outlive it, however briefly, in this module-level map). */
+  function dropRepoTree(repoId: string): void {
+    byRepo.delete(repoId);
+  }
+
+  return {
+    isRepoTreeLoaded,
+    repoTreeTruncated,
+    repoTreePaths,
+    repoTreeError,
+    refreshRepoTree,
+    ensureRepoTreeLoaded,
+    toggleRepoDir,
+    visibleRepoRows,
+    dropRepoTree,
+  };
+});

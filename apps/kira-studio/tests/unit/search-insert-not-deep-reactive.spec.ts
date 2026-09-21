@@ -10,15 +10,18 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
 import type { CodeSearchEvent, FileMatches } from '../../../../packages/shared/domain/repo';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 
-const { startRepoSearch, repoSearchRows, repoSearchRunning, dropRepoSearch } = await import(
-  '../../frontend/src/repo/state/search'
-);
+const { useRepoSearchStore } = await import('../../frontend/src/repo/state/search');
+const repoSearchStore = useRepoSearchStore();
 
 function group(path: string): FileMatches {
   return {
@@ -51,9 +54,8 @@ describe('C14-1: state.files insertion stays off Vue deep reactivity at scale', 
       control as unknown as { codeWorkspaceStartSearch: typeof control.codeWorkspaceStartSearch }
     ).codeWorkspaceStartSearch = async () => ({ searchId: 'search-1' });
 
-    const { setRepoSearchQuery } = await import('../../frontend/src/repo/state/search');
-    setRepoSearchQuery(repoId, 'needle');
-    await startRepoSearch(repoId);
+    repoSearchStore.setRepoSearchQuery(repoId, 'needle');
+    await repoSearchStore.startRepoSearch(repoId);
 
     // D11: workers emit out of order, so insertByPath's own binary search lands mid-array, not just
     // at the tail -- that's what actually pays the reactive-proxy element-shift cost the fix targets
@@ -102,13 +104,13 @@ describe('C14-1: state.files insertion stays off Vue deep reactivity at scale', 
     // without flaking on ordinary CI scheduling jitter for O(F) work over 10,000 elements.
     expect(elapsedMs).toBeLessThan(5_000);
 
-    expect(repoSearchRunning(repoId)).toBe(false);
-    const rows = repoSearchRows(repoId);
+    expect(repoSearchStore.repoSearchRunning(repoId)).toBe(false);
+    const rows = repoSearchStore.repoSearchRows(repoId);
     // One file-header row + one match row per path, in sorted order.
     expect(rows.length).toBe(totalPaths * 2);
     expect(rows[0]).toMatchObject({ kind: 'file', path: paths[0] });
     expect(rows[rows.length - 1]).toMatchObject({ kind: 'match', path: paths[paths.length - 1] });
 
-    dropRepoSearch(repoId);
+    repoSearchStore.dropRepoSearch(repoId);
   });
 });

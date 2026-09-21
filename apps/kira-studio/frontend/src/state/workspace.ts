@@ -8,8 +8,8 @@ import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { disposeGitTransport } from '../repo/git/transport';
-import { dropRepoTree } from '../repo/state/fileTree';
-import { dropRepoSearch } from '../repo/state/search';
+import { useFileTreeStore } from '../repo/state/fileTree';
+import { useRepoSearchStore } from '../repo/state/search';
 import { useModeStore } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
 import { closeWorkspaceTabs } from './tabs';
@@ -32,6 +32,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   // workspace now also brings the Git module forward (setModule('git')), which is what makes
   // clicking a repo file tab from Quick Open while in Studio bring Git's tab active, and what makes
   // `lastRepoKey` track "which repository was I last in" so returning to Git lands back on it.
+  // Nested store-to-store calls, no explicit pinia argument — Pinia's own useStore(pinia) already
+  // activated the instance before this setup body ran, so a plain useXStore() here synchronously
+  // resolves against it (mode.ts/coderepos.ts already established this pattern).
   function activateWorkspace(key: WorkspaceKey): void {
     const mode = moduleOfWorkspace(key);
     useModeStore().setModule(mode);
@@ -74,8 +77,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     // own doc comment) — closing the workspace itself is the one event that actually ends it. A
     // no-op when the graph tab was never mounted (no transport was ever created).
     disposeGitTransport(repoId);
-    dropRepoTree(repoId);
-    dropRepoSearch(repoId);
+    useFileTreeStore().dropRepoTree(repoId);
+    useRepoSearchStore().dropRepoSearch(repoId);
     if (state.lastRepoKey === key) state.lastRepoKey = null;
     // P67b §4.2: falls back to the Git module's own empty state (GitStart.vue), not to Studio — a
     // repo workspace closing is a Git-module event, and Studio has no reason to steal focus for it.

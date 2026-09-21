@@ -6,24 +6,20 @@ import { settingsState } from '../state/settings';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import { menuForRepoRow } from './menus';
 import RepoTreeRow from './RepoTreeRow.vue';
-import {
-  ensureRepoTreeLoaded,
-  type RepoTreeRowVm,
-  toggleRepoDir,
-  visibleRepoRows,
-} from './state/fileTree';
+import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
 
 const contextMenuStore = useContextMenuStore();
+const fileTreeStore = useFileTreeStore();
 
 const props = defineProps<{ repoId: string; search: string }>();
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const selected = ref<string | null>(null);
 
-onMounted(() => ensureRepoTreeLoaded(props.repoId));
+onMounted(() => fileTreeStore.ensureRepoTreeLoaded(props.repoId));
 watch(
   () => props.repoId,
-  (id) => ensureRepoTreeLoaded(id),
+  (id) => fileTreeStore.ensureRepoTreeLoaded(id),
 );
 
 // C13-6d: project/state/tree.ts's own debounce for the Studio schema tree's identical shape of
@@ -55,14 +51,14 @@ watch(
 );
 onUnmounted(() => clearTimeout(searchDebounceTimer));
 
-const rows = computed(() => visibleRepoRows(props.repoId, debouncedSearch.value));
+const rows = computed(() => fileTreeStore.visibleRepoRows(props.repoId, debouncedSearch.value));
 
 function onSelect(row: RepoTreeRowVm): void {
   selected.value = row.key;
 }
 
 function onToggle(row: RepoTreeRowVm): void {
-  toggleRepoDir(props.repoId, row.path);
+  fileTreeStore.toggleRepoDir(props.repoId, row.path);
 }
 
 // §7.2: single click (row's own onClick) opens a preview tab, double click/Enter a permanent one

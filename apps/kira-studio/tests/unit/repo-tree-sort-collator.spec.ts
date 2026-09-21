@@ -5,14 +5,17 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 
-const { ensureRepoTreeLoaded, visibleRepoRows } = await import(
-  '../../frontend/src/repo/state/fileTree'
-);
+const { useFileTreeStore } = await import('../../frontend/src/repo/state/fileTree');
+const fileTreeStore = useFileTreeStore();
 
 let repoCounter = 0;
 function freshRepoId() {
@@ -39,11 +42,11 @@ describe('C13-4: tree sort order after the Intl.Collator hoist', () => {
       control as unknown as { codeWorkspaceListFiles: typeof control.codeWorkspaceListFiles }
     ).codeWorkspaceListFiles = async () => ({ paths, status: {}, truncated: false });
 
-    ensureRepoTreeLoaded(repoId);
+    fileTreeStore.ensureRepoTreeLoaded(repoId);
     await Promise.resolve();
     await Promise.resolve();
 
-    const rows = visibleRepoRows(repoId, '');
+    const rows = fileTreeStore.visibleRepoRows(repoId, '');
     const topLevel = rows.filter((r) => r.depth === 0);
 
     // Directories (Apple/, zebra/, Zebra/) sort before files, and within each group names collate

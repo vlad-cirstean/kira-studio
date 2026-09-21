@@ -3,12 +3,7 @@ import fuzzysort, { type KeysResult, type Result, type SnapshotKeys } from 'fuzz
 import { defineStore } from 'pinia';
 import { reactive, toRefs, watch } from 'vue';
 import { useWorkspaceStore } from '../../state/workspace';
-import {
-  ensureRepoTreeLoaded,
-  isRepoTreeLoaded,
-  repoTreePaths,
-  repoTreeTruncated,
-} from './fileTree';
+import { useFileTreeStore } from './fileTree';
 
 // C9 §3.4: limit bounds sort work (fuzzysort's own `limit`), not just render work; candidates
 // bounds the per-keystroke matching cost itself (D3's measured knee — 34.78ms worst query at 50k,
@@ -65,8 +60,11 @@ interface QuickOpenCache {
 // D9: one snapshot per repo, rebuilt only when refreshRepoTree assigns a fresh `paths` array.
 const snapshotCache = new Map<string, QuickOpenCache>();
 
-function ensureSnapshot(repoId: string): QuickOpenCache {
-  const paths = repoTreePaths(repoId);
+function ensureSnapshot(
+  repoId: string,
+  fileTreeStore: ReturnType<typeof useFileTreeStore>,
+): QuickOpenCache {
+  const paths = fileTreeStore.repoTreePaths(repoId);
   const cached = snapshotCache.get(repoId);
   if (cached && cached.paths === paths) return cached;
   // C13-7: candidatesTruncated used to also be stored on this cache entry for
@@ -95,6 +93,7 @@ function toRow(item: QuickOpenItem, nameResult: Result | undefined): QuickOpenRo
 
 export const useQuickOpenStore = defineStore('quickOpen', () => {
   const workspaceStore = useWorkspaceStore();
+  const fileTreeStore = useFileTreeStore();
 
   const state = reactive({ open: false, repoId: '', query: '' });
 
@@ -106,7 +105,7 @@ export const useQuickOpenStore = defineStore('quickOpen', () => {
     state.repoId = repoId;
     state.query = '';
     state.open = true;
-    ensureRepoTreeLoaded(repoId);
+    fileTreeStore.ensureRepoTreeLoaded(repoId);
   }
 
   // C14-8: the fuzzysort snapshot is a large per-repo allocation (~110-150MB measured on a big
@@ -124,7 +123,7 @@ export const useQuickOpenStore = defineStore('quickOpen', () => {
 
   /** True while `openQuickOpen`'s own tree load for the open repo hasn't resolved yet. */
   function quickOpenLoading(): boolean {
-    return state.open && !isRepoTreeLoaded(state.repoId);
+    return state.open && !fileTreeStore.isRepoTreeLoaded(state.repoId);
   }
 
   // C13-7: was `quickOpenTruncated`, reading `snapshotCache.get(repoId)?.candidatesTruncated` for
@@ -145,14 +144,14 @@ export const useQuickOpenStore = defineStore('quickOpen', () => {
   function quickOpenIndexTruncated(): boolean {
     const repoId = state.repoId;
     if (!repoId) return false;
-    if (repoTreeTruncated(repoId)) return true;
-    return repoTreePaths(repoId).length > QUICK_OPEN_MAX_CANDIDATES;
+    if (fileTreeStore.repoTreeTruncated(repoId)) return true;
+    return fileTreeStore.repoTreePaths(repoId).length > QUICK_OPEN_MAX_CANDIDATES;
   }
 
   function quickOpenResults(): QuickOpenRow[] {
     const { repoId, query } = state;
-    if (!repoId || !isRepoTreeLoaded(repoId)) return [];
-    const cache = ensureSnapshot(repoId);
+    if (!repoId || !fileTreeStore.isRepoTreeLoaded(repoId)) return [];
+    const cache = ensureSnapshot(repoId, fileTreeStore);
     const q = query.trim();
     // §3.3: empty query shows the first MAX_RESULTS items, unmatched — the "open it, see
     // something" affordance, costing no fuzzysort call.

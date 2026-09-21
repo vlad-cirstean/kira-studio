@@ -1,19 +1,19 @@
 import { copyText } from '../clipboard';
 import type { MenuItem } from '../state/contextMenu';
 import { openRepoDiffTab, openRepoFileTab } from '../state/repoTabs';
-import type { RepoTreeRowVm } from './state/fileTree';
-import { toggleRepoDir } from './state/fileTree';
+import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
 
 // C5 §7.2: one row's own context menu — deliberately small (this workspace is read-only, §11: no
 // rename/delete/new-file affordance belongs here).
 export function menuForRepoRow(repoId: string, row: RepoTreeRowVm): MenuItem[] {
+  const fileTreeStore = useFileTreeStore();
   if (row.isDir) {
     return [
       {
         type: 'item',
         id: 'toggle',
         label: row.expanded ? 'Collapse' : 'Expand',
-        run: () => toggleRepoDir(repoId, row.path),
+        run: () => fileTreeStore.toggleRepoDir(repoId, row.path),
       },
       {
         type: 'item',

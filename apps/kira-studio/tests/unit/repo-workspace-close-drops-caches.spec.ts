@@ -18,15 +18,13 @@ restoreAfterEach(control);
 
 const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
 const { tabsState } = await import('../../frontend/src/state/tabs');
-const { ensureRepoTreeLoaded, isRepoTreeLoaded, repoTreePaths } = await import(
-  '../../frontend/src/repo/state/fileTree'
-);
-const { repoSearchQuery, setRepoSearchQuery } = await import(
-  '../../frontend/src/repo/state/search'
-);
+const { useFileTreeStore } = await import('../../frontend/src/repo/state/fileTree');
+const { useRepoSearchStore } = await import('../../frontend/src/repo/state/search');
 const { useWorkspaceStore } = await import('../../frontend/src/state/workspace');
 
 const workspaceStore = useWorkspaceStore();
+const fileTreeStore = useFileTreeStore();
+const repoSearchStore = useRepoSearchStore();
 
 let repoCounter = 0;
 function freshRepoId() {
@@ -59,23 +57,23 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
     workspaceStore.openRepoWorkspace(repoId);
     expect(workspaceStore.openRepos).toContain(repoId);
 
-    ensureRepoTreeLoaded(repoId);
+    fileTreeStore.ensureRepoTreeLoaded(repoId);
     // ensureRepoTreeLoaded fires refreshRepoTree without awaiting it — drain the microtask queue so
     // the mocked codeWorkspaceListFiles above resolves before asserting on the loaded tree.
     await Promise.resolve();
     await Promise.resolve();
-    expect(isRepoTreeLoaded(repoId)).toBe(true);
-    expect(repoTreePaths(repoId)).toEqual(['a.ts', 'b.ts']);
+    expect(fileTreeStore.isRepoTreeLoaded(repoId)).toBe(true);
+    expect(fileTreeStore.repoTreePaths(repoId)).toEqual(['a.ts', 'b.ts']);
 
-    setRepoSearchQuery(repoId, 'needle');
-    expect(repoSearchQuery(repoId)).toBe('needle');
+    repoSearchStore.setRepoSearchQuery(repoId, 'needle');
+    expect(repoSearchStore.repoSearchQuery(repoId)).toBe('needle');
 
     workspaceStore.closeRepoWorkspace(repoId);
 
     expect(workspaceStore.openRepos).not.toContain(repoId);
-    expect(isRepoTreeLoaded(repoId)).toBe(false);
-    expect(repoTreePaths(repoId)).toEqual([]);
-    expect(repoSearchQuery(repoId)).toBe('');
+    expect(fileTreeStore.isRepoTreeLoaded(repoId)).toBe(false);
+    expect(fileTreeStore.repoTreePaths(repoId)).toEqual([]);
+    expect(repoSearchStore.repoSearchQuery(repoId)).toBe('');
 
     const workspaceId = repoWorkspaceKey(repoId);
     expect(tabsState.tabs.some((t) => (t.workspaceId ?? null) === workspaceId)).toBe(false);
@@ -83,10 +81,10 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
     // Reopening the same repo in the same session must rebuild cleanly rather than surface stale
     // (already-dropped) cache state.
     workspaceStore.openRepoWorkspace(repoId);
-    ensureRepoTreeLoaded(repoId);
+    fileTreeStore.ensureRepoTreeLoaded(repoId);
     await Promise.resolve();
     await Promise.resolve();
-    expect(isRepoTreeLoaded(repoId)).toBe(true);
-    expect(repoTreePaths(repoId)).toEqual(['a.ts', 'b.ts']);
+    expect(fileTreeStore.isRepoTreeLoaded(repoId)).toBe(true);
+    expect(fileTreeStore.repoTreePaths(repoId)).toEqual(['a.ts', 'b.ts']);
   });
 });

@@ -20,10 +20,10 @@ import TextField from '../theme/primitives/TextField.vue';
 import RepoFileTree from './RepoFileTree.vue';
 import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
-import { refreshRepoTree, repoTreeError, repoTreeTruncated } from './state/fileTree';
+import { useFileTreeStore } from './state/fileTree';
 import { useRepoHeadsStore } from './state/repoHeads';
-import { refreshRepoWorktreeLinks, worktreeParentId } from './state/repoLinks';
-import { repoPanelTab, repoSearchView, setRepoPanelTab, setRepoSearchView } from './state/search';
+import { useRepoLinksStore } from './state/repoLinks';
+import { useRepoPanelTabStore, useRepoSearchStore } from './state/search';
 import { useWorktreesStore, worktreeLabel } from './state/worktrees';
 
 const contextMenuStore = useContextMenuStore();
@@ -33,6 +33,10 @@ const workspaceStore = useWorkspaceStore();
 const layoutStore = useLayoutStore();
 const repoHeadsStore = useRepoHeadsStore();
 const worktreesStore = useWorktreesStore();
+const fileTreeStore = useFileTreeStore();
+const repoLinksStore = useRepoLinksStore();
+const repoPanelTabStore = useRepoPanelTabStore();
+const repoSearchStore = useRepoSearchStore();
 
 // P67b §4.4: the Git module's own panel — one PanelShell, not a shell inside a shell. Absorbs the
 // repository list that used to live in ProjectPanel.vue's "Connections" section (§0's own
@@ -53,11 +57,11 @@ const local = reactive({ repoSearch: '', fileSearch: '' });
 // Bug fix (manual testing): only auto-switch to Files on a genuine no-repo -> repo transition
 // (oldId === ''). Switching between two already-open repos must leave the user's chosen tab alone.
 //
-// P92 item 6: backed by state/search.ts's panelTab, not a local ref — hostHandlers.ts's
+// P92 item 6: backed by state/search.ts's useRepoPanelTabStore, not a local ref — hostHandlers.ts's
 // review.open needs to flip it from outside this component (§5.2's own external-caller note).
 const tab = computed({
-  get: () => repoPanelTab(),
-  set: (v: 'repos' | 'files' | 'review') => setRepoPanelTab(v),
+  get: () => repoPanelTabStore.repoPanelTab(),
+  set: (v: 'repos' | 'files' | 'review') => repoPanelTabStore.setRepoPanelTab(v),
 });
 watch(
   repoId,
@@ -80,7 +84,7 @@ function isOpen(id: string): boolean {
   if (!id) return false;
   return (
     workspaceStore.openRepos.includes(id) ||
-    workspaceStore.openRepos.some((o) => worktreeParentId(o) === id)
+    workspaceStore.openRepos.some((o) => repoLinksStore.worktreeParentId(o) === id)
   );
 }
 function isActive(id: string): boolean {
@@ -101,7 +105,7 @@ function worktreeRecordId(path: string): string {
 // anchor's twisty (`worktreeEntries` below). §4.4: reads this panel's own PanelShell search box
 // (`local.repoSearch`), not the Studio tree's own `treeState.search`.
 const filteredRepos = computed<RepoSummary[]>(() => {
-  const topLevel = codeReposStore.records.filter((r) => !worktreeParentId(r.id));
+  const topLevel = codeReposStore.records.filter((r) => !repoLinksStore.worktreeParentId(r.id));
   const query = local.repoSearch.trim().toLowerCase();
   if (!query) return topLevel;
   return topLevel.filter((r) => r.name.toLowerCase().includes(query));
@@ -278,8 +282,8 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
 // does not reset it. P92 item 6: 'review' moved out to its own top-level `tab`, so this segment is
 // back to Files/Search only.
 const view = computed({
-  get: () => repoSearchView(repoId.value),
-  set: (v: 'files' | 'search') => setRepoSearchView(repoId.value, v),
+  get: () => repoSearchStore.repoSearchView(repoId.value),
+  set: (v: 'files' | 'search') => repoSearchStore.setRepoSearchView(repoId.value, v),
 });
 const viewOptions = [
   { value: 'files' as const, label: 'Files', testid: 'repo-view-files' },
@@ -311,7 +315,7 @@ watch(
 );
 
 function onRefresh(): void {
-  void refreshRepoTree(repoId.value);
+  void fileTreeStore.refreshRepoTree(repoId.value);
 }
 
 // C7 S10: `repo.search`'s own palette entry (shortcuts/state.ts) — this panel is the whole of a
@@ -327,7 +331,7 @@ onMounted(() => {
   void repoHeadsStore.refreshRepoHeads();
   // P84 §4.4 trigger 1: same reasoning — one batched worktree-parent read per session, not once
   // per row.
-  void refreshRepoWorktreeLinks();
+  void repoLinksStore.refreshRepoWorktreeLinks();
 });
 onUnmounted(() => {
   unregisterSearchCommand?.();
@@ -486,14 +490,14 @@ onUnmounted(() => {
               </div>
               <template v-if="view === 'files'">
                 <div
-                  v-if="repoTreeError(repoId)"
+                  v-if="fileTreeStore.repoTreeError(repoId)"
                   class="p-strip note error-note"
                   data-testid="repo-tree-error"
                 >
-                  {{ repoTreeError(repoId) }}
+                  {{ fileTreeStore.repoTreeError(repoId) }}
                 </div>
                 <div
-                  v-if="repoTreeTruncated(repoId)"
+                  v-if="fileTreeStore.repoTreeTruncated(repoId)"
                   class="p-strip note"
                   data-testid="repo-tree-truncated"
                 >

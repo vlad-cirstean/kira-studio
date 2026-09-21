@@ -6,38 +6,26 @@ import IconButton from '../theme/primitives/IconButton.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import VirtualList from '../theme/primitives/VirtualList.vue';
 import RepoSearchRow from './RepoSearchRow.vue';
-import {
-  cancelRepoSearch,
-  type RepoSearchRowVm,
-  repoSearchError,
-  repoSearchOptions,
-  repoSearchQuery,
-  repoSearchRows,
-  repoSearchRunning,
-  repoSearchStats,
-  setRepoSearchQuery,
-  startRepoSearch,
-  toggleRepoSearchCollapse,
-  toggleRepoSearchOption,
-} from './state/search';
+import { type RepoSearchRowVm, useRepoSearchStore } from './state/search';
 
 // C7 §7.3: the query field, the three Monaco-find-widget-vocabulary toggles (D13: the same three
 // codicons the in-file find widget and every other search surface in this app already use), the
 // Search/Stop button, and the streamed results list.
 const props = defineProps<{ repoId: string }>();
+const repoSearchStore = useRepoSearchStore();
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
 const selected = ref<string | null>(null);
 
 const query = computed({
-  get: () => repoSearchQuery(props.repoId),
-  set: (v: string) => setRepoSearchQuery(props.repoId, v),
+  get: () => repoSearchStore.repoSearchQuery(props.repoId),
+  set: (v: string) => repoSearchStore.setRepoSearchQuery(props.repoId, v),
 });
-const options = computed(() => repoSearchOptions(props.repoId));
-const running = computed(() => repoSearchRunning(props.repoId));
-const stats = computed(() => repoSearchStats(props.repoId));
-const error = computed(() => repoSearchError(props.repoId));
-const rows = computed(() => repoSearchRows(props.repoId));
+const options = computed(() => repoSearchStore.repoSearchOptions(props.repoId));
+const running = computed(() => repoSearchStore.repoSearchRunning(props.repoId));
+const stats = computed(() => repoSearchStore.repoSearchStats(props.repoId));
+const error = computed(() => repoSearchStore.repoSearchError(props.repoId));
+const rows = computed(() => repoSearchStore.repoSearchRows(props.repoId));
 
 // §7.3: "Searching…" while running, "N results in M files" when done, "(stopped at 10,000)"
 // appended when the whole run hit the cap, "K files skipped" appended when non-zero — the skip
@@ -58,11 +46,11 @@ const statusLine = computed(() => {
 });
 
 function runSearch(): void {
-  void startRepoSearch(props.repoId);
+  void repoSearchStore.startRepoSearch(props.repoId);
 }
 
 function onToggleOption(key: 'regex' | 'caseSensitive' | 'wholeWord'): void {
-  toggleRepoSearchOption(props.repoId, key);
+  repoSearchStore.toggleRepoSearchOption(props.repoId, key);
 }
 
 // D10: a search runs on Enter or the Search button only, never on every keystroke.
@@ -71,7 +59,7 @@ function onQueryKeydown(e: KeyboardEvent): void {
     e.preventDefault();
     runSearch();
   } else if (e.key === 'Escape') {
-    setRepoSearchQuery(props.repoId, '');
+    repoSearchStore.setRepoSearchQuery(props.repoId, '');
   }
 }
 
@@ -80,7 +68,7 @@ function onSelect(row: RepoSearchRowVm): void {
 }
 
 function onToggleCollapse(row: RepoSearchRowVm): void {
-  toggleRepoSearchCollapse(props.repoId, row.path);
+  repoSearchStore.toggleRepoSearchCollapse(props.repoId, row.path);
 }
 
 // §7.4/D12: a single click opens a preview tab, double-click/Enter a permanent one — the tree's
@@ -137,7 +125,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
         icon="debug-stop"
         v-tooltip="'Stop'"
         data-testid="repo-search-stop"
-        @click="cancelRepoSearch(repoId)"
+        @click="repoSearchStore.cancelRepoSearch(repoId)"
       />
       <IconButton
         v-else

@@ -5,7 +5,7 @@ import { useCodeReposStore } from '../../state/coderepos';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { useWorkspaceStore } from '../../state/workspace';
 import { disposeGitTransport, gitTransportFor } from '../git/transport';
-import { noteWorktreeLink, worktreeParentId } from './repoLinks';
+import { useRepoLinksStore } from './repoLinks';
 
 // P82 §6: per-repo worktree disclosure state, session-scoped and module-level — same shape and
 // reasoning as fileTree.ts's byRepo/search.ts's repoSearchView. Not persisted (§0/§10): a future
@@ -20,6 +20,7 @@ interface RepoWorktreeState {
 export const useWorktreesStore = defineStore('worktrees', () => {
   const codeReposStore = useCodeReposStore();
   const workspaceStore = useWorkspaceStore();
+  const repoLinksStore = useRepoLinksStore();
 
   // reactive() on the Map itself, not just each value — fileTree.ts:144-152's own reasoning: the
   // template reads byRepo.get(id) before any entry exists, and a plain Map makes that read untracked.
@@ -143,7 +144,12 @@ export const useWorktreesStore = defineStore('worktrees', () => {
       await codeReposStore.openRepoAtPath(wt.path);
       if (wt.isMain) return; // clicking the main worktree imports the *anchor*, which has no parent
       const record = codeReposStore.codeRepoRecordForPath(wt.path);
-      if (record) noteWorktreeLink(record.id, worktreeParentId(codeRepoId) || codeRepoId);
+      if (record) {
+        repoLinksStore.noteWorktreeLink(
+          record.id,
+          repoLinksStore.worktreeParentId(codeRepoId) || codeRepoId,
+        );
+      }
     } catch (err) {
       state.error = err instanceof Error ? err.message : String(err);
     }

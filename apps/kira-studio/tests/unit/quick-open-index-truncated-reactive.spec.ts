@@ -17,7 +17,7 @@ setActivePinia(pinia);
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 
-const { refreshRepoTree } = await import('../../frontend/src/repo/state/fileTree');
+const { useFileTreeStore } = await import('../../frontend/src/repo/state/fileTree');
 const { useWorkspaceStore } = await import('../../frontend/src/state/workspace');
 const { useQuickOpenStore, QUICK_OPEN_MAX_CANDIDATES } = await import(
   '../../frontend/src/repo/state/quickOpen'
@@ -25,6 +25,7 @@ const { useQuickOpenStore, QUICK_OPEN_MAX_CANDIDATES } = await import(
 
 const workspaceStore = useWorkspaceStore();
 const quickOpenStore = useQuickOpenStore();
+const fileTreeStore = useFileTreeStore();
 
 let repoCounter = 0;
 function freshRepoId() {
@@ -66,7 +67,7 @@ describe('C13-7: quickOpenIndexTruncated stays reactive across a later tree refr
     // candidate cap -- the tree's own `paths` array is reassigned wholesale, which is what the
     // fixed implementation reads directly and reactively.
     served = pathsOfLength(QUICK_OPEN_MAX_CANDIDATES + 1);
-    await refreshRepoTree(repoId);
+    await fileTreeStore.refreshRepoTree(repoId);
 
     expect(truncated.value).toBe(true);
   });
