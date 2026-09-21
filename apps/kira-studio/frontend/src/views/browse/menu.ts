@@ -8,8 +8,6 @@ import { useTabsStore } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';
 import { useBrowseViewStore } from './state';
 
-const confirmDialogStore = useConfirmDialogStore();
-
 // P41 D10: the bodies of project/menus.ts's now-deleted namespaceMenu/prefixMenu (a container row
 // — redis 'namespace' / s3 'prefix') and keyMenu/objectMenu (a leaf row — redis 'key' / s3
 // 'object'), moved here verbatim once the tree stopped rendering any of these rows at all (D5).
@@ -135,7 +133,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       // rejection there is guaranteed, not merely possible, so the catch belongs here.
       run: async () => {
         if (
-          !(await confirmDialogStore.confirmDialog(
+          !(await useConfirmDialogStore().confirmDialog(
             `Delete object "${node.name}"? This cannot be undone.`,
           ))
         )

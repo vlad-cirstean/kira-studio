@@ -1,8 +1,6 @@
 import type { RevealResult } from '@shared/domain/variables';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 
-const confirmDialogStore = useConfirmDialogStore();
-
 // P12 D13 (closing P5 OQ-2 + P9 OQ-4): the one reveal loop the module's three call sites share —
 // revealVariable and revealHistoryEntry (state/variables.ts) and the Copy as curl loop
 // (state/curl.ts, which calls revealVariable rather than hand-rolling its own copy). The
@@ -30,7 +28,7 @@ export async function runReveal(
       case 'cancelled':
         return undefined;
       case 'confirmation-required': {
-        const ok = await confirmDialogStore.confirmDialog(prompt, { danger: false });
+        const ok = await useConfirmDialogStore().confirmDialog(prompt, { danger: false });
         return ok ? await handle(await call(true)) : undefined;
       }
       default:
