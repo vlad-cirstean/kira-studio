@@ -130,8 +130,8 @@ func (s *GitClientsService) Deny(args GitClientsIDArgs) (GitPairingActionResult,
 // GitVsixStatus is gitvsix.Status's wire projection (G10 D14) — codeAvailable collapses
 // gitvsix.Status.CodePath's "" convention into a bool, since the pane only ever branches on
 // whether one was found, never on the path itself before a real Install call resolves it fresh.
-// Command is C3 §7.5's own small addition — the same transparency principle the Code intelligence
-// tab's Claude Code flow already applies, unrelated to MCP: show what the Install button is about
+// Command is C3 §7.5's own small addition — the same transparency principle the Database MCP
+// tab's own Install flow already applies, unrelated to MCP: show what the Install button is about
 // to run before the click, not only the outcome after. "" only when nothing is bundled at all —
 // once VsixPath is known, a command renders regardless of whether `code` was found, since the
 // button's own fallback (`open -R`) is exactly as worth showing in advance.

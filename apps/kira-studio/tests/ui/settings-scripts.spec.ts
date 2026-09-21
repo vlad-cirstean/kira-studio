@@ -2,8 +2,8 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
 
-// P85 §10: the Scripts section is instant-effect like Code intelligence and Connected editors —
-// modelled on settings-code-intelligence.spec.ts, the existing spec for that shape.
+// P85 §10: the Scripts section is instant-effect like Connected editors and Database MCP — a CRUD
+// section, not a staged draft/Save leaf.
 
 async function openSettings(page: Page): Promise<void> {
   await page.click('[data-testid="open-settings"]');

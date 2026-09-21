@@ -549,9 +549,7 @@ type CodeWorkspaceSearchHandle struct {
 // — a bad regex is E_INVALID on this call, never a stream error the panel has to render twice),
 // mints a search id, and starts one goroutine running codeworkspace.Search followed by the
 // coalescer's terminal flush. It returns the handle immediately — a full-worktree scan takes far
-// longer than an IPC call may (OpenWorkspace's own posture). StartSearch does NOT call
-// EnsureIndex: text search is independent of C2's graph, and searching a repository must not start
-// parsing one.
+// longer than an IPC call may (OpenWorkspace's own posture).
 func (s *CodeWorkspaceService) StartSearch(ctx context.Context, args CodeWorkspaceSearchArgs) (CodeWorkspaceSearchHandle, error) {
 	if args.ID == "" {
 		return CodeWorkspaceSearchHandle{}, ipcerr.BadRequest("id is required")
