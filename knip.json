@@ -28,7 +28,11 @@
     "@vscode/vsce",
     // Consumed transitively through @tailwindcss/vite's plugin and `@tailwind` CSS directives —
     // never imported by name in TS.
-    "tailwindcss"
+    "tailwindcss",
+    // P98: bootstrap dependency for P99's migration, no consumer yet. Composables come with the
+    // components/stores P99 migrates onto shadcn-vue/Pinia — delete this entry when the first one
+    // lands.
+    "@vueuse/core"
   ],
   "workspaces": {
     ".": {
