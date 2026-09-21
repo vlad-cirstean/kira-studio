@@ -1,11 +1,3 @@
-<script lang="ts">
-/** `SearchBox.vue`'s own `aria-controls` names this id (P11 W20 a11y pass) — the combobox
- *  pattern's own required-attribute, missing until then. A stable export rather than two files
- *  independently agreeing on the same string literal. `<script setup>` cannot itself carry a
- *  named export, so this one constant lives in a plain sibling `<script>` block instead. */
-export const SEARCH_LISTBOX_ID = 'kv-search-listbox';
-</script>
-
 <script setup lang="ts">
 /**
  * `docs/plans/P11.md` W12: the grouped dropdown `SearchBox.vue` renders inside its own panel
@@ -24,6 +16,7 @@ export const SEARCH_LISTBOX_ID = 'kv-search-listbox';
 import { computeFloatPosition, KuiButton } from "@kira/kira-ui";
 import { computed, nextTick, onMounted, ref } from "vue";
 import { formatRelativeDate } from "./dateFormat.ts";
+import { SEARCH_LISTBOX_ID } from "./searchListboxId.ts";
 import type { SearchOption, SearchResultsModel } from "./searchResultsModel.ts";
 import { fieldLabel } from "./searchResultsModel.ts";
 

@@ -62,7 +62,8 @@ import { computeFloatPosition, KuiButton, KuiSearchInput, KuiSelect } from '@kir
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
-import SearchResults, { SEARCH_LISTBOX_ID } from './SearchResults.vue';
+import SearchResults from './SearchResults.vue';
+import { SEARCH_LISTBOX_ID } from './searchListboxId.ts';
 import type { SearchOption } from './searchResultsModel.ts';
 import { buildSearchResultsModel } from './searchResultsModel.ts';
 
