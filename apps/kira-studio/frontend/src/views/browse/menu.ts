@@ -4,7 +4,7 @@ import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useConnectionsStore } from '../../state/connections';
 import type { MenuItem } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
-import { openKeyValueTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';
 import { reload, setActionError } from './state';
 
@@ -51,7 +51,7 @@ function keyRowMenu(connectionId: string, node: TreeNode): MenuItem[] {
       icon: nodeIcon(node.kind),
       shortcut: 'tree.open',
       run: () => {
-        openKeyValueTab(connectionId, node.path);
+        useTabsStore().openKeyValueTab(connectionId, node.path);
       },
     },
     {
@@ -60,7 +60,7 @@ function keyRowMenu(connectionId: string, node: TreeNode): MenuItem[] {
       label: 'Open in new tab',
       icon: nodeIcon(node.kind),
       run: () => {
-        openKeyValueTab(connectionId, node.path, { newTab: true });
+        useTabsStore().openKeyValueTab(connectionId, node.path, { newTab: true });
       },
     },
     {
@@ -89,7 +89,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       icon: nodeIcon(node.kind),
       shortcut: 'tree.open',
       run: () => {
-        openKeyValueTab(connectionId, node.path);
+        useTabsStore().openKeyValueTab(connectionId, node.path);
       },
     },
     {
@@ -98,7 +98,7 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
       label: 'Open in new tab',
       icon: nodeIcon(node.kind),
       run: () => {
-        openKeyValueTab(connectionId, node.path, { newTab: true });
+        useTabsStore().openKeyValueTab(connectionId, node.path, { newTab: true });
       },
     },
     {

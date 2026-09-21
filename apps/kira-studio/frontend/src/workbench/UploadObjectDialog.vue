@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
 import { useObjectStoreStore } from '../state/objectStore';
-import { openKeyValueTab } from '../state/tabs';
+import { useTabsStore } from '../state/tabs';
 import { browseInvalidate } from '../state/viewCommands';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -13,6 +13,7 @@ import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
 
 const objectStoreStore = useObjectStoreStore();
+const tabsStore = useTabsStore();
 
 // P33 D17: three entry points as of P41 (the Browse panel's own container rows/toolbar and — until
 // the tree stops rendering bucket/prefix rows, P41 D5 — the tree's own bucket/prefix menu) — driven
@@ -71,7 +72,7 @@ async function onUpload(): Promise<void> {
     });
     browseInvalidate(connectionId, objectStoreStore.containerPath);
     objectStoreStore.closeUploadDialog();
-    openKeyValueTab(connectionId, newPath, { newTab: true });
+    tabsStore.openKeyValueTab(connectionId, newPath, { newTab: true });
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
   } finally {

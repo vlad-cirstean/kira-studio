@@ -1,7 +1,7 @@
 import { copyText } from '../../clipboard';
 import type { MenuItem } from '../../state/contextMenu';
 import { useModeStore } from '../../state/mode';
-import { findDataTab, openDataTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { dataQueryCommands } from '../../state/viewCommands';
 
 // D9: the definition view's Columns section reuses the tree's former column-row menu items, but it
@@ -21,7 +21,7 @@ function targetTabForTable(connectionId: string, tablePath: string): string {
   ) {
     return active.id;
   }
-  return openDataTab(connectionId, tablePath).id;
+  return useTabsStore().openDataTab(connectionId, tablePath).id;
 }
 
 // F1/P21 round 1: the pure half of "Add to projection". `currentProjection === null` means "every
@@ -59,7 +59,7 @@ export function columnsSectionMenu(
       icon: 'list-selection',
       run: () => {
         const tabId = targetTabForTable(connectionId, tablePath);
-        const tab = findDataTab(tabId);
+        const tab = useTabsStore().findDataTab(tabId);
         const next = nextProjectionAfterAddingColumn(tab?.state.projection ?? null, columnName);
         if (next === null) return;
         void dataQueryCommands().setProjection(tabId, next);

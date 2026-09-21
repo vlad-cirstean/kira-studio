@@ -14,16 +14,19 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { openBrowseTab, openKeyValueTab, openDataTab, findKeyValueTab, findDataTab } = await import(
-  '../../frontend/src/state/tabs'
-);
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const {
   load: loadBrowse,
   descend: descendBrowse,
@@ -68,7 +71,7 @@ function emptyChunk(): TextColumnChunk {
 
 describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)', () => {
   test('1. resolving the older treeChildren call after the newer one still leaves the newer nodes in place', async () => {
-    const { id } = openBrowseTab('conn1', 'bucket:one', { newTab: true });
+    const { id } = tabsStore.openBrowseTab('conn1', 'bucket:one', { newTab: true });
     const calls: Array<ReturnType<typeof deferred<{ nodes: unknown[]; truncated: boolean }>>> = [];
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = () => {
@@ -91,7 +94,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
   });
 
   test('2. a superseded failure does not redden a level that loaded fine', async () => {
-    const { id } = openBrowseTab('conn2', 'bucket:two', { newTab: true });
+    const { id } = tabsStore.openBrowseTab('conn2', 'bucket:two', { newTab: true });
     const calls: Array<ReturnType<typeof deferred<{ nodes: unknown[]; truncated: boolean }>>> = [];
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = () => {
@@ -115,7 +118,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
   });
 
   test('3. rt.truncated is reset to false the moment a new load starts, before the await settles', async () => {
-    const { id } = openBrowseTab('conn3', 'bucket:three', { newTab: true });
+    const { id } = tabsStore.openBrowseTab('conn3', 'bucket:three', { newTab: true });
     const first = deferred<{ nodes: unknown[]; truncated: boolean }>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = () => first.promise;
@@ -134,7 +137,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
   // ever touching `filter`/`selected` — both carried over from whatever level the tab was
   // previously showing.
   test("4. descending into a level clears the previous level's filter and selection", async () => {
-    const { id } = openBrowseTab('conn4', 'bucket:four', { newTab: true });
+    const { id } = tabsStore.openBrowseTab('conn4', 'bucket:four', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = async () => ({ nodes: [{ name: 'child' }], truncated: false });
     await loadBrowse(id); // establishes the runtime record setFilter/selectRow write through
@@ -155,7 +158,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
   // under a breadcrumb that no longer matches it, which a row action (Delete) could act on by
   // mistake.
   test("5. a failed descend does not leave the previous level's nodes rendered under the new breadcrumb", async () => {
-    const { id } = openBrowseTab('conn5', 'bucket:five', { newTab: true });
+    const { id } = tabsStore.openBrowseTab('conn5', 'bucket:five', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = async () => ({
       nodes: [{ name: 'bucket-five-child' }],
@@ -182,7 +185,7 @@ describe('views/browse/state.ts — load() supersession guard (P44 F47, P43 D39)
   // nothing — the same shape project/state/tree.ts's own `children` already moved off deep
   // reactivity for.
   test('6. a loaded node list is markRaw — not wrapped in a reactivity Proxy (finding 8)', async () => {
-    const { id } = openBrowseTab('conn6', 'bucket:six', { newTab: true });
+    const { id } = tabsStore.openBrowseTab('conn6', 'bucket:six', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
     (control as any).treeChildren = async () => ({
       nodes: [{ name: 'a' }, { name: 'b' }],
@@ -222,7 +225,7 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
   }
 
   test('4. a cursor-strategy page reloads with offset: 0 and returns pageIndex to 0', async () => {
-    const { id } = openKeyValueTab('conn4', 'db0/key:big-hash', { newTab: true });
+    const { id } = tabsStore.openKeyValueTab('conn4', 'db0/key:big-hash', { newTab: true });
     setPage(id, makeKeyValuePage('cursor'));
     let capturedCursor: PageCursor | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
@@ -234,11 +237,11 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
     await loadKeyValue(id);
 
     expect(capturedCursor).toEqual({ mode: 'offset', offset: 0 });
-    expect(findKeyValueTab(id)?.state.pageIndex).toBe(0);
+    expect(tabsStore.findKeyValueTab(id)?.state.pageIndex).toBe(0);
   });
 
   test('5. an offset-strategy page on the same code path still reloads with pageIndex * pageSize, unchanged', async () => {
-    const { id } = openKeyValueTab('conn5', 'db0/key:big-list', { newTab: true });
+    const { id } = tabsStore.openKeyValueTab('conn5', 'db0/key:big-list', { newTab: true });
     setPage(id, makeKeyValuePage('offset'));
     let capturedCursor: PageCursor | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
@@ -246,14 +249,14 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
       capturedCursor = req.cursor;
       return Promise.resolve({ page: makeKeyValuePage('offset'), source: 'server' });
     };
-    const tab = findKeyValueTab(id);
+    const tab = tabsStore.findKeyValueTab(id);
     if (!tab) throw new Error('expected the tab to exist');
     tab.state.pageIndex = 2;
 
     await loadKeyValue(id);
 
     expect(capturedCursor).toEqual({ mode: 'offset', offset: 2 * tab.state.pageSize });
-    expect(findKeyValueTab(id)?.state.pageIndex).toBe(2);
+    expect(tabsStore.findKeyValueTab(id)?.state.pageIndex).toBe(2);
   });
 });
 
@@ -263,32 +266,32 @@ describe('views/shared/keyvalue/state.ts — cursor-strategy reload fallback (P4
 // actually fetched.
 describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled load (P2 R2, task #93)', () => {
   test('6. goNext reverts pageIndex to the previous page when the load fails', async () => {
-    const { id } = openDataTab('conn6', 'public.orders', { newTab: true });
+    const { id } = tabsStore.openDataTab('conn6', 'public.orders', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
 
     await gridGoNext(id);
 
-    expect(findDataTab(id)?.state.pageIndex).toBe(0);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(0);
     expect(gridRuntime[id]?.status).toBe('error');
   });
 
   test('7. goNext reverts pageIndex to the previous page when the load is cancelled', async () => {
-    const { id } = openDataTab('conn7', 'public.orders', { newTab: true });
+    const { id } = tabsStore.openDataTab('conn7', 'public.orders', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('cancelled'), { code: 'E_CANCELLED' }));
 
     await gridGoNext(id);
 
-    expect(findDataTab(id)?.state.pageIndex).toBe(0);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(0);
     expect(gridRuntime[id]?.status).toBe('cancelled');
   });
 
   test('8. goPrev reverts pageIndex to the previous page when the load fails', async () => {
-    const { id } = openDataTab('conn8', 'public.orders', { newTab: true });
-    const tab = findDataTab(id);
+    const { id } = tabsStore.openDataTab('conn8', 'public.orders', { newTab: true });
+    const tab = tabsStore.findDataTab(id);
     if (!tab) throw new Error('expected the tab to exist');
     tab.state.pageIndex = 3;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
@@ -297,11 +300,11 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
 
     await gridGoPrev(id);
 
-    expect(findDataTab(id)?.state.pageIndex).toBe(3);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(3);
   });
 
   test("9. a superseded (stale) load's failure does not revert a pageIndex a newer load already advanced", async () => {
-    const { id } = openDataTab('conn9', 'public.orders', { newTab: true });
+    const { id } = tabsStore.openDataTab('conn9', 'public.orders', { newTab: true });
     const first = deferred<{ page: unknown; source: string }>();
     const second = deferred<{ page: unknown; source: string }>();
     const reads: Array<typeof first> = [first, second];
@@ -310,34 +313,34 @@ describe('views/grid/state.ts — pageIndex reverts on a failed or cancelled loa
     (data as any).read = () => reads[call++]?.promise;
 
     const older = gridGoNext(id); // page 0 -> 1, opId A
-    expect(findDataTab(id)?.state.pageIndex).toBe(1);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1);
     const newer = gridGoNext(id); // page 1 -> 2, opId B (supersedes A)
-    expect(findDataTab(id)?.state.pageIndex).toBe(2);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(2);
 
     // A's request fails after B has already taken over — its failure must not stomp on B's
     // optimistic pageIndex, and reverting to "1" (the index *before A's own* advance) would be
     // exactly that stomp.
     first.reject(Object.assign(new Error('stale failure'), { code: 'E_QUERY' }));
     await older;
-    expect(findDataTab(id)?.state.pageIndex).toBe(2);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(2);
 
     // B itself now fails — being the current op, it must revert to its own previous index (1).
     second.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
     await newer;
-    expect(findDataTab(id)?.state.pageIndex).toBe(1);
+    expect(tabsStore.findDataTab(id)?.state.pageIndex).toBe(1);
   });
 });
 
 describe('views/shared/keyvalue/state.ts — pageIndex reverts on a failed load (P2 R2, task #93)', () => {
   test('10. goNext reverts pageIndex to the previous page when the load fails', async () => {
-    const { id } = openKeyValueTab('conn10', 'db0/key:big-list', { newTab: true });
+    const { id } = tabsStore.openKeyValueTab('conn10', 'db0/key:big-list', { newTab: true });
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
       Promise.reject(Object.assign(new Error('boom'), { code: 'E_QUERY' }));
 
     await keyValueGoNext(id);
 
-    expect(findKeyValueTab(id)?.state.pageIndex).toBe(0);
+    expect(tabsStore.findKeyValueTab(id)?.state.pageIndex).toBe(0);
     expect(keyValueRuntime[id]?.status).toBe('error');
   });
 });

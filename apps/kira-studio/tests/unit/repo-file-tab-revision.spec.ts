@@ -6,7 +6,11 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
@@ -15,7 +19,8 @@ restoreAfterEach(control);
 const { asRepoFileTab } = await import('../../../../packages/shared/domain/tabs');
 const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
 const { TAB_KINDS } = await import('../../frontend/src/state/tabKinds');
-const { tabsState } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { openRepoFileTab } = await import('../../frontend/src/state/repoTabs');
 
 let repoCounter = 0;
@@ -59,8 +64,8 @@ describe('P74 §7.3: openRepoFileTab at a revision', () => {
     const historical = openRepoFileTab(repoId, 'src/deep/file.ts', { preview: false, rev });
     const worktree = openRepoFileTab(repoId, 'src/deep/file.ts', { preview: false });
 
-    const historicalTab = tabsState.tabs.find((t) => t.id === historical.id) ?? null;
-    const worktreeTab = tabsState.tabs.find((t) => t.id === worktree.id) ?? null;
+    const historicalTab = tabsStore.tabs.find((t) => t.id === historical.id) ?? null;
+    const worktreeTab = tabsStore.tabs.find((t) => t.id === worktree.id) ?? null;
     expect(historicalTab).not.toBeNull();
     expect(worktreeTab).not.toBeNull();
     expect(historicalTab && TAB_KINDS['repo-file'].title(historicalTab)).toBe(
@@ -76,9 +81,9 @@ describe('P74 §7.3: openRepoFileTab at a revision', () => {
     const rev = 'e'.repeat(40);
     const ws = repoWorkspaceKey(repoId);
     const preview = openRepoFileTab(repoId, 'src/app.ts', { preview: true, rev });
-    expect(tabsState.previewIdsByWorkspace[ws] ?? []).toContain(preview.id);
+    expect(tabsStore.previewIdsByWorkspace[ws] ?? []).toContain(preview.id);
 
     openRepoFileTab(repoId, 'src/app.ts', { preview: false, rev });
-    expect(tabsState.previewIdsByWorkspace[ws] ?? []).not.toContain(preview.id);
+    expect(tabsStore.previewIdsByWorkspace[ws] ?? []).not.toContain(preview.id);
   });
 });

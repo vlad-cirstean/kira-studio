@@ -6,7 +6,7 @@ import { useConnectionDialogStore } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { settingsOpen } from '../state/settings';
-import { activateNextTab, activatePrevTab, closeTab } from '../state/tabs';
+import { useTabsStore } from '../state/tabs';
 import { runCommand } from './commands';
 
 interface PaletteCommand {
@@ -18,6 +18,7 @@ interface PaletteCommand {
 export const usePaletteStore = defineStore('palette', () => {
   const layoutStore = useLayoutStore();
   const quickOpenStore = useQuickOpenStore();
+  const tabsStore = useTabsStore();
 
   // D12: deliberately small and 1:1 with already-reachable actions — every global shortcut this
   // phase adds (the palette's own toggle excluded), plus the handful of other one-click actions
@@ -97,14 +98,14 @@ export const usePaletteStore = defineStore('palette', () => {
     // P15 D11: DataView.vue registers this only while a data tab is active and its connection
     // allows it — a no-op elsewhere, same as every other view-scoped command above.
     { id: 'data.generate', label: 'Generate data…', run: () => runCommand('data.generate') },
-    { id: 'tab-next', label: 'Next tab', run: activateNextTab },
-    { id: 'tab-prev', label: 'Previous tab', run: activatePrevTab },
+    { id: 'tab-next', label: 'Next tab', run: tabsStore.activateNextTab },
+    { id: 'tab-prev', label: 'Previous tab', run: tabsStore.activatePrevTab },
     {
       id: 'tab-close',
       label: 'Close tab',
       run: () => {
         const active = useModeStore().activeTab;
-        if (active) closeTab(active.id);
+        if (active) tabsStore.closeTab(active.id);
       },
     },
   ];

@@ -9,16 +9,7 @@ import {
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
 import { tabsForWorkspace } from './mode';
-import {
-  activateTab,
-  createPinnedRepoGraphTab,
-  evictPreviewCohort,
-  type OpenTabResult,
-  openTab,
-  patchRepoFileTabState,
-  removeFromPreviewCohort,
-  tabsState,
-} from './tabs';
+import { type OpenTabResult, useTabsStore } from './tabs';
 import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
 import { useWorkspaceStore } from './workspace';
 
@@ -53,32 +44,39 @@ export function openRepoFileTab(
   path: string,
   opts: OpenRepoFileOpts,
 ): OpenTabResult {
+  const tabsStore = useTabsStore();
   const revealLine = opts.reveal?.line ?? null;
   const rev = opts.rev ?? null;
   const workspaceId = repoWorkspaceKey(repoId);
-  const existing = tabsState.tabs.find((t) => {
+  const existing = tabsStore.tabs.find((t) => {
     if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
     const file = asRepoFileTab(t);
     return file !== null && file.state.rev === rev;
   });
   let result: OpenTabResult;
   if (existing) {
-    activateTab(existing.id);
+    tabsStore.activateTab(existing.id);
     // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
     // `openTab`'s own reuse branch does this; this wrapper's own reuse path needs the identical
     // rule since it never reaches openTab's (same reasoning as openRepoCommitDiffTab's own).
-    if (!opts.preview) removeFromPreviewCohort(workspaceId, existing.id);
+    if (!opts.preview) tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
     result = { id: existing.id, reused: true };
   } else {
-    result = openTab('repo-file', null, path, () => defaultRepoFileTabState(revealLine, rev), {
-      reuse: false,
-      workspaceId,
-      preview: opts.preview,
-    });
+    result = tabsStore.openTab(
+      'repo-file',
+      null,
+      path,
+      () => defaultRepoFileTabState(revealLine, rev),
+      {
+        reuse: false,
+        workspaceId,
+        preview: opts.preview,
+      },
+    );
   }
   // §5.2 rule 1: "Apply reveal either way" — a fresh tab's makeState() already carries it, so this
   // only does real work for a reused tab (and is a same-value no-op, via skipUnchanged, otherwise).
-  if (revealLine !== null) patchRepoFileTabState(result.id, { revealLine });
+  if (revealLine !== null) tabsStore.patchRepoFileTabState(result.id, { revealLine });
   // D12: requestReveal is what actually moves the cursor when the tab's editor is already mounted
   // and active (a reused tab this call didn't just create) — patchRepoFileTabState above only ever
   // updates persisted state, which RepoFileView.vue reads on mount, not on an existing mount.
@@ -92,7 +90,7 @@ export function openRepoFileTab(
 // path), so a diff tab and a file tab for the same path coexist, and a second "Open changes"
 // activates the existing one rather than opening a duplicate.
 export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
-  return openTab('repo-diff', null, path, defaultRepoDiffTabState, {
+  return useTabsStore().openTab('repo-diff', null, path, defaultRepoDiffTabState, {
     reuse: true,
     workspaceId: repoWorkspaceKey(repoId),
     preview: false,
@@ -120,8 +118,9 @@ export function openRepoCommitDiffTab(
   // same loop, so the cohort it started is joined rather than each file evicting the last.
   previewCohort?: boolean,
 ): OpenTabResult {
+  const tabsStore = useTabsStore();
   const workspaceId = repoWorkspaceKey(repoId);
-  const existing = tabsState.tabs.find((t) => {
+  const existing = tabsStore.tabs.find((t) => {
     if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
     const diff = asRepoDiffTab(t);
     return (
@@ -136,7 +135,7 @@ export function openRepoCommitDiffTab(
       // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
       // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
       // rule since it never reaches openTab's.
-      removeFromPreviewCohort(workspaceId, existing.id);
+      tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
     } else if (!previewCohort) {
       // P79 review fix (Functional, LOW): this reuse path short-circuits past openTab entirely,
       // so a preview-type open (not a cohort-joining one) never reached openTab's own §5.2 rule 3
@@ -147,12 +146,12 @@ export function openRepoCommitDiffTab(
       // exactly as it would if a fresh tab had been created here instead of reused. Ordered before
       // activateTab below so its own saveNow() call persists the eviction too, not a later,
       // unrelated save.
-      evictPreviewCohort(workspaceId, existing.id);
+      tabsStore.evictPreviewCohort(workspaceId, existing.id);
     }
-    activateTab(existing.id);
+    tabsStore.activateTab(existing.id);
     return { id: existing.id, reused: true };
   }
-  return openTab(
+  return tabsStore.openTab(
     'repo-diff',
     null,
     path,
@@ -181,7 +180,7 @@ export function openRepoMultiDiffTab(
   labels: { left: string; right: string },
   review?: ReviewRef,
 ): OpenTabResult {
-  return openTab(
+  return useTabsStore().openTab(
     'repo-multi-diff',
     null,
     right,
@@ -211,8 +210,9 @@ export function openRepoReviewDiffTab(
   // P74 §5.2: mirrors openRepoCommitDiffTab's own trailing param — see its doc comment.
   previewCohort?: boolean,
 ): OpenTabResult {
+  const tabsStore = useTabsStore();
   const workspaceId = repoWorkspaceKey(repoId);
-  const existing = tabsState.tabs.find((t) => {
+  const existing = tabsStore.tabs.find((t) => {
     if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
     const diff = asRepoDiffTab(t);
     return (
@@ -224,11 +224,11 @@ export function openRepoReviewDiffTab(
     );
   });
   if (existing) {
-    activateTab(existing.id);
-    if (pinned) removeFromPreviewCohort(workspaceId, existing.id);
+    tabsStore.activateTab(existing.id);
+    if (pinned) tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
     return { id: existing.id, reused: true };
   }
-  return openTab(
+  return tabsStore.openTab(
     'repo-diff',
     null,
     path,
@@ -266,13 +266,14 @@ export function openRepoTerminalTab(
 // hydrateTabs itself (state/tabs.ts already depends on this module for closeWorkspaceTabs's own
 // call graph; hydrateTabs calling back in here would add a third link to that cycle for no need).
 export function ensureWorkspaceShell(repoId: string): void {
+  const tabsStore = useTabsStore();
   const key = repoWorkspaceKey(repoId);
   const tabs = tabsForWorkspace(key);
   if (!tabs.some((t) => t.kind === 'repo-graph')) {
-    createPinnedRepoGraphTab(key);
+    tabsStore.createPinnedRepoGraphTab(key);
   }
   if (!tabs.some((t) => t.active)) {
     const graph = tabsForWorkspace(key).find((t) => t.kind === 'repo-graph');
-    if (graph) activateTab(graph.id);
+    if (graph) tabsStore.activateTab(graph.id);
   }
 }

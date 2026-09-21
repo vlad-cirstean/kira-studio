@@ -18,7 +18,7 @@ import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useObjectStoreStore } from './state/objectStore';
 import { settingsOpen } from './state/settings';
-import { activateNextTab, activatePrevTab, closeTab } from './state/tabs';
+import { useTabsStore } from './state/tabs';
 import AppTooltip from './workbench/AppTooltip.vue';
 import ConfirmDialog from './workbench/ConfirmDialog.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
@@ -43,12 +43,13 @@ const layoutStore = useLayoutStore();
 const quickOpenStore = useQuickOpenStore();
 const collectionsStore = useCollectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
+const tabsStore = useTabsStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
 
 function closeActiveTab(): void {
-  if (modeStore.activeTab) closeTab(modeStore.activeTab.id);
+  if (modeStore.activeTab) tabsStore.closeTab(modeStore.activeTab.id);
 }
 
 onMounted(() => {
@@ -77,8 +78,8 @@ onMounted(() => {
     control.onToggleOperationsPanel(layoutStore.toggleOperationsPanel),
     control.onCommandPalette(paletteStore.togglePalette),
     control.onQuickOpen(quickOpenStore.openQuickOpen),
-    control.onTabNext(activateNextTab),
-    control.onTabPrev(activatePrevTab),
+    control.onTabNext(tabsStore.activateNextTab),
+    control.onTabPrev(tabsStore.activatePrevTab),
     control.onTabClose(closeActiveTab),
     control.onViewFind(() => runCommand('view.find')),
     control.onViewRefresh(() => runCommand('view.refresh')),

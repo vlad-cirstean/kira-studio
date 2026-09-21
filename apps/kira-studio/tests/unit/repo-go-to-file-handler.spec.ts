@@ -20,7 +20,8 @@ const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/wo
 const { pinia } = await import('../../frontend/src/state/pinia');
 setActivePinia(pinia);
 const { useCodeReposStore } = await import('../../frontend/src/state/coderepos');
-const { tabsState } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { createHostHandlers } = await import('../../frontend/src/repo/git/hostHandlers');
 
 let repoCounter = 0;
@@ -69,7 +70,7 @@ describe("P74 §7.2: editor.goToFile's three outcomes", () => {
 
     expect(outcome).toEqual({ kind: 'liveFile', path: 'src/app.ts', line: 42 });
     const ws = repoWorkspaceKey(codeRepoId);
-    const tab = tabsState.tabs.find(
+    const tab = tabsStore.tabs.find(
       (t) => (t.workspaceId ?? null) === ws && t.path === 'src/app.ts',
     );
     const file = tab ? asRepoFileTab(tab) : null;
@@ -107,7 +108,7 @@ describe("P74 §7.2: editor.goToFile's three outcomes", () => {
 
     expect(outcome).toEqual({ kind: 'virtualBlob', path: 'src/renamed.ts', rev, line: 7 });
     const ws = repoWorkspaceKey(codeRepoId);
-    const tab = tabsState.tabs.find(
+    const tab = tabsStore.tabs.find(
       (t) => (t.workspaceId ?? null) === ws && t.path === 'src/renamed.ts',
     );
     const file = tab ? asRepoFileTab(tab) : null;
@@ -118,7 +119,7 @@ describe("P74 §7.2: editor.goToFile's three outcomes", () => {
   test('unavailable: passes the reason through and opens no tab', async () => {
     const { codeRepoId, gitRepoId } = freshRepoPair();
     const ws = repoWorkspaceKey(codeRepoId);
-    const tabCountBefore = tabsState.tabs.filter((t) => (t.workspaceId ?? null) === ws).length;
+    const tabCountBefore = tabsStore.tabs.filter((t) => (t.workspaceId ?? null) === ws).length;
     const handlers = handlersWithGoToTarget({ kind: 'unavailable', reason: 'notInRevision' });
 
     const outcome = await handlers['editor.goToFile']?.(
@@ -127,7 +128,7 @@ describe("P74 §7.2: editor.goToFile's three outcomes", () => {
     );
 
     expect(outcome).toEqual({ kind: 'unavailable', reason: 'notInRevision' });
-    expect(tabsState.tabs.filter((t) => (t.workspaceId ?? null) === ws).length).toBe(
+    expect(tabsStore.tabs.filter((t) => (t.workspaceId ?? null) === ws).length).toBe(
       tabCountBefore,
     );
   });

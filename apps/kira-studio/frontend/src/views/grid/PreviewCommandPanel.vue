@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/vue-query';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
-import { findDataTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
@@ -15,6 +15,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 // P99 §5.5: a plain preview of the *currently staged* edits — nothing pushes a change event for
 // it, and it must reflect this open's own pending state, so default staleTime (always refetch on
@@ -22,11 +23,11 @@ const connectionsStore = useConnectionsStore();
 const { data, isLoading, error } = useQuery(() => ({
   queryKey: ['previewPending', props.tabId] as const,
   queryFn: () => {
-    const tab = findDataTab(props.tabId);
+    const tab = tabsStore.findDataTab(props.tabId);
     if (!tab?.connectionId) return Promise.resolve([]);
     return pendingChangesStore.previewPending(tab.connectionId, tab.path, props.tabId);
   },
-  enabled: !!findDataTab(props.tabId)?.connectionId,
+  enabled: !!tabsStore.findDataTab(props.tabId)?.connectionId,
 }));
 
 const statements = computed(() => data.value ?? []);
@@ -40,7 +41,7 @@ const errorMessage = computed(() => {
 const doc = computed(() => statements.value.join(';\n\n') + (statements.value.length ? ';' : ''));
 
 const sqlDialect = computed(() =>
-  sqlDialectFor(connectionsStore.connectionRecord(findDataTab(props.tabId)?.connectionId)?.kind),
+  sqlDialectFor(connectionsStore.connectionRecord(tabsStore.findDataTab(props.tabId)?.connectionId)?.kind),
 );
 
 function close(): void {

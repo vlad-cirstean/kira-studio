@@ -9,7 +9,7 @@ import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { settingsState } from '../../state/settings';
-import { patchStreamTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -59,6 +59,7 @@ const contextMenuStore = useContextMenuStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const streamSearchStore = useStreamSearchStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 // MainView.vue keys this component by tab.id — same discipline as KeyValueView.vue.
 const props = defineProps<{ tab: StreamTabRecord }>();
@@ -281,7 +282,7 @@ watch(
     if (options.length === 0) return;
     if (options.some((o) => o.value === props.tab.state.pageSize)) return;
     const largest = options[options.length - 1];
-    if (largest) patchStreamTabState(props.tab.id, { pageSize: largest.value });
+    if (largest) tabsStore.patchStreamTabState(props.tab.id, { pageSize: largest.value });
   },
   { immediate: true },
 );
@@ -532,7 +533,7 @@ function onResizeMove(e: PointerEvent): void {
 }
 function onResizeEnd(e: PointerEvent): void {
   if (resizing && liveResizeWidth.value) {
-    patchStreamTabState(props.tab.id, {
+    tabsStore.patchStreamTabState(props.tab.id, {
       columnWidths: {
         ...props.tab.state.columnWidths,
         [resizing.column]: liveResizeWidth.value.width,

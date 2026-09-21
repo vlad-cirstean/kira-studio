@@ -1,6 +1,6 @@
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { unmarkHydrated } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 
 // P39 F12/F13: grid/state.ts, documents/state.ts, keyvalue/state.ts, stream/state.ts and
 // console/state.ts each declared the same DISCONNECTED_CODES set and the same code/message
@@ -147,7 +147,7 @@ export function applyLoadFailure(
     // invariant hold by luck at a distance rather than by construction.
     rt.status = 'idle';
     opts?.onDisconnected?.();
-    unmarkHydrated(tabId);
+    useTabsStore().unmarkHydrated(tabId);
     return;
   }
   rt.status = 'error';

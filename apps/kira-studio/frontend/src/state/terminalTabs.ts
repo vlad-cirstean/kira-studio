@@ -2,7 +2,7 @@ import type { PaletteColor } from '@shared/domain/color';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import type { WorkspaceKey } from '@shared/domain/workspace';
 import { canonicalPath } from './coderepos';
-import { type OpenTabResult, openTab } from './tabs';
+import { type OpenTabResult, useTabsStore } from './tabs';
 
 // P85 §5.3: what a non-plain launch (Claude Code, or a custom script) seeds a terminal tab with.
 // P86 §4: `kind` is the tab's own launchKind — always given explicitly by the one caller that
@@ -28,7 +28,7 @@ export function openTerminalTab(opts: {
   codeRepoId?: string;
   launch?: TerminalLaunch;
 }): OpenTabResult {
-  return openTab(
+  return useTabsStore().openTab(
     'terminal',
     null,
     opts.cwd,

@@ -11,11 +11,16 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { openConsoleTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { run, runtime } = await import('../../frontend/src/views/console/state');
 const { getPage } = await import('../../frontend/src/views/console/resultPages');
 
@@ -28,7 +33,7 @@ function fakePage(): Page {
 
 describe('console result cap (P2 R1)', () => {
   test('1. append mode evicts the oldest results once a tab holds more than the cap', async () => {
-    const tabId = openConsoleTab('conn-cap-1', 'db');
+    const tabId = tabsStore.openConsoleTab('conn-cap-1', 'db');
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ExecuteResponse
     (data as any).execute = (): Promise<ExecuteResponse> =>
       Promise.resolve({ pages: [fakePage()] });
@@ -51,7 +56,7 @@ describe('console result cap (P2 R1)', () => {
   });
 
   test("2. a single run's own result set is never evicted, however many statements it produced", async () => {
-    const tabId = openConsoleTab('conn-cap-2', 'db');
+    const tabId = tabsStore.openConsoleTab('conn-cap-2', 'db');
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ExecuteResponse
     (data as any).execute = (): Promise<ExecuteResponse> =>
       Promise.resolve({ pages: [fakePage()] });

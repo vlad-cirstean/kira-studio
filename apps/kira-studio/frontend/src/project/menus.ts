@@ -9,14 +9,7 @@ import { useConsoleDefaultsStore } from '../state/consoleDefaults';
 import type { MenuItem } from '../state/contextMenu';
 import { useObjectStoreStore } from '../state/objectStore';
 import { schemaDialectFor, useSchemaDialogStore } from '../state/schemas';
-import {
-  openBrowseTab,
-  openConsoleTab,
-  openDataTab,
-  openDefinitionTab,
-  openDocumentTab,
-  openStreamTab,
-} from '../state/tabs';
+import { useTabsStore } from '../state/tabs';
 import { countTab, dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
 import {
@@ -92,7 +85,7 @@ function consoleMenuItem(row: TreeRowVm): MenuItem[] {
       label: 'Open query console',
       icon: 'terminal',
       run: () => {
-        openConsoleTab(row.connectionId, row.path);
+        useTabsStore().openConsoleTab(row.connectionId, row.path);
       },
     },
   ];
@@ -276,7 +269,7 @@ function browseMenuItem(row: TreeRowVm): MenuItem[] {
       icon: 'list-tree',
       shortcut: 'tree.open',
       run: () => {
-        openBrowseTab(row.connectionId, row.path);
+        useTabsStore().openBrowseTab(row.connectionId, row.path);
       },
     },
   ];
@@ -335,7 +328,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       // action double-click performs), not this run() via runMenuShortcut.
       shortcut: 'tree.open',
       run: () => {
-        openDataTab(row.connectionId, row.path);
+        useTabsStore().openDataTab(row.connectionId, row.path);
       },
     },
     {
@@ -344,7 +337,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       label: 'Open data in new tab',
       icon: 'table',
       run: () => {
-        openDataTab(row.connectionId, row.path, { newTab: true });
+        useTabsStore().openDataTab(row.connectionId, row.path, { newTab: true });
       },
     },
     // D5: offered only when the connection's caps say so — never a permanently disabled row.
@@ -356,7 +349,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
             label: 'Open definition',
             icon: 'file-code',
             run: () => {
-              openDefinitionTab(row.connectionId, row.path);
+              useTabsStore().openDefinitionTab(row.connectionId, row.path);
             },
           },
         ]
@@ -392,7 +385,7 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
       // Opens (or reuses) the table's data tab and runs Σ on it — never a bare count with
       // nowhere to show the answer.
       run: () => {
-        const { id: tabId } = openDataTab(row.connectionId, row.path);
+        const { id: tabId } = useTabsStore().openDataTab(row.connectionId, row.path);
         countTab('data', tabId);
       },
     },
@@ -419,7 +412,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       icon: 'json',
       shortcut: 'tree.open',
       run: () => {
-        openDocumentTab(row.connectionId, row.path);
+        useTabsStore().openDocumentTab(row.connectionId, row.path);
       },
     },
     {
@@ -428,7 +421,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       label: 'Open in new tab',
       icon: 'json',
       run: () => {
-        openDocumentTab(row.connectionId, row.path, { newTab: true });
+        useTabsStore().openDocumentTab(row.connectionId, row.path, { newTab: true });
       },
     },
     // D5: offered only when the connection's caps say so — never a permanently disabled row.
@@ -440,7 +433,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
             label: 'Open definition',
             icon: 'file-code',
             run: () => {
-              openDefinitionTab(row.connectionId, row.path);
+              useTabsStore().openDefinitionTab(row.connectionId, row.path);
             },
           },
         ]
@@ -474,7 +467,7 @@ function collectionMenu(row: TreeRowVm): MenuItem[] {
       label: 'Count documents',
       icon: 'symbol-numeric',
       run: () => {
-        const { id: tabId } = openDocumentTab(row.connectionId, row.path);
+        const { id: tabId } = useTabsStore().openDocumentTab(row.connectionId, row.path);
         countTab('document', tabId);
       },
     },
@@ -524,7 +517,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
       icon: nodeIcon(row.kind),
       shortcut: 'tree.open',
       run: () => {
-        openStreamTab(row.connectionId, row.path);
+        useTabsStore().openStreamTab(row.connectionId, row.path);
       },
     },
     {
@@ -533,7 +526,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
       label: 'Open in new tab',
       icon: nodeIcon(row.kind),
       run: () => {
-        openStreamTab(row.connectionId, row.path, { newTab: true });
+        useTabsStore().openStreamTab(row.connectionId, row.path, { newTab: true });
       },
     },
     ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
@@ -544,7 +537,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
             label: 'Open definition',
             icon: 'file-code',
             run: () => {
-              openDefinitionTab(row.connectionId, row.path);
+              useTabsStore().openDefinitionTab(row.connectionId, row.path);
             },
           },
         ]
@@ -574,7 +567,7 @@ function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
             label: 'Open definition',
             icon: 'file-code',
             run: () => {
-              openDefinitionTab(row.connectionId, row.path);
+              useTabsStore().openDefinitionTab(row.connectionId, row.path);
             },
           },
         ]
@@ -618,7 +611,7 @@ function savedFiltersSubmenu(row: TreeRowVm): MenuItem[] {
     id: `saved-filter-${entry.id}`,
     label: entry.name,
     run: async () => {
-      const { id: tabId } = openDataTab(row.connectionId, row.path);
+      const { id: tabId } = useTabsStore().openDataTab(row.connectionId, row.path);
       await dataQueryCommands().setFilter(tabId, entry.body.where);
       await dataQueryCommands().setSort(tabId, entry.body.orderBy);
       await control.queriesTouch(entry.id);

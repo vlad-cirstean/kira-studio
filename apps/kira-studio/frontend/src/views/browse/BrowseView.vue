@@ -5,7 +5,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
-import { openKeyValueTab, patchBrowseTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { nodeIcon, redisTypeIcon, redisTypeLabel } from '../../theme/icons';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
@@ -43,6 +43,7 @@ const props = defineProps<{ tab: BrowseTabRecord }>();
 
 const objectStoreStore = useObjectStoreStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -124,7 +125,7 @@ const countText = computed(() => {
 const DEFAULT_LIST_WIDTH = 320;
 const listWidth = computed(() => props.tab.state.listWidth || DEFAULT_LIST_WIDTH);
 function onResizeList(size: number): void {
-  patchBrowseTabState(props.tab.id, { listWidth: size });
+  tabsStore.patchBrowseTabState(props.tab.id, { listWidth: size });
 }
 
 // The detail pane previews the selected row when it's a leaf (hasChildren: false) — a container
@@ -223,7 +224,7 @@ function onRowOpen(node: TreeNode): void {
     return;
   }
   if (!props.tab.connectionId) return;
-  openKeyValueTab(props.tab.connectionId, node.path);
+  tabsStore.openKeyValueTab(props.tab.connectionId, node.path);
 }
 
 // D10: the moved keyMenu/objectMenu/namespaceMenu/prefixMenu bodies, now addressed by node

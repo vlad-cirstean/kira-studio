@@ -22,7 +22,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useConnectionsStore } = await import('../../frontend/src/state/connections');
 const connectionsStore = useConnectionsStore();
-const { openConsoleTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
 
 function deferred<T>(): {
@@ -66,7 +67,7 @@ describe('console Stop wins even when the in-flight EXPLAIN batch resolves anywa
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),
     } as ConnectionSummary);
-    const tabId = openConsoleTab(connectionId, 'db');
+    const tabId = tabsStore.openConsoleTab(connectionId, 'db');
 
     const explainCall = deferred<ExecuteResponse>();
     const executeCalls: string[] = [];

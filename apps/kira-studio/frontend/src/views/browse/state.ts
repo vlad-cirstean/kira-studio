@@ -3,7 +3,7 @@ import { pathParent, type TreeNode } from '@shared/domain/tree';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findBrowseTab, patchBrowseTabState, unmarkHydrated } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { registerBrowseInvalidate, registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore } from '../shared/viewOp';
 
@@ -85,13 +85,13 @@ export { setActionError };
 /** The level a tab is currently showing — `''` in session state means "the tab's own container
  *  path" (D14), so a freshly opened tab and one restored at its root agree. */
 function currentLevel(tabId: string): string | null {
-  const tab = findBrowseTab(tabId);
+  const tab = useTabsStore().findBrowseTab(tabId);
   if (!tab?.connectionId) return null;
   return tab.state.levelPath === '' ? tab.path : tab.state.levelPath;
 }
 
 export async function load(tabId: string, opts?: { refresh?: boolean }): Promise<void> {
-  const tab = findBrowseTab(tabId);
+  const tab = useTabsStore().findBrowseTab(tabId);
   if (!tab?.connectionId) return;
   const level = currentLevel(tabId);
   if (level === null) return;
@@ -121,7 +121,7 @@ export async function load(tabId: string, opts?: { refresh?: boolean }): Promise
     const failure = classifyLoadError(err);
     if (failure.kind === 'disconnected') {
       rt.status = 'idle';
-      unmarkHydrated(tabId);
+      useTabsStore().unmarkHydrated(tabId);
       return;
     }
     rt.status = 'error';
@@ -141,7 +141,7 @@ export async function reload(tabId: string): Promise<void> {
 // Normalizes `level` back to `''` when it equals the tab's own container path, so a tab that
 // descends and returns to its root looks identical (in session state) to one that never left it.
 async function setLevel(tabId: string, level: string): Promise<void> {
-  const tab = findBrowseTab(tabId);
+  const tab = useTabsStore().findBrowseTab(tabId);
   if (!tab) return;
   // P21 round 3 functional finding 14: a level change used to keep the previous level's own
   // `filter`/`selected` — descending into a container while a substring filter was active carried
@@ -155,7 +155,7 @@ async function setLevel(tabId: string, level: string): Promise<void> {
   rt.keyTypes.clear();
   rt.keyTypesVersion++;
   pendingKeyTypePaths[tabId]?.clear();
-  patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
+  useTabsStore().patchBrowseTabState(tabId, { levelPath: level === tab.path ? '' : level });
   await load(tabId);
 }
 
@@ -166,7 +166,7 @@ export async function descend(tabId: string, path: string): Promise<void> {
 
 /** Up — one level shallower. A no-op at the tab's own container (nothing shallower to show). */
 export async function ascend(tabId: string): Promise<void> {
-  const tab = findBrowseTab(tabId);
+  const tab = useTabsStore().findBrowseTab(tabId);
   const level = currentLevel(tabId);
   if (!tab || level === null || level === tab.path) return;
   const parent = pathParent(level);
@@ -234,7 +234,7 @@ async function loadKeyTypes(
   seq: number,
   pending: Set<string>,
 ): Promise<void> {
-  const tab = findBrowseTab(tabId);
+  const tab = useTabsStore().findBrowseTab(tabId);
   if (!tab?.connectionId) {
     for (const p of batch) pending.delete(p);
     return;
@@ -265,7 +265,7 @@ async function loadKeyTypes(
 // its own currently-shown level may be stale, without project/ importing views/ directly.
 async function invalidateLevel(connectionId: string, path: string): Promise<void> {
   for (const tabId of Object.keys(runtime)) {
-    const tab = findBrowseTab(tabId);
+    const tab = useTabsStore().findBrowseTab(tabId);
     if (!tab || tab.connectionId !== connectionId) continue;
     if (currentLevel(tabId) !== path) continue;
     await load(tabId, { refresh: true });

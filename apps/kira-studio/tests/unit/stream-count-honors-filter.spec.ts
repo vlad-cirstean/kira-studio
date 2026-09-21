@@ -19,7 +19,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useConnectionsStore } = await import('../../frontend/src/state/connections');
 const connectionsStore = useConnectionsStore();
-const { openStreamTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { applyStreamFilter, runCount, runtime } = await import(
   '../../frontend/src/views/stream/state'
 );
@@ -67,7 +68,7 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
   test('runCount sends null filter when no partition/offset/timestamp filter is set', async () => {
     const connectionId = 'kafka-conn-1';
     markConnected(connectionId, kafkaCaps);
-    const { id } = openStreamTab(connectionId, 'topic:orders', { newTab: true });
+    const { id } = tabsStore.openStreamTab(connectionId, 'topic:orders', { newTab: true });
 
     let captured: { filter?: string | null } | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real CountResponse
@@ -90,7 +91,7 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
   test('runCount sends the same encoded filter the tab is browsing under, once one is applied', async () => {
     const connectionId = 'kafka-conn-2';
     markConnected(connectionId, kafkaCaps);
-    const { id } = openStreamTab(connectionId, 'topic:orders', { newTab: true });
+    const { id } = tabsStore.openStreamTab(connectionId, 'topic:orders', { newTab: true });
 
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>
@@ -128,7 +129,7 @@ describe('Kafka stream count honors the active filter (finding 7)', () => {
   test('applying a new filter clears the previous count instead of leaving a stale total under it', async () => {
     const connectionId = 'kafka-conn-3';
     markConnected(connectionId, kafkaCaps);
-    const { id } = openStreamTab(connectionId, 'topic:orders', { newTab: true });
+    const { id } = tabsStore.openStreamTab(connectionId, 'topic:orders', { newTab: true });
 
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real ReadResponse
     (data as any).read = () =>

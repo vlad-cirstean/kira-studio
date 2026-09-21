@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
-import { openDefinitionTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import type { ConstraintRow } from './structure';
 
 const props = defineProps<{
@@ -35,7 +35,7 @@ function referencedTableName(c: ConstraintRow): string | null {
 // through by structure.ts's merge) — opening its definition tab is the same "browse structure by
 // following the schema" affordance P7 already gives cell-level FK navigation in the grid.
 function onNavigate(c: ConstraintRow): void {
-  if (c.referencedPath) openDefinitionTab(props.connectionId, c.referencedPath);
+  if (c.referencedPath) useTabsStore().openDefinitionTab(props.connectionId, c.referencedPath);
 }
 </script>
 

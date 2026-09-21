@@ -3,7 +3,7 @@ import type { DocumentTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findDocumentTab, patchDocumentTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { registerTabCount, registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { setPage } from './page';
@@ -74,7 +74,7 @@ export async function load(
   cursor?: PageCursor,
   revertPageIndexOnFailure?: number,
 ): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   // Mirrors views/grid/state.ts's `load()`: the fallback cursor tracks `pageIndex * pageSize`,
@@ -120,20 +120,20 @@ export async function load(
     const superseded = rt.opId !== opId;
     applyLoadFailure(rt, opId, err, tabId);
     if (!superseded && revertPageIndexOnFailure !== undefined) {
-      patchDocumentTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+      useTabsStore().patchDocumentTabState(tabId, { pageIndex: revertPageIndexOnFailure });
     }
   }
 }
 
 export async function reload(tabId: string): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab?.connectionId) return;
   await data.invalidate(tab.connectionId, tab.path);
   await load(tabId);
 }
 
 export async function runCount(tabId: string): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   const opId = crypto.randomUUID();
@@ -170,7 +170,7 @@ export function stop(tabId: string): void {
 // forever instead of advancing, which is what "sort doesn't work" looked like once a collection
 // spanned more than one page.
 export async function goNext(tabId: string): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
   const prevIndex = tab.state.pageIndex;
@@ -178,12 +178,12 @@ export async function goNext(tabId: string): Promise<void> {
   const cursor: PageCursor = rt.nextToken
     ? { mode: 'after', token: rt.nextToken }
     : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
-  patchDocumentTabState(tabId, { pageIndex: nextIndex });
+  useTabsStore().patchDocumentTabState(tabId, { pageIndex: nextIndex });
   await load(tabId, cursor, prevIndex);
 }
 
 export async function goPrev(tabId: string): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
   const prevIndex = tab.state.pageIndex;
@@ -191,7 +191,7 @@ export async function goPrev(tabId: string): Promise<void> {
   const cursor: PageCursor = rt.prevToken
     ? { mode: 'before', token: rt.prevToken }
     : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
-  patchDocumentTabState(tabId, { pageIndex: targetIndex });
+  useTabsStore().patchDocumentTabState(tabId, { pageIndex: targetIndex });
   await load(tabId, cursor, prevIndex);
 }
 
@@ -199,30 +199,30 @@ export async function goPrev(tabId: string): Promise<void> {
 // supports an arbitrary skip()/limit() offset (unlike Redis's SCAN cursor or Kafka/SQS's
 // per-partition offsets), so a page-N jump is just as meaningful here as it is for SQL.
 export async function goFirst(tabId: string): Promise<void> {
-  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
-  patchDocumentTabState(tabId, { pageIndex: 0 });
+  const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
+  useTabsStore().patchDocumentTabState(tabId, { pageIndex: 0 });
   await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
 }
 
 // Requires a count, same as the grid's own goLast — the toolbar disables the Last-page button
 // until an exact/estimated count has run.
 export async function goLast(tabId: string): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   const rt = runtime[tabId];
   if (!tab || !rt?.count) return;
   const prevIndex = tab.state.pageIndex;
   const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
   const lastIndex = pageCount - 1;
-  patchDocumentTabState(tabId, { pageIndex: lastIndex });
+  useTabsStore().patchDocumentTabState(tabId, { pageIndex: lastIndex });
   await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize }, prevIndex);
 }
 
 export async function goToPage(tabId: string, n: number): Promise<void> {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab) return;
   const prevIndex = tab.state.pageIndex;
   const index = Math.max(0, n);
-  patchDocumentTabState(tabId, { pageIndex: index });
+  useTabsStore().patchDocumentTabState(tabId, { pageIndex: index });
   await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize }, prevIndex);
 }
 
@@ -239,14 +239,14 @@ function resetTokens(tabId: string): void {
 }
 
 export function setSearch(tabId: string, text: string): void {
-  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
+  const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
   // P43 F7/D10: same reasoning as views/grid/state.ts's setFilter — a count taken under the
   // previous search text answers a different question, not a drifted answer to this one.
   const rt = ensureRuntime(tabId);
   rt.count = null;
   rt.countOpId = null;
-  patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
+  useTabsStore().patchDocumentTabState(tabId, { search: text, pageIndex: 0 });
   void load(tabId, undefined, prevIndex);
 }
 
@@ -257,23 +257,23 @@ export function setSearch(tabId: string, text: string): void {
 // read.ts's D6 keyset strategy); any other sort falls back to skip/limit and `pageIndex` is what
 // goNext/goPrev (above) use to compute that offset.
 export function setProjection(tabId: string, projection: string[] | null): void {
-  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
+  const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
-  patchDocumentTabState(tabId, { projection, pageIndex: 0 });
+  useTabsStore().patchDocumentTabState(tabId, { projection, pageIndex: 0 });
   void load(tabId, undefined, prevIndex);
 }
 
 export function setSort(tabId: string, sort: SortSpec | null): void {
-  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
+  const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
-  patchDocumentTabState(tabId, { sort, pageIndex: 0 });
+  useTabsStore().patchDocumentTabState(tabId, { sort, pageIndex: 0 });
   void load(tabId, undefined, prevIndex);
 }
 
 export function setPageSize(tabId: string, pageSize: DocumentTabState['pageSize']): void {
-  const prevIndex = findDocumentTab(tabId)?.state.pageIndex;
+  const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
   resetTokens(tabId);
-  patchDocumentTabState(tabId, { pageSize, pageIndex: 0 });
+  useTabsStore().patchDocumentTabState(tabId, { pageSize, pageIndex: 0 });
   void load(tabId, undefined, prevIndex);
 }
 
@@ -290,12 +290,12 @@ export function selectRow(tabId: string, row: number | null): void {
 // missing meant collapsed) reads as `{}`, which under this new reading means "all expanded" —
 // exactly the new default, so no schema change and no migration.
 export function isDocumentExpanded(tabId: string, id: string): boolean {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   return tab ? tab.state.expanded[id] !== false : true;
 }
 
 export function toggleExpanded(tabId: string, id: string): void {
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   if (!tab) return;
   const expanded = { ...tab.state.expanded };
   if (isDocumentExpanded(tabId, id)) {
@@ -305,7 +305,7 @@ export function toggleExpanded(tabId: string, id: string): void {
     // every row a user has ever touched, one direction of which never happens with `true`.
     delete expanded[id];
   }
-  patchDocumentTabState(tabId, { expanded });
+  useTabsStore().patchDocumentTabState(tabId, { expanded });
 }
 
 // D2/D32: *Expand all* clears the map outright rather than writing one `true` per row — the
@@ -321,13 +321,13 @@ export function toggleExpanded(tabId: string, id: string): void {
 // map genuinely does mean "everything, everywhere, expanded".
 export function setAllExpanded(tabId: string, ids: string[], value: boolean): void {
   if (value) {
-    patchDocumentTabState(tabId, { expanded: {} });
+    useTabsStore().patchDocumentTabState(tabId, { expanded: {} });
     return;
   }
-  const tab = findDocumentTab(tabId);
+  const tab = useTabsStore().findDocumentTab(tabId);
   const expanded: Record<string, boolean> = { ...tab?.state.expanded };
   for (const id of ids) expanded[id] = false;
-  patchDocumentTabState(tabId, { expanded });
+  useTabsStore().patchDocumentTabState(tabId, { expanded });
 }
 
 // D5/D6: project/ no longer imports this module directly — it reaches reload/runCount through

@@ -1,5 +1,5 @@
 import type { PageSize } from '@shared/domain/tabs';
-import { findKeyValueTab, patchKeyValueTabState } from '../../../state/tabs';
+import { useTabsStore } from '../../../state/tabs';
 
 // P63 §2.2: the seam that lets views/shared/keyvalue/ (state.ts, mutations.ts, KeyValuePane.vue)
 // address either a real KeyValue tab or the browse split's preview pane through one shape, instead
@@ -31,14 +31,15 @@ export function unregisterKeyValueHost(viewKey: string): void {
 // registration required — "registered once, centrally" (§2.2 point 3) means this function, not a
 // per-tab call into registerKeyValueHost.
 function resolveTabHost(viewKey: string): KeyValueHost | null {
-  const tab = findKeyValueTab(viewKey);
+  const tabsStore = useTabsStore();
+  const tab = tabsStore.findKeyValueTab(viewKey);
   if (!tab) return null;
   return {
     connectionId: tab.connectionId,
     path: tab.path,
     pageIndex: tab.state.pageIndex,
     pageSize: tab.state.pageSize,
-    patch: (p) => patchKeyValueTabState(viewKey, p),
+    patch: (p) => tabsStore.patchKeyValueTabState(viewKey, p),
   };
 }
 

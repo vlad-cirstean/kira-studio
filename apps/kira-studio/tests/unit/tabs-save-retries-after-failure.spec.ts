@@ -13,11 +13,16 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { activateTab, openStreamTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -32,7 +37,7 @@ describe('state/tabs.ts saveIfChanged retries a snapshot a failed save never act
       return shouldFail ? Promise.reject(new Error('simulated FK failure')) : Promise.resolve();
     };
 
-    const { id } = openStreamTab('conn-tabs-1', 'topic:orders', { newTab: true });
+    const { id } = tabsStore.openStreamTab('conn-tabs-1', 'topic:orders', { newTab: true });
     await flush();
     expect(calls).toBe(1); // the open itself triggers saveNow -> saveIfChanged's first (failing) call
 
@@ -40,7 +45,7 @@ describe('state/tabs.ts saveIfChanged retries a snapshot a failed save never act
     // state — tabsState.tabs serializes identically both times — so this reproduces "the exact
     // same snapshot the failed save above never actually stored".
     shouldFail = false;
-    activateTab(id);
+    tabsStore.activateTab(id);
     await flush();
 
     expect(calls).toBe(2);

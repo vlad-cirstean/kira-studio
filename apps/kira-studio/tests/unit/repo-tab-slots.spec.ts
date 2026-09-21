@@ -5,7 +5,11 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
@@ -14,23 +18,13 @@ restoreAfterEach(control);
 const { defaultRepoFileTabState } = await import('../../../../packages/shared/domain/tabs');
 const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
 const { tabsForWorkspace } = await import('../../frontend/src/state/mode');
-const {
-  closeAll,
-  closeOthers,
-  closeTab,
-  createPinnedRepoGraphTab,
-  duplicateTab,
-  isPreview,
-  moveTab,
-  openTab,
-  promoteTab,
-  tabsState,
-} = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { openRepoCommitDiffTab, openRepoFileTab } = await import(
   '../../frontend/src/state/repoTabs'
 );
 
-// Every test gets its own fresh workspace ids — tabsState.tabs is one shared module-level array
+// Every test gets its own fresh workspace ids — tabsStore.tabs is one shared module-level array
 // with no per-test reset, so reusing a workspace id across tests would leak tabs between them.
 let workspaceCounter = 0;
 function freshWorkspace() {
@@ -48,7 +42,7 @@ function freshRepoId(): string {
 }
 
 function openFile(workspace: string, path: string, preview: boolean, previewCohort = false) {
-  return openTab('repo-file', null, path, () => defaultRepoFileTabState(), {
+  return tabsStore.openTab('repo-file', null, path, () => defaultRepoFileTabState(), {
     reuse: true,
     workspaceId: workspace,
     preview,
@@ -66,8 +60,8 @@ describe('C5 §5.2: the preview slot', () => {
 
     const d = openFile(ws, 'd.ts', true); // replaces b's preview, in b's own position
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, d.id, c.id]);
-    expect(tabsState.tabs.find((t) => t.id === b.id)).toBeUndefined();
-    expect(isPreview(d.id)).toBe(true);
+    expect(tabsStore.tabs.find((t) => t.id === b.id)).toBeUndefined();
+    expect(tabsStore.isPreview(d.id)).toBe(true);
   });
 
   test('a permanent open never evicts a preview tab', () => {
@@ -75,33 +69,33 @@ describe('C5 §5.2: the preview slot', () => {
     const preview = openFile(ws, 'p.ts', true);
     const permanent = openFile(ws, 'q.ts', false);
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([preview.id, permanent.id]);
-    expect(isPreview(preview.id)).toBe(true);
+    expect(tabsStore.isPreview(preview.id)).toBe(true);
   });
 
   test('reopening the same path activates rather than duplicating', () => {
     const ws = freshWorkspace();
     const first = openFile(ws, 'same.ts', true);
-    const countBefore = tabsState.tabs.length;
+    const countBefore = tabsStore.tabs.length;
     const second = openFile(ws, 'same.ts', false);
     expect(second.id).toBe(first.id);
     expect(second.reused).toBe(true);
-    expect(tabsState.tabs.length).toBe(countBefore);
+    expect(tabsStore.tabs.length).toBe(countBefore);
   });
 
   test('a permanent reopen of the current preview tab promotes it (clears the slot)', () => {
     const ws = freshWorkspace();
     const tab = openFile(ws, 'promote.ts', true);
-    expect(isPreview(tab.id)).toBe(true);
+    expect(tabsStore.isPreview(tab.id)).toBe(true);
     openFile(ws, 'promote.ts', false);
-    expect(isPreview(tab.id)).toBe(false);
+    expect(tabsStore.isPreview(tab.id)).toBe(false);
   });
 
   test('closing the preview tab clears the slot', () => {
     const ws = freshWorkspace();
     const tab = openFile(ws, 'closeme.ts', true);
-    expect(isPreview(tab.id)).toBe(true);
-    closeTab(tab.id);
-    expect(tabsState.previewIdsByWorkspace[ws] ?? []).toEqual([]);
+    expect(tabsStore.isPreview(tab.id)).toBe(true);
+    tabsStore.closeTab(tab.id);
+    expect(tabsStore.previewIdsByWorkspace[ws] ?? []).toEqual([]);
   });
 
   test("two workspaces' preview slots are independent", () => {
@@ -109,8 +103,8 @@ describe('C5 §5.2: the preview slot', () => {
     const wsB = freshWorkspace();
     const a = openFile(wsA, 'x.ts', true);
     const b = openFile(wsB, 'x.ts', true); // same relative path, different repo
-    expect(isPreview(a.id)).toBe(true);
-    expect(isPreview(b.id)).toBe(true);
+    expect(tabsStore.isPreview(a.id)).toBe(true);
+    expect(tabsStore.isPreview(b.id)).toBe(true);
     expect(a.id).not.toBe(b.id); // dedupe key includes workspaceId — never collapsed together
   });
 });
@@ -122,10 +116,10 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
     const b = openFile(ws, 'b.ts', true, true); // joins a's cohort
     const c = openFile(ws, 'c.ts', true, true); // joins too
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, c.id]);
-    expect(isPreview(a.id)).toBe(true);
-    expect(isPreview(b.id)).toBe(true);
-    expect(isPreview(c.id)).toBe(true);
-    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([a.id, b.id, c.id]);
+    expect(tabsStore.isPreview(a.id)).toBe(true);
+    expect(tabsStore.isPreview(b.id)).toBe(true);
+    expect(tabsStore.isPreview(c.id)).toBe(true);
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([a.id, b.id, c.id]);
   });
 
   test('a later single-file preview evicts the whole prior cohort, not just one member', () => {
@@ -136,10 +130,10 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, c.id]);
 
     const d = openFile(ws, 'd.ts', true, false); // a plain tree-click preview, not a bulk open
-    expect(tabsState.tabs.find((t) => t.id === a.id)).toBeUndefined();
-    expect(tabsState.tabs.find((t) => t.id === b.id)).toBeUndefined();
-    expect(tabsState.tabs.find((t) => t.id === c.id)).toBeUndefined();
-    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([d.id]);
+    expect(tabsStore.tabs.find((t) => t.id === a.id)).toBeUndefined();
+    expect(tabsStore.tabs.find((t) => t.id === b.id)).toBeUndefined();
+    expect(tabsStore.tabs.find((t) => t.id === c.id)).toBeUndefined();
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([d.id]);
   });
 
   test('a permanent open never evicts the cohort', () => {
@@ -147,19 +141,19 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
     const a = openFile(ws, 'a.ts', true, false);
     const b = openFile(ws, 'b.ts', true, true);
     const permanent = openFile(ws, 'keep.ts', false);
-    expect(isPreview(a.id)).toBe(true);
-    expect(isPreview(b.id)).toBe(true);
+    expect(tabsStore.isPreview(a.id)).toBe(true);
+    expect(tabsStore.isPreview(b.id)).toBe(true);
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, b.id, permanent.id]);
   });
 
   // P79 review fix (Performance, MEDIUM): evicting a large cohort ("Open all changes" on a
-  // many-file commit) used to call closeTab() per evicted tab, each doing its own synchronous
+  // many-file commit) used to call tabsStore.closeTab() per evicted tab, each doing its own synchronous
   // full-array control.tabsSave() round trip. Asserts the whole eviction now costs exactly one.
   test('evicting a large cohort in one go saves exactly once', () => {
     const ws = freshWorkspace();
     openFile(ws, 'seed.ts', true, false);
     for (let i = 0; i < 20; i++) openFile(ws, `bulk${i}.ts`, true, true);
-    expect(tabsState.previewIdsByWorkspace[ws]?.length).toBe(21);
+    expect(tabsStore.previewIdsByWorkspace[ws]?.length).toBe(21);
 
     let saveCalls = 0;
     const original = control.tabsSave;
@@ -174,7 +168,7 @@ describe('P74 §5.2: the preview cohort ("Open all changes")', () => {
       (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = original;
     }
     expect(saveCalls).toBe(1);
-    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([evictor.id]);
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([evictor.id]);
   });
 });
 
@@ -186,23 +180,23 @@ describe('P79 review fix: openRepoCommitDiffTab reuse still evicts the preview c
 
     // file 0's diff tab already exists as a permanent (pinned) tab.
     const file0 = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, true);
-    expect(isPreview(file0.id)).toBe(false);
+    expect(tabsStore.isPreview(file0.id)).toBe(false);
 
     // An unrelated preview tab is open in the same workspace beforehand.
     const stale = openRepoFileTab(repoId, 'unrelated.ts', { preview: true });
-    expect(isPreview(stale.id)).toBe(true);
+    expect(tabsStore.isPreview(stale.id)).toBe(true);
 
     // "Open all changes": file 0 reuses its existing permanent tab (pinned: false,
     // previewCohort unset) — the reuse short-circuit must still evict the stale cohort.
     const reused = openRepoCommitDiffTab(repoId, 'a.ts', 'base', 'sha1', diffLabels, false);
     expect(reused.id).toBe(file0.id);
     expect(reused.reused).toBe(true);
-    expect(tabsState.tabs.find((t) => t.id === stale.id)).toBeUndefined();
-    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([file0.id]);
+    expect(tabsStore.tabs.find((t) => t.id === stale.id)).toBeUndefined();
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([file0.id]);
 
     // file 1 joins the cohort file 0 just started.
     const file1 = openRepoCommitDiffTab(repoId, 'b.ts', 'base', 'sha1', diffLabels, false, true);
-    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([file0.id, file1.id]);
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([file0.id, file1.id]);
   });
 });
 
@@ -213,44 +207,44 @@ describe('P74 §6: promoting a preview tab on double click', () => {
     const b = openFile(ws, 'b.ts', true, true);
     const c = openFile(ws, 'c.ts', true, true);
 
-    promoteTab(b.id);
-    expect(isPreview(a.id)).toBe(true);
-    expect(isPreview(b.id)).toBe(false);
-    expect(isPreview(c.id)).toBe(true);
-    expect(tabsState.previewIdsByWorkspace[ws]).toEqual([a.id, c.id]);
+    tabsStore.promoteTab(b.id);
+    expect(tabsStore.isPreview(a.id)).toBe(true);
+    expect(tabsStore.isPreview(b.id)).toBe(false);
+    expect(tabsStore.isPreview(c.id)).toBe(true);
+    expect(tabsStore.previewIdsByWorkspace[ws]).toEqual([a.id, c.id]);
   });
 
   test('a promoted tab survives a later cohort-evicting preview open', () => {
     const ws = freshWorkspace();
     const a = openFile(ws, 'a.ts', true, false);
     const b = openFile(ws, 'b.ts', true, true);
-    promoteTab(a.id);
+    tabsStore.promoteTab(a.id);
 
     const c = openFile(ws, 'c.ts', true, false); // evicts only b, the one still previewed
-    expect(tabsState.tabs.find((t) => t.id === a.id)).toBeDefined();
-    expect(tabsState.tabs.find((t) => t.id === b.id)).toBeUndefined();
+    expect(tabsStore.tabs.find((t) => t.id === a.id)).toBeDefined();
+    expect(tabsStore.tabs.find((t) => t.id === b.id)).toBeUndefined();
     expect(tabsForWorkspace(ws).map((t) => t.id)).toEqual([a.id, c.id]);
   });
 
   test('promoting a tab that is not in any preview cohort is a no-op', () => {
     const ws = freshWorkspace();
     const permanent = openFile(ws, 'p.ts', false);
-    promoteTab(permanent.id);
-    expect(isPreview(permanent.id)).toBe(false);
-    expect(tabsState.tabs.find((t) => t.id === permanent.id)).toBeDefined();
+    tabsStore.promoteTab(permanent.id);
+    expect(tabsStore.isPreview(permanent.id)).toBe(false);
+    expect(tabsStore.tabs.find((t) => t.id === permanent.id)).toBeDefined();
   });
 });
 
 describe('C5 §6.1: the pinned tab', () => {
   test('tabsForWorkspace puts the pinned tab first after a moveTab that tried to drag another tab in front of it', () => {
     const ws = freshWorkspace();
-    const graph = createPinnedRepoGraphTab(ws);
+    const graph = tabsStore.createPinnedRepoGraphTab(ws);
     const file1 = openFile(ws, 'f1.ts', false);
     const file2 = openFile(ws, 'f2.ts', false);
 
     // Attempt to drag file2 in front of the pinned graph tab — moveTab must refuse outright since
     // the drop target (graph) is pinned.
-    moveTab(file2.id, graph.id);
+    tabsStore.moveTab(file2.id, graph.id);
 
     const order = tabsForWorkspace(ws).map((t) => t.id);
     expect(order[0]).toBe(graph.id);
@@ -259,37 +253,37 @@ describe('C5 §6.1: the pinned tab', () => {
 
   test('moveTab on the pinned tab itself is a no-op', () => {
     const ws = freshWorkspace();
-    const graph = createPinnedRepoGraphTab(ws);
+    const graph = tabsStore.createPinnedRepoGraphTab(ws);
     const file1 = openFile(ws, 'g1.ts', false);
-    const before = tabsState.tabs.map((t) => t.id);
-    moveTab(graph.id, file1.id);
-    expect(tabsState.tabs.map((t) => t.id)).toEqual(before);
+    const before = tabsStore.tabs.map((t) => t.id);
+    tabsStore.moveTab(graph.id, file1.id);
+    expect(tabsStore.tabs.map((t) => t.id)).toEqual(before);
   });
 
   test('closeTab, closeOthers and closeAll all leave the pinned tab alive', () => {
     const ws = freshWorkspace();
-    const graph = createPinnedRepoGraphTab(ws);
+    const graph = tabsStore.createPinnedRepoGraphTab(ws);
     const file1 = openFile(ws, 'h1.ts', false);
     const file2 = openFile(ws, 'h2.ts', false);
 
-    closeTab(graph.id); // §6.1: a pinned tab never closes.
-    expect(tabsState.tabs.some((t) => t.id === graph.id)).toBe(true);
+    tabsStore.closeTab(graph.id); // §6.1: a pinned tab never closes.
+    expect(tabsStore.tabs.some((t) => t.id === graph.id)).toBe(true);
 
-    closeOthers(file1.id);
-    expect(tabsState.tabs.some((t) => t.id === graph.id)).toBe(true);
-    expect(tabsState.tabs.some((t) => t.id === file2.id)).toBe(false);
+    tabsStore.closeOthers(file1.id);
+    expect(tabsStore.tabs.some((t) => t.id === graph.id)).toBe(true);
+    expect(tabsStore.tabs.some((t) => t.id === file2.id)).toBe(false);
 
-    closeAll();
-    expect(tabsState.tabs.some((t) => t.id === graph.id)).toBe(true);
+    tabsStore.closeAll();
+    expect(tabsStore.tabs.some((t) => t.id === graph.id)).toBe(true);
     expect(tabsForWorkspace(ws).filter((t) => t.id !== graph.id).length).toBe(0);
   });
 
   test('duplicateTab refuses a pinned tab', () => {
     const ws = freshWorkspace();
-    const graph = createPinnedRepoGraphTab(ws);
-    const countBefore = tabsState.tabs.length;
-    const result = duplicateTab(graph.id);
+    const graph = tabsStore.createPinnedRepoGraphTab(ws);
+    const countBefore = tabsStore.tabs.length;
+    const result = tabsStore.duplicateTab(graph.id);
     expect(result).toBe(graph.id);
-    expect(tabsState.tabs.length).toBe(countBefore);
+    expect(tabsStore.tabs.length).toBe(countBefore);
   });
 });

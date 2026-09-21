@@ -9,7 +9,7 @@ import { useConnectionsStore } from '../../state/connections';
 import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
-import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -23,6 +23,7 @@ import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../view
 const contextMenuStore = useContextMenuStore();
 const opsStore = useOpsStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 interface OpsListItem {
   key: string;
@@ -77,7 +78,7 @@ async function onCancel(record: OpRecord): Promise<void> {
 // instead of tabs.ts's own tabTitle, which falls back to the raw path (F4) and would print an
 // HTTP request tab's opaque constant 'request' path here.
 function tabTitleFor(record: OpRecord): string {
-  const tab = record.tabId ? tabsState.tabs.find((t) => t.id === record.tabId) : undefined;
+  const tab = record.tabId ? tabsStore.tabs.find((t) => t.id === record.tabId) : undefined;
   return tab ? TAB_KINDS[tab.kind].title(tab) : '—';
 }
 
@@ -85,8 +86,8 @@ function tabTitleFor(record: OpRecord): string {
 // closed, never an error. A plain click just expands the row's command/error detail; it used to
 // also jump to the originating tab, which surprised anyone just trying to read a log entry.
 function revealTab(record: OpRecord): void {
-  if (record.tabId && tabsState.tabs.some((t) => t.id === record.tabId)) {
-    activateTab(record.tabId);
+  if (record.tabId && tabsStore.tabs.some((t) => t.id === record.tabId)) {
+    tabsStore.activateTab(record.tabId);
   }
 }
 
@@ -111,12 +112,12 @@ function onRerun(record: OpRecord): void {
     dollarQuoting: dollarQuotingFor(opSqlDialect(record)),
   }).map((s) => s.text);
   if (statements.length === 0) return;
-  const tabId = openConsoleTab(record.connectionId, '');
+  const tabId = tabsStore.openConsoleTab(record.connectionId, '');
   void runConsole(tabId, statements);
 }
 
 function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
-  const hasTab = record.tabId !== null && tabsState.tabs.some((t) => t.id === record.tabId);
+  const hasTab = record.tabId !== null && tabsStore.tabs.some((t) => t.id === record.tabId);
   const canSql = !!record.connectionId && connectionsStore.states[record.connectionId]?.caps?.sql;
   const items: MenuItem[] = [
     {

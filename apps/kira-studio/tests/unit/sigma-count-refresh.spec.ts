@@ -7,13 +7,16 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { openDocumentTab, openKeyValueTab, openStreamTab } = await import(
-  '../../frontend/src/state/tabs'
-);
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { runCount: runDocumentCount, runtime: documentRuntime } = await import(
   '../../frontend/src/views/documents/state'
 );
@@ -35,19 +38,19 @@ interface Case {
 const cases: Case[] = [
   {
     name: 'documents',
-    open: () => openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id,
+    open: () => tabsStore.openDocumentTab('conn-doc', 'db/coll', { newTab: true }).id,
     runCount: runDocumentCount,
     runtime: documentRuntime,
   },
   {
     name: 'keyvalue',
-    open: () => openKeyValueTab('conn-kv', 'db0/key:big', { newTab: true }).id,
+    open: () => tabsStore.openKeyValueTab('conn-kv', 'db0/key:big', { newTab: true }).id,
     runCount: runKeyValueCount,
     runtime: keyValueRuntime,
   },
   {
     name: 'stream',
-    open: () => openStreamTab('conn-strm', 'topic:events', { newTab: true }).id,
+    open: () => tabsStore.openStreamTab('conn-strm', 'topic:events', { newTab: true }).id,
     runCount: runStreamCount,
     runtime: streamRuntime,
   },

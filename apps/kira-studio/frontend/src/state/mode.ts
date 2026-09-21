@@ -5,7 +5,7 @@ import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { TAB_KINDS } from './tabKinds';
-import { tabsState } from './tabs';
+import { useTabsStore } from './tabs';
 import { useWorkspaceStore } from './workspace';
 
 // P22 D12: which module a window was in, so it reopens into the same one. `windows.bounds_json`'s
@@ -68,8 +68,9 @@ export const useModeStore = defineStore('mode', () => {
   }
 
   const activeTab = computed<TabRecord | null>(() => {
-    const id = tabsState.activeIdByWorkspace[workspaceStore.active];
-    return tabsState.tabs.find((t) => t.id === id) ?? null;
+    const tabsStore = useTabsStore();
+    const id = tabsStore.activeIdByWorkspace[workspaceStore.active];
+    return tabsStore.tabs.find((t) => t.id === id) ?? null;
   });
 
   return { ...toRefs(state), hydrateMode, setModule, setMode, activeTab };
@@ -91,7 +92,7 @@ export function workspaceKeyOf(tab: TabRecord): WorkspaceKey {
 export function tabsForWorkspace(key: WorkspaceKey): TabRecord[] {
   const pinned: TabRecord[] = [];
   const rest: TabRecord[] = [];
-  for (const t of tabsState.tabs) {
+  for (const t of useTabsStore().tabs) {
     if (workspaceKeyOf(t) !== key) continue;
     (TAB_KINDS[t.kind].pinned ? pinned : rest).push(t);
   }

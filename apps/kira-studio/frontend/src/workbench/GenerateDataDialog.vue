@@ -5,7 +5,7 @@ import { data } from '../bridge/data';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../state/connections';
 import { useFakeDataStore } from '../state/fakeData';
-import { findDataTab } from '../state/tabs';
+import { useTabsStore } from '../state/tabs';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -30,8 +30,9 @@ import { sqlDialectFor } from '../views/shared/sqlIdent';
 
 const fakeDataStore = useFakeDataStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 const tabId = computed(() => fakeDataStore.tabId);
-const tab = computed(() => (tabId.value ? findDataTab(tabId.value) : null));
+const tab = computed(() => (tabId.value ? tabsStore.findDataTab(tabId.value) : null));
 const connRecord = computed(() => connectionsStore.connectionRecord(tab.value?.connectionId));
 const caps = computed(() =>
   tab.value?.connectionId ? (connectionsStore.states[tab.value.connectionId]?.caps ?? null) : null,

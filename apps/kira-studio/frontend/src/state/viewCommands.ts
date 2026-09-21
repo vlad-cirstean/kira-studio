@@ -1,5 +1,5 @@
 import type { SortSpec } from '@shared/domain/queries';
-import { isHydrated, tabsState } from './tabs';
+import { useTabsStore } from './tabs';
 
 // P39 iter3 D5/D6: the leaf-registry inversion state/tabRuntime.ts already uses, applied to the six
 // project/ -> views/ edges (ProjectTree.vue's four reload imports, menus.ts's runCount/
@@ -91,10 +91,11 @@ export function browseInvalidate(connectionId: string, path: string): void {
 // four kinds a mutation ever targets — a Browse tab's path is a container, never a mutation's own
 // (connectionId, path).
 export function reloadTabsForTarget(connectionId: string, path: string, exceptTabId: string): void {
-  for (const tab of tabsState.tabs) {
+  const tabsStore = useTabsStore();
+  for (const tab of tabsStore.tabs) {
     if (tab.id === exceptTabId) continue;
     if (tab.connectionId !== connectionId || tab.path !== path) continue;
-    if (!isHydrated(tab.id)) continue;
+    if (!tabsStore.isHydrated(tab.id)) continue;
     switch (tab.kind) {
       case 'data':
       case 'document':

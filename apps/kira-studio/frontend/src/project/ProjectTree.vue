@@ -6,13 +6,7 @@ import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { useSchemaColumnsStore } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
 import { settingsState } from '../state/settings';
-import {
-  openBrowseTab,
-  openDataTab,
-  openDocumentTab,
-  openKeyValueTab,
-  openStreamTab,
-} from '../state/tabs';
+import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
@@ -33,6 +27,7 @@ import TreeRow from './TreeRow.vue';
 const contextMenuStore = useContextMenuStore();
 const schemaColumnsStore = useSchemaColumnsStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 // Double-click opens a data tab for a relation (§8.10's "Open data" — the same action) rather
 // than toggling the twisty, which the twisty button itself already does.
@@ -104,27 +99,27 @@ function onOpen(row: TreeRowVm): void {
     return;
   }
   if (OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = openDataTab(row.connectionId, row.path);
+    const { id, reused } = tabsStore.openDataTab(row.connectionId, row.path);
     if (reused) reloadTab('data', id);
     return;
   }
   if (DOCUMENT_OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = openDocumentTab(row.connectionId, row.path);
+    const { id, reused } = tabsStore.openDocumentTab(row.connectionId, row.path);
     if (reused) reloadTab('document', id);
     return;
   }
   if (KEYVALUE_OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = openKeyValueTab(row.connectionId, row.path);
+    const { id, reused } = tabsStore.openKeyValueTab(row.connectionId, row.path);
     if (reused) reloadTab('keyvalue', id);
     return;
   }
   if (STREAM_OPENABLE_KINDS.has(row.kind)) {
-    const { id, reused } = openStreamTab(row.connectionId, row.path);
+    const { id, reused } = tabsStore.openStreamTab(row.connectionId, row.path);
     if (reused) reloadTab('stream', id);
     return;
   }
   if (isKeyBrowserRow(row)) {
-    const { id, reused } = openBrowseTab(row.connectionId, row.path);
+    const { id, reused } = tabsStore.openBrowseTab(row.connectionId, row.path);
     if (reused) reloadTab('browse', id);
     return;
   }

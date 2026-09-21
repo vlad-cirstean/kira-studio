@@ -13,18 +13,7 @@ import { openRepoTerminalTab } from '../../state/repoTabs';
 import { openSettingsAt } from '../../state/settings';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
-import {
-  activateTab,
-  closeAll,
-  closeOthers,
-  closeTab,
-  closeToTheRight,
-  duplicateTab,
-  isPreview,
-  moveTab,
-  promoteTab,
-  tabsState,
-} from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { terminalDefaults } from '../../state/terminals';
 import { openTerminalTab, type TerminalLaunch } from '../../state/terminalTabs';
 import { useWorkspaceStore } from '../../state/workspace';
@@ -39,6 +28,7 @@ const codeReposStore = useCodeReposStore();
 const customScriptsStore = useCustomScriptsStore();
 const tabIncognitoStore = useTabIncognitoStore();
 const workspaceStore = useWorkspaceStore();
+const tabsStore = useTabsStore();
 
 function isPinned(tab: TabRecord): boolean {
   return TAB_KINDS[tab.kind].pinned === true;
@@ -73,18 +63,18 @@ function badgeFor(tab: TabRecord): { icon: string; tooltip: string } | null | un
 }
 
 function onClick(tab: TabRecord): void {
-  activateTab(tab.id);
+  tabsStore.activateTab(tab.id);
 }
 
 // §6.1: a pinned tab has no middle-click close.
 function onMiddleClick(tab: TabRecord): void {
   if (isPinned(tab)) return;
-  closeTab(tab.id);
+  tabsStore.closeTab(tab.id);
 }
 
 function onClose(e: MouseEvent, tab: TabRecord): void {
   e.stopPropagation();
-  closeTab(tab.id);
+  tabsStore.closeTab(tab.id);
 }
 
 // §8.10's Tab row: Close · Close others · Close to the right · Close all · — · Duplicate tab ·
@@ -115,28 +105,28 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
       // P21 D13: `tab.close` always closes the *active* tab, not the clicked one — printed anyway
       // (VS Code does the same on this exact row) since it's the keyboard route to this command.
       shortcut: 'tab.close',
-      run: () => closeTab(tab.id),
+      run: () => tabsStore.closeTab(tab.id),
     },
     {
       type: 'item',
       id: 'close-others',
       label: 'Close others',
-      run: () => closeOthers(tab.id),
+      run: () => tabsStore.closeOthers(tab.id),
     },
     {
       type: 'item',
       id: 'close-to-the-right',
       label: 'Close to the right',
-      run: () => closeToTheRight(tab.id),
+      run: () => tabsStore.closeToTheRight(tab.id),
     },
-    { type: 'item', id: 'close-all', label: 'Close all', run: () => closeAll() },
+    { type: 'item', id: 'close-all', label: 'Close all', run: () => tabsStore.closeAll() },
     { type: 'separator' },
     {
       type: 'item',
       id: 'duplicate-tab',
       label: 'Duplicate tab',
       icon: 'copy',
-      run: () => void duplicateTab(tab.id),
+      run: () => void tabsStore.duplicateTab(tab.id),
     },
     {
       type: 'item',
@@ -176,7 +166,7 @@ const scrollingTabs = computed(() =>
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
 // active tab could be selected yet scrolled out of view, with nothing on screen indicating a
 // selection had even happened until the user scrolled the strip by hand to go find it.
-const activeTabId = computed(() => tabsState.activeIdByWorkspace[workspaceStore.active]);
+const activeTabId = computed(() => tabsStore.activeIdByWorkspace[workspaceStore.active]);
 const stripRef = ref<HTMLElement | null>(null);
 
 watch(
@@ -199,10 +189,10 @@ function onWheel(e: WheelEvent): void {
   if (wheelToHorizontal(stripRef.value, e)) e.preventDefault();
 }
 
-// Drag-reorder (same shape as ColumnsMenu.vue's column drag): moveTab splices tabsState.tabs
+// Drag-reorder (same shape as ColumnsMenu.vue's column drag): moveTab splices tabsStore.tabs
 // live as the dragged tab crosses another one's midpoint, so the strip itself needs no local
 // copy. Tracks the dragged tab's id (P1 F15), not its index — this strip renders a filtered,
-// per-mode view of tabsState.tabs, so an index into it no longer addresses the same element in
+// per-mode view of tabsStore.tabs, so an index into it no longer addresses the same element in
 // the underlying array moveTab splices.
 const dragId = ref<string | null>(null);
 
@@ -214,7 +204,7 @@ function onDragStart(id: string): void {
 function onDragOver(id: string): void {
   const from = dragId.value;
   if (from === null || from === id) return;
-  moveTab(from, id);
+  tabsStore.moveTab(from, id);
   dragId.value = id;
 }
 function onDragEnd(): void {
@@ -398,7 +388,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         :class="{
           'is-active': tab.active,
           'is-dragging': dragId === tab.id,
-          'is-preview': isPreview(tab.id),
+          'is-preview': tabsStore.isPreview(tab.id),
           'is-incognito': tabIncognitoStore.isIncognito(tab.id),
           'is-attention': isAttention(tab),
         }"
@@ -406,7 +396,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         :data-tab-id="tab.id"
         :data-tab-kind="tab.kind"
         :data-active="tab.active"
-        :data-preview="isPreview(tab.id)"
+        :data-preview="tabsStore.isPreview(tab.id)"
         data-pinned="false"
         :data-incognito="tabIncognitoStore.isIncognito(tab.id)"
         :data-attention="isAttention(tab)"
@@ -414,7 +404,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         :style="{ '--kira-rail': connColorVar(colorFor(tab)) }"
         draggable="true"
         @click="onClick(tab)"
-        @dblclick="promoteTab(tab.id)"
+        @dblclick="tabsStore.promoteTab(tab.id)"
         @auxclick.middle="onMiddleClick(tab)"
         @contextmenu.prevent="onContextMenu($event, tab)"
         @dragstart="onDragStart(tab.id)"

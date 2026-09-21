@@ -22,7 +22,7 @@ import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { queryClient } from './state/queryClient';
 import { ensureWorkspaceShell } from './state/repoTabs';
-import { hydrateTabs } from './state/tabs';
+import { useTabsStore } from './state/tabs';
 import { hydrateTerminalDefaults } from './state/terminals';
 import './theme/base.css';
 import { useLayoutStore } from './state/layout';
@@ -307,6 +307,7 @@ async function bootstrap(): Promise<void> {
   const opsStore = useOpsStore(pinia);
   const layoutStore = useLayoutStore(pinia);
   const connectionsStore = useConnectionsStore(pinia);
+  const tabsStore = useTabsStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -333,7 +334,7 @@ async function bootstrap(): Promise<void> {
     agentSessionsStore.initAgentSessions(),
     keepAwakeStore.initKeepAwake(),
     opsStore.hydrateOps(),
-    hydrateTabs(),
+    tabsStore.hydrateTabs(),
   ]);
   // C5 §4.2: hydrateTabs() already derived workspaceStore.openRepos from the restored tabs
   // themselves, but it cannot yet tell a live repo from one removed since this window last saved

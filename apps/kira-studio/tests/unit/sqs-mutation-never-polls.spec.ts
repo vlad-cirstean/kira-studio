@@ -21,7 +21,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useConnectionsStore } = await import('../../frontend/src/state/connections');
 const connectionsStore = useConnectionsStore();
-const { openStreamTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { reload, runtime } = await import('../../frontend/src/views/stream/state');
 const { reloadTabsForTarget } = await import('../../frontend/src/state/viewCommands');
 const { registerTabRuntimeCleanup } = await import('../../frontend/src/state/tabRuntime');
@@ -70,7 +71,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
   test('reload() on a batch-paginated (SQS) tab does not call data.read', async () => {
     const connectionId = 'sqs-conn-1';
     markConnected(connectionId, sqsCaps);
-    const { id } = openStreamTab(connectionId, 'queue:orders', { newTab: true });
+    const { id } = tabsStore.openStreamTab(connectionId, 'queue:orders', { newTab: true });
     runtime[id] = {
       status: 'idle',
       error: null,
@@ -112,8 +113,8 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
   test('reloadTabsForTarget fanning out to a sibling SQS stream tab does not poll it either', async () => {
     const connectionId = 'sqs-conn-2';
     markConnected(connectionId, sqsCaps);
-    const mutatingTab = openStreamTab(connectionId, 'queue:events', { newTab: true });
-    const siblingTab = openStreamTab(connectionId, 'queue:events', { newTab: true });
+    const mutatingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true });
+    const siblingTab = tabsStore.openStreamTab(connectionId, 'queue:events', { newTab: true });
     runtime[siblingTab.id] = {
       status: 'idle',
       error: null,
@@ -152,7 +153,7 @@ describe('SQS reload() never triggers a real ReceiveMessage (P21 round 2 functio
   test('a non-batch (Kafka) stream tab still reloads normally', async () => {
     const connectionId = 'kafka-conn-1';
     markConnected(connectionId, { ...sqsCaps, pagination: 'offsetWindow', canDelete: false });
-    const { id } = openStreamTab(connectionId, 'topic:events', { newTab: true });
+    const { id } = tabsStore.openStreamTab(connectionId, 'topic:events', { newTab: true });
     runtime[id] = {
       status: 'idle',
       error: null,

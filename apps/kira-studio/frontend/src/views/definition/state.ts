@@ -3,7 +3,7 @@ import type { ObjectMeta } from '@shared/domain/tree';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { tabsState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
 
 interface DefinitionViewRuntime {
@@ -30,7 +30,7 @@ registerTabRuntimeCleanup((tabId) => {
 });
 
 function findTab(tabId: string) {
-  return tabsState.tabs.find((t) => t.id === tabId && t.kind === 'definition') ?? null;
+  return useTabsStore().tabs.find((t) => t.id === tabId && t.kind === 'definition') ?? null;
 }
 
 // Deliberately simpler than the grid's load(): there is no op-id bookkeeping and no supersession

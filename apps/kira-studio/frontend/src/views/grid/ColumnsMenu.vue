@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
 import { computed, ref } from 'vue';
-import { findDataTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
@@ -21,10 +21,10 @@ const pkNames = computed(
 );
 
 function currentProjection(): string[] | null {
-  return findDataTab(props.tabId)?.state.projection ?? null;
+  return useTabsStore().findDataTab(props.tabId)?.state.projection ?? null;
 }
 function currentColumnOrder(): string[] | null {
-  return findDataTab(props.tabId)?.state.columnOrder ?? null;
+  return useTabsStore().findDataTab(props.tabId)?.state.columnOrder ?? null;
 }
 
 const selected = ref<Set<string>>(new Set(currentProjection() ?? columnNames.value));

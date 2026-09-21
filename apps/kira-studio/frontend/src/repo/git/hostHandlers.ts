@@ -35,7 +35,7 @@ import {
   openRepoMultiDiffTab,
   openRepoReviewDiffTab,
 } from '../../state/repoTabs';
-import { activateTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { useRepoPanelTabStore } from '../state/search';
 import { loadReviewSession, pinnedGraphTabId, saveReviewSession } from './reviewSession';
 
@@ -394,7 +394,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
       if (!deps.emitLocal('ui.action', { action: 'revealCommit', target })) {
         stashPendingBlameReveal(codeRepoId, target);
       }
-      activateTab(graphTabId);
+      useTabsStore().activateTab(graphTabId);
       return { revealed: true };
     },
 

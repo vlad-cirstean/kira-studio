@@ -23,7 +23,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useConnectionsStore } = await import('../../frontend/src/state/connections');
 const connectionsStore = useConnectionsStore();
-const { openConsoleTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { run, stop, runtime } = await import('../../frontend/src/views/console/state');
 
 function deferred<T>(): {
@@ -52,7 +53,7 @@ describe("console overlapping runs must not clobber each other's explainOpId (P1
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),
     } as ConnectionSummary);
-    const tabId = openConsoleTab(connectionId, 'db');
+    const tabId = tabsStore.openConsoleTab(connectionId, 'db');
 
     type Call = {
       opId: string;

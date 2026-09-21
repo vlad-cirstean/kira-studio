@@ -19,14 +19,7 @@ import {
   type VariableSetTabState,
 } from '@shared/domain/tabs';
 import type { VariableScope } from '@shared/domain/variables';
-import {
-  activateTab,
-  closeTab,
-  type OpenTabResult,
-  openTab,
-  patchTabState,
-  tabsState,
-} from '../state/tabs';
+import { type OpenTabResult, useTabsStore } from '../state/tabs';
 
 // P12 D9: the module's own tab helpers, moved out of state/tabs.ts (§1.4) — these are the
 // module's own code that happened to be written in a shell file, so this is a cut-and-paste onto
@@ -37,9 +30,15 @@ import {
 // `connectionId` is null (F3) and `path` is the literal constant 'request' (D2: non-empty per
 // F2, carrying no false uniqueness, safe through pathTail per F4).
 export function openApiRequestTab(): string {
-  return openTab('http-request', null, 'request', () => defaultHttpRequestTabState(), {
-    reuse: false,
-  }).id;
+  return useTabsStore().openTab(
+    'http-request',
+    null,
+    'request',
+    () => defaultHttpRequestTabState(),
+    {
+      reuse: false,
+    },
+  ).id;
 }
 
 // P4 D14: a saved request opens the **existing** 'http-request' tab kind — the same view P2 and
@@ -59,11 +58,12 @@ export function openCollectionRequestTab(
   name: string,
   saved: HttpSavedRequest,
 ): OpenTabResult {
-  const existing = tabsState.tabs.find(
+  const tabsStore = useTabsStore();
+  const existing = tabsStore.tabs.find(
     (t) => t.kind === 'http-request' && (t as HttpRequestTabRecord).state.itemId === itemId,
   );
   if (existing) {
-    activateTab(existing.id);
+    tabsStore.activateTab(existing.id);
     return { id: existing.id, reused: true };
   }
   // D4: the one boundary where a stored saved request becomes tab state, and so the one place it
@@ -75,13 +75,13 @@ export function openCollectionRequestTab(
     itemId,
     name,
   });
-  return openTab('http-request', null, 'request', () => state, { reuse: false });
+  return tabsStore.openTab('http-request', null, 'request', () => state, { reuse: false });
 }
 
 /** Renaming a request in the tree patches every tab bound to it, so the view header and the tab
  *  strip follow immediately (D14). A tab whose row was deleted keeps the name it last knew. */
 export function renameApiRequestTabs(itemId: string, name: string): void {
-  for (const tab of tabsState.tabs) {
+  for (const tab of useTabsStore().tabs) {
     if (tab.kind !== 'http-request') continue;
     if ((tab as HttpRequestTabRecord).state.itemId !== itemId) continue;
     patchHttpRequestTabState(tab.id, { name });
@@ -92,9 +92,15 @@ export function renameApiRequestTabs(itemId: string, name: string): void {
 // identical reasoning throughout (always fresh, no target to reuse by; a saved request opens the
 // existing kind with state sourced from the collection row instead of the default).
 export function openGrpcRequestTab(): string {
-  return openTab('grpc-request', null, 'request', () => defaultGrpcRequestTabState(), {
-    reuse: false,
-  }).id;
+  return useTabsStore().openTab(
+    'grpc-request',
+    null,
+    'request',
+    () => defaultGrpcRequestTabState(),
+    {
+      reuse: false,
+    },
+  ).id;
 }
 
 export function openCollectionGrpcRequestTab(
@@ -102,11 +108,12 @@ export function openCollectionGrpcRequestTab(
   name: string,
   saved: GrpcSavedRequest,
 ): OpenTabResult {
-  const existing = tabsState.tabs.find(
+  const tabsStore = useTabsStore();
+  const existing = tabsStore.tabs.find(
     (t) => t.kind === 'grpc-request' && (t as GrpcRequestTabRecord).state.itemId === itemId,
   );
   if (existing) {
-    activateTab(existing.id);
+    tabsStore.activateTab(existing.id);
     return { id: existing.id, reused: true };
   }
   const state = grpcRequestTabStateSchema.parse({
@@ -115,11 +122,11 @@ export function openCollectionGrpcRequestTab(
     itemId,
     name,
   });
-  return openTab('grpc-request', null, 'request', () => state, { reuse: false });
+  return tabsStore.openTab('grpc-request', null, 'request', () => state, { reuse: false });
 }
 
 export function renameGrpcRequestTabs(itemId: string, name: string): void {
-  for (const tab of tabsState.tabs) {
+  for (const tab of useTabsStore().tabs) {
     if (tab.kind !== 'grpc-request') continue;
     if ((tab as GrpcRequestTabRecord).state.itemId !== itemId) continue;
     patchGrpcRequestTabState(tab.id, { name });
@@ -130,19 +137,19 @@ export function renameGrpcRequestTabs(itemId: string, name: string): void {
 // (D9) is rare enough that the extra write is not worth the comparison every other patcher above
 // already accepts skipping for a hotter path (scroll offsets, page index).
 export function patchHttpRequestTabState(id: string, patch: Partial<HttpRequestTabState>): void {
-  patchTabState(id, 'http-request', patch, { skipUnchanged: false });
+  useTabsStore().patchTabState(id, 'http-request', patch, { skipUnchanged: false });
 }
 
 export function patchGrpcRequestTabState(id: string, patch: Partial<GrpcRequestTabState>): void {
-  patchTabState(id, 'grpc-request', patch, { skipUnchanged: false });
+  useTabsStore().patchTabState(id, 'grpc-request', patch, { skipUnchanged: false });
 }
 
 export function findHttpRequestTab(id: string): HttpRequestTabRecord | null {
-  return asHttpRequestTab(tabsState.tabs.find((t) => t.id === id));
+  return asHttpRequestTab(useTabsStore().tabs.find((t) => t.id === id));
 }
 
 export function findGrpcRequestTab(id: string): GrpcRequestTabRecord | null {
-  return asGrpcRequestTab(tabsState.tabs.find((t) => t.id === id));
+  return asGrpcRequestTab(useTabsStore().tabs.find((t) => t.id === id));
 }
 
 // P17 D16: one tab kind, reused by scope — a collection's variable set and an environment's are
@@ -158,19 +165,19 @@ export function openVariableSetTab(
 ): OpenTabResult {
   const path = `variables:${scope}:${ownerId}`;
   const state: VariableSetTabState = { scope, ownerId, name };
-  return openTab('variable-set', null, path, () => state, { reuse: true });
+  return useTabsStore().openTab('variable-set', null, path, () => state, { reuse: true });
 }
 
 /** P28 D16(c): the environment list, as a tab. `reuse: true` over a fixed path, so the action
  *  focuses the existing tab rather than stacking duplicates. */
 export function openEnvironmentsTab(): OpenTabResult {
-  return openTab('environments', null, 'environments', () => ({}), { reuse: true });
+  return useTabsStore().openTab('environments', null, 'environments', () => ({}), { reuse: true });
 }
 
 /** Renaming a collection or environment patches every open tab bound to it (D16), the same
  *  `renameApiRequestTabs`/`renameGrpcRequestTabs` shape. */
 export function renameVariableSetTabs(scope: VariableScope, ownerId: string, name: string): void {
-  for (const tab of tabsState.tabs) {
+  for (const tab of useTabsStore().tabs) {
     if (tab.kind !== 'variable-set') continue;
     const vt = tab as VariableSetTabRecord;
     if (vt.state.scope !== scope || vt.state.ownerId !== ownerId) continue;
@@ -179,15 +186,16 @@ export function renameVariableSetTabs(scope: VariableScope, ownerId: string, nam
 }
 
 function patchVariableSetTabState(id: string, patch: Partial<VariableSetTabState>): void {
-  patchTabState(id, 'variable-set', patch, { skipUnchanged: false });
+  useTabsStore().patchTabState(id, 'variable-set', patch, { skipUnchanged: false });
 }
 
 /** Deleting a collection or an environment closes any open tab for it (D16) — unlike a request
  *  tab, a variable-set tab has no state of its own worth preserving once its owner is gone. */
 export function closeVariableSetTabsForOwner(scope: VariableScope, ownerId: string): void {
-  for (const tab of [...tabsState.tabs]) {
+  const tabsStore = useTabsStore();
+  for (const tab of [...tabsStore.tabs]) {
     if (tab.kind !== 'variable-set') continue;
     const vt = tab as VariableSetTabRecord;
-    if (vt.state.scope === scope && vt.state.ownerId === ownerId) closeTab(tab.id);
+    if (vt.state.scope === scope && vt.state.ownerId === ownerId) tabsStore.closeTab(tab.id);
   }
 }

@@ -1,10 +1,16 @@
-import { findDocumentTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { createImmediateMutator } from '../shared/immediateMutation';
 import { reload } from './state';
 
 // Documents mutate immediately (P8's ground rules — §8.7 never mentions staging/preview, unlike
 // §8.5's grid section) — no pendingChanges.ts-style staged plan, no preview step.
-const mutate = createImmediateMutator({ findTab: findDocumentTab, reload });
+// A thunk, not a direct `useTabsStore().findDocumentTab` reference — this module evaluates before
+// `app.use(pinia)` (main.ts's own static import chain), so the store must not resolve until
+// `findTab` is actually called (always post-mount, from a real mutation).
+const mutate = createImmediateMutator({
+  findTab: (tabId: string) => useTabsStore().findDocumentTab(tabId),
+  reload,
+});
 
 export async function saveDocumentEdit(
   tabId: string,

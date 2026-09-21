@@ -19,7 +19,7 @@
  */
 import type { PersistedViewState, ViewStateStore } from '@kira/git-ui';
 import { asRepoGraphTab } from '@shared/domain/tabs';
-import { patchRepoGraphTabState, tabsState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 
 export class TabViewStateStore implements ViewStateStore {
   readonly #tabId: string;
@@ -31,12 +31,12 @@ export class TabViewStateStore implements ViewStateStore {
   }
 
   read(): PersistedViewState | null {
-    const tab = asRepoGraphTab(tabsState.tabs.find((t) => t.id === this.#tabId));
+    const tab = asRepoGraphTab(useTabsStore().tabs.find((t) => t.id === this.#tabId));
     if (!tab) return null;
     return this.#parse(tab.state.viewState);
   }
 
   write(state: PersistedViewState): void {
-    patchRepoGraphTabState(this.#tabId, { viewState: state });
+    useTabsStore().patchRepoGraphTabState(this.#tabId, { viewState: state });
   }
 }

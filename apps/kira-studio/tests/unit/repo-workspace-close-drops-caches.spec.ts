@@ -17,11 +17,12 @@ const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 
 const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
-const { tabsState } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const { useFileTreeStore } = await import('../../frontend/src/repo/state/fileTree');
 const { useRepoSearchStore } = await import('../../frontend/src/repo/state/search');
 const { useWorkspaceStore } = await import('../../frontend/src/state/workspace');
 
+const tabsStore = useTabsStore();
 const workspaceStore = useWorkspaceStore();
 const fileTreeStore = useFileTreeStore();
 const repoSearchStore = useRepoSearchStore();
@@ -76,7 +77,7 @@ describe('C13-3: closeRepoWorkspace drops per-repo caches', () => {
     expect(repoSearchStore.repoSearchQuery(repoId)).toBe('');
 
     const workspaceId = repoWorkspaceKey(repoId);
-    expect(tabsState.tabs.some((t) => (t.workspaceId ?? null) === workspaceId)).toBe(false);
+    expect(tabsStore.tabs.some((t) => (t.workspaceId ?? null) === workspaceId)).toBe(false);
 
     // Reopening the same repo in the same session must rebuild cleanly rather than surface stale
     // (already-dropped) cache state.

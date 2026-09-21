@@ -25,7 +25,7 @@ import { useConnectionsStore } from '../../state/connections';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
 import { correlationKeyFor, loadMaskRules, maskRulesFor, maskRulesQueryKey } from '../../state/maskRules';
 import { appearanceVersion, settingsState } from '../../state/settings';
-import { findDataTab, patchDataTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';
 import AppButton from '../../theme/primitives/AppButton.vue';
@@ -109,6 +109,7 @@ const cellSelectionStore = useCellSelectionStore();
 const pageSearchFilterStore = usePageSearchFilterStore();
 const pendingChangesStore = usePendingChangesStore();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 // P22 spike (§6 D3) — a from-scratch Vue host for SlickGrid, on editor/CodeMirrorHost.vue's own
 // established shape for wrapping an imperative library: one ref root div, the instance held in a
@@ -130,7 +131,7 @@ const props = defineProps<{ tabId: string }>();
 type KiraColumn = Column<any>;
 
 function tab() {
-  return findDataTab(props.tabId);
+  return tabsStore.findDataTab(props.tabId);
 }
 
 const rowHeight = computed(() => (settingsState.appearance.rowDensity === 'compact' ? 22 : 28));
@@ -845,7 +846,7 @@ function onViewportScrollPersist(): void {
   if (!el) return;
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
   scrollSaveTimer = setTimeout(() => {
-    patchDataTabState(props.tabId, { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
+    tabsStore.patchDataTabState(props.tabId, { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
   }, 300);
 }
 
@@ -1417,7 +1418,7 @@ function onColumnsResized(): void {
     widths[String(col.id)] = col.width;
   }
   suppressWidthEcho = true;
-  patchDataTabState(props.tabId, { columnWidths: widths });
+  tabsStore.patchDataTabState(props.tabId, { columnWidths: widths });
   suppressWidthEcho = false;
 }
 

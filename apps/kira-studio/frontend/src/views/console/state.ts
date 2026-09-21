@@ -6,7 +6,7 @@ import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findConsoleTab, patchConsoleTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { useDocumentRowsStore } from '../shared/document/rows';
 import { applyLoadFailure, classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { explainStatementsFor, isExplainable } from './explain';
@@ -278,11 +278,11 @@ export function activePage(tabId: string): Page | null {
 }
 
 export function setText(tabId: string, text: string): void {
-  patchConsoleTabState(tabId, { text });
+  useTabsStore().patchConsoleTabState(tabId, { text });
 }
 
 export function setNewResultSet(tabId: string, on: boolean): void {
-  patchConsoleTabState(tabId, { newResultSet: on });
+  useTabsStore().patchConsoleTabState(tabId, { newResultSet: on });
 }
 
 // D19: a pasted 200-statement script must not become 200 EXPLAINs — auto-explain skips itself
@@ -377,7 +377,7 @@ async function autoExplainCheck(
 // D-plan) mean there is exactly one op-log row and one success/failure outcome per call.
 export async function run(tabId: string, statements: string[]): Promise<void> {
   if (statements.length === 0) return;
-  const tab = findConsoleTab(tabId);
+  const tab = useTabsStore().findConsoleTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   const opId = crypto.randomUUID();
@@ -516,7 +516,7 @@ export function showAutoExplainPlan(tabId: string): void {
  *  "Show plan" action (below, same file) so it can push a plan it already parsed without a second
  *  round trip. */
 function pushPlanResult(tabId: string, statement: string, plan: QueryPlan): void {
-  const tab = findConsoleTab(tabId);
+  const tab = useTabsStore().findConsoleTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
   if (!tab.state.newResultSet) dropResults(tabId);
@@ -537,7 +537,7 @@ export async function explain(
   kind: ConnectionKind,
   statement: string,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const tab = findConsoleTab(tabId);
+  const tab = useTabsStore().findConsoleTab(tabId);
   if (!tab?.connectionId) return { ok: false, reason: 'no active connection' };
   const statements = explainStatementsFor(kind, statement);
   if (statements.length === 0) return { ok: false, reason: 'this console has nothing to explain' };

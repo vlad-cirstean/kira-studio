@@ -1,7 +1,7 @@
 import type { ConnectionStatus } from '@shared/domain/connection';
 import { type ComputedRef, computed } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
-import { isHydrated, markHydrated } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 
 /**
  * §8.4's reconnect gate, once — grid/documents/keyvalue/stream/definition/console each wrote out
@@ -27,7 +27,7 @@ export function useConnectionGate(
 
   // §8.4: a restored tab shows only the reconnect button until pressed — nothing loads automatically.
   const needsReconnect = computed(
-    () => !isHydrated(tab().id) || connectionStatus.value !== 'connected',
+    () => !useTabsStore().isHydrated(tab().id) || connectionStatus.value !== 'connected',
   );
 
   async function onReconnectAndLoad(): Promise<void> {
@@ -36,7 +36,7 @@ export function useConnectionGate(
     if (connectionStatus.value !== 'connected') {
       await useConnectionsStore().connectConnection(connectionId);
     }
-    markHydrated(tab().id);
+    useTabsStore().markHydrated(tab().id);
     await onLoad?.();
   }
 

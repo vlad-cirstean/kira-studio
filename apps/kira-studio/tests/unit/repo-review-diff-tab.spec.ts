@@ -7,7 +7,11 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
@@ -15,7 +19,8 @@ restoreAfterEach(control);
 
 const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
 const { asRepoDiffTab } = await import('../../../../packages/shared/domain/tabs');
-const { tabsState } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { openRepoReviewDiffTab } = await import('../../frontend/src/state/repoTabs');
 
 let workspaceCounter = 0;
@@ -53,11 +58,11 @@ describe('C13-1: openRepoReviewDiffTab reuse predicate', () => {
     expect(originMain.reused).toBe(false);
 
     const workspaceId = repoWorkspaceKey(repoId);
-    const tabsInWorkspace = tabsState.tabs.filter((t) => (t.workspaceId ?? null) === workspaceId);
+    const tabsInWorkspace = tabsStore.tabs.filter((t) => (t.workspaceId ?? null) === workspaceId);
     expect(tabsInWorkspace.length).toBe(2);
 
-    const mainTab = tabsState.tabs.find((t) => t.id === main.id);
-    const originTab = tabsState.tabs.find((t) => t.id === originMain.id);
+    const mainTab = tabsStore.tabs.find((t) => t.id === main.id);
+    const originTab = tabsStore.tabs.find((t) => t.id === originMain.id);
     const mainDiff = mainTab ? asRepoDiffTab(mainTab) : null;
     const originDiff = originTab ? asRepoDiffTab(originTab) : null;
     expect(mainDiff?.state.review?.branch).toBe('main');

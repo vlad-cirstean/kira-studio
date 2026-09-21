@@ -4,7 +4,7 @@ import { decodePath } from '@shared/domain/tree';
 import { copyText } from '../../clipboard';
 import type { MenuItem } from '../../state/contextMenu';
 import { maskRulesFor, removeMaskRule, upsertMaskRule } from '../../state/maskRules';
-import { openDataTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import {
   type RowSnapshot,
   rowsToCsv,
@@ -102,7 +102,9 @@ function navigateForeignKey(entry: ForeignKeyMeta, ctx: FkNavContext): void {
     ctx.rowValues,
   );
   if (filter === null) return;
-  const { id: tabId } = openDataTab(ctx.connectionId, entry.referencedPath, { newTab: true });
+  const { id: tabId } = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
+    newTab: true,
+  });
   void setFilter(tabId, filter);
 }
 
@@ -126,7 +128,9 @@ async function editReferencedRow(entry: ForeignKeyMeta, ctx: FkNavContext): Prom
     ctx.rowValues,
   );
   if (filter === null) return;
-  const { id: tabId } = openDataTab(ctx.connectionId, entry.referencedPath, { newTab: true });
+  const { id: tabId } = useTabsStore().openDataTab(ctx.connectionId, entry.referencedPath, {
+    newTab: true,
+  });
   await setFilter(tabId, filter);
   requestCellFocus(tabId, { row: 0, prefer: 'first-non-key', edit: true });
 }

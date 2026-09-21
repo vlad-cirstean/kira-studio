@@ -8,7 +8,7 @@ import { findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { useConnectionsStore } from '../../state/connections';
-import { openConsoleTab, patchDefinitionTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -35,6 +35,7 @@ import ValidationSection from './ValidationSection.vue';
 // DataView.vue.
 const props = defineProps<{ tab: DefinitionTabRecord }>();
 const connectionsStore = useConnectionsStore();
+const tabsStore = useTabsStore();
 
 const { needsReconnect, onReconnectAndLoad } = useConnectionGate(
   () => props.tab,
@@ -53,7 +54,7 @@ function onRefresh(): void {
 // "Open query console" mirrors project/menus.ts's own consoleMenuItem: the tab's own connection
 // and path, handed straight to openConsoleTab, no new capability involved.
 function onOpenConsole(): void {
-  if (props.tab.connectionId) openConsoleTab(props.tab.connectionId, props.tab.path);
+  if (props.tab.connectionId) tabsStore.openConsoleTab(props.tab.connectionId, props.tab.path);
 }
 
 function onCopy(): void {
@@ -91,7 +92,7 @@ const PANE_OPTIONS = [
   { value: 'source' as const, label: 'Source', testid: 'definition-pane-source' },
 ];
 function setPane(value: 'structure' | 'source'): void {
-  patchDefinitionTabState(props.tab.id, { pane: value });
+  tabsStore.patchDefinitionTabState(props.tab.id, { pane: value });
 }
 
 // Mongo collections have documents, not columns/constraints (D9/D11's scope is SQL relations);

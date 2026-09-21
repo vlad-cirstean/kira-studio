@@ -8,7 +8,7 @@ import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { registerCommand } from '../../shortcuts/commands';
 import { settingsState } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { patchRepoFileTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import EmptyState from '../../theme/primitives/EmptyState.vue';
 import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { registerEditor, unmountEditor } from './editors';
@@ -47,6 +47,7 @@ registerTabRuntimeCleanup((tabId) => {
 });
 
 const props = defineProps<{ tab: RepoFileTabRecord }>();
+const tabsStore = useTabsStore();
 
 type ViewState = 'loading' | 'found' | 'binary' | 'tooLarge' | 'missing' | 'error';
 const state = ref<ViewState>('loading');
@@ -86,7 +87,7 @@ async function ensureMarkdownRendered(): Promise<void> {
 
 function onViewChange(next: 'source' | 'reading'): void {
   view.value = next;
-  patchRepoFileTabState(props.tab.id, { markdownReading: next === 'reading' });
+  tabsStore.patchRepoFileTabState(props.tab.id, { markdownReading: next === 'reading' });
   if (next === 'reading') {
     void ensureMarkdownRendered();
   } else {
@@ -220,7 +221,7 @@ async function mount(): Promise<void> {
   // Debounced patch (patchRepoFileTabState's own skipUnchanged) — re-persists revealLine as the
   // user scrolls/navigates, so a restored session reopens roughly where it was left.
   const sub = editor.onDidChangeCursorPosition((e) => {
-    patchRepoFileTabState(props.tab.id, { revealLine: e.position.lineNumber });
+    tabsStore.patchRepoFileTabState(props.tab.id, { revealLine: e.position.lineNumber });
   });
   disposeCursorSub = () => sub.dispose();
 

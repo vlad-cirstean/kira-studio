@@ -4,14 +4,7 @@ import { computed } from 'vue';
 import { formatRelative } from '../../format';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useDatagripImportStore } from '../../state/datagripImport';
-import {
-  openDataTab,
-  openDocumentTab,
-  openKeyValueTab,
-  openStreamTab,
-  type RecentTableEntry,
-  recentTablesState,
-} from '../../state/tabs';
+import { type RecentTableEntry, useRecentTablesStore, useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 
@@ -23,6 +16,8 @@ import { connColorVar } from '../../theme/connColor';
 const datagripImportStore = useDatagripImportStore();
 const connectionsStore = useConnectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
+const recentTablesStore = useRecentTablesStore();
+const tabsStore = useTabsStore();
 
 const hasConnections = computed(() => connectionsStore.records.length > 0);
 
@@ -48,10 +43,10 @@ function iconColorFor(entry: RecentTableEntry): string {
 }
 
 function openRecent(entry: RecentTableEntry): void {
-  if (entry.kind === 'data') openDataTab(entry.connectionId, entry.path);
-  else if (entry.kind === 'document') openDocumentTab(entry.connectionId, entry.path);
-  else if (entry.kind === 'keyvalue') openKeyValueTab(entry.connectionId, entry.path);
-  else openStreamTab(entry.connectionId, entry.path);
+  if (entry.kind === 'data') tabsStore.openDataTab(entry.connectionId, entry.path);
+  else if (entry.kind === 'document') tabsStore.openDocumentTab(entry.connectionId, entry.path);
+  else if (entry.kind === 'keyvalue') tabsStore.openKeyValueTab(entry.connectionId, entry.path);
+  else tabsStore.openStreamTab(entry.connectionId, entry.path);
 }
 </script>
 
@@ -88,11 +83,11 @@ function openRecent(entry: RecentTableEntry): void {
       <div class="start-title">Kira Studio</div>
       <div class="start-sub muted">Pick something from the tree on the left, or reopen one of these.</div>
 
-      <template v-if="recentTablesState.entries.length > 0">
+      <template v-if="recentTablesStore.entries.length > 0">
         <div class="col-label dim">Recent tables</div>
         <div class="start-list">
           <button
-            v-for="entry in recentTablesState.entries"
+            v-for="entry in recentTablesStore.entries"
             :key="`${entry.kind}:${entry.connectionId}:${entry.path}`"
             type="button"
             class="start-row"

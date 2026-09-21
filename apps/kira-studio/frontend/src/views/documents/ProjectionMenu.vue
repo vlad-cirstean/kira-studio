@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
 import { ref } from 'vue';
-import { findDocumentTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
@@ -23,7 +23,7 @@ const emit = defineEmits<{ close: [] }>();
 const fieldNames = fieldNamesOnPage(props.tabId);
 
 function currentProjection(): string[] | null {
-  return findDocumentTab(props.tabId)?.state.projection ?? null;
+  return useTabsStore().findDocumentTab(props.tabId)?.state.projection ?? null;
 }
 
 const selected = ref<Set<string>>(new Set(currentProjection() ?? fieldNames));

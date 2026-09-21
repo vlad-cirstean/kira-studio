@@ -12,7 +12,7 @@ import { useFileTreeStore } from '../repo/state/fileTree';
 import { useRepoSearchStore } from '../repo/state/search';
 import { useModeStore } from './mode';
 import { ensureWorkspaceShell } from './repoTabs';
-import { closeWorkspaceTabs } from './tabs';
+import { useTabsStore } from './tabs';
 
 // P67b §4.2: the active workspace, the Git panel's repo switcher (`openRepos`), and which repo
 // workspace was last active inside Git (`lastRepoKey`, session-only — see activateWorkspace).
@@ -69,7 +69,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   // one-way; it instead watches `openRepos` itself and evicts on the same transition.
   function closeRepoWorkspace(repoId: string): void {
     const key = repoWorkspaceKey(repoId);
-    closeWorkspaceTabs(key);
+    useTabsStore().closeWorkspaceTabs(key);
     state.openRepos = state.openRepos.filter((id) => id !== repoId);
     void control.codeWorkspaceCloseWorkspace(repoId).catch(() => {});
     // C10 §8/S17: the pinned graph tab's own transport is cached per repo workspace, independent of

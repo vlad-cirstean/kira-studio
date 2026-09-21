@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { findStreamTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { type StreamFilterHistoryEntry, useStreamFilterHistoryStore } from './streamFilterHistory';
 
@@ -16,9 +16,10 @@ const emit = defineEmits<{
 }>();
 
 const streamFilterHistoryStore = useStreamFilterHistoryStore();
+const tabsStore = useTabsStore();
 
 function target(): { connectionId: string; path: string } | null {
-  const tab = findStreamTab(props.tabId);
+  const tab = tabsStore.findStreamTab(props.tabId);
   return tab?.connectionId ? { connectionId: tab.connectionId, path: tab.path } : null;
 }
 

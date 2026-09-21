@@ -5,11 +5,16 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { openBrowseTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const {
   load: loadBrowse,
   descend: descendBrowse,
@@ -36,7 +41,7 @@ async function flush(ticks = 10): Promise<void> {
 }
 
 async function openLoadedTab(connectionId: string, path: string): Promise<string> {
-  const { id } = openBrowseTab(connectionId, path, { newTab: true });
+  const { id } = tabsStore.openBrowseTab(connectionId, path, { newTab: true });
   // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real TreeChildrenResult
   (control as any).treeChildren = async () => ({ nodes: [], truncated: false });
   await loadBrowse(id);

@@ -1,11 +1,16 @@
-import { findStreamTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { createImmediateMutator } from '../shared/immediateMutation';
 import { reload } from './state';
 
 // Item 3/4: mutate immediately, no staging/preview step — documents/mutations.ts's precedent
 // (P8's ground rules), extended to streams. Each op uses the `$`-prefixed sentinel fields
 // kafka/produce.ts and sqs/mutate.ts's adapters agree on (mirrors mongo/mutate.ts's `$document`).
-const mutate = createImmediateMutator({ findTab: findStreamTab, reload });
+// A thunk, not a direct `useTabsStore().findStreamTab` reference — see documents/mutations.ts's
+// own comment (this module evaluates before `app.use(pinia)` too).
+const mutate = createImmediateMutator({
+  findTab: (tabId: string) => useTabsStore().findStreamTab(tabId),
+  reload,
+});
 
 export async function produceKafkaMessage(
   tabId: string,

@@ -15,12 +15,17 @@ import './support/window';
 import { describe, expect, test } from 'bun:test';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { cleanupTabRuntime } = await import('../../frontend/src/state/tabRuntime');
-const { openConsoleTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { run, runtime, resultPageKey } = await import('../../frontend/src/views/console/state');
 const { getPage } = await import('../../frontend/src/views/console/resultPages');
 
@@ -39,7 +44,7 @@ function fakePage(): Page {
 
 describe('console run() after the tab closes mid-run (P12 round 2 finding #3)', () => {
   test('the in-flight result is never written once the tab is gone', async () => {
-    const tabId = openConsoleTab('conn-close-mid-run', 'db');
+    const tabId = tabsStore.openConsoleTab('conn-close-mid-run', 'db');
     const call = deferred<ExecuteResponse>();
     // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
     (data as any).execute = (): Promise<ExecuteResponse> => call.promise;

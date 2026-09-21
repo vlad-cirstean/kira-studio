@@ -16,7 +16,7 @@
 import { asRepoGraphTab } from '@shared/domain/tabs';
 import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { tabsForWorkspace } from '../../state/mode';
-import { patchRepoGraphTabState, tabsState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 
 // P62 §4.5: exported so views/repo/blameAnnotation.ts's own click-through can find the pinned
 // graph tab without a second copy of this lookup — the same tab hostHandlers.ts's own pending-
@@ -32,7 +32,7 @@ export function pinnedGraphTabId(codeRepoId: string): string | null {
 export function loadReviewSession(codeRepoId: string): unknown | null {
   const tabId = pinnedGraphTabId(codeRepoId);
   if (!tabId) return null;
-  const tab = asRepoGraphTab(tabsState.tabs.find((t) => t.id === tabId));
+  const tab = asRepoGraphTab(useTabsStore().tabs.find((t) => t.id === tabId));
   return tab?.state.reviewSession ?? null;
 }
 
@@ -43,5 +43,5 @@ export function loadReviewSession(codeRepoId: string): unknown | null {
 export function saveReviewSession(codeRepoId: string, session: unknown | null): void {
   const tabId = pinnedGraphTabId(codeRepoId);
   if (!tabId) return;
-  patchRepoGraphTabState(tabId, { reviewSession: session });
+  useTabsStore().patchRepoGraphTabState(tabId, { reviewSession: session });
 }

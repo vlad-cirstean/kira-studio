@@ -1,10 +1,10 @@
 import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
-import type { PageSize } from '@shared/domain/tabs';
+import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { findStreamTab, patchStreamTabState } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { drop, setPage } from './page';
@@ -85,7 +85,7 @@ export { setActionError };
 // always null for SQS, since StreamView.vue never lets an SQS tab's three filter fields become
 // non-null in the first place — encodeKafkaStreamFilter itself would still collapse them to null
 // even if it did.
-function currentStreamFilter(tab: NonNullable<ReturnType<typeof findStreamTab>>): string | null {
+function currentStreamFilter(tab: StreamTabRecord): string | null {
   // P31 D14/F17: Date.parse returns NaN for junk, and isEmptyKafkaStreamFilter's own `!== null`
   // check doesn't catch it — a NaN would silently ride through encodeKafkaStreamFilter (JSON.
   // stringify turns it into `null` on the wire, so the engine reads "no timestamp filter" while
@@ -101,7 +101,7 @@ function currentStreamFilter(tab: NonNullable<ReturnType<typeof findStreamTab>>)
 }
 
 export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
-  const tab = findStreamTab(tabId);
+  const tab = useTabsStore().findStreamTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   const effectiveCursor: PageCursor = cursor ?? { mode: 'offset', offset: 0 };
@@ -145,7 +145,7 @@ export async function load(tabId: string, cursor?: PageCursor): Promise<void> {
 }
 
 export async function reload(tabId: string): Promise<void> {
-  const tab = findStreamTab(tabId);
+  const tab = useTabsStore().findStreamTab(tabId);
   if (!tab?.connectionId) return;
   await data.invalidate(tab.connectionId, tab.path);
   // P21 round 2 functional finding 1: reload() is reached from three paths that are not the
@@ -169,7 +169,7 @@ export async function reload(tabId: string): Promise<void> {
 }
 
 export async function runCount(tabId: string): Promise<void> {
-  const tab = findStreamTab(tabId);
+  const tab = useTabsStore().findStreamTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   const opId = crypto.randomUUID();
@@ -214,7 +214,7 @@ export function stop(tabId: string): void {
 // same default scope (ipcfixture/sqs_test.go already recorded this exact call for this exact
 // scenario, anticipating this fix).
 export async function poll(tabId: string): Promise<void> {
-  const tab = findStreamTab(tabId);
+  const tab = useTabsStore().findStreamTab(tabId);
   if (!tab?.connectionId) return;
   await data.invalidate(tab.connectionId, tab.path);
   await load(tabId);
@@ -233,11 +233,12 @@ export async function goNext(tabId: string): Promise<void> {
 // new size, and start over from the top. SQS's `batch` pagination has no continuation to reset and
 // is never auto-loaded (D10/D12) — changing the size there just takes effect on the next Poll.
 export async function setPageSize(tabId: string, pageSize: PageSize): Promise<void> {
-  const tab = findStreamTab(tabId);
+  const tabsStore = useTabsStore();
+  const tab = tabsStore.findStreamTab(tabId);
   if (!tab) return;
   const rt = ensureRuntime(tabId);
   rt.nextToken = null;
-  patchStreamTabState(tabId, { pageSize });
+  tabsStore.patchStreamTabState(tabId, { pageSize });
   const caps = tab.connectionId ? useConnectionsStore().states[tab.connectionId]?.caps : null;
   if (caps?.pagination === 'batch') return;
   if (!rt.polled) return; // mirrors onMounted's own guard — never auto-load before the first view
@@ -256,7 +257,8 @@ export interface StreamFilterInput {
 // a filter changes which messages a *new* browse would see, so continuing an old token under it
 // would silently ignore it.
 export async function applyStreamFilter(tabId: string, filter: StreamFilterInput): Promise<void> {
-  const tab = findStreamTab(tabId);
+  const tabsStore = useTabsStore();
+  const tab = tabsStore.findStreamTab(tabId);
   if (!tab?.connectionId) return;
   const rt = ensureRuntime(tabId);
   rt.nextToken = null;
@@ -268,7 +270,7 @@ export async function applyStreamFilter(tabId: string, filter: StreamFilterInput
   // wrong one under a `stale` label that would still be visible until the next Σ click.
   rt.count = null;
   rt.countOpId = null;
-  patchStreamTabState(tabId, {
+  tabsStore.patchStreamTabState(tabId, {
     offsetFilter: filter.offset,
     partitions: filter.partitions,
     timestampFilter: filter.timestamp,

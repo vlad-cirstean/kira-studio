@@ -20,7 +20,8 @@ const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
 const { useConnectionsStore } = await import('../../frontend/src/state/connections');
 const connectionsStore = useConnectionsStore();
-const { openConsoleTab } = await import('../../frontend/src/state/tabs');
+const { useTabsStore } = await import('../../frontend/src/state/tabs');
+const tabsStore = useTabsStore();
 const { run, runtime } = await import('../../frontend/src/views/console/state');
 
 // Both clear the default 100,000-row threshold (packages/shared/domain/settings.ts) — flagged, but
@@ -57,7 +58,7 @@ describe('auto-explain worstIndex points at the worst flagged plan, not the firs
       // biome-ignore lint/suspicious/noExplicitAny: a minimal fixture, not a real ConnectionSummary
       ...({ kind: 'postgres', autoExplain: true, name: 'x', color: 'blue' } as any),
     } as ConnectionSummary);
-    const tabId = openConsoleTab(connectionId, 'db');
+    const tabId = tabsStore.openConsoleTab(connectionId, 'db');
 
     // biome-ignore lint/suspicious/noExplicitAny: a minimal stub, not the real data.execute
     (data as any).execute = (): Promise<ExecuteResponse> =>

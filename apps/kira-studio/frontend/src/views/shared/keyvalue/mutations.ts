@@ -1,6 +1,6 @@
 import { decodePath, encodePath, pathParent } from '@shared/domain/tree';
 import { data } from '../../../bridge/data';
-import { openKeyValueTab } from '../../../state/tabs';
+import { useTabsStore } from '../../../state/tabs';
 import { browseInvalidate } from '../../../state/viewCommands';
 import { createImmediateMutator } from '../immediateMutation';
 import { keyValueHost } from './host';
@@ -76,5 +76,5 @@ export async function addKey(
     { kind: 'database', name: databaseSegment.name },
     { kind: 'key', name: newKeyName },
   ]);
-  openKeyValueTab(host.connectionId, newPath, { newTab: true });
+  useTabsStore().openKeyValueTab(host.connectionId, newPath, { newTab: true });
 }

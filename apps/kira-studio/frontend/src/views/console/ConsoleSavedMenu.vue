@@ -2,7 +2,7 @@
 import type { SavedConsoleQuery } from '@shared/domain/queries';
 import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
-import { findConsoleTab } from '../../state/tabs';
+import { useTabsStore } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import AppButton from '../../theme/primitives/AppButton.vue';
 import IconButton from '../../theme/primitives/IconButton.vue';
@@ -17,7 +17,7 @@ const props = defineProps<{ tabId: string }>();
 const emit = defineEmits<{ close: [] }>();
 
 function tab() {
-  return findConsoleTab(props.tabId);
+  return useTabsStore().findConsoleTab(props.tabId);
 }
 
 const saved = ref<SavedConsoleQuery[]>([]);
