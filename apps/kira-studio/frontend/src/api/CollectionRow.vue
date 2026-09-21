@@ -3,7 +3,7 @@ import { grpcMethodClass } from '@shared/domain/grpc';
 import { httpMethodToken } from '@shared/domain/http';
 import { computed, nextTick, ref, watch } from 'vue';
 import CodiconIcon from '../theme/CodiconIcon.vue';
-import { activeSearchQuery, type CollectionRowVm, collectionsState } from './state/collections';
+import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
 // P4 D13: the same 8 + depth × 14 px indent, roving tabindex and twisty as project/TreeRow.vue,
 // with three differences that are the whole reason this is a separate file rather than a widened
@@ -27,6 +27,8 @@ const emit = defineEmits<{
   'cancel-rename': [];
 }>();
 
+const collectionsStore = useCollectionsStore();
+
 // A collection is a library; a folder flips with its own expand state, the same way Studio's
 // group row does. A request gets no icon at all — the method chip is its identity.
 const icon = computed(() => {
@@ -34,7 +36,7 @@ const icon = computed(() => {
   return props.row.expanded ? 'folder-opened' : 'folder';
 });
 
-const renaming = computed(() => collectionsState.renamingKey === props.row.key);
+const renaming = computed(() => collectionsStore.renamingKey === props.row.key);
 const draft = ref('');
 const inputRef = ref<HTMLInputElement | null>(null);
 
@@ -70,7 +72,7 @@ function cancelRename(): void {
 // substring is <mark>-ed, not the whole label — project/TreeRow.vue's own highlighting, over this
 // tree's own row model.
 const parts = computed<{ text: string; hit: boolean }[]>(() => {
-  const query = activeSearchQuery.value;
+  const query = collectionsStore.activeSearchQuery;
   const name = props.row.name;
   if (!props.row.matched || !query) return [{ text: name, hit: false }];
   const lower = name.toLowerCase();

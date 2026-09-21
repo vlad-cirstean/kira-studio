@@ -4,12 +4,7 @@ import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
-import {
-  collectionIdFor,
-  openSaveGrpcDialog,
-  savedGrpcRequestFor,
-  saveGrpcRequest,
-} from '../../api/state/collections';
+import { useCollectionsStore } from '../../api/state/collections';
 import {
   variableCompletionSource,
   variableHoverSource,
@@ -52,6 +47,7 @@ import {
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
 const tabIncognitoStore = useTabIncognitoStore();
+const collectionsStore = useCollectionsStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -130,7 +126,7 @@ watch(
   { immediate: true },
 );
 
-const saved = computed(() => savedGrpcRequestFor(props.tab.state.itemId));
+const saved = computed(() => collectionsStore.savedGrpcRequestFor(props.tab.state.itemId));
 const dirty = computed(() => isGrpcDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
@@ -142,7 +138,7 @@ function onSave(): void {
     onSaveAs();
     return;
   }
-  void saveGrpcRequest(
+  void collectionsStore.saveGrpcRequest(
     itemId,
     props.tab.state.name || title.value,
     toSavedGrpcRequest(props.tab.state),
@@ -151,7 +147,7 @@ function onSave(): void {
 
 function onSaveAs(): void {
   if (incognito.value) return;
-  openSaveGrpcDialog(
+  collectionsStore.openSaveGrpcDialog(
     props.tab.id,
     props.tab.state.name || title.value,
     toSavedGrpcRequest(props.tab.state),
@@ -166,7 +162,7 @@ function onStop(): void {
   stop(props.tab.id);
 }
 
-const collectionId = computed(() => collectionIdFor(props.tab.state));
+const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.state));
 watch(
   [collectionId, envId],
   ([cid, eid]) => {

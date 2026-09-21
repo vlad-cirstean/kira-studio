@@ -4,18 +4,14 @@ import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import TextField from '../theme/primitives/TextField.vue';
-import {
-  closeSaveDialog,
-  collectionsState,
-  folderPaths,
-  saveDialogState,
-  submitSaveDialog,
-} from './state/collections';
+import { useCollectionsStore } from './state/collections';
+
+const collectionsStore = useCollectionsStore();
 
 // P4 D15: Save as… — one TextField for the name and one indented <select> of every collection and
-// folder as the target, on the existing DialogFrame. Driven by saveDialogState so the request
-// view can open it without importing this component (the same shape state/objectStore.ts's own
-// upload dialog uses).
+// folder as the target, on the existing DialogFrame. Driven by the store's own saveDialog state so
+// the request view can open it without importing this component (the same shape
+// state/objectStore.ts's own upload dialog uses).
 const name = ref('');
 const target = ref('');
 const saving = ref(false);
@@ -24,10 +20,10 @@ const error = ref<string | null>(null);
 /** Every collection, each carrying its own folders as a real <optgroup> (F7) — the value encodes
  *  both halves because a folder id alone does not say which collection it belongs to. */
 const collectionTargets = computed(() =>
-  collectionsState.collections.map((collection) => ({
+  collectionsStore.collections.map((collection) => ({
     id: collection.id,
     name: collection.name,
-    folders: folderPaths(collection.id),
+    folders: collectionsStore.folderPaths(collection.id),
   })),
 );
 
@@ -37,10 +33,10 @@ const firstTargetValue = computed(() => {
 });
 
 watch(
-  () => saveDialogState.open,
+  () => collectionsStore.open,
   (open) => {
     if (!open) return;
-    name.value = saveDialogState.suggestedName;
+    name.value = collectionsStore.suggestedName;
     target.value = firstTargetValue.value;
     saving.value = false;
     error.value = null;
@@ -55,7 +51,7 @@ async function onSave(): Promise<void> {
   saving.value = true;
   error.value = null;
   try {
-    await submitSaveDialog(collectionId, parentId, trimmed);
+    await collectionsStore.submitSaveDialog(collectionId, parentId, trimmed);
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
     saving.value = false;
@@ -76,7 +72,7 @@ function splitTarget(value: string): [string, string | null] {
     :width="480"
     test-id="save-request-dialog"
     close-test-id="save-request-close"
-    @close="closeSaveDialog"
+    @close="collectionsStore.closeSaveDialog"
   >
     <div class="p-dialog-body">
       <label class="field-label p-sm muted">Name</label>
@@ -102,7 +98,7 @@ function splitTarget(value: string): [string, string | null] {
 
     <template #footer>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" data-testid="save-request-cancel" @click="closeSaveDialog">Cancel</AppButton>
+        <AppButton kind="dialog" data-testid="save-request-cancel" @click="collectionsStore.closeSaveDialog">Cancel</AppButton>
         <AppButton
           kind="dialog"
           variant="primary"

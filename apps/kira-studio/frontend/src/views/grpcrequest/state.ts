@@ -8,7 +8,7 @@ import type {
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
 import { markRaw } from 'vue';
-import { collectionIdFor } from '../../api/state/collections';
+import { useCollectionsStore } from '../../api/state/collections';
 import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
@@ -154,7 +154,7 @@ async function resolveForDescribe(
 ): Promise<{ target: string; metadata: { name: string; value: string }[] } | null> {
   const tab = findGrpcRequestTab(tabId);
   if (!tab) return null;
-  const collectionId = collectionIdFor(tab.state);
+  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
   const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   const first = resolveGrpcTabState(tab.state, values, secretNames);
@@ -176,7 +176,7 @@ export async function loadSchema(tabId: string, reload = false): Promise<void> {
   // otherwise land after a newer one and clobber it.
   const myGen = ++rt.genId;
 
-  const collectionId = collectionIdFor(tab.state);
+  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
   const environmentId = environmentIdForTab(tabId);
   try {
     let target = tab.state.target;
@@ -296,7 +296,7 @@ export async function call(tabId: string): Promise<void> {
   rt.messageBytes = 0;
   rt.streaming = streaming;
 
-  const collectionId = collectionIdFor(tab.state);
+  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
   const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   const first = resolveGrpcTabState(tab.state, values, secretNames);

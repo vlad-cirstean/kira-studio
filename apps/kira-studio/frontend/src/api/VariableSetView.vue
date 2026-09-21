@@ -13,7 +13,7 @@ import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import TextField from '../theme/primitives/TextField.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
-import { collectionRecord, collectionsState, initCollections } from './state/collections';
+import { useCollectionsStore } from './state/collections';
 import {
   deleteVariable,
   duplicateEnvironment,
@@ -43,6 +43,8 @@ import VariableRow from './VariableRow.vue';
 // no edit.
 const props = defineProps<{ tab: VariableSetTabRecord }>();
 
+const collectionsStore = useCollectionsStore();
+
 const scope = computed(() => props.tab.state.scope);
 const ownerId = computed(() => props.tab.state.ownerId);
 
@@ -51,10 +53,10 @@ const ownerId = computed(() => props.tab.state.ownerId);
 // freshly-mounted tab doesn't flash "no longer exists" before initCollections/initVariables ever
 // resolve.
 const ownersLoaded = computed(() =>
-  scope.value === 'collection' ? collectionsState.loaded : variablesState.loaded,
+  scope.value === 'collection' ? collectionsStore.loaded : variablesState.loaded,
 );
 const owningCollection = computed(() =>
-  scope.value === 'collection' ? collectionRecord(ownerId.value) : undefined,
+  scope.value === 'collection' ? collectionsStore.collectionRecord(ownerId.value) : undefined,
 );
 const owningEnvironment = computed(() =>
   scope.value === 'environment'
@@ -66,7 +68,7 @@ const ownerExists = computed(() =>
 );
 
 onMounted(() => {
-  initCollections();
+  collectionsStore.initCollections();
   initVariables();
   void loadVariableSetRows(props.tab.id, scope.value, ownerId.value);
 });

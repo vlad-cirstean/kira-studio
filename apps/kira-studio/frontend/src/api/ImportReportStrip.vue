@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import IconButton from '../theme/primitives/IconButton.vue';
-import { collectionsState, dismissExportWarning, dismissReport } from './state/collections';
+import { useCollectionsStore } from './state/collections';
+
+const collectionsStore = useCollectionsStore();
 
 // P4 D12: the import report is part of the feature, not decoration. Every warning kind is a case
 // where the app quietly does something other than what the file said — a script that is kept but
@@ -18,7 +20,7 @@ import { collectionsState, dismissExportWarning, dismissReport } from './state/c
 // rather than through MessageStrip: that primitive has no dismiss affordance and only two tones,
 // and §3's rule is that this phase adds nothing to theme/primitives/. ProjectTree.vue's own
 // search-incomplete note uses the same class the same way.
-const report = computed(() => collectionsState.report);
+const report = computed(() => collectionsStore.report);
 
 const tone = computed(() => ((report.value?.warnings.length ?? 0) > 0 ? 'warn' : 'note'));
 
@@ -49,21 +51,21 @@ function plural(n: number, noun: string): string {
         aria-label="Dismiss"
         v-tooltip="'Dismiss'"
         data-testid="import-report-dismiss"
-        @click="dismissReport"
+        @click="collectionsStore.dismissReport"
       />
     </span>
   </div>
   <!-- P5 D16: the export path's own strip, independent of the import one above (a session can
        export without ever having imported). -->
-  <div v-if="collectionsState.exportWarning" class="p-strip warn" data-testid="export-warning">
-    <div class="report">{{ collectionsState.exportWarning }}</div>
+  <div v-if="collectionsStore.exportWarning" class="p-strip warn" data-testid="export-warning">
+    <div class="report">{{ collectionsStore.exportWarning }}</div>
     <span class="strip-action">
       <IconButton
         icon="close"
         aria-label="Dismiss"
         v-tooltip="'Dismiss'"
         data-testid="export-warning-dismiss"
-        @click="dismissExportWarning"
+        @click="collectionsStore.dismissExportWarning"
       />
     </span>
   </div>

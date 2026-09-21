@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 import ApiDialogs from './api/ApiDialogs.vue';
-import { importCollection } from './api/state/collections';
+import { useCollectionsStore } from './api/state/collections';
 import { openApiRequestTab } from './api/tabs';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
@@ -41,6 +41,7 @@ const fakeDataStore = useFakeDataStore();
 const objectStoreStore = useObjectStoreStore();
 const layoutStore = useLayoutStore();
 const quickOpenStore = useQuickOpenStore();
+const collectionsStore = useCollectionsStore();
 
 let unsubscribe: Array<() => void> = [];
 let teardownTooltips: (() => void) | null = null;
@@ -65,7 +66,7 @@ onMounted(() => {
     }),
     control.onImportPostman(() => {
       modeStore.setMode('api');
-      void importCollection();
+      void collectionsStore.importCollection();
     }),
     control.onImportDataGrip(() => {
       modeStore.setMode('studio');

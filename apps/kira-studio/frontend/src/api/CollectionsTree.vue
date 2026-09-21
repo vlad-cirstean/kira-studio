@@ -8,27 +8,7 @@ import { settingsState } from '../state/settings';
 import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
-import {
-  beginRename,
-  type CollectionRowVm,
-  cancelRename,
-  collapseRow,
-  collectionsState,
-  createCollection,
-  createGrpcItem,
-  createItem,
-  deleteRow,
-  duplicateRow,
-  expandRow,
-  exportCollection,
-  fetchSavedGrpcRequest,
-  fetchSavedRequest,
-  importCollection,
-  renameRow,
-  selectRow,
-  toggleRow,
-  visibleRows,
-} from './state/collections';
+import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
 import { openEnvironments } from './state/variables';
@@ -37,6 +17,7 @@ import { openCollectionGrpcRequestTab, openCollectionRequestTab, openVariableSet
 const confirmDialogStore = useConfirmDialogStore();
 const contextMenuStore = useContextMenuStore();
 const dynamicValuesStore = useDynamicValuesStore();
+const collectionsStore = useCollectionsStore();
 
 // P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
 // virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
@@ -52,30 +33,30 @@ async function reveal(key: string): Promise<void> {
 defineExpose({ reveal });
 
 function onSelect(row: CollectionRowVm): void {
-  selectRow(row.key);
+  collectionsStore.selectRow(row.key);
 }
 
 // The twisty always expands/collapses; unlike Studio's tree there is no adapter call behind it and
 // no synthetic group row to special-case (F15) — the whole tree is already in memory.
 function onToggle(row: CollectionRowVm): void {
-  toggleRow(row);
+  collectionsStore.toggleRow(row);
 }
 
 // A collection and a folder toggle on double-click; a request opens into the existing
 // 'http-request' tab kind (D14), reusing an already-open tab bound to the same row.
 async function onOpen(row: CollectionRowVm): Promise<void> {
   if (row.kind !== 'request') {
-    toggleRow(row);
+    collectionsStore.toggleRow(row);
     return;
   }
   // P11 D12: a gRPC row opens the 'grpc-request' kind, never 'http-request' — the tree's own
   // protocol column is what tells the two apart, since kind alone (D12's own reasoning) does not.
   if (row.protocol === 'grpc') {
-    const saved = await fetchSavedGrpcRequest(row.id);
+    const saved = await collectionsStore.fetchSavedGrpcRequest(row.id);
     openCollectionGrpcRequestTab(row.id, row.name, saved);
     return;
   }
-  const saved = await fetchSavedRequest(row.id);
+  const saved = await collectionsStore.fetchSavedRequest(row.id);
   openCollectionRequestTab(row.id, row.name, saved);
 }
 
@@ -84,17 +65,17 @@ async function onOpen(row: CollectionRowVm): Promise<void> {
 // of both the store's mutation half and the tab-opening path.
 const actions: CollectionMenuActions = {
   open: (row) => void onOpen(row),
-  newRequest: (row) => void createItem(row.collectionId, folderTarget(row), 'request'),
-  newGrpcRequest: (row) => void createGrpcItem(row.collectionId, folderTarget(row)),
-  newFolder: (row) => void createItem(row.collectionId, folderTarget(row), 'folder'),
-  newCollection: () => void createCollection(),
-  rename: beginRename,
-  duplicate: (row) => void duplicateRow(row),
+  newRequest: (row) => void collectionsStore.createItem(row.collectionId, folderTarget(row), 'request'),
+  newGrpcRequest: (row) => void collectionsStore.createGrpcItem(row.collectionId, folderTarget(row)),
+  newFolder: (row) => void collectionsStore.createItem(row.collectionId, folderTarget(row), 'folder'),
+  newCollection: () => void collectionsStore.createCollection(),
+  rename: collectionsStore.beginRename,
+  duplicate: (row) => void collectionsStore.duplicateRow(row),
   remove: (row) => void confirmAndDelete(row),
   copyUrl: (row) => void copyText(row.url),
-  importCollection: () => void importCollection(),
+  importCollection: () => void collectionsStore.importCollection(),
   importCurl: () => openImportCurlDialog(),
-  exportCollection: (row) => void exportCollection(row.id, row.name),
+  exportCollection: (row) => void collectionsStore.exportCollection(row.id, row.name),
   variables: (row) => openVariableSetTab('collection', row.id, row.name),
   environments: () => openEnvironments(),
   dynamicValues: () => dynamicValuesStore.openDynamicValuesDialog(),
@@ -111,11 +92,11 @@ async function confirmAndDelete(row: CollectionRowVm): Promise<void> {
   // which the prompt says out loud rather than leaving to be discovered.
   const suffix = row.kind === 'request' ? '' : ' and everything inside it';
   if (!(await confirmDialogStore.confirmDialog(`Delete ${what} "${row.name}"${suffix}?`))) return;
-  await deleteRow(row);
+  await collectionsStore.deleteRow(row);
 }
 
 function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
-  selectRow(row.key);
+  collectionsStore.selectRow(row.key);
   contextMenuStore.openContextMenu(event, menuForRow(row, actions));
 }
 
@@ -124,7 +105,7 @@ function onBackgroundContextMenu(event: MouseEvent): void {
 }
 
 function onRename(row: CollectionRowVm, name: string): void {
-  void renameRow(row, name);
+  void collectionsStore.renameRow(row, name);
 }
 
 // The same shape ProjectTree.vue has, over the existing tree.* shortcut ids (§3) — plus the
@@ -133,17 +114,17 @@ function onTreeKeydown(e: KeyboardEvent): void {
   if (e.defaultPrevented || e.isComposing) return;
   const target = e.target as HTMLElement | null;
   if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  const row = visibleRows.value.find((r) => r.key === collectionsState.selected);
+  const row = collectionsStore.visibleRows.find((r) => r.key === collectionsStore.selected);
   if (!row) return;
 
   if (e.key === 'ArrowRight') {
     e.preventDefault();
-    expandRow(row);
+    collectionsStore.expandRow(row);
     return;
   }
   if (e.key === 'ArrowLeft') {
     e.preventDefault();
-    collapseRow(row);
+    collectionsStore.collapseRow(row);
     return;
   }
   // Enter is the row's primary action, not a menu item — the same action double-click performs,
@@ -168,9 +149,9 @@ const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplica
   <TreeHost
     ref="treeHostRef"
     class="collections-tree"
-    :rows="visibleRows"
+    :rows="collectionsStore.visibleRows"
     :row-height="rowHeight"
-    :selected-key="collectionsState.selected"
+    :selected-key="collectionsStore.selected"
     @background-contextmenu="onBackgroundContextMenu"
     @keydown="onTreeKeydown"
   >
@@ -179,14 +160,14 @@ const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplica
         :class="{ 'sticky-row': sticky }"
         :style="sticky ? { top: `${top}px`, height: `${rowHeight}px` } : undefined"
         :row="row"
-        :selected="collectionsState.selected === row.key"
+        :selected="collectionsStore.selected === row.key"
         :sticky="sticky"
         @select="onSelect"
         @toggle="onToggle"
         @open="onOpen"
         @contextmenu="onContextMenu"
         @rename="onRename"
-        @cancel-rename="cancelRename"
+        @cancel-rename="collectionsStore.cancelRename"
       />
     </template>
   </TreeHost>

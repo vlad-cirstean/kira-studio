@@ -15,7 +15,7 @@ import type {
   HttpResponseWire,
   HttpTimeline,
 } from '@shared/domain/http';
-import { collectionIdFor } from '../../api/state/collections';
+import { useCollectionsStore } from '../../api/state/collections';
 import { environmentIdForTab, mergedValuesAndSecrets } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
@@ -180,7 +180,7 @@ export async function send(tabId: string): Promise<void> {
   rt.opId = opId;
   rt.error = null;
 
-  const collectionId = collectionIdFor(tab.state);
+  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
   const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   // P6 D7: the common case — no {{$...}} reference at all — is byte-for-byte today's behaviour:
@@ -266,7 +266,7 @@ export async function resolveForExport(tabId: string): Promise<ExportResolution 
   const tab = findHttpRequestTab(tabId);
   if (!tab) return null;
 
-  const collectionId = collectionIdFor(tab.state);
+  const collectionId = useCollectionsStore().collectionIdFor(tab.state);
   const environmentId = environmentIdForTab(tabId);
   const { values, secretNames } = mergedValuesAndSecrets(collectionId, environmentId);
   const first = resolveTabState(tab.state, values, secretNames);

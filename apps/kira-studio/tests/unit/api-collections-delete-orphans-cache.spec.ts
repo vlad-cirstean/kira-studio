@@ -1,9 +1,9 @@
 // P21 round 2 functional finding 4: Go's own delete genuinely cascades (repos/collections.go's
 // own comment: "the cascade is genuine") — deleting a folder or a collection removes every
 // descendant api_items row, not just the row clicked. deleteRow used to purge exactly one cache
-// entry (collectionsState.requests[row.id] / grpcRequests[row.id]), leaving every *descendant*
+// entry (collectionsStore.requests[row.id] / grpcRequests[row.id]), leaving every *descendant*
 // request's cached HttpSavedRequest/GrpcSavedRequest behind. D14's orphan rule
-// (HttpRequestView.vue: canSave depends on savedRequestFor(itemId) !== null) then silently
+// (HttpRequestView.vue: canSave depends on collectionsStore.savedRequestFor(itemId) !== null) then silently
 // misbehaved for any tab open on one of those orphaned descendants: the stale cache entry made the
 // tab look saveable when its row no longer existed at all.
 //
@@ -13,13 +13,17 @@ import './support/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
+import { setActivePinia } from 'pinia';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
+
+setActivePinia(pinia);
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
-const { collectionsState, deleteRow, fetchSavedRequest, savedRequestFor } = await import(
-  '../../frontend/src/api/state/collections'
-);
+const { useCollectionsStore } = await import('../../frontend/src/api/state/collections');
+
+const collectionsStore = useCollectionsStore();
 
 function collection(id: string, name: string): CollectionSummary {
   return { id, name, sortOrder: 0, createdAt: '', updatedAt: '' };
@@ -83,8 +87,8 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     //     folder-2 ("Nested")
     //       req-2 ("Refresh token") <- grandchild, via a nested folder
     //   req-3 ("Health check")      <- sibling, must survive
-    collectionsState.collections = [collection('col-1', 'Orders API')];
-    collectionsState.items = [
+    collectionsStore.collections = [collection('col-1', 'Orders API')];
+    collectionsStore.items = [
       folder('folder-1', 'col-1', null, 'Auth'),
       request('req-1', 'col-1', 'folder-1', 'Login'),
       folder('folder-2', 'col-1', 'folder-1', 'Nested'),
@@ -95,12 +99,12 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     (
       control as unknown as { collectionsGetRequest: typeof control.collectionsGetRequest }
     ).collectionsGetRequest = async (id: string) => savedRequest(id);
-    await fetchSavedRequest('req-1');
-    await fetchSavedRequest('req-2');
-    await fetchSavedRequest('req-3');
-    expect(savedRequestFor('req-1')).not.toBeNull();
-    expect(savedRequestFor('req-2')).not.toBeNull();
-    expect(savedRequestFor('req-3')).not.toBeNull();
+    await collectionsStore.fetchSavedRequest('req-1');
+    await collectionsStore.fetchSavedRequest('req-2');
+    await collectionsStore.fetchSavedRequest('req-3');
+    expect(collectionsStore.savedRequestFor('req-1')).not.toBeNull();
+    expect(collectionsStore.savedRequestFor('req-2')).not.toBeNull();
+    expect(collectionsStore.savedRequestFor('req-3')).not.toBeNull();
 
     const captured: { deletedId: string | null } = { deletedId: null };
     (
@@ -110,12 +114,12 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     };
     (control as unknown as { collectionsList: typeof control.collectionsList }).collectionsList =
       async () => ({
-        collections: collectionsState.collections,
+        collections: collectionsStore.collections,
         // Mirrors the real cascade: folder-1, req-1, folder-2 and req-2 are all gone post-delete.
-        items: collectionsState.items.filter((item) => item.id === 'req-3'),
+        items: collectionsStore.items.filter((item) => item.id === 'req-3'),
       });
 
-    await deleteRow({
+    await collectionsStore.deleteRow({
       key: 'i:folder-1',
       depth: 1,
       hasChildren: true,
@@ -136,23 +140,23 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
     // this is the assertion that fails against the pre-fix code (only 'folder-1' was purged, which
     // has no cache entry of its own since it is a folder, so pre-fix this test would still find
     // req-1/req-2 cached).
-    expect(savedRequestFor('req-1')).toBeNull();
-    expect(savedRequestFor('req-2')).toBeNull();
+    expect(collectionsStore.savedRequestFor('req-1')).toBeNull();
+    expect(collectionsStore.savedRequestFor('req-2')).toBeNull();
     // The sibling outside the deleted subtree must survive.
-    expect(savedRequestFor('req-3')).not.toBeNull();
+    expect(collectionsStore.savedRequestFor('req-3')).not.toBeNull();
   });
 
   test('deleting a whole collection purges every item in it, regardless of nesting depth', async () => {
-    collectionsState.collections = [collection('col-2', 'Widgets API')];
-    collectionsState.items = [
+    collectionsStore.collections = [collection('col-2', 'Widgets API')];
+    collectionsStore.items = [
       folder('folder-3', 'col-2', null, 'Top'),
       request('req-4', 'col-2', 'folder-3', 'List widgets'),
     ];
     (
       control as unknown as { collectionsGetRequest: typeof control.collectionsGetRequest }
     ).collectionsGetRequest = async (id: string) => savedRequest(id);
-    await fetchSavedRequest('req-4');
-    expect(savedRequestFor('req-4')).not.toBeNull();
+    await collectionsStore.fetchSavedRequest('req-4');
+    expect(collectionsStore.savedRequestFor('req-4')).not.toBeNull();
 
     (
       control as unknown as { collectionsDelete: typeof control.collectionsDelete }
@@ -163,7 +167,7 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
         items: [],
       });
 
-    await deleteRow({
+    await collectionsStore.deleteRow({
       key: 'c:col-2',
       depth: 0,
       hasChildren: true,
@@ -179,6 +183,6 @@ describe('deleteRow purges the whole deleted subtree from the request caches (fi
       matched: false,
     });
 
-    expect(savedRequestFor('req-4')).toBeNull();
+    expect(collectionsStore.savedRequestFor('req-4')).toBeNull();
   });
 });

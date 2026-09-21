@@ -18,12 +18,7 @@ import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
-import {
-  collectionIdFor,
-  openSaveDialog,
-  savedRequestFor,
-  saveRequest,
-} from '../../api/state/collections';
+import { useCollectionsStore } from '../../api/state/collections';
 import { applyCurlToTab, openCopyAsCurlDialog } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
@@ -67,6 +62,7 @@ const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
 const tabIncognitoStore = useTabIncognitoStore();
 const editRawStore = useEditRawStore();
+const collectionsStore = useCollectionsStore();
 
 const rt = computed(() => runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
@@ -163,7 +159,7 @@ function onUrlPaste(text: string, e: ClipboardEvent): void {
 // the cached saved document — not a stored flag there would be something to set, clear, migrate or
 // get wrong. `savedRequestFor` answers null for a tab bound to nothing, and for D14's orphan case
 // (a row deleted in this window or another), which is what makes Save fall back to Save as…
-const saved = computed(() => savedRequestFor(props.tab.state.itemId));
+const saved = computed(() => collectionsStore.savedRequestFor(props.tab.state.itemId));
 const dirty = computed(() => isDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
@@ -177,12 +173,16 @@ function onSave(): void {
     onSaveAs();
     return;
   }
-  void saveRequest(itemId, props.tab.state.name || title.value, toSavedRequest(props.tab.state));
+  void collectionsStore.saveRequest(
+    itemId,
+    props.tab.state.name || title.value,
+    toSavedRequest(props.tab.state),
+  );
 }
 
 function onSaveAs(): void {
   if (incognito.value) return;
-  openSaveDialog(
+  collectionsStore.openSaveDialog(
     props.tab.id,
     props.tab.state.name || title.value,
     toSavedRequest(props.tab.state),
@@ -249,7 +249,7 @@ function onEditRaw(): void {
 // generation must never be a side effect of typing (the chip re-runs on every keystroke). A
 // catalogued $name is told apart from an unrecognised one by isDynamicName's Set lookup alone, so
 // the preview stays a pure function of the tab's text: no await, no chunk load, nothing generated.
-const collectionId = computed(() => collectionIdFor(props.tab.state));
+const collectionId = computed(() => collectionsStore.collectionIdFor(props.tab.state));
 watch(
   [collectionId, envId],
   ([cid, eid]) => {

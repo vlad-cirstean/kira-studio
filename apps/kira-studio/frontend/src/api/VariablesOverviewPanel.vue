@@ -5,9 +5,11 @@ import { connColorVar } from '../theme/connColor';
 import EmptyState from '../theme/primitives/EmptyState.vue';
 import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
-import { collectionRecord } from './state/collections';
+import { useCollectionsStore } from './state/collections';
 import { overviewRows, type VariableOverviewRow, variablesState } from './state/variables';
 import { openVariableSetTab } from './tabs';
+
+const collectionsStore = useCollectionsStore();
 
 // P17 D20/item 8: a read-only popover over the already-merged data (`overviewRows`) — one panel,
 // reachable from any request tab (HttpRequestView.vue and GrpcRequestView.vue both mount this
@@ -50,7 +52,7 @@ function onCopy(name: string): void {
   void copyText(reference(name));
 }
 
-const collectionName = computed(() => collectionRecord(props.collectionId)?.name ?? '');
+const collectionName = computed(() => collectionsStore.collectionRecord(props.collectionId)?.name ?? '');
 const environmentName = computed(
   () => variablesState.environments.find((e) => e.id === props.environmentId)?.name ?? '',
 );

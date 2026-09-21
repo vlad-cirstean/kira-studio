@@ -7,20 +7,14 @@ import IconButton from '../theme/primitives/IconButton.vue';
 import PanelShell from '../theme/primitives/PanelShell.vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
-import {
-  collectionRecord,
-  collectionsState,
-  createCollection,
-  importCollection,
-  initCollections,
-  itemRecord,
-} from './state/collections';
+import { useCollectionsStore } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { useDynamicValuesStore } from './state/dynamicValues';
 import { initVariables, openEnvironments } from './state/variables';
 import { openApiRequestTab, openVariableSetTab } from './tabs';
 
 const dynamicValuesStore = useDynamicValuesStore();
+const collectionsStore = useCollectionsStore();
 
 // P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
 // shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
@@ -34,12 +28,12 @@ const dynamicValuesStore = useDynamicValuesStore();
 // environments, because the environments category lived in this panel and a project with
 // environments but no collections still had something to show; with that category gone, this
 // panel shows collections and nothing else, so an environment must not keep the empty state away.
-const empty = computed(() => collectionsState.collections.length === 0);
+const empty = computed(() => collectionsStore.collections.length === 0);
 
 // The fetch belongs to the panel rather than the tree: PanelShell renders #body only when it is
 // non-empty, so a tree that loaded itself on mount would never load at all on a fresh install —
 // no collections, no tree, no call, no collections.
-onMounted(initCollections);
+onMounted(collectionsStore.initCollections);
 // The header's Environments action and the active-environment select both read this; initVariables()
 // is idempotent (state/variables.ts's own guard), so mounting it here as well as wherever else
 // needs it is safe.
@@ -51,15 +45,15 @@ onMounted(initVariables);
 // collapsed (F11: it was behind a dialog before this, so a user has never had it open by default).
 const collectionsExpanded = ref(true);
 function onSearch(value: string): void {
-  collectionsState.search = value;
+  collectionsStore.search = value;
 }
 
 function onNewCollection(): void {
-  void createCollection();
+  void collectionsStore.createCollection();
 }
 
 function onImport(): void {
-  void importCollection();
+  void collectionsStore.importCollection();
 }
 
 // P5 D11, re-homed to a tab by P17 D16: the palette's Variables… entry — opens the tab for
@@ -67,17 +61,17 @@ function onImport(): void {
 // folder/request's own collection). A no-op with nothing selected, the same "view-scoped, no-op
 // elsewhere" shape view.run/api.save already have.
 function onVariablesCommand(): void {
-  const selected = collectionsState.selected;
+  const selected = collectionsStore.selected;
   if (!selected) return;
   if (selected.startsWith('c:')) {
     const id = selected.slice(2);
-    const collection = collectionRecord(id);
+    const collection = collectionsStore.collectionRecord(id);
     if (collection) openVariableSetTab('collection', id, collection.name);
     return;
   }
   if (selected.startsWith('i:')) {
-    const item = itemRecord(selected.slice(2));
-    const collection = item ? collectionRecord(item.collectionId) : undefined;
+    const item = collectionsStore.itemRecord(selected.slice(2));
+    const collection = item ? collectionsStore.collectionRecord(item.collectionId) : undefined;
     if (item && collection) {
       openVariableSetTab('collection', item.collectionId, collection.name);
     }
@@ -119,7 +113,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PanelShell :empty="empty" :search="collectionsState.search" @update:search="onSearch">
+  <PanelShell :empty="empty" :search="collectionsStore.search" @update:search="onSearch">
     <template #title>
       <span>Collections</span>
     </template>

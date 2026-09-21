@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '../theme/CodiconIcon.vue';
-import { importCollection } from './state/collections';
+import { useCollectionsStore } from './state/collections';
 import { openImportCurlDialog } from './state/curl';
 import { openApiRequestTab, openGrpcRequestTab } from './tabs';
+
+const collectionsStore = useCollectionsStore();
 
 // D13: the mode's front door — StudioStart.vue's own first-run shape verbatim (mark, title, one
 // line of copy, one p-dlgbtn primary button), the same `api/ -> state/` edge
@@ -12,7 +14,7 @@ import { openApiRequestTab, openGrpcRequestTab } from './tabs';
 // an existing collection is the other thing someone arriving here wants to do. The primary
 // button's `new-request-start` testid is untouched — two existing specs click it (F11).
 function onImport(): void {
-  void importCollection();
+  void collectionsStore.importCollection();
 }
 
 // P7 D12: a third front-door button — pasting a curl command is the other common way someone
