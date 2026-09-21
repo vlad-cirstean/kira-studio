@@ -10,13 +10,19 @@
 import './support/window';
 
 import { describe, expect, test } from 'bun:test';
+import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
 import type { OpRecord } from '../../../../packages/shared/domain/ops';
+import { pinia } from '../../frontend/src/state/pinia';
 import { restoreAfterEach } from './support/restoreAfterEach';
 
+setActivePinia(pinia);
+
 const { control } = await import('../../frontend/src/bridge/control');
-const { opsState, hydrateOps } = await import('../../frontend/src/state/ops');
+const { useOpsStore } = await import('../../frontend/src/state/ops');
 restoreAfterEach(control);
+
+const opsStore = useOpsStore();
 
 function record(partial: Partial<OpRecord> & Pick<OpRecord, 'id' | 'tabId' | 'status'>): OpRecord {
   return {
@@ -39,9 +45,9 @@ describe('state/ops.ts markRaw (finding 13)', () => {
     // biome-ignore lint/suspicious/noExplicitAny: a minimal fake, not the real control surface
     (control as any).onOpUpdate = () => () => {};
 
-    await hydrateOps();
+    await opsStore.hydrateOps();
 
-    expect(isReactive(opsState.records[0])).toBe(false);
+    expect(isReactive(opsStore.records[0])).toBe(false);
   });
 
   test('a record delivered via onOpUpdate (new op) is not wrapped either', async () => {
@@ -54,11 +60,11 @@ describe('state/ops.ts markRaw (finding 13)', () => {
       return () => {};
     };
 
-    await hydrateOps();
+    await opsStore.hydrateOps();
     const incoming = record({ id: 'new-1', tabId: 't2', status: 'running' });
     deliver(incoming);
 
-    const stored = opsState.records.find((r) => r.id === 'new-1');
+    const stored = opsStore.records.find((r) => r.id === 'new-1');
     expect(stored).toBeDefined();
     expect(isReactive(stored)).toBe(false);
   });
@@ -74,11 +80,11 @@ describe('state/ops.ts markRaw (finding 13)', () => {
       return () => {};
     };
 
-    await hydrateOps();
+    await opsStore.hydrateOps();
     const finished = record({ id: 'op-1', tabId: 't3', status: 'ok', durationMs: 12 });
     deliver(finished);
 
-    const stored = opsState.records.find((r) => r.id === 'op-1');
+    const stored = opsStore.records.find((r) => r.id === 'op-1');
     expect(stored?.status).toBe('ok');
     expect(isReactive(stored)).toBe(false);
   });

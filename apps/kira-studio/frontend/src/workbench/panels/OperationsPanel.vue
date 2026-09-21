@@ -7,7 +7,7 @@ import { copyText } from '../../clipboard';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { connectionRecord, connectionsState } from '../../state/connections';
 import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
-import { clearOps, opsState, runningCount, visibleOps } from '../../state/ops';
+import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { activateTab, openConsoleTab, tabsState } from '../../state/tabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -21,6 +21,7 @@ import { run as runConsole } from '../../views/console/state';
 import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../views/shared/sqlIdent';
 
 const contextMenuStore = useContextMenuStore();
+const opsStore = useOpsStore();
 
 interface OpsListItem {
   key: string;
@@ -42,7 +43,7 @@ function toggleExpanded(record: OpRecord): void {
 
 const listItems = computed<OpsListItem[]>(() => {
   const out: OpsListItem[] = [];
-  for (const record of visibleOps.value) {
+  for (const record of opsStore.visibleOps) {
     out.push({ key: record.id, kind: 'op', record });
     if (expandedId.value === record.id) {
       if (record.command) out.push({ key: `${record.id}-cmd`, kind: 'detail-command', record });
@@ -168,23 +169,23 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
     <div class="ops-header">
       <div class="filter-input">
         <TextField
-          v-model="opsState.filterText"
+          v-model="opsStore.filterText"
           icon="filter"
           placeholder="Filter"
           data-testid="ops-filter"
         />
       </div>
-      <SegmentedControl v-model="opsState.statusFilter" :options="statusFilterOptions" />
-      <span class="running-count">{{ runningCount }} running</span>
+      <SegmentedControl v-model="opsStore.statusFilter" :options="statusFilterOptions" />
+      <span class="running-count">{{ opsStore.runningCount }} running</span>
       <AppButton
         v-tooltip="'Clears the in-memory ring only — op_log retention is automatic'"
-        @click="clearOps"
+        @click="opsStore.clearOps"
       >
         Clear
       </AppButton>
     </div>
 
-    <div v-if="visibleOps.length === 0" class="min-h-0 flex-1">
+    <div v-if="opsStore.visibleOps.length === 0" class="min-h-0 flex-1">
       <EmptyState icon="checklist" label="No operations yet" />
     </div>
     <template v-else>

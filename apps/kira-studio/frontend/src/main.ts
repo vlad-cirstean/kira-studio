@@ -18,7 +18,7 @@ import { useDbMcpStore } from './state/dbmcp';
 import { useGitClientsStore } from './state/gitClients';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
-import { hydrateOps } from './state/ops';
+import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { queryClient } from './state/queryClient';
 import { ensureWorkspaceShell } from './state/repoTabs';
@@ -304,6 +304,7 @@ async function bootstrap(): Promise<void> {
   const dbMcpStore = useDbMcpStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
   const workspaceStore = useWorkspaceStore(pinia);
+  const opsStore = useOpsStore(pinia);
 
   cacheStatsStore.initCacheStats();
   appMetricsStore.initAppMetrics();
@@ -329,7 +330,7 @@ async function bootstrap(): Promise<void> {
     agentHooksStore.hydrateAgentHooks(),
     agentSessionsStore.initAgentSessions(),
     keepAwakeStore.initKeepAwake(),
-    hydrateOps(),
+    opsStore.hydrateOps(),
     hydrateTabs(),
   ]);
   // C5 §4.2: hydrateTabs() already derived workspaceStore.openRepos from the restored tabs
