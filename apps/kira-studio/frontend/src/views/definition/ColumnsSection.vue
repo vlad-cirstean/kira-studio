@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
@@ -68,13 +69,14 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
           </td>
           <td class="def-col-type mono">
             <span :style="{ color: columnTypeColor(col.dataType) }">{{ col.dataType }}</span>
-            <span
-              v-if="typeDescription(col.dataType)"
-              class="type-info"
-              v-tooltip="typeDescription(col.dataType) ?? ''"
-            >
-              <CodiconIcon name="info" :size="13" />
-            </span>
+            <Tooltip v-if="typeDescription(col.dataType)">
+              <TooltipTrigger as-child>
+                <span class="type-info" :aria-label="typeDescription(col.dataType) ?? ''">
+                  <CodiconIcon name="info" :size="13" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{{ typeDescription(col.dataType) }}</TooltipContent>
+            </Tooltip>
           </td>
           <td class="def-col-null mono">{{ col.nullable ? 'NULL' : 'NOT NULL' }}</td>
           <td class="def-col-default mono">{{ col.defaultExpr ?? '' }}</td>
@@ -98,7 +100,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .def-col-icon {
-  @apply text-muted w-[var(--kira-icon-box)];
+  @apply text-muted w-4;
 }
 
 .def-col-key {
@@ -106,7 +108,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .header-key {
-  @apply text-warn text-[length:var(--kira-t-xs)];
+  @apply text-warn text-kira-xs;
 }
 .header-key.is-fk {
   @apply text-info;
@@ -117,7 +119,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 }
 
 .type-info {
-  @apply align-middle cursor-help text-subtle ml-[var(--kira-s-1)];
+  @apply align-middle cursor-help text-subtle ml-0.5;
 }
 
 .def-col-null {

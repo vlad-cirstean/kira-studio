@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useTabsStore } from '../../state/tabs';
 import type { ConstraintRow } from './structure';
 
@@ -64,15 +65,14 @@ function onNavigate(c: ConstraintRow): void {
           </td>
           <td class="def-con-detail mono">{{ c.detail }}</td>
           <td class="def-con-table">
-            <button
-              v-if="c.referencedPath"
-              type="button"
-              class="ref-link"
-              v-tooltip="`Open ${referencedTableName(c)}'s definition`"
-              @click="onNavigate(c)"
-            >
-              {{ referencedTableName(c) }}
-            </button>
+            <Tooltip v-if="c.referencedPath">
+              <TooltipTrigger as-child>
+                <button type="button" class="ref-link" @click="onNavigate(c)">
+                  {{ referencedTableName(c) }}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Open {{ referencedTableName(c) }}'s definition</TooltipContent>
+            </Tooltip>
           </td>
         </tr>
       </tbody>
@@ -93,7 +93,7 @@ function onNavigate(c: ConstraintRow): void {
 }
 
 .header-key {
-  @apply text-warn text-[length:var(--kira-t-xs)];
+  @apply text-warn text-kira-xs;
 }
 .header-key.is-fk {
   @apply text-info;
@@ -106,10 +106,9 @@ function onNavigate(c: ConstraintRow): void {
 .ref-link {
   @apply border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info;
 }
-/* text-[var(--kira-accent)], not the text-accent utility — shadcn-bridge.css maps --color-accent
-   to --kira-hover (grey), the same cascade-layer precedent api/CollectionRow.vue's rename-input
-   already documents (Part 3). */
+/* P104 §7.2: text-primary, not text-accent — shadcn-bridge.css maps --color-accent to
+   --kira-hover (grey); --primary is the real brand accent. */
 .ref-link:hover {
-  @apply text-[var(--kira-accent)];
+  @apply text-primary;
 }
 </style>

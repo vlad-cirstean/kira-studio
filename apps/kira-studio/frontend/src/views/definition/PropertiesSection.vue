@@ -39,6 +39,6 @@ defineProps<{
 }
 
 .def-prop-detail {
-  @apply text-subtle text-[length:var(--kira-t-sm)];
+  @apply text-subtle text-kira-sm;
 }
 </style>

@@ -2,21 +2,22 @@
 import { definitionText } from '@shared/domain/definition';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
+import { useRunState } from '../../state/runState';
 import type { DefinitionTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import EngineIcon from '../../theme/EngineIcon.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
@@ -183,6 +184,17 @@ const canOpenConsole = computed(
 // cap) or a dot (view header) — the same per-tab lookup Toolbar.vue and TreeRow.vue already
 // use for the rail elsewhere, just aimed at the dot instead.
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
+// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart) —
+// railColor mirrors ViewChrome.vue's own `connection ? (connection.color ?? null) : undefined`.
+const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 // Produced locally from the path — the same discipline SlickGridHost.vue's own qualifiedName()
 // uses (never round-tripped to the engine for a string join): connection name plus every
 // segment above the target, joined for the view header's breadcrumb.
@@ -205,159 +217,196 @@ const breadcrumb = computed(() => {
     :data-source="rt?.source ?? ''"
     data-read-only-reason="definition-not-editable"
   >
-    <ViewChrome
-      :tab="tab"
-      icon="code"
-      :path="breadcrumb"
-      :name="targetLabel"
-      target-testid="definition-target"
-      refresh-testid="definition-refresh"
-      :can-refresh="!loading"
-      :can-stop="false"
-      @refresh="onRefresh"
-    >
-      <template #badges>
-        <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
-        <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
-          <CodiconIcon name="lock" :size="13" />
-          read-only — {{ originPhrase }}
-        </span>
-      </template>
-
-      <!-- Stop is permanently disabled: this load has no cancellation to offer (state.ts tracks
-           no op-id for it) — the slot stays reserved rather than wired to a stop that doesn't
-           exist. -->
-      <template #toolbar>
-        <div class="sep" />
-        <div class="group">
-          <SegmentedControl
-            :model-value="pane"
-            :options="PANE_OPTIONS"
-            data-testid="definition-pane"
-            @update:model-value="setPane"
-          />
-        </div>
-        <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
-             all — a find-in-document bar for Source, a plain substring filter for Structure. -->
-        <IconButton
-          icon="search"
-          :active="searchOpen"
-          v-tooltip="pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints'"
-          data-testid="definition-search-toggle"
-          @click="toggleSearch"
+    <!-- P104 §3: ViewChrome/ViewHeader inlined (no library counterpart) — Tailwind utilities over
+         components/ui parts, byte-identical `.p-view-head`/`.p-toolbar*` chrome classes kept since
+         primitives.css still styles them until A-final's cleanup. -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
+      />
+      <span v-if="connRecord?.kind" class="icon-box"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
+      <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>
+      <span class="p-view-target" data-testid="definition-target">
+        <span v-if="breadcrumb" class="path">{{ breadcrumb }}</span>{{ targetLabel }}
+      </span>
+      <span v-if="targetTail" class="p-badge">{{ targetTail.kind }}</span>
+      <span class="p-chip" style="background: var(--kira-bg-input); color: var(--kira-fg-muted)">
+        <CodiconIcon name="lock" :size="13" />
+        read-only — {{ originPhrase }}
+      </span>
+      <span class="p-push flex items-center gap-1" />
+    </div>
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <!-- Stop is permanently disabled: this load has no cancellation to offer (state.ts tracks
+         no op-id for it) — the slot stays reserved rather than wired to a stop that doesn't
+         exist. -->
+    <div class="p-toolbar">
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" :disabled="loading" aria-label="Refresh" data-testid="definition-refresh" @click="onRefresh">
+              <CodiconIcon name="refresh" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" disabled aria-label="Stop">
+              <CodiconIcon name="debug-stop" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
+        </Tooltip>
+      </div>
+      <div class="sep" />
+      <div class="group">
+        <ToggleGroup type="single" :model-value="pane" data-testid="definition-pane" @update:model-value="(v) => v && setPane(v as 'structure' | 'source')">
+          <ToggleGroupItem v-for="opt in PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
+            {{ opt.label }}
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      <!-- P22b D14: the single largest searchable document in Studio (F21) had no search at
+           all — a find-in-document bar for Source, a plain substring filter for Structure. -->
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :data-active="searchOpen"
+            aria-label="Search"
+            data-testid="definition-search-toggle"
+            @click="toggleSearch"
+          >
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ pane === 'source' ? 'Find in definition' : 'Filter columns/indexes/constraints' }}</TooltipContent>
+      </Tooltip>
+      <span class="p-push" />
+      <span
+        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+      >
+        <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+        <span
+          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          :class="{
+            'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent': runState.status === 'running',
+            'border-error': runState.status === 'error',
+          }"
         />
-      </template>
-
-      <template #toolbar-end>
+      </span>
+      <div class="group">
         <!-- D7: Copy/notes describe the Source pane's raw text specifically — Structure has its
              own per-section content and count badges, nothing to copy as one document. -->
         <template v-if="pane === 'source'">
           <div class="sep" />
-          <AppButton
-            icon="copy"
-            v-tooltip="'Copy definition to clipboard'"
-            data-testid="definition-copy"
-            @click="onCopy"
-          >
-            Copy
-          </AppButton>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira" data-testid="definition-copy" @click="onCopy">
+                <CodiconIcon name="copy" :size="13" />
+                Copy
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy definition to clipboard</TooltipContent>
+          </Tooltip>
         </template>
-        <AppButton
-          v-if="canOpenConsole"
-          icon="terminal"
-          v-tooltip="'Open query console here'"
-          data-testid="definition-open-console"
-          @click="onOpenConsole"
-        >
-          Open in console
-        </AppButton>
-      </template>
+        <Tooltip v-if="canOpenConsole">
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira" data-testid="definition-open-console" @click="onOpenConsole">
+              <CodiconIcon name="terminal" :size="13" />
+              Open in console
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Open query console here</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
 
-      <template #strips>
-        <MessageStrip
-          v-if="rt?.status === 'error' && rt.error"
-          tone="err"
-          icon="error"
-          data-testid="definition-error"
-        >
-          <span class="err-message">{{ rt.error }}</span>
-        </MessageStrip>
-        <div
-          v-if="pane === 'source' && definition && definition.notes.length > 0"
-          class="p-strip note"
-          data-testid="definition-notes"
-        >
-          <span class="icon-box"><CodiconIcon name="info" :size="13" /></span>
-          <ul class="notes-list">
-            <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
-          </ul>
-        </div>
-        <PanelSearchBox
-          v-if="searchOpen && pane === 'structure'"
-          v-model="structureFilterQuery"
-          placeholder="Filter columns, indexes, constraints"
-          testid="definition-structure-filter"
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="definition-error">
+      <AlertDescription><span class="err-message">{{ rt.error }}</span></AlertDescription>
+    </Alert>
+    <div
+      v-if="pane === 'source' && definition && definition.notes.length > 0"
+      class="p-strip note"
+      data-testid="definition-notes"
+    >
+      <span class="icon-box"><CodiconIcon name="info" :size="13" /></span>
+      <ul class="notes-list">
+        <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
+      </ul>
+    </div>
+    <InputGroup v-if="searchOpen && pane === 'structure'" data-testid="definition-structure-filter">
+      <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+      <InputGroupInput v-model="structureFilterQuery" placeholder="Filter columns, indexes, constraints" />
+      <InputGroupAddon v-if="structureFilterQuery" align="inline-end">
+        <InputGroupButton aria-label="Clear filter" @click="structureFilterQuery = ''">
+          <CodiconIcon name="close" :size="13" />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
+
+    <!-- Item 4: the reconnect gate used to replace this whole view chrome (header, toolbar and
+         all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+         this fixes. The chrome above always renders; only the body — the part that actually needs
+         a live connection — swaps for the gate. -->
+    <div v-if="needsReconnect" class="p-empty" data-testid="definition-reconnect">
+      <Button variant="dialog-primary" size="kira-lg" data-testid="definition-reconnect-load" @click="onReconnectAndLoad">
+        Reconnect &amp; load
+      </Button>
+    </div>
+    <template v-else>
+    <div v-if="pane === 'source'" class="editor-body">
+      <MonacoHost
+        ref="docHostRef"
+        :doc="document"
+        :language="definition?.language === 'json' ? 'json' : 'sql'"
+        :sql-dialect="dialect"
+        :read-only="true"
+        :range-highlights="docHighlights"
+      />
+    </div>
+    <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
+         describe() (F7), so a definition can arrive with meta still null. PropertiesSection
+         renders regardless; everything below it stays conditional on the data it needs, exactly
+         as before. P22b D14: Columns/Indexes/Constraints get the filtered arrays (computed
+         above) instead of meta's own raw ones — filtering lives here, once, not in each
+         section. -->
+    <div v-else-if="definition" class="structure-body">
+      <PropertiesSection v-for="section in definition.sections" :key="section.title" :section="section" />
+      <template v-if="meta">
+        <ColumnsSection
+          v-if="!isCollection"
+          :columns="filteredColumns"
+          :foreign-key-column-names="foreignKeyColumnNames"
+          :connection-id="tab.connectionId ?? ''"
+          :table-path="tab.path"
+        />
+        <IndexesSection :indexes="filteredIndexes" />
+        <ConstraintsSection
+          v-if="!isCollection"
+          :connection-id="tab.connectionId ?? ''"
+          :constraints="filteredConstraintRows"
         />
       </template>
-
-      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
-           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
-           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
-           the body — the part that actually needs a live connection — swaps for the gate. -->
-      <ReconnectGate
-        v-if="needsReconnect"
-        container-testid="definition-reconnect"
-        button-testid="definition-reconnect-load"
-        @reconnect="onReconnectAndLoad"
-      />
-      <template v-else>
-      <div v-if="pane === 'source'" class="editor-body">
-        <MonacoHost
-          ref="docHostRef"
-          :doc="document"
-          :language="definition?.language === 'json' ? 'json' : 'sql'"
-          :sql-dialect="dialect"
-          :read-only="true"
-          :range-highlights="docHighlights"
-        />
-      </div>
-      <!-- P23 D8: the Structure body no longer hard-requires `meta` — Kafka and SQS have no
-           describe() (F7), so a definition can arrive with meta still null. PropertiesSection
-           renders regardless; everything below it stays conditional on the data it needs, exactly
-           as before. P22b D14: Columns/Indexes/Constraints get the filtered arrays (computed
-           above) instead of meta's own raw ones — filtering lives here, once, not in each
-           section. -->
-      <div v-else-if="definition" class="structure-body">
-        <PropertiesSection v-for="section in definition.sections" :key="section.title" :section="section" />
-        <template v-if="meta">
-          <ColumnsSection
-            v-if="!isCollection"
-            :columns="filteredColumns"
-            :foreign-key-column-names="foreignKeyColumnNames"
-            :connection-id="tab.connectionId ?? ''"
-            :table-path="tab.path"
-          />
-          <IndexesSection :indexes="filteredIndexes" />
-          <ConstraintsSection
-            v-if="!isCollection"
-            :connection-id="tab.connectionId ?? ''"
-            :constraints="filteredConstraintRows"
-          />
-        </template>
-        <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
-      </div>
-      <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring HTTP's own
-           ResponsePane.vue — only shown over the Source pane's single document. -->
-      <ResponseFindBar
-        v-if="searchOpen && pane === 'source'"
-        ref="findBarRef"
-        :targets="findTargets"
-        @close="closeSearch"
-      />
-      <!-- LAW — there is no editor status line: identity moved to the view header above,
-           duration to the toolbar's run-state, and this tab has no pending edits to report. -->
-      </template>
-    </ViewChrome>
+      <ValidationSection v-if="isCollection" :document-schema="definition.documentSchema" />
+    </div>
+    <!-- P22b D14: docked below the pane it searches (LAW 03), mirroring HTTP's own
+         ResponsePane.vue — only shown over the Source pane's single document. -->
+    <ResponseFindBar
+      v-if="searchOpen && pane === 'source'"
+      ref="findBarRef"
+      :targets="findTargets"
+      @close="closeSearch"
+    />
+    <!-- LAW — there is no editor status line: identity moved to the view header above,
+         duration to the toolbar's run-state, and this tab has no pending edits to report. -->
+    </template>
   </div>
 </template>
 
