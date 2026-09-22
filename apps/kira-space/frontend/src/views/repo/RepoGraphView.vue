@@ -29,6 +29,8 @@
 // bit of state this `KeepAlive` exists to keep (layout, scroll position, loaded rows, the git
 // transport lease) is untouched, exactly as before.
 import type { MountHandle } from '@kira/git-ui';
+// P104 §3.4: EmptyState's ui/alert rewrite is a genuinely separate, non-mechanical piece of work --
+// not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';

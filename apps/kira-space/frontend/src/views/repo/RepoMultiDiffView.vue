@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+// P104 §3.4: EmptyState's ui/alert rewrite is a genuinely separate, non-mechanical piece of work --
+// not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
 // editor's counterpart. A scrolling column of per-file sections; each section's own diff editor
@@ -124,22 +127,31 @@ onUnmounted(() => {
   <div v-else class="repo-multi-diff-root" data-testid="repo-multi-diff-view">
     <div v-for="section in sections" :key="section.path" class="section">
       <div class="section-header">
-        <IconButton
-          :icon="section.expanded ? 'chevron-down' : 'chevron-right'"
-          data-testid="repo-multi-diff-toggle"
-          v-tooltip="section.expanded ? 'Collapse' : 'Expand'"
-          @click="toggle(section)"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="repo-multi-diff-toggle"
+              @click="toggle(section)"
+            >
+              <CodiconIcon :name="section.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ section.expanded ? 'Collapse' : 'Expand' }}</TooltipContent>
+        </Tooltip>
         <span class="path" :title="section.path">{{ basename(section.path) }}</span>
         <span class="path-dir" :title="section.path">{{ section.path }}</span>
-        <AppButton
+        <Button
           v-if="section.expanded && sectionState[section.path] === 'found'"
-          icon="go-to-file"
+          variant="toolbar"
+          size="kira"
           data-testid="repo-multi-diff-go-to-file"
           @click="goToFile(section.path)"
         >
+          <CodiconIcon name="go-to-file" :size="13" />
           Go to file
-        </AppButton>
+        </Button>
       </div>
       <template v-if="section.expanded">
         <div
@@ -186,7 +198,7 @@ onUnmounted(() => {
 }
 
 .section-header {
-  @apply flex flex-none items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-3)];
+  @apply flex flex-none items-center gap-1 py-1 px-1.5;
 }
 
 .path {
@@ -194,7 +206,7 @@ onUnmounted(() => {
 }
 
 .path-dir {
-  @apply flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted text-[length:var(--kira-t-sm)];
+  @apply flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted text-kira-sm;
 }
 
 .monaco-host {

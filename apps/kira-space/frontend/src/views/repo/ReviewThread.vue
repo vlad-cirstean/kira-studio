@@ -8,7 +8,8 @@
 // (review.comment.add/remove, plus the repaint that follows) stay in reviewDecorations.ts — this
 // component only renders and emits.
 import type { ReviewComment } from '@kira/git-ipc';
-import AppButton from '@theme/primitives/AppButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { computed, ref } from 'vue';
 
 const props = defineProps<{
@@ -60,8 +61,14 @@ function submit(): void {
       <div v-if="anchorLabel" class="review-thread-anchor">{{ anchorLabel }}</div>
       <div class="review-thread-body">{{ comment.body }}</div>
       <div class="review-thread-actions">
-        <AppButton icon="close" @click="emit('close')">Close</AppButton>
-        <AppButton icon="trash" variant="danger" @click="emit('delete')">Delete</AppButton>
+        <Button variant="toolbar" size="kira" @click="emit('close')">
+          <CodiconIcon name="close" :size="13" />
+          Close
+        </Button>
+        <Button variant="danger" size="kira" @click="emit('delete')">
+          <CodiconIcon name="trash" :size="13" />
+          Delete
+        </Button>
       </div>
     </template>
     <template v-else>
@@ -75,8 +82,11 @@ function submit(): void {
         @keydown.ctrl.enter="submit"
       />
       <div class="review-thread-actions">
-        <AppButton @click="emit('cancel')">Cancel</AppButton>
-        <AppButton icon="comment" variant="primary" @click="submit">Comment</AppButton>
+        <Button variant="toolbar" size="kira" @click="emit('cancel')">Cancel</Button>
+        <Button variant="toolbar-primary" size="kira" @click="submit">
+          <CodiconIcon name="comment" :size="13" />
+          Comment
+        </Button>
       </div>
     </template>
   </div>
@@ -103,7 +113,7 @@ function submit(): void {
 }
 
 .review-thread-input:focus {
-  @apply outline-none border-[var(--kira-focus)];
+  @apply outline-none border-focus;
 }
 
 .review-thread-actions {

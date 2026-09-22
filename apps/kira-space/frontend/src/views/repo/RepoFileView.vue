@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// P104 §3.4/§3.1: EmptyState's ui/alert rewrite and SegmentedControl's ToggleGroup recipe are each
+// a genuinely separate, non-mechanical piece of work -- not attempted in this pass, same deferral
+// as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -325,7 +328,7 @@ onUnmounted(() => {
    every block element below restates its own spacing (and headings their own scale, P73 §7); that
    is expected here, not a workaround. */
 .md-reading {
-  @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-[family-name:var(--kira-font-ui)] text-[length:var(--kira-t-md)] leading-[1.6] p-[var(--kira-s-6)];
+  @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-[1.6] p-4;
 }
 .md-reading > :deep(*) {
   @apply max-w-[72ch];
@@ -336,13 +339,13 @@ onUnmounted(() => {
 .md-reading :deep(h4),
 .md-reading :deep(h5),
 .md-reading :deep(h6) {
-  @apply font-semibold leading-[1.3] mt-[var(--kira-s-6)] mx-0 mb-[var(--kira-s-3)];
+  @apply font-semibold leading-[1.3] mt-4 mx-0 mb-1.5;
 }
 /* P73 §7(b): em, not --kira-t-xl (tokens.css: deliberately a 20px literal that ignores Appearance)
    — resolves against .md-reading's own font-size, so the scale tracks the Appearance font-size
    setting for free. Headings don't nest, so nothing compounds. */
 .md-reading :deep(h1) {
-  @apply border-b border-border text-[1.6em] pb-[var(--kira-s-3)];
+  @apply border-b border-border text-[1.6em] pb-1.5;
 }
 .md-reading :deep(h2) {
   @apply text-[1.4em];
@@ -358,43 +361,43 @@ onUnmounted(() => {
   @apply text-[1em];
 }
 .md-reading :deep(p) {
-  @apply mt-0 mx-0 mb-[var(--kira-s-4)];
+  @apply mt-0 mx-0 mb-2;
 }
 .md-reading :deep(ul),
 .md-reading :deep(ol) {
-  @apply list-[revert] mt-0 mx-0 mb-[var(--kira-s-4)] pl-[var(--kira-s-6)];
+  @apply list-[revert] mt-0 mx-0 mb-2 pl-4;
 }
 .md-reading :deep(li) {
-  @apply my-[var(--kira-s-1)] mx-0;
+  @apply my-0.5 mx-0;
 }
 .md-reading :deep(a) {
   @apply text-info cursor-pointer;
 }
 .md-reading :deep(blockquote) {
-  @apply border-l-[3px] border-border text-muted mt-0 mx-0 mb-[var(--kira-s-4)] py-0 px-[var(--kira-s-4)];
+  @apply border-l-[3px] border-border text-muted mt-0 mx-0 mb-2 py-0 px-2;
 }
 .md-reading :deep(hr) {
-  @apply border-0 border-t border-border my-[var(--kira-s-6)] mx-0;
+  @apply border-0 border-t border-border my-4 mx-0;
 }
 .md-reading :deep(code) {
-  @apply bg-input rounded-kira-sm font-[family-name:var(--kira-font-data)] text-[length:var(--kira-t-sm)] py-[0.1em] px-[0.35em];
+  @apply bg-input rounded-kira-sm font-data text-kira-sm py-[0.1em] px-[0.35em];
 }
 .md-reading :deep(pre) {
-  @apply overflow-auto bg-input rounded-kira-sm max-w-none mt-0 mx-0 mb-[var(--kira-s-4)] p-[var(--kira-s-4)];
+  @apply overflow-auto bg-input rounded-kira-sm max-w-none mt-0 mx-0 mb-2 p-2;
 }
 /* P73 §7(a): more specific than :deep(code) above, so fenced code wins without touching that
    rule — a fenced block matches Monaco's own size exactly. Inline code deliberately stays at
    --kira-t-sm (the step-down exists so a same-px monospace run doesn't outsize the prose around
    it, which doesn't apply inside a standalone block). */
 .md-reading :deep(pre code) {
-  @apply bg-none p-0 text-[length:var(--kira-t-md)];
+  @apply bg-none p-0 text-kira-md;
 }
 .md-reading :deep(table) {
-  @apply border-collapse max-w-none mt-0 mx-0 mb-[var(--kira-s-4)];
+  @apply border-collapse max-w-none mt-0 mx-0 mb-2;
 }
 .md-reading :deep(th),
 .md-reading :deep(td) {
-  @apply border border-border text-left py-[var(--kira-s-2)] px-[var(--kira-s-4)];
+  @apply border border-border text-left py-1 px-2;
 }
 .md-reading :deep(thead) {
   @apply border-b border-border;

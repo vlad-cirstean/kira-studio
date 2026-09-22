@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+// P104 §3.4: EmptyState's ui/alert rewrite is a genuinely separate, non-mechanical piece of work --
+// not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, ref } from 'vue';
@@ -117,9 +120,10 @@ onUnmounted(() => {
     <!-- P92 item 7: the same action the repo.goToFileFromDiff palette command runs — P74 built the
          behaviour and gave it no other affordance. -->
     <div v-if="state === 'found'" class="diff-actions">
-      <AppButton icon="go-to-file" data-testid="repo-diff-go-to-file" @click="onGoToFile">
+      <Button variant="toolbar" size="kira" data-testid="repo-diff-go-to-file" @click="onGoToFile">
+        <CodiconIcon name="go-to-file" :size="13" />
         Go to file
-      </AppButton>
+      </Button>
     </div>
     <div
       v-if="state === 'loading' || state === 'found'"
@@ -154,7 +158,7 @@ onUnmounted(() => {
 }
 
 .diff-actions {
-  @apply flex flex-none border-b border-border py-[var(--kira-s-2)] px-[var(--kira-s-3)];
+  @apply flex flex-none border-b border-border py-1 px-1.5;
 }
 
 .monaco-host {
