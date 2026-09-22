@@ -773,6 +773,150 @@ produced is informational, not a defect: the a11y recount (255 errors across 86 
 255/85 by one file, same total count) is P101's own starting point, named here and nowhere else —
 this phase fixes none of it, per its own explicit instruction not to.
 
+## P100 Part 1 result
+
+Landed per plan (`docs/v1.9/plans/P100-kira-space-extraction.md` §0-§3, §4, §8-§11), 25 commits
+from `dec0635` (hoisting the first repo-root package) through `4ab4656` (Kira Studio's own
+cleanup), plus this section's own commit.
+
+**Repo-root hoist (§4.2), 8 packages, 3 commits, not one-per-package.** `ipcerr`/`notify`/
+`pathsafe`/`rpcstream` landed together (`dec0635`) since none needed anything beyond a plain
+`git mv` + import-path rewrite; `startupfail`/`logging` together (`2691855`), each parameterized
+(`startupfail.Info`/`Reporter` DI, `logging.Init` taking a logs-dir argument) since neither could
+stay a process-wide singleton once two apps link it; `kirapaths`/`sqlitex` together (`6a544f3`), new
+packages generalized out of `apps/kira-studio/internal/config`/`storage`'s own path-join and
+migration-runner logic rather than duplicated. Each commit left `go build ./...` green.
+
+**Go's `internal/` visibility rule broke the plan's literal "one `git mv` per commit, green at
+every step" strategy — root-caused, not worked around silently.** A package under
+`apps/kira-studio/internal/...` is importable only by code rooted under `apps/kira-studio/`; §4.6's
+listed move order (`gitwire` → ... → `gitsock`) has `gitsock` importing `gitwire` at both ends, so
+moving `gitwire` out first would break Studio's still-resident `gitsock` before `gitsock` itself
+ever moves. Fixed with a copy-forward/delete-backward strategy instead: each of the 15 git packages
+plus `ghclient`/`codeworkspace` was copied to its new home, leaving Studio's own copy fully intact
+and self-consistent, until every package, the 4 bridge files and kira-space's own `main.go` existed
+and built in the new location — only then did one final commit (`4ab4656`) delete every old Studio
+copy at once, at the exact point nothing in Studio referenced them any more. `go build ./...` (whole
+repo) stayed green at every single commit throughout, which was the plan's real intent even though
+its literal instruction (delete-as-you-go) could not satisfy it. Each of the 16 package-move commits
+documents this; the first (`cfea4e3`, `gitwire`) carries the full rationale, every later one points
+back to it.
+
+**§4.6's suggested move order was not a valid topological order — corrected, not followed
+blindly.** `gitstore` (the plan's position 3) actually imports `gitclient/porcelain` (position 4),
+confirmed by `grep`. Computed the real order via Kahn's algorithm instead: `gitwire, gitpath,
+ghclient, gitprepare, gitaskpass, gitvsix, gitclient (+ porcelain/catfile/logsession), gitstore,
+gitpreflight, gitsearch, gitreview, gitops, codeworkspace, gitrpc, gitsock` — one topological
+sort, `ghclient`/`gitvsix` interleaved where their own dependency edges actually place them rather
+than appended at the end as the plan's prose does.
+
+**Wails skeleton, home/DB/socket split (§4.1, §4.2, §4.4), landed as documented at the time
+(`b4a6368`, `5af6f15`).** `apps/kira-space` builds (no `frontend/`, Part 2's job — `frontend/dist/
+index.html` is a force-added placeholder so `//go:embed` compiles), `KIRA_SPACE_HOME`, its own
+`kira.db`, `review.db`, `git.sock`. Root `package.json`'s `dev:space`/`build:space`/`package:space`/
+`typecheck:space-web` scripts stay deferred to Part 2 — they'd reference a `frontend/`/`tsconfig`
+that doesn't exist yet.
+
+**Storage split (§4.5), one stated deviation.** `apps/kira-space`'s `0001_init.sql` carries no
+`layout`/`tabs` tables — nothing in Part 1 reads or writes them (no frontend, no window-layout
+persistence yet), and Part 2 is where they'd first matter. `model.Settings` trimmed to
+`Appearance`/`Advanced.GitLogLevel`/`Git`; `repos.Repos` trimmed to 5 fields (`Settings`, `Windows`,
+`GitClients`, `CodeRepos`, `GitRepoSettings`).
+
+**The 4 bridge files (`dbb523c`) needed a trimmed `appcore.Deps` (3 fields: `Repos`, `Events`,
+`GitRegistry`) and two new local interfaces, not verbatim copies.** `bridge/stream.go`'s
+`StreamSession` and `bridge/browser.go`'s `Browser` each carry only the one method `gitstream.go`/
+`github.go` actually call — Studio's own versions live in files (`stream.go`'s full form,
+`update.go`) that also pull in `adapterhost`/`appupdate`, neither of which Part 1 has any reason to
+import. A new `apps/kira-space/internal/bridge/events.go` carries just the 3 channel constants the
+4 files need (`ChannelCodeSearch`, `ChannelGitPairing`, `ChannelGitClientsChanged`) — declared,
+unsubscribed, since Part 1 has no `Events.Attach` wiring of its own yet.
+
+**`main.go`, shell (`9d8c62d`), deliberately simpler than Studio's, each cut named in its own
+commit message.** `shell/quit.go` has no per-window flush handshake (Kira Space has no tabs/layout
+to flush yet); `shell/menu.go`/`menutemplate.go` are minimal (3 sections, no `ItemEmit` kind);
+`shell/app.go` has no `Dialogs`, no `AttachSystemWake`. `wireGit` is lifted wholesale from Studio's
+own (same runner/discovery/registry/askpass-broker/router/socket sequence). Kira Studio's askpass
+shim is deleted from Studio's `main.go` in the cleanup commit — Kira Space's own `main.go` is now
+the only askpass entry point.
+
+**One real content change inside a "move", flagged as such per §4.6's own framing (not just an
+import-path rewrite):** `apps/kira-space/internal/gitreview/db.go`'s `DefaultPath()` used
+`config.KiraHome()`, undefined in kira-space's own `config` package — fixed to
+`config.KiraSpaceHome()`.
+
+**`layering_test.go` copied to both apps (`4cd211b`), retargeted, not merely duplicated.**
+Kira Space's own carries `modulePrefix = ".../apps/kira-space/"` and a trimmed exemption set
+(`{internal, internal/bridge, internal/shell}` vs. Studio's larger one). Both pass —
+`TestDomainPackagesDoNotImportBridge` checks 44 non-exempt packages across the two apps combined (18
+in kira-space, 26 in Studio after cleanup), zero violations.
+
+**Kira Studio's cleanup (`4ab4656`) — one deliberate exception to the task's own instruction, plus
+two follow-on fixes it required.** `advanced.gitLogLevel` (and the rest of `GitSettings` on
+`model.Settings`) was **not** removed, despite being named alongside `wireGit`/`RegisterGitStream`
+in the task's own instruction: it's mirrored in `packages/shared/domain/settings.ts` and
+`SettingsDialog.vue` (confirmed by grep), so a Go-only removal would break the settings round-trip
+(the frontend still sending/expecting a field Go no longer has) — worse than leaving it alone, and
+fixing it correctly needs a frontend change, out of this phase's Go-only scope. Only the
+`GitRegistry`-fed `ReconcileAutoFetch()` side effect (pure Go-internal, no wire coupling) came out
+of `bridge/settings.go`. This one exception cascaded two fixes the plan didn't anticipate: (1)
+`ValidLogLevel` — `advanced.gitLogLevel`'s own validator — lived in the deleted
+`storage/model/gitreposettings.go`; moved into `settings.go` itself, its only remaining caller,
+since keeping the leaf without it would not build. (2) `bridge/link_test.go`'s `fakeBrowser` lived
+in the deleted `github_test.go`; it's `LinkService`'s own test double, unrelated to git, so it moved
+into `link_test.go` directly rather than being recreated as a new shared fixture for one caller.
+
+Everything else the task named came out cleanly: `wireGit`/`gitWired`, every git-threaded parameter
+through `wireEmbeddedServices`/`wireLifecycle`/`postAppDeps`, the 3 git `Services` entries, the
+whole pairing-notification block (`wirePairingNotifications` plus its bottom-of-file helpers —
+`gitsock.OnPairingChanged` was its only trigger, and with it gone the `notifications` package has no
+caller left in Studio either, so it and its `notifier` variable came out too, not just the pairing
+code path), `bridge/events.go`'s `Git` `Sources` field and the two pairing channels (comment points
+at their new home), `shell/app.go`'s `RegisterGitStream`. `model/window.go`'s `validWindowModes`
+drops `"git"` — a stored `git` row degrades to `studio` through `NormalizeMode`, the same posture
+the file already documents for an unrecognised mode, no migration needed for the window-mode leaf.
+`internal/ipcfixture/harness.go` needed no edit — it never referenced the git bridge services in the
+first place (confirmed by grep before and after; `go build`/`go vet` on it stayed clean throughout).
+
+**`0026_p100_drop_git_tables.sql`**: drops `git_repo_settings`, `git_clients`, `code_repos`.
+`tabs.workspace_id` stays, per the plan's own §4.5 reasoning — every remaining tab already parses as
+`workspace_id IS NULL`, so dropping the column would rewrite the whole table for no behavioural
+gain, and `model.NormalizeMode`'s degrade-on-unrecognised posture already covers the same case.
+
+**One-time import of pairings/repo list (§4.5) — scoped out, not attempted, per the plan's own
+named fallback.** The plan explicitly allows recording "ship nothing" here if the import "turns out
+to need more than one commit's worth of work," and it does: a settings-row guard needs a working
+Settings read/write path wired into kira-space's own boot sequence (Part 1 has no `SettingsService`
+bridge yet, deliberately — nothing in Part 1 reads settings past `Advanced.GitLogLevel` at
+`logging.SetLevel` time), the import itself is a genuine first-boot ordering problem (must run after
+kira-space's own DB is open and before any repo/pairing read, entirely separate from `wireGit`'s
+existing sequence), and it touches a second database (`review.db`) with its own failure-must-not-
+damage-either-file requirement. Given Part 1's already-large scope (the copy-forward migration
+alone), this is real, multi-commit-shaped work, not a corner that was cut for convenience — flagged
+here for the orchestrating session to schedule (a new phase, or folded into Part 2 once
+kira-space has a real settings path) rather than silently dropped or half-built.
+
+**Verification (§9).** `go build ./...` clean (both apps). `go vet ./...` clean. `gofmt -l` on
+every file this phase touched: clean (Studio's pre-existing drift in ~23 unrelated files, confirmed
+via `git status` to be untouched by this phase, matches the pattern already documented at `2691855`
+and earlier commits in this phase). `bun run lint:go` (`golangci-lint`): 0 issues. `bun run test:go`:
+every package green, including both `layering_test.go` copies (`TestDomainPackagesDoNotImportBridge`
+run explicitly with `-v`, 44 subtests total across both apps, all pass). `bun run typecheck`: clean
+across all five projects — untouched by this phase, re-run to confirm nothing broke. Both real
+binaries were run directly (no display in this sandbox, so this is as far as either can be
+verified): Kira Studio boots through config/logging/storage(migrated through `0026`)/repos/
+settings/adapters/connections/oplog/metrics/window-list, stopping only at this container's GTK
+"Failed to open display"; Kira Space (verified in the prior session segment, re-confirmed
+unaffected by this segment's Studio-only changes) produces `~/.kira-space/git.sock` at mode `0600`
+before hitting the same GTK failure. One sandbox artifact, not an app bug: a long scratchpad
+`KIRA_SPACE_HOME` path first failed `gitsock.Start()` with `bind: invalid argument` (Linux's
+~108-byte `sun_path` limit) — resolved by re-testing with a short `/tmp` path, which succeeded
+cleanly.
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry — that file is explicitly Part 4's to
+edit, not this phase's; the one open item this phase produced (the deferred first-boot import,
+above) is recorded here instead, for the orchestrating session to route.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
