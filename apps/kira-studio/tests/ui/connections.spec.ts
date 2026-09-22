@@ -297,7 +297,9 @@ test('connection dialog CRUD, colors, and D7/D9 secret handling', async ({ relau
   // --- P42 F16: the port field's numeric stepper draws both chevrons wholly inside their own
   // buttons, not spilling into a sibling or out of the field (a CSS regression guard). --------
   const portInput = page.locator('[data-testid="connection-port"]');
-  const stepButtons = portInput.locator('xpath=parent::span').locator('.step-btn');
+  const stepButtons = portInput
+    .locator('xpath=parent::div[@data-slot="input-group"]')
+    .locator('.step-btn');
   await expect(stepButtons).toHaveCount(2);
   for (const btn of await stepButtons.all()) {
     const btnBox = await btn.boundingBox();

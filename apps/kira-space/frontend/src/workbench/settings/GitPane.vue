@@ -2,7 +2,9 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref, watch } from 'vue';
 import {
   defaultSettings,
@@ -45,6 +47,12 @@ function resetProtectedBranches(): void {
   props.draft.git.protectedBranches = [...defaultSettings.git.protectedBranches];
   protectedBranchesText.value = props.draft.git.protectedBranches.join('\n');
 }
+
+// P104 §2: TextField's number stepper -> ui/input-group recipe.
+const fetchAutoIntervalGroupRef = ref<HTMLElement | null>(null);
+const fetchAutoIntervalStepper = useNumberStepper(fetchAutoIntervalGroupRef);
+const graphFontSizeGroupRef = ref<HTMLElement | null>(null);
+const graphFontSizeStepper = useNumberStepper(graphFontSizeGroupRef);
 
 const fetchAutoIntervalError = computed<string | null>(() => {
   const v = props.draft.git.fetchAutoIntervalMinutes;
@@ -132,16 +140,48 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <Input
-        type="number"
-        :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
-        :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-        :aria-invalid="!!fetchAutoIntervalError || undefined"
-        data-testid="settings-git-fetch-auto-interval"
-        :model-value="String(draft.git.fetchAutoIntervalMinutes)"
-        @input="onFetchAutoIntervalInput"
-      />
+      <span ref="fetchAutoIntervalGroupRef" class="contents">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+          <InputGroupInput
+            type="number"
+            :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
+            :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
+            class="h-full font-data"
+            :aria-invalid="!!fetchAutoIntervalError || undefined"
+            data-testid="settings-git-fetch-auto-interval"
+            :model-value="String(draft.git.fetchAutoIntervalMinutes)"
+            @input="onFetchAutoIntervalInput"
+          />
+          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="fetchAutoIntervalStepper.stepBy(1)"
+                >
+                  <CodiconIcon name="chevron-up" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Increase</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="fetchAutoIntervalStepper.stepBy(-1)"
+                >
+                  <CodiconIcon name="chevron-down" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Decrease</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        </InputGroup>
+      </span>
       <span
         v-if="fetchAutoIntervalError"
         class="field-error"
@@ -209,16 +249,48 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <Input
-        type="number"
-        :min="FONT_SIZE_RANGE.min"
-        :max="FONT_SIZE_RANGE.max"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-        :aria-invalid="!!graphFontSizeError || undefined"
-        data-testid="settings-git-graphFontSize"
-        :model-value="String(draft.git.graphFontSize)"
-        @input="onGraphFontSizeInput"
-      />
+      <span ref="graphFontSizeGroupRef" class="contents">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+          <InputGroupInput
+            type="number"
+            :min="FONT_SIZE_RANGE.min"
+            :max="FONT_SIZE_RANGE.max"
+            class="h-full font-data"
+            :aria-invalid="!!graphFontSizeError || undefined"
+            data-testid="settings-git-graphFontSize"
+            :model-value="String(draft.git.graphFontSize)"
+            @input="onGraphFontSizeInput"
+          />
+          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="graphFontSizeStepper.stepBy(1)"
+                >
+                  <CodiconIcon name="chevron-up" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Increase</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="graphFontSizeStepper.stepBy(-1)"
+                >
+                  <CodiconIcon name="chevron-down" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Decrease</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        </InputGroup>
+      </span>
       <span v-if="graphFontSizeError" class="field-error" data-testid="settings-git-graphFontSize-error">
         {{ graphFontSizeError }}
       </span>

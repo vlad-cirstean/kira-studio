@@ -2,9 +2,10 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed } from 'vue';
+import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import { computed, ref } from 'vue';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../../fonts';
 import {
   type AppearanceSettings,
@@ -80,6 +81,10 @@ const fontSizeError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('appearance.fontSize', fontSizeError);
+
+// P104 §2: TextField's number stepper -> ui/input-group recipe.
+const fontSizeGroupRef = ref<HTMLElement | null>(null);
+const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
 </script>
 
 <template>
@@ -171,17 +176,47 @@ props.registerFieldError('appearance.fontSize', fontSizeError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <div class="size-input">
-        <Input
-          type="number"
-          :min="FONT_SIZE_RANGE.min"
-          :max="FONT_SIZE_RANGE.max"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-          :aria-invalid="!!fontSizeError || undefined"
-          data-testid="settings-font-size"
-          :model-value="String(draft.appearance.fontSize)"
-          @input="onFontSizeInput"
-        />
+      <div class="size-input" ref="fontSizeGroupRef">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+          <InputGroupInput
+            type="number"
+            :min="FONT_SIZE_RANGE.min"
+            :max="FONT_SIZE_RANGE.max"
+            class="h-full font-data"
+            :aria-invalid="!!fontSizeError || undefined"
+            data-testid="settings-font-size"
+            :model-value="String(draft.appearance.fontSize)"
+            @input="onFontSizeInput"
+          />
+          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="fontSizeStepper.stepBy(1)"
+                >
+                  <CodiconIcon name="chevron-up" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Increase</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="fontSizeStepper.stepBy(-1)"
+                >
+                  <CodiconIcon name="chevron-down" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Decrease</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
       <span v-if="fontSizeError" class="field-error" data-testid="settings-font-size-error">
         {{ fontSizeError }}

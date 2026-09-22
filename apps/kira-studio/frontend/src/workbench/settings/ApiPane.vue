@@ -2,9 +2,10 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed } from 'vue';
+import { useNumberStepper } from '@theme/composables/useNumberStepper';
+import { computed, ref } from 'vue';
 import {
   type ApiSettings,
   HTTP_VERSIONS,
@@ -69,6 +70,14 @@ const maxRedirectsError = computed<string | null>(() => {
   return null;
 });
 props.registerFieldError('api.maxRedirects', maxRedirectsError);
+
+// P104 §2: TextField's number stepper -> ui/input-group recipe.
+const requestTimeoutMsGroupRef = ref<HTMLElement | null>(null);
+const requestTimeoutMsStepper = useNumberStepper(requestTimeoutMsGroupRef);
+const maxResponseMbGroupRef = ref<HTMLElement | null>(null);
+const maxResponseMbStepper = useNumberStepper(maxResponseMbGroupRef);
+const maxRedirectsGroupRef = ref<HTMLElement | null>(null);
+const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
 </script>
 
 <template>
@@ -125,16 +134,48 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <Input
-        type="number"
-        :min="REQUEST_TIMEOUT_MS_RANGE.min"
-        :max="REQUEST_TIMEOUT_MS_RANGE.max"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-        :aria-invalid="!!requestTimeoutMsError || undefined"
-        data-testid="settings-api-requestTimeoutMs"
-        :model-value="String(draft.api.requestTimeoutMs)"
-        @input="onRequestTimeoutMsInput"
-      />
+      <span ref="requestTimeoutMsGroupRef" class="contents">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+          <InputGroupInput
+            type="number"
+            :min="REQUEST_TIMEOUT_MS_RANGE.min"
+            :max="REQUEST_TIMEOUT_MS_RANGE.max"
+            class="h-full font-data"
+            :aria-invalid="!!requestTimeoutMsError || undefined"
+            data-testid="settings-api-requestTimeoutMs"
+            :model-value="String(draft.api.requestTimeoutMs)"
+            @input="onRequestTimeoutMsInput"
+          />
+          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="requestTimeoutMsStepper.stepBy(1)"
+                >
+                  <CodiconIcon name="chevron-up" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Increase</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="requestTimeoutMsStepper.stepBy(-1)"
+                >
+                  <CodiconIcon name="chevron-down" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Decrease</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        </InputGroup>
+      </span>
       <span
         v-if="requestTimeoutMsError"
         class="field-error"
@@ -166,16 +207,48 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <Input
-        type="number"
-        :min="MAX_RESPONSE_MB_RANGE.min"
-        :max="MAX_RESPONSE_MB_RANGE.max"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-        :aria-invalid="!!maxResponseMbError || undefined"
-        data-testid="settings-api-maxResponseMb"
-        :model-value="String(draft.api.maxResponseMb)"
-        @input="onMaxResponseMbInput"
-      />
+      <span ref="maxResponseMbGroupRef" class="contents">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+          <InputGroupInput
+            type="number"
+            :min="MAX_RESPONSE_MB_RANGE.min"
+            :max="MAX_RESPONSE_MB_RANGE.max"
+            class="h-full font-data"
+            :aria-invalid="!!maxResponseMbError || undefined"
+            data-testid="settings-api-maxResponseMb"
+            :model-value="String(draft.api.maxResponseMb)"
+            @input="onMaxResponseMbInput"
+          />
+          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="maxResponseMbStepper.stepBy(1)"
+                >
+                  <CodiconIcon name="chevron-up" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Increase</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  @mousedown.prevent="maxResponseMbStepper.stepBy(-1)"
+                >
+                  <CodiconIcon name="chevron-down" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Decrease</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        </InputGroup>
+      </span>
       <span
         v-if="maxResponseMbError"
         class="field-error"
@@ -277,17 +350,51 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <Input
-        type="number"
-        :min="MAX_REDIRECTS_RANGE.min"
-        :max="MAX_REDIRECTS_RANGE.max"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-        :disabled="!draft.api.followRedirects"
-        :aria-invalid="!!maxRedirectsError || undefined"
-        data-testid="settings-api-maxRedirects"
-        :model-value="String(draft.api.maxRedirects)"
-        @input="onMaxRedirectsInput"
-      />
+      <span ref="maxRedirectsGroupRef" class="contents">
+        <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
+          <InputGroupInput
+            type="number"
+            :min="MAX_REDIRECTS_RANGE.min"
+            :max="MAX_REDIRECTS_RANGE.max"
+            class="h-full font-data"
+            :disabled="!draft.api.followRedirects"
+            :aria-invalid="!!maxRedirectsError || undefined"
+            data-testid="settings-api-maxRedirects"
+            :model-value="String(draft.api.maxRedirects)"
+            @input="onMaxRedirectsInput"
+          />
+          <InputGroupAddon align="inline-end" class="self-stretch flex-col gap-0 p-0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  :disabled="!draft.api.followRedirects"
+                  @mousedown.prevent="maxRedirectsStepper.stepBy(1)"
+                >
+                  <CodiconIcon name="chevron-up" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Increase</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <InputGroupButton
+                  class="step-btn flex-1 h-auto min-h-0 w-5 rounded-none p-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  :disabled="!draft.api.followRedirects"
+                  @mousedown.prevent="maxRedirectsStepper.stepBy(-1)"
+                >
+                  <CodiconIcon name="chevron-down" :size="9" />
+                </InputGroupButton>
+              </TooltipTrigger>
+              <TooltipContent>Decrease</TooltipContent>
+            </Tooltip>
+          </InputGroupAddon>
+        </InputGroup>
+      </span>
       <span
         v-if="maxRedirectsError"
         class="field-error"
