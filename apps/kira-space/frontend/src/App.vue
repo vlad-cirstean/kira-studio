@@ -1,4 +1,8 @@
 <script setup lang="ts">
+// P104 A0 (§6.1): mounted additively, alongside the still-live v-tooltip/AppTooltip system --
+// every converted call site (A1...An/B1...Bn) reaches this same provider once it exists; nothing
+// reads it yet.
+import { TooltipProvider } from '@theme/components/ui/tooltip';
 import AppTooltip from '@workbench/components/AppTooltip.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
@@ -38,13 +42,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col">
-    <TitleBar />
-    <WorkbenchShell />
-  </div>
-  <GitPairingDialog />
-  <GitCredentialDialog />
-  <ConfirmDialog />
-  <ContextMenu />
-  <AppTooltip />
+  <!-- P104 A0 (§6.1): TooltipProvider owns timing (delayDuration/skipDelayDuration) for every
+       converted call site; disable-hoverable-content matches the current directive's own
+       pointer-events: none tooltip. Purely additive until a call site actually uses it. -->
+  <TooltipProvider :delay-duration="400" :skip-delay-duration="300" disable-hoverable-content>
+    <div class="h-full flex flex-col">
+      <TitleBar />
+      <WorkbenchShell />
+    </div>
+    <GitPairingDialog />
+    <GitCredentialDialog />
+    <ConfirmDialog />
+    <ContextMenu />
+    <AppTooltip />
+  </TooltipProvider>
 </template>
