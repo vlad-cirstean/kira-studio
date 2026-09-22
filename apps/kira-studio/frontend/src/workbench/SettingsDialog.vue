@@ -1778,32 +1778,24 @@ async function onAddScript(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .dialog-body-inner {
-  height: 100%;
-  display: flex;
-  min-height: 0;
+  @apply h-full flex min-h-0;
 }
 
 .section-list {
-  width: 176px;
-  flex-shrink: 0;
+  @apply w-[176px] shrink-0 flex flex-col gap-px;
   border-right: var(--kira-border-width) solid var(--kira-border);
-  display: flex;
-  flex-direction: column;
   padding: var(--kira-s-3) var(--kira-s-2);
-  gap: 1px;
 }
 
 .section-item {
+  @apply text-left rounded-[var(--kira-radius-sm)] bg-transparent border-none cursor-pointer;
   height: var(--kira-h-sm);
-  text-align: left;
   padding: 0 var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
-  background: transparent;
-  border: none;
   color: var(--kira-fg-muted);
   font-size: var(--kira-t-md);
-  cursor: pointer;
 }
 
 .section-item:hover {
@@ -1816,29 +1808,25 @@ async function onAddScript(): Promise<void> {
 }
 
 .section-pane {
-  flex: 1;
+  @apply flex-1 overflow-auto flex flex-col;
   padding: var(--kira-s-5);
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
   gap: var(--kira-s-4);
 }
 
 .sec-label {
+  @apply uppercase;
   font-size: var(--kira-t-sm);
   color: var(--kira-fg-subtle);
-  text-transform: uppercase;
   letter-spacing: 0.06em;
   padding-top: var(--kira-s-2);
 }
 
 .sec-label.first {
-  padding-top: 0;
+  @apply pt-0;
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
   gap: var(--kira-s-2);
   font-size: var(--kira-t-sm);
 }
@@ -1849,15 +1837,12 @@ async function onAddScript(): Promise<void> {
 
 /* P28 §2.2: label + per-setting reset icon, for every leaf whose field isn't a checkbox row. */
 .field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between;
   gap: var(--kira-s-2);
 }
 
 .field.checkbox {
-  flex-direction: row;
-  align-items: center;
+  @apply flex-row items-center;
   gap: var(--kira-s-3);
 }
 
@@ -1865,39 +1850,32 @@ async function onAddScript(): Promise<void> {
    <label for a checkbox> re-dispatches its click to that checkbox, which would toggle the very
    setting the button resets. */
 .checkbox-row {
-  flex-direction: row;
-  align-items: flex-start;
+  @apply flex-row items-start;
 }
 
 .checkbox-row .field.checkbox {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .size-input {
-  width: 96px;
+  @apply w-24;
 }
 
 .size-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .segmented {
-  display: inline-flex;
+  @apply inline-flex overflow-hidden self-start rounded-[var(--kira-radius-sm)];
   height: var(--kira-h-md);
   border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
-  align-self: flex-start;
 }
 
 .segmented button {
+  @apply cursor-pointer border-none bg-none;
   padding: 0 var(--kira-s-3);
   color: var(--kira-fg-muted);
   font-size: var(--kira-t-sm);
-  cursor: pointer;
-  border: none;
-  background: none;
 }
 
 .segmented button + button {
@@ -1910,23 +1888,21 @@ async function onAddScript(): Promise<void> {
 }
 
 .helper-text {
+  @apply leading-normal;
   color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
-  line-height: 1.5;
 }
 
 .field-error {
+  @apply leading-normal;
   color: var(--kira-error);
   font-size: var(--kira-t-xs);
-  line-height: 1.5;
 }
 
 .font-preview {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
   font-size: var(--kira-t-sm);
   color: var(--kira-fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .mono {
@@ -1936,16 +1912,11 @@ async function onAddScript(): Promise<void> {
 /* Command-before-button transparency (C3 §7.2/§7.5): a copyable, wrapped command string, shown
    ahead of every Install button that follows one. */
 .command-text {
-  margin: 0;
+  @apply m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-[var(--kira-radius-sm)];
   padding: var(--kira-s-2);
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
   font-size: var(--kira-t-xs);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-  user-select: all;
 }
 
 .muted-note {
@@ -1954,20 +1925,18 @@ async function onAddScript(): Promise<void> {
 }
 
 .section-subhead {
+  @apply font-semibold;
   margin: var(--kira-s-3) 0 0;
   font-size: var(--kira-t-sm);
-  font-weight: 600;
   color: var(--kira-fg);
 }
 
 .action-button {
-  align-self: flex-start;
+  @apply self-start;
 }
 
 .git-vsix-install {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  @apply flex flex-col items-start;
   gap: var(--kira-s-2);
   margin-bottom: var(--kira-s-4);
   padding-bottom: var(--kira-s-4);
@@ -1975,82 +1944,61 @@ async function onAddScript(): Promise<void> {
 }
 
 .git-clients-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col m-0 p-0 list-none;
   gap: var(--kira-s-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
 .git-client-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between rounded-[var(--kira-radius-sm)];
   gap: var(--kira-s-3);
   padding: var(--kira-s-2) var(--kira-s-3);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
 }
 
 .git-client-info {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col min-w-0;
   gap: var(--kira-s-1);
-  min-width: 0;
 }
 
 .git-client-label {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
   color: var(--kira-fg);
   font-size: var(--kira-t-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* M2 §7.3: the "Exposed connections" list's own per-row glance — .git-clients-list/.git-client-row's
    own pattern, with the info column allowed to wrap instead of eliding it. */
 .db-mcp-connections-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col m-0 p-0 list-none;
   gap: var(--kira-s-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 
 .db-mcp-connection-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between rounded-[var(--kira-radius-sm)];
   gap: var(--kira-s-3);
   padding: var(--kira-s-2) var(--kira-s-3);
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
 }
 
 .db-mcp-connection-info {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col min-w-0;
   gap: var(--kira-s-1);
-  min-width: 0;
 }
 
 .db-mcp-connection-name {
+  @apply break-words;
   color: var(--kira-fg);
   font-size: var(--kira-t-sm);
-  overflow-wrap: break-word;
 }
 
 /* SettingsDialog.html's row-density preview strip */
 .row-preview {
+  @apply overflow-hidden rounded-[var(--kira-radius-sm)];
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
 }
 
 .row-preview-row {
-  display: flex;
+  @apply flex;
 }
 
 .row-preview-row + .row-preview-row {
@@ -2063,17 +2011,13 @@ async function onAddScript(): Promise<void> {
 }
 
 .row-preview-cell {
+  @apply flex items-center overflow-hidden whitespace-nowrap text-ellipsis;
   flex: 0 0 150px;
-  display: flex;
-  align-items: center;
   padding: 0 var(--kira-s-4);
   font-family: var(--kira-font-data);
   font-size: var(--kira-t-md);
   color: var(--kira-fg);
   border-right: var(--kira-border-width) solid var(--kira-border);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .row-preview-head .row-preview-cell {
@@ -2083,33 +2027,27 @@ async function onAddScript(): Promise<void> {
 }
 
 .row-preview-gutter {
+  @apply justify-end;
   flex: 0 0 36px;
-  justify-content: flex-end;
   color: var(--kira-fg-subtle);
   font-size: var(--kira-t-xs);
   background: var(--kira-bg-elevated);
 }
 
 .row-preview-grow {
-  flex: 1;
+  @apply flex-1;
 }
 
 .footer-status {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
+  @apply flex-1 min-w-0 flex items-center;
 }
 
 /* P85 §10.2: the Scripts section's list/add row — ConnectionDialog.vue's own
    .mask-rule-list/.mask-rule-row/.mask-rule-add, restated here since that file's scoped styles
    don't reach this one. */
 .custom-script-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col max-h-80 overflow-y-auto;
   gap: var(--kira-s-3);
-  max-height: 320px;
-  overflow-y: auto;
 }
 
 /* Bug fix (manual testing, "there's no space to see and edit anything"): a script's own Name
@@ -2117,30 +2055,24 @@ async function onAddScript(): Promise<void> {
    a full-width line, stacked, instead of cramming three text fields into one row alongside the
    colour picker and a button. */
 .custom-script-row {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
   gap: var(--kira-s-2);
   padding: var(--kira-s-3) 0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
 .custom-script-add {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
   gap: var(--kira-s-2);
 }
 
 .script-row-top {
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
   gap: var(--kira-s-3);
 }
 
 .script-name {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-width: 0;
+  @apply flex flex-col flex-1 min-w-0;
 }
 
 /* .field's own column-flex pattern (above): a TextField's own root is inline-flex, so it only
@@ -2148,8 +2080,6 @@ async function onAddScript(): Promise<void> {
    (width is the cross axis there, and align-items defaults to stretch). */
 .script-command,
 .script-workingdir {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
+  @apply flex flex-col w-full;
 }
 </style>
