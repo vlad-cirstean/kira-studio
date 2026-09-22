@@ -1,6 +1,7 @@
 import type { AppMode } from '@shared/domain/mode';
 import { TAB_KIND_MODE, type TabRecord } from '@shared/domain/tabs';
 import type { WorkspaceKey } from '@shared/domain/workspace';
+import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -31,15 +32,10 @@ export const useModeStore = defineStore('mode', () => {
   // own explicit instance (state/pinia.ts's own header comment).
   const workspaceStore = useWorkspaceStore();
 
-  let writeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  function scheduleModeWrite(): void {
-    if (writeTimer) clearTimeout(writeTimer);
-    writeTimer = setTimeout(() => {
-      writeTimer = null;
-      void control.windowsSetMode(state.active);
-    }, MODE_WRITE_DEBOUNCE_MS);
-  }
+  // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be.
+  const scheduleModeWrite = useDebounceFn(() => {
+    void control.windowsSetMode(state.active);
+  }, MODE_WRITE_DEBOUNCE_MS);
 
   /** Called once at boot (main.ts's bootstrap, alongside hydrateLayout/hydrateSettings/…), before
    *  the app ever renders — sets the window's own persisted mode without going through `setMode`
@@ -57,7 +53,7 @@ export const useModeStore = defineStore('mode', () => {
   // bare 'git' key and losing which repository was open.
   function setModule(mode: AppMode): void {
     state.active = mode;
-    scheduleModeWrite();
+    void scheduleModeWrite();
   }
 
   // C5 §4.2: a module tab click — brings the workspace switcher to the same value, since

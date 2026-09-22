@@ -9,8 +9,9 @@ import {
   httpSavedRequestSchema,
   type ImportReport,
 } from '@shared/domain/collections';
+import { refDebounced } from '@vueuse/core';
 import { defineStore } from 'pinia';
-import { computed, reactive, ref, toRefs, watch } from 'vue';
+import { computed, reactive, toRef, toRefs } from 'vue';
 import { control } from '../../bridge/control';
 import {
   closeVariableSetTabsForOwner,
@@ -203,17 +204,8 @@ export const useCollectionsStore = defineStore('collections', () => {
   // input never stutters), and activeSearchQuery/visibleRows read the debounced value instead, so a
   // fast typist causes one recompute per pause rather than one per character.
   const SEARCH_DEBOUNCE_MS = 150;
-  const debouncedSearch = ref('');
-  let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-  watch(
-    () => state.search,
-    (value) => {
-      clearTimeout(searchDebounceTimer);
-      searchDebounceTimer = setTimeout(() => {
-        debouncedSearch.value = value;
-      }, SEARCH_DEBOUNCE_MS);
-    },
-  );
+  // P99 §9.3: refDebounced replaces the watch+setTimeout pair this used to hand-roll.
+  const debouncedSearch = refDebounced(toRef(state, 'search'), SEARCH_DEBOUNCE_MS);
 
   /** Lower-cased once per render rather than per row. '' means "no search active". */
   const activeSearchQuery = computed(() => debouncedSearch.value.trim().toLowerCase());

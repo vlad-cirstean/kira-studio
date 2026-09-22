@@ -6,8 +6,9 @@ import type {
 import type { SavedFilterQuery } from '@shared/domain/queries';
 import { type NodeKind, pathTail, type TreeNode } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
+import { refDebounced } from '@vueuse/core';
 import { defineStore } from 'pinia';
-import { computed, reactive, ref, shallowReactive, toRefs, watch } from 'vue';
+import { computed, reactive, shallowReactive, toRefs } from 'vue';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
 import { useSchemaColumnsStore } from '../../state/schemaColumns';
@@ -532,22 +533,17 @@ export const useTreeStore = defineStore('tree', () => {
   // via activeSearchQuery below) reads that instead, so a fast typist causes one recompute per pause
   // rather than one per character.
   const SEARCH_DEBOUNCE_MS = 150;
-  const debouncedQuery = ref('');
-  let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
-  watch(
-    () => treeState.search,
-    (value) => {
-      clearTimeout(searchDebounceTimer);
-      searchDebounceTimer = setTimeout(() => {
-        debouncedQuery.value = value.trim().toLowerCase();
-      }, SEARCH_DEBOUNCE_MS);
-    },
+  // P99 §9.3: refDebounced replaces the watch+setTimeout pair this used to hand-roll — the
+  // trim/lowercase step moves to activeSearchQuery below, reactively, off the debounced value.
+  const debouncedQuery = refDebounced(
+    computed(() => treeState.search),
+    SEARCH_DEBOUNCE_MS,
   );
 
   // TreeRow.vue's highlightParts() needs the exact query that produced row.matched, not the live
   // (undebounced) treeState.search — otherwise the highlighted substring can briefly disagree with
   // why a row is even showing as matched.
-  const activeSearchQuery = computed(() => debouncedQuery.value);
+  const activeSearchQuery = computed(() => debouncedQuery.value.trim().toLowerCase());
 
   // P94 pass 3 §4.3/§6 item 3: one connection's own row plus its (possibly search-filtered)
   // expanded children — moved out of searchResult's own computed body, but every reactive read
@@ -605,7 +601,7 @@ export const useTreeStore = defineStore('tree', () => {
   const searchResult = computed(() => {
     const rows: TreeRowVm[] = [];
     const stats: SearchStats = { incomplete: false };
-    const query = debouncedQuery.value;
+    const query = activeSearchQuery.value;
 
     for (const conn of useConnectionsStore().records) {
       const result = connectionRow(conn, query, stats);

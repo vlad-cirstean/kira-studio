@@ -42,6 +42,11 @@ export const useCookiesStore = defineStore('cookies', () => {
     }
   }
 
+  // P99 §9.3: not useDebounceFn — keyed per tabId (a tab's own pending fetch must not cancel or
+  // share a timer with another tab's), and useDebounceFn debounces one function identity. A
+  // per-key cache of debounced instances would be a new abstraction invented mid-pass for this one
+  // call site (§9.4 forbids that outside a genuine multi-site finding). Declined, named per
+  // CLAUDE.md's library rule.
   const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
   /** §3.1: the URL field fires per keystroke — SearchToolbar.vue's own debounce is the in-repo shape

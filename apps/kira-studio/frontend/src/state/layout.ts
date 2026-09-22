@@ -1,4 +1,5 @@
 import { defaultLayout, type Layout, type LayoutPatch } from '@shared/domain/layout';
+import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -9,7 +10,13 @@ export const useLayoutStore = defineStore('layout', () => {
   const state = reactive<Layout>(structuredClone(defaultLayout));
 
   let pendingPatch: LayoutPatch = {};
-  let writeTimer: ReturnType<typeof setTimeout> | null = null;
+  // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be —
+  // flushWrite reads/clears the accumulated pendingPatch at fire time, same as before.
+  const flushWrite = useDebounceFn(() => {
+    const toSend = pendingPatch;
+    pendingPatch = {};
+    void control.layoutSet(toSend);
+  }, WRITE_DEBOUNCE_MS);
 
   // applyRemote assigns a layout straight into local state with no re-emit back to control.layoutSet
   // — the same shape state/settings.ts's own applySettings/onSettingsChanged uses. It is what makes
@@ -49,13 +56,7 @@ export const useLayoutStore = defineStore('layout', () => {
   function patchLayout(patch: LayoutPatch): void {
     applyLocal(patch);
     pendingPatch = mergePatch(pendingPatch, patch);
-    if (writeTimer) clearTimeout(writeTimer);
-    writeTimer = setTimeout(() => {
-      const toSend = pendingPatch;
-      pendingPatch = {};
-      writeTimer = null;
-      void control.layoutSet(toSend);
-    }, WRITE_DEBOUNCE_MS);
+    void flushWrite();
   }
 
   function toggleProjectPanel(): void {

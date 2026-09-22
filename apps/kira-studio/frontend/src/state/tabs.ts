@@ -33,6 +33,7 @@ import {
   type TabRecord,
 } from '@shared/domain/tabs';
 import { isRepoWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
+import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -127,7 +128,6 @@ export const useTabsStore = defineStore('tabs', () => {
     previewIdsByWorkspace: {} as Record<WorkspaceKey, readonly string[]>,
   });
 
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
   // D17: the last serialisation actually written — a save whose snapshot is identical to this
   // (e.g. a scroll-offset patch that set a field to the value it already had) skips the IPC and
   // the write entirely, not just the debounce.
@@ -187,20 +187,12 @@ export const useTabsStore = defineStore('tabs', () => {
       });
   }
 
-  function saveNow(): void {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
-    saveIfChanged();
-  }
+  // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be.
+  const saveDebounced = useDebounceFn(saveIfChanged, 1000);
 
-  function saveDebounced(): void {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      saveIfChanged();
-    }, 1000);
+  function saveNow(): void {
+    saveDebounced.cancel();
+    saveIfChanged();
   }
 
   // A pending debounced save is otherwise lost outright if the window closes before its timer
@@ -211,10 +203,7 @@ export const useTabsStore = defineStore('tabs', () => {
   // `beforeunload` can't do this, since main tears the renderer down without waiting for anything
   // it starts there. One routine, two triggers, so the two handshakes can't drift out of sync.
   function flushPendingTabState(ack: () => void): void {
-    if (saveTimer) {
-      clearTimeout(saveTimer);
-      saveTimer = null;
-    }
+    saveDebounced.cancel();
     void control.tabsSave(persistableTabs()).finally(ack);
   }
 
@@ -925,7 +914,7 @@ export const useTabsStore = defineStore('tabs', () => {
     const state = target.state as S;
     if (opts.skipUnchanged && !patchChanged(state, patch)) return;
     Object.assign(state, patch);
-    saveDebounced();
+    void saveDebounced();
   }
 
   function patchDataTabState(id: string, patch: Partial<DataTabState>): void {

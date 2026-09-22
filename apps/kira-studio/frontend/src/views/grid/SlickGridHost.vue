@@ -2249,6 +2249,10 @@ onMounted(() => {
   // viewport (an insert row's `<input>` needs `keydown` regardless of scroll position, and `el`
   // is stable across a reload the way `viewportEl` — reassigned from `grid.getViewports()` — is
   // not).
+  // P99 §9.3: not useEventListener — the removal two lines into onUnmounted's own "Order matters
+  // (§6 D3)" sequence (between the viewportEl scroll cleanup and eventHandler.unsubscribeAll())
+  // is the same hand-ordered teardown the viewportEl listeners above are declined for. Declined,
+  // named per CLAUDE.md's library rule.
   el.addEventListener('input', onInsertGridInput);
   el.addEventListener('keydown', onInsertGridKeydown);
 

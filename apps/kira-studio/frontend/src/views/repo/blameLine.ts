@@ -8,6 +8,7 @@
  */
 import { formatAbsoluteDate, formatRelativeDate } from '@kira/git-core';
 import type { EventPayload, ResultOf, Transport } from '@kira/git-ipc';
+import { useDebounceFn } from '@vueuse/core';
 import { type ShallowRef, shallowRef } from 'vue';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 
@@ -116,7 +117,6 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
   // readOnly/domReadOnly and nothing in this app writes its model, so the buffer is always the
   // saved file (§4.3) — P5's dirty-buffer state is structurally absent here, not skipped.
   let lastLine: number | undefined;
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let inFlight: AbortController | undefined;
   // Per-mount cache: the model is immutable for the life of the mount, so (path, line) is a
   // stable key until `repo.changed` says otherwise (§4.3). A cached `null` is a resolved miss
@@ -144,11 +144,12 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
     state.value = toState(line, result);
   }
 
+  // P99 §9.3: useDebounceFn replaces the hand-rolled clearTimeout/setTimeout pair this used to be —
+  // resolveDebounced.cancel() below is cancelPending()'s own equivalent of the old clearTimeout.
+  const resolveDebounced = useDebounceFn((line: number) => resolveLine(line), DEBOUNCE_MS);
+
   function cancelPending(): void {
-    if (debounceTimer !== undefined) {
-      clearTimeout(debounceTimer);
-      debounceTimer = undefined;
-    }
+    resolveDebounced.cancel();
     inFlight?.abort();
     inFlight = undefined;
   }
@@ -210,10 +211,7 @@ export function createBlameLineController(deps: BlameLineControllerDeps): BlameL
       return;
     }
     paint(line, null); // clear any stale state from the previous line while this one resolves.
-    debounceTimer = setTimeout(() => {
-      debounceTimer = undefined;
-      void resolveLine(line);
-    }, DEBOUNCE_MS);
+    void resolveDebounced(line);
   }
 
   const cursorSub = deps.cursor.onDidChangeCursorPosition(() => refresh());
