@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
@@ -10,6 +11,10 @@ import { useSettingsStore } from '../state/settings';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
+// P103 Part 2 (§5.4): Kira Studio's own TitleBar.vue, now a thin composition over the shared bar
+// chrome (height/insets/background/Teleport, packages/workbench/src/components/TitleBar.vue) —
+// this file keeps exactly the per-app content: the mode switcher, the panel-toggle/keep-awake/
+// new-window action buttons, and the SettingsDialog it teleports.
 const keepAwakeStore = useKeepAwakeStore();
 const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
@@ -31,9 +36,7 @@ function onNewWindow(): void {
   });
 }
 
-// P87 §8.2: the button shows only the manual source — an "auto-held by the agent-aware setting"
-// third appearance is out of scope (§13). onNewWindow's own posture: no toast channel in the title
-// bar, a rejection is logged, not surfaced.
+// P87 §8.2: the button shows only the manual source.
 function onToggleKeepAwake(): void {
   keepAwakeStore.setKeepAwakeManual(!keepAwakeStore.status.manual).catch((err: unknown) => {
     console.error('toggle keep-awake', err);
@@ -52,7 +55,7 @@ const keepAwakeTooltip = computed(() => {
 </script>
 
 <template>
-  <div class="title-bar">
+  <TitleBarBase>
     <div class="mode-tabs">
       <button
         v-for="mode in MODE_ORDER"
@@ -64,22 +67,16 @@ const keepAwakeTooltip = computed(() => {
         :data-mode="mode"
         @click="onClick(mode)"
       >
-        <!-- P22 D6: was :size="13" — the codicon glyph set is drawn on a 16-unit grid, so at 13px
-             the advance leaves 1.5px of slack per side and each glyph's own ink sits unevenly
-             within it (F9(a): database's right side bearing is 2.4px, globe's 0.8px, measured by
-             P18 F18). Rendering at the icon's own 16px design size (--kira-icon-box) makes the
-             glyph fill its box, closing that slack. Mode-tab-local, not app-wide (OQ-3/F10). -->
+        <!-- P22 D6: rendered at the icon's own 16px design size (--kira-icon-box) — the glyph fills
+             its box instead of leaving per-glyph advance slack at 13px (F9(a)). Mode-tab-local. -->
         <span class="icon-box"><CodiconIcon :name="MODES[mode].icon" :size="16" /></span>
         <span class="mode-label">{{ MODES[mode].label }}</span>
       </button>
     </div>
 
-    <!-- Moved from the status bar (previously the bottom-right corner) — panel toggles and
-         Settings read more naturally as title-bar chrome, alongside the mode switcher, than
-         buried in a metrics strip. Filled icon + accent colour when a panel is visible, the
-         codicon "-off" companion glyph (a real outline variant that ships for exactly these two
-         icons, not a colour-only trick) plus the muted colour when it's not — .is-on used to be a
-         background tint alone, easy to miss against the bar's own colour). -->
+    <!-- Panel toggles and Settings read as title-bar chrome alongside the mode switcher. Filled
+         icon + accent colour when a panel is visible, the codicon "-off" companion glyph plus the
+         muted colour when it's not. -->
     <div class="title-bar-actions">
       <button
         type="button"
@@ -140,137 +137,46 @@ const keepAwakeTooltip = computed(() => {
         <span>New window</span>
       </button>
     </div>
-  </div>
 
-  <Teleport to="body">
-    <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
-  </Teleport>
+    <template #settings>
+      <SettingsDialog v-if="settingsStore.settingsOpen" @close="settingsStore.settingsOpen = false" />
+    </template>
+  </TitleBarBase>
 </template>
 
 <style scoped>
 @reference "@theme/base.css";
 
-/* P1 D2/C8: the root carries --wails-draggable: drag (drag.ts:98-108) so the bar behaves like a
-   native title bar — dragging it moves the window, double-clicking it zooms/minimises per System
-   Settings, both for free. On Linux (wails3 task dev) and under tests/ui (a static file server,
-   no Wails window at all) the custom property is simply inert and this renders as ordinary DOM. */
-.title-bar {
-  @apply relative flex items-center shrink-0;
-  --wails-draggable: drag;
-  height: var(--kira-titlebar-h);
-  min-height: var(--kira-titlebar-h);
-  padding-left: var(--kira-titlebar-inset-left);
-  padding-right: var(--kira-s-3);
-  background: var(--kira-bg-chrome);
-}
-
 /* No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
    redundant next to the mode switcher). Centered on the bar's true full width via absolute
-   positioning, deliberately NOT `justify-content: center` inside the flex row above — that would
-   center within the *padded* box (78px left vs. --kira-s-3 right), not the window, and reads
-   visibly off-centre. --kira-titlebar-inset-left's own reserved zone stays real (nothing else
-   renders there) — this just stops depending on it for centering math. */
+   positioning, deliberately NOT `justify-content: center` inside the flex row — that would center
+   within the *padded* box, not the window, and reads visibly off-centre. */
 .mode-tabs {
   @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5;
 }
 
-/* CRITICAL (D2): --wails-draggable inherits from .title-bar above, and isDraggableEvent
-   (drag.ts:99-108) reads the event *target's* computed style — so every interactive child here
-   must explicitly override it, or clicking a mode tab would also start a window drag. */
+/* CRITICAL (D2): --wails-draggable inherits from the shared TitleBar's own root, and
+   isDraggableEvent (drag.ts) reads the event *target's* computed style — so every interactive
+   child here must explicitly override it, or clicking a mode tab would also start a window drag. */
 .mode-tab {
   --wails-draggable: none;
-  /* P15 D9: .p-tab's own metrics (--kira-h-md/--kira-t-sm, 26px/11px) — was shrunk to
-     --kira-h-sm/--kira-t-xs (22px/10px) on the premise of a "~36px native macOS title bar" that
-     predates --kira-titlebar-h settling at 38px (tokens.css:76-88's own history of two reverted
-     guesses at that value): 26px inside 38px leaves 6px of clearance, the same --kira-s-3 the bar
-     already uses as its own right padding — no smaller than the app's other tabs read as smaller
-     targets for no reason. gap matches .p-tab's own (redeclared for clarity, not a different
-     value) now that the icon below needs one. */
+  /* P15 D9: .p-tab's own metrics (--kira-h-md/--kira-t-sm, 26px/11px) inside a 38px bar leaves 6px
+     of clearance, the same --kira-s-3 the bar already uses as its own right padding. */
   padding: 0 var(--kira-s-5);
   gap: var(--kira-s-2);
 }
-/* P18 D15/F18: the icon now sits in a real .icon-box (this app's own stated law — AppButton.vue's
-   own comment, primitives.css:25-32 — "icons never float unboxed next to text") and the label in a
-   real <span>, so both are real flex items instead of a bare glyph plus an anonymous text-run box.
-   Unboxed, the icon item's width was the glyph's *advance*, but its ink varies per glyph (F18's own
-   measurement from the codicon font: database's right side bearing is 2.4px, globe's is 0.8px) —
-   so the icon-to-label gap read differently on the two tabs and matched neither's own declared 4px.
-   A 16px flex-centred icon-box centres the advance, not the ink, making the slot glyph-independent
-   — the whole point of the law — and gives a test an actual element+rect to measure (an anonymous
-   flex item has neither). line-height: 1 keeps the label's own box ink-tight rather than inheriting
-   Tailwind preflight's 1.5, so both flex items are ink-tight boxes centred on one axis.
-   P22 D6(F9(b)): line-height: 1 made the label's own box exactly --kira-t-sm tall with the font
-   box centred inside it, and the icon's line box (13px, pre-D6) was centred in .icon-box's own
-   16px — two different fonts, each centred by their own metrics inside a differently-sized box,
-   with nothing making the two share one line. Both now share --kira-control-inline-h (14px) as
-   their line-height, so the two flex items are centred on the same line box instead of each on
-   its own font's ascent/descent. */
+/* P18 D15/F18: the icon sits in a real .icon-box (AppButton.vue's own stated law — "icons never
+   float unboxed next to text") and the label in a real <span>, both real flex items. */
 .mode-tab .icon-box,
 .mode-tab .mode-label {
   line-height: var(--kira-control-inline-h);
 }
-/* A residual sub-pixel optical offset a shared line-height can't absorb (e.g. a future codicon
-   version's own vertical metrics) would be nudged here — 0 today (D5's own ink measurement, once
-   green, found nothing left to correct). Kept as a single documented token rather than a magic
-   transform so a future re-measurement has an obvious place to land, and so it is a clean thing
-   to delete outright if OQ-3's inline-SVG icon vocabulary ever replaces codicons. */
+/* A residual sub-pixel optical offset a shared line-height can't absorb would be nudged here — 0
+   today (D5's own ink measurement found nothing left to correct). */
 .mode-tab .icon-box {
   transform: translateY(var(--kira-icon-optical-y, 0px));
 }
-/* primitives.css's own .p-tab has no :hover rule at all — TabStrip.vue (its other consumer)
-   declares one locally in its own scoped style, and Vue's scoped CSS never leaks across
-   components, so every .p-tab user needs its own copy of this or gets none. Same rule
-   TabStrip.vue's own `.p-tab:hover:not(.is-active)` uses. */
 .mode-tab:hover:not(.is-active) {
-  background: var(--kira-hover);
-}
-
-/* margin-left: auto pushes this flush to the bar's right edge, inside the flex row .mode-tabs
-   ignores entirely (it's absolutely positioned) — right-alignment via the row's own padding-right
-   has none of .mode-tabs' centering problem, since there's nothing on the far side to be
-   asymmetric against. */
-.title-bar-actions {
-  @apply flex items-center gap-0.5 ml-auto;
-  --wails-draggable: none;
-}
-
-.title-action {
-  @apply inline-flex items-center justify-center cursor-pointer rounded-[var(--kira-radius-sm)];
-  --wails-draggable: none;
-  height: var(--kira-h-sm);
-  width: var(--kira-h-sm);
-  /* A real (transparent) border at rest, not `border: none` — so .is-on below only swaps the
-     border's colour, never adds one, and the button never resizes/shifts between the two
-     states. Same technique .p-tab uses for the identical reason (primitives.css:365). */
-  border: var(--kira-border-width) solid transparent;
-  background: none;
-  color: var(--kira-fg-muted);
-}
-.title-action:hover {
-  background: var(--kira-hover);
-}
-/* P92 item 3: the one .title-action with a visible label, not just an icon — overrides the fixed
-   square (:width, above) back to content width. */
-.title-action--labelled {
-  @apply w-auto;
-  padding: 0 var(--kira-s-2);
-  gap: var(--kira-s-2);
-  font-size: var(--kira-t-sm);
-}
-/* This app's own established "active" treatment — .p-tab.is-active's exact combination
-   (primitives.css:372-376): a visible border, a background lift, full-brightness text/icon
-   colour. Not blue/accent-tinted (a first attempt at this was, and read as an unrelated "info"
-   colour rather than "this button is on") and not a background tint alone (the original
-   status-bar .is-on was just `background: var(--kira-bg-input)`, too close to the bar's own
-   colour to register as a highlight at a glance) — it's the filled-vs-"-off" glyph swap in the
-   template PLUS this, together, the same "shape and colour both change" redundancy .p-tab's own
-   active state already relies on. */
-.title-action.is-on {
-  background: var(--kira-bg-elevated);
-  border-color: var(--kira-border-strong);
-  color: var(--kira-fg);
-}
-.title-action.is-on:hover {
   background: var(--kira-hover);
 }
 </style>

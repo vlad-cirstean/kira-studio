@@ -1,22 +1,13 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import StatusBarBase from '@workbench/components/StatusBar.vue';
 import { computed } from 'vue';
 import { useBlameStatusStore } from '../state/blameStatus';
 import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 
-// P100 Part 2: Kira Studio's own workbench/StatusBar.vue, trimmed to LAW 14's own left "caret
-// status" slot plus the blame item (P76 §5.2, still real here — useInlineBlame.ts/blameStatus.ts
-// both ported verbatim, RepoFileView.vue's own inline-blame feature needs somewhere to publish
-// its status-bar readout). Everything else on the right side is dropped:
-//   - no AgentSessions store (no Claude Code hook integration, main.ts's own doc comment)
-//   - no AppMetrics store (no adapterhost/metrics ticker — no database connections to sample)
-//   - no AppUpdate store (this app has no UpdateService — apps/kira-space/main.go's own Services
-//     list)
-//   - no CacheStats store (no query-result cache — this app has no query console)
-//   - no EngineService/EngineStore (kira-space's own bundled-engine health check has no
-//     counterpart here)
-// The caret-status slot itself: not yet wired per-view (no per-editor caret tracking built yet),
-// so "no selection" is the honest default rather than a placeholder number, same as Studio's own.
+// P103 Part 2 (§5.4): Kira Studio's own workbench/StatusBar.vue, trimmed to the blame item (P76
+// §5.2) beside the shared caret-status slot. Now a thin composition over the shared bar chrome
+// (packages/workbench/src/components/StatusBar.vue).
 const blameStatusStore = useBlameStatusStore();
 
 // P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
@@ -33,12 +24,9 @@ function onRevealBlameCommit(): void {
 </script>
 
 <template>
-  <div class="p-statusbar" :style="{ color: 'var(--kira-fg-muted)' }">
-    <div class="side">
-      <span class="p-status" data-testid="caret-status">
-        <span class="mono xs muted">no selection</span>
-      </span>
-      <!-- P76 §5.2: a sibling fact, not the caret-status slot above — that readout stays unwired. -->
+  <StatusBarBase>
+    <template #left-extra>
+      <!-- P76 §5.2: a sibling fact, not the caret-status slot — that readout stays unwired. -->
       <button
         v-if="blame"
         class="p-status blame"
@@ -50,9 +38,8 @@ function onRevealBlameCommit(): void {
         <CodiconIcon name="git-commit" :size="13" />
         <span class="blame-text">{{ blameText }}</span>
       </button>
-    </div>
-    <div class="side" />
-  </div>
+    </template>
+  </StatusBarBase>
 </template>
 
 <style scoped>

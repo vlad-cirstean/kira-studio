@@ -2,12 +2,18 @@
 import AppTooltip from '@workbench/components/AppTooltip.vue';
 import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
 import ContextMenu from '@workbench/components/ContextMenu.vue';
+import { workbenchHostKey } from '@workbench/host';
 import { useTooltipStore } from '@workbench/state/tooltip';
-import { onMounted, onUnmounted } from 'vue';
+import { onMounted, onUnmounted, provide } from 'vue';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
+import { createWorkbenchHost } from './workbench/host';
 import TitleBar from './workbench/TitleBar.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
+
+// P103 Part 2 (§5.4): provided once, here, for MainView/TabStrip/WorkbenchShell (via their own
+// per-app workbench/*.vue wrappers) to inject through packages/workbench/src/host.ts.
+provide(workbenchHostKey, createWorkbenchHost());
 
 // P100 Part 2: Kira Studio's own App.vue, trimmed to this app's own always-mounted root dialogs —
 // ConfirmDialog (G1 D17's own precedent) and, moved here wholesale from Studio,

@@ -1,29 +1,34 @@
 <script setup lang="ts">
-import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useEventListener } from '@vueuse/core';
+import MainView from '@workbench/components/MainView.vue';
+import TabStrip from '@workbench/components/TabStrip.vue';
+import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
 import { runCommand } from '@workbench/shortcuts/commands';
 import { shortcutFor } from '@workbench/shortcuts/keys';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import GitPanel from '../repo/GitPanel.vue';
+import GitStart from '../repo/GitStart.vue';
+import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
-import MainView from './panels/MainView.vue';
-import TabStrip from './panels/TabStrip.vue';
+import { openRepoTerminalTab } from '../state/repoTabs';
+import { GENERAL_WORKSPACE, useWorkspaceStore } from '../state/workspace';
 import StatusBar from './StatusBar.vue';
 
-// P100 Part 2: Kira Studio's own WorkbenchShell.vue, trimmed — this app has exactly one module
-// (no MODES registry, no mode-scoped left panel lookup: GitPanel.vue is the whole of this app's
-// own left panel) and no Operations panel (no ops log here), so the grid collapses to
-// project/splitproj/main/status — Studio's own splitops/ops rows are dropped, not hidden.
+// P103 Part 2 (§5.4): Kira Studio's own WorkbenchShell.vue, trimmed — this app has exactly one
+// module (GitPanel.vue is the whole of this app's own left panel) and no Operations panel, so
+// `#dock` is never passed to the shared shell — its grid collapses to project/splitproj/main/status
+// exactly as before (the shared component's own `.has-dock`-gated rows, §5.4's own hazard note).
+// Now a thin composition over the shared grid/TabStrip/MainView package components; this file
+// keeps only this app's own per-app content: GitPanel, the "view.find" keydown binding, and the
+// "+" (a terminal at the active repository's own root).
 const layoutStore = useLayoutStore();
+const workspaceStore = useWorkspaceStore();
+const codeReposStore = useCodeReposStore();
 
-// shortcuts/keys.ts's own doc comment: this app's Go menu emits no accelerator channels
-// (App.vue's own note), so every shortcut binds through a local keydown here, regardless of the
-// shared SHORTCUTS table's `global` flag. 'view.find' is the one id kira-space actually has a
-// registered handler for (RepoFileView.vue/RepoDiffView.vue's own `registerCommand('view.find', …)`
-// — Monaco's find widget when the editor itself isn't already focused). 'repo.search' has no chord
-// of its own even in Studio's original (command-palette only, shortcuts/state.ts) — kira-space has
-// no command palette (out of this phase's own scope), so it stays reachable only through
-// GitPanel.vue's own UI, not the keyboard.
+// shortcuts/keys.ts's own doc comment: this app's Go menu emits no accelerator channels, so every
+// shortcut binds through a local keydown here, regardless of the shared SHORTCUTS table's `global`
+// flag. 'view.find' is the one id kira-space actually has a registered handler for.
 useEventListener(window, 'keydown', (e: KeyboardEvent) => {
   const id = shortcutFor(e, ['view.find']);
   if (!id) return;
@@ -31,80 +36,60 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
   runCommand(id);
 });
 
-const projectVisible = computed(() => layoutStore.panel.project.visible);
+// The "+" opens a terminal at the active repository's own root — hidden when no repository is
+// open yet, since a GENERAL_WORKSPACE terminal has no workspace of its own to scope a strip to.
+const showNewTab = computed(() => workspaceStore.active !== GENERAL_WORKSPACE);
+const newTabBtn = ref<HTMLButtonElement | null>(null);
 
-const gridStyle = computed(() => ({
-  '--project-w': projectVisible.value ? `${layoutStore.panel.project.width}px` : '0px',
-  '--project-split-w': projectVisible.value ? 'var(--kira-gap)' : '0px',
-}));
+function onNewTab(): void {
+  const btn = newTabBtn.value;
+  const repoId = workspaceStore.active;
+  if (!btn || repoId === GENERAL_WORKSPACE) return;
+  // Not the pinned repo-graph tab's own `path` — that field holds the workspace key (== repoId),
+  // not a filesystem path. The repo's real root lives on its own codeRepoRecord.
+  const record = codeReposStore.records.find((r) => r.id === repoId);
+  if (!record) return;
+  openRepoTerminalTab(repoId, record.root);
+}
 </script>
 
 <template>
-  <div class="workbench-shell" :style="gridStyle">
-    <div
-      v-if="projectVisible"
-      class="panel-surface"
-      style="grid-area: project"
-      data-testid="project-panel"
-    >
+  <WorkbenchShellBase
+    :project-visible="layoutStore.panel.project.visible"
+    :project-width="layoutStore.panel.project.width"
+    @resize-project="layoutStore.setProjectWidth"
+  >
+    <template #panel>
       <GitPanel />
-    </div>
-    <PanelSplitter
-      v-if="projectVisible"
-      style="grid-area: splitproj"
-      orientation="col"
-      :size="layoutStore.panel.project.width"
-      :min="180"
-      :max="480"
-      @resize="layoutStore.setProjectWidth"
-    />
-
-    <div class="editor-area" style="grid-area: main">
-      <div class="tab-strip-slot" data-testid="tab-strip"><TabStrip /></div>
-      <div class="main-view" data-testid="main-view"><MainView /></div>
-    </div>
-
-    <div style="grid-area: status" data-testid="status-bar">
+    </template>
+    <template #tab-strip>
+      <TabStrip>
+        <template #new-tab>
+          <div v-if="showNewTab" class="tab-strip-actions" data-testid="tab-strip-actions">
+            <button
+              ref="newTabBtn"
+              type="button"
+              class="tab-new"
+              aria-label="New terminal"
+              data-testid="tab-strip-new"
+              v-tooltip="'New terminal at repository root'"
+              @click="onNewTab"
+            >
+              <CodiconIcon name="add" :size="13" />
+            </button>
+          </div>
+        </template>
+      </TabStrip>
+    </template>
+    <template #main>
+      <MainView>
+        <template #empty>
+          <GitStart />
+        </template>
+      </MainView>
+    </template>
+    <template #status>
       <StatusBar />
-    </div>
-  </div>
+    </template>
+  </WorkbenchShellBase>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.workbench-shell {
-  @apply flex-1 min-h-0 box-border grid;
-  grid-template-areas:
-    'project splitproj main'
-    'status status status';
-  grid-template-columns: var(--project-w) var(--project-split-w) 1fr;
-  grid-template-rows: 1fr var(--kira-statusbar-h);
-  gap: var(--kira-gap);
-  padding: 0 var(--kira-window-inset) var(--kira-gap);
-  background: var(--kira-bg-chrome);
-}
-
-.panel-surface {
-  @apply overflow-hidden min-w-0 min-h-0 rounded-[var(--kira-radius)];
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg);
-}
-
-.editor-area {
-  @apply flex flex-col min-w-0 min-h-0 overflow-hidden rounded-[var(--kira-radius)];
-  border: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg);
-}
-
-.tab-strip-slot {
-  height: var(--kira-tabbar-h);
-  @apply min-h-0 overflow-hidden shrink-0;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-chrome);
-}
-
-.main-view {
-  @apply flex-1 min-h-0;
-}
-</style>

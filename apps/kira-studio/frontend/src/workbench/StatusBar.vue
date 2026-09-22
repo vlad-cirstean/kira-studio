@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import StatusBarBase from '@workbench/components/StatusBar.vue';
 import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
@@ -9,6 +10,9 @@ import { useAppUpdateStore } from '../state/appUpdate';
 import { useCacheStatsStore } from '../state/cacheStats';
 import { useEngineStore } from './state/engine';
 
+// P103 Part 2 (§5.4): Kira Studio's own StatusBar.vue, now a thin composition over the shared bar
+// chrome (packages/workbench/src/components/StatusBar.vue) — this file keeps exactly the per-app
+// right-side items: update/agent-sessions/app-metrics/cache-size/engine-status.
 const engineStore = useEngineStore();
 const agentSessionsStore = useAgentSessionsStore();
 const appMetricsStore = useAppMetricsStore();
@@ -16,14 +20,11 @@ const appUpdateStore = useAppUpdateStore();
 const cacheStatsStore = useCacheStatsStore();
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
-// a single app-wide figure, not a per-process breakdown. The whole segment is v-if-gated on
-// appMetricsStore.sample below, so the '' fallback here never actually renders — it only satisfies
-// the type checker.
+// a single app-wide figure, not a per-process breakdown.
 //
 // One decimal below 10% rather than Math.round: an idle app using e.g. 0.4% of the machine's whole
-// capacity (a real, non-zero reading — 4% of one core on a 10-core Mac) would otherwise round to a
-// flat "0%" indistinguishable from truly idle, which is exactly the kind of thing that reads as
-// "this number is broken" (P7 F6).
+// capacity (a real, non-zero reading) would otherwise round to a flat "0%" indistinguishable from
+// truly idle (P7 F6).
 const cpuLabel = computed(() => {
   const sample = appMetricsStore.sample;
   if (!sample) return '';
@@ -36,11 +37,6 @@ const memLabel = computed(() => {
   return sample ? formatBytes(sample.memoryBytes) : '';
 });
 
-// P22 D11: numbers only. The Activity-Monitor cross-check this used to spell out (P7 F6: this
-// figure is normalized — summed across every process, not the per-process "% CPU" column
-// Activity Monitor shows, which reads up to logicalCPUs times higher for the same load) is still
-// true and still the reason the CPU figure is shaped the way it is — it now lives in this comment
-// and in docs/ARCHITECTURE.md's metrics note, not in a five-line hover panel.
 const metricsTooltip = computed(() => {
   const sample = appMetricsStore.sample;
   if (!sample) return undefined;
@@ -73,16 +69,8 @@ function onOpenReleasePage(): void {
   void control.updateOpenReleasePage().catch(() => {});
 }
 
-// P100 Part 2: the blame readout (P76 §5.2 — state/blameStatus.ts, views/repo/blameLine.ts) used
-// to live here, a sibling fact beside the caret-status slot below. Blame is intrinsically a repo/
-// git fact, not duplicated the way the standalone Terminal renderer was (views/terminal/
-// TerminalView.vue's own doc comment) — both its state store and its one caller here moved to
-// apps/kira-space wholesale instead.
-
-// P86 §14.1: an app-wide fact like app-metrics/cache-size beside it, not a caret fact — §11's own
-// count, absent (not a zero reading, StatusBar's own rule above) rather than shown as "0".
-// state.cwd is an absolute path, not an encoded NodePath (tabKinds.ts's own basename, restated
-// here since it is not exported there).
+// P86 §14.1: an app-wide fact like app-metrics/cache-size beside it, not a caret fact — absent
+// (not a zero reading) rather than shown as "0".
 function basename(path: string): string {
   const slash = path.lastIndexOf('/');
   return slash === -1 ? path : path.slice(slash + 1);
@@ -92,8 +80,7 @@ const agentCount = computed(() => agentSessionsStore.sessions.length);
 
 // §13's own activity text: 'waiting for you' (attention, plus the bounded message when present),
 // 'running <toolName>' (working with a tool), 'working' (working with none), 'idle', or null when
-// this window knows no activity for that session (hooks off, or another window's session) — the
-// tooltip line then falls back to basename(cwd) alone.
+// this window knows no activity for that session.
 function activityText(terminalId: string): string | null {
   const activity = agentSessionsStore.agentActivityFor(terminalId);
   if (!activity) return null;
@@ -117,17 +104,8 @@ const agentTooltip = computed(() =>
 </script>
 
 <template>
-  <div class="p-statusbar" :style="{ color: 'var(--kira-fg-muted)' }">
-    <!-- LAW 14: the left readout answers "where is the caret" and nothing else — every fact a
-         toolbar already carries (row counts, pending edits, durations) stays there instead of
-         accumulating here too. Not yet wired per-view; "no selection" is the honest default. -->
-    <div class="side">
-      <span class="p-status" data-testid="caret-status">
-        <span class="mono xs muted">no selection</span>
-      </span>
-    </div>
-
-    <div class="side">
+  <StatusBarBase>
+    <template #right>
       <button
         v-if="appUpdateStore.available"
         class="p-status update"
@@ -177,16 +155,16 @@ const agentTooltip = computed(() =>
         />
         engine {{ engineStore.status }}
       </span>
-    </div>
-  </div>
+    </template>
+  </StatusBarBase>
 </template>
 
 <style scoped>
 @reference "@theme/base.css";
 
 /* Fixed, right-aligned slots (monospace, so `ch` is an exact character width) — as the CPU%/
-   memory readouts gain digits (0% -> 100%, 12.0 MB -> 1234.5 MB) they grow into their own
-   reserved space instead of pushing cache-size/engine-status/the toggle group sideways. */
+   memory readouts gain digits they grow into their own reserved space instead of pushing
+   cache-size/engine-status sideways. */
 .metric-value {
   @apply inline-block text-right;
 }
@@ -202,8 +180,7 @@ const agentTooltip = computed(() =>
 
 /* .update is a <button>, not the <span> its neighbours use — it is activated, so keyboard focus
    and Enter/Space come free. Reset the button's own UA chrome; .p-status already supplies
-   height/padding/border-radius/cursor. --kira-info (already used by .p-td.fk) reads as actionable
-   against the bar's own --kira-fg-muted. */
+   height/padding/border-radius/cursor. */
 .update {
   @apply bg-none;
   font: inherit;

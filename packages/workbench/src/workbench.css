@@ -8,3 +8,73 @@
  * referenced from packages/theme/src/base.css — that would couple theme to workbench, the wrong
  * direction (plan §4.4). */
 @source "./";
+
+/* P103 Part 2 (§5.4): TabStrip.vue's own trailing "new tab" affordance is per-app slot content
+ * (`#new-tab`) — each app keeps its own `v-if` gating the wrapper's presence in the DOM (Kira
+ * Studio: the Terminal module only; Kira Space: any open repository) — but the wrapper's classes
+ * are published here, plain CSS rather than `@apply`, so they don't depend on Tailwind's `@apply`
+ * seeing this file as part of a scoped component's own reference chain. */
+.tab-strip-actions {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px 4px 0 2px;
+}
+.tab-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--kira-radius-sm);
+  color: var(--kira-fg-muted);
+}
+.tab-new:hover {
+  background: var(--kira-hover);
+  color: var(--kira-fg);
+}
+
+/* TitleBar.vue's own action row and its buttons — `.title-action`'s own markup stays in each app
+ * (P104's job to swap it for shadcn-vue's Button), but the shared TitleBar.vue chrome needs both
+ * classes resolvable from its own default slot's content. */
+.title-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  --wails-draggable: none;
+}
+.title-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: var(--kira-radius-sm);
+  --wails-draggable: none;
+  height: var(--kira-h-sm);
+  width: var(--kira-h-sm);
+  border: var(--kira-border-width) solid transparent;
+  background: none;
+  color: var(--kira-fg-muted);
+}
+.title-action:hover {
+  background: var(--kira-hover);
+}
+.title-action--labelled {
+  width: auto;
+  padding: 0 var(--kira-s-2);
+  gap: var(--kira-s-2);
+  font-size: var(--kira-t-sm);
+}
+.title-action.is-on {
+  background: var(--kira-bg-elevated);
+  border-color: var(--kira-border-strong);
+  color: var(--kira-fg);
+}
+.title-action.is-on:hover {
+  background: var(--kira-hover);
+}

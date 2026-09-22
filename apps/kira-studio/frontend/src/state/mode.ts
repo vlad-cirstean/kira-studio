@@ -65,11 +65,3 @@ export const useModeStore = defineStore('mode', () => {
 export function workspaceKeyOf(tab: TabRecord): AppMode {
   return (tab.workspaceId as AppMode | null) ?? (STUDIO_TAB_KIND_MODE[tab.kind] as AppMode);
 }
-
-// P103 Part 2 (§5.2): the stable pinned-first partition itself moved into
-// packages/workbench/src/state/createTabsStore.ts's own `tabsForWorkspace` (identical logic, `K`
-// generic) — this stays a thin re-export so every existing `tabsForWorkspace(key)` call site here
-// is unchanged.
-export function tabsForWorkspace(key: AppMode): TabRecord[] {
-  return useTabsStore().tabsForWorkspace(key);
-}
