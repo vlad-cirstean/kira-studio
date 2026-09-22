@@ -546,7 +546,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
   <div
     v-if="hoverLines"
     ref="hoverPanelRef"
-    class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-[360px] px-[var(--kira-s-3)] py-[var(--kira-s-2)] font-[family-name:var(--kira-font-data)] text-[length:var(--kira-t-sm)] text-fg pointer-events-none"
+    class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-[360px] px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
     role="tooltip"
     data-testid="autocomplete-hover"
     :style="hoverStyle ?? undefined"
@@ -555,7 +555,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
       v-for="(line, i) in hoverLines"
       :key="i"
       class="hover-line whitespace-pre-wrap [overflow-wrap:anywhere]"
-      :class="{ 'mt-[var(--kira-s-1)] text-muted': i > 0 }"
+      :class="{ 'mt-0.5 text-muted': i > 0 }"
       >{{ line }}</div
     >
   </div>

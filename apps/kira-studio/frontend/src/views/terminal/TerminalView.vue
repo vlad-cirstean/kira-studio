@@ -171,19 +171,19 @@ async function onDismissHooksPrompt(): Promise<void> {
 @reference "@theme/base.css";
 
 .repo-terminal {
-  @apply flex flex-col h-full bg-bg p-[var(--kira-s-2)];
+  @apply flex flex-col h-full bg-bg p-1;
 }
 .terminal-host {
   @apply flex-1 min-h-0;
 }
 .terminal-footer {
-  @apply shrink-0 text-muted text-[length:var(--kira-t-sm)] bg-[var(--kira-bg-chrome)] py-[var(--kira-s-1)] px-[var(--kira-s-2)];
+  @apply shrink-0 text-muted text-kira-sm bg-chrome py-0.5 px-1;
 }
 .terminal-footer-error {
   @apply text-error;
 }
 .claude-code-hooks-prompt {
-  @apply flex items-center shrink-0 rounded-kira-sm bg-[var(--kira-bg-chrome)] text-muted text-[length:var(--kira-t-sm)] gap-[var(--kira-s-3)] mb-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-3)];
+  @apply flex items-center shrink-0 rounded-kira-sm bg-chrome text-muted text-kira-sm gap-1.5 mb-1 py-1 px-1.5;
 }
 .claude-code-hooks-prompt span {
   @apply flex-1;

@@ -161,7 +161,7 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .start-row {
-  @apply w-full flex items-center cursor-pointer text-left rounded-[var(--kira-radius-sm)];
+  @apply w-full flex items-center cursor-pointer text-left rounded-kira-sm;
   height: var(--kira-h-md);
   gap: var(--kira-s-3);
   padding: 0 var(--kira-s-3);
