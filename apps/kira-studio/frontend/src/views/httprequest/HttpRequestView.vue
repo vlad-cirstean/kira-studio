@@ -689,63 +689,53 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .overview-anchor {
-  position: relative;
-  display: flex;
+  @apply relative flex;
 }
 
 .http-request-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 /* P15 D4: TextField's inheritAttrs: false lands a call site's own class/style on the inner
    <input>, never the wrapping .p-input box that actually sizes it (F3) — the app's existing
    wrapper + :deep(.p-input) idiom, used at ten other call sites, fixes it here too. Was
    `style="flex: 1"` directly on <TextField>, which landed on the input (already flex: 1) and did
-   nothing — the URL field never grew with the window. */
+   nothing — the URL field never grew with the window. api-ui-consistency.spec.ts selects
+   `.url-field` directly — kept as a marker class. */
 .url-field {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .url-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .request-response-split {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
+/* api-ui-consistency.spec.ts selects `.request-pane` directly — kept as a marker class. */
 .request-pane {
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  @apply flex min-h-0 flex-col overflow-hidden;
 }
 
 /* Mirrors views/shared/celleditor/CellEditorDock.vue's own .cell-splitter comment: the workbench
    grid gives a splitter its size from a gap row; inside a view there is no gap band, so the
    track carries its own explicit height. P22 D13 (F22): the request/response boundary used to be
    4px of nothing until the pointer crossed it — `divider` (above) draws the line this comment
-   never reached. */
+   never reached. http-request.spec.ts/grpc-request.spec.ts poll `.request-splitter`'s box-shadow —
+   kept as a marker class. */
 .request-splitter {
-  height: var(--kira-s-2);
-  flex-shrink: 0;
+  @apply shrink-0 h-[var(--kira-s-2)];
 }
 
 .dirty-mark {
-  color: var(--kira-warn);
-  font-size: var(--kira-t-lg);
-  line-height: 1;
+  @apply text-warn leading-none text-[length:var(--kira-t-lg)];
 }
 
 .response-pane-slot {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 </style>
