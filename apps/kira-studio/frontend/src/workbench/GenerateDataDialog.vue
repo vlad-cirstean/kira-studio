@@ -373,68 +373,58 @@ function onSequenceStartChange(index: number, start: number): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .generate-form {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
   gap: var(--kira-s-4);
   padding: var(--kira-s-4) var(--kira-s-5);
 }
 
 .run-fields {
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
   gap: var(--kira-s-3);
 }
 
 .field-label {
-  padding: 0;
+  @apply p-0;
 }
 
 .recipe-table {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col overflow-y-auto max-h-[260px];
   gap: var(--kira-s-1);
-  max-height: 260px;
-  overflow-y: auto;
 }
 
 .recipe-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-  align-items: center;
+  @apply grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)] items-center;
   gap: var(--kira-s-2);
 }
 
 .recipe-head {
-  padding: 0;
+  @apply p-0;
 }
 
 .col-type {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .warning-list {
-  margin: 0;
+  @apply m-0;
   padding-left: var(--kira-s-4);
 }
 
 .preview-toggle {
-  background: none;
-  border: none;
+  @apply bg-none border-none cursor-pointer p-0;
   color: var(--kira-accent);
-  cursor: pointer;
-  padding: 0;
 }
 
 .preview-toggle:disabled {
+  @apply cursor-not-allowed;
   color: var(--kira-fg-muted);
-  cursor: not-allowed;
 }
 
 .preview-body {
-  height: 200px;
+  @apply h-[200px];
   margin-top: var(--kira-s-2);
 }
 </style>

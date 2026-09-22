@@ -110,41 +110,33 @@ function openRecent(entry: RecentTableEntry): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .start {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto;
   padding: var(--kira-s-6);
-  overflow: auto;
 }
 
 .start-inner {
-  width: 560px;
-  max-width: 100%;
+  @apply w-[560px] max-w-full;
 }
 
 .first-run-actions {
-  display: flex;
+  @apply flex;
   gap: var(--kira-s-3);
 }
 
 .start-inner.first-run {
-  width: 360px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
+  @apply w-[360px] flex flex-col items-center text-center;
   gap: var(--kira-s-4);
 }
 
 .start-title {
   /* P24 D31: no bold text anywhere in the app — --kira-t-xl (the scale's largest step) already
      carries the emphasis a first-run heading needs. */
+  @apply tracking-[-0.01em];
   font-size: var(--kira-t-xl);
   color: var(--kira-fg);
-  letter-spacing: -0.01em;
 }
 
 .start-sub {
@@ -153,36 +145,28 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .first-run .start-sub {
+  @apply leading-normal mt-0;
   font-size: var(--kira-t-md);
-  line-height: 1.5;
-  margin-top: 0;
 }
 
 .col-label {
+  @apply uppercase tracking-[0.06em];
   font-size: var(--kira-t-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   margin-bottom: var(--kira-s-3);
   margin-top: var(--kira-s-6);
 }
 
 .start-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
 }
 
 .start-row {
+  @apply w-full flex items-center cursor-pointer text-left rounded-[var(--kira-radius-sm)];
   height: var(--kira-h-md);
-  width: 100%;
-  display: flex;
-  align-items: center;
   gap: var(--kira-s-3);
   padding: 0 var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
   color: var(--kira-fg);
   font-size: var(--kira-t-md);
-  cursor: pointer;
-  text-align: left;
 }
 
 .start-row:hover {
@@ -190,16 +174,10 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .rail-dot {
-  width: 2px;
-  height: 13px;
-  border-radius: 1px;
-  flex-shrink: 0;
+  @apply w-0.5 h-[13px] rounded-[1px] shrink-0;
 }
 
 .entry-path {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
 }
 </style>
