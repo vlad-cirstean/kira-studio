@@ -107,15 +107,20 @@ test('Operations panel — a truncated command cannot be re-run, but can still b
   await expect(rows).toHaveCount(2);
 
   await rows.filter({ hasText: 'select 1' }).click({ button: 'right' });
-  await expect(page.locator('[data-testid="menu-item-re-run"]')).toHaveClass(/is-disabled/);
-  await expect(page.locator('[data-testid="menu-item-copy-command"]')).not.toHaveClass(
-    /is-disabled/,
+  await expect(page.locator('[data-testid="menu-item-re-run"]')).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await expect(page.locator('[data-testid="menu-item-copy-command"]')).not.toHaveAttribute(
+    'data-disabled',
   );
   await page.keyboard.press('Escape');
 
   await rows.filter({ hasText: 'select 2' }).click({ button: 'right' });
-  await expect(page.locator('[data-testid="menu-item-re-run"]')).not.toHaveClass(/is-disabled/);
-  await expect(page.locator('[data-testid="menu-item-copy-command"]')).not.toHaveClass(
-    /is-disabled/,
+  await expect(page.locator('[data-testid="menu-item-re-run"]')).not.toHaveAttribute(
+    'data-disabled',
+  );
+  await expect(page.locator('[data-testid="menu-item-copy-command"]')).not.toHaveAttribute(
+    'data-disabled',
   );
 });

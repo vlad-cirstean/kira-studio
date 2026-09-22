@@ -184,9 +184,9 @@ test('font-roles — chrome renders in the interface font, and it differs from t
   await expect(tabTitle).toBeVisible();
   expect(await tabTitle.evaluate(readFont)).toBe(uiFont);
 
-  // A DialogFrame title (Settings).
+  // A dialog title (Settings).
   await page.click('[data-testid="open-settings"]');
-  const dialogTitle = page.locator('[data-testid="settings-dialog"] .dialog-title');
+  const dialogTitle = page.locator('[data-testid="settings-dialog"] [data-slot="dialog-title"]');
   await expect(dialogTitle).toBeVisible();
   expect(await dialogTitle.evaluate(readFont)).toBe(uiFont);
   await page.click('[data-testid="settings-dialog-close"]');

@@ -169,10 +169,12 @@ function opsCount(log: { channel: string }[]): number {
 function menuItemIds(page: Page): Promise<string[]> {
   const menu = page.locator('[data-testid="context-menu"]');
   return menu
-    .locator(':scope > div')
+    .locator(
+      '[data-testid^="menu-item-"]:not([data-testid$="-shortcut"]), [data-slot="dropdown-menu-separator"]',
+    )
     .evaluateAll((els) =>
       els.map((el) =>
-        el.classList.contains('p-sep')
+        el.getAttribute('data-slot') === 'dropdown-menu-separator'
           ? '--separator--'
           : (el.getAttribute('data-testid') ?? '').replace('menu-item-', ''),
       ),
@@ -336,20 +338,20 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   ]);
   // D9: "Set as default" is unchecked until chosen, then stays checked on this row and clears
   // on the previously-default one — Postgres-only (§8.9), same connection this spec already has.
-  await expect(
-    page.locator('[data-testid="menu-item-set-as-default"] .icon-box .codicon-check'),
-  ).toHaveCount(0);
+  await expect(page.locator('[data-testid="menu-item-set-as-default"] .codicon-check')).toHaveCount(
+    0,
+  );
   await page.click('[data-testid="menu-item-set-as-default"]');
 
   await openRowMenu(page, DB_PATH);
-  await expect(
-    page.locator('[data-testid="menu-item-set-as-default"] .icon-box .codicon-check'),
-  ).toHaveCount(0);
+  await expect(page.locator('[data-testid="menu-item-set-as-default"] .codicon-check')).toHaveCount(
+    0,
+  );
   await page.keyboard.press('Escape');
 
   await openRowMenu(page, APP_PATH);
   await expect(
-    page.locator('[data-testid="menu-item-set-as-default"] .icon-box .codicon-check'),
+    page.locator('[data-testid="menu-item-set-as-default"] .codicon-check'),
   ).toBeVisible();
   await page.keyboard.press('Escape');
 
