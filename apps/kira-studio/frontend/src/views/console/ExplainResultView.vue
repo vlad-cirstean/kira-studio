@@ -170,127 +170,87 @@ const rawLanguage = computed(() =>
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .explain-view {
-  height: 100%;
-  overflow: auto;
-  padding: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
-  font-size: var(--kira-t-sm);
+  @apply h-full overflow-auto flex flex-col text-[length:var(--kira-t-sm)] gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
 }
 
 .explain-header {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-4);
-  flex-wrap: wrap;
+  @apply flex items-center flex-wrap gap-[var(--kira-s-4)];
 }
 
 .verdict {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  color: var(--kira-ok);
+  @apply flex items-center text-ok gap-[var(--kira-s-2)];
 }
 
 .verdict.warn {
-  color: var(--kira-warn);
+  @apply text-warn;
 }
 
 .native-cost {
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
-  cursor: default;
+  @apply text-muted text-[length:var(--kira-t-xs)] cursor-default;
 }
 
 .statement-excerpt {
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
-  white-space: pre-wrap;
-  word-break: break-word;
+  @apply text-muted text-[length:var(--kira-t-xs)] whitespace-pre-wrap break-words;
 }
 
 .issue-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  list-style: none;
-  padding: 0;
-  margin: 0;
+  @apply flex flex-col list-none m-0 p-0 gap-[var(--kira-s-2)];
 }
 
 .issue-list li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--kira-s-2);
+  @apply flex items-start gap-[var(--kira-s-2)];
 }
 
 .issue-list li.warn {
-  color: var(--kira-warn);
+  @apply text-warn;
 }
 
 .issue-list li.info {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .no-issues,
 .no-plan {
-  color: var(--kira-fg-subtle);
-  margin: 0;
+  @apply text-subtle m-0;
 }
 
 .plan-tree {
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  padding: var(--kira-s-2) 0;
+  @apply border border-border rounded-kira-sm py-[var(--kira-s-2)];
 }
 
 .plan-row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--kira-s-3);
-  padding: 2px var(--kira-s-3);
-  flex-wrap: wrap;
+  @apply flex items-baseline flex-wrap gap-[var(--kira-s-3)] py-0.5 px-[var(--kira-s-3)];
 }
 
 .plan-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .plan-toggle,
 .plan-toggle-spacer {
-  display: inline-flex;
-  align-items: center;
-  width: 12px;
-  flex-shrink: 0;
-  cursor: pointer;
+  @apply inline-flex items-center w-3 shrink-0 cursor-pointer;
 }
 
 .plan-label {
-  font-family: var(--kira-font-data);
+  @apply font-[family-name:var(--kira-font-data)];
 }
 
 .muted {
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
+  @apply text-muted text-[length:var(--kira-t-xs)];
 }
 
 .plan-detail {
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-xs);
+  @apply text-subtle text-[length:var(--kira-t-xs)];
 }
 
 .raw-toggle-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex items-center gap-[var(--kira-s-2)];
 }
 
 .raw-body {
-  height: 260px;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
+  @apply h-[260px] border border-border rounded-kira-sm overflow-hidden;
 }
 </style>

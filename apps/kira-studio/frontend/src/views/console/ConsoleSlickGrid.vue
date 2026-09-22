@@ -835,6 +835,10 @@ onMounted(() => {
     eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
   }
 
+  // P99 §9.3: not useEventListener/useResizeObserver — same declined reasoning as
+  // SlickGridHost.vue's own identical pair: registration order against SlickGrid's internal scroll
+  // listener is load-bearing for the velocity sampler this mirrors, and onUnmounted below tears
+  // these down in a specific hand-ordered position relative to eventHandler/grid.destroy().
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl) {
     lastOffset = viewportEl.scrollTop;

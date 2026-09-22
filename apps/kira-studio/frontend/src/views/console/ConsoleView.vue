@@ -801,53 +801,39 @@ const statusLine = computed(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .console-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 .saved-anchor {
-  position: relative;
+  @apply relative;
 }
 
 /* p-strip.err already carries the error's own look; only the parent's error message text needs
    pre-wrap so a long adapter error still wraps instead of scrolling. */
 .p-strip.err {
-  white-space: pre-wrap;
-  font-family: var(--kira-font-data);
+  @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
 }
 
 .auto-explain-message {
-  flex: 1;
+  @apply flex-1;
 }
 
 .auto-explain-action {
-  border: none;
-  background: none;
-  padding: 0;
-  color: inherit;
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: inherit;
-  flex-shrink: 0;
+  @apply border-0 bg-none p-0 text-inherit underline cursor-pointer text-[length:inherit] shrink-0;
 }
 
 .editor-body {
-  flex: 1 1 40%;
-  min-height: 0;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex-[1_1_40%] min-h-0 border-b border-border;
 }
 
 /* P40 D7: flex:1 (not a fixed height) so the active result's grid always reaches the panel's
    bottom edge — DataView.vue's own .grid-area rule (F1: the fixed-height .result-panel this used
    to be left an empty band below the last row whenever a result had fewer rows than that height). */
 .results-body {
-  flex: 1 1 60%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex-[1_1_60%] min-h-0 flex flex-col;
 }
 
 /* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
@@ -870,66 +856,48 @@ const statusLine = computed(() => {
    `.p-push`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
    scrolling content, so the status text stays pinned in view no matter how many chips pile up. */
 .result-strip-row {
-  gap: var(--kira-s-2);
+  @apply gap-[var(--kira-s-2)];
 }
 
 .result-strip {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
+  @apply flex items-center flex-1 min-w-0 overflow-x-auto gap-[var(--kira-s-2)];
   scrollbar-width: none;
 }
 
 .result-strip::-webkit-scrollbar {
-  display: none;
+  @apply hidden;
 }
 
 .result-tab {
-  height: var(--kira-h-sm);
-  font-size: var(--kira-t-xs);
-  max-width: 140px;
+  @apply max-w-[140px] h-[var(--kira-h-sm)] text-[length:var(--kira-t-xs)];
 }
 
 .result-tab:hover:not(.is-active) {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .result-tab-icon {
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 
 .result-tab-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
 }
 
 .result-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  border-radius: var(--kira-radius-sm);
-  opacity: 0;
+  @apply inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 rounded-kira-sm opacity-0;
 }
 
 .result-tab:hover .result-close,
 .result-tab.is-active .result-close {
-  opacity: 1;
+  @apply opacity-100;
 }
 
 .result-close:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .result-grid {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 </style>

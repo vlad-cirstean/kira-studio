@@ -397,34 +397,26 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .console-result-grid {
-  height: 100%;
-  min-height: 0;
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-md);
   /* P19 D6: the copy-error strip is an always-possible sibling above whichever one of
      no-rows/ConsoleSlickGrid/VirtualList is the actual body — a plain block stack would let that
      sibling's height double-count against the 100% above, so this becomes a column and the body
      takes what's left. */
-  display: flex;
-  flex-direction: column;
+  @apply h-full min-h-0 flex flex-col text-[length:var(--kira-t-md)] font-[family-name:var(--kira-font-data)];
 }
 
 .body {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 .row {
-  display: flex;
-  width: var(--total-width);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex border-b border-border w-[var(--total-width)];
 }
 
 .cell {
-  overflow: hidden;
-  white-space: nowrap;
-  cursor: default;
+  @apply overflow-hidden whitespace-nowrap cursor-default;
 }
 
 /* No zebra striping (DataGrid.vue's own rule/comment: "the design's own _gridrows.html/
@@ -434,7 +426,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
    no-op guard here: a kv cell is never itself `.selected`, only its row is — `.row.selected`,
    below). */
 .row:hover .cell:not(.selected) {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 /* P40 D10: same tokens grid/keyvalue's own search highlighting uses. */
@@ -444,20 +436,15 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 
 .search-match-current {
   background: var(--kira-search-match-current);
-  color: var(--kira-bg);
+  @apply text-bg;
 }
 
 .no-rows {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
+  @apply h-full flex items-center justify-center text-muted text-[length:var(--kira-t-sm)];
 }
 
 .doc-body {
-  padding: var(--kira-s-2);
+  @apply p-[var(--kira-s-2)];
 }
 
 /* P48 F10-F12: the row shell and its head now live in views/shared/document/DocumentRow.vue —
@@ -466,44 +453,26 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
    scope-id — the one place this copy genuinely differed from the document view's (F11): no
    pointer cursor over the row outside its head. */
 :deep(.doc-row) {
-  cursor: default;
+  @apply cursor-default;
 }
 
 .row.selected {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 .doc-body-tree {
-  flex: 1;
-  min-height: 0;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-elevated);
-  overflow: hidden;
+  @apply flex-1 min-h-0 border-t border-border bg-elevated overflow-hidden;
 }
 
 .doc-body-text {
-  margin: 0;
-  padding: var(--kira-s-2) var(--kira-s-4);
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--kira-font-data);
+  @apply m-0 whitespace-pre-wrap break-words font-[family-name:var(--kira-font-data)] py-[var(--kira-s-2)] px-[var(--kira-s-4)];
 }
 
 .kv-field {
-  width: 200px;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--kira-s-4);
-  color: var(--kira-fg-muted);
-  text-overflow: ellipsis;
+  @apply w-[200px] flex items-center text-muted text-ellipsis px-[var(--kira-s-4)];
 }
 
 .kv-value {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--kira-s-4);
-  white-space: pre-wrap;
-  word-break: break-word;
+  @apply flex-1 flex items-center whitespace-pre-wrap break-words px-[var(--kira-s-4)];
 }
 </style>

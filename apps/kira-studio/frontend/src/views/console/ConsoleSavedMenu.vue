@@ -150,37 +150,28 @@ async function saveCurrent(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
+/* text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to --kira-hover
+   (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */
 .save-current {
-  width: 100%;
-  color: var(--kira-accent);
-  cursor: pointer;
+  @apply w-full text-[var(--kira-accent)] cursor-pointer;
 }
 
 .prompt-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   /* P28 D17(c): the dialog rung, not a bare 30 tuned against PopoverPanel's own old 20. This
      prompt is raised from *inside* a popover and must paint above that popover's full-viewport
      backdrop, or the backdrop swallows every click aimed at these buttons — which is exactly what
      the ladder change caused until this line joined it (console.spec.ts caught it). */
+  @apply fixed inset-0 flex items-center justify-center bg-black/50;
   z-index: var(--kira-z-dialog);
 }
 
 .prompt-box {
-  width: 280px;
-  padding: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
+  @apply w-[280px] flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
 }
 
 .prompt-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kira-s-3);
+  @apply flex justify-end gap-[var(--kira-s-3)];
 }
 </style>
