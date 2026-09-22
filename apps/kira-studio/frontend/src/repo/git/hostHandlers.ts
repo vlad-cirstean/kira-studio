@@ -26,6 +26,7 @@ import type {
   Transport,
 } from '@kira/git-ipc';
 import { control } from '../../bridge/control';
+import { copyText } from '../../clipboard';
 import { useCodeReposStore } from '../../state/coderepos';
 import { useLayoutStore } from '../../state/layout';
 import {
@@ -324,7 +325,7 @@ export function createHostHandlers(deps: HostHandlersDeps): HostHandlers {
     },
 
     'clipboard.write': async ({ text }) => {
-      await navigator.clipboard.writeText(text);
+      await copyText(text);
       return {};
     },
 

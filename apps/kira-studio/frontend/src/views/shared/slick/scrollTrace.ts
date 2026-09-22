@@ -347,6 +347,11 @@ export function stop(): ScrollTraceResult | null {
   const result: ScrollTraceResult = { frames, summary: summarize(frames) };
   // Best-effort: readable from the console's own return value regardless, but a build where the
   // inspector isn't attachable still needs a way to get the JSON out.
+  // P99 §9.3: not copyText/useClipboard — the optional-chained navigator.clipboard? guard plus the
+  // outer synchronous try/catch handle a context where the Clipboard API itself may be entirely
+  // absent (a dev-tool console hook, not a normal app surface); copyText()/useClipboard() assume
+  // the API exists and would throw where this deliberately swallows. Declined, named per
+  // CLAUDE.md's library rule.
   try {
     navigator.clipboard?.writeText(JSON.stringify(result))?.catch(() => {});
   } catch {
