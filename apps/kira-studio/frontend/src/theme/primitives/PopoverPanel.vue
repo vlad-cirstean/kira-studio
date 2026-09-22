@@ -127,7 +127,7 @@ onUnmounted(() => stopAutoUpdate?.());
   <div ref="backdropEl" class="menu-backdrop fixed inset-0 z-[var(--kira-z-popover)]" :data-testid="backdropTestId" @click="close">
     <div
       ref="popoverEl"
-      class="popover p-float fixed overflow-y-auto rounded-kira border border-border-strong bg-elevated shadow-[var(--kira-shadow-dialog)]"
+      class="popover p-float fixed overflow-y-auto rounded-kira border border-border-strong bg-elevated shadow-kira-dialog"
       :data-testid="testId"
       :style="{
         width: `${props.width}px`,

@@ -24,7 +24,7 @@ withDefaults(
 
 <template>
   <div
-    class="p-strip shrink-0 flex items-start gap-[var(--kira-s-3)] px-[var(--kira-s-4)] py-[var(--kira-s-3)] text-[length:var(--kira-t-sm)] leading-[1.45] border-b border-border"
+    class="p-strip shrink-0 flex items-start gap-1.5 px-2 py-1.5 text-kira-sm leading-[1.45] border-b border-border"
     :class="[
       tone,
       tone === 'err' && 'bg-error/10 text-[#f3a3a3]',

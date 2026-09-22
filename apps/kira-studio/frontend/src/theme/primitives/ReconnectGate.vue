@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Button } from '@theme/components/ui/button';
 
 // §8.4: a restored tab shows only this gate until pressed — nothing loads automatically. Every
 // data/stream/keyvalue/document/definition/console view opens on exactly the same `.p-empty` +
@@ -22,8 +22,8 @@ const emit = defineEmits<{ reconnect: [] }>();
 
 <template>
   <div class="p-empty" :data-testid="containerTestid">
-    <AppButton variant="primary" kind="dialog" :data-testid="buttonTestid" @click="emit('reconnect')">
+    <Button variant="dialog-primary" size="kira-lg" :data-testid="buttonTestid" @click="emit('reconnect')">
       {{ buttonLabel }}
-    </AppButton>
+    </Button>
   </div>
 </template>

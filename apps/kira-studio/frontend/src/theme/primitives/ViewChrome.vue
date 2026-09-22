@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@shared/domain/color';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import IconButton from '@theme/primitives/IconButton.vue';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useRunState } from '../../state/runState';
@@ -98,20 +100,43 @@ const runState = useRunState(() => props.tab.id);
   <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
   <div class="p-toolbar" :class="{ last: !$slots['toolbar-2'] }" :data-testid="toolbarTestid">
     <div v-if="showRunControls" class="group">
-      <IconButton icon="refresh" v-tooltip="'Refresh'" :data-testid="refreshTestid" :disabled="canRefresh === false" @click="emit('refresh')" />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :data-testid="refreshTestid"
+            :disabled="canRefresh === false"
+            aria-label="Refresh"
+            @click="emit('refresh')"
+          >
+            <CodiconIcon name="refresh" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Refresh</TooltipContent>
+      </Tooltip>
       <!-- DataToolbar.vue's hand-rolled Stop already tints itself red only while a cancellable op
-           is in flight (`is-live`, keyed off the same boolean that also drives `disabled`) — this
-           shared Stop never got that treatment, so every non-grid view's Stop looked identically
-           muted whether idle or running. `canStop` is exactly "there is a live op to cancel", the
-           same signal DataToolbar keys off, so it doubles as the is-live flag here too. -->
-      <IconButton
-        icon="debug-stop"
-        :class="{ 'is-live': !!canStop }"
-        v-tooltip="'Stop'"
-        :data-testid="stopTestid"
-        :disabled="!canStop"
-        @click="emit('stop')"
-      />
+           is in flight (keyed off the same boolean that also drives `disabled`) — this shared Stop
+           never got that treatment, so every non-grid view's Stop looked identically muted whether
+           idle or running. `canStop` is exactly "there is a live op to cancel", the same signal
+           DataToolbar keys off, so it doubles as the tint flag here too (was `.p-iconbtn.is-live`,
+           `color: var(--kira-error)` -- now the plain `text-error` utility it always resolved to). -->
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'text-error': !!canStop }"
+            :data-testid="stopTestid"
+            :disabled="!canStop"
+            aria-label="Stop"
+            @click="emit('stop')"
+          >
+            <CodiconIcon name="debug-stop" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Stop</TooltipContent>
+      </Tooltip>
     </div>
     <slot name="toolbar" />
     <span class="p-push" />

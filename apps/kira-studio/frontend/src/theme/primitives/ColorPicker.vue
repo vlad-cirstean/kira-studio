@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
+// P104 §3: "a swatch grid of Buttons" -- each swatch is now a real ui/button Button (focus-visible
+// ring, keyboard semantics) with its round-swatch look as a class override; the tooltip directive
+// becomes the real Tooltip trio, keeping each swatch's own aria-label (already present) since a
+// color swatch is an icon-only trigger.
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 
 // P18 D18: promoted from project/ColorPicker.vue — api/** may not import project/** (biome.json),
 // and an environment (api/**) needs this swatch radiogroup too, exactly the promotion P15 D5 made
@@ -17,25 +23,23 @@ const colors = PALETTE_COLOR_CHOICES;
 </script>
 
 <template>
-  <div
-    class="color-picker flex h-[var(--kira-h-md)] flex-wrap items-center gap-[var(--kira-s-2)]"
-    role="radiogroup"
-    :aria-label="label"
-  >
-    <button
-      v-for="color in colors"
-      :key="color"
-      type="button"
-      class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 p-0"
-      :class="{ 'outline outline-2 outline-offset-2 outline-fg': modelValue === color, none: color === 'none' }"
-      :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
-      v-tooltip="color === 'none' ? 'No colour' : color"
-      :aria-label="color === 'none' ? 'No colour' : color"
-      role="radio"
-      :aria-checked="modelValue === color"
-      :data-testid="`color-${color}`"
-      @click="emit('update:modelValue', color)"
-    />
+  <div class="color-picker flex h-6.5 flex-wrap items-center gap-1" role="radiogroup" :aria-label="label">
+    <Tooltip v-for="color in colors" :key="color">
+      <TooltipTrigger as-child>
+        <Button
+          variant="ghost"
+          class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+          :class="{ 'outline outline-2 outline-offset-2 outline-fg': modelValue === color, none: color === 'none' }"
+          :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+          :aria-label="color === 'none' ? 'No colour' : color"
+          role="radio"
+          :aria-checked="modelValue === color"
+          :data-testid="`color-${color}`"
+          @click="emit('update:modelValue', color)"
+        />
+      </TooltipTrigger>
+      <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
