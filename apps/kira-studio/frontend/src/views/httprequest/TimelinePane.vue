@@ -311,123 +311,82 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .timeline-pane {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
 }
 
 .timeline-summary-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kira-s-3);
+  @apply flex items-center justify-between gap-[var(--kira-s-3)];
 }
 
 .timeline-summary {
-  padding: 0 var(--kira-s-1);
+  @apply px-[var(--kira-s-1)];
 }
 
 .timeline-hops {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
+  @apply flex flex-col gap-[var(--kira-s-3)];
 }
 
 .timeline-hop {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
-  padding: var(--kira-s-2);
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
+  @apply flex flex-col gap-[var(--kira-s-1)] rounded-kira border border-border p-[var(--kira-s-2)];
 }
 
 .hop-caption {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  font-size: var(--kira-t-xs);
+  @apply flex items-center gap-[var(--kira-s-2)] text-[length:var(--kira-t-xs)];
 }
 
 .hop-index {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .hop-url {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .hop-track {
-  position: relative;
-  height: 10px;
-  background: var(--kira-bg-input);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
+  @apply relative h-[10px] overflow-hidden rounded-kira-sm bg-input;
 }
 
 .hop-bar {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: flex;
-  min-width: 2px;
+  @apply absolute inset-y-0 flex min-w-[2px];
 }
 
 .hop-segment {
-  height: 100%;
+  @apply h-full;
 }
 
 .hop-phases {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kira-s-3);
+  @apply flex flex-wrap gap-[var(--kira-s-3)];
 }
 
 .hop-phase[data-present='false'] {
-  opacity: 0.6;
+  @apply opacity-60;
 }
 
 .hop-notes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex flex-col gap-[var(--kira-s-1)];
 }
 
 .hop-headers {
-  margin-top: var(--kira-s-1);
+  @apply mt-[var(--kira-s-1)];
 }
 
 /* p-kv-row supplies display/gap/font-size; this row also carries its own vertical breathing room. */
 .hop-header-row {
-  padding: var(--kira-s-1) 0;
+  @apply py-[var(--kira-s-1)];
 }
 
 .timeline-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-1);
+  @apply flex flex-wrap gap-[var(--kira-s-3)] px-[var(--kira-s-1)];
 }
 
 .legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-1);
+  @apply inline-flex items-center gap-[var(--kira-s-1)];
 }
 
 .legend-swatch {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--kira-radius-sm);
-  display: inline-block;
+  @apply inline-block h-[8px] w-[8px] rounded-kira-sm;
 }
 </style>

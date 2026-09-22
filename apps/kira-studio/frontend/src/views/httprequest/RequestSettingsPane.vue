@@ -263,67 +263,41 @@ function onEditGlobalDefaults(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .settings-pane {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-3)] overflow-auto p-[var(--kira-s-3)];
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  font-size: var(--kira-t-sm);
+  @apply flex flex-col gap-[var(--kira-s-2)] text-[length:var(--kira-t-sm)];
 }
 
 .field > span:first-child {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .field-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kira-s-2);
+  @apply flex items-center justify-between gap-[var(--kira-s-2)];
 }
 
 .field.checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--kira-s-3);
+  @apply flex-row items-center gap-[var(--kira-s-3)];
 }
 
 .checkbox-row {
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex-row items-center justify-between;
 }
 
 .inherit {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  font-size: var(--kira-t-xs);
-  color: var(--kira-fg-muted);
+  @apply flex items-center gap-[var(--kira-s-2)] text-muted text-[length:var(--kira-t-xs)];
 }
 
 .helper-text {
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-xs);
-  line-height: 1.5;
+  @apply text-subtle text-[length:var(--kira-t-xs)] leading-normal;
 }
 
 .hint-link {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--kira-accent);
-  cursor: pointer;
-  font-size: var(--kira-t-sm);
+  @apply self-start cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
 }
 </style>

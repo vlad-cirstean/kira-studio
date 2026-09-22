@@ -470,78 +470,51 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .response-pane {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 .response-status-row {
-  gap: var(--kira-s-2);
+  @apply gap-[var(--kira-s-2)];
 }
 
 .redirect-caption {
-  display: block;
-  width: 100%;
-  padding: var(--kira-s-2) var(--kira-s-3);
-  text-align: left;
+  @apply block w-full px-[var(--kira-s-3)] py-[var(--kira-s-2)] text-left;
 }
 
 /* D11: http-elapsed and http-redirects, still the same dim text they always were, now clickable —
    a plain button reset rather than AppButton's own chrome, so the status row's look is unchanged. */
 .pane-jump-link {
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
+  @apply cursor-pointer border-0 bg-none p-0 font-[inherit];
 }
 
 .pane-jump-link:hover {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 
 .response-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .binary-note {
-  padding: var(--kira-s-3);
+  @apply p-[var(--kira-s-3)];
 }
 
 .response-headers-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .response-headers-count {
-  padding: var(--kira-s-2) var(--kira-s-3) 0;
+  @apply px-[var(--kira-s-3)] pt-[var(--kira-s-2)] pb-0;
 }
 
 .response-headers {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-1)] overflow-auto p-[var(--kira-s-3)];
 }
 
-
 .history-hint-link {
-  margin-top: var(--kira-s-2);
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--kira-accent);
-  cursor: pointer;
-  font-size: var(--kira-t-sm);
+  @apply mt-[var(--kira-s-2)] cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
 }
 </style>

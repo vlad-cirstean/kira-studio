@@ -322,100 +322,78 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .diff-status {
-  padding: var(--kira-s-4);
+  @apply p-[var(--kira-s-4)];
 }
 
 .diff-body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 .diff-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-4);
-  padding: var(--kira-s-3) var(--kira-s-4);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  flex-shrink: 0;
+  @apply flex shrink-0 items-center gap-[var(--kira-s-4)] border-b border-border px-[var(--kira-s-4)] py-[var(--kira-s-3)];
 }
 
 .diff-summary-side {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex flex-col gap-[var(--kira-s-1)];
 }
 
 .diff-summary-time {
-  align-self: flex-start;
+  @apply self-start;
 }
 
 .diff-summary-col {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex items-center gap-[var(--kira-s-2)];
 }
 
 .diff-arrow {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .diff-headers {
-  flex-shrink: 0;
-  max-height: 160px;
-  overflow: auto;
-  padding: var(--kira-s-2) var(--kira-s-4);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply max-h-[160px] shrink-0 overflow-auto border-b border-border px-[var(--kira-s-4)] py-[var(--kira-s-2)];
 }
 
 .diff-header-row {
-  display: grid;
   grid-template-columns: 72px 160px 1fr 1fr;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-1) 0;
-  font-size: var(--kira-t-xs);
+  @apply grid gap-[var(--kira-s-2)] py-[var(--kira-s-1)] text-[length:var(--kira-t-xs)];
 }
 
 .diff-header-head {
-  color: var(--kira-fg-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  @apply text-subtle uppercase tracking-[0.05em];
 }
 
 .diff-header-row.added .diff-header-status {
-  color: var(--kira-ok);
+  @apply text-ok;
 }
 
 .diff-header-row.removed .diff-header-status {
-  color: var(--kira-error);
+  @apply text-error;
 }
 
 .diff-header-row.changed .diff-header-status {
-  color: var(--kira-warn);
+  @apply text-warn;
 }
 
 .diff-header-name {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .diff-header-value {
-  overflow-wrap: anywhere;
+  @apply [overflow-wrap:anywhere];
 }
 
 .diff-raw-note {
-  flex-shrink: 0;
-  padding: var(--kira-s-2) var(--kira-s-4);
+  @apply shrink-0 px-[var(--kira-s-4)] py-[var(--kira-s-2)];
 }
 
 .diff-merge-host {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  @apply flex-1 min-h-0 overflow-auto;
 }
 
 .diff-merge-host :deep(.monaco-diff-editor) {
-  height: 100%;
+  @apply h-full;
 }
 </style>

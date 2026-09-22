@@ -180,77 +180,51 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .cookies-pane {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col overflow-auto;
 }
 
 .cookies-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex items-center gap-[var(--kira-s-2)];
 }
 
 .clear-all-button {
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 
 .cookies-count {
-  padding: var(--kira-s-2) var(--kira-s-3) 0;
+  @apply px-[var(--kira-s-3)] pt-[var(--kira-s-2)] pb-0;
 }
 
 .cookies-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-1)] overflow-auto p-[var(--kira-s-3)];
 }
 
 .cookie-row {
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--kira-s-2);
+  @apply items-start justify-between gap-[var(--kira-s-2)];
 }
 
 .cookie-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  flex: 1;
+  @apply flex min-w-0 flex-1 flex-col;
 }
 
 /* AutocompleteField.vue's own hover-panel shape (P71 §8.2): a value line, then a muted second
    line for everything that isn't the value itself. */
 .cookie-attributes {
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
-  font-family: var(--kira-font-data);
+  @apply text-muted text-[length:var(--kira-t-xs)] font-[family-name:var(--kira-font-data)];
 }
 
 .cookies-group {
-  padding: var(--kira-s-3) 0 0;
+  @apply pt-[var(--kira-s-3)];
 }
 
 .cookies-group-head {
-  margin: 0;
-  padding: 0 var(--kira-s-3);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
+  @apply m-0 px-[var(--kira-s-3)] py-0 text-muted text-[length:var(--kira-t-sm)];
 }
 
 .hint-link {
-  margin-top: var(--kira-s-2);
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--kira-accent);
-  cursor: pointer;
-  font-size: var(--kira-t-sm);
+  @apply mt-[var(--kira-s-2)] cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
 }
 </style>

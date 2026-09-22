@@ -200,69 +200,50 @@ async function onClear(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .history-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .history-toolbar {
-  gap: var(--kira-s-2);
+  @apply gap-[var(--kira-s-2)];
 }
 
 .scratch-note {
-  margin-top: var(--kira-s-1);
+  @apply mt-[var(--kira-s-1)];
 }
 
 .history-rows {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col overflow-auto;
 }
 
 .history-row {
-  display: flex;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  cursor: pointer;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex cursor-pointer gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .history-row:hover,
 .history-row.is-viewing {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .history-row-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex min-w-0 flex-1 flex-col gap-[var(--kira-s-1)];
 }
 
 .history-row-line {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex items-center gap-[var(--kira-s-2)];
 }
 
 .history-time {
-  min-width: 64px;
+  @apply min-w-[64px];
 }
 
 .history-url {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .history-cap-note {
-  flex-shrink: 0;
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply shrink-0 border-t border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 </style>

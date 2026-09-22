@@ -232,19 +232,17 @@ const caption = computed(() =>
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .body-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .body-mode-row {
-  gap: var(--kira-s-2);
-  overflow-x: auto;
+  @apply gap-[var(--kira-s-2)] overflow-x-auto;
 }
 
 .body-caption {
-  padding: 0 var(--kira-s-3) var(--kira-s-2);
+  @apply px-[var(--kira-s-3)] pt-0 pb-[var(--kira-s-2)];
 }
 </style>

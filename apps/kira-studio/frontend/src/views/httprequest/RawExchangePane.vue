@@ -291,40 +291,25 @@ defineExpose({
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .raw-exchange-pane {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
 }
 
 .raw-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
-  min-height: 200px;
+  @apply flex min-h-[200px] flex-col gap-[var(--kira-s-1)];
 }
 
 .raw-section-header {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex items-center gap-[var(--kira-s-2)];
 }
 
 .raw-caption {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .raw-editor {
-  flex: 1;
-  min-height: 200px;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  overflow: hidden;
+  @apply flex-1 min-h-[200px] overflow-hidden rounded-kira border border-border;
 }
 </style>

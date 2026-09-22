@@ -34,11 +34,11 @@ function onClearFile(): void {
 </script>
 
 <template>
-  <div class="binary-body-picker">
+  <div class="flex items-center gap-[var(--kira-s-2)] p-[var(--kira-s-3)]">
     <AppButton data-testid="http-binary-choose-file" @click="onChooseFile">Choose file…</AppButton>
     <template v-if="tab.state.binaryFile">
       <span
-        class="p-sm muted binary-file-caption"
+        class="p-sm muted p-0"
         data-testid="http-binary-file-caption"
         v-tooltip="tab.state.binaryFile.path"
       >
@@ -53,16 +53,3 @@ function onClearFile(): void {
     </template>
   </div>
 </template>
-
-<style scoped>
-.binary-body-picker {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-}
-
-.binary-file-caption {
-  padding: 0;
-}
-</style>
