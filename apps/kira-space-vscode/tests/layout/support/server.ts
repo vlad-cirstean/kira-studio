@@ -11,13 +11,13 @@ import {
   WEBVIEW_ENTRY,
 } from '../../../src/webviewDocument.ts';
 
-// The exact bytes `bun run build:vscode` produces (`apps/kira-studio-vscode/dist/ui`) — the same
+// The exact bytes `bun run build:vscode` produces (`apps/kira-space-vscode/dist/ui`) — the same
 // output `renderHtml`'s own `resolveUiAssets` reads in the real extension host, served over plain
 // HTTP instead of through `webview.asWebviewUri`. Reimplemented here rather than imported from
 // `apps/kira-studio/tests/ui/support/server.ts`: SPEC's own module-boundary rule for this chapter
 // says git-specific frontend code lives under its own directories, and this config already exists
 // as a second `playwright.config.ts` for exactly that reason (see it for the fuller rationale).
-// `apps/kira-studio-vscode/package.json` declares `"type": "module"`, so this file runs as real
+// `apps/kira-space-vscode/package.json` declares `"type": "module"`, so this file runs as real
 // ESM — no `__dirname` global, hence the `import.meta.url` detour.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = resolve(__dirname, '../../../dist/ui');

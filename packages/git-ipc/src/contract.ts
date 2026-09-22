@@ -645,10 +645,10 @@ export interface WorktreePrepareResult {
 // (`StackBranch`/`StackSummary`/`RestackPreflight`) and `internal/gitsession/stack.go`'s
 // (`RestackResult`/`RestackProgress`) — kept honest by hand (this repo carries no
 // `wireConformance.test.ts`; see G24's own commit message for why) rather than by the plan's
-// own `apps/kira-studio-vscode/tests/unit/ipc/wireConformance.test.ts` (G26 plan §4.24), which
+// own `apps/kira-space-vscode/tests/unit/ipc/wireConformance.test.ts` (G26 plan §4.24), which
 // does not exist here for the same reason G24's equivalent copy doesn't: `test:unit`'s own
-// `bun test` invocation (root `package.json`) globs `apps/kira-studio-vscode/src`, never
-// `apps/kira-studio-vscode/tests` — a file there would never run.
+// `bun test` invocation (root `package.json`) globs `apps/kira-space-vscode/src`, never
+// `apps/kira-space-vscode/tests` — a file there would never run.
 // ---------------------------------------------------------------------------------------
 
 export type StackBranchState = 'upToDate' | 'needsRestack' | 'parentMissing';
@@ -1389,7 +1389,7 @@ export type SearchRunResult =
  *  every mutating palette command that isn't a fresh host-side implementation of `OpsState`'s own
  *  logic funnels through this one event — the palette is an entry point, never a second
  *  implementation. One member per served kind in
- *  `apps/kira-studio-vscode/src/commands.ts`'s `MUTATING_COMMANDS` table, plus `refresh` for the
+ *  `apps/kira-space-vscode/src/commands.ts`'s `MUTATING_COMMANDS` table, plus `refresh` for the
  *  one non-mutating palette addition (F15). A later phase (G13/G14/G15) that serves a currently-
  *  `pending` kind adds its own member here alongside its own table entry and manifest command. */
 export type UiActionKind =

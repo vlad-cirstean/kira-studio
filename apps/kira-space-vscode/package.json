@@ -1,7 +1,7 @@
 {
-  "name": "kira-studio-vscode",
-  "displayName": "Kira Version",
-  "description": "Kira Studio's git graph, branch review and remote operations, inside VS Code.",
+  "name": "kira-space-vscode",
+  "displayName": "Kira Space",
+  "description": "Kira Space's git graph, branch review and remote operations, inside VS Code.",
   "publisher": "vladcirstean",
   "license": "MIT",
   "private": true,

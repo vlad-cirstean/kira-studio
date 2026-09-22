@@ -1,6 +1,6 @@
 /**
  * G16 D10: the `vscode`-free half of the webview document assembly, split out of `html.ts` so
- * `apps/kira-studio-vscode/tests/layout/webview-layout.spec.ts` can build and serve the *genuine*
+ * `apps/kira-space-vscode/tests/layout/webview-layout.spec.ts` can build and serve the *genuine*
  * document — the exact template, CSP assembly and manifest walk `renderHtml` emits — without a
  * `vscode` module stub. G14 shipped a webview panel that instantiated but was visually collapsed
  * to ~75px while its own DOM/accessibility-tree check passed; a geometry guard built against a
@@ -12,9 +12,9 @@
 
 /** Vite's own convention: an entry's manifest key is its input path relative to the build
  *  root. `packages/git-ui/vite.config.ts`'s root is the repo root (a build whose source spans
- *  `packages/git-ui` and `apps/kira-studio-vscode` — see that file's own comment), so the key is
+ *  `packages/git-ui` and `apps/kira-space-vscode` — see that file's own comment), so the key is
  *  this file's repo-root-relative path. */
-export const WEBVIEW_ENTRY = 'apps/kira-studio-vscode/src/webview/main.ts';
+export const WEBVIEW_ENTRY = 'apps/kira-space-vscode/src/webview/main.ts';
 
 interface ViteManifestEntry {
   readonly file: string;

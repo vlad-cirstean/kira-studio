@@ -51,17 +51,8 @@
         "vue-tsc": "3.3.11",
       },
     },
-    "apps/kira-space/frontend": {
-      "name": "@kira/kira-space-frontend",
-      "version": "0.0.0",
-      "dependencies": {
-        "@kira/git-core": "workspace:*",
-        "@kira/git-ipc": "workspace:*",
-        "@kira/git-ui": "workspace:*",
-      },
-    },
-    "apps/kira-studio-vscode": {
-      "name": "kira-studio-vscode",
+    "apps/kira-space-vscode": {
+      "name": "kira-space-vscode",
       "version": "0.0.0",
       "dependencies": {
         "@kira/git-core": "workspace:*",
@@ -70,6 +61,15 @@
       },
       "devDependencies": {
         "@types/vscode": "1.134.0",
+      },
+    },
+    "apps/kira-space/frontend": {
+      "name": "@kira/kira-space-frontend",
+      "version": "0.0.0",
+      "dependencies": {
+        "@kira/git-core": "workspace:*",
+        "@kira/git-ipc": "workspace:*",
+        "@kira/git-ui": "workspace:*",
       },
     },
     "apps/kira-studio/frontend": {
@@ -1048,7 +1048,7 @@
 
     "keytar": ["keytar@7.9.0", "", { "dependencies": { "node-addon-api": "^4.3.0", "prebuild-install": "^7.0.1" } }, "sha512-VPD8mtVtm5JNtA2AErl6Chp06JBfy7diFQ7TQQhdpWOl6MrCRB+eRbvAZUsbGQS9kiMq0coJsy0W0vHpDCkWsQ=="],
 
-    "kira-studio-vscode": ["kira-studio-vscode@workspace:apps/kira-studio-vscode"],
+    "kira-space-vscode": ["kira-space-vscode@workspace:apps/kira-space-vscode"],
 
     "knip": ["knip@6.37.0", "", { "dependencies": { "fdir": "^6.5.0", "formatly": "^0.7.0", "get-tsconfig": "4.14.3", "jiti": "^2.7.0", "oxc-parser": "^0.150.0", "oxc-resolver": "11.24.2", "picomatch": "^4.0.7", "smol-toml": "^1.8.0", "strip-json-comments": "5.0.3", "tinyglobby": "^0.2.17", "unbash": "^4.0.11", "yaml": "^2.9.1", "zod": "^4.4.3" }, "bin": { "knip": "bin/knip.js", "knip-bun": "bin/knip-bun.js" } }, "sha512-NKCYuoGKJ+o2AuoCuV1mDvfMYnSSWfDXqxwmzxeHyd8fftjNRl8TBUg3fbSrtJjhm7Vj6sc1PX3WZnZhECs9EQ=="],
 

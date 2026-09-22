@@ -328,7 +328,7 @@
         "packages/git-ipc/**",
         "packages/git-core/**",
         "packages/git-ui/**",
-        "apps/kira-studio-vscode/**"
+        "apps/kira-space-vscode/**"
       ],
       "linter": {
         "rules": {

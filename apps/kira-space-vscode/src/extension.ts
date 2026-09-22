@@ -3,7 +3,7 @@
  * handshaking, and proving `app.init`/`repo.open` round-trip for real, with no webview view
  * registered. G3 registered the graph view. G6 registers the second and last view this chapter
  * defines — the branch-review sidebar — closing SPEC §5's "both webview views are registered"
- * hand-off: `apps/kira-studio-vscode` registers no further views after this phase.
+ * hand-off: `apps/kira-space-vscode` registers no further views after this phase.
  *
  * Upstream's `activate()` built an in-process `RepoService` and two webview providers; neither
  * exists here in that shape. `coerceSettings`/`readRawSettings` and the `onDidChangeConfiguration`

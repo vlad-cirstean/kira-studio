@@ -18,7 +18,7 @@
  */
 import type { OpRequest, RemoteOpParams, UiActionKind } from '@kira/git-ipc';
 
-/** `apps/kira-studio-vscode/package.json#contributes.commands`'s shared category for every
+/** `apps/kira-space-vscode/package.json#contributes.commands`'s shared category for every
  *  `kiraVersion.*` command — asserted by `commands.test.ts`. */
 export const CATEGORY = 'Kira Version';
 

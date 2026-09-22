@@ -1,5 +1,5 @@
 /**
- * C10 §5 (S11) — the native counterpart to `apps/kira-studio-vscode/src/proxyHandlers.ts`'s local
+ * C10 §5 (S11) — the native counterpart to `apps/kira-space-vscode/src/proxyHandlers.ts`'s local
  * arm: the handful of methods this host answers itself rather than forwarding over the git
  * stream. `transport.ts` (S12) is the thing that actually decides "local or forward" per request;
  * this file only supplies the local side, keyed by method name and total over nothing — an absent

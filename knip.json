@@ -18,7 +18,7 @@
   "ignoreBinaries": ["go"],
   "ignoreDependencies": [
     // Ambient VS Code API types, resolved through tsconfig's own `"types"` array
-    // (apps/kira-studio-vscode/tsconfig.json), never a static import.
+    // (apps/kira-space-vscode/tsconfig.json), never a static import.
     "@types/vscode",
     // CSS class-name references only (`codicon-*`), never imported as a JS/TS module — used in
     // both the root devDependency and packages/git-ui's own dependency.
@@ -62,7 +62,7 @@
       "entry": ["index.html"],
       "project": ["src/**/*.{ts,vue}"]
     },
-    "apps/kira-studio-vscode": {
+    "apps/kira-space-vscode": {
       "entry": [
         "src/extension.ts",
         "src/webview/main.ts",

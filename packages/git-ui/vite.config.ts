@@ -1,11 +1,11 @@
 /**
  * The UI bundle (G1 §5.2, ported from upstream's `packages/ui/vite.config.ts`) — one Vite build
- * producing the VS Code webview entry (`apps/kira-studio-vscode/src/webview/main.ts`), so the
+ * producing the VS Code webview entry (`apps/kira-space-vscode/src/webview/main.ts`), so the
  * same `packages/git-ui` component tree, theme CSS, and codicon font asset ship to the extension
  * unchanged.
  *
  * `root` is the repo root, not `packages/git-ui` itself: this build's source spans
- * `packages/git-ui` and `apps/kira-studio-vscode` — two different top-level directories in this
+ * `packages/git-ui` and `apps/kira-space-vscode` — two different top-level directories in this
  * repo's own `apps/`/`packages/` split (unlike upstream, where both lived under one shared
  * `packages/`) — and a root that can see both is what lets `rollupOptions.input` reach across.
  *
@@ -19,7 +19,7 @@ import vue from '@vitejs/plugin-vue';
 import { defineConfig } from 'vite';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..');
-const vscodeApp = resolve(repoRoot, 'apps', 'kira-studio-vscode');
+const vscodeApp = resolve(repoRoot, 'apps', 'kira-space-vscode');
 
 export default defineConfig({
   root: repoRoot,

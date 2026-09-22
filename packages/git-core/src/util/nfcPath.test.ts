@@ -57,7 +57,7 @@ describe('nfcPath', () => {
   });
 
   test('leaves a pure-ASCII path unchanged', () => {
-    const ascii = 'apps/kira-studio-vscode/src/extension.ts';
+    const ascii = 'apps/kira-space-vscode/src/extension.ts';
     expect(nfcPath(ascii)).toBe(ascii);
   });
 

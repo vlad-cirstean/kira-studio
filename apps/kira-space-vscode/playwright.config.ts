@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
 
-// `apps/kira-studio-vscode/package.json` declares `"type": "module"`, so this file runs as real
+// `apps/kira-space-vscode/package.json` declares `"type": "module"`, so this file runs as real
 // ESM under Node/Playwright's loader — no `__dirname` global, hence the `import.meta.url` detour.
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

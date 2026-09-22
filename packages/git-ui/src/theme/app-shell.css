@@ -6,7 +6,7 @@
  * no height on `html` or `body` either. Against that, `App.vue`'s `.kv-app { height: 100% }` and
  * `ReviewView.vue`'s `.kv-review-view { height: 100% }` both resolve to `auto`, and the whole
  * panel collapses to its content height (G16 F1). This file is the fix, and it lives here rather
- * than in the extension host's emitted document (`apps/kira-studio-vscode/src/html.ts`) because
+ * than in the extension host's emitted document (`apps/kira-space-vscode/src/html.ts`) because
  * `mount()` (`main.ts`) is a document-owning bootstrap, not a widget factory — it already owns
  * every stylesheet, both mounted roots, and the page's perf marks; owning the document's box is
  * the same boundary, stated one property further (G16 D1). A future host that wants to mount this
