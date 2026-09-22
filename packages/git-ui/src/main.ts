@@ -61,7 +61,7 @@ export interface MountOptions {
    *  local of that name (`BridgeClient.connectionState`, the cold-boot `app.init` success/failure
    *  signal), and a same-named prop would collide with it as a Vue template key. */
   readonly hostConnectionState: EventPayload<'connection.changed'>['state'];
-  /** P72 §9.1: only meaningful when `view === "graph"` — Kira Studio's own app-wide
+  /** P72 §9.1: only meaningful when `view === "graph"` — Kira Space's own app-wide
    *  `appearance.dateFormat` (`packages/shared/domain/settings.ts`), read once at mount time and
    *  preferred over `PersistedViewState.dateFormat` when present (`App.vue`'s own `bootstrap()`).
    *  `undefined`/absent keeps today's behaviour: `PersistedViewState`'s own stored value, or its

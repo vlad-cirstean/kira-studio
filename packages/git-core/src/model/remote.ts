@@ -13,10 +13,10 @@ export type PullStrategy = 'ff-only' | 'merge' | 'rebase';
 /** Where a resolved pull strategy came from, so the UI can say so before running it (§7.3). */
 export type PullStrategySource =
   | 'explicit' // the user picked it for this invocation
-  | 'setting' // kiraVersion.pull.strategy
+  | 'setting' // kiraSpace.pull.strategy
   | 'branchConfig' // branch.<name>.rebase
   | 'pullConfig' // pull.rebase / pull.ff
-  | 'default'; // kira-version's own ff-only fallback
+  | 'default'; // kira-space's own ff-only fallback
 
 /** Which remote operation `remote.run` is being asked to perform. One key, five kinds — see
  *  `docs/plans/P8.md`'s D51 for why this is not a fifth arm of `op.run`'s union. */
@@ -72,8 +72,8 @@ export interface RemoteOpRequest {
    *  other kind. */
   readonly plainForce: boolean | undefined;
   /** `forcePush`/`deleteRemoteBranch` against a protected branch only: the typed branch name,
-   *  checked server-side against Kira Studio's own server-owned `protectedBranches` setting (G7
-   *  D16/D17, superseding D52's `kiraVersion.protectedBranches`) — never trusted from the UI
+   *  checked server-side against Kira Space's own server-owned `protectedBranches` setting (G7
+   *  D16/D17, superseding D52's `kiraSpace.protectedBranches`) — never trusted from the UI
    *  alone. `undefined` for every other kind, and for an unprotected branch. */
   readonly confirmToken: string | undefined;
 }

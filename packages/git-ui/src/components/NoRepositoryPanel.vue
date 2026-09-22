@@ -39,7 +39,7 @@ async function openCandidate(candidate: RepoCandidate): Promise<void> {
       </li>
     </ul>
     <p v-else class="kv-no-repo-note">
-      Kira Version follows the folders open in this VS Code window. None of them is a Git
+      Kira Space follows the folders open in this VS Code window. None of them is a Git
       repository — open one with File → Open Folder.
     </p>
   </div>

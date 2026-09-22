@@ -144,8 +144,8 @@ async function openAllChanges(): Promise<void> {
   }
 }
 
-// G14 D8 row action 3 / D10, replaced P75 §2.3: was a `command:kiraVersion.openCommitInGraph`
-// anchor (VS Code's own webview escape hatch) — inert in Kira Studio, which mounts this same
+// G14 D8 row action 3 / D10, replaced P75 §2.3: was a `command:kiraSpace.openCommitInGraph`
+// anchor (VS Code's own webview escape hatch) — inert in Kira Space, which mounts this same
 // component in a Wails WebView with no `command:` handler at any layer. Now a real request both
 // hosts answer locally.
 async function revealInGraph(): Promise<void> {

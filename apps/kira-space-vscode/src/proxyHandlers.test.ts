@@ -103,7 +103,7 @@ describe('review.session.save/.load', () => {
     const store = fakeStore();
     const { requests } = buildHandlers(store);
     const fifteenDaysAgo = Date.now() - 15 * 24 * 60 * 60 * 1000;
-    await store.update('kiraVersion.review.session', {
+    await store.update('kiraSpace.review.session', {
       r1: { ...SNAPSHOT, savedAt: fifteenDaysAgo },
     });
     // biome-ignore lint/suspicious/noExplicitAny: ctx is unused by either handler.
@@ -115,7 +115,7 @@ describe('review.session.save/.load', () => {
     const store = fakeStore();
     const { requests } = buildHandlers(store);
     const thirteenDaysAgo = Date.now() - 13 * 24 * 60 * 60 * 1000;
-    await store.update('kiraVersion.review.session', {
+    await store.update('kiraSpace.review.session', {
       r1: { ...SNAPSHOT, savedAt: thirteenDaysAgo },
     });
     // biome-ignore lint/suspicious/noExplicitAny: ctx is unused by either handler.

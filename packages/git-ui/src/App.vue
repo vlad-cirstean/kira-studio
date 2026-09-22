@@ -120,7 +120,7 @@ const props = defineProps<{
    *  success/failure, not the host's live socket state; see that class's own doc comment on why
    *  the two are kept separate). */
   hostConnectionState: EventPayload<'connection.changed'>['state'];
-  /** P72 §9.1: Kira Studio's own app-wide `appearance.dateFormat`, read once at mount time — see
+  /** P72 §9.1: Kira Space's own app-wide `appearance.dateFormat`, read once at mount time — see
    *  `main.ts`'s own `MountOptions.dateFormat` doc comment for the full shape (not reactive, and
    *  `undefined` under `'vscode'`/`'harness'`, where `PersistedViewState.dateFormat` stays the
    *  only source). Preferred over the persisted value below whenever present. */
@@ -188,7 +188,7 @@ const settingsState = shallowRef<SettingsState | undefined>(undefined);
 // G12 D6: a failed bootstrap() used to leave repoState undefined forever — the whole template is
 // v-if="repoState", so that rendered nothing at all (F7). Set in the catch below, outside that
 // v-if, with a Retry that clears it and re-runs bootstrap() — the ordinary case this guards is a
-// panel opened before Kira Studio's socket is even up, not a rare failure.
+// panel opened before Kira Space's socket is even up, not a rare failure.
 const bootError = ref<string | undefined>(undefined);
 
 const detailOpen = ref(true);
@@ -217,10 +217,10 @@ const initialScrollRow = ref<number | undefined>(undefined);
 // setting itself moved to the new per-repo store (D1), so this now reads `repoSettingsState`
 // instead — `RepoSettingsState`'s own constructor already seeds it with the schema's own default
 // before any repo is open, so the `??` fallback below is defence in depth, not the primary path.
-const FALLBACK_PAGE_SIZE = SETTINGS['kiraVersion.graph.pageSize'].default;
+const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
 
 const pageSize = computed(
-  () => repoSettingsState.settings.value['kiraVersion.graph.pageSize'] ?? FALLBACK_PAGE_SIZE,
+  () => repoSettingsState.settings.value['kiraSpace.graph.pageSize'] ?? FALLBACK_PAGE_SIZE,
 );
 
 /** G14 D6: VS Code's own `workbench.tree.indent`, mirrored into the settings snapshot (host-owned,
@@ -233,25 +233,25 @@ const treeIndent = computed(
 
 /** `StashDialog.vue`'s create mode default — same "read the schema's own default as the fallback"
  *  shape as `pageSize` above; re-sourced from `repoSettingsState` for the same reason (G18 D13). */
-const FALLBACK_INCLUDE_UNTRACKED = SETTINGS['kiraVersion.stash.includeUntracked'].default;
+const FALLBACK_INCLUDE_UNTRACKED = SETTINGS['kiraSpace.stash.includeUntracked'].default;
 const stashIncludeUntrackedDefault = computed(
   () =>
-    repoSettingsState.settings.value['kiraVersion.stash.includeUntracked'] ??
+    repoSettingsState.settings.value['kiraSpace.stash.includeUntracked'] ??
     FALLBACK_INCLUDE_UNTRACKED,
 );
 
 /** `WorktreeDialog.vue`'s own path pre-fill default — same "read the schema's own default as the
  *  fallback" shape as `stashIncludeUntrackedDefault` above (G25 D10). */
-const FALLBACK_WORKTREE_BASE_PATH = SETTINGS['kiraVersion.worktree.basePath'].default;
+const FALLBACK_WORKTREE_BASE_PATH = SETTINGS['kiraSpace.worktree.basePath'].default;
 const worktreeBasePathDefault = computed(
   () =>
-    repoSettingsState.settings.value['kiraVersion.worktree.basePath'] ??
+    repoSettingsState.settings.value['kiraSpace.worktree.basePath'] ??
     FALLBACK_WORKTREE_BASE_PATH,
 );
-const FALLBACK_PREPARE_SCRIPT = SETTINGS['kiraVersion.worktree.prepareScript'].default;
+const FALLBACK_PREPARE_SCRIPT = SETTINGS['kiraSpace.worktree.prepareScript'].default;
 const worktreePrepareScript = computed(
   () =>
-    repoSettingsState.settings.value['kiraVersion.worktree.prepareScript'] ??
+    repoSettingsState.settings.value['kiraSpace.worktree.prepareScript'] ??
     FALLBACK_PREPARE_SCRIPT,
 );
 
@@ -1178,7 +1178,7 @@ async function bootstrap(): Promise<void> {
     lastPersisted = persisted;
     detailOpen.value = persisted.detailOpen;
     columnWidths.value = persisted.columnWidths;
-    // P72 §9.1: Kira Studio's own app-wide appearance.dateFormat mount option wins over whatever
+    // P72 §9.1: Kira Space's own app-wide appearance.dateFormat mount option wins over whatever
     // this webview last persisted for itself — 'vscode'/'harness' never pass one, so persisted
     // stays the only source there, unchanged.
     dateFormat.value = props.dateFormat ?? persisted.dateFormat;
@@ -1606,7 +1606,7 @@ onBeforeUnmount(() => {
     <!-- G12 D6: outside the v-if="repoState" gate below, since bootError means bootstrap() never
          got that far — a blank panel is never an acceptable rendering of a failure. -->
     <div v-if="bootError && !repoState" class="kv-boot-error" data-testid="boot-error">
-      <p>Kira Studio isn't reachable — {{ bootError }}</p>
+      <p>Kira Space isn't reachable — {{ bootError }}</p>
       <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
     </div>
     <template v-else-if="repoState">
@@ -1708,7 +1708,7 @@ onBeforeUnmount(() => {
              1's reported shape, whatever the underlying cause. Same anatomy as ReviewView.vue's
              stale-comparison banner: one line, a Retry action that also dismisses it. -->
         <div v-if="bootError" class="kv-boot-error-banner" role="status" data-testid="boot-error-banner">
-          <span>Kira Studio isn't reachable — {{ bootError }}</span>
+          <span>Kira Space isn't reachable — {{ bootError }}</span>
           <KuiButton data-testid="boot-error-banner-retry" @click="retryBootstrap">Retry</KuiButton>
         </div>
         <main class="kv-body">

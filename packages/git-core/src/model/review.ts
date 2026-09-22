@@ -52,7 +52,7 @@ export interface ResolveBaseInput {
    *  (V1: an absent or dangling `origin/HEAD` is "not set", never an error). Already a short
    *  ref name, e.g. `"origin/main"`. */
   readonly originHead: string | undefined;
-  /** `kiraVersion.review.baseCandidates`, in configured order (default `["main", "master"]`). */
+  /** `kiraSpace.review.baseCandidates`, in configured order (default `["main", "master"]`). */
   readonly candidates: readonly string[];
 }
 

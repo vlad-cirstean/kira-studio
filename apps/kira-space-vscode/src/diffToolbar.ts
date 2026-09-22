@@ -1,7 +1,7 @@
 /**
- * G14 D9/D10 — the review diff editor's own toolbar: `kiraVersion.goToFileFromDiff` ("Go to
- * file", item 7) and `kiraVersion.openCommitInGraph` ("Open in graph", item 8), both contributed
- * to `editor/title`, `when: isInDiffEditor && resourceScheme == kira-version`, placed left of VS
+ * G14 D9/D10 — the review diff editor's own toolbar: `kiraSpace.goToFileFromDiff` ("Go to
+ * file", item 7) and `kiraSpace.openCommitInGraph` ("Open in graph", item 8), both contributed
+ * to `editor/title`, `when: isInDiffEditor && resourceScheme == kira-space`, placed left of VS
  * Code's own next/previous-change navigation via `navigation@-99`/`navigation@-98`.
  *
  * Both resolve *which document* the same way: `vscode.window.tabGroups.activeTabGroup.activeTab`
@@ -43,7 +43,7 @@ export interface DiffToolbarDeps {
 }
 
 /** The URI shape both `editor.openDiff` and `editor.openRangeDiff` mint (`ports/
- *  editorIntegration.ts`'s `toUri`): `kira-version:/<encoded-key>/<label>`. Resolves either side
+ *  editorIntegration.ts`'s `toUri`): `kira-space:/<encoded-key>/<label>`. Resolves either side
  *  of a diff to `{repoId, rev, path}` — `reviewAnchorFor`'s own two opening lines (F11), reused
  *  here rather than re-derived. `undefined` for the `.empty` side (an added/deleted file's other
  *  half) or any URI this scheme did not mint. */
@@ -93,9 +93,9 @@ function currentLine(chosenUri: vscode.Uri): number {
   return 1;
 }
 
-/** `kiraVersion.goToFileFromDiff` (D9, item 7) — reuses G4's existing line-mapped "go to file"
+/** `kiraSpace.goToFileFromDiff` (D9, item 7) — reuses G4's existing line-mapped "go to file"
  *  capability, which already answers `live` (with drift hunks, mapped) or `historical` (the
- *  `kira-version:` blob revealed at the line), exactly item 7's "works for historical/non-checked-
+ *  `kira-space:` blob revealed at the line), exactly item 7's "works for historical/non-checked-
  *  out content too". */
 export function goToFileFromDiffCommand(deps: DiffToolbarDeps): () => void {
   return () => {
@@ -106,7 +106,7 @@ export function goToFileFromDiffCommand(deps: DiffToolbarDeps): () => void {
       const resolved = resolveVirtualUri(chosen);
       if (!resolved) {
         await vscode.window.showInformationMessage(
-          "Kira Version: this side of the diff has no file to go to (it's empty, or not one of " +
+          "Kira Space: this side of the diff has no file to go to (it's empty, or not one of " +
             "this diff's revisions).",
         );
         return;
@@ -120,13 +120,13 @@ export function goToFileFromDiffCommand(deps: DiffToolbarDeps): () => void {
             : outcome.reason === 'tooLarge'
               ? 'the file is too large'
               : "the file doesn't exist at that revision";
-        await vscode.window.showInformationMessage(`Kira Version: can't go to file — ${reason}.`);
+        await vscode.window.showInformationMessage(`Kira Space: can't go to file — ${reason}.`);
       }
     })();
   };
 }
 
-/** `kiraVersion.openCommitInGraph` (D10, item 8) — reveals and selects a commit in the graph
+/** `kiraSpace.openCommitInGraph` (D10, item 8) — reveals and selects a commit in the graph
  *  webview. `explicit`, when given (a `command:` URI invocation — see this file's own doc
  *  comment), names the commit directly and skips tab resolution entirely; the editor/title
  *  invocation (no args) resolves it from the active diff tab exactly like `goToFileFromDiff`
@@ -144,7 +144,7 @@ export function openCommitInGraphCommand(deps: DiffToolbarDeps): (explicit?: unk
     const resolved = resolveVirtualUri(preferredSide(tab));
     if (!resolved) {
       void vscode.window.showInformationMessage(
-        "Kira Version: this side of the diff isn't a commit (it's empty).",
+        "Kira Space: this side of the diff isn't a commit (it's empty).",
       );
       return;
     }

@@ -14,7 +14,7 @@
  * created in `activate()` cannot show until something has already activated the extension.
  * `activate()` now also registers every palette command straight from `commands.ts`'s tables (no
  * hand-written second list to drift from), and the SCM title-bar button is a manifest-only
- * addition (`contributes.menus.scm/title`) pointing at the pre-existing `kiraVersion.focusGraph`.
+ * addition (`contributes.menus.scm/title`) pointing at the pre-existing `kiraSpace.focusGraph`.
  */
 import {
   coerceSettings,
@@ -71,10 +71,10 @@ interface ServerAppInitResult {
 // from here for exactly that reason, not merely unused.
 // G1 §5.4 removed this command saying it "returns in G3" (D13/D17) — it does, once there is a
 // graph view to focus.
-const FOCUS_GRAPH_COMMAND = 'kiraVersion.focusGraph';
-const SHOW_CONNECTION_STATUS_COMMAND = 'kiraVersion.showConnectionStatus';
-const GRAPH_VIEW_ID = 'kiraVersion.graph';
-const REVIEW_VIEW_ID = 'kiraVersion.review';
+const FOCUS_GRAPH_COMMAND = 'kiraSpace.focusGraph';
+const SHOW_CONNECTION_STATUS_COMMAND = 'kiraSpace.showConnectionStatus';
+const GRAPH_VIEW_ID = 'kiraSpace.graph';
+const REVIEW_VIEW_ID = 'kiraSpace.review';
 const SETTING_KEYS = Object.keys(SETTINGS) as readonly SettingKey[];
 
 function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, unknown> {
@@ -89,16 +89,16 @@ function readRawSettings(config: vscode.WorkspaceConfiguration): Record<string, 
 // ---------------------------------------------------------------------------------------
 // G18 D11: a one-time, best-effort migration for a value a user already had set for any of the
 // eight keys that leave contributes.configuration this phase — the seven that moved into the new
-// per-repo store (D1) plus kiraVersion.git.path (D15, fixed but relocated to Kira Studio's own
+// per-repo store (D1) plus kiraSpace.git.path (D15, fixed but relocated to Kira Space's own
 // server-owned settings, never the per-repo one). Never edits the user's settings.json (§8's own
 // non-goal) — the orphaned legacy value(s) are simply left in place, unread by anything after this
 // migration runs once.
 // ---------------------------------------------------------------------------------------
 
-// D15: kiraVersion.git.path is no longer a SETTINGS key at all (it never belonged in this
+// D15: kiraSpace.git.path is no longer a SETTINGS key at all (it never belonged in this
 // VS-Code-facing schema once its true home was kira.db's own settings table) — this is the one
 // place its pre-G18 dotted key still needs to be named, purely to look for a legacy value.
-const LEGACY_GIT_PATH_KEY = 'kiraVersion.git.path';
+const LEGACY_GIT_PATH_KEY = 'kiraSpace.git.path';
 
 // Tracks whether the one-time migration has already run (successfully) — a context.globalState
 // flag rather than editing settings.json (which stays untouched, §8), the same "per editor
@@ -220,7 +220,7 @@ function plainTextOf(markdownLine: string): string {
 //
 // G14 D5: the two states that need the user's attention (pairing, an error) keep a word; the
 // three that do not (connecting, connected, loading) are icon-only — everything the text used to
-// spend on "Kira Version" now lives in a structured Markdown tooltip instead (F7). `appInit` is
+// spend on "Kira Space" now lives in a structured Markdown tooltip instead (F7). `appInit` is
 // the server/contract version the connected/idle tooltip names — fetched separately (extension.ts's
 // own app.init round-trip), so it is `undefined` for the first render of a fresh `connected` state.
 //
@@ -244,13 +244,13 @@ function updateStatusBar(
   switch (state.kind) {
     case 'connecting': {
       item.text = '$(sync~spin)';
-      tooltipLines = ['**Kira Studio**', 'Connecting…', '`~/.kira-studio/git.sock`'];
+      tooltipLines = ['**Kira Space**', 'Connecting…', '`~/.kira-space/git.sock`'];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
     case 'pairing': {
       item.text = '$(key) Approve';
-      tooltipLines = ['**Kira Studio**', "Waiting for approval in Kira Studio's window"];
+      tooltipLines = ['**Kira Space**', "Waiting for approval in Kira Space's window"];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
       break;
     }
@@ -260,22 +260,22 @@ function updateStatusBar(
       item.command = FOCUS_GRAPH_COMMAND;
       if (active) {
         item.text = '$(sync~spin)';
-        tooltipLines = ['**Kira Studio**', 'Loading…'];
+        tooltipLines = ['**Kira Space**', 'Loading…'];
       } else if (blame?.kind === 'dirty') {
         item.text = '$(git-branch) Unsaved changes';
-        tooltipLines = ['**Kira Studio**', 'Unsaved changes — blame updates once you save'];
+        tooltipLines = ['**Kira Space**', 'Unsaved changes — blame updates once you save'];
       } else if (blame?.kind === 'uncommitted') {
         item.text = '$(git-branch) Uncommitted';
-        tooltipLines = ['**Kira Studio**', 'This line has not been committed yet'];
+        tooltipLines = ['**Kira Space**', 'This line has not been committed yet'];
       } else if (blame?.kind === 'resolved') {
         item.text = `$(git-branch) ${blameStatusText(blame)}`;
         tooltipLines = [
-          '**Kira Studio**',
+          '**Kira Space**',
           blame.summary,
           `${blame.author}, ${new Date(blame.authorTimeSeconds * 1000).toLocaleString()}`,
         ];
         item.command = {
-          command: 'kiraVersion.openCommitInGraph',
+          command: 'kiraSpace.openCommitInGraph',
           title: 'Open Commit in Graph',
           arguments: [{ repoId: blame.repoId, sha: blame.sha }],
         };
@@ -284,13 +284,10 @@ function updateStatusBar(
         // G27 D7: a workspace folder's fsPath is filesystem-sourced.
         const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         const root = rawRoot === undefined ? undefined : nfcPath(rawRoot);
-        const lines = ['**Kira Studio**', 'Connected'];
+        const lines = ['**Kira Space**', 'Connected'];
         if (root) lines.push(root);
         if (appInit) {
-          lines.push(
-            `Kira Studio ${appInit.serverVersion}`,
-            `Contract v${appInit.contractVersion}`,
-          );
+          lines.push(`Kira Space ${appInit.serverVersion}`, `Contract v${appInit.contractVersion}`);
         }
         tooltipLines = lines;
       }
@@ -299,7 +296,7 @@ function updateStatusBar(
     case 'denied': {
       item.text = '$(error) Kira';
       tooltipLines = [
-        '**Kira Studio**',
+        '**Kira Space**',
         state.reason === 'timeout' ? 'Pairing request timed out' : 'Pairing was denied',
         'Click to retry',
       ];
@@ -310,9 +307,9 @@ function updateStatusBar(
     case 'versionMismatch': {
       item.text = '$(error) Kira';
       tooltipLines = [
-        '**Kira Studio**',
+        '**Kira Space**',
         `Version mismatch — extension expects contract ${state.expected}, ` +
-          `Kira Studio (${state.serverVersion}) speaks ${state.received}`,
+          `Kira Space (${state.serverVersion}) speaks ${state.received}`,
         'Both need to be on the same release',
       ];
       item.command = SHOW_CONNECTION_STATUS_COMMAND;
@@ -328,13 +325,13 @@ function updateStatusBar(
 let connection: ConnectionManager | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const outputChannel = vscode.window.createOutputChannel('Kira Version');
+  const outputChannel = vscode.window.createOutputChannel('Kira Space');
   context.subscriptions.push(outputChannel);
 
   let currentSettings = coerceSettings(
     readRawSettings(vscode.workspace.getConfiguration()),
   ).settings;
-  const logger = new VsCodeLogger(outputChannel, () => currentSettings['kiraVersion.log.level']);
+  const logger = new VsCodeLogger(outputChannel, () => currentSettings['kiraSpace.log.level']);
   const roots = new VsCodeWorkspaceRoots();
   const clipboard = new VsCodeClipboard();
   const editor = new VsCodeEditorIntegration();
@@ -451,7 +448,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   // G14 D5: set once — the item's text no longer carries a name (F7), so this is what makes it
   // identifiable in the status bar's own right-click "manage" menu.
-  statusItem.name = 'Kira Version';
+  statusItem.name = 'Kira Space';
   context.subscriptions.push(statusItem);
   // G12 D10: the in-flight-work indicator — debounced 150ms on the rising edge only (a burst of
   // small requests must not flicker the item several times a second), never on the falling edge
@@ -462,7 +459,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // extension already fetches (the app.init round-trip a few lines below, previously logged only)
   // but does not have at the moment `connected` itself first fires, hence a second updateStatusBar
   // call once it resolves. Cleared whenever the state leaves `connected`, since a reconnect may
-  // land on a different Kira Studio process.
+  // land on a different Kira Space process.
   let lastAppInit: { readonly serverVersion: string; readonly contractVersion: number } | undefined;
   // P5: the status-bar blame widget's own controller — active-line tracking, debounce and repoId
   // resolution live entirely inside it; this file only reads its current state on render.
@@ -495,31 +492,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // biome-ignore lint/suspicious/noExplicitAny: see the comment above — two of these ids take a real menu-command argument.
   const otherCommandHandlers: Record<OtherCommandId, (...args: any[]) => unknown> = {
     [SHOW_CONNECTION_STATUS_COMMAND]: () => void showConnectionStatus(manager),
-    'kiraVersion.openRepository': () => void openRepository(manager),
-    'kiraVersion.focusGraph': () => {
+    'kiraSpace.openRepository': () => void openRepository(manager),
+    'kiraSpace.focusGraph': () => {
       void vscode.commands.executeCommand(`${GRAPH_VIEW_ID}.focus`);
     },
-    'kiraVersion.reviewBranch': () => reviewProvider.reviewBranch(undefined, undefined),
-    'kiraVersion.refresh': () => graphProvider.runUiAction('refresh'),
+    'kiraSpace.reviewBranch': () => reviewProvider.reviewBranch(undefined, undefined),
+    'kiraSpace.refresh': () => graphProvider.runUiAction('refresh'),
     // G11 D17: the review webview's own command, not the graph's — toggling a reviewed file only
     // makes sense in the review sidebar's Files pane.
-    'kiraVersion.toggleFileReviewed': () => reviewProvider.runUiAction('toggleFileReviewed'),
+    'kiraSpace.toggleFileReviewed': () => reviewProvider.runUiAction('toggleFileReviewed'),
     // G13 D19: D9's own controller owns the real logic; this table only routes to it.
-    'kiraVersion.addReviewComment': () => void reviewComments.addAtSelection(),
-    'kiraVersion.copyReviewComments': () => reviewProvider.runUiAction('copyReviewComments'),
-    'kiraVersion.submitReviewComment': (reply: vscode.CommentReply) =>
+    'kiraSpace.addReviewComment': () => void reviewComments.addAtSelection(),
+    'kiraSpace.copyReviewComments': () => reviewProvider.runUiAction('copyReviewComments'),
+    'kiraSpace.submitReviewComment': (reply: vscode.CommentReply) =>
       void reviewComments.submit(reply),
-    'kiraVersion.deleteReviewComment': (comment: vscode.Comment) =>
+    'kiraSpace.deleteReviewComment': (comment: vscode.Comment) =>
       void reviewComments.deleteComment(comment),
-    'kiraVersion.goToFileFromDiff': goToFileFromDiffCommand(diffToolbarDeps),
-    'kiraVersion.openCommitInGraph': openCommitInGraphCommand(diffToolbarDeps),
+    'kiraSpace.goToFileFromDiff': goToFileFromDiffCommand(diffToolbarDeps),
+    'kiraSpace.openCommitInGraph': openCommitInGraphCommand(diffToolbarDeps),
     // G15 D2: the two entry points shared by the toolbar, the context menu, the palette, the
     // gutter hover's command link and the CodeLens (an explicit {uri, ranges} argument bypasses
     // tab/selection resolution for the last two).
-    'kiraVersion.markSelectionReviewed': markSelectionReviewedCommand(reviewMarking),
-    'kiraVersion.markSelectionUnreviewed': markSelectionUnreviewedCommand(reviewMarking),
+    'kiraSpace.markSelectionReviewed': markSelectionReviewedCommand(reviewMarking),
+    'kiraSpace.markSelectionUnreviewed': markSelectionUnreviewedCommand(reviewMarking),
     // G-UX D9 (item 9): the palette's own route to toggling the graph panel's search row.
-    'kiraVersion.toggleSearch': () => graphProvider.runUiAction('toggleSearch'),
+    'kiraSpace.toggleSearch': () => graphProvider.runUiAction('toggleSearch'),
   };
   for (const entry of Object.values(MUTATING_COMMANDS)) {
     if (isPaletteCommand(entry)) {
@@ -664,7 +661,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // is this early return, so a live change to it still reaches both webviews through the same
       // settings.changed event below.
       if (
-        !event.affectsConfiguration('kiraVersion') &&
+        !event.affectsConfiguration('kiraSpace') &&
         !event.affectsConfiguration('workbench.tree.indent')
       ) {
         return;
@@ -684,27 +681,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 async function showConnectionStatus(manager: ConnectionManager): Promise<void> {
   const state = manager.state;
-  const socketNote = `Socket: ~/.kira-studio/git.sock`;
+  const socketNote = `Socket: ~/.kira-space/git.sock`;
   switch (state.kind) {
     case 'connected': {
-      await vscode.window.showInformationMessage(`Kira Version: connected. ${socketNote}`);
+      await vscode.window.showInformationMessage(`Kira Space: connected. ${socketNote}`);
       return;
     }
     case 'pairing': {
       await vscode.window.showInformationMessage(
-        `Kira Version: waiting for approval in Kira Studio. ${socketNote}`,
+        `Kira Space: waiting for approval in Kira Space. ${socketNote}`,
       );
       return;
     }
     case 'connecting': {
-      await vscode.window.showInformationMessage(`Kira Version: connecting… ${socketNote}`);
+      await vscode.window.showInformationMessage(`Kira Space: connecting… ${socketNote}`);
       return;
     }
     case 'denied': {
       const action = await vscode.window.showWarningMessage(
         state.reason === 'timeout'
-          ? `Kira Version: pairing request timed out. ${socketNote}`
-          : `Kira Version: pairing was denied. ${socketNote}`,
+          ? `Kira Space: pairing request timed out. ${socketNote}`
+          : `Kira Space: pairing was denied. ${socketNote}`,
         'Retry',
       );
       if (action === 'Retry') manager.retry();
@@ -712,8 +709,8 @@ async function showConnectionStatus(manager: ConnectionManager): Promise<void> {
     }
     case 'versionMismatch': {
       const action = await vscode.window.showErrorMessage(
-        `Kira Version: version mismatch — extension expects contract ${state.expected}, ` +
-          `Kira Studio (${state.serverVersion}) speaks ${state.received}. Both need to be on the ` +
+        `Kira Space: version mismatch — extension expects contract ${state.expected}, ` +
+          `Kira Space (${state.serverVersion}) speaks ${state.received}. Both need to be on the ` +
           'same release.',
         'Retry',
       );
@@ -740,7 +737,7 @@ async function openRepository(manager: ConnectionManager): Promise<void> {
     path = nfcPath(picked.folder.uri.fsPath);
   } else {
     await vscode.window.showInformationMessage(
-      "Kira Version follows this window's workspace folders — open a folder first (File → Open Folder).",
+      "Kira Space follows this window's workspace folders — open a folder first (File → Open Folder).",
     );
     return;
   }
@@ -754,19 +751,17 @@ async function openRepository(manager: ConnectionManager): Promise<void> {
           ? result.repo.head.name
           : result.repo.head.kind;
       await vscode.window.showInformationMessage(
-        `Kira Version: opened ${result.repo.root} on ${head} (${result.repo.gitDir}).`,
+        `Kira Space: opened ${result.repo.root} on ${head} (${result.repo.gitDir}).`,
       );
     } else if (result.kind === 'notARepository') {
-      await vscode.window.showWarningMessage(
-        `Kira Version: ${result.path} is not a git repository.`,
-      );
+      await vscode.window.showWarningMessage(`Kira Space: ${result.path} is not a git repository.`);
     } else {
       await vscode.window.showWarningMessage(
-        `Kira Version: git is unavailable (${result.git.kind}).`,
+        `Kira Space: git is unavailable (${result.git.kind}).`,
       );
     }
   } catch (err) {
-    await vscode.window.showErrorMessage(`Kira Version: repo.open failed — ${String(err)}`);
+    await vscode.window.showErrorMessage(`Kira Space: repo.open failed — ${String(err)}`);
   }
 }
 

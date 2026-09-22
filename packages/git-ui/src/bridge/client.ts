@@ -30,7 +30,7 @@ export type HostConnectionState = EventPayload<'connection.changed'>['state'];
  */
 export class BridgeClient {
   readonly connectionState = shallowRef<ConnectionState>('connecting');
-  /** G-UX (item 13): the live "is the host's own socket to Kira Studio up" signal — kept
+  /** G-UX (item 13): the live "is the host's own socket to Kira Space up" signal — kept
    *  separately from `connectionState` above rather than folded into it, since that field already
    *  has its own well-established, narrower meaning three other things key off (`app.init` cold-
    *  boot success/failure) and this needs a fourth state (`pairing`) that concept never had.

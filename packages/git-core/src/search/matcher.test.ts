@@ -34,9 +34,9 @@ function fields(partial: Partial<CommitFields> & { readonly sha: string }): Comm
     subject: '',
     body: '',
     authorName: 'Kira Fixture',
-    authorEmail: 'fixture@kira-version.test',
+    authorEmail: 'fixture@kira-space.test',
     committerName: 'Kira Fixture',
-    committerEmail: 'fixture@kira-version.test',
+    committerEmail: 'fixture@kira-space.test',
     ...partial,
   };
 }
@@ -190,7 +190,7 @@ describe('matchRef — semantics table, rows 14-15', () => {
     const annotated = ref({
       shortName: 'v1.0.0',
       annotation: {
-        tagger: 'Kira Fixture <fixture@kira-version.test>',
+        tagger: 'Kira Fixture <fixture@kira-space.test>',
         date: 1_700_000_000,
         subject: 'Release 1.0.0',
         body: 'Ships the new widgetorium assembly line.',
@@ -207,7 +207,7 @@ describe('matchRef — semantics table, rows 14-15', () => {
     const annotated = ref({
       shortName: 'v1.0.0',
       annotation: {
-        tagger: 'Kira Fixture <fixture@kira-version.test>',
+        tagger: 'Kira Fixture <fixture@kira-space.test>',
         date: 1_700_000_000,
         subject: 'Release 1.0.0',
         body: '',

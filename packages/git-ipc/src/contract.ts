@@ -12,7 +12,7 @@
  */
 
 /** Which shell mounted the UI bundle. `"harness"` is a real value, not a test-only stand-in —
- *  the harness is a first-class Transport consumer (§8.4, C4). `"kira"` (C10) is Kira Studio's own
+ *  the harness is a first-class Transport consumer (§8.4, C4). `"kira"` (C10) is Kira Space's own
  *  native workspace, mounting these same components read-only over an in-process Wails stream —
  *  see `docs/v1.5/plans/C10-git-graph-native.md`. */
 export type HostKind = 'vscode' | 'harness' | 'kira';
@@ -48,10 +48,10 @@ export type DecorationRef =
 /** The settings schema's keys and value types (D25, W4) — a structural copy of `core`'s
  *  generated `Settings` type, kept in step by wireConformance.test.ts.
  *
- *  G18: the one remaining window/host-scoped key after this phase — `kiraVersion.git.path` and
+ *  G18: the one remaining window/host-scoped key after this phase — `kiraSpace.git.path` and
  *  the six originally-named per-repo keys are gone (`git.path` is server-owned elsewhere now,
- *  D15; the rest moved to `RepoSettingsSnapshot` below). `kiraVersion.pull.strategy` and
- *  `kiraVersion.log.level` moved too (D14). */
+ *  D15; the rest moved to `RepoSettingsSnapshot` below). `kiraSpace.pull.strategy` and
+ *  `kiraSpace.log.level` moved too (D14). */
 export interface SettingsSnapshot {
   /** G14 D6: VS Code's own tree indentation, mirrored so the webview's file trees match the
    *  Explorer. Read from the host, never contributed by this extension. */
@@ -60,28 +60,28 @@ export interface SettingsSnapshot {
 
 /** G18 D4: the per-repo display settings, server-stored, edited from the new in-app dialog
  *  (`RepoSettingsDialog.vue`) rather than VS Code's settings.json — every leaf here is genuinely
- *  scoped by repoId. P72 §9.2: `kiraVersion.log.level` used to be the one exception (D14, `its
+ *  scoped by repoId. P72 §9.2: `kiraSpace.log.level` used to be the one exception (D14, `its
  *  value shared across every repo this installation opens, stored under a reserved key rather
- *  than repoId`) — that collapse is deleted; Kira Studio gets its own independent, genuinely
+ *  than repoId`) — that collapse is deleted; Kira Space gets its own independent, genuinely
  *  app-wide `advanced.gitLogLevel` control instead (`packages/shared/domain/settings.ts`), and
- *  `kiraVersion.log.level` reverts to an ordinary per-repo leaf, still the only surface VS Code
+ *  `kiraSpace.log.level` reverts to an ordinary per-repo leaf, still the only surface VS Code
  *  itself has to set it. */
 export interface RepoSettingsSnapshot {
-  readonly 'kiraVersion.graph.pageSize': number;
-  readonly 'kiraVersion.graph.scope': 'all' | 'head';
+  readonly 'kiraSpace.graph.pageSize': number;
+  readonly 'kiraSpace.graph.scope': 'all' | 'head';
   /** P9 W6: whether stash entries appear as nodes in the commit graph (OQ5 default: true). */
-  readonly 'kiraVersion.stash.showInGraph': boolean;
+  readonly 'kiraSpace.stash.showInGraph': boolean;
   /** P9 W6: the Stash dialog's "include untracked files" checkbox default. */
-  readonly 'kiraVersion.stash.includeUntracked': boolean;
+  readonly 'kiraSpace.stash.includeUntracked': boolean;
   /** P7 W7/D43: Branch review's own candidate base branches (§6.8). */
-  readonly 'kiraVersion.review.baseCandidates': readonly string[];
-  readonly 'kiraVersion.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
-  readonly 'kiraVersion.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
+  readonly 'kiraSpace.review.baseCandidates': readonly string[];
+  readonly 'kiraSpace.pull.strategy': 'auto' | 'ff-only' | 'merge' | 'rebase';
+  readonly 'kiraSpace.log.level': 'off' | 'error' | 'warn' | 'info' | 'debug';
   /** G24 D16: whether the GitHub PR indicator/badges/search-arm/reaper re-resolve are active for
    *  this repository at all — genuinely per-repo, default true. Off means no
    *  `gh` probe, no spawn, no cache fill: both commit.resolvePr/branch.resolvePr answer
    *  `{kind:'disabled'}` outright. */
-  readonly 'kiraVersion.github.enabled': boolean;
+  readonly 'kiraSpace.github.enabled': boolean;
   /** G25 D10: the worktree prepare script — one command-line string, never a path, never an argv
    *  array. Empty means the feature is off for this repository: no spawn, no shell, ever. Read
    *  ONLY from this table (`source: 'repo'`) — never from `.git/config`, a tracked file, or any
@@ -89,15 +89,15 @@ export interface RepoSettingsSnapshot {
    *  feature (D10). The sha256-pinned approval this script requires before it can run
    *  (`prepareScriptApprovedSha`) is deliberately NOT a member here, or anywhere near
    *  `RepoSettingsPatch` — it is a server-only key `repoSettings.set` cannot write (D11/F15). */
-  readonly 'kiraVersion.worktree.prepareScript': string;
+  readonly 'kiraSpace.worktree.prepareScript': string;
   /** G25 D10: pure UX — pre-fills `WorktreeDialog`'s own path field. Empty means no suggestion
    *  beyond the dialog's own basename default. Never a security boundary. */
-  readonly 'kiraVersion.worktree.basePath': string;
+  readonly 'kiraSpace.worktree.basePath': string;
   /** G28 D16: whether a blocked checkout is automatically re-issued with `autoStash: true` instead
    *  of opening the old `CheckoutDialog`. Read CLIENT-SIDE ONLY — the server never consults this
    *  leaf, so a stale or absent value can only ever produce the OLD dialog, never an unexpected
    *  write (the fail-safe direction). Default true. */
-  readonly 'kiraVersion.checkout.autoStash': boolean;
+  readonly 'kiraSpace.checkout.autoStash': boolean;
 }
 
 /** G18: `RepoSettingsSnapshot`'s own `.partial()` shape — `repoSettings.set`'s request, every leaf
@@ -785,10 +785,10 @@ export type PullStrategy = 'ff-only' | 'merge' | 'rebase';
 /** Where a resolved pull strategy came from, so the UI can say so before running it (§7.3). */
 export type PullStrategySource =
   | 'explicit' // the user picked it for this invocation
-  | 'setting' // kiraVersion.pull.strategy
+  | 'setting' // kiraSpace.pull.strategy
   | 'branchConfig' // branch.<name>.rebase
   | 'pullConfig' // pull.rebase / pull.ff
-  | 'default'; // kira-version's own ff-only fallback
+  | 'default'; // kira-space's own ff-only fallback
 
 /** Which remote operation `remote.run` is being asked to perform. One key, five kinds — see
  *  `docs/plans/P8.md`'s D51 for why this is not a fifth arm of `op.run`'s union. */
@@ -835,8 +835,8 @@ export interface PushPreflight {
 
 /** `remote.run`'s params — one request key for all five `RemoteOpKind`s (D51). `confirmToken`
  *  is present only for a protected-branch force-push/delete: the typed branch name, checked
- *  server-side against Kira Studio's own server-owned `protectedBranches` setting (G7 D16/D17,
- *  superseding D52's `kiraVersion.protectedBranches` — moved out of VS Code's settings because
+ *  server-side against Kira Space's own server-owned `protectedBranches` setting (G7 D16/D17,
+ *  superseding D52's `kiraSpace.protectedBranches` — moved out of VS Code's settings because
  *  two windows disagreeing about it is a safety issue, not a preference) — never trusted from the
  *  UI alone. */
 export interface RemoteOpParams {
@@ -1189,7 +1189,7 @@ export interface PrRecord {
 }
 
 /** commit.resolvePr / branch.resolvePr's own shared result shape (D14). `"disabled"` covers both
- *  `kiraVersion.github.enabled === false` and "no GitHub remote at all" — the grid/badge/detail
+ *  `kiraSpace.github.enabled === false` and "no GitHub remote at all" — the grid/badge/detail
  *  pane render nothing for either, so the two need no further distinction on the wire. */
 export type PrLookupResult =
   | { readonly kind: 'ok'; readonly prs: readonly PrRecord[] }
@@ -1538,7 +1538,7 @@ export type Contract = {
     'graph.loadMore': {
       /** `range` present ⇒ pages the review walk instead of the panel's own (P7 W5).
        *  `scope`/`pageSize` (G3 D6): optional, injected by the extension from the window's own
-       *  `kiraVersion.graph.*` settings — SPEC's "can travel with the request and differ per
+       *  `kiraSpace.graph.*` settings — SPEC's "can travel with the request and differ per
        *  window harmlessly". A raw socket client that omits them gets the server's own defaults
        *  ("all", 5000). */
       params: {
@@ -1566,7 +1566,7 @@ export type Contract = {
         repoId: string;
         branch: string;
         base?: string;
-        /** G6: `kiraVersion.review.baseCandidates`, injected by the extension from the window's
+        /** G6: `kiraSpace.review.baseCandidates`, injected by the extension from the window's
          *  own coerced settings snapshot — SPEC's "can travel with the request and differ per
          *  window harmlessly". Absent for a raw socket client, which gets the server's own
          *  `["main", "master"]` default. */
@@ -1988,7 +1988,7 @@ export type Contract = {
       params: {
         repoId: string;
         branch: string;
-        /** G7 D2: injected by the extension from `kiraVersion.pull.strategy`, exactly as
+        /** G7 D2: injected by the extension from `kiraSpace.pull.strategy`, exactly as
          *  `review.resolveBase` injects `baseCandidates`. Absent for every raw socket client —
          *  the server treats that the same as `"auto"`. */
         strategySetting?: PullStrategy | 'auto';
@@ -2091,7 +2091,7 @@ export type Contract = {
       params: { repoId: string; patch: RepoSettingsPatch };
       result: RepoSettingsSnapshot;
     };
-    /** G18 D11/D15: the one-time settings migration's own `kiraVersion.git.path` leg. That key
+    /** G18 D11/D15: the one-time settings migration's own `kiraSpace.git.path` leg. That key
      *  never lived in the per-repo store (D15 — it is server-owned, not a per-repo fact), so its
      *  migrated value (when a user had customized it before this phase) is written through Kira
      *  Studio's own server-owned settings surface instead of `repoSettings.set`. Extension-only,
@@ -2221,7 +2221,7 @@ export type Contract = {
       result: { readonly cancelled: boolean };
     };
     // ---- P75 §2.3: reveal a review commit in the graph, from either host -------------------
-    /** Replaces the review row's old `command:kiraVersion.openCommitInGraph?…` anchor (VS Code's
+    /** Replaces the review row's old `command:kiraSpace.openCommitInGraph?…` anchor (VS Code's
      *  own webview link escape hatch, unreachable outside a VS Code webview — `RepoReviewView.vue`
      *  mounts the same row component in a Wails WebView, where no `command:` handler exists at any
      *  layer). Host-answered in both hosts, never reaching Go (like `review.open`/
@@ -2273,12 +2273,12 @@ export type Contract = {
      *  `stack.restack` is in flight. */
     'stack.progress': RestackProgress;
     /** G7 D2/D4: one prompt from git's own askpass protocol, sent to the connection that owns the
-     *  in-flight remote op — never Kira Studio's own window (SPEC §5 item 4, §6, confirmed
+     *  in-flight remote op — never Kira Space's own window (SPEC §5 item 4, §6, confirmed
      *  2026-09-07). `requestId` is a server-minted, unguessable id; the extension answers exactly
      *  once with `credential.provide`. Nothing here is ever logged or stored on either side —
      *  `prompt` can itself contain a username the user just typed (probe P1's second prompt).
      *
-     *  P67e: "never Kira Studio's own window" scopes an *external paired client's* op, owned by
+     *  P67e: "never Kira Space's own window" scopes an *external paired client's* op, owned by
      *  that client's own `gitsession.Conn` — the native stream's own remote op is owned by the
      *  native `Conn` (`internal/bridge/gitstream.go`), so its prompt is answered by this same
      *  window (`state/gitCredential.ts` + `workbench/GitCredentialDialog.vue`). Routing it there

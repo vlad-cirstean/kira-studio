@@ -20,7 +20,7 @@
  *    nothing in this app's own document ever does, so those selectors simply never match here —
  *    Kira's own dark/light handling is `--kira-*`'s own business, resolved before this file ever
  *    runs.
- *  - `--vscode-kiraVersion-graphLane0..7`: git-ui's own invented, contrast/CVD-checked lane
+ *  - `--vscode-kiraSpace-graphLane0..7`: git-ui's own invented, contrast/CVD-checked lane
  *    palette. Kira has no equivalent categorical ramp for this many lanes; the existing tuned
  *    fallback literals are the better choice.
  *  - `--vscode-editor-lineHighlightBackground`: no existing Kira token approximates a subtle

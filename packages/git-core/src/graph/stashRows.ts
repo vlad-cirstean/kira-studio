@@ -27,7 +27,7 @@ export interface StashRowFilter {
 }
 
 /** `entries` empty ⇒ every method below is a no-op pass-through — the same filter this file
- *  hands out when `kiraVersion.stash.showInGraph` is off, or a repo has no stashes at all. */
+ *  hands out when `kiraSpace.stash.showInGraph` is off, or a repo has no stashes at all. */
 export function buildStashRowFilter(entries: readonly StashEntry[]): StashRowFilter {
   const helperShas = new Set<string>();
   const baseByStashSha = new Map<string, string>();

@@ -22,7 +22,7 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // extension-side only (the Go server neither emits nor parses either), the same "the sole
 // compatibility authority still moves" precedent G10 D9/G12 D1 set.
 // G18 D5: 21 -> 22, for three new requests (repoSettings.get/set, settings.setGitPath) and one
-// new event (repoSettings.changed) — seven kiraVersion.* settings move out of
+// new event (repoSettings.changed) — seven kiraSpace.* settings move out of
 // contributes.configuration into their own per-repo store (D1/D3/D4); git.path's own dead
 // server-side wiring is fixed in the same phase (D15) and its one-time migration leg needs its
 // own tiny server-only request (D11) since git.path was never part of the per-repo store
@@ -55,7 +55,7 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // extension already answered on its own.
 // G24 D14: 26 -> 27, for two new Go-served requests ('commit.resolvePr', 'branch.resolvePr'), four
 // new wire types (GhStatus/PrRecord/PrLookupResult and the state string union it carries), and one
-// new RepoSettingsSnapshot member ('kiraVersion.github.enabled'). Additive only -- SearchMatchField
+// new RepoSettingsSnapshot member ('kiraSpace.github.enabled'). Additive only -- SearchMatchField
 // is untouched (F9: the wire's own search-field union is commits-only, the PR fields live entirely
 // in git-core's client-side SearchField instead).
 // G25 D16 (2026-09-09): 27 -> 28, for worktree support -- no upstream design existed for this
@@ -67,8 +67,8 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // 'OpErrorKind' member ('WorktreeLocked' -- 'worktree.prepare's own four synthetic refusals live
 // in a SEPARATE, dedicated 'WorktreePrepareErrorKind' instead, spending none of this budget), two
 // new capabilities ('openWorktreeWindow', 'runPrepareScript'), one new 'UiActionKind' member
-// ('createWorktree'), and two new 'RepoSettingsSnapshot' members ('kiraVersion.worktree.
-// prepareScript', 'kiraVersion.worktree.basePath'). Deliberately absent from every wire type this
+// ('createWorktree'), and two new 'RepoSettingsSnapshot' members ('kiraSpace.worktree.
+// prepareScript', 'kiraSpace.worktree.basePath'). Deliberately absent from every wire type this
 // phase touches: the prepare script's own sha256-pinned approval -- a server-only key, reachable
 // only through the Go server's own dedicated storage accessors, never through 'repoSettings.get'/
 // 'set' or any 'OpRequest'/'OpResult' shape (D11/F15).
@@ -90,7 +90,7 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // and one new 'WorktreeAddPreflight.routes' member ('detachHere') -- all three additive to an
 // EXISTING string-array field, no new wire type; one new 'OpErrorKind' member
 // ('NothingToStash'); one new 'UiActionKind' member ('saveGlobalStash'); one new
-// 'RepoSettingsSnapshot' member ('kiraVersion.checkout.autoStash', read client-side only). 'StashEntry'
+// 'RepoSettingsSnapshot' member ('kiraSpace.checkout.autoStash', read client-side only). 'StashEntry'
 // itself widens by two fields ('scope', 'ref') rather than forking a parallel 'GlobalStashEntry'
 // type -- so, notably, ZERO new wire interfaces. No SQL migration, no watcher change, no new
 // 'ClassifyOpError' stderr row (this phase's own explicit non-goals).

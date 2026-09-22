@@ -17,17 +17,17 @@ import { RepoSettingsState } from './repoSettings.ts';
 
 function defaultSnapshot(): RepoSettingsSnapshot {
   return {
-    'kiraVersion.graph.pageSize': SETTINGS['kiraVersion.graph.pageSize'].default,
-    'kiraVersion.graph.scope': SETTINGS['kiraVersion.graph.scope'].default,
-    'kiraVersion.stash.showInGraph': SETTINGS['kiraVersion.stash.showInGraph'].default,
-    'kiraVersion.stash.includeUntracked': SETTINGS['kiraVersion.stash.includeUntracked'].default,
-    'kiraVersion.review.baseCandidates': SETTINGS['kiraVersion.review.baseCandidates'].default,
-    'kiraVersion.pull.strategy': SETTINGS['kiraVersion.pull.strategy'].default,
-    'kiraVersion.log.level': SETTINGS['kiraVersion.log.level'].default,
-    'kiraVersion.github.enabled': SETTINGS['kiraVersion.github.enabled'].default,
-    'kiraVersion.worktree.prepareScript': SETTINGS['kiraVersion.worktree.prepareScript'].default,
-    'kiraVersion.worktree.basePath': SETTINGS['kiraVersion.worktree.basePath'].default,
-    'kiraVersion.checkout.autoStash': SETTINGS['kiraVersion.checkout.autoStash'].default,
+    'kiraSpace.graph.pageSize': SETTINGS['kiraSpace.graph.pageSize'].default,
+    'kiraSpace.graph.scope': SETTINGS['kiraSpace.graph.scope'].default,
+    'kiraSpace.stash.showInGraph': SETTINGS['kiraSpace.stash.showInGraph'].default,
+    'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
+    'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
+    'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
+    'kiraSpace.log.level': SETTINGS['kiraSpace.log.level'].default,
+    'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
+    'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
+    'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
+    'kiraSpace.checkout.autoStash': SETTINGS['kiraSpace.checkout.autoStash'].default,
   };
 }
 
@@ -97,12 +97,12 @@ describe('RepoSettingsState', () => {
     transport.onRequest = (method, params) => {
       expect(method).toBe('repoSettings.get');
       expect(params).toEqual({ repoId: '/repos/a' });
-      return { ...defaultSnapshot(), 'kiraVersion.pull.strategy': 'rebase' };
+      return { ...defaultSnapshot(), 'kiraSpace.pull.strategy': 'rebase' };
     };
     state.setRepoId('/repos/a');
     await tick();
 
-    expect(state.settings.value['kiraVersion.pull.strategy']).toBe('rebase');
+    expect(state.settings.value['kiraSpace.pull.strategy']).toBe('rebase');
     state.dispose();
   });
 
@@ -110,10 +110,10 @@ describe('RepoSettingsState', () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const state = new RepoSettingsState(bridge);
-    transport.onRequest = () => ({ ...defaultSnapshot(), 'kiraVersion.pull.strategy': 'merge' });
+    transport.onRequest = () => ({ ...defaultSnapshot(), 'kiraSpace.pull.strategy': 'merge' });
     state.setRepoId('/repos/a');
     await tick();
-    expect(state.settings.value['kiraVersion.pull.strategy']).toBe('merge');
+    expect(state.settings.value['kiraSpace.pull.strategy']).toBe('merge');
 
     state.setRepoId(undefined);
     expect(state.settings.value).toEqual(defaultSnapshot());
@@ -132,12 +132,12 @@ describe('RepoSettingsState', () => {
       expect(method).toBe('repoSettings.set');
       expect(params).toEqual({
         repoId: '/repos/a',
-        patch: { 'kiraVersion.graph.pageSize': 1000 },
+        patch: { 'kiraSpace.graph.pageSize': 1000 },
       });
-      return { ...defaultSnapshot(), 'kiraVersion.graph.pageSize': 1000 };
+      return { ...defaultSnapshot(), 'kiraSpace.graph.pageSize': 1000 };
     };
-    await state.set({ 'kiraVersion.graph.pageSize': 1000 });
-    expect(state.settings.value['kiraVersion.graph.pageSize']).toBe(1000);
+    await state.set({ 'kiraSpace.graph.pageSize': 1000 });
+    expect(state.settings.value['kiraSpace.graph.pageSize']).toBe(1000);
     state.dispose();
   });
 
@@ -148,23 +148,23 @@ describe('RepoSettingsState', () => {
     const transport = new FakeTransport();
     const bridge = new BridgeClient(transport);
     const state = new RepoSettingsState(bridge);
-    expect(state.settings.value['kiraVersion.github.enabled']).toBe(true);
+    expect(state.settings.value['kiraSpace.github.enabled']).toBe(true);
 
     transport.onRequest = () => defaultSnapshot();
     state.setRepoId('/repos/a');
     await tick();
-    expect(state.settings.value['kiraVersion.github.enabled']).toBe(true);
+    expect(state.settings.value['kiraSpace.github.enabled']).toBe(true);
 
     transport.onRequest = (method, params) => {
       expect(method).toBe('repoSettings.set');
       expect(params).toEqual({
         repoId: '/repos/a',
-        patch: { 'kiraVersion.github.enabled': false },
+        patch: { 'kiraSpace.github.enabled': false },
       });
-      return { ...defaultSnapshot(), 'kiraVersion.github.enabled': false };
+      return { ...defaultSnapshot(), 'kiraSpace.github.enabled': false };
     };
-    await state.set({ 'kiraVersion.github.enabled': false });
-    expect(state.settings.value['kiraVersion.github.enabled']).toBe(false);
+    await state.set({ 'kiraSpace.github.enabled': false });
+    expect(state.settings.value['kiraSpace.github.enabled']).toBe(false);
     state.dispose();
   });
 
@@ -177,26 +177,26 @@ describe('RepoSettingsState', () => {
     const state = new RepoSettingsState(bridge);
     transport.onRequest = () => ({
       ...defaultSnapshot(),
-      'kiraVersion.pull.strategy': 'rebase',
+      'kiraSpace.pull.strategy': 'rebase',
     });
     state.setRepoId('/repos/a');
     await tick();
-    expect(state.settings.value['kiraVersion.pull.strategy']).toBe('rebase');
+    expect(state.settings.value['kiraSpace.pull.strategy']).toBe('rebase');
 
     transport.emit('repoSettings.changed', {
       repoId: '/repos/b',
       settings: {
         ...defaultSnapshot(),
-        'kiraVersion.log.level': 'debug',
-        'kiraVersion.pull.strategy': 'merge',
+        'kiraSpace.log.level': 'debug',
+        'kiraSpace.pull.strategy': 'merge',
       },
     });
 
     // /repos/b's own write must NOT have touched /repos/a's state at all, log.level included.
-    expect(state.settings.value['kiraVersion.log.level']).toBe(
-      SETTINGS['kiraVersion.log.level'].default,
+    expect(state.settings.value['kiraSpace.log.level']).toBe(
+      SETTINGS['kiraSpace.log.level'].default,
     );
-    expect(state.settings.value['kiraVersion.pull.strategy']).toBe('rebase');
+    expect(state.settings.value['kiraSpace.pull.strategy']).toBe('rebase');
     state.dispose();
   });
 
@@ -210,10 +210,10 @@ describe('RepoSettingsState', () => {
 
     transport.emit('repoSettings.changed', {
       repoId: '/repos/a',
-      settings: { ...defaultSnapshot(), 'kiraVersion.graph.scope': 'head' },
+      settings: { ...defaultSnapshot(), 'kiraSpace.graph.scope': 'head' },
     });
 
-    expect(state.settings.value['kiraVersion.graph.scope']).toBe('head');
+    expect(state.settings.value['kiraSpace.graph.scope']).toBe('head');
     state.dispose();
   });
 });

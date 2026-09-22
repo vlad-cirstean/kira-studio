@@ -1,5 +1,5 @@
 /**
- * The `WebviewViewProvider` for `kiraVersion.graph` (P3 W10, §2.1). `retainContextWhenHidden`
+ * The `WebviewViewProvider` for `kiraSpace.graph` (P3 W10, §2.1). `retainContextWhenHidden`
  * is deliberately left off — W9's rehydration exists precisely so we do not pay for it — so
  * `resolveWebviewView` runs again on every hide/reveal and must rebuild the channel and the
  * `RpcServer` from scratch each time.
@@ -26,7 +26,7 @@ import { toWireConnectionState } from './connection.ts';
 import { renderHtml } from './html.ts';
 import { createWebviewChannel } from './transport.ts';
 
-const GRAPH_FOCUS_COMMAND = 'kiraVersion.graph.focus';
+const GRAPH_FOCUS_COMMAND = 'kiraSpace.graph.focus';
 
 export interface KiraGraphViewProviderDeps {
   readonly extensionUri: vscode.Uri;

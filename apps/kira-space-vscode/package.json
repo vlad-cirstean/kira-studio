@@ -37,371 +37,371 @@
     "viewsContainers": {
       "panel": [
         {
-          "id": "kiraVersion",
+          "id": "kiraSpace",
           "title": "Kira",
           "icon": "resources/icon.svg"
         }
       ],
       "activitybar": [
         {
-          "id": "kiraVersionReview",
-          "title": "Kira Version",
+          "id": "kiraSpaceReview",
+          "title": "Kira Space",
           "icon": "resources/review-icon.svg"
         }
       ]
     },
     "views": {
-      "kiraVersion": [
+      "kiraSpace": [
         {
-          "id": "kiraVersion.graph",
+          "id": "kiraSpace.graph",
           "name": "Graph",
           "type": "webview"
         }
       ],
-      "kiraVersionReview": [
+      "kiraSpaceReview": [
         {
-          "id": "kiraVersion.review",
-          "name": "Kira Version",
+          "id": "kiraSpace.review",
+          "name": "Kira Space",
           "type": "webview"
         }
       ]
     },
     "commands": [
       {
-        "command": "kiraVersion.showConnectionStatus",
+        "command": "kiraSpace.showConnectionStatus",
         "title": "Show Connection Status",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.openRepository",
+        "command": "kiraSpace.openRepository",
         "title": "Open Repository",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.focusGraph",
+        "command": "kiraSpace.focusGraph",
         "title": "Open Kira",
-        "category": "Kira Version",
+        "category": "Kira Space",
         "icon": "$(git-branch)"
       },
       {
-        "command": "kiraVersion.reviewBranch",
+        "command": "kiraSpace.reviewBranch",
         "title": "Review Branch Changes",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.refresh",
+        "command": "kiraSpace.refresh",
         "title": "Refresh",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.toggleFileReviewed",
+        "command": "kiraSpace.toggleFileReviewed",
         "title": "Toggle File Reviewed",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.addReviewComment",
+        "command": "kiraSpace.addReviewComment",
         "title": "Add Review Comment",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.copyReviewComments",
+        "command": "kiraSpace.copyReviewComments",
         "title": "Copy Review Comments",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.submitReviewComment",
+        "command": "kiraSpace.submitReviewComment",
         "title": "Submit Review Comment",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.deleteReviewComment",
+        "command": "kiraSpace.deleteReviewComment",
         "title": "Delete Review Comment",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.goToFileFromDiff",
+        "command": "kiraSpace.goToFileFromDiff",
         "title": "Go to File",
-        "category": "Kira Version",
+        "category": "Kira Space",
         "icon": "$(go-to-file)"
       },
       {
-        "command": "kiraVersion.openCommitInGraph",
+        "command": "kiraSpace.openCommitInGraph",
         "title": "Open Commit in Graph",
-        "category": "Kira Version",
+        "category": "Kira Space",
         "icon": "$(git-commit)"
       },
       {
-        "command": "kiraVersion.markSelectionReviewed",
+        "command": "kiraSpace.markSelectionReviewed",
         "title": "Mark Selection Reviewed",
-        "category": "Kira Version",
+        "category": "Kira Space",
         "icon": "$(check)"
       },
       {
-        "command": "kiraVersion.markSelectionUnreviewed",
+        "command": "kiraSpace.markSelectionUnreviewed",
         "title": "Mark Selection Unreviewed",
-        "category": "Kira Version",
+        "category": "Kira Space",
         "icon": "$(circle-slash)"
       },
       {
-        "command": "kiraVersion.checkout",
+        "command": "kiraSpace.checkout",
         "title": "Checkout…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.createBranch",
+        "command": "kiraSpace.createBranch",
         "title": "Create Branch…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.deleteBranch",
+        "command": "kiraSpace.deleteBranch",
         "title": "Delete Branch…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.renameBranch",
+        "command": "kiraSpace.renameBranch",
         "title": "Rename Branch…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.createTag",
+        "command": "kiraSpace.createTag",
         "title": "Create Tag…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.deleteTag",
+        "command": "kiraSpace.deleteTag",
         "title": "Delete Tag…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.deleteRemoteBranch",
+        "command": "kiraSpace.deleteRemoteBranch",
         "title": "Delete Remote Branch…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.revertCommit",
+        "command": "kiraSpace.revertCommit",
         "title": "Revert Commit…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.continueOperation",
+        "command": "kiraSpace.continueOperation",
         "title": "Continue Operation",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.abortOperation",
+        "command": "kiraSpace.abortOperation",
         "title": "Abort Operation",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.skipCommit",
+        "command": "kiraSpace.skipCommit",
         "title": "Skip Commit",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.undo",
+        "command": "kiraSpace.undo",
         "title": "Undo Last Operation",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.fetch",
+        "command": "kiraSpace.fetch",
         "title": "Fetch",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.pull",
+        "command": "kiraSpace.pull",
         "title": "Pull",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.push",
+        "command": "kiraSpace.push",
         "title": "Push",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.forcePush",
+        "command": "kiraSpace.forcePush",
         "title": "Force Push…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.cancelRemoteOperation",
+        "command": "kiraSpace.cancelRemoteOperation",
         "title": "Cancel Remote Operation",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.stashChanges",
+        "command": "kiraSpace.stashChanges",
         "title": "Stash Changes…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.applyStash",
+        "command": "kiraSpace.applyStash",
         "title": "Apply Stash…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.popStash",
+        "command": "kiraSpace.popStash",
         "title": "Pop Stash…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.dropStash",
+        "command": "kiraSpace.dropStash",
         "title": "Drop Stash…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.createBranchFromStash",
+        "command": "kiraSpace.createBranchFromStash",
         "title": "Create Branch from Stash…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.resetToCommit",
+        "command": "kiraSpace.resetToCommit",
         "title": "Reset to Commit…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.cherryPickCommit",
+        "command": "kiraSpace.cherryPickCommit",
         "title": "Cherry-pick Commit…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.createWorktree",
+        "command": "kiraSpace.createWorktree",
         "title": "Create Worktree…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.removeWorktree",
+        "command": "kiraSpace.removeWorktree",
         "title": "Remove Worktree…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.setStackParent",
+        "command": "kiraSpace.setStackParent",
         "title": "Set Stack Parent…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.restackStack",
+        "command": "kiraSpace.restackStack",
         "title": "Restack this Stack…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.goToStackParent",
+        "command": "kiraSpace.goToStackParent",
         "title": "Go to Parent Branch",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.goToStackChild",
+        "command": "kiraSpace.goToStackChild",
         "title": "Go to Child Branch",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.saveGlobalStash",
+        "command": "kiraSpace.saveGlobalStash",
         "title": "Save to Global Stash…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.removeGlobalStash",
+        "command": "kiraSpace.removeGlobalStash",
         "title": "Remove from Global Stash…",
-        "category": "Kira Version"
+        "category": "Kira Space"
       },
       {
-        "command": "kiraVersion.toggleSearch",
+        "command": "kiraSpace.toggleSearch",
         "title": "Toggle Search",
-        "category": "Kira Version"
+        "category": "Kira Space"
       }
     ],
     "menus": {
       "scm/title": [
         {
-          "command": "kiraVersion.focusGraph",
+          "command": "kiraSpace.focusGraph",
           "group": "navigation"
         }
       ],
       "editor/title": [
         {
-          "command": "kiraVersion.goToFileFromDiff",
+          "command": "kiraSpace.goToFileFromDiff",
           "group": "navigation@-99",
-          "when": "isInDiffEditor && resourceScheme == kira-version"
+          "when": "isInDiffEditor && resourceScheme == kira-space"
         },
         {
-          "command": "kiraVersion.openCommitInGraph",
+          "command": "kiraSpace.openCommitInGraph",
           "group": "navigation@-98",
-          "when": "isInDiffEditor && resourceScheme == kira-version"
+          "when": "isInDiffEditor && resourceScheme == kira-space"
         },
         {
-          "command": "kiraVersion.markSelectionReviewed",
+          "command": "kiraSpace.markSelectionReviewed",
           "group": "navigation@-97",
-          "when": "isInDiffEditor && kiraVersion.inReviewDiff && kiraVersion.reviewSelection != full"
+          "when": "isInDiffEditor && kiraSpace.inReviewDiff && kiraSpace.reviewSelection != full"
         },
         {
-          "command": "kiraVersion.markSelectionUnreviewed",
+          "command": "kiraSpace.markSelectionUnreviewed",
           "group": "navigation@-97",
-          "when": "isInDiffEditor && kiraVersion.inReviewDiff && kiraVersion.reviewSelection == full"
+          "when": "isInDiffEditor && kiraSpace.inReviewDiff && kiraSpace.reviewSelection == full"
         }
       ],
       "editor/context": [
         {
-          "command": "kiraVersion.markSelectionReviewed",
-          "group": "kiraVersion@1",
-          "when": "kiraVersion.inReviewDiff"
+          "command": "kiraSpace.markSelectionReviewed",
+          "group": "kiraSpace@1",
+          "when": "kiraSpace.inReviewDiff"
         },
         {
-          "command": "kiraVersion.markSelectionUnreviewed",
-          "group": "kiraVersion@1",
-          "when": "kiraVersion.inReviewDiff"
+          "command": "kiraSpace.markSelectionUnreviewed",
+          "group": "kiraSpace@1",
+          "when": "kiraSpace.inReviewDiff"
         }
       ],
       "comments/commentThread/context": [
         {
-          "command": "kiraVersion.submitReviewComment",
+          "command": "kiraSpace.submitReviewComment",
           "group": "inline",
-          "when": "commentController == kiraVersion.reviewComments"
+          "when": "commentController == kiraSpace.reviewComments"
         }
       ],
       "comments/comment/title": [
         {
-          "command": "kiraVersion.deleteReviewComment",
+          "command": "kiraSpace.deleteReviewComment",
           "group": "inline",
-          "when": "commentController == kiraVersion.reviewComments"
+          "when": "commentController == kiraSpace.reviewComments"
         }
       ],
       "commandPalette": [
         {
-          "command": "kiraVersion.submitReviewComment",
+          "command": "kiraSpace.submitReviewComment",
           "when": "false"
         },
         {
-          "command": "kiraVersion.deleteReviewComment",
+          "command": "kiraSpace.deleteReviewComment",
           "when": "false"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "kiraVersion.goToStackParent",
+        "command": "kiraSpace.goToStackParent",
         "key": "alt+up",
-        "when": "focusedView == 'kiraVersion.graph'"
+        "when": "focusedView == 'kiraSpace.graph'"
       },
       {
-        "command": "kiraVersion.goToStackChild",
+        "command": "kiraSpace.goToStackChild",
         "key": "alt+down",
-        "when": "focusedView == 'kiraVersion.graph'"
+        "when": "focusedView == 'kiraSpace.graph'"
       },
       {
-        "command": "kiraVersion.toggleSearch",
+        "command": "kiraSpace.toggleSearch",
         "key": "ctrl+alt+f",
         "mac": "cmd+alt+f",
-        "when": "focusedView == 'kiraVersion.graph'"
+        "when": "focusedView == 'kiraSpace.graph'"
       },
       {
-        "command": "kiraVersion.toggleSearch",
+        "command": "kiraSpace.toggleSearch",
         "key": "ctrl+f",
         "mac": "cmd+f",
-        "when": "focusedView == 'kiraVersion.graph'"
+        "when": "focusedView == 'kiraSpace.graph'"
       }
     ],
     "colors": [
       {
-        "id": "kiraVersion.graphLane0",
-        "description": "Kira Version: commit graph lane colour 0.",
+        "id": "kiraSpace.graphLane0",
+        "description": "Kira Space: commit graph lane colour 0.",
         "defaults": {
           "dark": "#096db3",
           "light": "#1b99f3",
@@ -410,8 +410,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane1",
-        "description": "Kira Version: commit graph lane colour 1.",
+        "id": "kiraSpace.graphLane1",
+        "description": "Kira Space: commit graph lane colour 1.",
         "defaults": {
           "dark": "#c2380a",
           "light": "#f56738",
@@ -420,8 +420,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane2",
-        "description": "Kira Version: commit graph lane colour 2.",
+        "id": "kiraSpace.graphLane2",
+        "description": "Kira Space: commit graph lane colour 2.",
         "defaults": {
           "dark": "#3196dd",
           "light": "#1d72af",
@@ -430,8 +430,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane3",
-        "description": "Kira Version: commit graph lane colour 3.",
+        "id": "kiraSpace.graphLane3",
+        "description": "Kira Space: commit graph lane colour 3.",
         "defaults": {
           "dark": "#e16d47",
           "light": "#bd461f",
@@ -440,8 +440,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane4",
-        "description": "Kira Version: commit graph lane colour 4.",
+        "id": "kiraSpace.graphLane4",
+        "description": "Kira Space: commit graph lane colour 4.",
         "defaults": {
           "dark": "#7fb2d7",
           "light": "#285b80",
@@ -450,8 +450,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane5",
-        "description": "Kira Version: commit graph lane colour 5.",
+        "id": "kiraSpace.graphLane5",
+        "description": "Kira Space: commit graph lane colour 5.",
         "defaults": {
           "dark": "#da9f8b",
           "light": "#88422b",
@@ -460,8 +460,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane6",
-        "description": "Kira Version: commit graph lane colour 6.",
+        "id": "kiraSpace.graphLane6",
+        "description": "Kira Space: commit graph lane colour 6.",
         "defaults": {
           "dark": "#aec5d5",
           "light": "#2f495b",
@@ -470,8 +470,8 @@
         }
       },
       {
-        "id": "kiraVersion.graphLane7",
-        "description": "Kira Version: commit graph lane colour 7.",
+        "id": "kiraSpace.graphLane7",
+        "description": "Kira Space: commit graph lane colour 7.",
         "defaults": {
           "dark": "#d9beb5",
           "light": "#623e32",
@@ -480,8 +480,8 @@
         }
       },
       {
-        "id": "kiraVersion.reviewedLineBackground",
-        "description": "Kira Version: whole-line tint for a range/hunk already marked reviewed, in the modified pane of a branch review diff (G15).",
+        "id": "kiraSpace.reviewedLineBackground",
+        "description": "Kira Space: whole-line tint for a range/hunk already marked reviewed, in the modified pane of a branch review diff (G15).",
         "defaults": {
           "dark": "rgba(46,160,67,0.15)",
           "light": "rgba(31,136,61,0.10)",
@@ -490,8 +490,8 @@
         }
       },
       {
-        "id": "kiraVersion.reviewedLineOverviewRuler",
-        "description": "Kira Version: overview ruler mark for a range/hunk already marked reviewed (G15) — the only surface that answers \"how much of this file have I read\" without scrolling.",
+        "id": "kiraSpace.reviewedLineOverviewRuler",
+        "description": "Kira Space: overview ruler mark for a range/hunk already marked reviewed (G15) — the only surface that answers \"how much of this file have I read\" without scrolling.",
         "defaults": {
           "dark": "rgba(46,160,67,0.8)",
           "light": "rgba(31,136,61,0.8)",

@@ -32,7 +32,7 @@ const props = defineProps<{
   ops: OpsState;
   /** Toggled by `AppToolbar.vue`'s "Stash" button, via `App.vue`. */
   createOpen: boolean;
-  /** `kiraVersion.stash.includeUntracked`'s current value — the create form's own default,
+  /** `kiraSpace.stash.includeUntracked`'s current value — the create form's own default,
    *  re-read fresh every time the dialog opens (a setting change mid-session should be seen the
    *  next time this opens, not only after a reload). */
   includeUntrackedDefault: boolean;

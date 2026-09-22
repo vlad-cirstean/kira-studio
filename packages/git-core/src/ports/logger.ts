@@ -1,6 +1,6 @@
 /**
  * Leveled logging to an output channel — VS Code's `window.createOutputChannel` today. `"off"`
- * is a setting value (`kiraVersion.log.level`), never a level a caller logs *at* — hence
+ * is a setting value (`kiraSpace.log.level`), never a level a caller logs *at* — hence
  * `Exclude<LogLevel, "off">` on `log()`.
  */
 export type LogLevel = 'off' | 'error' | 'warn' | 'info' | 'debug';

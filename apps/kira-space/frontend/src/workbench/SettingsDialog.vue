@@ -26,7 +26,7 @@ import { type Section, sections, useSettingsStore } from '../state/settings';
 // of which this app has a feature for), Git (server-owned remote-op settings, moved here wholesale
 // from Studio along with the repo workspace it configures), Connected editors (state/gitClients.ts,
 // also moved here wholesale) and Advanced (trimmed to the one leaf this app still owns,
-// advanced.gitLogLevel — kira-version's own diagnostic log verbosity).
+// advanced.gitLogLevel — kira-space's own diagnostic log verbosity).
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -182,7 +182,7 @@ function onGraphFontSizeInput(e: Event): void {
   draft.git.graphFontSize = raw === '' ? 0 : Number(raw);
 }
 
-// P72 §9.2: kira-version's own diagnostic log verbosity — genuinely installation-wide.
+// P72 §9.2: kira-space's own diagnostic log verbosity — genuinely installation-wide.
 function onGitLogLevelChange(e: Event): void {
   draft.advanced.gitLogLevel = (e.target as HTMLSelectElement)
     .value as Settings['advanced']['gitLogLevel'];

@@ -10,7 +10,7 @@
  *   `RevertDialog.vue`'s mainline picker re-runs `previewRevertMainline` — this dialog never lets
  *   `runWorktreeAdd` spawn against a blocked combination the user can already see is blocked.
  * - **prepare** — shown automatically right after a successful create, IFF `prepareScript` (this
- *   repository's own stored `kiraVersion.worktree.prepareScript`) is non-empty. The full script
+ *   repository's own stored `kiraSpace.worktree.prepareScript`) is non-empty. The full script
  *   text is always shown here before it can run (D11's own "never runs anything the user has not
  *   seen"). The server's own approval record is a security-critical implementation detail this
  *   dialog structurally cannot read (D11/F15: the sha is server-only, absent from every wire
@@ -39,14 +39,14 @@ const props = defineProps<{
    *  opens the create phase and re-seeds it; `undefined` closes it. Watched by reference rather
    *  than a boolean so a second row action re-seeds even while the dialog is already open. */
   createRequest: WorktreeCreateSeed | undefined;
-  /** `kiraVersion.worktree.basePath`'s current value — pre-fills the path field's own directory
+  /** `kiraSpace.worktree.basePath`'s current value — pre-fills the path field's own directory
    *  (D10); pure UX, never validated as an existing directory. */
   basePathDefault: string;
-  /** This repository's own stored `kiraVersion.worktree.prepareScript` — "" means the feature is
+  /** This repository's own stored `kiraSpace.worktree.prepareScript` — "" means the feature is
    *  off, and the prepare phase is skipped entirely after a successful create. */
   prepareScript: string;
   /** `capabilities.runPrepareScript` (D14) — false for VS Code's own workspace-trust gate, or
-   *  because a host (Kira Studio's native window) refuses running arbitrary scripts outright.
+   *  because a host (Kira Space's native window) refuses running arbitrary scripts outright.
    *  When false, the prepare phase still shows the script (transparency costs nothing) but offers
    *  no way to run it — the message below stays host-neutral rather than naming either reason. */
   runPrepareScriptCapability: boolean;

@@ -44,14 +44,14 @@
      scripts/gen-lane-palette.ts (P4 W1); the literal fallback below is the "dark" kind's
      colour (see that script's own doc comment for why only one kind's literal is possible). */
   /* kv-lane-tokens:start (scripts/gen-lane-palette.ts) — do not hand-edit */
-  --kv-graph-lane-0: var(--vscode-kiraVersion-graphLane0, #096db3);
-  --kv-graph-lane-1: var(--vscode-kiraVersion-graphLane1, #c2380a);
-  --kv-graph-lane-2: var(--vscode-kiraVersion-graphLane2, #3196dd);
-  --kv-graph-lane-3: var(--vscode-kiraVersion-graphLane3, #e16d47);
-  --kv-graph-lane-4: var(--vscode-kiraVersion-graphLane4, #7fb2d7);
-  --kv-graph-lane-5: var(--vscode-kiraVersion-graphLane5, #da9f8b);
-  --kv-graph-lane-6: var(--vscode-kiraVersion-graphLane6, #aec5d5);
-  --kv-graph-lane-7: var(--vscode-kiraVersion-graphLane7, #d9beb5);
+  --kv-graph-lane-0: var(--vscode-kiraSpace-graphLane0, #096db3);
+  --kv-graph-lane-1: var(--vscode-kiraSpace-graphLane1, #c2380a);
+  --kv-graph-lane-2: var(--vscode-kiraSpace-graphLane2, #3196dd);
+  --kv-graph-lane-3: var(--vscode-kiraSpace-graphLane3, #e16d47);
+  --kv-graph-lane-4: var(--vscode-kiraSpace-graphLane4, #7fb2d7);
+  --kv-graph-lane-5: var(--vscode-kiraSpace-graphLane5, #da9f8b);
+  --kv-graph-lane-6: var(--vscode-kiraSpace-graphLane6, #aec5d5);
+  --kv-graph-lane-7: var(--vscode-kiraSpace-graphLane7, #d9beb5);
   /* kv-lane-tokens:end */
 
   /* Badges. --kv-badge-local-bg's fallback is a self-contained fill (white text of its own,

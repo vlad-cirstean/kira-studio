@@ -1,5 +1,5 @@
 /**
- * G19 D9 (item 9): a `vscode.FileDecorationProvider` for the `kira-version:` scheme (F9 —
+ * G19 D9 (item 9): a `vscode.FileDecorationProvider` for the `kira-space:` scheme (F9 —
  * previously none existed at all, `grep registerFileDecorationProvider` returned zero hits).
  * Badges a virtual document — a historical revision of a tracked file, opened read-only through
  * `ports/editorIntegration.ts`'s own `registerVirtualDocuments` — with a lock icon only when the

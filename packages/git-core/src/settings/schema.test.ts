@@ -32,100 +32,96 @@ describe('coerceSettings', () => {
 
   test('accepts a valid value for every type: ranged number, enum, and stringArray', () => {
     const result = coerceSettings({
-      'kiraVersion.graph.pageSize': 1000,
-      'kiraVersion.graph.scope': 'head',
-      'kiraVersion.review.baseCandidates': ['trunk', 'develop'],
+      'kiraSpace.graph.pageSize': 1000,
+      'kiraSpace.graph.scope': 'head',
+      'kiraSpace.review.baseCandidates': ['trunk', 'develop'],
     });
     expect(result.problems).toEqual([]);
-    expect(result.settings['kiraVersion.graph.pageSize']).toBe(1000);
-    expect(result.settings['kiraVersion.graph.scope']).toBe('head');
-    expect(result.settings['kiraVersion.review.baseCandidates']).toEqual(['trunk', 'develop']);
+    expect(result.settings['kiraSpace.graph.pageSize']).toBe(1000);
+    expect(result.settings['kiraSpace.graph.scope']).toBe('head');
+    expect(result.settings['kiraSpace.review.baseCandidates']).toEqual(['trunk', 'develop']);
   });
 
-  // G18 D10/D15: kiraVersion.git.path is no longer a SETTINGS key at all (it moved to kira.db's
+  // G18 D10/D15: kiraSpace.git.path is no longer a SETTINGS key at all (it moved to kira.db's
   // existing server-owned `settings` table) — a raw client that still sends it is treated exactly
   // like any other stranger, not specially.
-  test('kiraVersion.git.path is an unknown key, not a settable string (G18 D15)', () => {
-    const result = coerceSettings({ 'kiraVersion.git.path': '/usr/bin/git' });
-    expect(result.problems).toEqual([{ key: 'kiraVersion.git.path', reason: 'unknown key' }]);
+  test('kiraSpace.git.path is an unknown key, not a settable string (G18 D15)', () => {
+    const result = coerceSettings({ 'kiraSpace.git.path': '/usr/bin/git' });
+    expect(result.problems).toEqual([{ key: 'kiraSpace.git.path', reason: 'unknown key' }]);
   });
 
   test('stringArray: a non-array value falls back to the default and is reported', () => {
-    const result = coerceSettings({ 'kiraVersion.review.baseCandidates': 'main' });
-    expect(result.settings['kiraVersion.review.baseCandidates']).toEqual(
-      SETTINGS['kiraVersion.review.baseCandidates'].default,
+    const result = coerceSettings({ 'kiraSpace.review.baseCandidates': 'main' });
+    expect(result.settings['kiraSpace.review.baseCandidates']).toEqual(
+      SETTINGS['kiraSpace.review.baseCandidates'].default,
     );
     expect(result.problems).toEqual([
-      { key: 'kiraVersion.review.baseCandidates', reason: 'wrong type' },
+      { key: 'kiraSpace.review.baseCandidates', reason: 'wrong type' },
     ]);
   });
 
   test('stringArray: one non-string member rejects the WHOLE array, never partly', () => {
     const result = coerceSettings({
-      'kiraVersion.review.baseCandidates': ['main', 42, 'master'],
+      'kiraSpace.review.baseCandidates': ['main', 42, 'master'],
     });
-    expect(result.settings['kiraVersion.review.baseCandidates']).toEqual(
-      SETTINGS['kiraVersion.review.baseCandidates'].default,
+    expect(result.settings['kiraSpace.review.baseCandidates']).toEqual(
+      SETTINGS['kiraSpace.review.baseCandidates'].default,
     );
     expect(result.problems).toEqual([
-      { key: 'kiraVersion.review.baseCandidates', reason: 'wrong type' },
+      { key: 'kiraSpace.review.baseCandidates', reason: 'wrong type' },
     ]);
   });
 
   test('stringArray: an empty array is a valid value, not an error', () => {
-    const result = coerceSettings({ 'kiraVersion.review.baseCandidates': [] });
-    expect(result.settings['kiraVersion.review.baseCandidates']).toEqual([]);
+    const result = coerceSettings({ 'kiraSpace.review.baseCandidates': [] });
+    expect(result.settings['kiraSpace.review.baseCandidates']).toEqual([]);
     expect(result.problems).toEqual([]);
   });
 
   test('a wrong type falls back to the default and is reported', () => {
-    const result = coerceSettings({ 'kiraVersion.graph.pageSize': 'lots' });
-    expect(result.settings['kiraVersion.graph.pageSize']).toBe(
-      SETTINGS['kiraVersion.graph.pageSize'].default,
+    const result = coerceSettings({ 'kiraSpace.graph.pageSize': 'lots' });
+    expect(result.settings['kiraSpace.graph.pageSize']).toBe(
+      SETTINGS['kiraSpace.graph.pageSize'].default,
     );
-    expect(result.problems).toEqual([{ key: 'kiraVersion.graph.pageSize', reason: 'wrong type' }]);
+    expect(result.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'wrong type' }]);
   });
 
   test('an out-of-range number falls back to the default and is reported', () => {
-    const tooLow = coerceSettings({ 'kiraVersion.graph.pageSize': 1 });
-    expect(tooLow.settings['kiraVersion.graph.pageSize']).toBe(
-      SETTINGS['kiraVersion.graph.pageSize'].default,
+    const tooLow = coerceSettings({ 'kiraSpace.graph.pageSize': 1 });
+    expect(tooLow.settings['kiraSpace.graph.pageSize']).toBe(
+      SETTINGS['kiraSpace.graph.pageSize'].default,
     );
-    expect(tooLow.problems).toEqual([
-      { key: 'kiraVersion.graph.pageSize', reason: 'out of range' },
-    ]);
+    expect(tooLow.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'out of range' }]);
 
-    const tooHigh = coerceSettings({ 'kiraVersion.graph.pageSize': 1_000_000 });
-    expect(tooHigh.problems).toEqual([
-      { key: 'kiraVersion.graph.pageSize', reason: 'out of range' },
-    ]);
+    const tooHigh = coerceSettings({ 'kiraSpace.graph.pageSize': 1_000_000 });
+    expect(tooHigh.problems).toEqual([{ key: 'kiraSpace.graph.pageSize', reason: 'out of range' }]);
   });
 
   test('an unknown enum member falls back to the default and is reported', () => {
-    const result = coerceSettings({ 'kiraVersion.graph.scope': 'everything' });
-    expect(result.settings['kiraVersion.graph.scope']).toBe(
-      SETTINGS['kiraVersion.graph.scope'].default,
+    const result = coerceSettings({ 'kiraSpace.graph.scope': 'everything' });
+    expect(result.settings['kiraSpace.graph.scope']).toBe(
+      SETTINGS['kiraSpace.graph.scope'].default,
     );
     expect(result.problems).toEqual([
-      { key: 'kiraVersion.graph.scope', reason: 'unknown enum member' },
+      { key: 'kiraSpace.graph.scope', reason: 'unknown enum member' },
     ]);
   });
 
   test('an unknown key falls back to defaults for everything and is reported, without touching known keys', () => {
     const result = coerceSettings({
-      'kiraVersion.nonsense': true,
-      'kiraVersion.log.level': 'debug',
+      'kiraSpace.nonsense': true,
+      'kiraSpace.log.level': 'debug',
     });
-    expect(result.settings).toEqual({ ...defaultSettings(), 'kiraVersion.log.level': 'debug' });
-    expect(result.problems).toEqual([{ key: 'kiraVersion.nonsense', reason: 'unknown key' }]);
+    expect(result.settings).toEqual({ ...defaultSettings(), 'kiraSpace.log.level': 'debug' });
+    expect(result.problems).toEqual([{ key: 'kiraSpace.nonsense', reason: 'unknown key' }]);
   });
 
   test('never throws on a hostile input shape', () => {
     expect(() =>
       coerceSettings({
-        'kiraVersion.git.path': 42,
-        'kiraVersion.graph.pageSize': null,
-        'kiraVersion.log.level': {},
+        'kiraSpace.git.path': 42,
+        'kiraSpace.graph.pageSize': null,
+        'kiraSpace.log.level': {},
       }),
     ).not.toThrow();
   });
@@ -149,26 +145,26 @@ describe('toVsCodeConfiguration', () => {
     expect(properties['workbench.tree.indent']).toBeUndefined();
   });
 
-  test('does not expose a source: "repo" key, e.g. kiraVersion.graph.pageSize (G18)', () => {
+  test('does not expose a source: "repo" key, e.g. kiraSpace.graph.pageSize (G18)', () => {
     const { properties } = toVsCodeConfiguration();
-    expect(properties['kiraVersion.graph.pageSize']).toBeUndefined();
+    expect(properties['kiraSpace.graph.pageSize']).toBeUndefined();
   });
 });
 
 describe('repoSettingKeys', () => {
   test('returns exactly the eleven source: "repo" keys, G18 D1/G24 D16/G25 D10/G28 D16', () => {
     const expected: SettingKey[] = [
-      'kiraVersion.checkout.autoStash',
-      'kiraVersion.github.enabled',
-      'kiraVersion.graph.pageSize',
-      'kiraVersion.graph.scope',
-      'kiraVersion.log.level',
-      'kiraVersion.pull.strategy',
-      'kiraVersion.review.baseCandidates',
-      'kiraVersion.stash.includeUntracked',
-      'kiraVersion.stash.showInGraph',
-      'kiraVersion.worktree.basePath',
-      'kiraVersion.worktree.prepareScript',
+      'kiraSpace.checkout.autoStash',
+      'kiraSpace.github.enabled',
+      'kiraSpace.graph.pageSize',
+      'kiraSpace.graph.scope',
+      'kiraSpace.log.level',
+      'kiraSpace.pull.strategy',
+      'kiraSpace.review.baseCandidates',
+      'kiraSpace.stash.includeUntracked',
+      'kiraSpace.stash.showInGraph',
+      'kiraSpace.worktree.basePath',
+      'kiraSpace.worktree.prepareScript',
     ];
     expect([...repoSettingKeys()].sort()).toEqual(expected.sort());
   });

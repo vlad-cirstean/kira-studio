@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * G-UX (item 13): "if app is off, show this in the panels as well" — before this, a dropped
- * connection to Kira Studio was visible only in the extension's own status bar
+ * connection to Kira Space was visible only in the extension's own status bar
  * (`extension.ts`'s `updateStatusBar`, the sole consumer of `ConnectionManager.onStateChange`); a
  * panel that was already open kept rendering its last-known data with nothing telling the user it
  * had gone stale. `BridgeClient.hostConnection` is the live signal this reads — seeded from the
@@ -66,14 +66,14 @@ const visible = computed(() => {
   return true;
 });
 
-/** Reuses `App.vue`'s own established "Kira Studio isn't reachable — …" wording (its `bootError`
+/** Reuses `App.vue`'s own established "Kira Space isn't reachable — …" wording (its `bootError`
  *  banners) for `connecting`/`denied`/`versionMismatch` — the three states this class's own
  *  `ConnectionState` shares the same underlying fact with (no live socket). `pairing` gets its
  *  own wording (`updateStatusBar`'s own "Waiting for approval…" text) since it is not a failure at
  *  all, just a step the user has not finished yet. */
 const title = computed(() => {
-  if (props.state?.kind === 'pairing') return "Waiting for approval in Kira Studio's window";
-  return "Kira Studio isn't reachable";
+  if (props.state?.kind === 'pairing') return "Waiting for approval in Kira Space's window";
+  return "Kira Space isn't reachable";
 });
 
 const detail = computed(() => props.state?.detail);

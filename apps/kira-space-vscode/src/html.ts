@@ -75,7 +75,7 @@ export interface RenderHtmlOptions {
   } | null;
   /** G-UX (item 13): the connection state as of THIS resolve — both `panelView.ts` and
    *  `reviewView.ts` read `ConnectionManager.state` fresh (via `connection.ts`'s own
-   *  `toWireConnectionState`) right before calling this, so a panel opened while Kira Studio is
+   *  `toWireConnectionState`) right before calling this, so a panel opened while Kira Space is
    *  already unreachable shows the banner immediately instead of only on the next live
    *  `connection.changed` push (`retainContextWhenHidden` is off — an `emit` sent before this
    *  webview has booted is simply dropped, the same cold-boot race `pendingUiAction` above already

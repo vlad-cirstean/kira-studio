@@ -29,7 +29,8 @@ type AdvancedSettings struct {
 	// EXPENSIVE_QUERY_ROWS_RANGE comment carries the full argument.
 	ExpensiveQueryRows int `json:"expensiveQueryRows"`
 	// GitLogLevel is P72 §9.2's genuinely app-wide replacement for the per-repo
-	// kiraVersion.log.level — internal/logging.SetLevel is its actual mechanism.
+	// kiraSpace.log.level (renamed from kiraVersion.log.level, P100 Part 3) —
+	// internal/logging.SetLevel is its actual mechanism.
 	GitLogLevel string `json:"gitLogLevel"`
 }
 
@@ -236,7 +237,8 @@ func ValidPageSize(v int) bool {
 	}
 }
 
-// ValidLogLevel mirrors schema.ts's kiraVersion.log.level enum. P100 Part 1: kept here rather than
+// ValidLogLevel mirrors schema.ts's kiraSpace.log.level enum (kiraVersion.log.level before P100
+// Part 3's rename). P100 Part 1: kept here rather than
 // deleted with the rest of internal/storage/model/gitreposettings.go — advanced.gitLogLevel (the
 // only remaining caller) stays on model.Settings, see this app's own bridge/settings.go comment.
 func ValidLogLevel(v string) bool {

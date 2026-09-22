@@ -18,7 +18,7 @@ import { assert } from '../util/assert.ts';
 export type HostKind = 'vscode' | 'harness';
 
 /** `docs/plans/P7.md` W7/D43: `"stringArray"` is the first array-valued setting type — added for
- *  `kiraVersion.review.baseCandidates` (§6.8) exclusively; nothing else in the schema needs it
+ *  `kiraSpace.review.baseCandidates` (§6.8) exclusively; nothing else in the schema needs it
  *  yet. */
 export type SettingType = 'string' | 'number' | 'boolean' | 'enum' | 'stringArray';
 
@@ -43,7 +43,7 @@ export interface SettingDef<T> {
 }
 
 export const SETTINGS = {
-  // G18 D1/D15: kiraVersion.git.path used to live here — it is server-owned (unchanged verdict)
+  // G18 D1/D15: kiraSpace.git.path used to live here — it is server-owned (unchanged verdict)
   // but its wiring was dead until this phase fixed it (Discovery.Status(ctx, "") hardcoded at
   // every call site). Its fixed home is kira.db's existing `settings` table, surfaced in Kira
   // Studio's own "Git" settings section — not this schema, and not the new per-repo dialog either
@@ -54,9 +54,9 @@ export const SETTINGS = {
   // G18 D1/D10: the keys below all moved from VS Code settings.json into a new per-repo
   // table (storage/repos.GitRepoSettingsRepo), edited from git-ui's own RepoSettingsDialog —
   // `source: 'repo'` is what drops each out of `contributes.configuration` (toVsCodeConfiguration
-  // below). P72 §9.2: `kiraVersion.log.level` used to be the one exception among these — not
+  // below). P72 §9.2: `kiraSpace.log.level` used to be the one exception among these — not
   // actually a per-repo fact (`instanceWide: true`, D14) even though it lived in the same table
-  // and dialog. That special case is now deleted rather than generalised: Kira Studio gets its own
+  // and dialog. That special case is now deleted rather than generalised: Kira Space gets its own
   // independent, genuinely app-wide `advanced.gitLogLevel` control instead, and this key goes back
   // to being an ordinary, honestly-per-repo leaf — still the only surface VS Code itself has to
   // set it (RepoSettingsDialog.vue's Diagnostics section, shown only under that host).
@@ -64,8 +64,8 @@ export const SETTINGS = {
   // this repository at all — genuinely per-repo (unlike log.level), default true. Off means no
   // `gh` probe, no spawn, no cache fill, no badge: both commit.resolvePr/branch.resolvePr answer
   // {kind:'disabled'} outright.
-  'kiraVersion.github.enabled': {
-    key: 'kiraVersion.github.enabled',
+  'kiraSpace.github.enabled': {
+    key: 'kiraSpace.github.enabled',
     type: 'boolean',
     default: true,
     description:
@@ -73,8 +73,8 @@ export const SETTINGS = {
       'installed and authenticated). Off disables every gh probe, spawn and badge for this repo.',
     source: 'repo',
   },
-  'kiraVersion.graph.pageSize': {
-    key: 'kiraVersion.graph.pageSize',
+  'kiraSpace.graph.pageSize': {
+    key: 'kiraSpace.graph.pageSize',
     type: 'number',
     default: 5000,
     description: 'How many commits a single Load more page fetches.',
@@ -82,24 +82,24 @@ export const SETTINGS = {
     maximum: 50000,
     source: 'repo',
   },
-  'kiraVersion.graph.scope': {
-    key: 'kiraVersion.graph.scope',
+  'kiraSpace.graph.scope': {
+    key: 'kiraSpace.graph.scope',
     type: 'enum',
     default: 'all',
     description: 'Whether the graph shows every ref ("all") or only the current HEAD\'s ancestry.',
     enum: ['all', 'head'],
     source: 'repo',
   },
-  'kiraVersion.log.level': {
-    key: 'kiraVersion.log.level',
+  'kiraSpace.log.level': {
+    key: 'kiraSpace.log.level',
     type: 'enum',
     default: 'info',
-    description: "Verbosity of kira-version's own diagnostic log.",
+    description: "Verbosity of kira-space's own diagnostic log.",
     enum: ['off', 'error', 'warn', 'info', 'debug'],
     source: 'repo',
   },
-  'kiraVersion.review.baseCandidates': {
-    key: 'kiraVersion.review.baseCandidates',
+  'kiraSpace.review.baseCandidates': {
+    key: 'kiraSpace.review.baseCandidates',
     type: 'stringArray',
     default: ['main', 'master'],
     description:
@@ -108,8 +108,8 @@ export const SETTINGS = {
       '(origin/HEAD) both fail to resolve.',
     source: 'repo',
   },
-  'kiraVersion.pull.strategy': {
-    key: 'kiraVersion.pull.strategy',
+  'kiraSpace.pull.strategy': {
+    key: 'kiraSpace.pull.strategy',
     type: 'enum',
     default: 'auto',
     enum: ['auto', 'ff-only', 'merge', 'rebase'],
@@ -118,8 +118,8 @@ export const SETTINGS = {
       '(branch.<name>.rebase, then pull.rebase, then pull.ff), falling back to fast-forward-only.',
     source: 'repo',
   },
-  'kiraVersion.stash.includeUntracked': {
-    key: 'kiraVersion.stash.includeUntracked',
+  'kiraSpace.stash.includeUntracked': {
+    key: 'kiraSpace.stash.includeUntracked',
     type: 'boolean',
     default: false,
     description:
@@ -133,8 +133,8 @@ export const SETTINGS = {
   // can run (D11) is DELIBERATELY absent from this schema entirely: it is a server-only key this
   // extension never reads, writes, or even names — repoSettings.set cannot write it, and no
   // setting in this file could ever expose it.
-  'kiraVersion.worktree.prepareScript': {
-    key: 'kiraVersion.worktree.prepareScript',
+  'kiraSpace.worktree.prepareScript': {
+    key: 'kiraSpace.worktree.prepareScript',
     type: 'string',
     default: '',
     description:
@@ -145,8 +145,8 @@ export const SETTINGS = {
       'and any edit here requires re-approving it.',
     source: 'repo',
   },
-  'kiraVersion.worktree.basePath': {
-    key: 'kiraVersion.worktree.basePath',
+  'kiraSpace.worktree.basePath': {
+    key: 'kiraSpace.worktree.basePath',
     type: 'string',
     default: '',
     description:
@@ -154,8 +154,8 @@ export const SETTINGS = {
       'security boundary, and never validated as an existing directory.',
     source: 'repo',
   },
-  'kiraVersion.stash.showInGraph': {
-    key: 'kiraVersion.stash.showInGraph',
+  'kiraSpace.stash.showInGraph': {
+    key: 'kiraSpace.stash.showInGraph',
     type: 'boolean',
     default: true,
     description:
@@ -168,8 +168,8 @@ export const SETTINGS = {
   // unexpected write). One behaviour, one switch: no separate setting for auto-detach (§10.7's own
   // reasoning) — that route is announced loudly enough on its own that a preference would be
   // solving a visibility problem with a switch.
-  'kiraVersion.checkout.autoStash': {
-    key: 'kiraVersion.checkout.autoStash',
+  'kiraSpace.checkout.autoStash': {
+    key: 'kiraSpace.checkout.autoStash',
     type: 'boolean',
     default: true,
     description:
@@ -188,7 +188,7 @@ export const SETTINGS = {
     minimum: 0,
     maximum: 40,
     description:
-      "VS Code's own tree indentation, read (never contributed) so Kira Version's file trees " +
+      "VS Code's own tree indentation, read (never contributed) so Kira Space's file trees " +
       'line up with the Explorer beside them.',
   },
 } as const satisfies Record<string, SettingDef<unknown>>;
@@ -341,7 +341,7 @@ export function toVsCodeConfiguration(): VsCodeConfigurationSchema {
 
 /** G18 D10: the seven keys `source: 'repo'` marks — exactly the settings
  * `RepoSettingsDialog.vue`/`RepoSettingsState` show/carry, and the eight keys D11's migration
- * covers minus `kiraVersion.git.path` (which never lived in this schema — D15). Schema-driven
+ * covers minus `kiraSpace.git.path` (which never lived in this schema — D15). Schema-driven
  * rather than a hand-maintained list in `git-ui`, the same "one schema, one place" reason this
  * dialog is schema.ts's second consumer at all. */
 export function repoSettingKeys(): readonly SettingKey[] {

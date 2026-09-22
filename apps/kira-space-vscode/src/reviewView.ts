@@ -1,5 +1,5 @@
 /**
- * The `WebviewViewProvider` for `kiraVersion.review` (P7 W8, §2.1/§6.8). `panelView.ts`'s
+ * The `WebviewViewProvider` for `kiraSpace.review` (P7 W8, §2.1/§6.8). `panelView.ts`'s
  * sibling, deliberately *not* a refactor of it into a shared base class — the two differ in what
  * HTML is rendered and how a review target is pushed in, and a base class hiding that behind a
  * template method would be harder to read than two short files.
@@ -27,7 +27,7 @@ import type { ReviewTarget } from './html.ts';
 import { renderHtml } from './html.ts';
 import { createWebviewChannel } from './transport.ts';
 
-const REVIEW_FOCUS_COMMAND = 'kiraVersion.review.focus';
+const REVIEW_FOCUS_COMMAND = 'kiraSpace.review.focus';
 
 export interface KiraReviewViewProviderDeps {
   readonly extensionUri: vscode.Uri;

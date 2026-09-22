@@ -78,7 +78,7 @@ export function toWireConnectionState(state: ConnectionState): {
         kind: 'versionMismatch',
         detail:
           `Extension expects contract ${state.expected}, ` +
-          `Kira Studio (${state.serverVersion}) speaks ${state.received}`,
+          `Kira Space (${state.serverVersion}) speaks ${state.received}`,
       };
     default:
       return { kind: state.kind };
@@ -99,7 +99,7 @@ interface HandshakeResponse {
 }
 
 function socketPath(): string {
-  const home = process.env.KIRA_HOME ?? path.join(os.homedir(), '.kira-studio');
+  const home = process.env.KIRA_SPACE_HOME ?? path.join(os.homedir(), '.kira-space');
   return path.join(home, 'git.sock');
 }
 
@@ -176,7 +176,7 @@ export class ConnectionManager implements vscode.Disposable {
    *  Rejects on `denied`/`versionMismatch` — the two terminal states (D22) — since waiting for a
    *  state this manager will never re-enter without a retry() call is a hang, not patience. Lets
    *  a caller (app.init, G12 D6) await a socket that simply is not up yet instead of failing
-   *  fast against the ordinary "panel opened before Kira Studio" race. */
+   *  fast against the ordinary "panel opened before Kira Space" race. */
   whenConnected(signal?: AbortSignal): Promise<void> {
     if (this.#state.kind === 'connected') return Promise.resolve();
     if (this.#state.kind === 'denied' || this.#state.kind === 'versionMismatch') {
@@ -210,7 +210,7 @@ export class ConnectionManager implements vscode.Disposable {
     signal?: AbortSignal,
   ): Promise<ResultOf<K>> {
     if (!this.#transport) {
-      return Promise.reject(new Error('connection: not connected to Kira Studio'));
+      return Promise.reject(new Error('connection: not connected to Kira Space'));
     }
     this.#beginActivity();
     return this.#transport.request(method, params, signal).finally(() => this.#endActivity());
@@ -225,7 +225,7 @@ export class ConnectionManager implements vscode.Disposable {
     signal?: AbortSignal,
   ): Promise<void> {
     if (!this.#transport) {
-      return Promise.reject(new Error('connection: not connected to Kira Studio'));
+      return Promise.reject(new Error('connection: not connected to Kira Space'));
     }
     this.#beginActivity();
     return this.#transport

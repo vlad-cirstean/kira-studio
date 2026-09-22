@@ -13,7 +13,7 @@ import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 //   - no AppUpdate store (this app has no UpdateService — apps/kira-space/main.go's own Services
 //     list)
 //   - no CacheStats store (no query-result cache — this app has no query console)
-//   - no EngineService/EngineStore (kira-version's own bundled-engine health check has no
+//   - no EngineService/EngineStore (kira-space's own bundled-engine health check has no
 //     counterpart here)
 // The caret-status slot itself: not yet wired per-view (no per-editor caret tracking built yet),
 // so "no selection" is the honest default rather than a placeholder number, same as Studio's own.

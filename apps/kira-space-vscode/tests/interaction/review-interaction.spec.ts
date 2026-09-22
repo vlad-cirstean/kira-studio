@@ -86,7 +86,7 @@ test.describe('review sidebar interaction', () => {
     await expect(row).toHaveAttribute('aria-expanded', 'false');
   });
 
-  // P75 §2.3: replaces the old command:kiraVersion.openCommitInGraph anchor — inert in Kira
+  // P75 §2.3: replaces the old command:kiraSpace.openCommitInGraph anchor — inert in Kira
   // Studio's Wails WebView, which has no command: handler at any layer (SPEC's own original guess
   // for this row's dead affordance). The real cause was VS Code-only wiring in a shared component;
   // the fix is one request both hosts answer locally, asserted here as a plain bridge call.

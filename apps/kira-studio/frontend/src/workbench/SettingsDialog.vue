@@ -326,7 +326,7 @@ function onDisableCookieJarChange(checked: boolean): void {
   draft.api.disableCookieJar = checked;
 }
 
-// P72 §9.2: kira-version's own diagnostic log verbosity, moved here from the per-repo
+// P72 §9.2: kira-space's own diagnostic log verbosity, moved here from the per-repo
 // RepoSettingsDialog.vue's kiraVersion.log.level — genuinely installation-wide, not a per-repo
 // fact, so this is now the one control that sets it.
 function onGitLogLevelChange(e: Event): void {
@@ -1475,7 +1475,7 @@ async function onAddScript(): Promise<void> {
                 <option value="info">Info</option>
                 <option value="debug">Debug</option>
               </select>
-              <span class="helper-text">Verbosity of kira-version's own diagnostic log, for every repository.</span>
+              <span class="helper-text">Verbosity of kira-space's own diagnostic log, for every repository.</span>
             </label>
           </template>
       </section>

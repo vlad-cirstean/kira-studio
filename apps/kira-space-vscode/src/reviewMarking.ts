@@ -32,11 +32,11 @@ import { SCHEME } from './ports/editorIntegration.ts';
 import { reviewAnchorFor } from './reviewComments.ts';
 import { decodeKey, encodeKey, parseVirtualKey, virtualKey } from './virtualKey.ts';
 
-const MARK_REVIEWED_COMMAND = 'kiraVersion.markSelectionReviewed';
-const MARK_UNREVIEWED_COMMAND = 'kiraVersion.markSelectionUnreviewed';
+const MARK_REVIEWED_COMMAND = 'kiraSpace.markSelectionReviewed';
+const MARK_UNREVIEWED_COMMAND = 'kiraSpace.markSelectionUnreviewed';
 
-const IN_REVIEW_DIFF_CONTEXT = 'kiraVersion.inReviewDiff';
-const REVIEW_SELECTION_CONTEXT = 'kiraVersion.reviewSelection';
+const IN_REVIEW_DIFF_CONTEXT = 'kiraSpace.inReviewDiff';
+const REVIEW_SELECTION_CONTEXT = 'kiraSpace.reviewSelection';
 
 export interface ReviewMarkingDeps {
   readonly connection: ConnectionManager;
@@ -142,15 +142,15 @@ function bodyKindMessage(
 ): string {
   switch (kind) {
     case 'binary':
-      return "Kira Version: can't mark ranges — this file is binary.";
+      return "Kira Space: can't mark ranges — this file is binary.";
     case 'lfsPointer':
-      return "Kira Version: can't mark ranges — this file is stored in Git LFS.";
+      return "Kira Space: can't mark ranges — this file is stored in Git LFS.";
     case 'tooLarge':
-      return "Kira Version: can't mark ranges — this file is too large to diff.";
+      return "Kira Space: can't mark ranges — this file is too large to diff.";
     case 'empty':
       return reason === 'modeChangeOnly'
-        ? "Kira Version: can't mark ranges — this is a mode change only, no content differs."
-        : "Kira Version: can't mark ranges — the content is identical, there is nothing to review.";
+        ? "Kira Space: can't mark ranges — this is a mode change only, no content differs."
+        : "Kira Space: can't mark ranges — the content is identical, there is nothing to review.";
     case 'text':
       return '';
   }
@@ -182,8 +182,8 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
   const markedReviewedIcon = vscode.Uri.joinPath(extensionUri, 'resources', 'marked-reviewed.svg');
   const reviewedType = vscode.window.createTextEditorDecorationType({
     isWholeLine: true,
-    backgroundColor: new vscode.ThemeColor('kiraVersion.reviewedLineBackground'),
-    overviewRulerColor: new vscode.ThemeColor('kiraVersion.reviewedLineOverviewRuler'),
+    backgroundColor: new vscode.ThemeColor('kiraSpace.reviewedLineBackground'),
+    overviewRulerColor: new vscode.ThemeColor('kiraSpace.reviewedLineOverviewRuler'),
     overviewRulerLane: vscode.OverviewRulerLane.Left,
   });
   const actionableType = vscode.window.createTextEditorDecorationType({
@@ -223,7 +223,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
     let cached = baseMemo.get(key);
     if (!cached) {
       // G18 D6: baseCandidates is no longer injected here — a raw request (omitting it) now
-      // resolves the repo's own stored kiraVersion.review.baseCandidates server-side, the exact
+      // resolves the repo's own stored kiraSpace.review.baseCandidates server-side, the exact
       // upgrade D6 describes, so this call needs nothing beyond repoId/branch any more.
       cached = connection
         .request('review.resolveBase', { repoId, branch })
@@ -473,7 +473,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
       const activeUri = vscode.window.activeTextEditor?.document.uri;
       if (activeUri && activeUri.toString() === tab.original.toString()) {
         await vscode.window.showInformationMessage(
-          "Kira Version: mark reviewed works on the right-hand side of the diff — the branch's own version of the file.",
+          "Kira Space: mark reviewed works on the right-hand side of the diff — the branch's own version of the file.",
         );
         return;
       }
@@ -501,7 +501,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
     if (!state) return;
     if (state.stale) {
       await vscode.window.showInformationMessage(
-        `Kira Version: this diff is from an earlier revision of ${state.anchor.branch} — reopen the file from the Kira Version sidebar to mark it.`,
+        `Kira Space: this diff is from an earlier revision of ${state.anchor.branch} — reopen the file from the Kira Space sidebar to mark it.`,
       );
       return;
     }
@@ -522,7 +522,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
         ranges: clamped,
       });
     } catch (err) {
-      await vscode.window.showErrorMessage(`Kira Version: couldn't mark reviewed — ${String(err)}`);
+      await vscode.window.showErrorMessage(`Kira Space: couldn't mark reviewed — ${String(err)}`);
       return;
     }
     // F9: never Union(old, given) locally — the server re-snapshots on every write, so the
@@ -640,7 +640,7 @@ export function createReviewMarkingController(deps: ReviewMarkingDeps): ReviewMa
   };
 }
 
-/** `kiraVersion.markSelectionReviewed` — `diffToolbar.ts`'s own two-arm command shape
+/** `kiraSpace.markSelectionReviewed` — `diffToolbar.ts`'s own two-arm command shape
  *  (`openCommitInGraphCommand`), reused: an explicit `{uri, ranges}` argument (the hover link, the
  *  CodeLens) bypasses tab/selection resolution entirely. */
 export function markSelectionReviewedCommand(

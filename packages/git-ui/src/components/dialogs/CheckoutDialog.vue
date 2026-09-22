@@ -16,7 +16,7 @@
  *
  * G28 D16: `OpsState.runCheckout` now resolves a blocked verdict AUTOMATICALLY — no dialog at all
  * — whenever `preflight.routes` offers `"detachHere"` (always) or `"autoStash"` (when
- * `kiraVersion.checkout.autoStash` is on), re-issuing the same op with `mode: 'detach'` and/or
+ * `kiraSpace.checkout.autoStash` is on), re-issuing the same op with `mode: 'detach'` and/or
  * `autoStash: true` instead. This dialog now only ever opens for what is LEFT after that: an
  * `inProgressOperation` blocker (routing is never offered for one), or a blocked verdict with
  * neither route available (a tracked-only or untracked-only block when `autoStash` itself is off,

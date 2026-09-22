@@ -3,14 +3,14 @@
  * G18 D13: "Repository settings" — the dialog `AppToolbar.vue`'s own gear (`⚙`, D13) opens.
  * Each field here is hand-written, not schema-driven (no loop over `repoSettingKeys()`) — a new
  * `source: 'repo'` leaf needs an explicit field/patch-diff line added here, same as every leaf
- * already present. `kiraVersion.worktree.prepareScript`/`.basePath` (G25) are the two `'repo'`
+ * already present. `kiraSpace.worktree.prepareScript`/`.basePath` (G25) are the two `'repo'`
  * leaves this dialog deliberately does NOT surface — they are edited from `WorktreeDialog.vue`
  * itself instead, where the prepare-script approval flow they gate lives. G28 D16 adds
- * `kiraVersion.checkout.autoStash`, its own new "Checkout" section.
+ * `kiraSpace.checkout.autoStash`, its own new "Checkout" section.
  *
- * P72 §8.3/§9: `kiraVersion.log.level` **used to not be per-repo** (D14) — a hardcoded sentinel
+ * P72 §8.3/§9: `kiraSpace.log.level` **used to not be per-repo** (D14) — a hardcoded sentinel
  * collapse in `gitreposettings.go`, surfaced here as a visible note. Both that collapse and the
- * note are deleted: Kira Studio now has its own independent, genuinely app-wide
+ * note are deleted: Kira Space now has its own independent, genuinely app-wide
  * `advanced.gitLogLevel` (`SettingsDialog.vue`), and this leaf reverts to an ordinary per-repo
  * fact, same as `dateFormat` below moved to `appearance.dateFormat` there. Both sections
  * (Display/Diagnostics) are host-conditional (the `host` prop) — shown under `'vscode'`/
@@ -48,7 +48,7 @@ const props = defineProps<{
   repoSettingsState: RepoSettingsState;
   dateFormat: DateFormat;
   /** P72 §8.3: which shell mounted this dialog — 'kira' hides the Display/Diagnostics sections
-   *  (Kira Studio owns both app-wide now, appearance.dateFormat/advanced.gitLogLevel,
+   *  (Kira Space owns both app-wide now, appearance.dateFormat/advanced.gitLogLevel,
    *  packages/shared/domain/settings.ts), 'vscode'/'harness' keep showing them, since the
    *  extension has no app-wide settings dialog of its own (this dialog is its only surface for
    *  either value, §8.3's own finding). */
@@ -96,9 +96,9 @@ watch(
 );
 
 const baseCandidatesText = computed({
-  get: () => draft['kiraVersion.review.baseCandidates'].join('\n'),
+  get: () => draft['kiraSpace.review.baseCandidates'].join('\n'),
   set: (value: string) => {
-    draft['kiraVersion.review.baseCandidates'] = value
+    draft['kiraSpace.review.baseCandidates'] = value
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line !== '');
@@ -126,15 +126,15 @@ const logLevelOptions: readonly KuiSelectOption[] = [
 ];
 
 function onGraphScopeChange(value: string): void {
-  draft['kiraVersion.graph.scope'] = value as RepoSettingsSnapshot['kiraVersion.graph.scope'];
+  draft['kiraSpace.graph.scope'] = value as RepoSettingsSnapshot['kiraSpace.graph.scope'];
 }
 
 function onPullStrategyChange(value: string): void {
-  draft['kiraVersion.pull.strategy'] = value as RepoSettingsSnapshot['kiraVersion.pull.strategy'];
+  draft['kiraSpace.pull.strategy'] = value as RepoSettingsSnapshot['kiraSpace.pull.strategy'];
 }
 
 function onLogLevelChange(value: string): void {
-  draft['kiraVersion.log.level'] = value as RepoSettingsSnapshot['kiraVersion.log.level'];
+  draft['kiraSpace.log.level'] = value as RepoSettingsSnapshot['kiraSpace.log.level'];
 }
 
 function close(): void {
@@ -144,37 +144,37 @@ function close(): void {
 async function save(): Promise<void> {
   const current = props.repoSettingsState.settings.value;
   const patch: { -readonly [K in keyof RepoSettingsPatch]: RepoSettingsPatch[K] } = {};
-  if (draft['kiraVersion.graph.pageSize'] !== current['kiraVersion.graph.pageSize']) {
-    patch['kiraVersion.graph.pageSize'] = draft['kiraVersion.graph.pageSize'];
+  if (draft['kiraSpace.graph.pageSize'] !== current['kiraSpace.graph.pageSize']) {
+    patch['kiraSpace.graph.pageSize'] = draft['kiraSpace.graph.pageSize'];
   }
-  if (draft['kiraVersion.graph.scope'] !== current['kiraVersion.graph.scope']) {
-    patch['kiraVersion.graph.scope'] = draft['kiraVersion.graph.scope'];
+  if (draft['kiraSpace.graph.scope'] !== current['kiraSpace.graph.scope']) {
+    patch['kiraSpace.graph.scope'] = draft['kiraSpace.graph.scope'];
   }
-  if (draft['kiraVersion.checkout.autoStash'] !== current['kiraVersion.checkout.autoStash']) {
-    patch['kiraVersion.checkout.autoStash'] = draft['kiraVersion.checkout.autoStash'];
+  if (draft['kiraSpace.checkout.autoStash'] !== current['kiraSpace.checkout.autoStash']) {
+    patch['kiraSpace.checkout.autoStash'] = draft['kiraSpace.checkout.autoStash'];
   }
-  if (draft['kiraVersion.stash.showInGraph'] !== current['kiraVersion.stash.showInGraph']) {
-    patch['kiraVersion.stash.showInGraph'] = draft['kiraVersion.stash.showInGraph'];
-  }
-  if (
-    draft['kiraVersion.stash.includeUntracked'] !== current['kiraVersion.stash.includeUntracked']
-  ) {
-    patch['kiraVersion.stash.includeUntracked'] = draft['kiraVersion.stash.includeUntracked'];
+  if (draft['kiraSpace.stash.showInGraph'] !== current['kiraSpace.stash.showInGraph']) {
+    patch['kiraSpace.stash.showInGraph'] = draft['kiraSpace.stash.showInGraph'];
   }
   if (
-    draft['kiraVersion.review.baseCandidates'].join('\n') !==
-    current['kiraVersion.review.baseCandidates'].join('\n')
+    draft['kiraSpace.stash.includeUntracked'] !== current['kiraSpace.stash.includeUntracked']
   ) {
-    patch['kiraVersion.review.baseCandidates'] = [...draft['kiraVersion.review.baseCandidates']];
+    patch['kiraSpace.stash.includeUntracked'] = draft['kiraSpace.stash.includeUntracked'];
   }
-  if (draft['kiraVersion.pull.strategy'] !== current['kiraVersion.pull.strategy']) {
-    patch['kiraVersion.pull.strategy'] = draft['kiraVersion.pull.strategy'];
+  if (
+    draft['kiraSpace.review.baseCandidates'].join('\n') !==
+    current['kiraSpace.review.baseCandidates'].join('\n')
+  ) {
+    patch['kiraSpace.review.baseCandidates'] = [...draft['kiraSpace.review.baseCandidates']];
   }
-  if (draft['kiraVersion.log.level'] !== current['kiraVersion.log.level']) {
-    patch['kiraVersion.log.level'] = draft['kiraVersion.log.level'];
+  if (draft['kiraSpace.pull.strategy'] !== current['kiraSpace.pull.strategy']) {
+    patch['kiraSpace.pull.strategy'] = draft['kiraSpace.pull.strategy'];
   }
-  if (draft['kiraVersion.github.enabled'] !== current['kiraVersion.github.enabled']) {
-    patch['kiraVersion.github.enabled'] = draft['kiraVersion.github.enabled'];
+  if (draft['kiraSpace.log.level'] !== current['kiraSpace.log.level']) {
+    patch['kiraSpace.log.level'] = draft['kiraSpace.log.level'];
+  }
+  if (draft['kiraSpace.github.enabled'] !== current['kiraSpace.github.enabled']) {
+    patch['kiraSpace.github.enabled'] = draft['kiraSpace.github.enabled'];
   }
   if (Object.keys(patch).length > 0) {
     await props.repoSettingsState.set(patch);
@@ -185,7 +185,7 @@ async function save(): Promise<void> {
 
 <template>
   <KuiDialog :open="open" title="Repository settings" @close="close">
-    <!-- P72 §8.3/§9.1: dateFormat moved to Kira Studio's own app-wide appearance.dateFormat
+    <!-- P72 §8.3/§9.1: dateFormat moved to Kira Space's own app-wide appearance.dateFormat
          (SettingsDialog.vue) — Studio owns it there now, so this section is VS Code's only
          remaining surface for it. -->
     <section v-if="host !== 'kira'" class="kv-repo-settings-section">
@@ -207,16 +207,16 @@ async function save(): Promise<void> {
         Load more page size
         <input
           type="number"
-          v-model.number="draft['kiraVersion.graph.pageSize']"
-          :min="SETTINGS['kiraVersion.graph.pageSize'].minimum"
-          :max="SETTINGS['kiraVersion.graph.pageSize'].maximum"
+          v-model.number="draft['kiraSpace.graph.pageSize']"
+          :min="SETTINGS['kiraSpace.graph.pageSize'].minimum"
+          :max="SETTINGS['kiraSpace.graph.pageSize'].maximum"
           autofocus
         />
       </label>
       <label class="kv-dialog-field">
         Scope
         <KuiSelect
-          :model-value="draft['kiraVersion.graph.scope']"
+          :model-value="draft['kiraSpace.graph.scope']"
           :options="graphScopeOptions"
           @update:model-value="onGraphScopeChange"
         />
@@ -226,7 +226,7 @@ async function save(): Promise<void> {
     <section class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Checkout</h3>
       <label class="kv-dialog-field kv-dialog-field--inline">
-        <input type="checkbox" v-model="draft['kiraVersion.checkout.autoStash']" />
+        <input type="checkbox" v-model="draft['kiraSpace.checkout.autoStash']" />
         Automatically stash local changes that block a branch switch
       </label>
       <p class="kv-dialog-note">
@@ -239,11 +239,11 @@ async function save(): Promise<void> {
     <section class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">Stash</h3>
       <label class="kv-dialog-field kv-dialog-field--inline">
-        <input type="checkbox" v-model="draft['kiraVersion.stash.showInGraph']" />
+        <input type="checkbox" v-model="draft['kiraSpace.stash.showInGraph']" />
         Show stash entries as nodes in the commit graph
       </label>
       <label class="kv-dialog-field kv-dialog-field--inline">
-        <input type="checkbox" v-model="draft['kiraVersion.stash.includeUntracked']" />
+        <input type="checkbox" v-model="draft['kiraSpace.stash.includeUntracked']" />
         "Include untracked files" starts checked in the Stash dialog
       </label>
     </section>
@@ -259,7 +259,7 @@ async function save(): Promise<void> {
     <section class="kv-repo-settings-section">
       <h3 class="kv-repo-settings-heading">GitHub</h3>
       <label class="kv-dialog-field kv-dialog-field--inline">
-        <input type="checkbox" v-model="draft['kiraVersion.github.enabled']" />
+        <input type="checkbox" v-model="draft['kiraSpace.github.enabled']" />
         Show pull request status for this repository
       </label>
     </section>
@@ -269,14 +269,14 @@ async function save(): Promise<void> {
       <label class="kv-dialog-field">
         Strategy
         <KuiSelect
-          :model-value="draft['kiraVersion.pull.strategy']"
+          :model-value="draft['kiraSpace.pull.strategy']"
           :options="pullStrategyOptions"
           @update:model-value="onPullStrategyChange"
         />
       </label>
     </section>
 
-    <!-- P72 §8.3/§9.2: Kira Studio now has its own independent, genuinely app-wide
+    <!-- P72 §8.3/§9.2: Kira Space now has its own independent, genuinely app-wide
          advanced.gitLogLevel (SettingsDialog.vue) — this per-repo leaf is VS Code's only
          remaining surface for log level, and, with D14's cross-repo collapse deleted, it is
          genuinely per-repo again, so no "applies everywhere" note belongs here any more. -->
@@ -285,7 +285,7 @@ async function save(): Promise<void> {
       <label class="kv-dialog-field">
         Log level
         <KuiSelect
-          :model-value="draft['kiraVersion.log.level']"
+          :model-value="draft['kiraSpace.log.level']"
           :options="logLevelOptions"
           @update:model-value="onLogLevelChange"
         />

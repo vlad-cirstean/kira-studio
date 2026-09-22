@@ -2,8 +2,8 @@
  * `EditorIntegration` over VS Code's native diff and document APIs (P5 W5). Four details that
  * are the difference between this working and nearly working (`docs/plans/P5.md`'s W5):
  *
- * 1. The scheme is `kira-version`, registered once at activation and disposed with the
- *    extension. The URI is `kira-version:/<opaque key>/<basename>` — the key is opaque to VS
+ * 1. The scheme is `kira-space`, registered once at activation and disposed with the
+ *    extension. The URI is `kira-space:/<opaque key>/<basename>` — the key is opaque to VS
  *    Code and meaningful only to the registered `VirtualDocumentSource`; the *last* path segment
  *    is the real filename, because that is what VS Code resolves the language mode from.
  * 2. Content is cached by VS Code per URI and never invalidated: a `<rev>:<path>` blob is
@@ -34,7 +34,7 @@ import { decodeKey, encodeKey } from '../virtualKey.ts';
 
 // Exported (G13 D9) so reviewComments.ts's commentingRangeProvider and its own document-uri
 // builder use the exact same scheme literal — never a second copy that could drift.
-export const SCHEME = 'kira-version';
+export const SCHEME = 'kira-space';
 /** The first path segment reserved for the "empty" side of an add/delete diff. `.` is not in
  *  base64url's alphabet (G12 D11), so this can never collide with a real encoded key — unlike the
  *  bare `empty` it replaces, which relied only on a real key always containing a `/`.

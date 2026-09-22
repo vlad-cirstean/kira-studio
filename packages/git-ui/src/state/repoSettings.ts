@@ -8,17 +8,17 @@ import type { BridgeClient } from '../bridge/client.ts';
  *  open (`setRepoId(undefined)`). */
 function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
   return {
-    'kiraVersion.graph.pageSize': SETTINGS['kiraVersion.graph.pageSize'].default,
-    'kiraVersion.graph.scope': SETTINGS['kiraVersion.graph.scope'].default,
-    'kiraVersion.stash.showInGraph': SETTINGS['kiraVersion.stash.showInGraph'].default,
-    'kiraVersion.stash.includeUntracked': SETTINGS['kiraVersion.stash.includeUntracked'].default,
-    'kiraVersion.review.baseCandidates': SETTINGS['kiraVersion.review.baseCandidates'].default,
-    'kiraVersion.pull.strategy': SETTINGS['kiraVersion.pull.strategy'].default,
-    'kiraVersion.log.level': SETTINGS['kiraVersion.log.level'].default,
-    'kiraVersion.github.enabled': SETTINGS['kiraVersion.github.enabled'].default,
-    'kiraVersion.worktree.prepareScript': SETTINGS['kiraVersion.worktree.prepareScript'].default,
-    'kiraVersion.worktree.basePath': SETTINGS['kiraVersion.worktree.basePath'].default,
-    'kiraVersion.checkout.autoStash': SETTINGS['kiraVersion.checkout.autoStash'].default,
+    'kiraSpace.graph.pageSize': SETTINGS['kiraSpace.graph.pageSize'].default,
+    'kiraSpace.graph.scope': SETTINGS['kiraSpace.graph.scope'].default,
+    'kiraSpace.stash.showInGraph': SETTINGS['kiraSpace.stash.showInGraph'].default,
+    'kiraSpace.stash.includeUntracked': SETTINGS['kiraSpace.stash.includeUntracked'].default,
+    'kiraSpace.review.baseCandidates': SETTINGS['kiraSpace.review.baseCandidates'].default,
+    'kiraSpace.pull.strategy': SETTINGS['kiraSpace.pull.strategy'].default,
+    'kiraSpace.log.level': SETTINGS['kiraSpace.log.level'].default,
+    'kiraSpace.github.enabled': SETTINGS['kiraSpace.github.enabled'].default,
+    'kiraSpace.worktree.prepareScript': SETTINGS['kiraSpace.worktree.prepareScript'].default,
+    'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
+    'kiraSpace.checkout.autoStash': SETTINGS['kiraSpace.checkout.autoStash'].default,
   };
 }
 
@@ -27,10 +27,10 @@ function defaultRepoSettingsSnapshot(): RepoSettingsSnapshot {
  * "one instance for the life of the component, reset via `setRepoId`" shape (P9 W13) — a repo's
  * own settings are exactly as reset-on-switch as its stash stack.
  *
- * P72 §9.2: `kiraVersion.log.level`'s own cross-repo collapse (D14) is deleted, storage layer and
+ * P72 §9.2: `kiraSpace.log.level`'s own cross-repo collapse (D14) is deleted, storage layer and
  * here together — `repoSettings.changed`'s own `repoId` naming a DIFFERENT repository than the one
  * this instance is currently tracking is irrelevant now for every field, log.level included, and
- * is ignored outright, the same as it always was for the other ten leaves. Kira Studio's own
+ * is ignored outright, the same as it always was for the other ten leaves. Kira Space's own
  * equivalent, genuinely app-wide `advanced.gitLogLevel`, lives in `SettingsState` instead
  * (`packages/shared/domain/settings.ts`), entirely separate from this per-repo mechanism.
  */

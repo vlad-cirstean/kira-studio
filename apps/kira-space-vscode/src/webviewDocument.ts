@@ -91,7 +91,7 @@ export function buildWebviewDocument(opts: WebviewDocumentOptions): string {
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="${csp}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kira Version</title>
+    <title>Kira Space</title>
     ${styleLinks}
   </head>
   <body>

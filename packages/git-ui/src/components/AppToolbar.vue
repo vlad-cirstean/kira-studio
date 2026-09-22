@@ -289,7 +289,7 @@ const write = computed(() => props.actions?.capabilities.write ?? false);
        allows overriding a `<header>`'s own implicit "banner" role with — a plain `<div>` carries
        no implicit role of its own to conflict with the explicit one, which is all this element
        ever wanted (§6.2's own layout, not a page banner). -->
-  <div class="kv-toolbar" role="toolbar" aria-label="Kira Version toolbar">
+  <div class="kv-toolbar" role="toolbar" aria-label="Kira Space toolbar">
     <BranchPicker
       ref="branchPickerRef"
       :refs="refsState"

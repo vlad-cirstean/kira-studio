@@ -47,13 +47,13 @@ export function gitBlockedCopy(status: BlockedGitStatus, platform: Platform): Gi
         title: 'Git was not found',
         detail:
           status.probed.length > 0
-            ? `Looked for git at: ${status.probed.join(', ')}. Install git, or set kiraVersion.git.path to point at it.`
-            : 'Install git, or set kiraVersion.git.path to point at it.',
+            ? `Looked for git at: ${status.probed.join(', ')}. Install git, or set kiraSpace.git.path to point at it.`
+            : 'Install git, or set kiraSpace.git.path to point at it.',
       };
     case 'tooOld':
       return {
         title: 'Git is too old',
-        detail: `Found ${status.detected} at ${status.path}; Kira Version needs at least ${status.required}. Run "${upgradeCommandFor(platform)}", or set ${status.settingId} to a newer git.`,
+        detail: `Found ${status.detected} at ${status.path}; Kira Space needs at least ${status.required}. Run "${upgradeCommandFor(platform)}", or set ${status.settingId} to a newer git.`,
       };
     case 'unusable':
       return {

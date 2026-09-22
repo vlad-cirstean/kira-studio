@@ -37,7 +37,7 @@ hand-drawn glyphs, not reproductions of Amazon's trademarks.
 
 ## seti-icons / seti-ui
 
-Kira Version's file tree (`FileTree.vue`) renders per-language file icons from
+Kira Space's file tree (`FileTree.vue`) renders per-language file icons from
 [`seti-icons`](https://www.npmjs.com/package/seti-icons) (npm), via
 `import { themeIcons } from 'seti-icons'`. `seti-icons` repackages the icon set and colour palette
 from [jesseweed/seti-ui](https://github.com/jesseweed/seti-ui) — the same upstream VS Code's own

@@ -77,7 +77,7 @@ export interface ReviewSessionStore {
  *  `review.session.load`'s own 14-day TTL is measured against. */
 type StoredReviewSession = ReviewSessionSnapshot & { readonly savedAt: number };
 
-const REVIEW_SESSION_KEY = 'kiraVersion.review.session';
+const REVIEW_SESSION_KEY = 'kiraSpace.review.session';
 /** Matches G11's own `review.db` idle-purge window — reused for consistency (a "session-level
  *  resumption" concept), not re-derived from nothing. See the plan's own §2 D11b. */
 const REVIEW_SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -225,7 +225,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
 
   const requests: ServerHandlers['requests'] = {
     // G12 D6: waits for the socket to actually be up rather than failing fast — a webview panel
-    // opened before Kira Studio's handshake completes (the ordinary case, not an edge case) used
+    // opened before Kira Space's handshake completes (the ordinary case, not an edge case) used
     // to reject instantly and permanently (F7); now it just takes as long as the connection does.
     'app.init': async (_params, ctx) => {
       await connection.whenConnected(ctx.signal);
@@ -275,7 +275,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
     },
     'graph.status': forward('graph.status'),
     // G18 D6: scope/pageSize are no longer injected here — a raw request omitting them now
-    // resolves this repo's own stored kiraVersion.graph.* settings server-side (the per-repo
+    // resolves this repo's own stored kiraSpace.graph.* settings server-side (the per-repo
     // dialog's own storage), the exact upgrade D6 describes. Wire shape unchanged.
     'graph.loadMore': forward('graph.loadMore'),
     'graph.refresh': forward('graph.refresh'),
@@ -480,7 +480,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       return {};
     },
     // G18 D6: baseCandidates is no longer injected here — a raw request omitting it now resolves
-    // this repo's own stored kiraVersion.review.baseCandidates server-side. Wire shape unchanged.
+    // this repo's own stored kiraSpace.review.baseCandidates server-side. Wire shape unchanged.
     'review.resolveBase': forward('review.resolveBase'),
     // D13: the seventh and last host-capability method — a host action (reveal a VS Code view),
     // answered locally rather than forwarded. The server has no review.open case and answers
@@ -489,7 +489,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       revealReview(repoId, branch);
       return {};
     },
-    // P75 §2.3: replaces the review row's own `command:kiraVersion.openCommitInGraph` webview
+    // P75 §2.3: replaces the review row's own `command:kiraSpace.openCommitInGraph` webview
     // anchor — host-answered like review.open just above, never reaching the server.
     'graph.revealCommit': async ({ repoId, sha }) => {
       revealCommitInGraph(repoId, sha);
@@ -529,7 +529,7 @@ export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandle
       return result;
     },
     // G18 D6/F14: strategySetting is no longer injected here — a raw request omitting it now
-    // resolves this repo's own stored kiraVersion.pull.strategy server-side, the same upgrade D6
+    // resolves this repo's own stored kiraSpace.pull.strategy server-side, the same upgrade D6
     // already gives graph.loadMore/graph.stream/review.resolveBase. Wire shape unchanged.
     'remote.pullPreflight': forward('remote.pullPreflight'),
     'remote.pushPreflight': forward('remote.pushPreflight'),

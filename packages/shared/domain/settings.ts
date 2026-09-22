@@ -79,7 +79,7 @@ export const advancedSettingsSchema = /*#__PURE__*/ z.object({
     .max(EXPENSIVE_QUERY_ROWS_RANGE.max)
     .default(100_000),
   // P72 §9.2: the git graph's own diagnostic log verbosity — moved here from the per-repo
-  // RepoSettingsDialog.vue's `kiraVersion.log.level` (`instanceWide: true` there was a label, not
+  // RepoSettingsDialog.vue's `kiraSpace.log.level` (`instanceWide: true` there was a label, not
   // a mechanism; this is where installation-wide settings actually live). `.default('info')`
   // matches that leaf's own pre-existing default (schema.ts).
   gitLogLevel: z.enum(['off', 'error', 'warn', 'info', 'debug']).default('info'),

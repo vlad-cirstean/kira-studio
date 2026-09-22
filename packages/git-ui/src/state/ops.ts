@@ -264,7 +264,7 @@ export class OpsState {
    *  mutating action here gets. Optional so a test can construct `OpsState` without one, mirroring
    *  `PrState`'s own optional threading through `StackState`/`SearchState`. */
   readonly #stack: StackState | undefined;
-  /** G28 D16: `kiraVersion.checkout.autoStash`'s own read point — optional, same "a test can
+  /** G28 D16: `kiraSpace.checkout.autoStash`'s own read point — optional, same "a test can
    *  construct `OpsState` without one" convention `#stack` already establishes; `undefined`
    *  resolves to the setting's own default (`true`, the fail-safe direction: a stale/absent
    *  value can only ever produce the OLD dialog, never an unexpected write, D16). */
@@ -375,7 +375,7 @@ export class OpsState {
    *     `{ mode: 'detach', autoStash: true }` — both blockers (a worktree conflict AND a dirty
    *     tree) clear in one composed re-issue (D6's own "the two routes compose client-side" case).
    *  3. `routes` has `'detachHere'` only -> `{ mode: 'detach', autoStash: false }`.
-   *  4. `routes` has `'autoStash'` (only) AND the `kiraVersion.checkout.autoStash` SETTING is on
+   *  4. `routes` has `'autoStash'` (only) AND the `kiraSpace.checkout.autoStash` SETTING is on
    *     -> `{ mode: <the originally requested mode>, autoStash: true }`.
    *  5. Otherwise -> the old dialog (discard / stashAndCarry / cancel), completely unchanged.
    */
@@ -390,7 +390,7 @@ export class OpsState {
     if (hasDetachHere && hasAutoStash) return { mode: 'detach', autoStash: true };
     if (hasDetachHere) return { mode: 'detach', autoStash: false };
     const autoStashSetting =
-      this.#repoSettings?.settings.value['kiraVersion.checkout.autoStash'] ?? true;
+      this.#repoSettings?.settings.value['kiraSpace.checkout.autoStash'] ?? true;
     if (hasAutoStash && autoStashSetting) return { mode: requestedMode, autoStash: true };
     return null;
   }

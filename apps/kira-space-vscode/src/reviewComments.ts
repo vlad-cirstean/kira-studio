@@ -15,7 +15,7 @@ import type { ConnectionManager } from './connection.ts';
 import { SCHEME } from './ports/editorIntegration.ts';
 import { decodeKey, encodeKey, parseVirtualKey, virtualKey } from './virtualKey.ts';
 
-const CONTROLLER_ID = 'kiraVersion.reviewComments';
+const CONTROLLER_ID = 'kiraSpace.reviewComments';
 const CONTROLLER_LABEL = 'Kira review comments';
 
 /** Everything `review.comment.*` needs about one document, resolved statelessly from its own URI
@@ -87,7 +87,7 @@ export interface ReviewCommentController extends vscode.Disposable {
   submit(reply: vscode.CommentReply): Promise<void>;
   /** `comments/comment/title`'s own handler (D9's "deleting"). */
   deleteComment(comment: vscode.Comment): Promise<void>;
-  /** `kiraVersion.addReviewComment`'s own handler (D19): an expanded, empty thread at the active
+  /** `kiraSpace.addReviewComment`'s own handler (D19): an expanded, empty thread at the active
    *  editor's selection, so the user types into VS Code's own editor — or an explanation when the
    *  active editor is not a review document. */
   addAtSelection(): Promise<void>;
@@ -132,7 +132,7 @@ export function createReviewCommentController(
     const thread = controller.createCommentThread(uri, new vscode.Range(line0, 0, line1, 0), []);
     thread.canReply = false; // D5/D9: flat, never a real reply — SPEC's own "no threading in v1.3"
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
-    thread.contextValue = 'kiraVersionReviewThread';
+    thread.contextValue = 'kiraSpaceReviewThread';
     const label = anchorLabel(comment, branch);
     if (label !== undefined) thread.label = label;
     const item: KiraReviewComment = {
@@ -141,7 +141,7 @@ export function createReviewCommentController(
       body: comment.body,
       mode: vscode.CommentMode.Preview,
       author: { name: 'Review comment' },
-      contextValue: 'kiraVersionReviewComment',
+      contextValue: 'kiraSpaceReviewComment',
     };
     thread.comments = [item];
     return thread;
@@ -206,9 +206,7 @@ export function createReviewCommentController(
       });
     } catch (err) {
       thread.dispose();
-      await vscode.window.showErrorMessage(
-        `Kira Version: couldn't add the comment — ${String(err)}`,
-      );
+      await vscode.window.showErrorMessage(`Kira Space: couldn't add the comment — ${String(err)}`);
       return;
     }
     thread.dispose(); // the composing thread — renderThreads recreates the real, rendered one
@@ -230,7 +228,7 @@ export function createReviewCommentController(
       });
     } catch (err) {
       await vscode.window.showErrorMessage(
-        `Kira Version: couldn't delete the comment — ${String(err)}`,
+        `Kira Space: couldn't delete the comment — ${String(err)}`,
       );
       return;
     }
@@ -250,7 +248,7 @@ export function createReviewCommentController(
     const thread = controller.createCommentThread(editor.document.uri, editor.selection, []);
     thread.canReply = true;
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
-    thread.contextValue = 'kiraVersionReviewThread';
+    thread.contextValue = 'kiraSpaceReviewThread';
   }
 
   // D9's "when it renders" (d): a review document that becomes visible without ever having been

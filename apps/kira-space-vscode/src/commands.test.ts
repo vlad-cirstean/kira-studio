@@ -5,7 +5,7 @@
  * 1. Every served mutating kind has a real command.
  * 2. No served kind is marked `pending`, and no unserved kind carries a command (the converse).
  * 3. Every table command id is declared in `package.json#contributes.commands`.
- * 4. Every `kiraVersion.*` manifest command is in the table (no orphan).
+ * 4. Every `kiraSpace.*` manifest command is in the table (no orphan).
  * 5. Command ids are unique.
  *
  * The "served" half of (1)/(2) is extracted from the Go source itself —
@@ -196,10 +196,10 @@ describe('MUTATING_COMMANDS against package.json#contributes.commands', () => {
     }
   });
 
-  test('every kiraVersion.* manifest command is in the table (no orphan)', () => {
+  test('every kiraSpace.* manifest command is in the table (no orphan)', () => {
     const tableIds = new Set(ALL_COMMANDS.map((c) => c.command));
     for (const manifestEntry of manifestCommands) {
-      if (!manifestEntry.command.startsWith('kiraVersion.')) continue;
+      if (!manifestEntry.command.startsWith('kiraSpace.')) continue;
       expect(
         tableIds.has(manifestEntry.command),
         `"${manifestEntry.command}" is in the manifest but not in commands.ts's ALL_COMMANDS`,

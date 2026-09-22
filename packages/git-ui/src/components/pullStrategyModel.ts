@@ -17,7 +17,7 @@ export function describePullStrategySource(source: PullStrategySource): string {
     case 'pullConfig':
       return 'from your pull.rebase/pull.ff config';
     case 'default':
-      return 'kira-version default';
+      return 'kira-space default';
   }
 }
 

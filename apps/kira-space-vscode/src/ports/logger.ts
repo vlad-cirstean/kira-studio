@@ -1,6 +1,6 @@
 /**
- * `Logger` over `window.createOutputChannel("Kira Version")` (P3 W10). Filters by
- * `kiraVersion.log.level` itself — `Logger.log`'s signature excludes `"off"` on purpose (a
+ * `Logger` over `window.createOutputChannel("Kira Space")` (P3 W10). Filters by
+ * `kiraSpace.log.level` itself — `Logger.log`'s signature excludes `"off"` on purpose (a
  * caller never logs *at* off), so honouring it is this adapter's job, not the caller's.
  */
 import type { Logger, LogLevel } from '@kira/git-core';

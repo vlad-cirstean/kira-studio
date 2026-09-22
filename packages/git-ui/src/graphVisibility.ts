@@ -1,4 +1,4 @@
-// P79 review fix (Performance, LOW): lets a KeepAlive host (Kira Studio's `RepoGraphView.vue`,
+// P79 review fix (Performance, LOW): lets a KeepAlive host (Kira Space's `RepoGraphView.vue`,
 // P72 §3) tell this mount's own `CommitGrid.vue` it has been backgrounded, so a `repo.changed`-
 // driven generation bump (`graphView.generation`/`search.searchGeneration`/`pr.generation`/
 // `stack.generation`, CommitGrid.vue's own four-watcher F12 pattern) defers its full rebuild

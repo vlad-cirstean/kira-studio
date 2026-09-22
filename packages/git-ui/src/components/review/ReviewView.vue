@@ -541,7 +541,7 @@ const comparisonSummaryLabel = computed(() => {
   return `${commits} · ${commitCountFormatter.format(files)} ${files === 1 ? 'file' : 'files'} changed`;
 });
 
-const FALLBACK_PAGE_SIZE = SETTINGS['kiraVersion.graph.pageSize'].default;
+const FALLBACK_PAGE_SIZE = SETTINGS['kiraSpace.graph.pageSize'].default;
 
 function loadMoreLabel(): string {
   const r = review.value;
@@ -710,7 +710,7 @@ watch(
 
     <template v-if="bootError">
       <div class="kv-review-boot-error" data-testid="boot-error">
-        <p>Kira Studio isn't reachable — {{ bootError }}</p>
+        <p>Kira Space isn't reachable — {{ bootError }}</p>
         <KuiButton data-testid="boot-retry" @click="retryBootstrap">Retry</KuiButton>
       </div>
     </template>
