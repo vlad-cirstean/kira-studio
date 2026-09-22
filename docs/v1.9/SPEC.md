@@ -1269,6 +1269,120 @@ established for this gitignored directory.
 No new `docs/ARCHITECTURE.md` **Known open items** entry — nothing this phase touched left a new
 standing limitation; the settings-key finding above is a closed investigation, not an open item.
 
+## P100 Part 4 result
+
+Landed per plan (`docs/v1.9/plans/P100-kira-space-extraction.md` §7, §10). 5 commits, `1442e95`
+(icon) through `8514a8d` (audit fix-up), against `fd480a4`: 926 insertions(+), 1126 deletions(-)
+summed per-commit (the combined range diff also carries a 5-line, unrelated `docs/v1.9/SPEC.md`
+edit from the concurrently-running P103-planning background agent's own `845a8d7`, interleaved in
+this range but no part of this phase — excluded from every number below).
+
+**The icon (`1442e95`, fixed further in `5061ad2`).** Kira Space's own copy of
+`apps/kira-space/build/appicon.icon/Assets/kira_icon_vector.svg`: `#bg` gradient stops tan
+(`#D2A97C`/`#A3794C`) → blue (`#3B9BE8`/`#0A5FA8`); all four client glyphs (database stack, SQL
+cell grid, document braces, message queue) deleted; replaced with the commit-graph mark lifted
+verbatim from `apps/kira-space-vscode/resources/icon.svg` (same four-node/two-edge path, same
+`#F1E4CC` stroke). Title, sparkle and glow colours updated to the new blue palette. Kira Studio's
+own SVG untouched — confirmed both by `git diff` at landing and again in this phase's own audit
+(check 11, below).
+
+First render exposed a real bug this phase's own instruction to sanity-check caught: the mark's
+`<g transform="translate(512 512) scale(21) …">` sat dead-centre, directly behind the cat's opaque
+`#FDFDFB` body fill, which paints later in SVG document order — the mark was present in source and
+completely invisible in the rasterized PNG that `1442e95` had already committed. Root-caused via
+source diff and document-order z-stacking, not guessed at. Fixed in `5061ad2`:
+`translate(232 700) scale(8.5) rotate(-6) translate(-12 -12)`, moving the mark into the open
+bottom-left gap beside the body/legs (where the four original client glyphs each sat) and shrinking
+its footprint to match. Re-rasterized and visually confirmed at both sizes before committing.
+
+**Rasterization.** No system SVG rasterizer exists in this sandbox (`rsvg-convert`/`inkscape`/
+`convert`/`magick`/`cairosvg`/`resvg`/`sips` all absent, confirmed by `command -v`). Rendered both
+required PNGs through Playwright's already-vendored headless Chromium instead (`page.goto('file://
+…')` + `page.screenshot()`): `apps/kira-space/build/appicon.png` at 1024×1024 and
+`apps/kira-space-vscode/resources/icon.png` at 128×128, the latter rasterized from the same
+full-colour `kira_icon_vector.svg` rather than the small `currentColor` activity-bar glyph, matching
+the pre-P100 precedent (confirmed via `git show` on the old `kira-studio-vscode` copy). No
+placeholder was ever committed — the one bad render was a real, visually-verified bug, not a stand-
+in, and was caught and fixed before this phase closed.
+
+**Documentation sweep (`dacf8c2`, `d0575d8`).** `docs/ARCHITECTURE.md`'s seven git-related sections
+—the Stack table's "Git module transport"/"Git graph in the native workspace" rows and its
+"Packaging" row's `.vsix` claim, the "Go packages" section (`gitrpc`'s 51 request methods and
+`ContractVersion` 40, `startupfail` no longer described as a git package, `gitvsix`/`rpcstream`
+scope notes), "Git graph in the native workspace (C10)", "Code review, ported natively (C11)", "Git
+blame, inline (P62)" (its own stale "`ContractVersion` is 39" corrected to 40), Storage's
+`review.db` paragraph (`${KIRA_HOME}` → `${KIRA_SPACE_HOME}`), and "Renderer security surface"
+(`packages/git-ui` scope note plus a newly-found dead `LinkService` bind in Kira Studio, recorded as
+a Known open item, not silently removed) — all corrected, plus two dead test-support files removed
+via `git rm` (`apps/kira-studio/tests/ui/support/{gitStreamMock,graphStreamFixture}.ts`, confirmed
+zero remaining importers). `docs/PACKAGING.md` gained a new "§8 Kira Space packaging" section and
+lost its stale `.vsix`/Connected-editors description from Kira Studio's own sections.
+`docs/DEV_ENVIRONMENT.md`'s git section retargeted at `apps/kira-space`, plus fixes to the
+typecheck/darwin-cgo bullets to cover both apps. `docs/PERF.md`'s one stray `apps/kira-studio/
+internal/gitsock/` path note fixed. Root `README.md` rewritten (git sections moved out to a new
+`apps/kira-space/README.md`, created from scratch, ~180 lines, mirroring the root's own structure).
+All three stale facts this phase's own earlier investigation had flagged are confirmed fixed and
+none remain repo-wide: `startupfail` no longer listed as a git package, the command count reads 47
+(verified again in this phase: `len(package.json's contributes.commands)` == 47, not 46 or 62), and
+every surviving `ContractVersion` citation reads 40.
+
+**Two real, non-cosmetic bugs found and fixed during the sweep, not just prose:**
+- `scripts/setup.sh` only ever regenerated Kira Studio's own Wails bindings — a fresh clone's first
+  `bun run typecheck` would fail on `apps/kira-space/frontend/src/bridge/*.ts` missing entirely.
+  Fixed by looping the bindings-regeneration block over both apps. Verified by actually deleting
+  `apps/kira-space/frontend/bindings` + `.task` and re-running `sh scripts/setup.sh`: both apps'
+  bindings regenerated (`315 Packages, 10 Services, 38 Methods` for Kira Space).
+- `package.json` had no `predev:space`/`prepackage:space` hooks, so `bun run dev:space`/
+  `package:space` would run against a stale or absent wails3 CLI on a fresh clone. Added both hooks;
+  confirmed bun honours `pre<name>` for colon-containing script names via a throwaway `/tmp` test.
+
+**The phase-closing audit (§10, all 11 checks, run for real in this session):**
+
+| # | Check | Result |
+|---|---|---|
+| 1 | No git Go code left in Kira Studio | Pass — every hit is a historical comment (precedent citation); zero live package declarations or imports |
+| 2 | No git frontend left in Kira Studio | Pass — every hit is a historical comment or a `Repo`-substring false positive (`Report`); zero live files/dirs |
+| 3 | No dead route | Pass — zero real `Git`/`Repo`/`CodeWorkspace` hits in `bridge/index.ts` or `internal/bridge/*.go`'s service list (the `Repo`-prefixed hits are all the unrelated DB-repository pattern) |
+| 4 | No cross-app `internal/` import | Pass — `go build ./...` clean; every grep hit inside `apps/kira-space/` is a comment |
+| 5 | `layering_test` still bites | Pass — `TestDomainPackagesDoNotImportBridge` passes in both apps (44 non-exempt packages combined) |
+| 6 | No `kiraVersion` anywhere live | Pass — every hit is either historical docs/SPEC (left uncorrected by convention) or an explanatory "renamed from kiraVersion" comment; zero live identifiers in extension/app source |
+| 7 | Every surviving `Kira Studio` means the DB client | **Found 8 real stale self-references** inside actual git-domain packages (`gitsock`, `gitsession` ×2, `gitrpc` ×2, `gitvsix`, `gitprepare`, `gitreview`, `gitpreflight`) — comments describing Kira Space's own window/settings pane/executable/server process as "Kira Studio", a Part 1 extraction leftover. Fixed in `8514a8d`. Every other hit (shell/appcore/storage/bridge "app-base" files, `git-ui`'s theme tokens) correctly cites Kira Studio as porting precedent or a real cross-app design reference |
+| 8 | Contract versions agree | Pass — Go `gitrpc.ContractVersion = 40` (`contract.go:162`), TS `CONTRACT_VERSION = 40` (`validate.ts:158`), `TestContractVersion_Is40` passes |
+| 9 | Settings keys migrated round-trip | **Check as originally specified is inapplicable, for the reason Part 1's own result section already recorded**: the one-time cross-DB import (`~/.kira-studio/kira.db` → `~/.kira-space/kira.db`) was scoped out in Part 1 per the plan's own named fallback, so no `kiraVersion.*`-seeded row ever exists to migrate. Verified what remains true instead: `TestRepoSettings_GetSetRoundTrip` and five sibling tests pass, confirming `GitRepoSettingsRepo` reads/writes correctly under the `kiraSpace.*` keys |
+| 10 | Every component exactly one `<script>` block | Pass — 115 + 25 + 46 + 11 = 197 `.vue` files across both frontends plus `git-ui`/`kira-ui` checked; the two 2-count hits (`RepoGraphView.vue`, `KuiButton.vue`) are a real `<script setup>` tag plus a code comment quoting `` `<script setup>` `` in backticks, not a second block |
+| 11 | Icon has no client glyph and no tan; Kira Studio's own SVG unchanged | Pass — zero hits for `database stack\|sql cell grid\|message queue\|document braces\|#D2A97C\|#A3794C` in Kira Space's SVG; zero commits touching `apps/kira-studio/build/appicon.icon/` across the whole of P100 (`87a7f09..HEAD`) |
+
+**Verification.** Every command re-run in this session, not trusted from an earlier claim:
+
+- `go build ./...`, `go vet ./...`: clean, no output.
+- `bun run lint:go` (golangci-lint): `0 issues.`
+- `bun run test:go`: 66 packages `ok`, 0 `FAIL`.
+- `bun run typecheck`: clean across all eight projects.
+- `bun run lint` (Biome + `check-tokens.sh`): clean, `Checked 1339 files … No fixes applied.`
+- `bun run lint:dead` (knip): exit 0, same 6 duplicate-export + 6 configuration-hint baseline as
+  Parts 2-3 — no new finding.
+- `bun run build`: clean, `✓ built in 4.49s` (pre-existing >500kB chunk-size advisory only).
+- `bun run build:space`: clean, `✓ built in 3.22s`, same advisory.
+- `bun run build:vscode`: clean, `✓ built in 1.21s`, both bundles produced.
+- `bun run verify:packaging`: `all checks passed` (A1/A3/A4/A5/A6/N2/N3 skipped for both apps — no
+  built `.app`/`.dmg` in this sandbox, same documented precedent every prior part used).
+- `bun run test:unit`: 1534 pass, 0 fail, 13649 `expect()` calls, 155 files.
+- `bun run test:webview`: 55 passed, 0 failed.
+
+**Known open items.** Two were already recorded in `docs/ARCHITECTURE.md` during this phase's own
+documentation sweep and remain open, carried forward rather than resolved here (both are
+genuinely outside Part 4's own icon/docs/audit scope, named rather than silently fixed or dropped):
+Kira Studio's dead `LinkService` bind (`main.go` still binds it; no live caller since `git-ui`'s
+commit-body link left with the rest of the git module) and `.github/workflows/pr.yml` carrying no
+Kira Space build/test coverage (blocked on the `.github/workflows/` push-scope limitation; a patch
+would need to go through `docs/pending-changes/`, not attempted this phase). Check 9's inapplicable
+one-time-import gap is not a new open item — it is Part 1's own already-recorded, plan-sanctioned
+decision, re-confirmed here rather than re-opened.
+
+**P100 (all four parts) is now fully complete.** No separate whole-phase `## P100 result` rollup —
+P99, also a four-part phase, closed the same way with no rollup section, and nothing about this
+phase's own closure changes that precedent.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
