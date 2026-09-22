@@ -1,6 +1,10 @@
 package model
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/kirathecat/kira-studio/internal/appsettings"
+)
 
 // GitRepoSettings is G18 D3's display settings a user edits from the git graph's own dialog,
 // moved out of VS Code's contributes.configuration entirely (D1). P72 §9.2: LogLevel used to be
@@ -90,21 +94,13 @@ func ValidPullStrategy(v string) bool {
 	}
 }
 
-// ValidLogLevel mirrors schema.ts's kiraSpace.log.level enum.
-func ValidLogLevel(v string) bool {
-	switch v {
-	case "off", "error", "warn", "info", "debug":
-		return true
-	default:
-		return false
-	}
-}
-
 // validGraphPageSize mirrors schema.ts's kiraSpace.graph.pageSize bounds (100-50000).
-var validGraphPageSize = InRange(100, 50000)
+var validGraphPageSize = appsettings.InRange(100, 50000)
 
 // Validate checks every leaf the caller actually patched against schema.ts's own bounds, naming
-// the offending leaf in the error — the same discipline SettingsPatch.Validate follows.
+// the offending leaf in the error — the same discipline SettingsPatch.Validate follows. LogLevel
+// reuses appsettings.ValidLogLevel (P103 Part 4 §7.1) — the same off/error/warn/info/debug enum
+// Settings.Advanced.GitLogLevel validates against, genuinely shared, not merely parallel.
 func (p GitRepoSettingsPatch) Validate() error {
 	if p.GraphPageSize != nil && !validGraphPageSize(*p.GraphPageSize) {
 		return fmt.Errorf("model: graphPageSize: out of range value %d", *p.GraphPageSize)
@@ -115,7 +111,7 @@ func (p GitRepoSettingsPatch) Validate() error {
 	if p.PullStrategy != nil && !ValidPullStrategy(*p.PullStrategy) {
 		return fmt.Errorf("model: pullStrategy: invalid value %q", *p.PullStrategy)
 	}
-	if p.LogLevel != nil && !ValidLogLevel(*p.LogLevel) {
+	if p.LogLevel != nil && !appsettings.ValidLogLevel(*p.LogLevel) {
 		return fmt.Errorf("model: logLevel: invalid value %q", *p.LogLevel)
 	}
 	return nil
