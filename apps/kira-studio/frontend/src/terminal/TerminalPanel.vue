@@ -1,18 +1,15 @@
 <script setup lang="ts">
 import type { CustomScript } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertAction, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-// P104 §3: PanelShell is a forbidden shared primitive (packages/theme/src/primitives/) -- not
-// converted in this pass, same deferral as ProjectPanel.vue's own: its type-ahead-redirect/
-// search-reveal logic is real app behavior that would need extracting into a shared composable
-// before inlining at its 3 call sites without tripling that logic.
-import PanelShell from '@theme/primitives/PanelShell.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
+import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, ref } from 'vue';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useSettingsStore } from '../state/settings';
@@ -51,6 +48,16 @@ const filteredRecords = computed(() => {
 });
 
 const empty = computed(() => customScriptsStore.records.length === 0 && !adding.value);
+
+// P104 §3: PanelShell's own header/search-reveal/type-ahead-redirect logic, inlined via the
+// shared usePanelHeaderSearch composable -- this panel is always searchable (PanelShell's own
+// `:searchable="true"`).
+const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+  searchable: () => true,
+  setSearch: (v) => {
+    search.value = v;
+  },
+});
 
 function openAddRow(): void {
   adding.value = true;
@@ -129,16 +136,21 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 
 <template>
   <div data-testid="terminal-panel" class="terminal-panel">
-    <PanelShell
-      :search="search"
-      :empty="empty"
-      :searchable="true"
-      @update:search="search = $event"
-    >
-      <template #title>
+    <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, search)">
+      <div class="p-panel-head h-[34px]">
         <span class="panel-title">Quick commands</span>
-      </template>
-      <template #actions>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          class="p-push"
+          :data-active="showSearch"
+          aria-label="Search"
+          v-tooltip="showSearch ? 'Hide search' : 'Search'"
+          data-testid="toggle-search"
+          @click="toggleSearch"
+        >
+          <CodiconIcon name="search" :size="13" />
+        </Button>
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -167,76 +179,98 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
           </TooltipTrigger>
           <TooltipContent>Manage scripts…</TooltipContent>
         </Tooltip>
-      </template>
-      <template #body>
-        <div class="terminal-panel-body">
-          <div v-if="adding" class="quick-command-add" data-testid="quick-command-add-row">
-            <Input
-              v-model="newName"
-              placeholder="Name"
-              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-              data-testid="quick-command-add-name"
-            />
-            <Input
-              v-model="newCommand"
-              placeholder="Command"
-              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-              data-testid="quick-command-add-command"
-            />
-            <div class="quick-command-add-actions">
-              <Button variant="dialog" size="kira-lg" @click="cancelAdd">Cancel</Button>
-              <Button
-                variant="dialog-primary"
-                size="kira-lg"
-                :disabled="!canAdd"
-                data-testid="quick-command-add-confirm"
-                @click="onAdd"
-                >Add</Button
-              >
-            </div>
-            <span v-if="addError" class="field-error">{{ addError }}</span>
-          </div>
-
-          <div
-            v-if="filteredRecords.length > 0"
-            class="quick-command-list"
-            data-testid="quick-command-list"
-          >
-            <div
-              v-for="script in filteredRecords"
-              :key="script.id"
-              class="quick-command-row"
-              :data-testid="`quick-command-${script.id}`"
-              @click="runScript(script)"
-              @contextmenu.prevent="onContextMenu($event, script)"
-            >
-              <span
-                v-if="script.color !== 'none'"
-                class="swatch"
-                :style="{ background: connColorVar(script.color) }"
+      </div>
+      <template v-if="!empty">
+        <div v-if="showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
+          <InputGroup>
+            <InputGroupAddon>
+              <CodiconIcon name="search" :size="13" />
+            </InputGroupAddon>
+            <InputGroupInput v-model="search" placeholder="Search" data-testid="tree-search" />
+            <InputGroupAddon v-if="search" align="inline-end">
+              <InputGroupButton aria-label="Clear search" @click="search = ''">
+                <CodiconIcon name="close" :size="12" />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+        </div>
+        <div class="min-h-0 flex-1">
+          <div class="terminal-panel-body">
+            <div v-if="adding" class="quick-command-add" data-testid="quick-command-add-row">
+              <Input
+                v-model="newName"
+                placeholder="Name"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                data-testid="quick-command-add-name"
               />
-              <CodiconIcon v-else name="play" :size="13" class="run-icon" />
-              <div class="quick-command-text">
-                <span class="quick-command-name">{{ script.name }}</span>
-                <span class="quick-command-command">{{ script.command }}</span>
+              <Input
+                v-model="newCommand"
+                placeholder="Command"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                data-testid="quick-command-add-command"
+              />
+              <div class="quick-command-add-actions">
+                <Button variant="dialog" size="kira-lg" @click="cancelAdd">Cancel</Button>
+                <Button
+                  variant="dialog-primary"
+                  size="kira-lg"
+                  :disabled="!canAdd"
+                  data-testid="quick-command-add-confirm"
+                  @click="onAdd"
+                  >Add</Button
+                >
+              </div>
+              <span v-if="addError" class="field-error">{{ addError }}</span>
+            </div>
+
+            <div
+              v-if="filteredRecords.length > 0"
+              class="quick-command-list"
+              data-testid="quick-command-list"
+            >
+              <div
+                v-for="script in filteredRecords"
+                :key="script.id"
+                class="quick-command-row"
+                :data-testid="`quick-command-${script.id}`"
+                @click="runScript(script)"
+                @contextmenu.prevent="onContextMenu($event, script)"
+              >
+                <span
+                  v-if="script.color !== 'none'"
+                  class="swatch"
+                  :style="{ background: connColorVar(script.color) }"
+                />
+                <CodiconIcon v-else name="play" :size="13" class="run-icon" />
+                <div class="quick-command-text">
+                  <span class="quick-command-name">{{ script.name }}</span>
+                  <span class="quick-command-command">{{ script.command }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </template>
-      <template #empty>
-        <EmptyState icon="terminal-bash" label="No quick commands">
-          <button
-            type="button"
-            class="p-dlgbtn primary"
-            data-testid="quick-command-empty-add"
-            @click="openAddRow"
-          >
-            Add a quick command
-          </button>
-        </EmptyState>
-      </template>
-    </PanelShell>
+      <div
+        v-else
+        class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
+      >
+        <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
+          <CodiconIcon name="terminal-bash" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md font-normal text-muted">No quick commands</AlertTitle>
+          <AlertAction class="static mt-1">
+            <Button
+              variant="dialog-primary"
+              size="kira-lg"
+              data-testid="quick-command-empty-add"
+              @click="openAddRow"
+            >
+              Add a quick command
+            </Button>
+          </AlertAction>
+        </Alert>
+      </div>
+    </div>
   </div>
 </template>
 
