@@ -47,6 +47,7 @@ check_layer() {
 FRONTEND_SRC=apps/kira-studio/frontend/src
 SPACE_SRC=apps/kira-space/frontend/src
 THEME_SRC=packages/theme/src
+WORKBENCH_SRC=packages/workbench/src
 GIT_UI_SRC=packages/git-ui/src
 KIRA_UI_SRC=packages/kira-ui/src
 
@@ -55,7 +56,10 @@ KIRA_UI_SRC=packages/kira-ui/src
 # apps — definitions read from their real new location. Usage now scans both apps' own src (kira-
 # space is a real --kira-* consumer, not just Studio) plus packages/theme/src itself, whose own
 # components/primitives reference the same tokens.
-check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC" \
+#
+# P103 Part 1: packages/workbench/src added to the usage scan too — its own moved ContextMenu.vue/
+# AppTooltip.vue/ConfirmDialog.vue reference --kira-* tokens the same way they did inside each app.
+check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC $WORKBENCH_SRC" \
   "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css" kira
 check_layer 'kv-' "$GIT_UI_SRC" \
   "$GIT_UI_SRC/theme/vscode-tokens.css $GIT_UI_SRC/theme/density.css $GIT_UI_SRC/theme/kira-structure.css" kv

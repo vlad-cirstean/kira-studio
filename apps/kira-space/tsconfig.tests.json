@@ -17,9 +17,20 @@
     "paths": {
       "@shared/*": ["../../packages/shared/*"],
       "@theme/*": ["../../packages/theme/src/*"],
+      "@workbench/*": ["../../packages/workbench/src/*"],
       "@kira/git-ipc": ["../../packages/git-ipc/src/index.ts"],
       "@kira/git-ipc/codec": ["../../packages/git-ipc/src/codec.ts"]
     }
   },
-  "include": ["../../packages/shared/**/*.ts", "playwright.config.ts", "tests/ui/**/*.ts"]
+  "include": [
+    "../../packages/shared/**/*.ts",
+    "../../packages/workbench/src/**/*.ts",
+    "../../packages/workbench/env.d.ts",
+    "playwright.config.ts",
+    "tests/ui/**/*.ts"
+  ],
+  // P103 Part 1: testing/unit/* imports `bun:test` (this project's own `types` is `["node"]`,
+  // for tests/ui's Playwright surface, not `bun-types`) — apps/*/tests/unit/tsconfig.json is
+  // its real project.
+  "exclude": ["../../packages/workbench/src/testing/unit/**"]
 }

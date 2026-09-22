@@ -34,6 +34,12 @@ export default defineConfig(({ command }) => {
         // vite.config.ts's own note — the same shared theme/shadcn-vue/primitive source, this app
         // importing rather than owning its own copy.
         '@theme': fileURLToPath(new URL('../../../packages/theme/src', import.meta.url)),
+        // P103 Part 1: the byte-identical/code-identical workbench tier hoisted out of both apps'
+        // own src/ into one real location — this app importing, not owning, its own copy. Follows
+        // @theme's own alias shape exactly (not packages/git-ui's exports-map precedent), since
+        // these files import @theme/*/@shared/* themselves, which only resolve through this app's
+        // own alias table.
+        '@workbench': fileURLToPath(new URL('../../../packages/workbench/src', import.meta.url)),
         '@bindings': fileURLToPath(
           new URL(
             './bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge',

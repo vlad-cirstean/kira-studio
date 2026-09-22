@@ -10,6 +10,7 @@
     "apps/kira-space-vscode",
     "packages/shared",
     "packages/theme",
+    "packages/workbench",
     "packages/api-core",
     "packages/git-ipc",
     "packages/git-core",

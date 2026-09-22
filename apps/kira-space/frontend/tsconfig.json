@@ -14,6 +14,7 @@
       "@/*": ["./src/*"],
       "@shared/*": ["../../../packages/shared/*"],
       "@theme/*": ["../../../packages/theme/src/*"],
+      "@workbench/*": ["../../../packages/workbench/src/*"],
       "@bindings/*": [
         "./bindings/github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/*"
       ],
@@ -28,6 +29,9 @@
     "src/**/*.vue",
     "../../../packages/shared/**/*.ts",
     "../../../packages/theme/src/**/*.ts",
-    "../../../packages/theme/src/**/*.vue"
+    "../../../packages/theme/src/**/*.vue",
+    "../../../packages/workbench/src/**/*.ts",
+    "../../../packages/workbench/src/**/*.vue",
+    "../../../packages/workbench/env.d.ts"
   ]
 }

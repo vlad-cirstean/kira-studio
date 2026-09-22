@@ -1,0 +1,10 @@
+/* P103 Part 1: Tailwind v4's automatic content scan roots at the consuming app's own Vite project
+ * and never reaches a sibling package (P100 Part 2's own finding, fixed the same way for
+ * packages/theme/src/base.css). `@source "./";` tells Tailwind to scan this package's own src/ too,
+ * so a utility class used only inside a moved workbench component (ContextMenu.vue, AppTooltip.vue,
+ * ConfirmDialog.vue, …) still generates its CSS. Each app's own main.ts imports this file directly
+ * after `@theme/base.css` — no `@import` here to keep `@source` first is required, so if one is
+ * ever added, `@source` must stay after it (`noInvalidPositionAtImportRule`). Deliberately NOT
+ * referenced from packages/theme/src/base.css — that would couple theme to workbench, the wrong
+ * direction (plan §4.4). */
+@source "./";

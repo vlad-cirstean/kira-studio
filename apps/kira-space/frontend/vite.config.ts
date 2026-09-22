@@ -27,6 +27,12 @@ export default defineConfig(({ command }) => {
         // shadcn-vue/primitive files this app shared verbatim with Kira Studio, hoisted out of both
         // apps' own src/ into one real location — this app importing, not owning, its own copy.
         '@theme': fileURLToPath(new URL('../../../packages/theme/src', import.meta.url)),
+        // P103 Part 1: the byte-identical/code-identical workbench tier hoisted out of both apps'
+        // own src/ into one real location — this app importing, not owning, its own copy. Follows
+        // @theme's own alias shape exactly (not packages/git-ui's exports-map precedent), since
+        // these files import @theme/*/@shared/* themselves, which only resolve through this app's
+        // own alias table.
+        '@workbench': fileURLToPath(new URL('../../../packages/workbench/src', import.meta.url)),
         // The module path stays "kira-studio" — that is the Go module name (go.mod), not the app
         // name (plan §5.1) — do not "fix" it.
         '@bindings': fileURLToPath(

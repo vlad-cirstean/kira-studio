@@ -85,6 +85,14 @@
       "entry": ["src/**/*.{ts,vue}"],
       "project": ["src/**/*.{ts,vue}"]
     },
+    "packages/workbench": {
+      // Same alias-boundary reasoning as packages/theme above (`@workbench/*`, P103 Part 1) —
+      // every file here is its own entry. `formatBytes` (util/format.ts) and `runMenuShortcut`
+      // (state/contextMenu.ts) each have exactly one real consumer today (Kira Studio only) — an
+      // expected, not-a-finding shape per the plan's own §9 gate, not an unused export.
+      "entry": ["src/**/*.{ts,vue}"],
+      "project": ["src/**/*.{ts,vue}"]
+    },
     "packages/api-core": {
       // src/index.ts dropped (P94 pass 3 §3.2): knip already reaches it through package.json's
       // own `main`/`exports` field — a redundant entry pattern. test/**/*.test.ts corrected to
