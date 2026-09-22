@@ -3,7 +3,7 @@
  * G1 §5.2/F18 — the extension's own build, in this repo's style (a small script beside
  * generate-wire.sh, `Bun.build` over the CLI so the exact output filename is ours to name, the
  * same call upstream's own scripts/build.ts made). Two outputs, both under
- * apps/kira-studio-vscode/dist/ (that package's own package.json#main commits to this, unlike
+ * apps/kira-space-vscode/dist/ (that package's own package.json#main commits to this, unlike
  * upstream's shared repo-root dist/ — see html.ts's own comment): the webview UI
  * (packages/git-ui/vite.config.ts) and the extension bundle itself.
  *
@@ -18,8 +18,9 @@
  * (one implementation of "build the extension", not a subprocess) — `main()` runs only when this
  * file is executed directly.
  *
- * G10 D8: wired into the *packaging* graph now (`apps/kira-studio/build/Taskfile.yml`'s
- * `build:vsix`, reached only from `darwin:package`/`darwin:package:universal`) — still out of `bun
+ * G10 D8: wired into the *packaging* graph now (`apps/kira-space/build/Taskfile.yml`'s
+ * `build:vsix`, retargeted here from Kira Studio by P100 Part 3, reached only from
+ * `darwin:package`/`darwin:package:universal`) — still out of `bun
  * run build` and `scripts/setup.sh`, per G3 D20's own reasoning: neither is on a path that has any
  * use for a packaged extension.
  */
@@ -28,7 +29,7 @@ import { dirname, join, relative } from 'node:path';
 import { build as viteBuild } from 'vite';
 
 const ROOT = join(import.meta.dir, '..');
-const VSCODE_APP = join(ROOT, 'apps', 'kira-studio-vscode');
+const VSCODE_APP = join(ROOT, 'apps', 'kira-space-vscode');
 const DIST = join(VSCODE_APP, 'dist');
 
 async function buildUi(): Promise<void> {

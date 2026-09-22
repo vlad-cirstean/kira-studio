@@ -1,9 +1,10 @@
 #!/usr/bin/env bun
 /**
- * G10 D7 — packages the built extension into a real `.vsix`: `apps/kira-studio/bin/kira-version.vsix`.
+ * G10 D7 — packages the built extension into a real `.vsix`: `apps/kira-space/bin/kira-space.vsix`
+ * (retargeted from Kira Studio by P100 Part 3 — the extension is Kira Space's own product now).
  * That directory is the repo's one build-output location (already gitignored, already where
- * `Kira Studio.app`/`.dmg` land) and, decisively, is *outside* the directory vsce packages
- * (`apps/kira-studio-vscode`), so a previous run's own `.vsix` can never be packaged into the next
+ * `Kira Space.app`/`.dmg` land) and, decisively, is *outside* the directory vsce packages
+ * (`apps/kira-space-vscode`), so a previous run's own `.vsix` can never be packaged into the next
  * one. A fixed filename (no version in it) keeps the Taskfile copy step and the Go-side path
  * constant; the version lives inside the manifest, where `code` reads it.
  *
@@ -22,8 +23,8 @@ import { dirname, join } from 'node:path';
 import { buildVsCodeBundles } from './build-vscode.ts';
 
 const ROOT = join(import.meta.dir, '..');
-const VSCODE_APP = join(ROOT, 'apps', 'kira-studio-vscode');
-const OUT = join(ROOT, 'apps', 'kira-studio', 'bin', 'kira-version.vsix');
+const VSCODE_APP = join(ROOT, 'apps', 'kira-space-vscode');
+const OUT = join(ROOT, 'apps', 'kira-space', 'bin', 'kira-space.vsix');
 const VSCE = join(ROOT, 'node_modules', '@vscode', 'vsce', 'vsce');
 
 async function main(): Promise<void> {

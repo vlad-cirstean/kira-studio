@@ -94,6 +94,30 @@ tasks:
       - mkdir -p .task
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename .task/unused-icon.ico
 
+  build:vsix:
+    summary: Packages the VS Code extension into apps/kira-space/bin/kira-space.vsix (G10 D7/D8, retargeted P100 Part 3)
+    run: once
+    dir: '{{.WORKSPACE_ROOT}}'
+    deps:
+      - task: install:frontend:deps
+    sources:
+      - apps/kira-space-vscode/package.json
+      - apps/kira-space-vscode/.vscodeignore
+      - apps/kira-space-vscode/LICENSE
+      - apps/kira-space-vscode/src/**/*
+      - apps/kira-space-vscode/resources/**/*
+      - packages/git-core/src/**/*
+      - packages/git-ipc/src/**/*
+      - packages/git-ui/src/**/*
+      - packages/kira-ui/src/**/*
+      - scripts/build-vscode.ts
+      - scripts/package-vscode.ts
+      - exclude: apps/kira-space-vscode/dist/**/*
+    generates:
+      - apps/kira-space/bin/kira-space.vsix
+    cmds:
+      - bun run scripts/package-vscode.ts
+
   update:build-assets:
     summary: Updates the build assets
     dir: build

@@ -36,7 +36,7 @@ func (f fakeFileInfo) Sys() any           { return nil }
 func newInstaller(t *testing.T, vsixExists bool, codeMode string, run func(context.Context, string, []string) error) (*Installer, string) {
 	t.Helper()
 	exeDir := t.TempDir()
-	exe := filepath.Join(exeDir, "MacOS", "Kira Studio")
+	exe := filepath.Join(exeDir, "MacOS", "Kira Space")
 	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -115,17 +115,17 @@ func TestInstall_CodeOnPath_Installed(t *testing.T) {
 }
 
 // TestInstall_VsixPathWithSpace_SurvivesAsOneArgvElement is D13's own stated risk made concrete:
-// the app's own executable is literally "Contents/MacOS/Kira Studio", space included.
+// the app's own executable is literally "Contents/MacOS/Kira Space", space included.
 func TestInstall_VsixPathWithSpace_SurvivesAsOneArgvElement(t *testing.T) {
 	exeDir := t.TempDir()
-	exe := filepath.Join(exeDir, "Kira Studio.app", "Contents", "MacOS", "Kira Studio")
+	exe := filepath.Join(exeDir, "Kira Space.app", "Contents", "MacOS", "Kira Space")
 	if err := os.MkdirAll(filepath.Dir(exe), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(exe, []byte{}, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	resourcesDir := filepath.Join(exeDir, "Kira Studio.app", "Contents", "Resources")
+	resourcesDir := filepath.Join(exeDir, "Kira Space.app", "Contents", "Resources")
 	if err := os.MkdirAll(resourcesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

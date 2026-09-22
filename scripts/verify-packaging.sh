@@ -107,8 +107,11 @@ fi
 # G10 D21: both are "0.0.0" today, so this passes immediately; release.yml's version step writes
 # both files from the same tag, so they stay in agreement after a real release. Static (not an
 # artifact check) so it runs on Linux and in every CI job, not only when a bundle exists.
-VSCODE_PKG="apps/kira-studio-vscode/package.json"
-CONFIG_YML="apps/kira-studio/build/config.yml"
+# P100 Part 3: the extension ships inside Kira Space's bundle now, not Kira Studio's — checked
+# against apps/kira-space/build/config.yml, the file create:app:bundle actually stamps the .vsix
+# alongside.
+VSCODE_PKG="apps/kira-space-vscode/package.json"
+CONFIG_YML="apps/kira-space/build/config.yml"
 if [ -f "$VSCODE_PKG" ] && [ -f "$CONFIG_YML" ]; then
   EXT_VERSION="$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)"
   APP_VERSION="$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG_YML" | head -1)"
@@ -145,8 +148,10 @@ APP="apps/kira-studio/bin/Kira Studio.app"
 DMG="apps/kira-studio/bin/Kira Studio.dmg"
 
 # --- Artifact checks (only if the bundle exists) -----------------------------------------------
+# P100 Part 3: no A6 here — Kira Studio's bundle no longer carries a .vsix (that moved to Kira
+# Space's own bundle, checked separately below).
 if [ ! -d "$APP" ]; then
-  note "skipped A1/A3/A5/A6/N2 — \"$APP\" not present (run 'bun run package' first)"
+  note "skipped A1/A3/A5/N2 — \"$APP\" not present (run 'bun run package' first)"
 else
   # A1: ad-hoc signature (P58f: back to the single-target check — no vendored node binary, no
   # nested executable, left to sign independently before the whole bundle is deep-signed).
@@ -189,26 +194,6 @@ else
     note "skipped A5 — PlistBuddy not available on this runner"
   fi
 
-  # A6: the bundled .vsix (G10 D8/D21) — present, non-empty, and a real zip archive ("PK" is a
-  # zip's own magic number), so a truncated or missing copy is caught here rather than the Install
-  # button silently reporting "not bundled" or failing to install a corrupt file.
-  VSIX="$APP/Contents/Resources/kira-version.vsix"
-  if [ ! -f "$VSIX" ]; then
-    fail "vsix not bundled" "\"$VSIX\" not present — create:app:bundle must copy it before codesign:adhoc"
-  else
-    VSIX_SIZE="$(wc -c < "$VSIX" | tr -d ' ')"
-    if [ "$VSIX_SIZE" -eq 0 ]; then
-      fail "vsix empty" "\"$VSIX\" is empty"
-    elif [ "$(dd if="$VSIX" bs=1 count=2 2>/dev/null)" != "PK" ]; then
-      fail "vsix not a zip" "\"$VSIX\" does not start with the zip \"PK\" signature"
-    elif command -v unzip >/dev/null 2>&1 && ! unzip -l "$VSIX" | grep -qi 'extension/readme\.md'; then
-      # G12 D15: the extension's own README ships with no packaging edit (.vscodeignore is an
-      # exclusion list) — this is the one line that proves it actually landed in the archive.
-      # vsce lowercases the entry to extension/readme.md, hence -i rather than a literal case.
-      fail "vsix missing README" "\"$VSIX\" does not contain extension/readme.md"
-    fi
-  fi
-
   # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
   if command -v codesign >/dev/null 2>&1; then
     if ! codesign --verify --deep --strict "$APP" >/dev/null 2>&1; then
@@ -233,6 +218,97 @@ else
   # N3: and it verifies.
   if ! codesign --verify --strict "$DMG" >/dev/null 2>&1; then
     fail "dmg does not verify" "codesign --verify --strict \"$DMG\" did not exit 0"
+  fi
+fi
+
+# --- Kira Space's own bundle (P100 Part 3: retargeted here from Kira Studio) -------------------
+SPACE_APP="apps/kira-space/bin/Kira Space.app"
+SPACE_DMG="apps/kira-space/bin/Kira Space.dmg"
+
+if [ ! -d "$SPACE_APP" ]; then
+  note "skipped A1/A3/A5/A6/N2 — \"$SPACE_APP\" not present (run 'bun run package:space' first)"
+else
+  # A1: ad-hoc signature.
+  if command -v codesign >/dev/null 2>&1; then
+    for target in "$SPACE_APP"; do
+      if [ -e "$target" ]; then
+        if ! codesign -dv --verbose=2 "$target" 2>&1 | grep -q 'Signature=adhoc'; then
+          fail "signature not ad-hoc" "codesign on \"$target\" did not report Signature=adhoc"
+        fi
+      else
+        note "skipped the ad-hoc signature check for \"$target\" — not present"
+      fi
+    done
+  else
+    note "skipped A1 — codesign not available on this runner"
+  fi
+
+  # A3: bundle identifier.
+  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
+    SPACE_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SPACE_APP/Contents/Info.plist" 2>/dev/null || echo '')"
+    if [ "$SPACE_BUNDLE_ID" != "com.kirathecat.kira-space" ]; then
+      fail "wrong bundle identifier" "CFBundleIdentifier is '$SPACE_BUNDLE_ID', expected com.kirathecat.kira-space"
+    fi
+  else
+    note "skipped A3 — PlistBuddy not available on this runner"
+  fi
+
+  # A5: the bundle reports the version build/config.yml holds.
+  if command -v /usr/libexec/PlistBuddy >/dev/null 2>&1; then
+    SPACE_WANT_VERSION="$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' apps/kira-space/build/config.yml | head -1)"
+    SPACE_GOT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SPACE_APP/Contents/Info.plist" 2>/dev/null || echo '')"
+    if [ "$SPACE_GOT_VERSION" != "$SPACE_WANT_VERSION" ]; then
+      fail "wrong bundle version" "CFBundleShortVersionString is '$SPACE_GOT_VERSION', expected '$SPACE_WANT_VERSION' (apps/kira-space/build/config.yml's info.version)"
+    fi
+  else
+    note "skipped A5 — PlistBuddy not available on this runner"
+  fi
+
+  # A6: the bundled .vsix (G10 D8/D21, retargeted here by P100 Part 3) — present, non-empty, and a
+  # real zip archive ("PK" is a zip's own magic number), so a truncated or missing copy is caught
+  # here rather than the Install button silently reporting "not bundled" or failing to install a
+  # corrupt file.
+  SPACE_VSIX="$SPACE_APP/Contents/Resources/kira-space.vsix"
+  if [ ! -f "$SPACE_VSIX" ]; then
+    fail "vsix not bundled" "\"$SPACE_VSIX\" not present — create:app:bundle must copy it before codesign:adhoc"
+  else
+    SPACE_VSIX_SIZE="$(wc -c < "$SPACE_VSIX" | tr -d ' ')"
+    if [ "$SPACE_VSIX_SIZE" -eq 0 ]; then
+      fail "vsix empty" "\"$SPACE_VSIX\" is empty"
+    elif [ "$(dd if="$SPACE_VSIX" bs=1 count=2 2>/dev/null)" != "PK" ]; then
+      fail "vsix not a zip" "\"$SPACE_VSIX\" does not start with the zip \"PK\" signature"
+    elif command -v unzip >/dev/null 2>&1 && ! unzip -l "$SPACE_VSIX" | grep -qi 'extension/readme\.md'; then
+      # G12 D15: the extension's own README ships with no packaging edit (.vscodeignore is an
+      # exclusion list) — this is the one line that proves it actually landed in the archive.
+      # vsce lowercases the entry to extension/readme.md, hence -i rather than a literal case.
+      fail "vsix missing README" "\"$SPACE_VSIX\" does not contain extension/readme.md"
+    fi
+  fi
+
+  # --- N2: the whole bundle verifies deep-signed -------------------------------------------------
+  if command -v codesign >/dev/null 2>&1; then
+    if ! codesign --verify --deep --strict "$SPACE_APP" >/dev/null 2>&1; then
+      fail "bundle does not verify" "codesign --verify --deep --strict \"$SPACE_APP\" did not exit 0"
+    fi
+  else
+    note "skipped N2 — codesign not available on this runner"
+  fi
+fi
+
+# --- A4/N3: Kira Space's shipped .dmg (only if it exists) --------------------------------------
+if [ ! -f "$SPACE_DMG" ]; then
+  note "skipped A4/N3 — \"$SPACE_DMG\" not present (run 'bun run package:space' first)"
+elif ! command -v codesign >/dev/null 2>&1; then
+  note "skipped A4/N3 — codesign not available on this runner"
+else
+  # A4: the image carries its own ad-hoc signature (scripts/sign-bundle.sh), same property A1
+  # asserts for the bundle. No --deep: a disk image is a flat file, not a bundle tree.
+  if ! codesign -dv --verbose=2 "$SPACE_DMG" 2>&1 | grep -q 'Signature=adhoc'; then
+    fail "dmg signature not ad-hoc" "codesign on \"$SPACE_DMG\" did not report Signature=adhoc"
+  fi
+  # N3: and it verifies.
+  if ! codesign --verify --strict "$SPACE_DMG" >/dev/null 2>&1; then
+    fail "dmg does not verify" "codesign --verify --strict \"$SPACE_DMG\" did not exit 0"
   fi
 fi
 

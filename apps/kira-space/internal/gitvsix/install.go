@@ -1,4 +1,4 @@
-// Package gitvsix locates the `.vsix` bundled inside a packaged `Kira Studio.app` and installs it
+// Package gitvsix locates the `.vsix` bundled inside a packaged `Kira Space.app` and installs it
 // into VS Code, or reveals it in Finder when `code` isn't available — SPEC §7's `internal/git*`
 // convention for a git-chapter domain package (G10 D10). It imports nothing from `internal/bridge`
 // (the Wails adapter layer, kept honest by `internal/layering_test.go`) and nothing from
@@ -17,7 +17,7 @@ import (
 // this package looks for beside the running executable (D8/D11). No version in the name — the
 // version lives inside the manifest, where `code` reads it — so this constant is the one place a
 // future phase would change to ship more than one side by side.
-const vsixFileName = "kira-version.vsix"
+const vsixFileName = "kira-space.vsix"
 
 // Deps are the four independent seams D13 calls for: locating this binary, finding `code`/`open`,
 // checking a candidate exists, and spawning one. Function fields rather than an interface — there
@@ -112,7 +112,7 @@ const (
 // (verify-packaging.sh's own S8 forbids an env-driven dev branch in main.go, and the same
 // instinct applies here — the dev story is `darwin:run`'s own conditional copy, a real bundle,
 // not a variable that makes a non-bundle pretend to be one). Resolves correctly inside both
-// `Kira Studio.app` and `Kira Studio.dev.app`; resolves to nothing under `wails3 task dev`.
+// `Kira Space.app` and `Kira Space.dev.app`; resolves to nothing under `wails3 task dev`.
 func (i *Installer) vsixPath() (string, bool) {
 	exe, err := i.executable()
 	if err != nil {
