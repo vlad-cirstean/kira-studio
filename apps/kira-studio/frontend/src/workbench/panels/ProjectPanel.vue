@@ -44,15 +44,9 @@ const treeStore = useTreeStore();
          already lives on the main start page, so it is not repeated here. -->
     <template #empty>
       <span class="dim"><CodiconIcon name="database" :size="24" /></span>
-      <span class="p-xs dim side-empty-text">Everything you connect to<br />shows up here.</span>
+      <span class="p-xs dim leading-normal">Everything you connect to<br />shows up here.</span>
     </template>
   </PanelShell>
   <FiltersDialog />
   <SchemaDialog v-if="schemaDialogStore.open" />
 </template>
-
-<style scoped>
-.side-empty-text {
-  line-height: 1.5;
-}
-</style>

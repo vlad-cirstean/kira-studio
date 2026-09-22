@@ -23,10 +23,18 @@ function onConfirm(): void {
     close-test-id="confirm-dialog-close"
     @close="onCancel"
   >
-    <p class="message" data-testid="confirm-dialog-message">{{ confirmDialogStore.message }}</p>
+    <p
+      class="m-0 whitespace-pre-wrap"
+      style="padding: var(--kira-s-4) var(--kira-s-5)"
+      data-testid="confirm-dialog-message"
+    >
+      {{ confirmDialogStore.message }}
+    </p>
 
     <template #footer>
-      <span class="p-dialog-actions end footer-actions p-push">
+      <!-- p-dialog-actions.end supplies display/align-items/justify-content/width; this dialog
+           keeps its own tighter s-2 gap rather than the shared s-3. -->
+      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
         <AppButton kind="dialog" data-testid="confirm-dialog-cancel" @click="onCancel">
           Cancel
         </AppButton>
@@ -42,17 +50,3 @@ function onConfirm(): void {
     </template>
   </DialogFrame>
 </template>
-
-<style scoped>
-.message {
-  margin: 0;
-  padding: var(--kira-s-4) var(--kira-s-5);
-  white-space: pre-wrap;
-}
-
-/* p-dialog-actions.end supplies display/align-items/justify-content/width; this dialog keeps its
-   own tighter s-2 gap rather than the shared s-3. */
-.footer-actions {
-  gap: var(--kira-s-2);
-}
-</style>

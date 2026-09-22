@@ -58,12 +58,16 @@ function onCancel(): void {
     close-test-id="git-credential-dialog-close"
     @close="onCancel"
   >
-    <div class="credential-form">
-      <p class="subtitle" data-testid="git-credential-repo">
+    <div class="flex flex-col" style="gap: var(--kira-s-2); padding: var(--kira-s-4) var(--kira-s-5)">
+      <p class="m-0" style="color: var(--kira-fg-subtle)" data-testid="git-credential-repo">
         {{ codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name }}
       </p>
       <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
-      <p class="prompt mono" data-testid="git-credential-prompt">
+      <p
+        class="mono whitespace-pre-wrap"
+        style="margin: 0 0 var(--kira-s-1)"
+        data-testid="git-credential-prompt"
+      >
         {{ gitCredentialStore.active.prompt }}
       </p>
       <TextField
@@ -77,7 +81,7 @@ function onCancel(): void {
     </div>
 
     <template #footer>
-      <span class="p-dialog-actions end footer-actions p-push">
+      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
         <AppButton kind="dialog" data-testid="git-credential-cancel" @click="onCancel">
           Cancel
         </AppButton>
@@ -93,26 +97,3 @@ function onCancel(): void {
     </template>
   </DialogFrame>
 </template>
-
-<style scoped>
-.credential-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-4) var(--kira-s-5);
-}
-
-.subtitle {
-  margin: 0;
-  color: var(--kira-fg-subtle);
-}
-
-.prompt {
-  margin: 0 0 var(--kira-s-1);
-  white-space: pre-wrap;
-}
-
-.footer-actions {
-  gap: var(--kira-s-2);
-}
-</style>
