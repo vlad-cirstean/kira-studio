@@ -181,8 +181,10 @@ test('a cancelled re-auth does not commit a stale plaintext from an earlier succ
   ).toHaveValue('s3cr3t-key');
   expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(1);
 
-  // Un-ticking "secret" triggers a second, independent reveal call (D9) — this one is cancelled.
-  await variableRow(page, 'var-apikey').locator('[data-testid="variable-secret"]').uncheck();
+  // Un-ticking "secret" triggers a second, independent reveal call (D9) — this one is cancelled,
+  // so the checkbox (a controlled ARIA toggle, not a native input) stays checked; a plain click
+  // fires the action without asserting the unchecked postcondition `.uncheck()` would demand.
+  await variableRow(page, 'var-apikey').locator('[data-testid="variable-secret"]').click();
   expect(control.log().filter((e) => e.channel === IPC.variablesReveal)).toHaveLength(2);
 
   // The stale success from the *first* reveal must not stand in for the second, cancelled one:
@@ -333,9 +335,10 @@ test('the variables filter matches a secret’s name, never its plaintext, and d
   // D14: reordering is refused while filtered — the row itself carries `:draggable`, the drag
   // handle says why via its own tooltip, and Alt+↑ is a no-op.
   await expect(variableRow(page, 'var-apikey')).toHaveAttribute('draggable', 'false');
-  await expect(
-    variableRow(page, 'var-apikey').locator('[data-testid="variable-grip"]'),
-  ).toHaveAttribute('data-kira-tip', 'Clear the filter to reorder');
+  await variableRow(page, 'var-apikey').locator('[data-testid="variable-grip"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    'Clear the filter to reorder',
+  );
   await variableRow(page, 'var-apikey').locator('[data-testid="variable-name"]').focus();
   await page.keyboard.press('Alt+ArrowUp');
   expect(control.log().filter((e) => e.channel === IPC.variablesReorder)).toHaveLength(0);

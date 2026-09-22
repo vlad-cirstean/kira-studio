@@ -1097,7 +1097,10 @@ test('a non-OK status shows what the code means and what the server said (P18 D1
   const chip = page.locator('[data-testid="grpc-status-chip"]');
   const message = page.locator('[data-testid="grpc-status-message"]');
   await expect(page.locator('[data-testid="grpc-status-hint"]')).toHaveCount(0);
-  await expect(chip).toHaveAttribute('data-kira-tip', /no such method or resource/);
+  await chip.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    'no such method or resource',
+  );
   await expect(message).toBeVisible();
   await expect(message).toHaveText('no user with that id');
 });

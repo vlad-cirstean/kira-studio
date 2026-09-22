@@ -145,9 +145,9 @@ async function onClear(): Promise<void> {
     </Alert>
 
     <template v-else>
-      <InputGroup data-testid="http-history-filter">
+      <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter history" />
+        <InputGroupInput v-model="filterQuery" placeholder="Filter history" data-testid="http-history-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
           <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
             <CodiconIcon name="close" :size="13" />

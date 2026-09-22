@@ -191,9 +191,9 @@ function onKeydown(e: KeyboardEvent, id: string): void {
     </div>
     <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
     <div class="p-toolbar last">
-      <InputGroup v-if="variablesStore.environments.length > 0" data-testid="environments-filter">
+      <InputGroup v-if="variablesStore.environments.length > 0">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" />
+        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="environments-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
           <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
             <CodiconIcon name="close" :size="13" />

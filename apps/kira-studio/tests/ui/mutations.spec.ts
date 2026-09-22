@@ -302,11 +302,19 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
 
   // --- scenario 6: commit sends the batch and reloads the tab ------------------------------
   const countButton = page.locator('[data-testid="toolbar-count"]');
+  const countTip = page.locator('[data-slot="tooltip-content"]').first();
+  // Neither click() nor fill()/press() moves the real pointer off this button once it has already
+  // been hovered, so hover() alone can land with no actual movement and fire no new mouseenter.
+  // Move away first, every time, to guarantee a real one.
+  async function hoverCount(): Promise<void> {
+    await page.mouse.move(0, 0);
+    await countButton.hover();
+  }
   await countButton.click();
-  await expect(countButton).toHaveAttribute('data-kira-tip', /Count all rows — Σ \d/, {
-    timeout: 10_000,
-  });
-  const countBeforeCommit = await countButton.getAttribute('data-kira-tip');
+  await hoverCount();
+  await expect(countTip).toContainText(/Count all rows — Σ \d/, { timeout: 10_000 });
+  const countBeforeCommit = (await countTip.textContent())?.match(/Count all rows — Σ [\d,]+/)?.[0];
+  expect(countBeforeCommit).toBeTruthy();
 
   const deletedRowName = await cellText(page, 1, 'name');
   await editCell(page, 0, 'name', 'committed value');
@@ -320,17 +328,16 @@ test('mutations — edit, add, delete, preview, commit, discard, read-only guard
   expect(remainingNames).not.toContain(deletedRowName);
 
   // §7/F21/D18: a local mutation greys the count instead of blanking it.
-  await expect(countButton).toHaveAttribute('data-kira-tip', /stale, click to refresh/, {
-    timeout: 10_000,
-  });
-  expect(await countButton.getAttribute('data-kira-tip')).toBe(
-    `${countBeforeCommit} (stale, click to refresh)`,
-  );
+  await hoverCount();
+  await expect(countTip).toContainText('stale, click to refresh', { timeout: 10_000 });
+  await expect(countTip).toContainText(`${countBeforeCommit} (stale, click to refresh)`);
 
   // Clicking it through produces a real recount and clears the stale mark.
   await countButton.click();
-  await expect(countButton).not.toHaveAttribute('data-kira-tip', /stale/, { timeout: 10_000 });
-  expect(await countButton.getAttribute('data-kira-tip')).not.toBe(countBeforeCommit);
+  await hoverCount();
+  await expect(countTip).not.toContainText('stale', { timeout: 10_000 });
+  const countAfterCommit = (await countTip.textContent())?.match(/Count all rows — Σ [\d,]+/)?.[0];
+  expect(countAfterCommit).not.toBe(countBeforeCommit);
 
   // --- P43 F5/D7: a failed commit reports the server's own error, not an unhandled rejection —
   // (1, 1) is the surviving row from scenario 6's own edit, so a fresh insert of the same

@@ -367,16 +367,18 @@ function onContainerKeydown(e: KeyboardEvent): void {
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :disabled="entry.index >= rows.length"
-            aria-label="Remove"
-            :data-testid="`${testidPrefix}-remove`"
-            @click="removeRow(entry.index)"
-          >
-            <CodiconIcon name="close" :size="13" />
-          </Button>
+          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :disabled="entry.index >= rows.length"
+              aria-label="Remove"
+              :data-testid="`${testidPrefix}-remove`"
+              @click="removeRow(entry.index)"
+            >
+              <CodiconIcon name="close" :size="13" />
+            </Button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>Remove</TooltipContent>
       </Tooltip>

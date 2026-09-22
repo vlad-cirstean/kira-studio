@@ -198,11 +198,15 @@ function selectMethod(service: string, method: string): void {
       <AlertDescription>{{ rt.error }}</AlertDescription>
     </Alert>
 
-    <InputGroup v-if="rt?.schema && rt.schema.services.length > 0" data-testid="grpc-schema-filter">
+    <InputGroup v-if="rt?.schema && rt.schema.services.length > 0">
       <InputGroupAddon>
         <CodiconIcon name="search" :size="13" />
       </InputGroupAddon>
-      <InputGroupInput v-model="filterQuery" placeholder="Filter services and methods" />
+      <InputGroupInput
+        v-model="filterQuery"
+        placeholder="Filter services and methods"
+        data-testid="grpc-schema-filter"
+      />
       <InputGroupAddon v-if="filterQuery" align="inline-end">
         <InputGroupButton @click="filterQuery = ''">
           <CodiconIcon name="close" :size="13" />

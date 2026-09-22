@@ -121,8 +121,8 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
 
   // P22b D1: a secondary status surface (the history list) now carries the code's meaning too —
   // not as a bare chip, since a dense list row has no room for a full sentence on its own line.
-  await expect(rows.nth(1).locator('.p-chip').last()).toHaveAttribute(
-    'data-kira-tip',
+  await rows.nth(1).locator('.p-chip').last().hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     'the server has no resource at this URL',
   );
 
@@ -139,7 +139,10 @@ test('Http history — browse a request’s past responses', async ({ relaunch }
   // P28 D1 reverses D1/F1's "the hint stays an inline line": the standing caption is gone and the
   // meaning is the chip's own tooltip, the same way ResponseHistoryList/ResponseDiffDialog/
   // TimelinePane have always shown it.
-  await expect(status).toHaveAttribute('data-kira-tip', /no resource at this URL/);
+  await status.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    /no resource at this URL/,
+  );
   await expect(page.locator('[data-testid="http-status-hint"]')).toHaveCount(0);
 
   const bodyEditor = page.locator('[data-testid="http-response-pane"] .response-body');

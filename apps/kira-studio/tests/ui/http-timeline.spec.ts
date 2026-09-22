@@ -377,9 +377,10 @@ test('Http timeline — a failed send carries the timeline it got as far as', as
   // Finding 9: phaseTooltip used to fall through every unhandled phase — Download included — to
   // the Wait explanation, even for a hop like this one where Download is legitimately absent
   // because the connect itself never completed.
-  await expect(
-    hops.first().locator('[data-testid="http-timeline-phase-download"]'),
-  ).toHaveAttribute('data-kira-tip', 'No download — no response bytes ever arrived.');
+  await hops.first().locator('[data-testid="http-timeline-phase-download"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    'No download — no response bytes ever arrived.',
+  );
 
   // The error strip at the top of the pane is unaffected by this — the same message a failed
   // send has always shown, still shown, alongside the new detail rather than instead of it.

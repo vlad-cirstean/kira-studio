@@ -510,16 +510,18 @@ onUnmounted(() => {
       <span class="p-push flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira"
-              data-testid="http-save"
-              :disabled="incognito || (canSave && !dirty)"
-              @click="onSave"
-            >
-              <CodiconIcon name="save" :size="13" />
-              Save
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="http-save"
+                :disabled="incognito || (canSave && !dirty)"
+                @click="onSave"
+              >
+                <CodiconIcon name="save" :size="13" />
+                Save
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
@@ -538,9 +540,11 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="http-request-stop" @click="onStop">
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="http-request-stop" @click="onStop">
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -575,16 +579,18 @@ onUnmounted(() => {
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button
-            variant="toolbar-primary"
-            size="kira"
-            data-testid="http-send"
-            :disabled="running"
-            @click="onSend"
-          >
-            <CodiconIcon name="play" :size="13" />
-            Send
-          </Button>
+          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <Button
+              variant="toolbar-primary"
+              size="kira"
+              data-testid="http-send"
+              :disabled="running"
+              @click="onSend"
+            >
+              <CodiconIcon name="play" :size="13" />
+              Send
+            </Button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>Send</TooltipContent>
       </Tooltip>
@@ -620,9 +626,11 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" :disabled="!canEditRaw" aria-label="Edit as raw HTTP" data-testid="http-edit-raw" @click="onEditRaw">
-              <CodiconIcon name="code" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button variant="toolbar" size="kira-icon" :disabled="!canEditRaw" aria-label="Edit as raw HTTP" data-testid="http-edit-raw" @click="onEditRaw">
+                <CodiconIcon name="code" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{{ editRawTooltip }}</TooltipContent>
         </Tooltip>
@@ -738,9 +746,9 @@ onUnmounted(() => {
 
     <div class="request-response-split">
       <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
-        <InputGroup v-if="fieldFilterOpen && showFieldFilterToggle" data-testid="http-field-filter">
+        <InputGroup v-if="fieldFilterOpen && showFieldFilterToggle">
           <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-          <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" />
+          <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" data-testid="http-field-filter" />
           <InputGroupAddon v-if="fieldFilterQuery" align="inline-end">
             <InputGroupButton aria-label="Clear filter" @click="fieldFilterQuery = ''">
               <CodiconIcon name="close" :size="13" />

@@ -320,16 +320,18 @@ onUnmounted(() => {
              #badges group above, so it shifts position with the dirty mark/unresolved chip. -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira"
-              data-testid="grpc-save"
-              :disabled="incognito || (canSave && !dirty)"
-              @click="onSave"
-            >
-              <CodiconIcon name="save" :size="13" />
-              Save
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="grpc-save"
+                :disabled="incognito || (canSave && !dirty)"
+                @click="onSave"
+              >
+                <CodiconIcon name="save" :size="13" />
+                Save
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
@@ -348,9 +350,11 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="grpc-request-stop" @click="onStop">
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="grpc-request-stop" @click="onStop">
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -395,16 +399,18 @@ onUnmounted(() => {
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button
-            variant="toolbar-primary"
-            size="kira"
-            data-testid="grpc-call"
-            :disabled="running || !tab.state.service || !tab.state.method"
-            @click="onCall"
-          >
-            <CodiconIcon name="play" :size="13" />
-            Call
-          </Button>
+          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <Button
+              variant="toolbar-primary"
+              size="kira"
+              data-testid="grpc-call"
+              :disabled="running || !tab.state.service || !tab.state.method"
+              @click="onCall"
+            >
+              <CodiconIcon name="play" :size="13" />
+              Call
+            </Button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>Call</TooltipContent>
       </Tooltip>
@@ -528,9 +534,9 @@ onUnmounted(() => {
           @update:doc="onMessageInput"
         />
         <template v-else-if="tab.state.requestPane === 'metadata'">
-          <InputGroup v-if="fieldFilterOpen" data-testid="grpc-field-filter">
+          <InputGroup v-if="fieldFilterOpen">
             <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-            <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" />
+            <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" data-testid="grpc-field-filter" />
             <InputGroupAddon v-if="fieldFilterQuery" align="inline-end">
               <InputGroupButton aria-label="Clear filter" @click="fieldFilterQuery = ''">
                 <CodiconIcon name="close" :size="13" />

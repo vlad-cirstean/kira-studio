@@ -507,18 +507,20 @@ const statusLine = computed(() => {
       <span class="format-group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="p-select bordered format-select"
-              data-testid="cell-editor-format"
-              :disabled="isNullValue"
-              @click="openFormatMenu"
-            >
-              <span class="format-select-label">{{
-                override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
-              }}</span>
-              <CodiconIcon name="chevron-down" :size="12" />
-            </button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <button
+                type="button"
+                class="p-select bordered format-select"
+                data-testid="cell-editor-format"
+                :disabled="isNullValue"
+                @click="openFormatMenu"
+              >
+                <span class="format-select-label">{{
+                  override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
+                }}</span>
+                <CodiconIcon name="chevron-down" :size="12" />
+              </button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{{ formatHint }}</TooltipContent>
         </Tooltip>
@@ -531,16 +533,18 @@ const statusLine = computed(() => {
           <span class="generate-anchor">
             <Tooltip>
               <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Generate a value"
-                  :disabled="!isEditable"
-                  data-testid="cell-editor-generate"
-                  @click="generatePanelOpen = !generatePanelOpen"
-                >
-                  <CodiconIcon name="sparkle" :size="13" />
-                </Button>
+                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <Button
+                    variant="toolbar"
+                    size="kira-icon"
+                    aria-label="Generate a value"
+                    :disabled="!isEditable"
+                    data-testid="cell-editor-generate"
+                    @click="generatePanelOpen = !generatePanelOpen"
+                  >
+                    <CodiconIcon name="sparkle" :size="13" />
+                  </Button>
+                </span>
               </TooltipTrigger>
               <TooltipContent>Generate a value</TooltipContent>
             </Tooltip>

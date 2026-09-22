@@ -333,5 +333,8 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   const roGenerateButton = page.locator('[data-testid="toolbar-generate-data"]');
   await expect(roGenerateButton).toBeVisible();
   await expect(roGenerateButton).toBeDisabled();
-  await expect(roGenerateButton).toHaveAttribute('data-kira-tip', /read-only/i);
+  // Disabled control: pointer-events:none on the button itself, so the §6.3 focusable wrapper span
+  // is the real hover target.
+  await page.locator('[data-slot="tooltip-trigger"]').filter({ has: roGenerateButton }).hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(/read-only/i);
 });

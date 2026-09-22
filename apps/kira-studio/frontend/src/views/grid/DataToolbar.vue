@@ -324,16 +324,18 @@ function onDeleteRow(): void {
   <div class="group">
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          data-testid="toolbar-add-row"
-          :disabled="!isWritable"
-          aria-label="Add a row"
-          @click="onAddRow"
-        >
-          <CodiconIcon name="add" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            data-testid="toolbar-add-row"
+            :disabled="!isWritable"
+            aria-label="Add a row"
+            @click="onAddRow"
+          >
+            <CodiconIcon name="add" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>
         {{
@@ -347,31 +349,35 @@ function onDeleteRow(): void {
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          data-testid="toolbar-generate-data"
-          :disabled="!canGenerateData"
-          aria-label="Generate data"
-          @click="onGenerateData"
-        >
-          <CodiconIcon name="wand" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            data-testid="toolbar-generate-data"
+            :disabled="!canGenerateData"
+            aria-label="Generate data"
+            @click="onGenerateData"
+          >
+            <CodiconIcon name="wand" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>{{ generateDataTooltip }}</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          data-testid="toolbar-delete-row"
-          :disabled="!canDeleteRows"
-          aria-label="Delete selected row(s)"
-          @click="onDeleteRow"
-        >
-          <CodiconIcon name="trash" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            data-testid="toolbar-delete-row"
+            :disabled="!canDeleteRows"
+            aria-label="Delete selected row(s)"
+            @click="onDeleteRow"
+          >
+            <CodiconIcon name="trash" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>{{ deleteRowTooltip }}</TooltipContent>
     </Tooltip>
@@ -392,17 +398,19 @@ function onDeleteRow(): void {
     </Tooltip>
     <Tooltip v-if="hasMaskRules">
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          :class="{ 'bg-input text-fg': rt?.maskPreview }"
-          :disabled="hasPendingChanges"
-          data-testid="toolbar-mask-preview"
-          aria-label="Toggle masking preview"
-          @click="onToggleMaskPreview"
-        >
-          <CodiconIcon name="eye-closed" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg is-active': rt?.maskPreview }"
+            :disabled="hasPendingChanges"
+            data-testid="toolbar-mask-preview"
+            aria-label="Toggle masking preview"
+            @click="onToggleMaskPreview"
+          >
+            <CodiconIcon name="eye-closed" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>{{ maskPreviewTooltip }}</TooltipContent>
     </Tooltip>

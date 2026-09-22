@@ -247,17 +247,21 @@ const breadcrumb = computed(() => {
       <div class="group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" :disabled="loading" aria-label="Refresh" data-testid="definition-refresh" @click="onRefresh">
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button variant="toolbar" size="kira-icon" :disabled="loading" aria-label="Refresh" data-testid="definition-refresh" @click="onRefresh">
+                <CodiconIcon name="refresh" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="toolbar" size="kira-icon" disabled aria-label="Stop">
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button variant="toolbar" size="kira-icon" disabled aria-label="Stop">
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -341,9 +345,13 @@ const breadcrumb = computed(() => {
         <li v-for="(note, i) in definition.notes" :key="i">{{ note }}</li>
       </ul>
     </div>
-    <InputGroup v-if="searchOpen && pane === 'structure'" data-testid="definition-structure-filter">
+    <InputGroup v-if="searchOpen && pane === 'structure'">
       <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-      <InputGroupInput v-model="structureFilterQuery" placeholder="Filter columns, indexes, constraints" />
+      <InputGroupInput
+        v-model="structureFilterQuery"
+        placeholder="Filter columns, indexes, constraints"
+        data-testid="definition-structure-filter"
+      />
       <InputGroupAddon v-if="structureFilterQuery" align="inline-end">
         <InputGroupButton aria-label="Clear filter" @click="structureFilterQuery = ''">
           <CodiconIcon name="close" :size="13" />

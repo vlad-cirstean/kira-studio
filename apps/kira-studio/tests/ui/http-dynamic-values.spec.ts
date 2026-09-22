@@ -125,7 +125,10 @@ test('the preview never generates: a catalogued name is not a warning and stays 
   await page.fill('[data-testid="http-url"]', '{{$nope}}');
   const chip = page.locator('[data-testid="http-unresolved-chip"]');
   await expect(chip).toContainText('1 unresolved');
-  await expect(chip).toHaveAttribute('data-kira-tip', /\$nope — unknown dynamic value/);
+  await chip.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    /\$nope — unknown dynamic value/,
+  );
 });
 
 // ---- 4. The reference dialog lists the vocabulary with live samples ----

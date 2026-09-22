@@ -446,9 +446,9 @@ onUnmounted(() => {
     />
     <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers-pane" data-testid="http-response-headers">
       <template v-if="response">
-        <InputGroup data-testid="http-response-headers-filter">
+        <InputGroup>
           <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-          <InputGroupInput v-model="headerFilter" placeholder="Filter headers" />
+          <InputGroupInput v-model="headerFilter" placeholder="Filter headers" data-testid="http-response-headers-filter" />
           <InputGroupAddon v-if="headerFilter" align="inline-end">
             <InputGroupButton aria-label="Clear filter" @click="headerFilter = ''">
               <CodiconIcon name="close" :size="13" />

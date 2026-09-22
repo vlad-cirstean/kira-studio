@@ -205,32 +205,36 @@ function onCloseSearch(): void {
       <div class="group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              data-testid="toolbar-refresh"
-              :disabled="rt?.opId !== undefined"
-              aria-label="Refresh"
-              @click="onRefresh"
-            >
-              <CodiconIcon name="refresh" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="toolbar-refresh"
+                :disabled="!!rt?.opId"
+                aria-label="Refresh"
+                @click="onRefresh"
+              >
+                <CodiconIcon name="refresh" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'text-error': !!rt?.opId }"
-              data-testid="toolbar-stop"
-              :disabled="!rt?.opId"
-              aria-label="Stop"
-              @click="onStop"
-            >
-              <CodiconIcon name="debug-stop" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'text-error': !!rt?.opId }"
+                data-testid="toolbar-stop"
+                :disabled="!rt?.opId"
+                aria-label="Stop"
+                @click="onStop"
+              >
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -261,16 +265,18 @@ function onCloseSearch(): void {
           <div class="preview-anchor">
             <Tooltip>
               <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  data-testid="toolbar-preview-command"
-                  :disabled="!isWritable"
-                  aria-label="Preview the SQL for pending changes"
-                  @click="previewOpen = !previewOpen"
-                >
-                  <CodiconIcon name="eye" :size="13" />
-                </Button>
+                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <Button
+                    variant="toolbar"
+                    size="kira-icon"
+                    data-testid="toolbar-preview-command"
+                    :disabled="!isWritable"
+                    aria-label="Preview the SQL for pending changes"
+                    @click="previewOpen = !previewOpen"
+                  >
+                    <CodiconIcon name="eye" :size="13" />
+                  </Button>
+                </span>
               </TooltipTrigger>
               <TooltipContent>{{ isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only' }}</TooltipContent>
             </Tooltip>
@@ -278,31 +284,35 @@ function onCloseSearch(): void {
           </div>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                data-testid="toolbar-discard-changes"
-                :disabled="!isWritable"
-                aria-label="Discard pending changes"
-                @click="onDiscard"
-              >
-                <CodiconIcon name="discard" :size="13" />
-              </Button>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  data-testid="toolbar-discard-changes"
+                  :disabled="!isWritable"
+                  aria-label="Discard pending changes"
+                  @click="onDiscard"
+                >
+                  <CodiconIcon name="discard" :size="13" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>Discard pending changes</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button
-                variant="toolbar-primary"
-                size="kira-icon"
-                data-testid="toolbar-commit-changes"
-                :disabled="!isWritable"
-                aria-label="Commit pending changes"
-                @click="onCommit"
-              >
-                <CodiconIcon name="save" :size="13" />
-              </Button>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button
+                  variant="toolbar-primary"
+                  size="kira-icon"
+                  data-testid="toolbar-commit-changes"
+                  :disabled="!isWritable"
+                  aria-label="Commit pending changes"
+                  @click="onCommit"
+                >
+                  <CodiconIcon name="save" :size="13" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>Commit pending changes</TooltipContent>
           </Tooltip>

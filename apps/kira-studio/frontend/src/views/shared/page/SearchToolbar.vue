@@ -332,7 +332,7 @@ onUnmounted(() => {
           <Button
             variant="toolbar"
             size="kira-icon"
-            :class="{ 'bg-input text-fg': filtering }"
+            :class="{ 'bg-input text-fg is-active': filtering }"
             aria-label="Show only matching rows"
             :data-testid="`${testidPrefix}search-filter-rows`"
             @click="toggleFilter"

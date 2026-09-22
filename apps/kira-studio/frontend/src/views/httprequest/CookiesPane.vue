@@ -97,11 +97,11 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
     </Alert>
     <template v-else>
       <div class="cookies-toolbar">
-        <InputGroup data-testid="http-cookies-filter">
+        <InputGroup>
           <InputGroupAddon>
             <CodiconIcon name="search" :size="13" />
           </InputGroupAddon>
-          <InputGroupInput v-model="filter" placeholder="Filter cookies" />
+          <InputGroupInput v-model="filter" placeholder="Filter cookies" data-testid="http-cookies-filter" />
           <InputGroupAddon v-if="filter" align="inline-end">
             <InputGroupButton @click="filter = ''">
               <CodiconIcon name="close" :size="13" />

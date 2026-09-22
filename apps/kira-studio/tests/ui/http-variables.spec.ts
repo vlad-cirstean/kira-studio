@@ -242,8 +242,10 @@ test('substitution reaches the wire, and a secret does not', async ({ relaunch }
   // deferred secret, which will resolve fine at send time.
   const chip = page.locator('[data-testid="http-unresolved-chip"]');
   await expect(chip).toContainText('1 unresolved');
-  await expect(chip).toHaveAttribute('data-kira-tip', /missing/);
-  await expect(chip).not.toHaveAttribute('data-kira-tip', /token/);
+  await chip.hover();
+  const tip = page.locator('[data-slot="tooltip-content"]').first();
+  await expect(tip).toContainText(/missing/);
+  await expect(tip).not.toContainText(/token/);
 
   await page.click('[data-testid="http-send"]');
   await expect(page.locator('[data-testid="http-status"]')).toContainText('200');

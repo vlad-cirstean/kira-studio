@@ -73,9 +73,9 @@ function close(): void {
     @close="close"
   >
     <div class="p-dialog-body list dynamic-values-body">
-      <InputGroup data-testid="dynamic-values-filter">
+      <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter" />
+        <InputGroupInput v-model="filterQuery" placeholder="Filter" data-testid="dynamic-values-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
           <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
             <CodiconIcon name="close" :size="13" />

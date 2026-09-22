@@ -1293,54 +1293,48 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect.poll(() => lastGutterNumber(page), { timeout: 15_000 }).toBe('10');
 
   // --- count: Σ fills in "of N" pages; survives a page change; refresh recounts on demand ---
-  await page.click('[data-testid="toolbar-count"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    /1,000,000/,
-    { timeout: 15_000 },
-  );
+  const countButton = page.locator('[data-testid="toolbar-count"]');
+  const countTip = page.locator('[data-slot="tooltip-content"]').first();
+  // Neither click() nor fill()/press() moves the real pointer off this button once it has already
+  // been hovered, so hover() alone can land with no actual movement and fire no new mouseenter.
+  // Move away first, every time, to guarantee a real one.
+  async function hoverCount(): Promise<void> {
+    await page.mouse.move(0, 0);
+    await countButton.hover();
+  }
+  await countButton.click();
+  await hoverCount();
+  await expect(countTip).toContainText(/1,000,000/, { timeout: 15_000 });
   await expect(page.locator('[data-testid="pager"]')).toContainText('of 100000');
 
   await page.click('[data-testid="pager-next"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    /1,000,000/,
-  );
+  await hoverCount();
+  await expect(countTip).toContainText(/1,000,000/);
 
   const countsBeforeRefresh = await readOpsCount(stream, DATA_OP.count);
   await page.click('[data-testid="toolbar-refresh"]');
   await page.waitForTimeout(200);
-  await page.click('[data-testid="toolbar-count"]');
+  await countButton.click();
   await expect.poll(() => readOpsCount(stream, DATA_OP.count)).toBe(countsBeforeRefresh + 1);
 
   // --- P43 F7/D10: a filter change invalidates the count -----------------------------------
   await page.fill('[data-testid="filter-where-input"]', 'id <= 5');
   await page.press('[data-testid="filter-where-input"]', 'Enter');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    'Count all rows',
-  );
+  await hoverCount();
+  await expect(countTip).toContainText('Count all rows');
   await expect(page.locator('[data-testid="pager-last"]')).toBeDisabled();
-  await page.click('[data-testid="toolbar-count"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    /Σ\s*5(?!\d)/,
-    { timeout: 15_000 },
-  );
+  await countButton.click();
+  await hoverCount();
+  await expect(countTip).toContainText(/Σ\s*5(?!\d)/, { timeout: 15_000 });
   await expect(page.locator('[data-testid="pager-last"]')).toBeEnabled();
 
   await page.fill('[data-testid="filter-where-input"]', '');
   await page.press('[data-testid="filter-where-input"]', 'Enter');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    'Count all rows',
-  );
-  await page.click('[data-testid="toolbar-count"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    /1,000,000/,
-    { timeout: 15_000 },
-  );
+  await hoverCount();
+  await expect(countTip).toContainText('Count all rows');
+  await countButton.click();
+  await hoverCount();
+  await expect(countTip).toContainText(/1,000,000/, { timeout: 15_000 });
 
   // The page input only reacts to a native `change` event, which Enter does not fire on its own —
   // Tab moves focus away and blurs it, which does.

@@ -189,7 +189,7 @@ test('a freshly opened request tab shows the response pane switcher before any s
   // rather than throwing.
   await page.click('[data-testid="http-response-pane-headers"]');
   const headers = page.locator('[data-testid="http-response-headers"]');
-  await expect(headers.locator('.p-empty')).toHaveText('Send a request to see the response');
+  await expect(headers.locator('.empty-state')).toHaveText('Send a request to see the response');
 });
 
 test('the body-mode segmented control has a JSON segment (D6)', async ({ relaunch }) => {

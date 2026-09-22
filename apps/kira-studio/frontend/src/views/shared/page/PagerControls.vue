@@ -68,31 +68,35 @@ function onJump(e: Event): void {
   <div class="group pager" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          aria-label="First page"
-          :data-testid="`${testidPrefix}pager-first`"
-          :disabled="pageIndex === 0"
-          @click="emit('first')"
-        >
-          <CodiconIcon name="chevron-left" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="First page"
+            :data-testid="`${testidPrefix}pager-first`"
+            :disabled="pageIndex === 0"
+            @click="emit('first')"
+          >
+            <CodiconIcon name="chevron-left" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>First page</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          aria-label="Previous page"
-          :data-testid="`${testidPrefix}pager-prev`"
-          :disabled="pageIndex === 0"
-          @click="emit('prev')"
-        >
-          <CodiconIcon name="arrow-left" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Previous page"
+            :data-testid="`${testidPrefix}pager-prev`"
+            :disabled="pageIndex === 0"
+            @click="emit('prev')"
+          >
+            <CodiconIcon name="arrow-left" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>Previous page</TooltipContent>
     </Tooltip>
@@ -112,31 +116,35 @@ function onJump(e: Event): void {
     </span>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          aria-label="Next page"
-          :data-testid="`${testidPrefix}pager-next`"
-          :disabled="!hasMore"
-          @click="emit('next')"
-        >
-          <CodiconIcon name="arrow-right" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Next page"
+            :data-testid="`${testidPrefix}pager-next`"
+            :disabled="!hasMore"
+            @click="emit('next')"
+          >
+            <CodiconIcon name="arrow-right" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>Next page</TooltipContent>
     </Tooltip>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          aria-label="Last page"
-          :data-testid="`${testidPrefix}pager-last`"
-          :disabled="!pageCount"
-          @click="emit('last')"
-        >
-          <CodiconIcon name="chevron-right" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Last page"
+            :data-testid="`${testidPrefix}pager-last`"
+            :disabled="!pageCount"
+            @click="emit('last')"
+          >
+            <CodiconIcon name="chevron-right" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>{{ pageCount ? 'Last page' : lastTooltip }}</TooltipContent>
     </Tooltip>

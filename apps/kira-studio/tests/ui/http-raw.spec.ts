@@ -253,8 +253,10 @@ test('Http raw — the editor', async ({ relaunch }) => {
   await page.click('[data-testid="http-body-mode-formdata"]');
   const editRawButton = page.locator('[data-testid="http-edit-raw"]');
   await expect(editRawButton).toBeDisabled();
-  await expect(editRawButton).toHaveAttribute(
-    'data-kira-tip',
+  // Disabled control: pointer-events:none on the button itself, so the §6.3 focusable wrapper span
+  // is the real hover target.
+  await page.locator('[data-slot="tooltip-trigger"]').filter({ has: editRawButton }).hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     /has no text form that can be edited and parsed back/,
   );
 });

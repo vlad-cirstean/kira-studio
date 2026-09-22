@@ -85,9 +85,9 @@ function editEnvironmentVariables(): void {
 <template>
   <PopoverPanel :width="360" anchor="left" test-id="variables-overview" backdrop-test-id="variables-overview-backdrop" @close="close">
     <div class="overview-panel">
-      <InputGroup data-testid="variables-overview-filter">
+      <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" />
+        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-overview-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
           <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
             <CodiconIcon name="close" :size="13" />

@@ -182,7 +182,7 @@ function onKeydown(e: KeyboardEvent): void {
     </div>
     <Tooltip>
       <TooltipTrigger as-child>
-        <label class="secret-toggle">
+        <label class="secret-toggle" tabindex="0" :aria-describedby="undefined">
           <Checkbox
             :model-value="row.isSecret"
             :disabled="secretsUnavailable && !row.isSecret"
@@ -198,16 +198,18 @@ function onKeydown(e: KeyboardEvent): void {
     <div class="history-anchor">
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            :disabled="trailing"
-            aria-label="History"
-            data-testid="variable-history"
-            @click="onHistoryClick"
-          >
-            <CodiconIcon name="history" :size="13" />
-          </Button>
+          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :disabled="trailing"
+              aria-label="History"
+              data-testid="variable-history"
+              @click="onHistoryClick"
+            >
+              <CodiconIcon name="history" :size="13" />
+            </Button>
+          </span>
         </TooltipTrigger>
         <TooltipContent>History</TooltipContent>
       </Tooltip>
@@ -218,16 +220,18 @@ function onKeydown(e: KeyboardEvent): void {
     </div>
     <Tooltip>
       <TooltipTrigger as-child>
-        <Button
-          variant="toolbar"
-          size="kira-icon"
-          :disabled="props.trailing"
-          aria-label="Remove"
-          data-testid="variable-remove"
-          @click="emit('remove')"
-        >
-          <CodiconIcon name="trash" :size="13" />
-        </Button>
+        <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :disabled="props.trailing"
+            aria-label="Remove"
+            data-testid="variable-remove"
+            @click="emit('remove')"
+          >
+            <CodiconIcon name="trash" :size="13" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent>Remove</TooltipContent>
     </Tooltip>

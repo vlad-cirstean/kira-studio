@@ -120,13 +120,15 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
       <div class="ts-field">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Input
-              :model-value="fieldText"
-              :disabled="readOnly"
-              class="w-full"
-              data-testid="cell-editor-timestamp-field"
-              @update:model-value="onFieldInput(String($event))"
-            />
+            <span tabindex="0" class="inline-flex w-full" :aria-describedby="undefined">
+              <Input
+                :model-value="fieldText"
+                :disabled="readOnly"
+                class="w-full"
+                data-testid="cell-editor-timestamp-field"
+                @update:model-value="onFieldInput(String($event))"
+              />
+            </span>
           </TooltipTrigger>
           <TooltipContent>YYYY-MM-DD HH:mm:ss, in the zone selected above</TooltipContent>
         </Tooltip>
@@ -134,16 +136,18 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
       <span class="ts-calendar-anchor">
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              aria-label="Pick a date and time"
-              :disabled="readOnly"
-              data-testid="cell-editor-timestamp-calendar"
-              @click="calendarOpen = !calendarOpen"
-            >
-              <CodiconIcon name="calendar" :size="13" />
-            </Button>
+            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Pick a date and time"
+                :disabled="readOnly"
+                data-testid="cell-editor-timestamp-calendar"
+                @click="calendarOpen = !calendarOpen"
+              >
+                <CodiconIcon name="calendar" :size="13" />
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>Pick a date and time</TooltipContent>
         </Tooltip>

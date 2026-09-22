@@ -705,17 +705,19 @@ onUnmounted(() => {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'is-live': !!running }"
-                aria-label="Stop"
-                data-testid="keyvalue-stop"
-                :disabled="!running"
-                @click="onStop"
-              >
-                <CodiconIcon name="debug-stop" :size="13" />
-              </Button>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  :class="{ 'is-live': !!running }"
+                  aria-label="Stop"
+                  data-testid="keyvalue-stop"
+                  :disabled="!running"
+                  @click="onStop"
+                >
+                  <CodiconIcon name="debug-stop" :size="13" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>Stop</TooltipContent>
           </Tooltip>
@@ -773,32 +775,36 @@ onUnmounted(() => {
                only place the Count button's result (below) ever gets shown, for every engine. -->
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Previous page"
-                data-testid="keyvalue-prev"
-                :disabled="prevDisabled"
-                @click="keyValueViewStore.goPrev(viewKey)"
-              >
-                <CodiconIcon name="arrow-left" :size="13" />
-              </Button>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Previous page"
+                  data-testid="keyvalue-prev"
+                  :disabled="prevDisabled"
+                  @click="keyValueViewStore.goPrev(viewKey)"
+                >
+                  <CodiconIcon name="arrow-left" :size="13" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>Previous page</TooltipContent>
           </Tooltip>
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Next page"
-                data-testid="keyvalue-next"
-                :disabled="!rt?.hasMore"
-                @click="keyValueViewStore.goNext(viewKey)"
-              >
-                <CodiconIcon name="arrow-right" :size="13" />
-              </Button>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Next page"
+                  data-testid="keyvalue-next"
+                  :disabled="!rt?.hasMore"
+                  @click="keyValueViewStore.goNext(viewKey)"
+                >
+                  <CodiconIcon name="arrow-right" :size="13" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>Next page</TooltipContent>
           </Tooltip>
@@ -844,9 +850,11 @@ onUnmounted(() => {
           <div class="add-anchor">
             <Tooltip>
               <TooltipTrigger as-child>
-                <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
-                  <CodiconIcon name="add" :size="13" />
-                </Button>
+                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
+                    <CodiconIcon name="add" :size="13" />
+                  </Button>
+                </span>
               </TooltipTrigger>
               <TooltipContent>{{ addTitle }}</TooltipContent>
             </Tooltip>
@@ -882,9 +890,11 @@ onUnmounted(() => {
           <div class="edit-anchor">
             <Tooltip>
               <TooltipTrigger as-child>
-                <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
-                  <CodiconIcon name="edit" :size="13" />
-                </Button>
+                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
+                    <CodiconIcon name="edit" :size="13" />
+                  </Button>
+                </span>
               </TooltipTrigger>
               <TooltipContent>{{ editTitle }}</TooltipContent>
             </Tooltip>
@@ -922,9 +932,11 @@ onUnmounted(() => {
 
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Delete" :disabled="!canDelete" data-testid="keyvalue-delete" @click="onDeleteKey">
-                <CodiconIcon name="trash" :size="13" />
-              </Button>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button variant="toolbar" size="kira-icon" aria-label="Delete" :disabled="!canDelete" data-testid="keyvalue-delete" @click="onDeleteKey">
+                  <CodiconIcon name="trash" :size="13" />
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>{{ deleteTitle }}</TooltipContent>
           </Tooltip>

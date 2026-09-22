@@ -427,9 +427,9 @@ function onBulkClose(): void {
          (the band every other view's own filter/search control lives in), the .env-text toggle in
          the trailing group (every other view's own trailing action group). -->
     <div class="p-toolbar last">
-      <InputGroup v-if="!bulkMode" data-testid="variables-filter">
+      <InputGroup v-if="!bulkMode">
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
-        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" />
+        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" data-testid="variables-filter" />
         <InputGroupAddon v-if="filterQuery" align="inline-end">
           <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
             <CodiconIcon name="close" :size="13" />

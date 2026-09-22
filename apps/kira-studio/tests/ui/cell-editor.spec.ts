@@ -572,9 +572,9 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await page.keyboard.press(SELECT_ALL);
   await page.keyboard.type('{"a":}');
   await expect(invalidChip).toBeVisible();
-  await expect(invalidChip).toHaveAttribute(
-    'data-kira-tip',
-    /^broken JSON, invalid at offset \d+$/,
+  await invalidChip.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
+    /broken JSON, invalid at offset \d+/,
   );
 
   await page.click('[data-testid="cell-editor-beautify-reset"]');
@@ -586,8 +586,8 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   await selectFormat(page, 'iso8601');
   await expect(panel).toHaveAttribute('data-format', 'iso8601');
   await expect(invalidChip).toBeVisible();
-  await expect(invalidChip).toHaveAttribute(
-    'data-kira-tip',
+  await invalidChip.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     'not a valid timestamp for this format',
   );
 
@@ -1090,10 +1090,8 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(page.locator('[data-testid="cell-editor-decoded-empty"]')).toHaveCount(0);
 
   // --- beautify/reset buttons carry a tooltip once enabled, not just when disabled -------------
-  await expect(page.locator('[data-testid="cell-editor-beautify-indented"]')).toHaveAttribute(
-    'data-kira-tip',
-    /./,
-  );
+  await page.locator('[data-testid="cell-editor-beautify-indented"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(/./);
 
   // --- modified chip + data-dirty (D25), Escape reverts (D26/F10) ------------------------------
   await selectCell(page, 0, 'sample'); // json row
@@ -1107,10 +1105,8 @@ test('cell editor — UUID generate, timestamp translate pane, hex/base64 decode
   await expect(page.locator('[data-testid="cell-editor-modified"]')).toBeVisible();
   await expect(panel).toHaveAttribute('data-dirty', 'true');
   // Reset's tooltip while enabled (D24/F7a) — the same bug already fixed for the beautify pair.
-  await expect(page.locator('[data-testid="cell-editor-beautify-reset"]')).toHaveAttribute(
-    'data-kira-tip',
-    /./,
-  );
+  await page.locator('[data-testid="cell-editor-beautify-reset"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(/./);
   await page.locator('[data-testid="cell-editor-panel"] .view-lines').press('Escape');
   await expect(page.locator('[data-testid="cell-editor-modified"]')).toHaveCount(0);
   await expect(panel).toHaveAttribute('data-dirty', 'false');
