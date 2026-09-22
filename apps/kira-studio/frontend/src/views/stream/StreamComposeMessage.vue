@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, ref } from 'vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
@@ -67,13 +67,32 @@ async function submit(): Promise<void> {
       <div class="compose-header p-panel-head">
         <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
-        <IconButton icon="close" class="p-push" v-tooltip="'Close'" @click="emit('close')" />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              class="p-push"
+              aria-label="Close"
+              @click="emit('close')"
+            >
+              <CodiconIcon name="close" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Close</TooltipContent>
+        </Tooltip>
       </div>
 
       <div class="compose-body">
         <label v-if="isKafka" class="field">
           <span class="p-sm muted">Key (optional)</span>
-          <TextField v-model="key" placeholder="(none)" data-testid="stream-add-message-key" />
+          <Input
+            :model-value="key"
+            placeholder="(none)"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            data-testid="stream-add-message-key"
+            @update:model-value="(v) => (key = String(v))"
+          />
         </label>
 
         <label class="field">
@@ -106,16 +125,16 @@ async function submit(): Promise<void> {
       </div>
 
       <div class="compose-actions">
-        <AppButton kind="dialog" @click="emit('close')">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
+        <Button variant="dialog" size="kira-lg" @click="emit('close')">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
           :disabled="!canSubmit"
           data-testid="stream-add-message-submit"
           @click="submit"
         >
           {{ isKafka ? 'Produce' : 'Send' }}
-        </AppButton>
+        </Button>
       </div>
     </div>
   </PopoverPanel>
@@ -133,15 +152,15 @@ async function submit(): Promise<void> {
 }
 
 .compose-body {
-  @apply flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
+  @apply flex flex-col gap-1.5 p-2;
 }
 
 .field {
-  @apply flex flex-col gap-[var(--kira-s-1)];
+  @apply flex flex-col gap-0.5;
 }
 
 .field-inline {
-  @apply flex-row items-center gap-[var(--kira-s-2)];
+  @apply flex-row items-center gap-1;
 }
 
 .error-text {
@@ -149,6 +168,6 @@ async function submit(): Promise<void> {
 }
 
 .compose-actions {
-  @apply flex justify-end gap-[var(--kira-s-3)] border-t border-border py-[var(--kira-s-3)] px-[var(--kira-s-4)];
+  @apply flex justify-end gap-1.5 border-t border-border py-1.5 px-2;
 }
 </style>

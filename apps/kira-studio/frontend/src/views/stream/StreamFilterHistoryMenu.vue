@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, onMounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
@@ -81,7 +82,12 @@ function remove(entry: StreamFilterHistoryEntry): void {
     <template #entry="{ entry }">
       <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's
            own note (the 320px popover is structurally too narrow for a long summary). -->
-      <span class="entry-name mono" v-tooltip="summarize(entry)">{{ summarize(entry) }}</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="entry-name mono">{{ summarize(entry) }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ summarize(entry) }}</TooltipContent>
+      </Tooltip>
     </template>
   </SavedListMenu>
 </template>
