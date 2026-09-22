@@ -1,0 +1,65 @@
+/* C11 §7.3/§7.4 (S9) — Monaco glyph-margin/line decoration classes for the review diff layer.
+   No precedent elsewhere in this repo (the plan's own §7 doc comment): reviewDecorations.ts
+   assigns these class names to glyphMarginClassName/className; the codicon font (already loaded,
+   base.css) supplies each glyph's ::before content, so this file only sets color/sizing. */
+
+.kira-review-glyph {
+  cursor: pointer;
+}
+
+.kira-review-glyph-actionable::before {
+  color: var(--kira-accent);
+}
+
+.kira-review-glyph-reviewed::before {
+  color: var(--kira-ok);
+}
+
+.kira-review-glyph-comment::before {
+  color: var(--kira-info);
+}
+
+/* The hover-tracked "add a comment" glyph (§7.4/OQ3) — muted until hovered, since it is painted on
+   every line the pointer passes over, not just lines worth acting on. */
+.kira-review-glyph-add::before {
+  color: var(--kira-fg-disabled);
+}
+
+.kira-review-glyph-add:hover::before {
+  color: var(--kira-fg);
+}
+
+/* Whole-line background for a reviewed range (reviewedType's native equivalent, §7.4). A subtle
+   tint of --kira-ok rather than a second token — this app has one fixed dark theme (monaco.ts's
+   own doc comment), so no light-mode counterpart is needed. */
+.kira-review-line-reviewed {
+  background-color: color-mix(in srgb, var(--kira-ok) 10%, transparent);
+}
+
+/* C12-7: reviewDecorations.ts's own view-zone banner for a failed review.resolveBase — plain DOM
+   (no Vue mount, unlike the compose/thread zone), visible in place of what used to be a silent
+   empty diff. */
+.kira-review-load-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 12px;
+  background-color: color-mix(in srgb, var(--kira-error) 12%, transparent);
+  color: var(--kira-error);
+  font-size: 12px;
+}
+
+.kira-review-load-error-retry {
+  border: 1px solid var(--kira-error);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--kira-error);
+  font-size: 12px;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.kira-review-load-error-retry:hover {
+  background-color: color-mix(in srgb, var(--kira-error) 16%, transparent);
+}

@@ -1,0 +1,10 @@
+export { default as Dialog } from '@theme/components/ui/dialog/Dialog.vue';
+export { default as DialogClose } from '@theme/components/ui/dialog/DialogClose.vue';
+export { default as DialogContent } from '@theme/components/ui/dialog/DialogContent.vue';
+export { default as DialogDescription } from '@theme/components/ui/dialog/DialogDescription.vue';
+export { default as DialogFooter } from '@theme/components/ui/dialog/DialogFooter.vue';
+export { default as DialogHeader } from '@theme/components/ui/dialog/DialogHeader.vue';
+export { default as DialogOverlay } from '@theme/components/ui/dialog/DialogOverlay.vue';
+export { default as DialogScrollContent } from '@theme/components/ui/dialog/DialogScrollContent.vue';
+export { default as DialogTitle } from '@theme/components/ui/dialog/DialogTitle.vue';
+export { default as DialogTrigger } from '@theme/components/ui/dialog/DialogTrigger.vue';
