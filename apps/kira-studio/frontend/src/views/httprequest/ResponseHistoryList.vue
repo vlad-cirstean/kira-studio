@@ -4,11 +4,17 @@ import {
   HISTORY_PER_SCOPE_LIMIT,
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, onMounted, ref } from 'vue';
@@ -102,29 +108,30 @@ async function onClear(): Promise<void> {
     <div class="history-toolbar p-toolbar">
       <span class="p-xs dim">{{ entries.length }} {{ entries.length === 1 ? 'response' : 'responses' }}</span>
       <span class="p-push" />
-      <AppButton
+      <Button
+        variant="toolbar"
+        size="kira"
         :disabled="selected.length !== 2"
         data-testid="http-history-compare"
         @click="onCompare"
       >
         Compare
-      </AppButton>
-      <AppButton
-        icon="trash"
+      </Button>
+      <Button
+        variant="toolbar"
+        size="kira"
         :disabled="entries.length === 0"
         data-testid="http-history-clear"
         @click="onClear"
       >
+        <CodiconIcon name="trash" :size="13" />
         Clear history
-      </AppButton>
+      </Button>
     </div>
 
-    <EmptyState
-      v-if="entries.length === 0"
-      icon="history"
-      label="No past responses yet"
-      data-testid="http-history-empty"
-    >
+    <Alert v-if="entries.length === 0" class="empty-state" data-testid="http-history-empty">
+      <CodiconIcon name="history" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">No past responses yet</AlertTitle>
       <span class="p-xs dim scratch-note">
         <template v-if="incognito">Responses are not recorded in an incognito tab.</template>
         <template v-else>
@@ -135,20 +142,26 @@ async function onClear(): Promise<void> {
           </template>
         </template>
       </span>
-    </EmptyState>
+    </Alert>
 
     <template v-else>
-      <PanelSearchBox
-        v-model="filterQuery"
-        placeholder="Filter history"
-        testid="http-history-filter"
-      />
-      <EmptyState
+      <InputGroup data-testid="http-history-filter">
+        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+        <InputGroupInput v-model="filterQuery" placeholder="Filter history" />
+        <InputGroupAddon v-if="filterQuery" align="inline-end">
+          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <Alert
         v-if="isFiltered && filteredEntries.length === 0"
-        icon="search"
-        label="No matches"
+        class="empty-state"
         data-testid="http-history-filter-empty"
-      />
+      >
+        <CodiconIcon name="search" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+      </Alert>
     </template>
 
     <div v-if="entries.length > 0 && filteredEntries.length > 0" class="history-rows">
@@ -166,26 +179,42 @@ async function onClear(): Promise<void> {
           :disabled="!selected.includes(entry.id) && selected.length >= 2"
           @click.stop
           @update:model-value="onToggle(entry.id)"
-        />
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <div class="history-row-main">
           <div class="history-row-line">
-            <span v-tooltip="entry.sentAt" class="p-xs dim history-time">{{ formatRelative(entry.sentAt) }}</span>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="p-xs dim history-time">{{ formatRelative(entry.sentAt) }}</span>
+              </TooltipTrigger>
+              <TooltipContent>{{ entry.sentAt }}</TooltipContent>
+            </Tooltip>
             <span class="p-chip p-method" :class="httpMethodToken(entry.method)">{{ entry.method }}</span>
-            <span
-              class="p-chip"
-              :class="statusClass(entry.status)"
-              v-tooltip="statusHint(entry.status)"
-              >{{ entry.status }} {{ entry.statusText }}</span
-            >
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="p-chip" :class="statusClass(entry.status)">{{ entry.status }} {{ entry.statusText }}</span>
+              </TooltipTrigger>
+              <TooltipContent>{{ statusHint(entry.status) }}</TooltipContent>
+            </Tooltip>
             <span class="p-xs dim">{{ entry.elapsedMs }} ms</span>
             <span class="p-xs dim">{{ formatBytes(entry.bodyBytes) }}</span>
             <span v-if="entry.environment" class="p-xs dim">{{ entry.environment }}</span>
             <span class="p-push" />
-            <IconButton
-              icon="trash"
-              data-testid="http-history-delete"
-              @click.stop="onDelete(entry.id)"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Delete"
+                  data-testid="http-history-delete"
+                  @click.stop="onDelete(entry.id)"
+                >
+                  <CodiconIcon name="trash" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
           </div>
           <div v-if="showUrl(i)" class="p-xs dim history-url">{{ entry.url }}</div>
         </div>
@@ -207,11 +236,11 @@ async function onClear(): Promise<void> {
 }
 
 .history-toolbar {
-  @apply gap-[var(--kira-s-2)];
+  @apply gap-1;
 }
 
 .scratch-note {
-  @apply mt-[var(--kira-s-1)];
+  @apply mt-0.5;
 }
 
 .history-rows {
@@ -219,7 +248,7 @@ async function onClear(): Promise<void> {
 }
 
 .history-row {
-  @apply flex cursor-pointer gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex cursor-pointer gap-1 border-b border-border px-1.5 py-1;
 }
 
 .history-row:hover,
@@ -228,11 +257,11 @@ async function onClear(): Promise<void> {
 }
 
 .history-row-main {
-  @apply flex min-w-0 flex-1 flex-col gap-[var(--kira-s-1)];
+  @apply flex min-w-0 flex-1 flex-col gap-0.5;
 }
 
 .history-row-line {
-  @apply flex items-center gap-[var(--kira-s-2)];
+  @apply flex items-center gap-1;
 }
 
 .history-time {
@@ -244,6 +273,10 @@ async function onClear(): Promise<void> {
 }
 
 .history-cap-note {
-  @apply shrink-0 border-t border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply shrink-0 border-t border-border px-1.5 py-1;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 </style>

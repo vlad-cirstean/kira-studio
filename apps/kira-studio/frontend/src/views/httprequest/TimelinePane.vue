@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
-import EmptyState from '@theme/primitives/EmptyState.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useHttpHistoryStore } from './history';
 import { useHttpRequestViewStore } from './state';
 
@@ -199,17 +200,17 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
     <template v-if="activeTimeline && activeTimeline.hops.length > 0">
       <!-- D15: a failed send's own partial timeline — the failure sentence names the phase the
            request never got past, from the same measured phases the hop below already shows. -->
-      <MessageStrip
-        v-if="failedTimeline"
-        tone="err"
-        data-testid="http-timeline-failure-note"
-      >
-        The request failed during {{ failurePhaseText(failedTimeline.hops[failedTimeline.hops.length - 1]) }}.
-        The steps below are what completed before it did.
-      </MessageStrip>
-      <MessageStrip v-else-if="viewingStored" tone="note" data-testid="http-timeline-stored-note">
-        This timeline was recorded when the response was received.
-      </MessageStrip>
+      <Alert v-if="failedTimeline" variant="destructive" data-testid="http-timeline-failure-note">
+        <AlertDescription>
+          The request failed during {{ failurePhaseText(failedTimeline.hops[failedTimeline.hops.length - 1]) }}.
+          The steps below are what completed before it did.
+        </AlertDescription>
+      </Alert>
+      <Alert v-else-if="viewingStored" class="strip-note" data-testid="http-timeline-stored-note">
+        <AlertDescription class="strip-note-text">
+          This timeline was recorded when the response was received.
+        </AlertDescription>
+      </Alert>
 
       <div v-if="!failedTimeline" class="timeline-summary-row">
         <div class="p-xs dim timeline-summary" data-testid="http-timeline-summary">
@@ -237,14 +238,12 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
             <span>{{ hop.method }}</span>
             <span class="hop-url">{{ hop.url }}</span>
             <span>→</span>
-            <span
-              v-if="hop.status > 0"
-              class="p-chip"
-              :class="statusClass(hop.status)"
-              v-tooltip="statusHint(hop.status)"
-            >
-              {{ hop.status }} {{ hop.statusText }}
-            </span>
+            <Tooltip v-if="hop.status > 0">
+              <TooltipTrigger as-child>
+                <span class="p-chip" :class="statusClass(hop.status)">{{ hop.status }} {{ hop.statusText }}</span>
+              </TooltipTrigger>
+              <TooltipContent>{{ statusHint(hop.status) }}</TooltipContent>
+            </Tooltip>
             <span v-else class="p-chip err" data-testid="http-timeline-hop-failed-chip">
               {{ hop.error || 'failed' }}
             </span>
@@ -263,13 +262,16 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 
           <div class="hop-phases p-xs dim">
             <template v-for="seg in PHASE_SEGMENTS" :key="seg.key">
-              <span
-                class="hop-phase"
-                :data-testid="`http-timeline-phase-${seg.key}`"
-                :data-present="hop[seg.key] ? 'true' : 'false'"
-                v-tooltip="hop[seg.key] ? undefined : phaseTooltip(hop, seg.key)"
-              >
-                {{ seg.label }} {{ hop[seg.key] ? formatMs(hop[seg.key]!.durationMs) : '—' }}
+              <Tooltip v-if="!hop[seg.key]">
+                <TooltipTrigger as-child>
+                  <span class="hop-phase" :data-testid="`http-timeline-phase-${seg.key}`" data-present="false">
+                    {{ seg.label }} —
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{{ phaseTooltip(hop, seg.key) }}</TooltipContent>
+              </Tooltip>
+              <span v-else class="hop-phase" :data-testid="`http-timeline-phase-${seg.key}`" data-present="true">
+                {{ seg.label }} {{ formatMs(hop[seg.key]!.durationMs) }}
               </span>
             </template>
           </div>
@@ -299,14 +301,18 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
       </div>
     </template>
 
-    <EmptyState v-else-if="response" icon="watch" label="No timeline for this response" data-testid="http-timeline-empty" />
-    <EmptyState
-      v-else-if="rt?.status === 'error'"
-      icon="warning"
-      label="This request failed before any timeline was captured"
-      data-testid="http-timeline-empty"
-    />
-    <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
+    <Alert v-else-if="response" class="empty-state" data-testid="http-timeline-empty">
+      <CodiconIcon name="watch" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">No timeline for this response</AlertTitle>
+    </Alert>
+    <Alert v-else-if="rt?.status === 'error'" class="empty-state" data-testid="http-timeline-empty">
+      <CodiconIcon name="warning" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">This request failed before any timeline was captured</AlertTitle>
+    </Alert>
+    <Alert v-else class="empty-state">
+      <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+    </Alert>
   </div>
 </template>
 
@@ -314,27 +320,27 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 @reference "@theme/base.css";
 
 .timeline-pane {
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
 }
 
 .timeline-summary-row {
-  @apply flex items-center justify-between gap-[var(--kira-s-3)];
+  @apply flex items-center justify-between gap-1.5;
 }
 
 .timeline-summary {
-  @apply px-[var(--kira-s-1)];
+  @apply px-0.5;
 }
 
 .timeline-hops {
-  @apply flex flex-col gap-[var(--kira-s-3)];
+  @apply flex flex-col gap-1.5;
 }
 
 .timeline-hop {
-  @apply flex flex-col gap-[var(--kira-s-1)] rounded-kira border border-border p-[var(--kira-s-2)];
+  @apply flex flex-col gap-0.5 rounded-kira border border-border p-1;
 }
 
 .hop-caption {
-  @apply flex items-center gap-[var(--kira-s-2)] text-[length:var(--kira-t-xs)];
+  @apply flex items-center gap-1 text-kira-xs;
 }
 
 .hop-index {
@@ -358,7 +364,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .hop-phases {
-  @apply flex flex-wrap gap-[var(--kira-s-3)];
+  @apply flex flex-wrap gap-1.5;
 }
 
 .hop-phase[data-present='false'] {
@@ -366,27 +372,40 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .hop-notes {
-  @apply flex flex-col gap-[var(--kira-s-1)];
+  @apply flex flex-col gap-0.5;
 }
 
 .hop-headers {
-  @apply mt-[var(--kira-s-1)];
+  @apply mt-0.5;
 }
 
 /* p-kv-row supplies display/gap/font-size; this row also carries its own vertical breathing room. */
 .hop-header-row {
-  @apply py-[var(--kira-s-1)];
+  @apply py-0.5;
 }
 
 .timeline-legend {
-  @apply flex flex-wrap gap-[var(--kira-s-3)] px-[var(--kira-s-1)];
+  @apply flex flex-wrap gap-1.5 px-0.5;
 }
 
 .legend-item {
-  @apply inline-flex items-center gap-[var(--kira-s-1)];
+  @apply inline-flex items-center gap-0.5;
 }
 
 .legend-swatch {
   @apply inline-block h-[8px] w-[8px] rounded-kira-sm;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+
+/* Alert tone class replacing the raw MessageStrip note marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 </style>

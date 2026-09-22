@@ -8,8 +8,11 @@ import {
   userContentTypeHeader,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
-import IconButton from '@theme/primitives/IconButton.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import {
   type VariableSupport,
@@ -20,7 +23,6 @@ import { patchHttpRequestTabState } from '../../api/tabs';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
@@ -152,12 +154,19 @@ const caption = computed(() =>
 <template>
   <div class="body-pane">
     <div class="body-mode-row p-toolbar">
-      <SegmentedControl
+      <ToggleGroup
+        type="single"
         :model-value="selection"
-        :options="BODY_MODE_OPTIONS"
         data-testid="http-body-mode"
-        @update:model-value="setSelection"
-      />
+        @update:model-value="(v) => v && setSelection(v as HttpBodySelection)"
+      >
+        <Tooltip v-for="opt in BODY_MODE_OPTIONS" :key="opt.value">
+          <TooltipTrigger as-child>
+            <ToggleGroupItem :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
+          </TooltipTrigger>
+          <TooltipContent>{{ opt.title }}</TooltipContent>
+        </Tooltip>
+      </ToggleGroup>
       <select
         v-if="tab.state.bodyMode === 'code' && tab.state.codeLanguage !== 'json'"
         class="p-select bordered"
@@ -170,22 +179,23 @@ const caption = computed(() =>
         </option>
       </select>
       <span class="p-push" />
-      <IconButton
-        v-if="tab.state.bodyMode === 'code' && beautifyFormat"
-        icon="expand-all"
-        v-tooltip="'Beautify'"
-        data-testid="http-body-beautify"
-        @click="onBeautifyBody"
-      />
+      <Tooltip v-if="tab.state.bodyMode === 'code' && beautifyFormat">
+        <TooltipTrigger as-child>
+          <Button variant="toolbar" size="kira-icon" aria-label="Beautify" data-testid="http-body-beautify" @click="onBeautifyBody">
+            <CodiconIcon name="expand-all" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Beautify</TooltipContent>
+      </Tooltip>
     </div>
 
     <div v-if="caption" class="p-xs dim body-caption" data-testid="http-body-content-type-caption">
       {{ caption }}
     </div>
 
-    <MessageStrip v-if="beautifyError" tone="err" data-testid="http-body-beautify-error">
-      {{ beautifyError }}
-    </MessageStrip>
+    <Alert v-if="beautifyError" variant="destructive" data-testid="http-body-beautify-error">
+      <AlertDescription>{{ beautifyError }}</AlertDescription>
+    </Alert>
 
     <MonacoHost
       v-if="tab.state.bodyMode === 'raw'"
@@ -239,10 +249,10 @@ const caption = computed(() =>
 }
 
 .body-mode-row {
-  @apply gap-[var(--kira-s-2)] overflow-x-auto;
+  @apply gap-1 overflow-x-auto;
 }
 
 .body-caption {
-  @apply px-[var(--kira-s-3)] pt-0 pb-[var(--kira-s-2)];
+  @apply px-1.5 pt-0 pb-1;
 }
 </style>

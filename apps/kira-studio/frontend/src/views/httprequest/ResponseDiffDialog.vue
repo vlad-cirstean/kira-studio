@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
 import { formatBytes, formatRelative } from '@workbench/util/format';
@@ -9,7 +11,6 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 
 // P8 D12: two entries, three levels of difference, one dialog. `ids` are the two selections from
 // the History list's own checkboxes — this dialog itself decides which is A (older) and which is
@@ -226,40 +227,46 @@ onUnmounted(() => {
     @close="emit('close')"
   >
     <div v-if="loadingSnapshots" class="diff-status p-xs dim">Loading…</div>
-    <MessageStrip v-else-if="loadError" tone="err">{{ loadError }}</MessageStrip>
+    <Alert v-else-if="loadError" variant="destructive"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="diff-body">
       <div class="diff-summary" data-testid="http-diff-summary">
         <div class="diff-summary-side">
-          <span v-tooltip="snapA.entry.sentAt" class="p-xs dim diff-summary-time">{{
-            formatRelative(snapA.entry.sentAt)
-          }}</span>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="p-xs dim diff-summary-time">{{ formatRelative(snapA.entry.sentAt) }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ snapA.entry.sentAt }}</TooltipContent>
+          </Tooltip>
           <div class="diff-summary-col">
-            <span
-              class="p-chip"
-              :class="statusClass(snapA.entry.status)"
-              v-tooltip="statusHint(snapA.entry.status)"
-              data-testid="http-diff-status-a"
-            >
-              {{ snapA.entry.status }} {{ snapA.entry.statusText }}
-            </span>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="p-chip" :class="statusClass(snapA.entry.status)" data-testid="http-diff-status-a">
+                  {{ snapA.entry.status }} {{ snapA.entry.statusText }}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{{ statusHint(snapA.entry.status) }}</TooltipContent>
+            </Tooltip>
             <span class="p-xs dim">{{ snapA.entry.elapsedMs }} ms</span>
             <span class="p-xs dim">{{ formatBytes(snapA.entry.bodyBytes) }}</span>
           </div>
         </div>
         <span class="diff-arrow">→</span>
         <div class="diff-summary-side">
-          <span v-tooltip="snapB.entry.sentAt" class="p-xs dim diff-summary-time">{{
-            formatRelative(snapB.entry.sentAt)
-          }}</span>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="p-xs dim diff-summary-time">{{ formatRelative(snapB.entry.sentAt) }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ snapB.entry.sentAt }}</TooltipContent>
+          </Tooltip>
           <div class="diff-summary-col">
-            <span
-              class="p-chip"
-              :class="statusClass(snapB.entry.status)"
-              v-tooltip="statusHint(snapB.entry.status)"
-              data-testid="http-diff-status-b"
-            >
-              {{ snapB.entry.status }} {{ snapB.entry.statusText }}
-            </span>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span class="p-chip" :class="statusClass(snapB.entry.status)" data-testid="http-diff-status-b">
+                  {{ snapB.entry.status }} {{ snapB.entry.statusText }}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{{ statusHint(snapB.entry.status) }}</TooltipContent>
+            </Tooltip>
             <span class="p-xs dim">{{ snapB.entry.elapsedMs }} ms</span>
             <span class="p-xs dim">{{ formatBytes(snapB.entry.bodyBytes) }}</span>
           </div>
@@ -301,9 +308,11 @@ onUnmounted(() => {
         </details>
       </div>
 
-      <MessageStrip v-if="!bothStored" tone="note" data-testid="http-diff-not-comparable">
-        At least one response's body was not kept in history, so it can't be compared.
-      </MessageStrip>
+      <Alert v-if="!bothStored" class="strip-note" data-testid="http-diff-not-comparable">
+        <AlertDescription class="strip-note-text">
+          At least one response's body was not kept in history, so it can't be compared.
+        </AlertDescription>
+      </Alert>
       <template v-else>
         <div v-if="!commonFormat" class="p-xs dim diff-raw-note">
           Comparing raw bytes — the two bodies aren't both JSON or both XML.
@@ -315,7 +324,7 @@ onUnmounted(() => {
 
     <template #footer>
       <span class="p-dialog-actions end">
-        <AppButton kind="dialog" data-testid="http-diff-close" @click="emit('close')">Close</AppButton>
+        <Button variant="dialog" size="kira" data-testid="http-diff-close" @click="emit('close')">Close</Button>
       </span>
     </template>
   </DialogFrame>
@@ -325,7 +334,7 @@ onUnmounted(() => {
 @reference "@theme/base.css";
 
 .diff-status {
-  @apply p-[var(--kira-s-4)];
+  @apply p-2;
 }
 
 .diff-body {
@@ -333,11 +342,11 @@ onUnmounted(() => {
 }
 
 .diff-summary {
-  @apply flex shrink-0 items-center gap-[var(--kira-s-4)] border-b border-border px-[var(--kira-s-4)] py-[var(--kira-s-3)];
+  @apply flex shrink-0 items-center gap-2 border-b border-border px-2 py-1.5;
 }
 
 .diff-summary-side {
-  @apply flex flex-col gap-[var(--kira-s-1)];
+  @apply flex flex-col gap-0.5;
 }
 
 .diff-summary-time {
@@ -345,7 +354,7 @@ onUnmounted(() => {
 }
 
 .diff-summary-col {
-  @apply flex items-center gap-[var(--kira-s-2)];
+  @apply flex items-center gap-1;
 }
 
 .diff-arrow {
@@ -353,12 +362,12 @@ onUnmounted(() => {
 }
 
 .diff-headers {
-  @apply max-h-[160px] shrink-0 overflow-auto border-b border-border px-[var(--kira-s-4)] py-[var(--kira-s-2)];
+  @apply max-h-[160px] shrink-0 overflow-auto border-b border-border px-2 py-1;
 }
 
 .diff-header-row {
   grid-template-columns: 72px 160px 1fr 1fr;
-  @apply grid gap-[var(--kira-s-2)] py-[var(--kira-s-1)] text-[length:var(--kira-t-xs)];
+  @apply grid gap-1 py-0.5 text-kira-xs;
 }
 
 .diff-header-head {
@@ -386,7 +395,7 @@ onUnmounted(() => {
 }
 
 .diff-raw-note {
-  @apply shrink-0 px-[var(--kira-s-4)] py-[var(--kira-s-2)];
+  @apply shrink-0 px-2 py-1;
 }
 
 .diff-merge-host {
@@ -395,5 +404,14 @@ onUnmounted(() => {
 
 .diff-merge-host :deep(.monaco-diff-editor) {
   @apply h-full;
+}
+
+/* Alert tone class replacing the raw MessageStrip note marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 </style>

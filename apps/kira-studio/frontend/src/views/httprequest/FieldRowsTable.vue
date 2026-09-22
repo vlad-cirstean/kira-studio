@@ -3,9 +3,11 @@
   lang="ts"
   generic="T extends { name: string; value: string; enabled?: boolean; description?: string }"
 >
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
@@ -278,7 +280,9 @@ function onContainerKeydown(e: KeyboardEvent): void {
         :disabled="entry.index >= rows.length"
         :data-testid="`${testidPrefix}-enabled`"
         @update:model-value="toggleEnabled(entry.index)"
-      />
+      >
+        <CodiconIcon name="check" :size="10" />
+      </Checkbox>
       <div class="field-cell">
         <!-- P28 D10: a name is as legal a place for a {{reference}} as a value is
              (`X-{{tenant}}-Id`), and until now it was the one editable Api surface that painted
@@ -299,14 +303,15 @@ function onContainerKeydown(e: KeyboardEvent): void {
           :hover-at="valueVariableSupport?.hoverAt"
           @update:model-value="updateField(entry.index, 'name', $event)"
         />
-        <TextField
-          v-else
-          grow
-          :model-value="entry.row.name"
-          :placeholder="namePlaceholder"
-          :data-testid="`${testidPrefix}-name`"
-          @update:model-value="updateField(entry.index, 'name', $event)"
-        />
+        <InputGroup v-else>
+          <InputGroupTextarea
+            :model-value="entry.row.name"
+            :placeholder="namePlaceholder"
+            :data-testid="`${testidPrefix}-name`"
+            rows="1"
+            @update:model-value="updateField(entry.index, 'name', String($event))"
+          />
+        </InputGroup>
       </div>
       <slot
         name="value"
@@ -328,27 +333,30 @@ function onContainerKeydown(e: KeyboardEvent): void {
             :hover-at="valueVariableSupport.hoverAt"
             @update:model-value="updateField(entry.index, 'value', $event)"
           />
-          <TextField
-            v-else
-            grow
-            :model-value="entry.row.value"
-            :placeholder="valuePlaceholder"
-            :data-testid="`${testidPrefix}-value`"
-            @update:model-value="updateField(entry.index, 'value', $event)"
-          />
+          <InputGroup v-else>
+            <InputGroupTextarea
+              :model-value="entry.row.value"
+              :placeholder="valuePlaceholder"
+              :data-testid="`${testidPrefix}-value`"
+              rows="1"
+              @update:model-value="updateField(entry.index, 'value', String($event))"
+            />
+          </InputGroup>
         </div>
       </slot>
       <!-- P22b D6: plain prose about the field, not a value — no autocomplete, no {{variable}}
            colouring. Behind showDescriptions (D7) so a table with no descriptions in it does not
            pay a fourth AutocompleteField-width column for nothing. -->
       <div v-if="showDescriptions" class="field-cell">
-        <TextField
-          grow
-          :model-value="entry.row.description ?? ''"
-          placeholder="description"
-          :data-testid="`${testidPrefix}-description`"
-          @update:model-value="updateField(entry.index, 'description', $event)"
-        />
+        <InputGroup>
+          <InputGroupTextarea
+            :model-value="entry.row.description ?? ''"
+            placeholder="description"
+            :data-testid="`${testidPrefix}-description`"
+            rows="1"
+            @update:model-value="updateField(entry.index, 'description', String($event))"
+          />
+        </InputGroup>
       </div>
       <!-- P22b D9: wrapped in its own single grid cell — FormDataTable's own trailing content
            (kind select, plus a conditional Choose-file button/caption/remove) varies row to row,
@@ -357,13 +365,21 @@ function onContainerKeydown(e: KeyboardEvent): void {
       <div class="field-cell-trailing">
         <slot name="trailing" :row="entry.row" :index="entry.index" :is-trailing="entry.index >= rows.length" />
       </div>
-      <IconButton
-        icon="close"
-        :disabled="entry.index >= rows.length"
-        v-tooltip="'Remove'"
-        :data-testid="`${testidPrefix}-remove`"
-        @click="removeRow(entry.index)"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :disabled="entry.index >= rows.length"
+            aria-label="Remove"
+            :data-testid="`${testidPrefix}-remove`"
+            @click="removeRow(entry.index)"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Remove</TooltipContent>
+      </Tooltip>
     </div>
   </div>
 </template>
@@ -375,14 +391,14 @@ function onContainerKeydown(e: KeyboardEvent): void {
   /* P16 D13: flex:1 rather than height:100% — this is no longer always its flex-column parent's
      only child (HttpRequestView.vue's own filter row, when open, is a sibling above it), and a
      percentage height would ignore that sibling's own space and overflow past it. */
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
 }
 
 /* P22b D9: a grid, not independent flex items — named columns (gridTemplateColumns, above) keep
    every row's name/value/trailing/remove cells at the same width regardless of what an individual
    row happens to render inside one of them (F13). */
 .field-row {
-  @apply grid items-center gap-[var(--kira-s-2)];
+  @apply grid items-center gap-1;
 }
 
 .field-cell {
@@ -393,6 +409,6 @@ function onContainerKeydown(e: KeyboardEvent): void {
 }
 
 .field-cell-trailing {
-  @apply flex min-w-0 items-center gap-[var(--kira-s-2)];
+  @apply flex min-w-0 items-center gap-1;
 }
 </style>

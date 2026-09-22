@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-core';
 import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import type { FindBarHost } from '../shared/ResponseFindBar.vue';
 import { useHttpHistoryStore } from './history';
 import { useHttpRequestViewStore } from './state';
@@ -151,12 +152,12 @@ defineExpose({
 <template>
   <div class="raw-exchange-pane" data-testid="http-raw-pane">
     <template v-if="wire">
-      <MessageStrip :tone="fidelityTone" data-testid="http-wire-fidelity">
-        {{ fidelityText }}
-      </MessageStrip>
-      <MessageStrip v-if="maskingNote" tone="note" data-testid="http-wire-masking-note">
-        {{ maskingNote }}
-      </MessageStrip>
+      <Alert :class="fidelityTone === 'warn' ? 'strip-warn' : 'strip-note'" data-testid="http-wire-fidelity">
+        <AlertDescription :class="fidelityTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'">{{ fidelityText }}</AlertDescription>
+      </Alert>
+      <Alert v-if="maskingNote" class="strip-note" data-testid="http-wire-masking-note">
+        <AlertDescription class="strip-note-text">{{ maskingNote }}</AlertDescription>
+      </Alert>
 
       <div class="raw-section">
         <div class="raw-section-header">
@@ -164,17 +165,18 @@ defineExpose({
             {{ requestCaption }}
           </span>
           <span class="p-push" />
-          <IconButton
-            icon="copy"
-            aria-label="Copy request"
-            v-tooltip="'Copy request'"
-            data-testid="http-wire-request-copy"
-            @click="onCopyRequest"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Copy request" data-testid="http-wire-request-copy" @click="onCopyRequest">
+                <CodiconIcon name="copy" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy request</TooltipContent>
+          </Tooltip>
         </div>
-        <MessageStrip v-if="elisionNote" tone="note" data-testid="http-wire-elision-note">
-          {{ elisionNote }}
-        </MessageStrip>
+        <Alert v-if="elisionNote" class="strip-note" data-testid="http-wire-elision-note">
+          <AlertDescription class="strip-note-text">{{ elisionNote }}</AlertDescription>
+        </Alert>
         <div class="raw-editor">
           <MonacoHost
             ref="requestHostRef"
@@ -191,13 +193,14 @@ defineExpose({
         <div class="raw-section-header">
           <span class="p-xs dim mono raw-caption">←</span>
           <span class="p-push" />
-          <IconButton
-            icon="copy"
-            aria-label="Copy response"
-            v-tooltip="'Copy response'"
-            data-testid="http-wire-response-copy"
-            @click="onCopyResponse"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Copy response" data-testid="http-wire-response-copy" @click="onCopyResponse">
+                <CodiconIcon name="copy" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy response</TooltipContent>
+          </Tooltip>
         </div>
         <div class="raw-editor">
           <MonacoHost
@@ -209,10 +212,12 @@ defineExpose({
             data-testid="http-wire-response-editor"
           />
         </div>
-        <MessageStrip tone="note" data-testid="http-wire-order-note">
-          Response headers are shown alphabetised and in canonical case — Go's HTTP client does not
-          expose them in received order.
-        </MessageStrip>
+        <Alert class="strip-note" data-testid="http-wire-order-note">
+          <AlertDescription class="strip-note-text">
+            Response headers are shown alphabetised and in canonical case — Go's HTTP client does not
+            expose them in received order.
+          </AlertDescription>
+        </Alert>
       </div>
     </template>
 
@@ -221,16 +226,16 @@ defineExpose({
          one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so this
          gets its own honest strip rather than a fourth, misleading fidelity value. -->
     <template v-else-if="showReconstructed">
-      <MessageStrip tone="note" data-testid="http-raw-reconstructed">
-        Reconstructed from what this request was recorded as — not the exact bytes on the wire.
-      </MessageStrip>
-      <MessageStrip
-        v-if="requestBodyStorageTruncated"
-        tone="note"
-        data-testid="http-history-request-truncated"
-      >
-        Only the first 256 KB of this request's body was kept in history.
-      </MessageStrip>
+      <Alert class="strip-note" data-testid="http-raw-reconstructed">
+        <AlertDescription class="strip-note-text">
+          Reconstructed from what this request was recorded as — not the exact bytes on the wire.
+        </AlertDescription>
+      </Alert>
+      <Alert v-if="requestBodyStorageTruncated" class="strip-note" data-testid="http-history-request-truncated">
+        <AlertDescription class="strip-note-text">
+          Only the first 256 KB of this request's body was kept in history.
+        </AlertDescription>
+      </Alert>
 
       <div class="raw-section">
         <div class="raw-section-header">
@@ -238,13 +243,14 @@ defineExpose({
             {{ requestCaption }}
           </span>
           <span class="p-push" />
-          <IconButton
-            icon="copy"
-            aria-label="Copy request"
-            v-tooltip="'Copy request'"
-            data-testid="http-wire-request-copy"
-            @click="onCopyRequest"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Copy request" data-testid="http-wire-request-copy" @click="onCopyRequest">
+                <CodiconIcon name="copy" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy request</TooltipContent>
+          </Tooltip>
         </div>
         <div class="raw-editor">
           <MonacoHost
@@ -262,13 +268,14 @@ defineExpose({
         <div class="raw-section-header">
           <span class="p-xs dim mono raw-caption">←</span>
           <span class="p-push" />
-          <IconButton
-            icon="copy"
-            aria-label="Copy response"
-            v-tooltip="'Copy response'"
-            data-testid="http-wire-response-copy"
-            @click="onCopyResponse"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Copy response" data-testid="http-wire-response-copy" @click="onCopyResponse">
+                <CodiconIcon name="copy" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy response</TooltipContent>
+          </Tooltip>
         </div>
         <div class="raw-editor">
           <MonacoHost
@@ -284,9 +291,15 @@ defineExpose({
     </template>
 
     <template v-else-if="emptyLabel">
-      <EmptyState icon="file-binary" :label="emptyLabel" />
+      <Alert class="empty-state">
+        <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">{{ emptyLabel }}</AlertTitle>
+      </Alert>
     </template>
-    <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
+    <Alert v-else class="empty-state">
+      <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+    </Alert>
   </div>
 </template>
 
@@ -294,15 +307,15 @@ defineExpose({
 @reference "@theme/base.css";
 
 .raw-exchange-pane {
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
 }
 
 .raw-section {
-  @apply flex min-h-[200px] flex-col gap-[var(--kira-s-1)];
+  @apply flex min-h-[200px] flex-col gap-0.5;
 }
 
 .raw-section-header {
-  @apply flex items-center gap-[var(--kira-s-2)];
+  @apply flex items-center gap-1;
 }
 
 .raw-caption {
@@ -311,5 +324,24 @@ defineExpose({
 
 .raw-editor {
   @apply flex-1 min-h-[200px] overflow-hidden rounded-kira border border-border;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+
+/* Alert tone classes replacing the raw MessageStrip note/warn markers (P104 §9 rule 5: literal
+   hex, not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
+}
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

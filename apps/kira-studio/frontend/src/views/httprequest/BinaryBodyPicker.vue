@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -34,22 +35,31 @@ function onClearFile(): void {
 </script>
 
 <template>
-  <div class="flex items-center gap-[var(--kira-s-2)] p-[var(--kira-s-3)]">
-    <AppButton data-testid="http-binary-choose-file" @click="onChooseFile">Choose file…</AppButton>
+  <div class="flex items-center gap-1 p-1.5">
+    <Button variant="toolbar" size="kira" data-testid="http-binary-choose-file" @click="onChooseFile">
+      Choose file…
+    </Button>
     <template v-if="tab.state.binaryFile">
-      <span
-        class="p-sm muted p-0"
-        data-testid="http-binary-file-caption"
-        v-tooltip="tab.state.binaryFile.path"
-      >
-        {{ caption }}
-      </span>
-      <IconButton
-        icon="close"
-        v-tooltip="'Clear'"
-        data-testid="http-binary-clear-file"
-        @click="onClearFile"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="p-sm muted p-0" data-testid="http-binary-file-caption">{{ caption }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ tab.state.binaryFile.path }}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Clear"
+            data-testid="http-binary-clear-file"
+            @click="onClearFile"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Clear</TooltipContent>
+      </Tooltip>
     </template>
   </div>
 </template>

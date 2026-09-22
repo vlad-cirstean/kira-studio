@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { HttpFormDataFieldState } from '@shared/domain/http';
 import { contentTypeForFilename } from '@shared/domain/object-store';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatBytes } from '@workbench/util/format';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
@@ -106,14 +108,15 @@ function onClearFile(index: number): void {
           :hover-at="variables.hoverAt"
           @update:model-value="update"
         />
-        <TextField
-          v-else
-          grow
-          :model-value="row.value"
-          placeholder="value"
-          data-testid="http-formdata-value"
-          @update:model-value="update"
-        />
+        <InputGroup v-else>
+          <InputGroupTextarea
+            :model-value="row.value"
+            placeholder="value"
+            data-testid="http-formdata-value"
+            rows="1"
+            @update:model-value="update(String($event))"
+          />
+        </InputGroup>
       </div>
     </template>
 
@@ -128,30 +131,37 @@ function onClearFile(index: number): void {
         <option value="file">File</option>
       </select>
       <template v-if="row.kind === 'file'">
-        <AppButton data-testid="http-formdata-choose-file" @click="onChooseFile(index)">
+        <Button variant="toolbar" size="kira" data-testid="http-formdata-choose-file" @click="onChooseFile(index)">
           Choose file…
-        </AppButton>
-        <span
-          v-if="row.fileName"
-          class="p-xs muted formdata-file-caption"
-          data-testid="http-formdata-file-caption"
-          v-tooltip="row.path"
-        >
-          {{ row.fileName }} ({{ formatBytes(row.fileSize) }})
-        </span>
-        <IconButton
-          v-if="row.fileName"
-          icon="close"
-          v-tooltip="'Clear file'"
-          data-testid="http-formdata-clear-file"
-          @click="onClearFile(index)"
-        />
+        </Button>
+        <Tooltip v-if="row.fileName">
+          <TooltipTrigger as-child>
+            <span class="p-xs muted formdata-file-caption" data-testid="http-formdata-file-caption">
+              {{ row.fileName }} ({{ formatBytes(row.fileSize) }})
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ row.path }}</TooltipContent>
+        </Tooltip>
+        <Tooltip v-if="row.fileName">
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Clear file"
+              data-testid="http-formdata-clear-file"
+              @click="onClearFile(index)"
+            >
+              <CodiconIcon name="close" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Clear file</TooltipContent>
+        </Tooltip>
         <div class="field-cell">
-          <TextField
+          <Input
             :model-value="row.contentType"
             placeholder="Content type"
             data-testid="http-formdata-content-type"
-            @update:model-value="(v) => updateRow(index, { contentType: v })"
+            @update:model-value="(v) => updateRow(index, { contentType: String(v) })"
           />
         </div>
       </template>

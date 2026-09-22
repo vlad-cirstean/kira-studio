@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../state/settings';
 import { useCookiesStore } from './cookies';
@@ -80,28 +86,38 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 
 <template>
   <div v-if="mode === 'request'" class="cookies-pane" data-testid="http-request-cookies">
-    <EmptyState
-      v-if="disableCookieJar"
-      icon="circle-slash"
-      label="The cookie jar is off for this request"
-      data-testid="http-cookies-jar-off"
-    >
+    <Alert v-if="disableCookieJar" class="empty-state" data-testid="http-cookies-jar-off">
+      <CodiconIcon name="circle-slash" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">
+        The cookie jar is off for this request
+      </AlertTitle>
       <button class="hint-link" data-testid="http-cookies-edit-defaults" @click="onEditGlobalDefaults">
         Edit global defaults…
       </button>
-    </EmptyState>
+    </Alert>
     <template v-else>
       <div class="cookies-toolbar">
-        <PanelSearchBox v-model="filter" placeholder="Filter cookies" testid="http-cookies-filter" />
-        <AppButton
-          kind="dialog"
+        <InputGroup data-testid="http-cookies-filter">
+          <InputGroupAddon>
+            <CodiconIcon name="search" :size="13" />
+          </InputGroupAddon>
+          <InputGroupInput v-model="filter" placeholder="Filter cookies" />
+          <InputGroupAddon v-if="filter" align="inline-end">
+            <InputGroupButton @click="filter = ''">
+              <CodiconIcon name="close" :size="13" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
+        <Button
+          variant="dialog"
+          size="kira"
           class="clear-all-button"
           :disabled="requestCookies.length === 0"
           data-testid="http-cookies-clear-all"
           @click="onClearAll"
         >
           Clear all
-        </AppButton>
+        </Button>
       </div>
       <span
         v-if="filter.trim()"
@@ -117,23 +133,27 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
             <span class="p-kv-value mono">{{ c.value }}</span>
             <span v-if="attributeLine(c)" class="cookie-attributes">{{ attributeLine(c) }}</span>
           </div>
-          <IconButton
-            icon="close"
-            aria-label="Remove cookie"
-            v-tooltip="'Remove'"
-            :data-testid="`http-cookies-remove-${c.name}`"
-            @click="onRemove(c.name)"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Remove cookie"
+                :data-testid="`http-cookies-remove-${c.name}`"
+                @click="onRemove(c.name)"
+              >
+                <CodiconIcon name="close" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Remove</TooltipContent>
+          </Tooltip>
         </div>
       </div>
-      <EmptyState
-        v-else
-        icon="symbol-key"
-        label="No cookies for this request's URL"
-        data-testid="http-cookies-empty"
-      >
+      <Alert v-else class="empty-state" data-testid="http-cookies-empty">
+        <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">No cookies for this request's URL</AlertTitle>
         <button class="hint-link" data-testid="http-cookies-retry" @click="onRetry">Refresh</button>
-      </EmptyState>
+      </Alert>
     </template>
   </div>
 
@@ -173,9 +193,15 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
           </div>
         </div>
       </template>
-      <EmptyState v-else icon="symbol-key" label="This response carries no cookies" data-testid="http-response-cookies-empty" />
+      <Alert v-else class="empty-state" data-testid="http-response-cookies-empty">
+        <CodiconIcon name="symbol-key" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">This response carries no cookies</AlertTitle>
+      </Alert>
     </template>
-    <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
+    <Alert v-else class="empty-state">
+      <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+    </Alert>
   </div>
 </template>
 
@@ -187,7 +213,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 }
 
 .cookies-toolbar {
-  @apply flex items-center gap-[var(--kira-s-2)];
+  @apply flex items-center gap-1;
 }
 
 .clear-all-button {
@@ -195,15 +221,15 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 }
 
 .cookies-count {
-  @apply px-[var(--kira-s-3)] pt-[var(--kira-s-2)] pb-0;
+  @apply px-1.5 pt-1 pb-0;
 }
 
 .cookies-list {
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-1)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5;
 }
 
 .cookie-row {
-  @apply items-start justify-between gap-[var(--kira-s-2)];
+  @apply items-start justify-between gap-1;
 }
 
 .cookie-body {
@@ -213,18 +239,22 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 /* AutocompleteField.vue's own hover-panel shape (P71 §8.2): a value line, then a muted second
    line for everything that isn't the value itself. */
 .cookie-attributes {
-  @apply text-muted text-[length:var(--kira-t-xs)] font-[family-name:var(--kira-font-data)];
+  @apply text-muted text-kira-xs font-[family-name:var(--kira-font-data)];
 }
 
 .cookies-group {
-  @apply pt-[var(--kira-s-3)];
+  @apply pt-1.5;
 }
 
 .cookies-group-head {
-  @apply m-0 px-[var(--kira-s-3)] py-0 text-muted text-[length:var(--kira-t-sm)];
+  @apply m-0 px-1.5 py-0 text-muted text-kira-sm;
 }
 
 .hint-link {
-  @apply mt-[var(--kira-s-2)] cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
+  @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 </style>

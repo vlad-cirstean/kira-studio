@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Input } from '@theme/components/ui/input';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
@@ -94,8 +95,10 @@ function onEditGlobalDefaults(): void {
           <Checkbox
             :model-value="settings.httpVersion === null"
             data-testid="http-settings-httpVersion-inherit"
-            @update:model-value="onHttpVersionInherit"
-          />
+            @update:model-value="(v) => onHttpVersionInherit(v === true)"
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
           Inherit
         </label>
       </div>
@@ -118,16 +121,17 @@ function onEditGlobalDefaults(): void {
           <Checkbox
             :model-value="settings.requestTimeoutMs === null"
             data-testid="http-settings-requestTimeoutMs-inherit"
-            @update:model-value="onRequestTimeoutMsInherit"
-          />
+            @update:model-value="(v) => onRequestTimeoutMsInherit(v === true)"
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
           Inherit
         </label>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="REQUEST_TIMEOUT_MS_RANGE.min"
         :max="REQUEST_TIMEOUT_MS_RANGE.max"
-        size="md"
         :disabled="settings.requestTimeoutMs === null"
         data-testid="http-settings-requestTimeoutMs"
         :model-value="String(settings.requestTimeoutMs ?? global.requestTimeoutMs)"
@@ -145,16 +149,17 @@ function onEditGlobalDefaults(): void {
           <Checkbox
             :model-value="settings.maxResponseMb === null"
             data-testid="http-settings-maxResponseMb-inherit"
-            @update:model-value="onMaxResponseMbInherit"
-          />
+            @update:model-value="(v) => onMaxResponseMbInherit(v === true)"
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
           Inherit
         </label>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="MAX_RESPONSE_MB_RANGE.min"
         :max="MAX_RESPONSE_MB_RANGE.max"
-        size="md"
         :disabled="settings.maxResponseMb === null"
         data-testid="http-settings-maxResponseMb"
         :model-value="String(settings.maxResponseMb ?? global.maxResponseMb)"
@@ -171,16 +176,20 @@ function onEditGlobalDefaults(): void {
           :model-value="settings.sslVerify ?? global.sslVerify"
           :disabled="settings.sslVerify === null"
           data-testid="http-settings-sslVerify"
-          @update:model-value="onSslVerifyChange"
-        />
+          @update:model-value="(v) => onSslVerifyChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Verify SSL certificates</span>
       </label>
       <label class="inherit">
         <Checkbox
           :model-value="settings.sslVerify === null"
           data-testid="http-settings-sslVerify-inherit"
-          @update:model-value="onSslVerifyInherit"
-        />
+          @update:model-value="(v) => onSslVerifyInherit(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         Inherit
       </label>
     </div>
@@ -192,16 +201,20 @@ function onEditGlobalDefaults(): void {
           :model-value="settings.followRedirects ?? global.followRedirects"
           :disabled="settings.followRedirects === null"
           data-testid="http-settings-followRedirects"
-          @update:model-value="onFollowRedirectsChange"
-        />
+          @update:model-value="(v) => onFollowRedirectsChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Follow redirects</span>
       </label>
       <label class="inherit">
         <Checkbox
           :model-value="settings.followRedirects === null"
           data-testid="http-settings-followRedirects-inherit"
-          @update:model-value="onFollowRedirectsInherit"
-        />
+          @update:model-value="(v) => onFollowRedirectsInherit(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         Inherit
       </label>
     </div>
@@ -214,16 +227,17 @@ function onEditGlobalDefaults(): void {
           <Checkbox
             :model-value="settings.maxRedirects === null"
             data-testid="http-settings-maxRedirects-inherit"
-            @update:model-value="onMaxRedirectsInherit"
-          />
+            @update:model-value="(v) => onMaxRedirectsInherit(v === true)"
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
           Inherit
         </label>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="MAX_REDIRECTS_RANGE.min"
         :max="MAX_REDIRECTS_RANGE.max"
-        size="md"
         :disabled="settings.maxRedirects === null || !effectiveFollowRedirects"
         data-testid="http-settings-maxRedirects"
         :model-value="String(settings.maxRedirects ?? global.maxRedirects)"
@@ -241,16 +255,20 @@ function onEditGlobalDefaults(): void {
           :model-value="settings.disableCookieJar ?? global.disableCookieJar"
           :disabled="settings.disableCookieJar === null"
           data-testid="http-settings-disableCookieJar"
-          @update:model-value="onDisableCookieJarChange"
-        />
+          @update:model-value="(v) => onDisableCookieJarChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Disable cookie jar</span>
       </label>
       <label class="inherit">
         <Checkbox
           :model-value="settings.disableCookieJar === null"
           data-testid="http-settings-disableCookieJar-inherit"
-          @update:model-value="onDisableCookieJarInherit"
-        />
+          @update:model-value="(v) => onDisableCookieJarInherit(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         Inherit
       </label>
     </div>
@@ -266,11 +284,11 @@ function onEditGlobalDefaults(): void {
 @reference "@theme/base.css";
 
 .settings-pane {
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-3)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-1.5 overflow-auto p-1.5;
 }
 
 .field {
-  @apply flex flex-col gap-[var(--kira-s-2)] text-[length:var(--kira-t-sm)];
+  @apply flex flex-col gap-1 text-kira-sm;
 }
 
 .field > span:first-child {
@@ -278,11 +296,11 @@ function onEditGlobalDefaults(): void {
 }
 
 .field-head {
-  @apply flex items-center justify-between gap-[var(--kira-s-2)];
+  @apply flex items-center justify-between gap-1;
 }
 
 .field.checkbox {
-  @apply flex-row items-center gap-[var(--kira-s-3)];
+  @apply flex-row items-center gap-1.5;
 }
 
 .checkbox-row {
@@ -290,14 +308,14 @@ function onEditGlobalDefaults(): void {
 }
 
 .inherit {
-  @apply flex items-center gap-[var(--kira-s-2)] text-muted text-[length:var(--kira-t-xs)];
+  @apply flex items-center gap-1 text-muted text-kira-xs;
 }
 
 .helper-text {
-  @apply text-subtle text-[length:var(--kira-t-xs)] leading-normal;
+  @apply text-subtle text-kira-xs leading-normal;
 }
 
 .hint-link {
-  @apply self-start cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
+  @apply self-start cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
 }
 </style>

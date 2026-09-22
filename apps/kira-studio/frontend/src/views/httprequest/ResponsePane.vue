@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { formatBytes } from '@workbench/util/format';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -14,7 +20,6 @@ import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
@@ -296,57 +301,81 @@ onUnmounted(() => {
 
 <template>
   <div class="response-pane" data-testid="http-response-pane">
-    <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="http-send-error">
-      {{ rt.error.message }}
-    </MessageStrip>
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="http-send-error">
+      <AlertDescription>{{ rt.error.message }}</AlertDescription>
+    </Alert>
 
     <div class="response-status-row p-toolbar">
       <template v-if="response">
-        <span
-          class="p-chip"
-          :class="statusClass(response.status)"
-          data-testid="http-status"
-          v-tooltip="hint"
-        >
-          {{ response.status }} {{ response.statusText }}
-        </span>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="p-chip" :class="statusClass(response.status)" data-testid="http-status">
+              {{ response.status }} {{ response.statusText }}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ hint }}</TooltipContent>
+        </Tooltip>
         <span class="p-push" />
-        <button
-          type="button"
-          class="p-xs dim pane-jump-link"
-          data-testid="http-elapsed"
-          v-tooltip="'See where the time went'"
-          @click="viewTimeline"
-        >
-          {{ response.elapsedMs }} ms
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="p-xs dim pane-jump-link"
+              data-testid="http-elapsed"
+              @click="viewTimeline"
+            >
+              {{ response.elapsedMs }} ms
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>See where the time went</TooltipContent>
+        </Tooltip>
         <span class="p-xs dim" data-testid="http-body-bytes">{{ formatBytes(response.bodyBytes) }}</span>
-        <SegmentedControl
+        <ToggleGroup
           v-if="tab.state.responsePane === 'body' && prettyFormat"
+          type="single"
           :model-value="tab.state.responseView"
-          :options="RESPONSE_VIEW_OPTIONS"
           data-testid="http-response-view-toggle"
-          @update:model-value="setResponseView"
-        />
+          @update:model-value="(v) => v && setResponseView(v as 'pretty' | 'raw')"
+        >
+          <ToggleGroupItem v-for="opt in RESPONSE_VIEW_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
+            {{ opt.label }}
+          </ToggleGroupItem>
+        </ToggleGroup>
       </template>
       <span v-else class="p-push" />
       <!-- D11: only the two panes with a rangeHighlights compartment free (Body, Raw) get the
            find affordance — Headers has its own separate filter (D12), and History/Timeline are
            lists, not one searchable document. -->
-      <IconButton
-        v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'"
-        icon="search"
-        :active="findOpen"
-        v-tooltip="'Find in response'"
-        data-testid="http-find-toggle"
-        @click="toggleFind"
-      />
-      <SegmentedControl
+      <Tooltip v-if="tab.state.responsePane === 'body' || tab.state.responsePane === 'raw'">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': findOpen }"
+            aria-label="Find in response"
+            data-testid="http-find-toggle"
+            @click="toggleFind"
+          >
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Find in response</TooltipContent>
+      </Tooltip>
+      <ToggleGroup
+        type="single"
         :model-value="tab.state.responsePane"
-        :options="RESPONSE_PANE_OPTIONS_WITH_COOKIES"
         data-testid="http-response-pane-toggle"
-        @update:model-value="setResponsePane"
-      />
+        @update:model-value="(v) => v && setResponsePane(v as HttpResponsePane)"
+      >
+        <ToggleGroupItem
+          v-for="opt in RESPONSE_PANE_OPTIONS_WITH_COOKIES"
+          :key="opt.value"
+          :value="opt.value"
+          :data-testid="opt.testid"
+        >
+          {{ opt.label }}
+        </ToggleGroupItem>
+      </ToggleGroup>
     </div>
 
     <!-- Real-interaction fix (reported bug — the response search bar sat below/at the bottom of
@@ -369,33 +398,46 @@ onUnmounted(() => {
       @close="closeFind"
     />
 
-    <MessageStrip v-if="viewing" tone="note" data-testid="http-history-band">
-      Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
-      {{ viewing?.snapshot.entry.url }}
-      <AppButton class="strip-action" data-testid="http-history-back" @click="onBackToLatest">
-        {{ rt?.response ? 'Back to latest' : 'Close' }}
-      </AppButton>
-    </MessageStrip>
+    <Alert v-if="viewing" class="strip-note" data-testid="http-history-band">
+      <AlertDescription class="strip-note-text flex items-start gap-1.5">
+        <span>
+          Viewing the response from {{ viewingTime }} · {{ viewing?.snapshot.entry.method }}
+          {{ viewing?.snapshot.entry.url }}
+        </span>
+        <Button variant="toolbar" size="kira" class="ml-auto shrink-0" data-testid="http-history-back" @click="onBackToLatest">
+          {{ rt?.response ? 'Back to latest' : 'Close' }}
+        </Button>
+      </AlertDescription>
+    </Alert>
 
-    <MessageStrip v-if="response?.bodyTruncated" tone="warn" data-testid="http-body-truncated">
-      Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
-    </MessageStrip>
-    <MessageStrip v-if="bodyStorageTruncated" tone="note" data-testid="http-history-truncated">
-      Only the first 256 KB of this response was kept in history.
-    </MessageStrip>
-    <MessageStrip v-if="bodyNotStored" tone="note" data-testid="http-history-binary-note">
-      This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
-    </MessageStrip>
-    <button
-      v-if="redirectCaption"
-      type="button"
-      class="p-xs dim redirect-caption pane-jump-link"
-      data-testid="http-redirects"
-      v-tooltip="'See where the time went'"
-      @click="viewTimeline"
-    >
-      {{ redirectCaption }}
-    </button>
+    <Alert v-if="response?.bodyTruncated" class="strip-warn" data-testid="http-body-truncated">
+      <AlertDescription class="strip-warn-text">
+        Response truncated at {{ formatBytes(response.bodyBytes) }} — the server sent more than that.
+      </AlertDescription>
+    </Alert>
+    <Alert v-if="bodyStorageTruncated" class="strip-note" data-testid="http-history-truncated">
+      <AlertDescription class="strip-note-text">
+        Only the first 256 KB of this response was kept in history.
+      </AlertDescription>
+    </Alert>
+    <Alert v-if="bodyNotStored" class="strip-note" data-testid="http-history-binary-note">
+      <AlertDescription class="strip-note-text">
+        This response's body was binary and was not kept — {{ response ? formatBytes(response.bodyBytes) : '' }}.
+      </AlertDescription>
+    </Alert>
+    <Tooltip v-if="redirectCaption">
+      <TooltipTrigger as-child>
+        <button
+          type="button"
+          class="p-xs dim redirect-caption pane-jump-link"
+          data-testid="http-redirects"
+          @click="viewTimeline"
+        >
+          {{ redirectCaption }}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>See where the time went</TooltipContent>
+    </Tooltip>
 
     <ResponseHistoryList
       v-if="tab.state.responsePane === 'history'"
@@ -404,11 +446,15 @@ onUnmounted(() => {
     />
     <div v-else-if="tab.state.responsePane === 'headers'" class="response-headers-pane" data-testid="http-response-headers">
       <template v-if="response">
-        <PanelSearchBox
-          v-model="headerFilter"
-          placeholder="Filter headers"
-          testid="http-response-headers-filter"
-        />
+        <InputGroup data-testid="http-response-headers-filter">
+          <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+          <InputGroupInput v-model="headerFilter" placeholder="Filter headers" />
+          <InputGroupAddon v-if="headerFilter" align="inline-end">
+            <InputGroupButton aria-label="Clear filter" @click="headerFilter = ''">
+              <CodiconIcon name="close" :size="13" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
         <span
           v-if="headerFilter.trim()"
           class="p-xs subtle response-headers-count"
@@ -423,7 +469,10 @@ onUnmounted(() => {
           </div>
         </div>
       </template>
-      <EmptyState v-else icon="arrow-right" label="Send a request to see the response" />
+      <Alert v-else class="empty-state">
+        <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
+      </Alert>
     </div>
     <RawExchangePane
       v-else-if="tab.state.responsePane === 'raw'"
@@ -452,7 +501,9 @@ onUnmounted(() => {
           :range-highlights="bodyHighlights"
         />
       </template>
-      <EmptyState v-else icon="arrow-right" label="Send a request to see the response">
+      <Alert v-else class="empty-state">
+        <CodiconIcon name="arrow-right" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">Send a request to see the response</AlertTitle>
         <button
           v-if="hasHistory"
           type="button"
@@ -462,7 +513,7 @@ onUnmounted(() => {
         >
           {{ historyCount }} past response{{ historyCount === 1 ? '' : 's' }} · View history
         </button>
-      </EmptyState>
+      </Alert>
     </div>
 
     <ResponseDiffDialog v-if="compareIds" :ids="compareIds" @close="closeCompare" />
@@ -477,11 +528,11 @@ onUnmounted(() => {
 }
 
 .response-status-row {
-  @apply gap-[var(--kira-s-2)];
+  @apply gap-1;
 }
 
 .redirect-caption {
-  @apply block w-full px-[var(--kira-s-3)] py-[var(--kira-s-2)] text-left;
+  @apply block w-full px-1.5 py-1 text-left;
 }
 
 /* D11: http-elapsed and http-redirects, still the same dim text they always were, now clickable —
@@ -499,7 +550,7 @@ onUnmounted(() => {
 }
 
 .binary-note {
-  @apply p-[var(--kira-s-3)];
+  @apply p-1.5;
 }
 
 .response-headers-pane {
@@ -507,14 +558,33 @@ onUnmounted(() => {
 }
 
 .response-headers-count {
-  @apply px-[var(--kira-s-3)] pt-[var(--kira-s-2)] pb-0;
+  @apply px-1.5 pt-1 pb-0;
 }
 
 .response-headers {
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-1)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-0.5 overflow-auto p-1.5;
 }
 
 .history-hint-link {
-  @apply mt-[var(--kira-s-2)] cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
+  @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+
+/* Alert tone classes replacing the raw MessageStrip note/warn markers (P104 §9 rule 5: literal
+   hex, not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
+}
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>
