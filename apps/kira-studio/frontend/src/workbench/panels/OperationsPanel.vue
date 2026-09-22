@@ -2,19 +2,15 @@
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-// P104 §3.1/§3.4: SegmentedControl (ToggleGroup recipe), VirtualList (@tanstack/vue-virtual
-// recipe, a new dependency not yet added) and EmptyState (ui/alert composition) are each a
-// genuinely separate, non-mechanical piece of work -- not attempted in this pass. Only the
-// mechanical AppButton/TextField/v-tooltip conversions below are done here.
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import VirtualList from '@theme/primitives/VirtualList.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
+import { useVirtualRows } from '@workbench/util/virtualRows';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -59,6 +55,16 @@ const listItems = computed<OpsListItem[]>(() => {
     }
   }
   return out;
+});
+
+// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
+// useVirtualRows composable -- every row here is a fixed 18px (the same JS/CSS-numeric
+// requirement the component's own comment below states).
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, onScroll } = useVirtualRows({
+  count: () => listItems.value.length,
+  rowHeight: () => 18,
+  scrollElement: scrollEl,
 });
 
 function connectionFor(record: OpRecord) {
@@ -184,7 +190,15 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
           data-testid="ops-filter"
         />
       </div>
-      <SegmentedControl v-model="opsStore.statusFilter" :options="statusFilterOptions" />
+      <ToggleGroup
+        type="single"
+        :model-value="opsStore.statusFilter"
+        @update:model-value="(v) => v && (opsStore.statusFilter = v as (typeof statusFilterOptions)[number]['value'])"
+      >
+        <ToggleGroupItem v-for="opt in statusFilterOptions" :key="opt.value" :value="opt.value">
+          {{ opt.label }}
+        </ToggleGroupItem>
+      </ToggleGroup>
       <span class="running-count">{{ opsStore.runningCount }} running</span>
       <Tooltip>
         <TooltipTrigger as-child>
@@ -195,7 +209,10 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
     </div>
 
     <div v-if="opsStore.visibleOps.length === 0" class="min-h-0 flex-1">
-      <EmptyState icon="checklist" label="No operations yet" />
+      <Alert class="h-full flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
+        <CodiconIcon name="checklist" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md font-normal text-muted">No operations yet</AlertTitle>
+      </Alert>
     </div>
     <template v-else>
       <div class="ops-columns">
@@ -208,89 +225,98 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
         <span>Rows</span>
         <span>Command</span>
       </div>
-      <div class="ops-body">
+      <div ref="scrollEl" class="ops-body overflow-auto" data-testid="virtual-list" @scroll="onScroll">
         <!--
-          The expanded command/error detail rows embed a MonacoHost (D18/D19, P60a) inside
-          VirtualList's fixed row rather than making VirtualList itself variable-height
-          (P2 §0 note 14 leaves it fixed on purpose) — `single-line` forces a non-wrapping line
-          and no gutter so it reads like the plain text it replaces, just with SQL syntax
-          highlighting. This prop is JS, not CSS (P24 D34) — it has to stay numerically equal to
-          --kira-h-xs (18px), which .ops-row/.ops-columns/.ops-detail-row and the embedded
-          .monaco-editor's own height all use below.
+          The expanded command/error detail rows embed a MonacoHost (D18/D19, P60a) inside a fixed
+          virtual row rather than the list itself being variable-height (P2 §0 note 14 leaves it
+          fixed on purpose) — `single-line` forces a non-wrapping line and no gutter so it reads
+          like the plain text it replaces, just with SQL syntax highlighting. The row height below
+          is JS, not CSS (P24 D34) — it has to stay numerically equal to --kira-h-xs (18px), which
+          .ops-row/.ops-columns/.ops-detail-row and the embedded .monaco-editor's own height all
+          use below.
         -->
-        <VirtualList :items="listItems" :row-height="18">
-          <template #default="{ item }">
+        <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+          <template v-for="vi in virtualItems" :key="String(vi.key)">
             <div
-              v-if="item.kind === 'op'"
-              class="ops-row"
-              :class="{ error: item.record.status === 'error' }"
+              v-if="listItems[vi.index].kind === 'op'"
+              class="ops-row virtual-row"
+              :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
+              :class="{ error: listItems[vi.index].record.status === 'error' }"
               data-testid="op-row"
-              :data-status="item.record.status"
-              @click="onRowClick(item.record)"
-              @contextmenu.prevent="onRowContextMenu(item.record, $event)"
+              :data-status="listItems[vi.index].record.status"
+              @click="onRowClick(listItems[vi.index].record)"
+              @contextmenu.prevent="onRowContextMenu(listItems[vi.index].record, $event)"
             >
-              <span class="mono">{{ formatTime(item.record.startedAt) }}</span>
+              <span class="mono">{{ formatTime(listItems[vi.index].record.startedAt) }}</span>
               <span class="connection-cell">
                 <span
-                  v-if="connectionFor(item.record)"
+                  v-if="connectionFor(listItems[vi.index].record)"
                   class="chip"
-                  :style="{ background: connColorVar(connectionFor(item.record)?.color) ?? 'none' }"
+                  :style="{ background: connColorVar(connectionFor(listItems[vi.index].record)?.color) ?? 'none' }"
                 />
-                <span class="truncate">{{ connectionFor(item.record)?.name ?? '—' }}</span>
+                <span class="truncate">{{ connectionFor(listItems[vi.index].record)?.name ?? '—' }}</span>
               </span>
-              <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(item.record) }}</span>
-              <span>{{ item.record.kind }}</span>
+              <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(listItems[vi.index].record) }}</span>
+              <span>{{ listItems[vi.index].record.kind }}</span>
               <span class="status-cell">
-                <CodiconIcon v-if="item.record.status === 'running'" name="loading" class="animate-spin" :size="13" />
-                {{ item.record.status }}
+                <CodiconIcon v-if="listItems[vi.index].record.status === 'running'" name="loading" class="animate-spin" :size="13" />
+                {{ listItems[vi.index].record.status }}
                 <button
-                  v-if="item.record.status === 'running'"
+                  v-if="listItems[vi.index].record.status === 'running'"
                   type="button"
                   class="cancel-button"
                   aria-label="Cancel operation"
-                  @click.stop="onCancel(item.record)"
+                  @click.stop="onCancel(listItems[vi.index].record)"
                 >
                   <CodiconIcon name="debug-stop" :size="13" />
                 </button>
               </span>
-              <span>{{ formatDuration(item.record.durationMs) }}</span>
-              <span>{{ item.record.rows ?? '—' }}</span>
-              <Tooltip v-if="item.record.status === 'error'">
+              <span>{{ formatDuration(listItems[vi.index].record.durationMs) }}</span>
+              <span>{{ listItems[vi.index].record.rows ?? '—' }}</span>
+              <Tooltip v-if="listItems[vi.index].record.status === 'error'">
                 <TooltipTrigger as-child>
-                  <span class="mono truncate error-text block">{{ item.record.error }}</span>
+                  <span class="mono truncate error-text block">{{ listItems[vi.index].record.error }}</span>
                 </TooltipTrigger>
-                <TooltipContent>{{ item.record.error ?? '' }}</TooltipContent>
+                <TooltipContent>{{ listItems[vi.index].record.error ?? '' }}</TooltipContent>
               </Tooltip>
               <Tooltip v-else>
                 <TooltipTrigger as-child>
-                  <span class="mono truncate block">{{ item.record.command ?? '—' }}</span>
+                  <span class="mono truncate block">{{ listItems[vi.index].record.command ?? '—' }}</span>
                 </TooltipTrigger>
-                <TooltipContent>{{ item.record.command ?? '' }}</TooltipContent>
+                <TooltipContent>{{ listItems[vi.index].record.command ?? '' }}</TooltipContent>
               </Tooltip>
             </div>
-            <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
+            <div
+              v-else-if="listItems[vi.index].kind === 'detail-command'"
+              class="ops-detail-row ops-detail-cm virtual-row"
+              :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
+            >
               <MonacoHost
                 :doc="
-                  item.record.commandTruncated
-                    ? `command (truncated at 64 KiB — cannot Re-run): ${item.record.command}`
-                    : `command: ${item.record.command}`
+                  listItems[vi.index].record.commandTruncated
+                    ? `command (truncated at 64 KiB — cannot Re-run): ${listItems[vi.index].record.command}`
+                    : `command: ${listItems[vi.index].record.command}`
                 "
-                :language="item.record.kind === 'http' ? 'plain' : 'sql'"
-                :sql-dialect="opSqlDialect(item.record)"
+                :language="listItems[vi.index].record.kind === 'http' ? 'plain' : 'sql'"
+                :sql-dialect="opSqlDialect(listItems[vi.index].record)"
                 :read-only="true"
                 :single-line="true"
               />
             </div>
-            <div v-else class="ops-detail-row ops-detail-cm">
+            <div
+              v-else
+              class="ops-detail-row ops-detail-cm virtual-row"
+              :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
+            >
               <MonacoHost
-                :doc="`error: ${item.record.error}`"
+                :doc="`error: ${listItems[vi.index].record.error}`"
                 language="plain"
                 :read-only="true"
                 :single-line="true"
               />
             </div>
           </template>
-        </VirtualList>
+        </div>
       </div>
     </template>
   </div>
@@ -339,6 +365,10 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 
 .ops-body {
   @apply flex-1 min-h-0;
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
 }
 
 .ops-row {
