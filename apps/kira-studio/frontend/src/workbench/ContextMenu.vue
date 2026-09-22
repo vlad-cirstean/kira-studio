@@ -1,13 +1,6 @@
 <script setup lang="ts">
-import {
-  type ComponentPublicInstance,
-  computed,
-  nextTick,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from 'vue';
+import { useEventListener, useTimeoutFn } from '@vueuse/core';
+import { type ComponentPublicInstance, computed, nextTick, ref, watch } from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -15,6 +8,23 @@ import { connColorVar } from '../theme/connColor';
 import { computeFloatPosition, pointReference } from '../theme/floatingPosition';
 import { CONTEXT_MENU_KEY_HANDLERS, type ContextMenuKeyContext } from './contextMenuKeys';
 
+// P99 Part 2 §6.3 hard case: stays hand-rolled, DropdownMenuRoot/ContextMenuRoot both declined.
+// (1) This is one shared singleton menu opened imperatively from useContextMenuStore() by many
+// unrelated call sites (tree rows, grid rows, tabs, ...), each handing it a fully custom
+// MenuItem[] tree (swatch/checked/danger/shortcut/hint) — reka-ui's DropdownMenuItem has no prop
+// for any of that, so every row still needs custom slot content; reka-ui buys nothing on render.
+// (2) reka-ui's trigger/content model assumes one owning trigger per menu; this menu's anchor is
+// an arbitrary (x, y) captured once into the store. A zero-size virtual anchor could stand in for
+// that, but reka-ui's own Sub/SubContent state model still expects a declarative trigger/content
+// pair per submenu, while this submenu is one dynamically-toggled row inside a v-for — re-deriving
+// reka-ui's internal open state to match the already-tuned activeIndex/activeSubIndex roving focus,
+// hover-delay-open and Escape/blur-close (contextMenuKeys.ts, P43/P94) is a rewrite of tested
+// keyboard semantics, not a swap, and risks exactly the behavior regression §9.4 forbids.
+// (3) Positioning already goes through this app's own floatingPosition.ts, shared with
+// PopoverPanel/ErrorPopover; forking just this menu onto reka-ui's internal Floating UI wiring
+// would split one shared positioning implementation across components not otherwise in scope here.
+// What DID move: the document/window listeners to useEventListener, the submenu-open timer to
+// useTimeoutFn (below) — VueUse's actual equivalents for this file's own event/timer machinery.
 const contextMenuStore = useContextMenuStore();
 
 const SUBMENU_OPEN_DELAY_MS = 150;
@@ -24,7 +34,19 @@ const submenuRef = ref<HTMLElement | null>(null);
 const openSubmenuId = ref<string | null>(null);
 const style = ref({ left: '0px', top: '0px' });
 const submenuStyle = ref({ left: '0px', top: '0px' });
-let submenuTimer: ReturnType<typeof setTimeout> | null = null;
+
+// VueUse's useTimeoutFn auto-clears on unmount (tryOnScopeDispose) — no manual onUnmounted
+// cleanup needed. pendingItem/submenuDelayMs are set right before start() so the callback (which
+// reads .value, not a closure argument) always sees the row onRowEnter was just called for.
+const pendingItem = ref<MenuItem | null>(null);
+const submenuDelayMs = ref(0);
+const { start: startSubmenuTimer, stop: clearSubmenuTimer } = useTimeoutFn(
+  () => {
+    openSubmenuId.value = pendingItem.value?.type === 'submenu' ? pendingItem.value.id : null;
+  },
+  submenuDelayMs,
+  { immediate: false },
+);
 
 // A plain `ref="submenuRef"` on this element would silently do the wrong thing: it sits inside
 // this template's own `v-for="item in contextMenuStore.items"`, and Vue collects any `ref` bound
@@ -127,10 +149,6 @@ function onDocMouseDown(e: MouseEvent): void {
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) contextMenuStore.closeContextMenu();
 }
 
-function clearSubmenuTimer(): void {
-  if (submenuTimer) clearTimeout(submenuTimer);
-}
-
 // P94 pass 3 §4.3: the handler table itself (contextMenuKeys.ts) owns every branch's body;
 // onKeydown stays the Escape guard, the open guard and the lookup. `keyCtx` carries the SFC's own
 // refs/computed refs directly (never a snapshot), since a handler must re-read `.value` at the
@@ -159,17 +177,9 @@ function onKeydown(e: KeyboardEvent): void {
   handler(keyCtx);
 }
 
-onMounted(() => {
-  document.addEventListener('mousedown', onDocMouseDown, true);
-  document.addEventListener('keydown', onKeydown);
-  window.addEventListener('blur', contextMenuStore.closeContextMenu);
-});
-onUnmounted(() => {
-  document.removeEventListener('mousedown', onDocMouseDown, true);
-  document.removeEventListener('keydown', onKeydown);
-  window.removeEventListener('blur', contextMenuStore.closeContextMenu);
-  if (submenuTimer) clearTimeout(submenuTimer);
-});
+useEventListener(document, 'mousedown', onDocMouseDown, true);
+useEventListener(document, 'keydown', onKeydown);
+useEventListener(window, 'blur', () => contextMenuStore.closeContextMenu());
 
 function onRowEnter(item: MenuItem): void {
   // D43: hovering a row syncs activeIndex so the mouse and the keyboard never disagree about
@@ -177,13 +187,9 @@ function onRowEnter(item: MenuItem): void {
   // leaves nothing active, matching what Enter would do there anyway (nothing).
   activeIndex.value = navigable.value.indexOf(item);
   activeSubIndex.value = -1;
-  if (submenuTimer) clearTimeout(submenuTimer);
-  submenuTimer = setTimeout(
-    () => {
-      openSubmenuId.value = item.type === 'submenu' ? item.id : null;
-    },
-    item.type === 'submenu' ? SUBMENU_OPEN_DELAY_MS : 0,
-  );
+  pendingItem.value = item;
+  submenuDelayMs.value = item.type === 'submenu' ? SUBMENU_OPEN_DELAY_MS : 0;
+  startSubmenuTimer();
 }
 
 function onSubRowEnter(sub: MenuItem): void {
@@ -297,6 +303,8 @@ async function onItemClick(item: MenuItem): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* P16 design system: every floating surface is the same primitive (Menus.html) — .p-float
    supplies bg-elevated / border-strong / radius / shadow, overflow: hidden included. P23: the
    submenu below used to be an absolutely-positioned child (`left: 100%`) that had to escape this
@@ -305,17 +313,14 @@ async function onItemClick(item: MenuItem): Promise<void> {
    it no longer nests inside this box at all, so this menu keeps .p-float's default clipping like
    every other floating surface in the app. */
 .context-menu {
-  position: fixed;
+  @apply fixed overflow-y-auto flex flex-col;
   /* P28 D17(a): computeFloatPosition's size() middleware writes these; a menu that fits is
      unaffected, one taller than the viewport scrolls instead of having its lower rows clipped away
      by .p-float's own overflow: hidden. */
   max-height: var(--kira-float-max-h, none);
   max-width: var(--kira-float-max-w, none);
-  overflow-y: auto;
   min-width: 180px;
   padding: var(--kira-s-2);
-  display: flex;
-  flex-direction: column;
   gap: 1px;
   z-index: var(--kira-z-menu);
 }
@@ -323,13 +328,12 @@ async function onItemClick(item: MenuItem): Promise<void> {
 /* Rows share the tree/operations-list row primitive (P8) so a menu row and a
    tree row highlight identically. */
 .row {
-  position: relative;
-  white-space: nowrap;
+  @apply relative whitespace-nowrap;
 }
 
 .row.is-disabled {
+  @apply cursor-default;
   color: var(--kira-fg-disabled);
-  cursor: default;
 }
 
 /* P43 iter3 D43: the roving keyboard focus target — the same background primitives.css's own
@@ -340,7 +344,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
 }
 
 .row.is-disabled:hover {
-  background: transparent;
+  @apply bg-transparent;
 }
 
 .row.danger {
@@ -352,10 +356,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
 }
 
 .swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  @apply w-2.5 h-2.5 rounded-full shrink-0;
 }
 
 .swatch.none {
@@ -363,16 +364,13 @@ async function onItemClick(item: MenuItem): Promise<void> {
 }
 
 .label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply flex-1 overflow-hidden text-ellipsis;
 }
 
 .shortcut {
+  @apply shrink-0 whitespace-nowrap;
   margin-left: var(--kira-s-4);
   color: var(--kira-fg-muted);
-  flex-shrink: 0;
-  white-space: nowrap;
 }
 .row.is-disabled .shortcut {
   color: var(--kira-fg-disabled);
@@ -387,18 +385,15 @@ async function onItemClick(item: MenuItem): Promise<void> {
      offscreen bug this was: a plain `left: 100%; top: -4px` here (with no flip and no clamp at
      all) rendered a submenu near the right or bottom edge of the window partly or wholly
      offscreen. */
-  position: fixed;
+  @apply fixed overflow-y-auto flex flex-col;
   z-index: var(--kira-z-menu);
   /* P28 D17(a): computeFloatPosition's size() middleware writes these; a menu that fits is
      unaffected, one taller than the viewport scrolls instead of having its lower rows clipped away
      by .p-float's own overflow: hidden. */
   max-height: var(--kira-float-max-h, none);
   max-width: var(--kira-float-max-w, none);
-  overflow-y: auto;
   min-width: 160px;
   padding: var(--kira-s-2);
-  display: flex;
-  flex-direction: column;
   gap: 1px;
 }
 </style>
