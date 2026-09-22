@@ -1,0 +1,122 @@
+Note: P100 Part 3 — retargets the version-stamp step off apps/kira-studio-vscode (renamed to kira-space-vscode) and adds a release-space job producing/uploading Kira Space.dmg onto the same draft release; apply with 'git apply' against .github/workflows/release.yml, then delete this file.
+
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index af49910..693d971 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -94,13 +94,9 @@ jobs:
+           test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
+           echo "app version set to $TAG (from tag $GITHUB_REF_NAME)"
+ 
+-          # G10 D21: the extension manifest's own version, kept in lockstep with config.yml's — S9
+-          # asserts the two agree. Anchored to the top-level "version" key at two-space indent, the
+-          # same idiom as the config.yml rewrite above.
+-          VSCODE_PKG=apps/kira-studio-vscode/package.json
+-          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
+-          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
+-          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
++          # P100 Part 3: the vscode extension moved to apps/kira-space-vscode and packages into
++          # Kira Space's own bundle now (apps/kira-space/build/Taskfile.yml's build:vsix) — Kira
++          # Studio no longer bundles or version-stamps it. See the release-space job below.
+ 
+       - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
+         run: sh scripts/setup.sh
+@@ -185,3 +181,98 @@ jobs:
+           name: kira-studio-macos-arm64
+           path: kira-studio-macos-arm64.dmg
+           retention-days: 14
++
++  # P100 Part 3: Kira Space's own counterpart to the "release" job above, producing
++  # "Kira Space.dmg" and uploading it onto the same draft release rather than creating a second
++  # one — needs: [..., release] so it runs after that draft exists, never racing it for
++  # `gh release create`. Caches use their own keys/paths since Wails generates bindings per app.
++  release-space:
++    name: release (Kira Space)
++    needs: [test-matrix, db-compat, release]
++    runs-on: macos-15
++    timeout-minutes: 40
++    env:
++      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++    steps:
++      - uses: actions/checkout@v7
++      - uses: oven-sh/setup-bun@v2
++        with:
++          bun-version: latest
++      - uses: actions/setup-go@v7
++        with:
++          go-version-file: go.mod
++      - name: Cache bun install (keyed on the lockfile, so an unchanged dependency set skips re-download)
++        uses: actions/cache@v4
++        with:
++          path: ~/.bun/install/cache
++          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
++      - run: bun install --frozen-lockfile
++      - name: Cache wails3 CLI (v1.4 P1 — go.mod-keyed, OS-specific binary)
++        uses: actions/cache@v4
++        with:
++          path: ~/go/bin/wails3
++          key: wails3-${{ runner.os }}-${{ hashFiles('go.mod') }}
++      - name: Cache generated Wails bindings, Kira Space (own path/key — Wails generates bindings per app, not shared with Kira Studio's cache above)
++        uses: actions/cache@v4
++        with:
++          path: |
++            apps/kira-space/frontend/bindings
++            apps/kira-space/.task
++          key: wails-bindings-space-${{ hashFiles('go.mod') }}
++
++      # Same idiom as the "release" job's own version-stamp step, retargeted at Kira Space's
++      # config.yml and at the extension manifest, which now lives under kira-space-vscode and
++      # packages into this app's own bundle (P100 Part 3).
++      - name: Set the Kira Space app version from the release tag
++        run: |
++          set -eu
++          TAG="${GITHUB_REF_NAME#v}"
++          CONFIG=apps/kira-space/build/config.yml
++          perl -i -pe 's/^(  version: )"[^"]*"/$1"'"$TAG"'"/' "$CONFIG"
++          test "$(sed -n 's/^  version: *"\([^"]*\)".*/\1/p' "$CONFIG" | head -1)" = "$TAG"
++          echo "Kira Space app version set to $TAG (from tag $GITHUB_REF_NAME)"
++
++          VSCODE_PKG=apps/kira-space-vscode/package.json
++          perl -i -pe 's/^(  "version": )"[^"]*"/$1"'"$TAG"'"/' "$VSCODE_PKG"
++          test "$(sed -n 's/^  "version": *"\([^"]*\)".*/\1/p' "$VSCODE_PKG" | head -1)" = "$TAG"
++          echo "extension version set to $TAG (from tag $GITHUB_REF_NAME)"
++
++      - name: Generate Wails bindings (P20 D7 — routed through scripts/setup.sh)
++        run: sh scripts/setup.sh
++
++      - run: bun run lint
++      - run: bun run typecheck
++
++      - run: bun run package:space
++
++      - name: Name the signed disk image for distribution
++        run: cp "apps/kira-space/bin/Kira Space.dmg" "kira-space-macos-arm64.dmg"
++
++      - name: Verify packaging
++        run: bun run verify:packaging
++
++      - name: Assert packaged bundle and disk image (docs/PACKAGING.md §4, Kira Space's own counterpart to the "release" job's assertion above)
++        run: |
++          set -eu
++          APP="apps/kira-space/bin/Kira Space.app"
++          DMG="apps/kira-space/bin/Kira Space.dmg"
++          test -d "$APP"
++          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" \
++            = 'com.kirathecat.kira-space'
++          codesign -dv --verbose=2 "$APP" 2>&1 | grep -q 'Signature=adhoc'
++          test -f "$DMG"
++          codesign -dv --verbose=2 "$DMG" 2>&1 | grep -q 'Signature=adhoc'
++          hdiutil attach -nobrowse -readonly -mountpoint /tmp/kira-space-dmg "$DMG"
++          test -d "/tmp/kira-space-dmg/Kira Space.app"
++          test -L "/tmp/kira-space-dmg/Applications"
++          hdiutil detach /tmp/kira-space-dmg
++          du -sh "$APP" "$DMG"
++
++      - name: Upload the Kira Space disk image onto the draft release the "release" job created
++        run: gh release upload "$GITHUB_REF_NAME" kira-space-macos-arm64.dmg
++
++      - uses: actions/upload-artifact@v7
++        with:
++          name: kira-space-macos-arm64
++          path: kira-space-macos-arm64.dmg
++          retention-days: 14
