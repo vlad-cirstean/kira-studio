@@ -503,6 +503,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
       <ComboboxContent
         v-if="filtered.length > 0"
         :id="listId"
+        as="ul"
         position="popper"
         side="bottom"
         align="start"
@@ -515,6 +516,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
             v-for="(c, i) in filtered"
             :id="`${listId}-${i}`"
             :key="c.label"
+            as="li"
             :value="i"
             class="p-completion-row"
             :class="{ 'is-on': i === activeIndex }"
