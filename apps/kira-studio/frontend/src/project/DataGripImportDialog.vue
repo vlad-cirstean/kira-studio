@@ -290,15 +290,15 @@ async function onConfirm(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .row-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
   padding: var(--kira-s-2) 0;
 }
 
 .ds-row {
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
   gap: var(--kira-s-3);
   height: var(--kira-h-md);
   padding: 0 var(--kira-s-5);
@@ -311,29 +311,21 @@ async function onConfirm(): Promise<void> {
 }
 
 .row-check {
-  width: 16px;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
+  @apply w-4 shrink-0 flex justify-center;
 }
 
 .engine-mark {
-  flex-shrink: 0;
-  display: flex;
+  @apply shrink-0 flex;
 }
 
 .ds-name {
-  min-width: 0;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply min-w-0 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .ds-target,
 .ds-username {
+  @apply whitespace-nowrap;
   font-size: var(--kira-t-sm);
-  white-space: nowrap;
 }
 
 .ds-skip {
@@ -342,14 +334,13 @@ async function onConfirm(): Promise<void> {
 }
 
 .ds-warnings {
-  display: flex;
+  @apply flex shrink-0;
   gap: var(--kira-s-1);
-  flex-shrink: 0;
 }
 
 .empty-note {
+  @apply text-center;
   padding: var(--kira-s-5);
   color: var(--kira-fg-muted);
-  text-align: center;
 }
 </style>

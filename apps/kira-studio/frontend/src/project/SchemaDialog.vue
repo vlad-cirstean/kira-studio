@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../state/connections';
@@ -39,8 +40,10 @@ const draft = ref('');
 // precedent. An external load (the watcher below) writes both refs immediately, with no delay —
 // only typing goes through the timer.
 const debouncedDraft = ref('');
-let parseSummaryTimer: ReturnType<typeof setTimeout> | undefined;
-onBeforeUnmount(() => clearTimeout(parseSummaryTimer));
+const setDebouncedDraft = useDebounceFn((text: string) => {
+  debouncedDraft.value = text;
+}, 400);
+onBeforeUnmount(() => setDebouncedDraft.cancel());
 
 const connectionId = computed(() => schemaDialogStore.connectionId);
 const connectionKind = computed(() => connectionsStore.connectionRecord(connectionId.value)?.kind);
@@ -66,7 +69,7 @@ watch(
     // gates on `open`, not `connectionId`) — switching connections while it stays open reuses
     // this same instance, so a debounce timer left running from typing in the previous
     // connection's DDL text would otherwise fire later and clobber this one's debouncedDraft.
-    clearTimeout(parseSummaryTimer);
+    setDebouncedDraft.cancel();
     draft.value = '';
     debouncedDraft.value = '';
     if (!id) return;
@@ -86,10 +89,7 @@ const parseSummary = computed(() => ddlParseSummary(connectionKind.value, deboun
 
 function onDocChange(text: string): void {
   draft.value = text;
-  clearTimeout(parseSummaryTimer);
-  parseSummaryTimer = setTimeout(() => {
-    debouncedDraft.value = text;
-  }, 400);
+  void setDebouncedDraft(text);
 }
 
 // P12 round 1 finding #14: SettingsDialog.vue's own pattern (a saveError ref plus a footer strip)
@@ -173,20 +173,22 @@ async function onSave(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .schema-dialog-body {
-  height: 60vh;
+  @apply h-[60vh];
 }
 
 .help {
+  @apply leading-normal;
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-subtle);
-  line-height: 1.5;
 }
 
 .field-error {
+  @apply leading-normal;
   font-size: var(--kira-t-xs);
   color: var(--kira-error);
-  line-height: 1.5;
 }
 
 .mono {
@@ -194,17 +196,13 @@ async function onSave(): Promise<void> {
 }
 
 .editor-wrap {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0 overflow-hidden rounded-[var(--kira-radius-sm)];
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
 }
 
 .summary-strip {
-  align-self: stretch;
+  @apply self-stretch rounded-[var(--kira-radius-sm)];
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
 }
 
 .empty-note {

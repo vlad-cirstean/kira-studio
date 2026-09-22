@@ -262,11 +262,12 @@ const connectionName = computed(
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
 
 .help {
+  @apply leading-normal;
   font-size: var(--kira-t-xs);
   color: var(--kira-fg-subtle);
-  line-height: 1.5;
 }
 
 .mono {
@@ -274,69 +275,52 @@ const connectionName = computed(
 }
 
 .filter-section {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
   gap: var(--kira-s-2);
 }
 
 .section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between;
 }
 
 .section-title {
+  @apply font-semibold;
   font-size: var(--kira-t-sm);
-  font-weight: 600;
   color: var(--kira-fg);
 }
 
 .section-links {
-  display: flex;
+  @apply flex;
   gap: var(--kira-s-2);
 }
 
 .link-btn {
-  background: none;
-  border: none;
-  padding: 0;
+  @apply bg-none border-none p-0 cursor-pointer;
   font-size: var(--kira-t-xs);
   color: var(--kira-accent);
-  cursor: pointer;
 }
 
 .link-btn:hover {
-  text-decoration: underline;
+  @apply underline;
 }
 
 .kind-list,
 .object-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  max-height: 220px;
-  overflow-y: auto;
+  @apply flex flex-col gap-px max-h-[220px] overflow-y-auto rounded-[var(--kira-radius-sm)];
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
   padding: var(--kira-s-2);
 }
 
 .kind-row,
 .object-row {
-  display: flex;
-  align-items: center;
+  @apply flex items-center cursor-default;
   gap: var(--kira-s-2);
   height: var(--kira-h-md);
-  cursor: default;
 }
 
 .kind-label,
 .object-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
   font-size: var(--kira-t-sm);
 }
 
@@ -347,31 +331,17 @@ const connectionName = computed(
 }
 
 .object-checkbox-label {
-  display: flex;
-  align-items: center;
+  @apply flex items-center flex-1 min-w-0 cursor-pointer;
   gap: var(--kira-s-2);
-  flex: 1;
-  min-width: 0;
-  cursor: pointer;
 }
 
 .twisty-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  padding: 0;
+  @apply flex items-center justify-center w-4 h-4 shrink-0 bg-none border-none p-0 cursor-pointer;
   color: var(--kira-fg-muted);
-  cursor: pointer;
 }
 
 .twisty-spacer {
-  width: 16px;
-  flex-shrink: 0;
+  @apply w-4 shrink-0;
 }
 
 .empty-note {
@@ -381,26 +351,25 @@ const connectionName = computed(
 }
 
 .truncated-note {
-  font-style: italic;
+  @apply italic;
 }
 
 .name-filter-wrap {
-  width: 100%;
+  @apply w-full;
 }
 
 .name-filter-wrap :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 /* the live-consequence strip is boxed rather than full-bleed, since it sits inside the
    dialog body rather than spanning a whole view */
 .preview-strip {
-  align-self: stretch;
+  @apply self-stretch rounded-[var(--kira-radius-sm)];
   border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
 }
 
 .cached-note {
-  align-self: flex-start;
+  @apply self-start;
 }
 </style>
