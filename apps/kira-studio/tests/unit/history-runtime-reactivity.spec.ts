@@ -5,7 +5,7 @@
 // tab's runtime record, which this file's own first case fails against directly.
 //
 // tree-state.spec.ts's own precedent: `effect()` from vue, no DOM, no bridge — createHistoryStore
-// imports only vue and state/tabRuntime.ts (a bare Set), so this needs neither './support/window'
+// imports only vue and state/tabRuntime.ts (a bare Set), so this needs neither '@workbench/testing/unit/window'
 // nor a mocked control.ts.
 
 import { describe, expect, test } from 'bun:test';

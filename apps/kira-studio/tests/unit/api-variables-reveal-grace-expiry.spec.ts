@@ -5,12 +5,12 @@
 // the tab, cleared only when the tab happened to close. This pins that a reveal now schedules its
 // own re-mask at the grace window, without waiting five real minutes: setTimeout is captured
 // rather than actually run, and invoked manually to simulate the window elapsing.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

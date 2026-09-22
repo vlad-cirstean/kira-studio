@@ -7,14 +7,14 @@
 // reference comes back out — the observable, testable consequence of the fix.
 // state/ops.ts's own bridge/control.ts import reaches `window.kira` at module scope, hence the
 // shared window stub, same as run-state.spec.ts.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
 import type { OpRecord } from '../../../../packages/shared/domain/ops';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

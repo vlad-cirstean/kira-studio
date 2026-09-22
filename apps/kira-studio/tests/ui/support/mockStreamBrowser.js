@@ -34,7 +34,7 @@
   var CLOSED = 3;
 
   // Mirrors @wailsio/runtime's stream.js own `defineHandlerProperty`, and
-  // tests/unit/support/fakeSocket.ts's copy of it — kept in sync by hand across the three (real
+  // @workbench/testing/unit/fakeSocket's copy of it — kept in sync by hand across the three (real
   // runtime, unit fake, this one) rather than shared, since none of the three may import from
   // another.
   function defineHandlerProperty(target, type) {

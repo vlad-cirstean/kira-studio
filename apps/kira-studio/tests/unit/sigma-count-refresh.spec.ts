@@ -4,12 +4,12 @@
 // that line over: every call always sent refresh as undefined/false, so once their cached count
 // went stale, clicking Σ could never force a real recount — it kept re-reading the same stale L3
 // entry until it fell out of cache entirely. This file pins the fix across all three.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

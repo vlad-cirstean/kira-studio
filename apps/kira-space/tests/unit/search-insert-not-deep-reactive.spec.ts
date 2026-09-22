@@ -7,13 +7,13 @@
 // regression-catching wall-clock bound -- a return to O(F^2) reactive proxying would blow well past
 // it -- and (2) the result rows are still correct and the view still re-renders incrementally
 // (repoSearchRows reflects each flush), so the `filesVersion` reactivity workaround actually works.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import type { CodeSearchEvent, FileMatches } from '../../../../packages/shared/domain/repo';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

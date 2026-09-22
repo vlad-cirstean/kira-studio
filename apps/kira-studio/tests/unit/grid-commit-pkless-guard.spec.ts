@@ -7,18 +7,18 @@
 // badge cleared, nothing changed on the server. This pins that it now throws instead.
 //
 // pendingChanges.ts transitively reaches bridge/data.ts -> '/wails/runtime.js' at module scope,
-// so this has to be a dynamic import() after ./support/window's mock.module registration has run
+// so this has to be a dynamic import() after @workbench/testing/unit/window's mock.module registration has run
 // (the same pattern row-values-visible-span.spec.ts already uses).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import {
   createTabularPageBuilder,
   unpagedPosition,
 } from '../../../../packages/shared/protocol/page';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

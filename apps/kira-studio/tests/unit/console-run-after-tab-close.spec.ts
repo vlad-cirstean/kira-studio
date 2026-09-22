@@ -10,20 +10,20 @@
 // bypasses `closeTab` itself, which also debounces a real `control.tabsSave` IPC call through
 // `bridge/port.ts`'s module-scope singleton — `bridge-port.spec.ts` drives that same singleton
 // directly against its own fake socket, so triggering a real send from here would race it.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 
 const { data } = await import('../../frontend/src/bridge/data');
 restoreAfterEach(data);
-const { cleanupTabRuntime } = await import('../../frontend/src/state/tabRuntime');
+const { cleanupTabRuntime } = await import('@workbench/state/tabRuntime');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useConsoleViewStore, resultPageKey } = await import(

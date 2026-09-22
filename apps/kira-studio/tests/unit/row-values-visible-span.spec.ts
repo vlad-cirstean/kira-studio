@@ -1,4 +1,4 @@
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 
@@ -10,7 +10,7 @@ import { describe, expect, test } from 'bun:test';
 //
 // rowValues.ts transitively reaches `bridge/control`/`bridge/data` (via `./menu`/`./pendingChanges`
 // — Bun's own module graph resolves those against `/wails/runtime.js` eagerly), so it has to be a
-// dynamic `import()` here, after `./support/window`'s mock.module registration has actually run —
+// dynamic `import()` here, after `@workbench/testing/unit/window`'s mock.module registration has actually run —
 // the same pattern console-auto-explain-race.spec.ts and its siblings already use.
 const { pasteTargetRows, visibleRowsInSpan } = await import(
   '../../frontend/src/views/grid/slick/rowValues'

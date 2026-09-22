@@ -5,7 +5,7 @@
 // needed cached. Neither function had any test coverage before this file (the census this phase's
 // own research pass ran found zero — tests/unit/autocomplete-tokenizers.spec.ts, despite its name,
 // covers only theme/primitives/completion.ts's plain-field tokenizers).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';

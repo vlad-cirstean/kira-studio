@@ -10,12 +10,12 @@
 // tab's own `.active` field, which is already `true` for the target, so tabsState.tabs serializes
 // to the exact same JSON both times it is called — the same "identical snapshot recurs" shape the
 // bug needs.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

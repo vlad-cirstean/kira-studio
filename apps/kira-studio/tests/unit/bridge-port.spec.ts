@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import type { FakeSocket } from '@workbench/testing/unit/fakeSocket';
+import { getStream } from '@workbench/testing/unit/wailsRuntime';
 import { encodeFrame, type FrameSpec } from '../support/encodeFrame';
-import type { FakeSocket } from './support/fakeSocket';
-import { getStream } from './support/wailsRuntime';
 
 // port.ts calls Stream('engine') once at module scope (P57 §4.1), so every test in this file
 // drives the one resulting connection through the same fake — matching how the real module
@@ -10,7 +10,7 @@ import { getStream } from './support/wailsRuntime';
 // has (Bun's module registry caches port.ts itself for the whole test process) — either way,
 // `getStream('engine')` after the import hands back whichever socket port.ts actually ended up
 // holding, so this file's own assertions never depend on winning a load-order race against
-// whatever other spec's import chain also reaches port.ts (see support/wailsRuntime.ts).
+// whatever other spec's import chain also reaches port.ts (see @workbench/testing/unit/wailsRuntime).
 const { ready, request, onPortEvent } = await import('../../frontend/src/bridge/port');
 const socket: FakeSocket = getStream('engine');
 

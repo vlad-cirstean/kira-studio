@@ -4,12 +4,12 @@
 // same commit) collided onto one tab, so review.mark/review.comment.add calls kept writing to the
 // FIRST branch's review session while the panel showed the second branch's name. This is the
 // data-correctness regression test CLAUDE.md calls for given the bug class.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

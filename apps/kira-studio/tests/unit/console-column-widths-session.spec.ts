@@ -9,9 +9,9 @@
 //
 // console/state.ts transitively reaches bridge/control.ts -> '/wails/runtime.js' at module scope
 // (control.ts's own top-level service-binding imports), hence the dynamic import after
-// ./support/window's mock.module registration — the same pattern console-run-after-tab-close.spec.ts
+// @workbench/testing/unit/window's mock.module registration — the same pattern console-run-after-tab-close.spec.ts
 // already uses.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';

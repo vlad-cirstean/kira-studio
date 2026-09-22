@@ -3,12 +3,12 @@
 // identical class of gap openRepoReviewDiffTab's own bug (repo-review-diff-tab.spec.ts) guards one
 // kind over. Also covers repoFileTitle carrying the short rev (tabKinds.ts), the one visible signal
 // distinguishing such tabs in the strip.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

@@ -5,14 +5,14 @@
 // drives run()/stop() end to end (same style as console-result-cap.spec.ts) to prove: pressing
 // Stop while the EXPLAIN batch is in flight cancels *that* op, and the real query is never issued
 // at all — the one ordering guarantee no non-Docker Playwright test can force deterministically.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

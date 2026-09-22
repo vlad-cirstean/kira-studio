@@ -5,10 +5,10 @@
 // (console completion/diagnostics/hover, the Schema dialog) re-awaited and re-threw the same
 // stale rejection, with nothing retrying and nothing surfacing to the user. This pins the fix:
 // pendingLoads must clear on rejection too, so a later call gets a fresh attempt.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
-import { restoreAfterEach } from './support/restoreAfterEach';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);

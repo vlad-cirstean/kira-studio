@@ -7,7 +7,7 @@
 // state/agentSessions.ts transitively reaches bridge/control.ts -> '/wails/runtime.js' at module
 // scope (bridge/index.ts imports every generated *service.js binding), so this needs the same
 // dynamic-import-after-mock pattern document-console-row-menu-lazy-snapshot.spec.ts already uses.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { AgentEvent } from '@shared/domain/agent';

@@ -4,15 +4,15 @@
 // pointed at the mild one. This drives run() end to end (same style as
 // console-auto-explain-race.spec.ts) with two flagged postgres statements, the first far cheaper
 // than the second, and asserts worstIndex lands on the expensive one.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

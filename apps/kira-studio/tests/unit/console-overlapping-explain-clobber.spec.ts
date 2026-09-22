@@ -6,14 +6,14 @@
 // re-entrancy, so two runs against the same tab can genuinely overlap. This drives run() end to end
 // (same style as console-stop-auto-explain.spec.ts) to prove: run A's EXPLAIN batch settling must
 // not discard run B's explainOpId, so Stop pressed during B's batch still has something to cancel.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

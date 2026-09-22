@@ -4,12 +4,12 @@
 // rather than guessing — worth a direct test at the handler itself rather than through the whole
 // transport/UI stack this repo has no mock for yet (gitStreamMock.ts answers only app.init/
 // repo.list/refs.list, and has no streaming support at all — see docs/v1.8/SPEC.md's P74 result).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import type { Transport } from '../../../../packages/git-ipc/src/transport';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);

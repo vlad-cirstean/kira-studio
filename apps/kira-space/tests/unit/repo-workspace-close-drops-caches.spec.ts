@@ -4,12 +4,12 @@
 // session accumulated unbounded retained memory (measured ~55 MB per 50k-file repo). This asserts
 // the tree and search caches are actually gone after a plain close, and that a reopen rebuilds
 // cleanly from scratch rather than resurrecting stale state.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

@@ -1,7 +1,7 @@
 import './wailsRuntime';
 
 // A shared globalThis.window stub for every tests/unit spec that needs one, imported for its
-// side effect (`import './support/window'`) rather than declared inline per spec.
+// side effect (`import '@workbench/testing/unit/window'`) rather than declared inline per spec.
 //
 // P57: bridge/control.ts and bridge/port.ts no longer read `window.kira` at all — control.ts's
 // module-scope dependency is now `Events`/`Stream` from '/wails/runtime.js', and state/tabs.ts's

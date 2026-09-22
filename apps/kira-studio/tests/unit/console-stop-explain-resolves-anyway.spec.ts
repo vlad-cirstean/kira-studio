@@ -6,15 +6,15 @@
 // to end (same style as console-stop-auto-explain.spec.ts) with exactly that ordering: Stop is
 // pressed while the EXPLAIN batch is in flight, and *then* the batch resolves successfully instead
 // of rejecting — the real query must still never be issued.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

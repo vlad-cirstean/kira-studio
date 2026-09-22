@@ -8,10 +8,11 @@
 //
 // Mirrors grid-commit-pkless-guard.spec.ts's own dynamic-import pattern (pendingChanges.ts
 // transitively reaches bridge/data.ts -> '/wails/runtime.js' at module scope).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ObjectMeta } from '@shared/domain/tree';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import {
   type ColumnDescriptor,
@@ -19,7 +20,6 @@ import {
   unpagedPosition,
 } from '../../../../packages/shared/protocol/page';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

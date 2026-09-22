@@ -2,12 +2,12 @@
 // call per comparison -- measured 20x slower than one hoisted Intl.Collator at scale (200k files,
 // the MaxListedFiles cap: 3,760ms -> 322ms). This locks in that the visible ordering is unchanged
 // (directories first, case-insensitive collation) after switching to the shared collator.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

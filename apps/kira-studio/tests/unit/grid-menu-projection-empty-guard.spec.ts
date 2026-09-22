@@ -6,9 +6,9 @@
 // at their own boundary rather than through setProjection's real load() pipeline.
 //
 // menu.ts transitively reaches bridge/control/bridge/data (via ./pendingChanges/./state), so this
-// has to be a dynamic import(), after ./support/window's mock.module registration has run — the
+// has to be a dynamic import(), after @workbench/testing/unit/window's mock.module registration has run — the
 // same pattern row-values-visible-span.spec.ts already uses.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 

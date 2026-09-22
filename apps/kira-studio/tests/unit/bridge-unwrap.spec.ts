@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { resetCallFactory, setCallFactory } from './support/wailsRuntime';
+import { resetCallFactory, setCallFactory } from '@workbench/testing/unit/wailsRuntime';
 
 const { control, unwrap } = await import('../../frontend/src/bridge/control');
 

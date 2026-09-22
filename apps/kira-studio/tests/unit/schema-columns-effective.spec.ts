@@ -3,7 +3,7 @@
 // wholesale the moment it has any tables; otherwise the cache fills in; both empty is the empty
 // schema. Three cases, no more: the precedence is never a per-table merge (see the module's own
 // doc comment for why).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';

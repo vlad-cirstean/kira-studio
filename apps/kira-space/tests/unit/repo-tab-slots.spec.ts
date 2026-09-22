@@ -2,12 +2,12 @@
 // tab-scoping rewrite that is genuinely several interacting rules over one mutable structure
 // (CLAUDE.md's own testing bar), tested directly against openTab/closeTab/moveTab/closeOthers/
 // closeAll rather than through any UI.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

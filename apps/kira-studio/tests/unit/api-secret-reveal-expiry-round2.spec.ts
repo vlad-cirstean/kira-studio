@@ -6,12 +6,12 @@
 // inline). Both were cleared only by their own dialog/popover's close path, never by expiry. This
 // test fails against the pre-fix code (neither map ever schedules a timer) and passes once both
 // share the same createRevealExpiry discipline `revealedValues` already had.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

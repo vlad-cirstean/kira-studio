@@ -4,9 +4,9 @@
 // their real bounds (finding 2) — both failure modes abort the whole batch on the first row that
 // overflows, with committedRows = 0 and nothing in the plan warning it could happen.
 // generate.ts imports bridge/data.ts, which reaches '/wails/runtime.js' at module scope — this has
-// to be a dynamic import(), after ./support/window's mock.module registration has run (the same
+// to be a dynamic import(), after @workbench/testing/unit/window's mock.module registration has run (the same
 // pattern fake-data-temporal-format.spec.ts already uses).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ColumnDescriptor } from '@shared/protocol/page';

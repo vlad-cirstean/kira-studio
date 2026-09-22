@@ -6,14 +6,14 @@
 // eviction helper) — data.execute is overridden the same way view-state.spec.ts does for
 // data.read/control.treeChildren, so the exercised code is state.ts's actual push+evict sequence,
 // not a hand-rolled stand-in for it.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

@@ -2,12 +2,12 @@
 // set plus a loadSeq guard, the "cache invalidation with interacting rules" case CLAUDE.md's own
 // testing bar names. One test file, not a suite (§7's own scope: a split layout, an icon swap and
 // a lookup table get nothing; this is the one thing in the plan that does).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

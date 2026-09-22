@@ -1,7 +1,7 @@
 // rowValues.ts pulls in grid/menu.ts (FK nav items) -> state/tabs.ts and pendingChanges.ts ->
 // bridge/data.ts -> bridge/port.ts, which reaches '/wails/runtime.js' at module scope — the same
 // dynamic-import/window-mock need grid-commit-composite-pk-guard.spec.ts's own comment documents.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { rowsForSelection } from '../../frontend/src/views/grid/slick/rowValues';

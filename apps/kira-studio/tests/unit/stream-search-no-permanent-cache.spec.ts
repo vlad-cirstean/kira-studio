@@ -5,7 +5,7 @@
 // This pins that a search no longer populates that cache at all: pageStoreEntries() (the same
 // Playwright-exposed retention probe main.ts's own __kiraRetention uses) must report zero decode-
 // cache rows for a tab that has only ever been searched, never rendered.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { createStreamPageBuilder } from '@shared/protocol/page';

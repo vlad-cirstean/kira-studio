@@ -10,7 +10,7 @@ import { pinia } from '../../frontend/src/state/pinia';
 // import), which the shared stub below satisfies — state/ops.ts imports nothing else DOM-shaped.
 // Both modules under test are imported dynamically, after the stub is installed: a static import
 // is hoisted and would run before this file's own code has a chance to set `globalThis.window`.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 setActivePinia(pinia);
 

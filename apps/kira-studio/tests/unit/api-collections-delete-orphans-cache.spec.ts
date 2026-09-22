@@ -9,13 +9,13 @@
 //
 // This test fails against the pre-fix deleteRow (only the folder's own id is purged, both
 // descendant requests' cache entries survive) and passes once the whole subtree is purged.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

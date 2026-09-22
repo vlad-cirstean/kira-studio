@@ -9,9 +9,9 @@
 // stageEdit/stageNull (neither toggles either) — "Revert row(s)" is the one way to undo a delete.
 //
 // pendingChanges.ts transitively reaches bridge/data.ts -> '/wails/runtime.js' at module scope,
-// hence the dynamic import after ./support/window's mock.module registration — the same pattern
+// hence the dynamic import after @workbench/testing/unit/window's mock.module registration — the same pattern
 // grid-commit-composite-pk-guard.spec.ts and grid-staged-value-snapshot.spec.ts already use.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';

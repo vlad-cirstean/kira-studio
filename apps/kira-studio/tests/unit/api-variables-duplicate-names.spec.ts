@@ -5,13 +5,13 @@
 // overwrite on every iteration (last-wins). This pins the fix: given two same-named variables, the
 // one with the lower sort_order — the one control.variablesList returns first — is the value
 // mergedValuesAndSecrets actually reports, exactly what a live send or a copied curl command uses.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ApiVariable } from '@shared/domain/variables';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

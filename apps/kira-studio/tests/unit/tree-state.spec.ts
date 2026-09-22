@@ -16,7 +16,7 @@
 //    on every keystroke with nothing debouncing the recompute this triggers. Test 4 confirms a
 //    burst of synchronous writes (a fast typist) produces exactly one settled update, not one per
 //    character.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';

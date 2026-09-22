@@ -5,13 +5,13 @@
 // it. This pins two things: runCount now sends the exact same encoded filter load() would send for
 // the tab's current filter state, and applying a new filter clears the previous (now
 // differently-scoped) count rather than leaving a stale total on screen under the new filter.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionState } from '@shared/domain/connection';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

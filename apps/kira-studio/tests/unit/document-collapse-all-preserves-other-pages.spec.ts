@@ -3,7 +3,7 @@
 // discarding every `false` entry for a document on any other page — an absent key means expanded,
 // so paging away and back re-expanded everything collapsed there. state.expanded is persisted tab
 // state, so this survived a restart as the wrong value too.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import { setActivePinia } from 'pinia';

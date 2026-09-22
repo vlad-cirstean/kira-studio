@@ -6,7 +6,7 @@
 // exact interleaving no Playwright test can force — the same technique
 // tests/unit/view-state.spec.ts already established for views/browse/state.ts's own supersession
 // guard.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcSchemaWire } from '@shared/domain/grpc';

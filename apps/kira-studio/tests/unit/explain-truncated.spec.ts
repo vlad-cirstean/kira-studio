@@ -3,15 +3,15 @@
 // `isTruncated` set on the cell — parseExplainPages used to ignore that flag entirely and hand
 // the (invalid, truncated) JSON straight to JSON.parse, which fails with an opaque "Unexpected end
 // of JSON input" instead of a real, actionable message.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { createTabularPageBuilder, MAX_CELL_BYTES } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
 import { ExplainTruncatedError, parseExplainPages } from '../../frontend/src/views/console/plan';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

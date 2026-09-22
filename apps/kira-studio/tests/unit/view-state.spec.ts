@@ -9,15 +9,15 @@
 // wrappers a stub can satisfy — this file resolves the *older* of two in-flight loads *after* the
 // newer one, the exact interleaving no Playwright test can force, by holding both on manually
 // resolved promises.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

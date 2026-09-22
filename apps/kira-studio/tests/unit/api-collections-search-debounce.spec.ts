@@ -4,7 +4,7 @@
 // keystroke. This pins both fixes at the state level: the search itself stays immediate (so the
 // input never stutters), the debounced query it drives lands ~150ms after typing settles, and a
 // request row's own search never recurses into a childrenOf lookup (it can never have children).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';

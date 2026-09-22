@@ -7,13 +7,13 @@
 // (ProjectTree.vue's `reused` branch, which also calls reloadTab('stream', id)). All three funnel
 // through stream/state.ts's exported `reload`, so this pins the fix at that one choke point and
 // exercises it the same way each call site actually reaches it.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionState } from '@shared/domain/connection';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 
@@ -26,7 +26,7 @@ const tabsStore = useTabsStore();
 const { useStreamViewStore } = await import('../../frontend/src/views/stream/state');
 const streamViewStore = useStreamViewStore();
 const { reloadTabsForTarget } = await import('../../frontend/src/state/viewCommands');
-const { registerTabRuntimeCleanup } = await import('../../frontend/src/state/tabRuntime');
+const { registerTabRuntimeCleanup } = await import('@workbench/state/tabRuntime');
 void registerTabRuntimeCleanup;
 
 type Caps = NonNullable<ConnectionState['caps']>;

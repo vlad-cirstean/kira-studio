@@ -8,15 +8,15 @@
 // interleaving the finding describes: a slow, wide-scan run (A) started first, then superseded by
 // a fast, non-explainable run (B) whose own explain check resolves — and finishes entirely —
 // before A's slow EXPLAIN finally settles.
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import { createTabularPageBuilder, type Page, unpagedPosition } from '@shared/protocol/page';
+import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
-import { restoreAfterEach } from './support/restoreAfterEach';
 
 setActivePinia(pinia);
 

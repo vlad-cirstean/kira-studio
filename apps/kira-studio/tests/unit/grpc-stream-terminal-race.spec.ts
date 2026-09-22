@@ -7,7 +7,7 @@
 // delivered, and the event handler's own `rt.opId !== event.callId` check then dropped it outright.
 // This drives both orderings directly, the exact interleaving no Playwright test can force (the
 // same technique grpc-schema-supersession.spec.ts already established for loadSchema's own race).
-import './support/window';
+import '@workbench/testing/unit/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcCallEvent, GrpcCallResultWire, GrpcSchemaWire } from '@shared/domain/grpc';
