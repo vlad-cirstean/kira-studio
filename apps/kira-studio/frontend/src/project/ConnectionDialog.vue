@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PALETTE_COLOR_CHOICES } from '@shared/domain/color';
 import type { ConnectionKind, McpPermissionMode } from '@shared/domain/connection';
 import {
   AWS_STYLE_KINDS,
@@ -14,16 +15,15 @@ import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
-// P104 §3.1: SegmentedControl's ToggleGroup recipe is a genuinely separate, non-mechanical piece
-// of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -38,8 +38,6 @@ import {
 } from '../state/maskRules';
 import { schemaDialectFor } from '../state/schemas';
 import EngineIcon from '../theme/EngineIcon.vue';
-import ColorPicker from '../theme/primitives/ColorPicker.vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 
 const confirmDialogStore = useConfirmDialogStore();
 const connectionsStore = useConnectionsStore();
@@ -88,6 +86,9 @@ const SUPPORTED_KINDS: ReadonlySet<ConnectionKind> = new Set([
   's3',
 ]);
 const kinds = connectionKindSchema.options;
+// P104 §3: ColorPicker inlined -- the offered subset (not the full storable enum), same as its
+// own `colors` constant.
+const connectionColors = PALETTE_COLOR_CHOICES;
 
 // M2 §7.2: the MCP tab's three permission rows, one SegmentedControl per class — mcpModeOptions(x)
 // builds each row's own per-button testids (connection-mcp-<class>-<mode>) under the row's own
@@ -719,7 +720,28 @@ const preconnectText = computed({
             </div>
             <div class="field color-field">
               <label>Color</label>
-              <ColorPicker v-model="draft.color" label="Connection color" />
+              <div
+                class="color-picker flex h-6.5 flex-wrap items-center gap-1"
+                role="radiogroup"
+                aria-label="Connection color"
+              >
+                <Tooltip v-for="color in connectionColors" :key="color">
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+                      :class="{ 'outline outline-2 outline-offset-2 outline-fg': draft.color === color, none: color === 'none' }"
+                      :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                      :aria-label="color === 'none' ? 'No colour' : color"
+                      role="radio"
+                      :aria-checked="draft.color === color"
+                      :data-testid="`color-${color}`"
+                      @click="draft.color = color"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
           </div>
           <span v-if="fieldErrors.name" class="field-error">{{ fieldErrors.name }}</span>
@@ -1087,30 +1109,60 @@ const preconnectText = computed({
 
           <div class="field">
             <label>Read <span class="dim">— SELECT and its engine equivalents</span></label>
-            <SegmentedControl
-              v-model="draft.mcpReadMode"
-              :options="mcpModeOptions('read')"
+            <ToggleGroup
+              type="single"
+              :model-value="draft.mcpReadMode"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-read"
-            />
+              @update:model-value="(v) => v && draft && (draft.mcpReadMode = v as McpPermissionMode)"
+            >
+              <ToggleGroupItem
+                v-for="opt in mcpModeOptions('read')"
+                :key="opt.value"
+                :value="opt.value"
+                :data-testid="opt.testid"
+              >
+                {{ opt.label }}
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
           <div class="field">
             <label>Write <span class="dim">— INSERT/UPDATE/DELETE and equivalents</span></label>
-            <SegmentedControl
-              v-model="draft.mcpWriteMode"
-              :options="mcpModeOptions('write')"
+            <ToggleGroup
+              type="single"
+              :model-value="draft.mcpWriteMode"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-write"
-            />
+              @update:model-value="(v) => v && draft && (draft.mcpWriteMode = v as McpPermissionMode)"
+            >
+              <ToggleGroupItem
+                v-for="opt in mcpModeOptions('write')"
+                :key="opt.value"
+                :value="opt.value"
+                :data-testid="opt.testid"
+              >
+                {{ opt.label }}
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
           <div class="field">
             <label>DDL <span class="dim">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></label>
-            <SegmentedControl
-              v-model="draft.mcpDdlMode"
-              :options="mcpModeOptions('ddl')"
+            <ToggleGroup
+              type="single"
+              :model-value="draft.mcpDdlMode"
               :disabled="!draft.mcpEnabled"
               data-testid="connection-mcp-ddl"
-            />
+              @update:model-value="(v) => v && draft && (draft.mcpDdlMode = v as McpPermissionMode)"
+            >
+              <ToggleGroupItem
+                v-for="opt in mcpModeOptions('ddl')"
+                :key="opt.value"
+                :value="opt.value"
+                :data-testid="opt.testid"
+              >
+                {{ opt.label }}
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
           <p class="helper-text">
             A statement this app cannot classify is treated as whichever of the three is strictest.
@@ -1209,15 +1261,17 @@ const preconnectText = computed({
             </Button>
 
             <template v-if="!isFileStyle">
-              <MessageStrip
+              <Alert
                 v-if="secretStatus?.insecureFallback"
-                tone="warn"
                 data-testid="mask-key-credential-note"
+                class="strip-warn"
               >
-                Development fallback: the correlation key is obfuscated with a built-in key, not a
-                real keychain, on this platform — an attacker with filesystem access could recover
-                it. The redaction itself is unaffected; it stays uninvertible regardless.
-              </MessageStrip>
+                <AlertDescription class="strip-warn-text">
+                  Development fallback: the correlation key is obfuscated with a built-in key, not a
+                  real keychain, on this platform — an attacker with filesystem access could recover
+                  it. The redaction itself is unaffected; it stays uninvertible regardless.
+                </AlertDescription>
+              </Alert>
             </template>
           </template>
           </div>
@@ -1243,18 +1297,26 @@ const preconnectText = computed({
             >
               Credentials are encrypted with your macOS Keychain.
             </p>
-            <MessageStrip
+            <Alert
               v-else-if="secretStatus?.insecureFallback"
-              tone="warn"
+              data-testid="connection-credential-note"
+              class="strip-warn"
+            >
+              <AlertDescription class="strip-warn-text">
+                Development fallback: credentials on this platform are obfuscated with a built-in
+                key, not a real keychain.
+              </AlertDescription>
+            </Alert>
+            <Alert
+              v-else-if="secretStatus"
+              variant="destructive"
               data-testid="connection-credential-note"
             >
-              Development fallback: credentials on this platform are obfuscated with a built-in
-              key, not a real keychain.
-            </MessageStrip>
-            <MessageStrip v-else-if="secretStatus" tone="err" data-testid="connection-credential-note">
-              The macOS Keychain is unavailable, so passwords cannot be saved. Everything else
-              about this connection can be.
-            </MessageStrip>
+              <AlertDescription>
+                The macOS Keychain is unavailable, so passwords cannot be saved. Everything else
+                about this connection can be.
+              </AlertDescription>
+            </Alert>
           </template>
       </div>
     </template>
@@ -1312,6 +1374,8 @@ const preconnectText = computed({
 </template>
 
 <style scoped>
+@reference "@theme/base.css";
+
 .title-mid {
   display: flex;
   min-width: 0;
@@ -1562,5 +1626,27 @@ const preconnectText = computed({
 
 .mask-rule-add {
   align-items: center;
+}
+
+/* Alert tone classes replacing MessageStrip's own warn-tone colors (P104 §9 rule 5: literal hex,
+   not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+
+/* P104 §3: ColorPicker's own "none" swatch -- a diagonal slash, never a 13th hue standing in for
+   "nothing chosen" (its own comment, ported verbatim). */
+.swatch.none {
+  border: 1.5px solid var(--kira-fg-muted);
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
 }
 </style>

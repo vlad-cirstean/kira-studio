@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import TreeHost from '@theme/primitives/TreeHost.vue';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useSchemaColumnsStore } from '../state/schemaColumns';
@@ -43,7 +43,15 @@ function isKeyBrowserRow(row: TreeRowVm): boolean {
 }
 
 const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
-const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
+
+// P104 §3.4: TreeHost's own recipe (virtualization + pinned ancestor band + reveal-scroll),
+// inlined via the shared useTreeVirtualRows composable rather than kept as a wrapper component.
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRows({
+  rows: () => treeStore.visibleRows,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollEl,
+});
 
 onMounted(() => {
   treeStore.initTreeSync();
@@ -52,14 +60,14 @@ onMounted(() => {
 });
 
 // revealPath() (Step 7b) sets pendingScrollKey once its expansion/selection work is done;
-// scrolling happens here, one tick later, once treeStore.visibleRows reflects the newly expanded nodes —
-// TreeHost.revealKey() does the animation-frame wait, the index lookup and the band-inset scroll.
+// scrolling happens here, one tick later, once treeStore.visibleRows reflects the newly expanded
+// nodes — revealKey() does the animation-frame wait, the index lookup and the band-inset scroll.
 watch(
   () => treeStore.pendingScrollKey,
   async (key) => {
     if (!key) return;
     treeStore.pendingScrollKey = null;
-    await treeHostRef.value?.revealKey(key);
+    await revealKey(key);
   },
 );
 
@@ -168,29 +176,45 @@ function onTreeKeydown(e: KeyboardEvent): void {
 
 <template>
   <div class="project-tree">
-    <TreeHost
-      ref="treeHostRef"
-      class="tree-body"
-      :rows="treeStore.visibleRows"
-      :row-height="rowHeight"
-      :selected-key="treeStore.selected"
-      @background-contextmenu="onBackgroundContextMenu"
+    <div
+      ref="scrollEl"
+      class="tree-body h-full overflow-auto"
+      data-testid="tree-background"
+      @scroll="onScroll"
+      @contextmenu.prevent="onBackgroundContextMenu"
       @keydown="onTreeKeydown"
     >
-      <template #row="{ row, sticky, top }">
-        <TreeRow
-          :class="{ 'sticky-row': sticky }"
-          :style="sticky ? { top: `${top}px`, height: `${rowHeight}px` } : undefined"
-          :row="row"
-          :selected="treeStore.selected === row.key"
-          :sticky="sticky"
-          @select="onSelect"
-          @toggle="onToggle"
-          @open="onOpen"
-          @contextmenu="onContextMenu"
-        />
-      </template>
-    </TreeHost>
+      <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
+        <template v-for="slot in band" :key="slot.row.key">
+          <TreeRow
+            class="sticky-row"
+            :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
+            :row="slot.row"
+            :selected="treeStore.selected === slot.row.key"
+            :sticky="true"
+            @select="onSelect"
+            @toggle="onToggle"
+            @open="onOpen"
+            @contextmenu="onContextMenu"
+          />
+        </template>
+      </div>
+      <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+        <template v-for="item in virtualItems" :key="String(item.key)">
+          <TreeRow
+            class="virtual-row"
+            :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+            :row="treeStore.visibleRows[item.index]"
+            :selected="treeStore.selected === treeStore.visibleRows[item.index].key"
+            :sticky="false"
+            @select="onSelect"
+            @toggle="onToggle"
+            @open="onOpen"
+            @contextmenu="onContextMenu"
+          />
+        </template>
+      </div>
+    </div>
     <div
       v-if="treeStore.searchIncomplete"
       class="p-strip note search-incomplete-note"
@@ -212,13 +236,17 @@ function onTreeKeydown(e: KeyboardEvent): void {
   @apply flex-1 min-h-0;
 }
 
-/* Positioned relative to VirtualList's own zero-height .virtual-list-sticky (itself
-   position: sticky), which is what makes each row's `top` (stickyBand.ts's own output) land
-   correctly without this component needing to know anything about the scrollport (P28 D2). A row
-   here is opaque and full-width so it fully occludes whatever real row has scrolled up behind it. */
+/* Positioned relative to the zero-height .virtual-list-sticky (itself position: sticky), which is
+   what makes each row's `top` (stickyBand.ts's own output) land correctly without this component
+   needing to know anything about the scrollport (P28 D2). A row here is opaque and full-width so
+   it fully occludes whatever real row has scrolled up behind it. */
 .sticky-row {
   @apply absolute left-0 right-0 z-1;
   background: var(--kira-bg);
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
 }
 
 /* P24 D34: reuses .p-strip.note (primitives.css) for padding/font-size/colour/background — this
