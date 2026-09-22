@@ -147,85 +147,58 @@ function onKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* D4: mirrors CommandPalette.vue's own palette-backdrop/palette/palette-input-pad/palette-input/
    palette-list/palette-item/palette-empty vocabulary verbatim — the two share chrome, not a base
    component (D4's own reasoning). */
 .palette-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--kira-z-dialog);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 120px;
-  background: rgba(0, 0, 0, 0.3);
+  @apply fixed inset-0 z-[var(--kira-z-dialog)] flex items-start justify-center bg-black/30 pt-[120px];
 }
 
 .palette {
   /* §4: 560px, wider than CommandPalette's 420px — paths run longer than command labels. */
-  width: 560px;
-  max-height: 360px;
-  display: flex;
-  flex-direction: column;
+  @apply w-[560px] max-h-[360px] flex flex-col;
 }
 
 .palette-input-pad {
-  flex-shrink: 0;
-  padding: var(--kira-s-3);
+  @apply shrink-0 p-[var(--kira-s-3)];
 }
 
 .palette-input {
-  width: 100%;
+  @apply w-full;
 }
 
 .palette-list {
-  overflow-y: auto;
-  padding: var(--kira-s-2);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply overflow-y-auto flex flex-col border-t border-border gap-px p-[var(--kira-s-2)];
 }
 
 .palette-item {
-  white-space: nowrap;
+  @apply whitespace-nowrap;
 }
 
 .quick-open-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--kira-s-2);
-  min-width: 0;
+  @apply flex items-baseline min-w-0 gap-[var(--kira-s-2)];
 }
 
 .quick-open-name {
-  flex-shrink: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply shrink-0 overflow-hidden text-ellipsis;
 }
 
+/* text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to --kira-hover
+   (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */
 .quick-open-match {
-  color: var(--kira-accent);
-  font-weight: 600;
+  @apply text-[var(--kira-accent)] font-semibold;
 }
 
 .quick-open-dir {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--kira-t-sm);
   /* §4: long paths ellipsise at the start, so the distinguishing tail (nearest the file) survives
      truncation instead of the repo-root end every path shares. */
+  @apply flex-1 min-w-0 overflow-hidden text-ellipsis text-[length:var(--kira-t-sm)] text-left;
   direction: rtl;
-  text-align: left;
 }
 
 .palette-empty {
-  height: var(--kira-h-sm);
-  display: flex;
-  align-items: center;
-  padding: 0 var(--kira-s-3);
-  font-size: var(--kira-t-md);
+  @apply flex items-center h-[var(--kira-h-sm)] text-[length:var(--kira-t-md)] px-[var(--kira-s-3)];
 }
 </style>

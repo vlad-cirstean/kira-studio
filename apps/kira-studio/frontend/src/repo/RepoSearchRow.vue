@@ -97,25 +97,18 @@ function onDblClick(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-search-row {
-  height: var(--kira-row-height);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding-left: var(--kira-s-2);
-  padding-right: var(--kira-s-4);
-  cursor: default;
-  white-space: nowrap;
-  font-size: var(--kira-t-md);
-  user-select: none;
+  @apply flex items-center cursor-default whitespace-nowrap select-none h-[var(--kira-row-height)] text-[length:var(--kira-t-md)] gap-[var(--kira-s-2)] pl-[var(--kira-s-2)] pr-[var(--kira-s-4)];
 }
 
 .repo-search-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .repo-search-row.selected {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 .match-row {
@@ -123,24 +116,13 @@ function onDblClick(): void {
 }
 
 .twisty {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  padding: 0;
+  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted p-0 w-3.5 h-3.5;
 }
 
 /* P67b §6.2: matches RepoTreeRow.vue's own rule — a real per-language icon here too, rather than
    the tree gaining per-language icons while search keeps one generic glyph. */
 .node-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  @apply shrink-0 w-4 h-4;
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;
@@ -150,28 +132,23 @@ function onDblClick(): void {
 }
 
 .label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis flex-1 min-w-0;
 }
 
 .match-count {
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 
 .match-line {
-  flex-shrink: 0;
-  min-width: 40px;
+  @apply shrink-0 min-w-[40px];
 }
 
 .preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply overflow-hidden text-ellipsis;
 }
 
 .preview-match {
+  @apply rounded-[2px];
   background: var(--kira-search-match);
-  border-radius: 2px;
 }
 </style>

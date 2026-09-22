@@ -76,53 +76,33 @@ function onContextMenu(e: MouseEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-tree-row {
-  height: var(--kira-row-height);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding-right: var(--kira-s-4);
-  position: relative;
-  cursor: default;
-  white-space: nowrap;
-  font-size: var(--kira-t-md);
-  user-select: none;
+  @apply flex items-center relative cursor-default whitespace-nowrap select-none h-[var(--kira-row-height)] text-[length:var(--kira-t-md)] gap-[var(--kira-s-2)] pr-[var(--kira-s-4)];
 }
 
 .repo-tree-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .repo-tree-row.selected {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 .twisty {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  padding: 0;
-  cursor: pointer;
+  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted p-0 cursor-pointer w-3.5 h-3.5;
 }
 
 .twisty.invisible {
-  visibility: hidden;
+  @apply invisible;
 }
 
 /* P67b §6.2: 16x16, matching VS Code's own explorer icon box (FileTree.vue's own
    .kv-file-tree-icon, ported verbatim) — was a bare 13px codicon glyph with no box at all. The
    mask-* rules are inert for the directory glyph (a codicon <i>, not a CSS mask) but harmless. */
 .node-icon {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  color: var(--kira-fg-muted);
+  @apply shrink-0 w-4 h-4 text-muted;
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;
@@ -132,22 +112,19 @@ function onContextMenu(e: MouseEvent): void {
 }
 
 .label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis min-w-0;
 }
 
 .repo-tree-row[data-status='M'] .label,
 .repo-tree-row[data-status='A'] .label {
-  color: var(--kira-warn);
+  @apply text-warn;
 }
 
 .repo-tree-row[data-status='D'] .label {
-  color: var(--kira-error);
-  text-decoration: line-through;
+  @apply text-error line-through;
 }
 
 .repo-tree-row[data-status='?'] .label {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 </style>

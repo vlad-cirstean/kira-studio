@@ -3,6 +3,7 @@ import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
 import { repoIdOfWorkspace, repoWorkspaceKey } from '@shared/domain/workspace';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { copyText } from '../clipboard';
 import { registerCommand } from '../shortcuts/commands';
 import { useCodeReposStore } from '../state/coderepos';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -174,7 +175,7 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       id: 'copy-path',
       label: 'Copy path',
       icon: 'copy',
-      run: () => void navigator.clipboard.writeText(repo.root),
+      run: () => void copyText(repo.root),
     },
     {
       type: 'item' as const,
@@ -236,7 +237,7 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
       id: 'copy-path',
       label: 'Copy path',
       icon: 'copy',
-      run: () => void navigator.clipboard.writeText(wt.path),
+      run: () => void copyText(wt.path),
     },
   ];
   // P84 §6.2: once the flat top-level row is gone, Rename/Close/Remove for this record are
@@ -555,70 +556,51 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .git-panel-body {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 /* P84 §8.6: the Repositories tab owns the whole panel height now — nothing stacks below the list
    any more, so P82 §9's has-workspace 50% cap and this section's own border are both gone. */
 .repo-section {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  @apply flex-1 min-h-0 overflow-y-auto;
 }
 
 /* P84 §8.2: the Files/Search/Review picker, moved out of the header into a strip above the Files
    tab's own body. */
 .view-strip {
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  display: flex;
-  align-items: center;
-  height: var(--kira-row-height);
+  @apply shrink-0 px-[var(--kira-s-3)] border-b border-border flex items-center h-[var(--kira-row-height)];
 }
 
 .repo-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
 }
 
 .repo-row {
-  height: var(--kira-row-height);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: 0 var(--kira-s-3);
-  cursor: default;
-  user-select: none;
+  @apply h-[var(--kira-row-height)] flex items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] cursor-default select-none;
 }
 
 .repo-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .repo-row.active {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 /* Imported, not open: muted icon. Open (active or not): full-brightness, the same distinction the
    title bar's own repo tabs used to carry (§4.4's row-state table). */
 .repo-icon {
-  flex-shrink: 0;
-  color: var(--kira-fg-muted);
+  @apply shrink-0 text-muted;
 }
 .repo-row.open .repo-icon {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 
 .repo-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 /* P83 plan §12.4: a repo row's checked-out branch. `.repo-name` keeps `flex: 1`, so it yields
@@ -626,120 +608,79 @@ onUnmounted(() => {
    below, so a collapsed row's branch and its expanded children's read as the same class of
    information. */
 .repo-head {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 45%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-subtle);
+  @apply flex-none min-w-0 max-w-[45%] overflow-hidden text-ellipsis whitespace-nowrap text-[length:var(--kira-t-sm)] text-subtle;
 }
 
 .repo-twisty { /* RepoTreeRow.vue's .twisty, ported */
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  padding: 0;
-  cursor: pointer;
+  @apply flex shrink-0 items-center justify-center bg-transparent border-0 text-muted p-0 cursor-pointer w-3.5 h-3.5;
 }
 
 .worktree-row {
-  height: var(--kira-row-height);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply h-[var(--kira-row-height)] flex items-center gap-[var(--kira-s-2)] cursor-default select-none text-[length:var(--kira-t-sm)] text-muted;
   /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap. */
   padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
-  cursor: default;
-  user-select: none;
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
 }
 .worktree-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 .worktree-row.current {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 /* P84 §6.1/§8.6: this app's own open/active workspace state, once the nested row is where a
    worktree's marking has to live — reusing --kira-fg/--kira-select exactly as .repo-row does.
    Distinct from .current (this git session's own worktree, a fact about the repository, not this
    app's workspaces). */
 .worktree-row.open {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 .worktree-row.active {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 .worktree-icon {
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 
 .worktree-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .worktree-badge {
-  flex-shrink: 0;
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-subtle);
+  @apply shrink-0 text-[length:var(--kira-t-sm)] text-subtle;
 }
 
 .worktree-badge-icon {
-  flex-shrink: 0;
-  color: var(--kira-fg-subtle);
+  @apply shrink-0 text-subtle;
 }
 
 .worktree-note {
+  @apply text-[length:var(--kira-t-sm)] text-subtle;
   padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-subtle);
 }
 .worktree-note.error {
-  color: var(--kira-error);
+  @apply text-error;
 }
 
 .repo-tree {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 .error-note {
-  color: var(--kira-error);
+  @apply text-error;
 }
 
 .prompt-scrim {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 30;
+  /* z-30, not var(--kira-z-dialog): unlike ConsoleSavedMenu.vue's own prompt-scrim (P28 D17(c)),
+     this prompt is raised directly from the panel, never from inside a popover with its own
+     full-viewport backdrop to clear — no cascade requirement to preserve here. */
+  @apply fixed inset-0 flex items-center justify-center bg-black/50 z-30;
 }
 
 .prompt-box {
-  width: 280px;
-  padding: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
+  @apply w-[280px] p-[var(--kira-s-4)] flex flex-col gap-[var(--kira-s-3)];
 }
 
 .prompt-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kira-s-3);
+  @apply flex justify-end gap-[var(--kira-s-3)];
 }
 </style>

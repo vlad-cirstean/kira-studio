@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useContextMenuStore } from '../state/contextMenu';
 import { openRepoFileTab } from '../state/repoTabs';
@@ -31,14 +32,15 @@ watch(
 // into "one pause pays this", which is what actually fixes the perceived lag.
 const SEARCH_DEBOUNCE_MS = 150;
 const debouncedSearch = ref(props.search);
-let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+// SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted/the repoId
+// watch replaces the clearTimeout below.
+const applySearchDebounced = useDebounceFn((value: string) => {
+  debouncedSearch.value = value;
+}, SEARCH_DEBOUNCE_MS);
 watch(
   () => props.search,
   (value) => {
-    clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(() => {
-      debouncedSearch.value = value;
-    }, SEARCH_DEBOUNCE_MS);
+    void applySearchDebounced(value);
   },
 );
 // A workspace/repo switch must not show the new repo's tree filtered by a stale debounce timer
@@ -46,11 +48,11 @@ watch(
 watch(
   () => props.repoId,
   () => {
-    clearTimeout(searchDebounceTimer);
+    applySearchDebounced.cancel();
     debouncedSearch.value = props.search;
   },
 );
-onUnmounted(() => clearTimeout(searchDebounceTimer));
+onUnmounted(() => applySearchDebounced.cancel());
 
 const rows = computed(() => fileTreeStore.visibleRepoRows(props.repoId, debouncedSearch.value));
 
@@ -93,15 +95,13 @@ function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-tree-body {
-  height: 100%;
+  @apply h-full;
 }
 
 .sticky-row {
-  position: absolute;
-  left: 0;
-  right: 0;
-  background: var(--kira-bg);
-  z-index: 1;
+  @apply absolute left-0 right-0 bg-bg z-[1];
 }
 </style>

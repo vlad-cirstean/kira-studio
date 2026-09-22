@@ -161,43 +161,37 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-search-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 .repo-search-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-4);
+  @apply flex items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-4)];
 }
 
 .repo-search-input {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .repo-search-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .group {
-  display: flex;
+  @apply flex;
 }
 
 .repo-search-status {
-  margin: 0 var(--kira-s-4) var(--kira-s-2);
+  @apply mt-0 mx-[var(--kira-s-4)] mb-[var(--kira-s-2)];
 }
 
 .error-note {
-  color: var(--kira-error);
+  @apply text-error;
 }
 
 .repo-search-list {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 </style>

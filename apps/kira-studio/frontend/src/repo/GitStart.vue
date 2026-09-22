@@ -37,22 +37,17 @@ async function onImport(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .start {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--kira-s-6);
-  overflow: auto;
+  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-[var(--kira-s-6)];
 }
 
 .start-inner {
-  width: 420px;
-  max-width: 100%;
+  @apply w-[420px] max-w-full;
 }
 
 .error-note {
-  color: var(--kira-error);
+  @apply text-error;
 }
 </style>
