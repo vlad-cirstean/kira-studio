@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ForeignKeyMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import { useEventListener } from '@vueuse/core';
 import { computeFloatPosition, pointReference } from '@workbench/util/floatingPosition';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -147,9 +148,10 @@ onUnmounted(() => {
       </div>
 
       <div class="fk-preview-actions">
-        <AppButton data-testid="fk-preview-open" icon="arrow-right" @click="onOpenClick">
+        <Button variant="toolbar" size="kira" data-testid="fk-preview-open" @click="onOpenClick">
+          <CodiconIcon name="arrow-right" :size="13" />
           Open in new tab
-        </AppButton>
+        </Button>
       </div>
 
       <div class="fk-preview-body">
@@ -157,13 +159,9 @@ onUnmounted(() => {
           <CodiconIcon name="loading" class="spin" :size="14" />
         </div>
         <div v-else-if="state.status === 'error'" class="p-chip err">{{ state.message }}</div>
-        <div
-          v-else-if="state.status === 'ready' && state.rows.length === 0"
-          class="p-strip note"
-          data-testid="fk-preview-empty"
-        >
-          No matching row in {{ tableLabel }}
-        </div>
+        <Alert v-else-if="state.status === 'ready' && state.rows.length === 0" class="strip-note" data-testid="fk-preview-empty">
+          <AlertDescription class="strip-note-text">No matching row in {{ tableLabel }}</AlertDescription>
+        </Alert>
         <table v-else-if="state.status === 'ready'" class="fk-preview-table">
           <tbody>
             <tr v-for="(col, i) in state.columns" :key="col.name">
@@ -202,7 +200,7 @@ onUnmounted(() => {
 }
 
 .fk-preview-header {
-  @apply flex items-center justify-between border-b border-border-strong flex-none gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
+  @apply flex items-center justify-between border-b border-border-strong flex-none gap-1 p-1.5;
 }
 
 .fk-preview-title {
@@ -212,7 +210,7 @@ onUnmounted(() => {
 .fk-preview-body {
   /* Load-bearing: without this a flex child refuses to shrink below its content height, and the
      panel overflows its own max-height instead of scrolling here. */
-  @apply flex-1 min-h-0 overflow-y-auto p-[var(--kira-s-3)];
+  @apply flex-1 min-h-0 overflow-y-auto p-1.5;
 }
 
 .fk-preview-loading {
@@ -232,13 +230,13 @@ onUnmounted(() => {
 }
 
 .fk-preview-table {
-  @apply w-full border-collapse text-[length:var(--kira-t-sm)];
+  @apply w-full border-collapse text-kira-sm;
 }
 .fk-preview-table th {
-  @apply text-left font-medium text-muted whitespace-nowrap align-top py-[var(--kira-s-1)] pl-0 pr-[var(--kira-s-2)];
+  @apply text-left font-medium text-muted whitespace-nowrap align-top py-0.5 pl-0 pr-1;
 }
 .fk-preview-table td {
-  @apply break-words py-[var(--kira-s-1)];
+  @apply break-words py-0.5;
 }
 
 /* .header-key/.header-key.is-fk: no rule here — this popover is always rendered inside
@@ -247,6 +245,15 @@ onUnmounted(() => {
    for), unscoped CSS reaching into any descendant regardless of which component rendered it. */
 
 .fk-preview-actions {
-  @apply flex border-b border-border-strong flex-none gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
+  @apply flex border-b border-border-strong flex-none gap-1 p-1.5;
+}
+
+/* Alert tone class replacing the raw `.p-strip note` marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 </style>

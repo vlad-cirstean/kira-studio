@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
@@ -117,8 +118,8 @@ function close(): void {
   >
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
-        <AppButton data-testid="columns-select-all" @click="selectAll"> All </AppButton>
-        <AppButton data-testid="columns-select-none" @click="selectNone"> None </AppButton>
+        <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
+        <Button variant="toolbar" size="kira" data-testid="columns-select-none" @click="selectNone">None</Button>
       </div>
       <div v-if="!meta" class="columns-menu-loading p-sm muted">Loading columns…</div>
       <!-- Drag by the grip handle to reorder — the same order the grid renders columns in
@@ -135,13 +136,27 @@ function close(): void {
           @dragend="onDragEnd"
         >
           <span class="drag-handle" aria-hidden="true"><CodiconIcon name="gripper" :size="13" /></span>
+          <Tooltip v-if="pkNames.has(name)">
+            <TooltipTrigger as-child>
+              <Checkbox
+                :model-value="selected.has(name)"
+                disabled
+                data-testid="columns-menu-item"
+                @update:model-value="toggle(name)"
+              >
+                <CodiconIcon name="check" :size="10" />
+              </Checkbox>
+            </TooltipTrigger>
+            <TooltipContent>Primary key — always shown</TooltipContent>
+          </Tooltip>
           <Checkbox
+            v-else
             :model-value="selected.has(name)"
-            :disabled="pkNames.has(name)"
-            v-tooltip="pkNames.has(name) ? 'Primary key — always shown' : undefined"
             data-testid="columns-menu-item"
             @update:model-value="toggle(name)"
-          />
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
           {{ name }}
         </label>
       </div>
@@ -161,19 +176,19 @@ function close(): void {
 }
 
 .columns-menu-header {
-  @apply flex border-b border-border gap-[var(--kira-s-2)] p-[var(--kira-s-2)];
+  @apply flex border-b border-border gap-1 p-1;
 }
 
 .columns-menu-loading {
-  @apply p-[var(--kira-s-4)];
+  @apply p-2;
 }
 
 .columns-menu-list {
-  @apply overflow-y-auto p-[var(--kira-s-1)];
+  @apply overflow-y-auto p-0.5;
 }
 
 .columns-menu-item {
-  @apply cursor-pointer gap-[var(--kira-s-2)];
+  @apply cursor-pointer gap-1;
 }
 
 .columns-menu-item.is-dragging {
@@ -185,6 +200,6 @@ function close(): void {
 }
 
 .columns-menu-footer {
-  @apply px-[var(--kira-s-3)] pb-[var(--kira-s-3)];
+  @apply px-1.5 pb-1.5;
 }
 </style>

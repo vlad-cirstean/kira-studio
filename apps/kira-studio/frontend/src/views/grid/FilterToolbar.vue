@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
@@ -124,12 +125,21 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
   <!-- LAW 02 / README: one row, two prefixed inputs, one verb — permanent, so Clear rather than
        a close button that would make the grid change height under you. -->
   <div class="history-anchor">
-    <IconButton
-      icon="history"
-      v-tooltip="'Saved & recent filters'"
-      data-testid="filter-history-button"
-      @click="historyOpen = !historyOpen"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          :class="{ 'bg-input text-fg': historyOpen }"
+          data-testid="filter-history-button"
+          aria-label="Saved & recent filters"
+          @click="historyOpen = !historyOpen"
+        >
+          <CodiconIcon name="history" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Saved & recent filters</TooltipContent>
+    </Tooltip>
     <FilterHistoryMenu
       v-if="historyOpen"
       :connection-id="tab.connectionId"
@@ -171,7 +181,12 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       @blur="applyOrderBy"
     />
   </div>
-  <AppButton v-tooltip="'Empty both fields and refetch'" @click="onClear"> Clear </AppButton>
+  <Tooltip>
+    <TooltipTrigger as-child>
+      <Button variant="toolbar" size="kira" @click="onClear">Clear</Button>
+    </TooltipTrigger>
+    <TooltipContent>Empty both fields and refetch</TooltipContent>
+  </Tooltip>
 </template>
 
 <style scoped>

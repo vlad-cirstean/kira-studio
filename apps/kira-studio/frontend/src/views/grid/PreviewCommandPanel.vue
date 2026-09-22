@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
@@ -61,13 +62,21 @@ function close(): void {
       <div class="preview-panel-header p-panel-head">
         <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>
         <span>Preview SQL</span>
-        <IconButton
-          icon="close"
-          class="p-push"
-          v-tooltip="'Close'"
-          data-testid="preview-command-close"
-          @click="close"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              class="p-push"
+              aria-label="Close"
+              data-testid="preview-command-close"
+              @click="close"
+            >
+              <CodiconIcon name="close" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Close</TooltipContent>
+        </Tooltip>
       </div>
       <div v-if="isLoading" class="preview-panel-loading p-sm muted">Loading…</div>
       <div
@@ -100,11 +109,11 @@ function close(): void {
 
 .preview-panel-loading,
 .preview-panel-empty {
-  @apply p-[var(--kira-s-4)];
+  @apply p-2;
 }
 
 .preview-panel-error {
-  @apply text-error p-[var(--kira-s-4)];
+  @apply text-error p-2;
 }
 
 .preview-panel-body {

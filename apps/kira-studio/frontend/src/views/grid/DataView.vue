@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import IconButton from '@theme/primitives/IconButton.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
+import { useRunState } from '../../state/runState';
 import type { DataTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import { ancestorPathPrefix } from '../shared/targetPath';
@@ -42,6 +44,17 @@ const rt = computed(() => gridViewStore.runtime[props.tab.id]);
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 
 const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
+
+// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
+const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
@@ -165,151 +178,208 @@ function onCloseSearch(): void {
 
 <template>
   <div class="data-view">
-    <ViewChrome
-      :tab="tab"
-      :icon="targetIcon"
-      :icon-color="iconColor"
-      :path="pathPrefix"
-      :name="targetTail?.name ?? tab.path"
-      target-testid="grid-target"
-      refresh-testid="toolbar-refresh"
-      stop-testid="toolbar-stop"
-      toolbar-testid="data-toolbar"
-      toolbar2-testid="filter-toolbar"
-      :can-refresh="!rt?.opId"
-      :can-stop="!!rt?.opId"
-      @refresh="onRefresh"
-      @stop="onStop"
-    >
-      <template #badges>
-        <span v-if="targetTail?.kind" class="p-badge" data-testid="grid-kind-badge">{{
-          targetTail.kind
-        }}</span>
-        <span v-if="columnCount !== null" class="p-badge" data-testid="grid-column-count-badge"
-          >{{ columnCount }} columns</span
-        >
-        <span class="p-badge" data-testid="grid-writable-badge">{{
-          effectivelyWritable ? 'read-write' : 'read-only'
-        }}</span>
-        <span v-if="rt?.count" class="p-badge" data-testid="grid-row-count-badge"
-          >Σ {{ rt.count.value.toLocaleString() }} rows</span
-        >
-      </template>
-      <template #head-trailing>
-        <span v-if="primaryKeyLabel" class="p-chip info" data-testid="grid-pk-chip">{{
-          primaryKeyLabel
-        }}</span>
-      </template>
+    <div class="p-view-head">
+      <span v-if="railColor !== undefined" class="p-conn-dot" :class="{ none: !railColor }" :style="{ '--kira-rail': connColorVar(railColor) }" />
+      <span v-if="connRecord?.kind" class="icon-box"><EngineIcon :kind="connRecord.kind" :size="13" /></span>
+      <span class="icon-box" :style="{ color: iconColor }"><CodiconIcon :name="targetIcon" :size="13" /></span>
+      <span class="p-view-target" data-testid="grid-target">
+        <span v-if="pathPrefix" class="path">{{ pathPrefix }}</span>{{ targetTail?.name ?? tab.path }}
+      </span>
+      <span v-if="targetTail?.kind" class="p-badge" data-testid="grid-kind-badge">{{ targetTail.kind }}</span>
+      <span v-if="columnCount !== null" class="p-badge" data-testid="grid-column-count-badge"
+        >{{ columnCount }} columns</span
+      >
+      <span class="p-badge" data-testid="grid-writable-badge">{{
+        effectivelyWritable ? 'read-write' : 'read-only'
+      }}</span>
+      <span v-if="rt?.count" class="p-badge" data-testid="grid-row-count-badge"
+        >Σ {{ rt.count.value.toLocaleString() }} rows</span
+      >
+      <span class="p-push flex items-center gap-1">
+        <span v-if="primaryKeyLabel" class="p-chip info" data-testid="grid-pk-chip">{{ primaryKeyLabel }}</span>
+      </span>
+    </div>
 
-      <template #toolbar>
-        <DataToolbar :tab="tab" />
-      </template>
-
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="p-toolbar" data-testid="data-toolbar">
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="toolbar-refresh"
+              :disabled="rt?.opId !== undefined"
+              aria-label="Refresh"
+              @click="onRefresh"
+            >
+              <CodiconIcon name="refresh" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'text-error': !!rt?.opId }"
+              data-testid="toolbar-stop"
+              :disabled="!rt?.opId"
+              aria-label="Stop"
+              @click="onStop"
+            >
+              <CodiconIcon name="debug-stop" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
+        </Tooltip>
+      </div>
+      <DataToolbar :tab="tab" />
+      <span class="p-push" />
+      <span
+        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+      >
+        <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+        <span
+          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          :class="{
+            'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
+            'border-error': runState.status === 'error',
+          }"
+        />
+      </span>
       <!-- FIX-3: pending edits as a count with both actions beside it — Commit is the only
            accent-filled control on the whole screen. The preview-command eye sits in this same
-           group (only ever relevant while there is something pending to preview). ViewChrome
-           itself already wraps #toolbar-end in a `.group` div — no second one needed here. -->
-      <template #toolbar-end>
+           group. -->
+      <div class="group">
         <template v-if="tabHasPending">
           <span class="p-chip warn"
             >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span
           >
           <div class="preview-anchor">
-            <IconButton
-              icon="eye"
-              data-testid="toolbar-preview-command"
-              :disabled="!isWritable"
-              v-tooltip="isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only'"
-              @click="previewOpen = !previewOpen"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  data-testid="toolbar-preview-command"
+                  :disabled="!isWritable"
+                  aria-label="Preview the SQL for pending changes"
+                  @click="previewOpen = !previewOpen"
+                >
+                  <CodiconIcon name="eye" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only' }}</TooltipContent>
+            </Tooltip>
             <PreviewCommandPanel v-if="previewOpen" :tab-id="tab.id" @close="previewOpen = false" />
           </div>
-          <IconButton
-            icon="discard"
-            data-testid="toolbar-discard-changes"
-            :disabled="!isWritable"
-            v-tooltip="'Discard pending changes'"
-            @click="onDiscard"
-          />
-          <IconButton
-            icon="save"
-            tone="primary"
-            data-testid="toolbar-commit-changes"
-            :disabled="!isWritable"
-            v-tooltip="'Commit pending changes'"
-            @click="onCommit"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="toolbar-discard-changes"
+                :disabled="!isWritable"
+                aria-label="Discard pending changes"
+                @click="onDiscard"
+              >
+                <CodiconIcon name="discard" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Discard pending changes</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar-primary"
+                size="kira-icon"
+                data-testid="toolbar-commit-changes"
+                :disabled="!isWritable"
+                aria-label="Commit pending changes"
+                @click="onCommit"
+              >
+                <CodiconIcon name="save" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Commit pending changes</TooltipContent>
+          </Tooltip>
         </template>
-      </template>
+      </div>
+    </div>
+    <div class="p-toolbar last" data-testid="filter-toolbar">
+      <FilterToolbar :tab="tab" />
+    </div>
 
-      <template #toolbar-2>
-        <FilterToolbar :tab="tab" />
-      </template>
+    <!-- Below the filter row, not floating over the grid it searches — the "docks at the bottom
+         of the result" placement from Toolbars.html overlapped the last visible row, which read as
+         a bug rather than a search bar. -->
+    <SearchToolbar
+      v-if="rt?.searchOpen"
+      :tab-id="tab.id"
+      testid-prefix=""
+      row-noun="rows"
+      :api="pageSearchApi"
+      :mask-preview-on="!!rt?.maskPreview"
+      @go-to-match="onGoToMatch"
+      @close="onCloseSearch"
+    />
 
-      <template #strips>
-        <!-- Below the filter row, not floating over the grid it searches — the "docks at the
-             bottom of the result" placement from Toolbars.html overlapped the last visible row,
-             which read as a bug rather than a search bar. -->
-        <SearchToolbar
-          v-if="rt?.searchOpen"
-          :tab-id="tab.id"
-          testid-prefix=""
-          row-noun="rows"
-          :api="pageSearchApi"
-          :mask-preview-on="!!rt?.maskPreview"
-          @go-to-match="onGoToMatch"
-          @close="onCloseSearch"
-        />
-      </template>
-
-      <ReconnectGate
-        v-if="needsReconnect"
-        container-testid="reconnect-panel"
-        button-testid="reconnect-load"
-        @reconnect="onReconnectAndLoad"
-      />
-      <template v-else>
-        <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
-             that started it (ViewChrome's own RunState), never a bar across the top of the view —
-             §8.5's "never a spinner that replaces the previous page" still holds, it just no
-             longer needs a bar of its own to say so. -->
-        <MessageStrip
-          v-if="rt?.status === 'error' && rt.error"
-          tone="err"
-          icon="warning"
-          data-testid="error-strip"
-          class="error-strip"
-        >
-          <span>{{ rt.error.message }}</span>
-        </MessageStrip>
-        <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
-             showing a perfectly valid page, only the write was refused. -->
-        <MessageStrip
-          v-if="rt?.actionError"
-          tone="err"
-          icon="warning"
-          data-testid="data-action-error"
-          class="error-strip"
-        >
-          <span>{{ rt.actionError }}</span>
-        </MessageStrip>
-        <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
-             stored data — a preview convenience (§6.1), not the security boundary, but a user
-             switching tabs or taking a screenshot must not mistake a bucket string for a literal
-             value. -->
-        <MessageStrip
-          v-if="rt?.maskPreview"
-          tone="note"
-          icon="eye-closed"
-          data-testid="mask-preview-strip"
-        >
-          <span>Values shown are masked for this preview — not the stored data. Editing is off while it's on.</span>
-        </MessageStrip>
-        <div class="grid-area">
-          <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
-        </div>
-      </template>
-    </ViewChrome>
+    <div
+      v-if="needsReconnect"
+      class="p-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-2 text-subtle"
+      data-testid="reconnect-panel"
+    >
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        data-testid="reconnect-load"
+        @click="onReconnectAndLoad"
+      >
+        Reconnect & load
+      </Button>
+    </div>
+    <template v-else>
+      <!-- P16 design system LAW: work-in-progress is the ring + elapsed time beside the button
+           that started it (RunState, above), never a bar across the top of the view — §8.5's
+           "never a spinner that replaces the previous page" still holds, it just no longer needs a
+           bar of its own to say so. -->
+      <Alert
+        v-if="rt?.status === 'error' && rt.error"
+        variant="destructive"
+        data-testid="error-strip"
+        class="error-strip"
+      >
+        <CodiconIcon name="warning" :size="16" />
+        <AlertDescription>{{ rt.error.message }}</AlertDescription>
+      </Alert>
+      <!-- P43 F5/D7: a failed commit, distinct from a failed load above — the grid is still
+           showing a perfectly valid page, only the write was refused. -->
+      <Alert
+        v-if="rt?.actionError"
+        variant="destructive"
+        data-testid="data-action-error"
+        class="error-strip"
+      >
+        <CodiconIcon name="warning" :size="16" />
+        <AlertDescription>{{ rt.actionError }}</AlertDescription>
+      </Alert>
+      <!-- M5 §6.4: the one place this view states, in prose, that what's on screen is not the
+           stored data — a preview convenience (§6.1), not the security boundary, but a user
+           switching tabs or taking a screenshot must not mistake a bucket string for a literal
+           value. -->
+      <Alert v-if="rt?.maskPreview" class="strip-note" data-testid="mask-preview-strip">
+        <CodiconIcon name="eye-closed" :size="16" />
+        <AlertDescription class="strip-note-text">
+          Values shown are masked for this preview — not the stored data. Editing is off while it's on.
+        </AlertDescription>
+      </Alert>
+      <div class="grid-area">
+        <SlickGridHost ref="dataGridRef" :tab-id="tab.id" />
+      </div>
+    </template>
     <CellEditorDock :tab-id="tab.id" />
   </div>
 </template>
@@ -331,5 +401,14 @@ function onCloseSearch(): void {
 
 .preview-anchor {
   @apply relative;
+}
+
+/* Alert tone class replacing MessageStrip's own note-tone color (P104 §9 rule 5: literal hex, not
+   a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 </style>

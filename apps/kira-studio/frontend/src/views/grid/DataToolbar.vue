@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
-import IconButton from '@theme/primitives/IconButton.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
@@ -251,37 +253,68 @@ function onDeleteRow(): void {
     @jump="onJump"
   />
 
-  <SegmentedControl
-    :model-value="tab.state.pageSize"
-    :options="PAGE_SIZE_OPTIONS"
+  <ToggleGroup
+    type="single"
+    :model-value="String(tab.state.pageSize)"
     data-testid="page-size-picker"
-    @update:model-value="onPageSize"
-  />
+    @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
+  >
+    <ToggleGroupItem
+      v-for="opt in PAGE_SIZE_OPTIONS"
+      :key="opt.value"
+      :value="String(opt.value)"
+      :data-testid="opt.testid"
+    >
+      {{ opt.label }}
+    </ToggleGroupItem>
+  </ToggleGroup>
 
   <div class="sep" />
 
   <div class="group">
-    <IconButton
-      icon="symbol-number"
-      data-testid="toolbar-count"
-      :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
-      v-tooltip="
-        rt?.count
-          ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
-          : 'Count all rows'
-      "
-      @click="onCount"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          data-testid="toolbar-count"
+          :style="rt?.count?.stale ? { color: 'var(--kira-warn)' } : undefined"
+          aria-label="Count all rows"
+          @click="onCount"
+        >
+          <CodiconIcon name="symbol-number" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {{
+          rt?.count
+            ? `Count all rows — Σ ${rt.count.exact ? '' : '~'}${rt.count.value.toLocaleString()}${rt.count.stale ? ' (stale, click to refresh)' : ''}`
+            : 'Count all rows'
+        }}
+      </TooltipContent>
+    </Tooltip>
 
     <div class="columns-anchor">
-      <IconButton
-        icon="list-selection"
-        data-testid="toolbar-columns"
-        :indicator="columnsIndicator"
-        :active="columnsOpen"
-        v-tooltip="columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns'"
-        @click="columnsOpen = !columnsOpen"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            class="relative"
+            data-testid="toolbar-columns"
+            :class="{ 'bg-input text-fg': columnsOpen }"
+            aria-label="Columns"
+            @click="columnsOpen = !columnsOpen"
+          >
+            <CodiconIcon name="list-selection" :size="13" />
+            <span
+              v-if="columnsIndicator"
+              class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-[var(--kira-state-on)]"
+            />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns' }}</TooltipContent>
+      </Tooltip>
       <ColumnsMenu v-if="columnsOpen" :tab-id="tab.id" :caps="caps" @close="columnsOpen = false" />
     </div>
   </div>
@@ -289,49 +322,90 @@ function onDeleteRow(): void {
   <div class="sep" />
 
   <div class="group">
-    <IconButton
-      icon="add"
-      data-testid="toolbar-add-row"
-      :disabled="!isWritable"
-      v-tooltip="
-        isWritable
-          ? 'Add a row'
-          : rt?.maskPreview
-            ? 'Values are masked — turn the preview off to edit'
-            : 'Connection is read-only'
-      "
-      @click="onAddRow"
-    />
-    <IconButton
-      icon="wand"
-      data-testid="toolbar-generate-data"
-      :disabled="!canGenerateData"
-      v-tooltip="generateDataTooltip"
-      @click="onGenerateData"
-    />
-    <IconButton
-      icon="trash"
-      data-testid="toolbar-delete-row"
-      :disabled="!canDeleteRows"
-      v-tooltip="deleteRowTooltip"
-      @click="onDeleteRow"
-    />
-    <IconButton
-      icon="search"
-      :active="!!rt?.searchOpen"
-      v-tooltip="'Search this page'"
-      data-testid="toolbar-search"
-      @click="onToggleSearch"
-    />
-    <IconButton
-      v-if="hasMaskRules"
-      icon="eye-closed"
-      :active="!!rt?.maskPreview"
-      :disabled="hasPendingChanges"
-      data-testid="toolbar-mask-preview"
-      v-tooltip="maskPreviewTooltip"
-      @click="onToggleMaskPreview"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          data-testid="toolbar-add-row"
+          :disabled="!isWritable"
+          aria-label="Add a row"
+          @click="onAddRow"
+        >
+          <CodiconIcon name="add" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        {{
+          isWritable
+            ? 'Add a row'
+            : rt?.maskPreview
+              ? 'Values are masked — turn the preview off to edit'
+              : 'Connection is read-only'
+        }}
+      </TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          data-testid="toolbar-generate-data"
+          :disabled="!canGenerateData"
+          aria-label="Generate data"
+          @click="onGenerateData"
+        >
+          <CodiconIcon name="wand" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ generateDataTooltip }}</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          data-testid="toolbar-delete-row"
+          :disabled="!canDeleteRows"
+          aria-label="Delete selected row(s)"
+          @click="onDeleteRow"
+        >
+          <CodiconIcon name="trash" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ deleteRowTooltip }}</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          :class="{ 'bg-input text-fg': rt?.searchOpen }"
+          data-testid="toolbar-search"
+          aria-label="Search this page"
+          @click="onToggleSearch"
+        >
+          <CodiconIcon name="search" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Search this page</TooltipContent>
+    </Tooltip>
+    <Tooltip v-if="hasMaskRules">
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          :class="{ 'bg-input text-fg': rt?.maskPreview }"
+          :disabled="hasPendingChanges"
+          data-testid="toolbar-mask-preview"
+          aria-label="Toggle masking preview"
+          @click="onToggleMaskPreview"
+        >
+          <CodiconIcon name="eye-closed" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ maskPreviewTooltip }}</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 

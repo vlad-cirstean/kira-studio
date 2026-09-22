@@ -4,10 +4,12 @@ import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
+import AttributeTooltip from '@workbench/components/AttributeTooltip.vue';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
@@ -716,6 +718,10 @@ let viewportEl: HTMLElement | null = null;
 let gridRootEl: HTMLElement | null = null;
 // C4/§5 D0 rule 2 — never a ref/shallowRef/reactive, same as `grid` itself.
 let selectionModel: SlickHybridSelectionModel | null = null;
+// P104 §6.4 — AttributeTooltip.vue's own `container` prop: a ref (not a plain let) since
+// AttributeTooltip's `useEventListener(computed(() => props.container), ...)` re-binds reactively
+// once this is set, after the constructor's synchronous header build below.
+const headerRowEl = ref<HTMLElement | null>(null);
 // P22 postscript §14.2's "cell-editor dock panel is sometimes missing its header" investigation
 // (below, onMounted) surfaced a real, adjacent bug while chasing it: SlickGrid never self-observes
 // its own container's size (confirmed reading slick.grid.ts — no ResizeObserver anywhere in the
@@ -2177,6 +2183,10 @@ onMounted(() => {
     eventHandler.subscribe(cellRangeSelector.onCellRangeSelecting, onCellRangeSelecting);
   }
 
+  // P104 §6.4 — the constructor call above already ran SlickGrid's own synchronous header build
+  // (see the postscript comment just below), so `.slick-header-columns` exists in `el` by now.
+  headerRowEl.value = el.querySelector<HTMLElement>('.slick-header-columns');
+
   // P22 postscript §14.2's two "reported but not reproduced" dock/badge symptoms, root-caused
   // together: `new KiraSlickGrid(...)` above runs synchronously through slick.grid.ts's own
   // `initialize()` -> `finishInitialization()` -> `createColumnHeaders()` (since
@@ -2313,6 +2323,7 @@ onUnmounted(() => {
   gridRootEl?.removeEventListener('input', onInsertGridInput);
   gridRootEl?.removeEventListener('keydown', onInsertGridKeydown);
   gridRootEl = null;
+  headerRowEl.value = null;
   eventHandler?.unsubscribeAll();
   eventHandler = null;
   // C4 — `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
@@ -2712,27 +2723,31 @@ defineExpose({
     :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"
   >
     <div ref="rootRef" class="slick-grid-mount"></div>
-    <EmptyState
+    <AttributeTooltip :container="headerRowEl" />
+    <Alert
       v-if="showNoRows"
-      class="no-rows"
-      icon="table"
-      label="No rows"
+      class="no-rows flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
       data-testid="grid-no-rows"
-    />
-    <EmptyState
+    >
+      <CodiconIcon name="table" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">No rows</AlertTitle>
+    </Alert>
+    <Alert
       v-else-if="showNoMatchingRows"
-      class="no-rows"
-      icon="search"
-      label="No matching rows"
+      class="no-rows flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"
       data-testid="grid-no-matching-rows"
     >
-      <AppButton
+      <CodiconIcon name="search" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">No matching rows</AlertTitle>
+      <Button
+        variant="toolbar"
+        size="kira"
         data-testid="grid-show-all-rows"
         @click="pageSearchFilterStore.setSearchFiltering(props.tabId, false)"
       >
         Show all rows
-      </AppButton>
-    </EmptyState>
+      </Button>
+    </Alert>
     <FkPreviewPopover
       v-if="fkPreview"
       :x="fkPreview.x"
