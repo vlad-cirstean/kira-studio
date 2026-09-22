@@ -470,14 +470,13 @@ function terminalModuleMenuItems(): MenuItem[] {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* P72 §7: the actual flex row — `.tab-strip-pinned` (fixed) and `.tab-strip` (scrolling) are its
    two children, so the pinned tab sits outside the latter's own `overflow-x` entirely instead of
    scrolling away with it. */
 .tab-strip-wrapper {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  min-width: 0;
+  @apply h-full flex items-center min-w-0;
 }
 
 .tab-strip-wrapper.is-empty {
@@ -485,12 +484,8 @@ function terminalModuleMenuItems(): MenuItem[] {
 }
 
 .tab-strip-pinned {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  @apply h-full flex items-center gap-0.5 shrink-0;
   padding: 2px 0 0 4px;
-  flex-shrink: 0;
 }
 
 .p-tab.is-pinned {
@@ -499,29 +494,21 @@ function terminalModuleMenuItems(): MenuItem[] {
 
 /* The visible "and after it the tab bar begins" boundary the request asked for. */
 .tab-strip-separator {
-  align-self: stretch;
+  @apply self-stretch shrink-0;
   width: var(--kira-border-width);
   margin: 4px 2px 4px 0;
   background: var(--kira-border);
-  flex-shrink: 0;
 }
 
 .tab-strip {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 4px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  min-width: 0;
   /* Scrolls with too many tabs open, but the track itself stays hidden — reachable by wheel
      (onWheel above), trackpad, or drag either way, with no visible scrollbar chrome. */
-  scrollbar-width: none;
+  @apply h-full flex items-center gap-0.5 overflow-x-auto overflow-y-hidden min-w-0 [scrollbar-width:none];
+  padding: 2px 4px 0;
 }
 
 .tab-strip::-webkit-scrollbar {
-  display: none;
+  @apply hidden;
 }
 
 /* P24 D32: .tab used to re-declare .p-tab's own rules (primitives.css) by hand, 1px and 10px off
@@ -532,81 +519,61 @@ function terminalModuleMenuItems(): MenuItem[] {
 }
 
 .p-tab.is-dragging {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 
 .tab-icon {
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 
 /* P73 §2.3: a seti mask icon (repo-file tabs) rather than a codicon glyph — coloured per language,
    14px (--kira-control-inline-h) rather than the tree's 16px so it doesn't outweigh the 13px
    codicon beside it on other tabs. */
 .tab-file-icon {
+  @apply [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [-webkit-mask-size:contain] [-webkit-mask-repeat:no-repeat] [-webkit-mask-position:center];
   width: var(--kira-control-inline-h);
   height: var(--kira-control-inline-h);
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
 }
 
 .tab-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
 }
 
 /* C5 §5.1: the preview-tab affordance — VS Code's own convention for "opened, not yet promoted". */
 .p-tab.is-preview .tab-title {
-  font-style: italic;
+  @apply italic;
 }
 
 /* P86 §14.2: a Claude Code session waiting on you, in a tab that is not the active one —
    IconButton.vue's own .has-indicator::after dot, --kira-state-on's existing amber reused rather
    than a new token for a single small badge. */
 .p-tab.is-attention {
-  position: relative;
+  @apply relative;
 }
 .p-tab.is-attention::after {
+  @apply absolute top-1 right-1 w-1.5 h-1.5 rounded-full;
   content: '';
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
   background: var(--kira-state-on);
 }
 
 .tab-badge {
-  flex-shrink: 0;
+  @apply shrink-0;
   color: var(--kira-fg-muted);
 }
 
 /* P71 §5.1: mirrors .tab-badge's own colour — a small, unobtrusive mark, not a warning. */
 .tab-incognito {
-  flex-shrink: 0;
+  @apply shrink-0;
   color: var(--kira-fg-muted);
 }
 
 .tab-close {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--kira-radius-sm);
-  opacity: 0;
+  @apply shrink-0 flex items-center justify-center w-4 h-4 opacity-0 rounded-[var(--kira-radius-sm)];
 }
 
 .p-tab:hover .tab-close,
 .p-tab.is-active .tab-close {
-  opacity: 1;
+  @apply opacity-100;
 }
 
 .tab-close:hover {
@@ -615,23 +582,12 @@ function terminalModuleMenuItems(): MenuItem[] {
 
 /* P83 §9.1/§14: the trailing fixed slot, `.tab-strip-pinned`'s own mirror at the other end. */
 .tab-strip-actions {
-  height: 100%;
-  display: flex;
-  align-items: center;
+  @apply h-full flex items-center shrink-0;
   padding: 2px 4px 0 2px;
-  flex-shrink: 0;
 }
 .tab-new {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  background: transparent;
-  border: none;
+  @apply flex items-center justify-center w-[22px] h-[22px] bg-transparent border-none cursor-pointer rounded-[var(--kira-radius-sm)];
   color: var(--kira-fg-muted);
-  border-radius: var(--kira-radius-sm);
-  cursor: pointer;
 }
 .tab-new:hover {
   background: var(--kira-hover);

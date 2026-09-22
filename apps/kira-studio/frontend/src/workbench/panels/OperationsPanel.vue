@@ -235,7 +235,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               <span class="truncate" data-testid="op-tab-cell">{{ tabTitleFor(item.record) }}</span>
               <span>{{ item.record.kind }}</span>
               <span class="status-cell">
-                <CodiconIcon v-if="item.record.status === 'running'" name="loading" class="spin" :size="13" />
+                <CodiconIcon v-if="item.record.status === 'running'" name="loading" class="animate-spin" :size="13" />
                 {{ item.record.status }}
                 <button
                   v-if="item.record.status === 'running'"
@@ -283,18 +283,15 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .ops-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
   font-size: var(--kira-t-sm);
 }
 
 .ops-header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
+  @apply shrink-0 flex items-center;
   gap: var(--kira-s-4);
   padding: var(--kira-s-2) var(--kira-s-4);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
@@ -304,48 +301,42 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
    (see TextField.vue's inheritAttrs:false), so the fixed-width sizing moves onto this wrapper
    instead of a style/class attribute on the component tag itself (DocumentView.vue precedent). */
 .filter-input {
-  flex: 0 0 160px;
+  @apply flex-none w-40;
 }
 
 .filter-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .running-count {
+  @apply ml-auto;
   color: var(--kira-fg-muted);
-  margin-left: auto;
 }
 
 .ops-columns,
 .ops-row,
 .ops-detail-row {
-  display: grid;
-  grid-template-columns: 90px 140px 40px 80px 90px 70px 60px 1fr;
+  @apply grid grid-cols-[90px_140px_40px_80px_90px_70px_60px_1fr] items-center;
   gap: var(--kira-s-4);
   padding: 0 var(--kira-s-4);
-  align-items: center;
 }
 
 .ops-columns {
-  flex-shrink: 0;
+  /* P24 D31: no bold text anywhere in the app — the design system builds hierarchy from colour,
+     size, case and letter-spacing alone, matching .p-panel-head's own section-label idiom. */
+  @apply shrink-0 uppercase tracking-[0.05em];
   height: var(--kira-h-xs);
   color: var(--kira-fg-muted);
   border-bottom: var(--kira-border-width) solid var(--kira-border);
-  /* P24 D31: no bold text anywhere in the app — the design system builds hierarchy from colour,
-     size, case and letter-spacing alone, matching .p-panel-head's own section-label idiom. */
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .ops-body {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 .ops-row {
+  @apply cursor-pointer select-text;
   height: var(--kira-h-xs);
-  cursor: pointer;
-  user-select: text;
 }
 
 .ops-row:hover {
@@ -357,24 +348,16 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .connection-cell {
-  display: flex;
-  align-items: center;
+  @apply flex items-center min-w-0;
   gap: var(--kira-s-2);
-  min-width: 0;
 }
 
 .chip {
-  width: 8px;
-  height: 8px;
-  flex-shrink: 0;
-  border-radius: 2px;
+  @apply w-2 h-2 shrink-0 rounded-[2px];
 }
 
 .truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap min-w-0;
 }
 
 .mono {
@@ -386,45 +369,24 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .status-cell {
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
   gap: var(--kira-s-2);
 }
 
-.spin {
-  animation: ops-spin 1s linear infinite;
-}
-
-@keyframes ops-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .cancel-button {
-  background: transparent;
-  border: none;
+  @apply bg-transparent border-none cursor-pointer p-0 flex;
   color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 0;
-  display: flex;
 }
 
 .ops-detail-row {
+  @apply grid-cols-[1fr] overflow-hidden text-ellipsis whitespace-nowrap;
   height: var(--kira-h-xs);
-  grid-template-columns: 1fr;
   color: var(--kira-fg-muted);
   background: var(--kira-bg-elevated);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ops-detail-cm {
-  padding: 0;
+  @apply p-0;
 }
 
 .ops-detail-cm :deep(.monaco-editor) {
