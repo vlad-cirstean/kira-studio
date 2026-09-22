@@ -18,6 +18,19 @@ export const buttonVariants = cva(
         destructive:
           'bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30',
         link: 'text-primary underline-offset-4 hover:underline',
+        // P104 §3: AppButton's `kind`/`variant` vocabulary, collapsed onto this cva's own
+        // `variant` axis instead of a second wrapper prop layer (§0's "no hand-rolled fallback").
+        // Geometry stays on the `kira`/`kira-lg`/`kira-icon` sizes below (design-system tokens,
+        // runtime-adjustable via @theme's --spacing-control* -- see base.css §7.2), never this
+        // set's own fixed h-8/h-7 scale, which would shift every control's height against those
+        // tokens.
+        toolbar: 'rounded-kira-sm text-muted hover:bg-hover hover:text-fg',
+        'toolbar-primary':
+          'rounded-kira-sm bg-primary text-primary-foreground hover:bg-primary/80 disabled:opacity-45',
+        dialog: 'justify-center rounded-kira-sm border border-border-strong bg-input text-fg',
+        'dialog-primary':
+          'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground disabled:opacity-45',
+        danger: 'rounded-kira-sm text-error hover:bg-hover',
       },
       size: {
         default:
@@ -31,6 +44,13 @@ export const buttonVariants = cva(
         'icon-sm':
           'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
         'icon-lg': 'size-9',
+        // P104 §3: AppButton/IconButton's own runtime-adjustable control heights (base.css's
+        // --spacing-control*, an @theme-indirected --kira-control-h*) -- never this set's fixed
+        // h-8/h-7 steps, which don't track the Appearance density setting.
+        kira: 'h-control gap-1.5 px-3 text-kira-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+        'kira-lg':
+          'h-control-lg gap-1.5 px-3 text-kira-sm has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2',
+        'kira-icon': 'size-control',
       },
     },
     defaultVariants: {
