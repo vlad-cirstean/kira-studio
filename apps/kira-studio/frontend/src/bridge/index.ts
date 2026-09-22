@@ -32,7 +32,7 @@ import type {
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
 import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
-import type { Layout, LayoutPatch } from '@shared/domain/layout';
+import type { Layout } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { AppMode } from '@shared/domain/mode';
 import type { OpRecord } from '@shared/domain/ops';
@@ -48,39 +48,27 @@ import type {
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
-import type { Settings, SettingsPatch } from '@shared/domain/settings';
-import type { TerminalLaunchKind } from '@shared/domain/tabs';
+import type { Settings } from '@shared/domain/settings';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
-import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
+import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
+import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
 
 // bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports
-// both halves — Studio's own 67-method surface, defined right here, and the Api module's 39
-// (apiControl.ts) — and combines them into the one `control` object every other file in the app
-// imports. Neither half imports the other; both depend only on rpc.ts's shared on/trust/unwrap/
-// windowKey. control.ts itself is now a thin re-export of this module, so every existing
-// `import { control } from '.../bridge/control'` call site (~200 of them) is unchanged.
+// every part of the app's own bound-call surface — the 20 methods §5.6 moved into
+// createCoreControl.ts (shared verbatim with Kira Space's own copy of this file), Studio's own 94
+// remaining methods, defined right here, and the Api module's 39 (apiControl.ts) — and combines
+// them into the one `control` object every other file in the app imports. None of the three
+// depends on either of the others; all three ultimately depend only on rpc.ts's shared
+// on/trust/unwrap/windowKey. control.ts itself is now a thin re-export of this module, so every
+// existing `import { control } from '.../bridge/control'` call site (~200 of them) is unchanged.
 const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
   updateStatus: (): Promise<WailsModels.UpdateStatus> => unwrap(UpdateService.Status()),
   updateOpenReleasePage: (): Promise<void> => unwrap(UpdateService.OpenReleasePage()),
-  // P79 finding 4: link.openExternal's own OS-browser leg — linkify.ts's message-body URLs are
-  // untrusted renderer-visible text (unlike a PR URL), so LinkService.OpenExternal validates the
-  // URL's own shape (a well-formed http(s) URL) rather than composing or re-checking a host.
-  linkOpenExternal: (url: string): Promise<void> => unwrap(LinkService.OpenExternal({ url })),
-  settingsGetAll: (): Promise<Settings> =>
-    unwrap(SettingsService.GetAll()).then((r) => trust<Settings>(r)),
-  settingsSet: (patch: SettingsPatch): Promise<Settings> =>
-    unwrap(SettingsService.Set({ patch })).then((r) => trust<Settings>(r)),
-  onSettingsChanged: (cb: (settings: Settings) => void): (() => void) =>
-    on(CHANNEL.settingsChanged, cb),
-  layoutGetAll: (): Promise<Layout> => unwrap(LayoutService.GetAll()).then((r) => trust<Layout>(r)),
-  layoutSet: (patch: LayoutPatch): Promise<Layout> =>
-    unwrap(LayoutService.Set({ patch })).then((r) => trust<Layout>(r)),
-  onLayoutChanged: (cb: (layout: Layout) => void): (() => void) => on(CHANNEL.layoutChanged, cb),
   engineStatus: (): Promise<WailsModels.EngineStatus> => unwrap(EngineService.Status()),
   onOpenSettings: (cb: () => void): (() => void) => on(CHANNEL.openSettings, cb),
   onNewConnection: (cb: () => void): (() => void) => on(CHANNEL.newConnection, cb),
@@ -103,29 +91,12 @@ const studioControl = {
   onViewRun: (cb: () => void): (() => void) => on(CHANNEL.viewRun, cb),
   onViewRunAll: (cb: () => void): (() => void) => on(CHANNEL.viewRunAll, cb),
   onViewFormat: (cb: () => void): (() => void) => on(CHANNEL.viewFormat, cb),
-  // Quit handshake: main holds `before-quit` until every window acks this (P8 C8: every window,
-  // not just the first to ack), so a debounced save still pending when the user quits is never
-  // silently lost.
-  onFlushBeforeClose: (cb: () => void): (() => void) => on(CHANNEL.appFlushBeforeClose, cb),
-  appFlushed: (): void => {
-    void LifecycleService.Flushed({ windowKey });
-  },
-  // Close-window handshake (P8 C6/F8): the single-window analogue of the quit handshake above —
-  // this window's own close is held until it acks, or a 2s timeout on the Go side gives up.
-  onWindowFlushBeforeClose: (cb: () => void): (() => void) =>
-    on(CHANNEL.windowFlushBeforeClose, cb),
-  windowFlushed: (): void => {
-    void LifecycleService.WindowFlushed({ windowKey });
-  },
 
   filesChooseSave: (defaultName: string): Promise<WailsModels.FilesChooseSaveResult> =>
     unwrap(FilesService.ChooseSave({ defaultName })),
   filesChooseOpen: (
     args?: WailsModels.FilesChooseOpenArgs,
   ): Promise<WailsModels.FilesChooseOpenResult> => unwrap(FilesService.ChooseOpen(args ?? {})),
-  // P25 D13: the same "" means cancelled" convention as filesChooseOpen/filesChooseSave.
-  filesChooseFolder: (title?: string): Promise<WailsModels.FilesChooseFolderResult> =>
-    unwrap(FilesService.ChooseFolder({ title: title ?? '' })),
 
   connectionsList: (): Promise<ConnectionSummary[]> =>
     unwrap(ConnectionsService.List()).then((r) => trust<ConnectionSummary[]>(r ?? [])),
@@ -360,12 +331,6 @@ const studioControl = {
   // P92 item 3: the title bar's "New window" button.
   windowsOpenNew: (): Promise<void> => unwrap(WindowsService.OpenNew()),
 
-  // Both scoped to this page's own workbench (P8 D2/F6) — windowKey is read once, synchronously,
-  // at module load (state/window.ts), before hydrateTabs() ever calls tabsList().
-  tabsList: (): Promise<TabRecord[]> =>
-    unwrap(TabsService.List({ windowKey })).then((r) => trust<TabRecord[]>(r ?? [])),
-  tabsSave: (tabs: TabRecord[]): Promise<void> => unwrap(TabsService.Save({ windowKey, tabs })),
-
   // Go's SavedQuery is one flat struct with `kind: string` and `body: json.RawMessage` (typed
   // `any` in the bindings) rather than the domain's real discriminated union — Go has no sum
   // types, so the polymorphic body is opaque JSON on the wire and the discriminant is a plain
@@ -423,42 +388,6 @@ const studioControl = {
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
 
-  // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
-  // hydrated once at boot (state/terminals.ts's hydrateTerminalDefaults).
-  terminalDefaultCwd: (): Promise<{ path: string }> =>
-    unwrap(TerminalService.DefaultCwd()).then((r) => trust<{ path: string }>(r)),
-  // P83 §3.2: the embedded terminal's own bound surface — terminalId is client-supplied (the tab
-  // id) so state/terminals.ts subscribes to onTerminal before this call returns, and no output can
-  // race the subscription. windowKey addresses ChannelTerminal at this window only, exactly like
-  // codeWorkspaceStartSearch. P86 §4: launchKind forwards to TerminalOpenArgs.LaunchKind as-is.
-  terminalOpen: (
-    terminalId: string,
-    cwd: string,
-    cols: number,
-    rows: number,
-    command?: string,
-    launchKind?: TerminalLaunchKind,
-  ): Promise<{ shell: string }> =>
-    unwrap(
-      TerminalService.Open({
-        terminalId,
-        cwd,
-        cols,
-        rows,
-        windowKey,
-        command: command ?? '',
-        launchKind: launchKind ?? 'shell',
-      }),
-    ).then((r) => trust<{ shell: string }>(r)),
-  // data is base64 — keystrokes are not always valid UTF-8 (paste, Alt-meta, mouse reports).
-  terminalWrite: (terminalId: string, data: string): Promise<void> =>
-    unwrap(TerminalService.Write({ terminalId, data })),
-  terminalResize: (terminalId: string, cols: number, rows: number): Promise<void> =>
-    unwrap(TerminalService.Resize({ terminalId, cols, rows })),
-  terminalClose: (terminalId: string): Promise<void> =>
-    unwrap(TerminalService.Close({ terminalId })),
-  onTerminal: (cb: (event: TerminalEvent) => void): (() => void) => on(CHANNEL.terminal, cb),
-
   // P86 §11/§12: every live Claude Code session across every window — the boot-time hydrate for a
   // window opened after sessions already started (ChannelAgentSessions only fires on change), plus
   // the broadcast subscription. Emit, not EmitTo (customScriptsChanged's own shape): the count is
@@ -484,8 +413,23 @@ const studioControl = {
     on(CHANNEL.customScriptsChanged, cb),
 };
 
-// P12 D11: one exported object, composed from Studio's 67 methods and the module's own 39
-// (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is unchanged, and
-// mockRuntime.ts's channel map is unchanged, since neither the method names nor their bound-call
-// FQNs moved.
-export const control = { ...studioControl, ...apiControl };
+// P103 Part 2 (§5.6): one exported object, composed from the 20 methods shared with Kira Space
+// (createCoreControl.ts), Studio's own 94 remaining methods (studioControl, above) and the module's
+// own 39 (apiControl.ts) — every one of the ~200 `control.xxx()` call sites in the app is
+// unchanged, and mockRuntime.ts's channel map is unchanged, since neither the method names nor
+// their bound-call FQNs moved. Spread order matters not at all here (the three objects' key sets
+// are disjoint by construction — §5.6's own 20-method survey), but studioControl last keeps this
+// line's own diff-history the smallest against the pre-§5.6 file.
+export const control = {
+  ...createCoreControl<Settings, Layout, TabRecord>({
+    settings: SettingsService,
+    layout: LayoutService,
+    tabs: TabsService,
+    lifecycle: LifecycleService,
+    terminal: TerminalService,
+    files: FilesService,
+    link: LinkService,
+  }),
+  ...apiControl,
+  ...studioControl,
+};
