@@ -83,16 +83,17 @@ tasks:
       - wails3 generate bindings -f '{{.BUILD_FLAGS}}' -clean=true{{if eq .OBFUSCATED "true"}} -obfuscated{{end}} -b -names -ts -i
 
   generate:icons:
-    summary: Generates the Mac `.icns` from an image.
+    summary: Generates the Mac `.icns` from an image; `-iconcomposerinput appicon.icon -macassetdir darwin` also produces `Assets.car` from a `.icon` file. `-windowsfilename` has no off switch in the CLI itself (always writes one), so it's redirected into `.task/unused-icon.ico` — a macOS-only app has no `build/windows/` to write it into.
     run: once
     dir: build
     sources:
       - "appicon.png"
+      - "appicon.icon"
     generates:
       - "darwin/icons.icns"
     cmds:
       - mkdir -p .task
-      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename .task/unused-icon.ico
+      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename .task/unused-icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
 
   build:vsix:
     summary: Packages the VS Code extension into apps/kira-space/bin/kira-space.vsix (G10 D7/D8, retargeted P100 Part 3)
