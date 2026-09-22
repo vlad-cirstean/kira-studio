@@ -10,9 +10,9 @@ import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
-import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import type { Completion } from '../../theme/primitives/completion';
 import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
+import AutocompleteField from '../shared/AutocompleteField.vue';
 
 // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
 // RequestHeadersTable.vue and QueryParamsTable.vue were the same file twice minus a checkbox

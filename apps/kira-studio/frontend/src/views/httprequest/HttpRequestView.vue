@@ -45,8 +45,8 @@ import { useRunState } from '../../state/runState';
 import { useSettingsStore } from '../../state/settings';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
+import AutocompleteField from '../shared/AutocompleteField.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,

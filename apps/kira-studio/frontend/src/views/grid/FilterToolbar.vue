@@ -7,7 +7,7 @@ import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
 import type { DataTabRecord } from '../../state/tabDomain';
-import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
+import AutocompleteField from '../shared/AutocompleteField.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import {
