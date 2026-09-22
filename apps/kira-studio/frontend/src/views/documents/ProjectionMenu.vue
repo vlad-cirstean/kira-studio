@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
@@ -57,8 +58,12 @@ function close(): void {
   >
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
-        <AppButton data-testid="document-projection-select-all" @click="selectAll"> All </AppButton>
-        <AppButton data-testid="document-projection-select-none" @click="selectNone"> None </AppButton>
+        <Button variant="toolbar" size="kira" data-testid="document-projection-select-all" @click="selectAll"
+          >All</Button
+        >
+        <Button variant="toolbar" size="kira" data-testid="document-projection-select-none" @click="selectNone"
+          >None</Button
+        >
       </div>
       <div v-if="fieldNames.length === 0" class="columns-menu-loading p-sm muted">
         No fields seen yet — load a page first.
@@ -67,9 +72,12 @@ function close(): void {
         <label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
           <Checkbox
             :model-value="selected.has(name)"
+            class="size-3.5"
             data-testid="document-projection-menu-item"
             @update:model-value="toggle(name)"
-          />
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
           {{ name }}
         </label>
       </div>
@@ -90,15 +98,15 @@ function close(): void {
 }
 
 .columns-menu-header {
-  @apply flex gap-[var(--kira-s-2)] border-b border-border p-[var(--kira-s-2)];
+  @apply flex gap-1 border-b border-border p-1;
 }
 
 .columns-menu-loading {
-  @apply p-[var(--kira-s-4)];
+  @apply p-2;
 }
 
 .columns-menu-list {
-  @apply overflow-y-auto p-[var(--kira-s-1)];
+  @apply overflow-y-auto p-0.5;
 }
 
 .columns-menu-item {
@@ -106,6 +114,6 @@ function close(): void {
 }
 
 .columns-menu-footer {
-  @apply px-[var(--kira-s-3)] pb-[var(--kira-s-3)];
+  @apply px-1.5 pb-1.5;
 }
 </style>
