@@ -1,10 +1,7 @@
 <script setup lang="ts">
-// P104 §3.4: same @tanstack/vue-virtual recipe VirtualList needs -- a genuinely separate,
-// non-mechanical piece of work, not attempted in this pass (same deferral as OperationsPanel.vue's
-// own).
-import TreeHost from '@theme/primitives/TreeHost.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
@@ -59,6 +56,13 @@ onUnmounted(() => applySearchDebounced.cancel());
 
 const rows = computed(() => fileTreeStore.visibleRepoRows(props.repoId, debouncedSearch.value));
 
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, band, onScroll } = useTreeVirtualRows({
+  rows: () => rows.value,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollEl,
+});
+
 function onSelect(row: RepoTreeRowVm): void {
   selected.value = row.key;
 }
@@ -80,21 +84,44 @@ function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
 </script>
 
 <template>
-  <TreeHost class="repo-tree-body" :rows="rows" :row-height="rowHeight" :selected-key="selected">
-    <template #row="{ row, sticky, top }">
-      <RepoTreeRow
-        :class="{ 'sticky-row': sticky }"
-        :style="sticky ? { top: `${top}px`, height: `${rowHeight}px` } : undefined"
-        :row="row"
-        :selected="selected === row.key"
-        :sticky="sticky"
-        @select="onSelect"
-        @toggle="onToggle"
-        @open="onOpen"
-        @contextmenu="onContextMenu"
-      />
-    </template>
-  </TreeHost>
+  <div
+    ref="scrollEl"
+    class="repo-tree-body h-full overflow-auto"
+    data-testid="tree-background"
+    @scroll="onScroll"
+    @contextmenu.prevent
+  >
+    <div class="sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
+      <template v-for="slot in band" :key="slot.row.key">
+        <RepoTreeRow
+          class="sticky-row"
+          :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
+          :row="slot.row"
+          :selected="selected === slot.row.key"
+          :sticky="true"
+          @select="onSelect"
+          @toggle="onToggle"
+          @open="onOpen"
+          @contextmenu="onContextMenu"
+        />
+      </template>
+    </div>
+    <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+      <template v-for="item in virtualItems" :key="String(item.key)">
+        <RepoTreeRow
+          class="virtual-row"
+          :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+          :row="rows[item.index]"
+          :selected="selected === rows[item.index].key"
+          :sticky="false"
+          @select="onSelect"
+          @toggle="onToggle"
+          @open="onOpen"
+          @contextmenu="onContextMenu"
+        />
+      </template>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -106,5 +133,9 @@ function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
 
 .sticky-row {
   @apply absolute left-0 right-0 bg-bg z-1;
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
 }
 </style>

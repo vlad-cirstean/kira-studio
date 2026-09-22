@@ -3,9 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-// P104 §3.4: VirtualList's @tanstack/vue-virtual recipe is a genuinely separate, non-mechanical
-// piece of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
-import VirtualList from '@theme/primitives/VirtualList.vue';
+import { useVirtualRows } from '@workbench/util/virtualRows';
 import { computed, ref } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
@@ -31,6 +29,13 @@ const running = computed(() => repoSearchStore.repoSearchRunning(props.repoId));
 const stats = computed(() => repoSearchStore.repoSearchStats(props.repoId));
 const error = computed(() => repoSearchStore.repoSearchError(props.repoId));
 const rows = computed(() => repoSearchStore.repoSearchRows(props.repoId));
+
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, onScroll } = useVirtualRows({
+  count: () => rows.value.length,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollEl,
+});
 
 // §7.3: "Searching…" while running, "N results in M files" when done, "(stopped at 10,000)"
 // appended when the whole run hit the cap, "K files skipped" appended when non-zero — the skip
@@ -190,17 +195,21 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     >
       {{ statusLine }}
     </div>
-    <VirtualList class="repo-search-list" :items="rows" :row-height="rowHeight">
-      <template #default="{ item }">
-        <RepoSearchRow
-          :row="item"
-          :selected="selected === item.key"
-          @select="onSelect"
-          @toggle-collapse="onToggleCollapse"
-          @open="onOpen"
-        />
-      </template>
-    </VirtualList>
+    <div ref="scrollEl" class="repo-search-list overflow-auto" data-testid="virtual-list" @scroll="onScroll">
+      <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+        <template v-for="item in virtualItems" :key="String(item.key)">
+          <RepoSearchRow
+            class="virtual-row"
+            :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+            :row="rows[item.index]"
+            :selected="selected === rows[item.index].key"
+            @select="onSelect"
+            @toggle-collapse="onToggleCollapse"
+            @open="onOpen"
+          />
+        </template>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -233,5 +242,9 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 
 .repo-search-list {
   @apply flex-1 min-h-0;
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
 }
 </style>
