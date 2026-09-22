@@ -1600,6 +1600,148 @@ fixed in the same pass — the `cssVar` unused export and the `pinia.ts`/`queryC
 regression were both this phase's own, both root-caused and fixed here, not deferred or noted as
 "pre-existing."
 
+## P103 Part 2 result
+
+Landed as 3 commits against `8648be5`: `4cddea7` (§5.1, tab-kind vocabulary split), `6e7fae8`
+(§5.2, the tabs store factory), `f6f95d9` (§5.3, the layout/settings/terminals store factories),
+plus this section's own commit. Plan: `docs/v1.9/plans/P103-shared-app-base.md` §5. No plan doc
+split needed for the work actually done.
+
+**§5.1 — done.** Each app now declares its own tab-kind union (Kira Studio 12, Kira Space 5,
+`terminal` genuinely shared) instead of both stubbing the other's kinds through the one shared
+16-member `tabKindSchema`. `packages/workbench` owns only the generic `TabKindDef`/`TabViewMap`
+contract. Kira Studio's Go `RenderableTabKinds` no longer lists the four `repo-*` kinds it can't
+produce (`apps/kira-studio/internal/storage/model/tabs.go`, the one Go file this phase touches).
+`go-ts-vocabulary-parity.spec.ts` is two checks now, one per app, each passing on its own
+vocabulary rather than passing only because both sides were equally wrong. Dead code removed in
+the same pass: `asVariableSetTab` (Studio), `asRepoMultiDiffTab` (Space), the now-private
+`*TabKindSchema`/`tabRecordSchema`/`reviewRefSchema` consts `lint:dead` flagged once domain logic
+moved out of `packages/shared` (whose own `knip.json` treats every export as public API) into
+app-internal files (where it correctly doesn't).
+
+**§5.2 — done.** `createTabsStore<K, R, E>(host)` in `packages/workbench/src/state/
+createTabsStore.ts` owns the shared skeleton (persistableTabs/saveIfChanged/openTab/closeTab/
+activateTab/moveTab/stepTab/patchTabState/…) both apps' `state/tabs.ts` used to duplicate almost
+verbatim (Studio 981 lines, Space 526). A rich hook surface (`persistable`, `onCleanup`,
+`seedWorkspaceKeys`, `onHydrated`, `onOpened`, `onClosed`, `onDuplicated`, `fallbackWorkspaceKey`,
+`extend`) covers every point the two apps' skeletons actually diverged on — several more than the
+plan's own two-hook sketch (`persistable`/`onCleanup`), found by reading both original files side
+by side rather than trusting the plan's summary: hydrated-marking inline inside `openTab`/
+`duplicateTab`/`reuseExistingTab`, `cellSelection`/`pendingChanges` cleanup inside every `close*`,
+incognito-copy inside `duplicateTab`. `extend(actions): E` merges extra named actions onto the
+store's own return object, so the ~50+ call sites across Studio calling e.g.
+`tabsStore.findDataTab(id)` as a genuine store method needed zero changes.
+`createOpenTerminalTab<K>()` in `createTerminalTabs.ts` hoists the near-identical terminal-tab
+opener the same way. `packages/workbench/tsconfig.json` (new) exists only so `bun test` can
+resolve a real (non-type-only) cross-package import — every other `@shared` import from within
+`packages/workbench/src` was type-only, erased before runtime, so this gap stayed latent through
+Part 1.
+
+**§5.3 — done.** `createLayoutStore<E>`, `createSettingsStore<S>()`, `createTerminalsStore` cover
+the three remaining per-app stores. `contextMenu.ts` needed no factory — Part 1 already confirmed
+it's genuinely identical between apps with zero per-app divergence, nothing to parameterize.
+`createTerminalsStore` likewise takes no `extend` — Kira Space's own `state/coderepos.ts` was
+still defining a local `canonicalPath` duplicate that `@shared/domain/path`'s own header comment
+already says should be the one definition since P100 Part 2; folded in, and the two apps'
+`state/terminals.ts` are now byte-identical.
+
+**A real TS+Pinia interaction, found the hard way, worth recording since it isn't obvious from
+either tool's own docs:** a store factory's `extend` hook must never be optional with a defaulted
+type parameter. A call that leaves that type parameter at its `Record<string, never>` default —
+whether by omitting `extend` entirely, or by giving one *other* type parameter explicitly (which
+disables inference for the rest, TypeScript's partial-explicit-type-argument rule) — breaks
+Pinia's own action/state extraction for the *whole* store, not just that call: every property
+Pinia's setup-store return type merges with that empty-record spread collapses to `never`,
+including properties with no relation to `extend` at all, and the resulting error surfaces far
+from its cause (`useLayoutStore(pinia).hydrateLayout` "not callable" at a `main.ts` call site, not
+at `state/layout.ts` itself). Root-caused by isolating a minimal repro outside the real files
+(a plain generic function around `defineStore`) until the exact trigger — an *inferred* empty
+object type works, an *explicit* `Record<string, never>`/`Record<string, unknown>` type argument
+does not — was found. Fixed by making `extend` required everywhere (including retrofitted onto
+`createTabsStore`, whose two current callers happened never to hit this only because both already
+pass real content) and, for `createSettingsStore` specifically, currying on `S` (the app's own
+Section union, which has nothing to infer it from) so the inner call never carries an explicit
+type argument and `E` is always inferred fresh from the real `extend` argument. Documented in each
+factory's own comment so a future caller doesn't rediscover this by way of a `never`-typed store
+failing somewhere else entirely.
+
+**The `state/pinia.ts`/`state/queryClient.ts` decision, deferred from Part 1's own note to
+re-examine it: decline, unchanged.** Both stay duplicated per app. Reasoning, re-confirmed against
+Part 1's own finding rather than assumed: each file is 5-20 lines of pure library construction
+with zero per-app option divergence (both apps' `queryClient.ts` are byte-identical) — a factory
+function wrapping `createPinia()`/`new QueryClient(...)` would save close to nothing. Set against
+that near-zero benefit is a real, demonstrated hazard: Part 1 found that hoisting the *singleton
+value* (`export const pinia = createPinia()`) collided both apps' stores onto one Pinia instance
+within `bun test`'s single shared module cache, breaking 9 of Kira Space's own unit tests. A
+factory *function* (each app calling its own `createAppPinia()`) would technically sidestep that
+specific collision — confirmed while designing this phase's own store factories, which are
+functions, not shared instances — but the marginal duplication saved doesn't justify the added
+indirection, or the risk of a future edit quietly turning the function back into a shared constant
+and reintroducing exactly Part 1's bug. Kept simple and duplicated, matching
+`state/terminals.ts`/`editor/monaco.ts`'s own pre-P103 "duplicate, don't hoist" precedent for a
+genuinely low-value shared surface.
+
+**Not attempted this part, and left as open Part 2 scope — not "Part 3," which the table's own
+row 27 already names as a distinct, Go-only workstream (the shell/terminal/event hoist,
+independent of Parts 1-2 by that row's own "Why here"): §5.4 (`WorkbenchShell`/`TitleBar`/
+`StatusBar`/`TabStrip`/`MainView` via named slots + a provided `WorkbenchHost`), §5.5
+(`SettingsDialog.vue` → shared `SettingsShell.vue` + per-app panes, ~331 class-based Playwright
+selectors depending on unchanged markup), and §5.6 (`bridge/*` → `createCoreControl(bindings)`).**
+This is a genuine scope gap in Part 2, flagged for the orchestrating session to resolve — either
+as further Part 2 work, or as a newly numbered part per `CLAUDE.md`'s own phase-numbering rules,
+not a call this subagent makes unilaterally. Reasoning for stopping here rather than rushing it:
+§5.2/§5.3's own store-factory work surfaced a genuine, non-obvious TS+Pinia failure mode that cost significant
+investigation to root-cause (see above) — the kind of subtle, hard-to-detect breakage that §5.4's
+UI-slot sharing and especially §5.5's pixel/selector-exact pane extraction are exactly as exposed
+to, at higher stakes (a wrong class or a `never`-typed prop in a shared component fails silently
+in `test:visual`/`test:ui`, not at typecheck) and with a much slower verify-fix loop (`test:visual`
+alone takes minutes per iteration). Rather than rush that work in the time remaining and risk
+landing something that reads as "shared" but is subtly wrong in a way this pass's verification
+budget couldn't fully rule out, it stays out of this commit set entirely per `CLAUDE.md`'s own
+"scope left out of a phase stays out entirely, never half-implemented." No file under §5.4/§5.5/
+§5.6's scope was moved, renamed or edited this phase — confirmed via `git diff --stat 8648be5..HEAD`
+touching none of `WorkbenchShell.vue`/`TitleBar.vue`/`StatusBar.vue`/`TabStrip.vue`/`MainView.vue`/
+`SettingsDialog.vue`/`bridge/index.ts` in either app.
+
+**Verification, run for real, in the order `CLAUDE.md` requires (implement whole phase, then test
+once and fix what's found):**
+
+- `bun run typecheck`: exit 0 across all 8 parallel project checks. One intermediate failure fixed
+  in the same pass: the `Record<string, never>`/partial-explicit-generic landmine above, hit twice
+  (once for `createLayoutStore`, once for `createSettingsStore`) before both factories' own
+  signatures were fixed at the root rather than worked around per call site.
+- `bun run lint`: `biome check .` clean (1323 files) plus `check-tokens.sh` clean. Exit 0.
+- `bun run lint:dead`: exit 0. No new unused-export finding — the same 6 pre-existing
+  "Duplicate exports" and 7 configuration hints seen throughout this whole phase, confirmed
+  unrelated. Two findings fixed in the same pass as they surfaced: a stale `TerminalLaunch`
+  re-export in Studio's `state/terminalTabs.ts` (Space-specific rationale, no Studio consumer),
+  and an unused `TerminalSession` re-export in both apps' `state/terminals.ts` (no external
+  consumer of the type anywhere in either app, confirmed by grep before removing).
+- `bun run build` / `bun run build:space`: both exit 0, same pre-existing advisories
+  (`INEFFECTIVE_DYNAMIC_IMPORT` on `monacoTheme.ts`, chunk-size warnings) as Part 1, no new one.
+- `bun run test:unit`: `1535 pass, 0 fail, 13650 expect() calls, 156 files` — the `1534` baseline
+  plus the one Space parity spec §5.1 added, exactly as expected.
+- `bun run test:ui`: `279 passed` on a clean re-run. First run showed `274 passed, 1 failed
+  (slick-grid.spec.ts:1229, a frame-pacing invariant), 4 did not run` (Playwright's own
+  `dependencies: ['ui']` skips `ui-timing` entirely when `ui` has any failure) — re-ran the failing
+  test alone (`passed, 12.9s`) and then the full suite again (`279 passed, 6.2m`) to confirm
+  flakiness under parallel-worker contention, not a regression: `git diff --stat 8648be5` touches
+  no file under `views/grid/slick/` or the test itself, only type-only import paths in 4 grid
+  files (`DataToolbar.vue`/`DataView.vue`/`FilterToolbar.vue`/`state.ts`, all `DataTabRecord`/
+  `DataTabState` moving from `@shared/domain/tabs` to `../../state/tabDomain` per §5.1, zero
+  runtime change).
+- `bun run test:ui:space`: `20 passed`, matching baseline exactly.
+- `bun run test:visual`: `5 failed` (`connection-dialog`, `console`, `data-view`, `schema-dialog`,
+  `workbench`), the identical 5 specs Part 1 documented as the pre-existing baseline — no sixth
+  failure, confirming no regression in the workbench/title-bar/settings surfaces this phase's
+  stores back, even though the components themselves weren't touched (§5.4/§5.5 deferred, above).
+- `go build ./...` / `go vet ./...`: both exit 0, clean, covering `tabs.go` (the one Go file this
+  phase touches).
+
+No pre-existing failing test/lint/typecheck/hook surfaced by this phase's changes that wasn't
+fixed in the same pass. No new `docs/ARCHITECTURE.md` **Known open items** entry: `test:visual`'s
+5 failures are the pre-existing baseline this phase inherited, not caused, same as Part 1.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
