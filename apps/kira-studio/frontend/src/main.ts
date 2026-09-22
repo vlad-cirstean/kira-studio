@@ -21,7 +21,8 @@ import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
-import '@theme/base.css';
+// workbench.css imports @theme/base.css itself now (P104) — importing both here would compile
+// base.css as two separate Tailwind roots and double its output.
 import '@workbench/workbench.css';
 import { useTooltipStore } from '@workbench/state/tooltip';
 import { useLayoutStore } from './state/layout';
