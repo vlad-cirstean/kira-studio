@@ -278,16 +278,12 @@ function onContainerKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .metadata-table {
-  padding: var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  overflow: auto;
   /* P16 D13: flex:1 rather than height:100% — GrpcRequestView.vue's own filter row, when open, is
      a sibling above this in the same flex-column parent. */
-  flex: 1;
-  min-height: 0;
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
 }
 
 /* P22b D9 (FieldRowsTable.vue's own sibling — F18's literal copy): a grid, not independent flex
@@ -295,15 +291,13 @@ function onContainerKeydown(e: KeyboardEvent): void {
    grid-template-columns itself is set inline (above) since it depends on showDescriptions, which
    — like showEnabled in FieldRowsTable.vue — is fixed per table instance, never per row. */
 .metadata-row {
-  display: grid;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply grid items-center gap-[var(--kira-s-2)];
 }
 
 .metadata-cell {
-  min-width: 0;
+  @apply min-w-0;
 }
 .metadata-cell :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 </style>

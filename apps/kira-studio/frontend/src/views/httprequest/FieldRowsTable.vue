@@ -369,39 +369,30 @@ function onContainerKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .field-rows-table {
-  padding: var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  overflow: auto;
   /* P16 D13: flex:1 rather than height:100% — this is no longer always its flex-column parent's
      only child (HttpRequestView.vue's own filter row, when open, is a sibling above it), and a
      percentage height would ignore that sibling's own space and overflow past it. */
-  flex: 1;
-  min-height: 0;
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
 }
 
 /* P22b D9: a grid, not independent flex items — named columns (gridTemplateColumns, above) keep
    every row's name/value/trailing/remove cells at the same width regardless of what an individual
    row happens to render inside one of them (F13). */
 .field-row {
-  display: grid;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply grid items-center gap-[var(--kira-s-2)];
 }
 
 .field-cell {
-  min-width: 0;
+  @apply min-w-0;
 }
 .field-cell :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .field-cell-trailing {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  min-width: 0;
+  @apply flex min-w-0 items-center gap-[var(--kira-s-2)];
 }
 </style>

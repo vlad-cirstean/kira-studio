@@ -160,19 +160,18 @@ function onClearFile(index: number): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Vue scoped CSS attributes slotted content with the *passing* component's scope id, not
    FieldRowsTable's — so its own .field-cell rule doesn't reach these slots; repeated here. */
 .field-cell {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 .field-cell :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .formdata-file-caption {
-  white-space: nowrap;
-  padding: 0;
+  @apply whitespace-nowrap p-0;
 }
-
 </style>
