@@ -1116,7 +1116,7 @@ onUnmounted(() => {
 .stream-row {
   /* P49 F7/D5: previously unset (sized off whatever text a cell happened to hold) — now fixed,
      matching the density-driven rowHeight computed VirtualList's offset math needs. */
-  @apply flex border-b border-border cursor-pointer h-[var(--kira-row-height)];
+  @apply flex border-b border-border cursor-pointer h-row;
 }
 
 .stream-row:hover {

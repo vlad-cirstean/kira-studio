@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { useLayoutStore } from '../state/layout';
 import { useSettingsStore } from '../state/settings';
@@ -16,29 +17,37 @@ const layoutStore = useLayoutStore();
 <template>
   <TitleBarBase>
     <div class="title-bar-actions">
-      <button
-        type="button"
-        class="title-action"
-        :class="{ 'is-on': layoutStore.panel.project.visible }"
-        v-tooltip="'Repositories'"
-        data-testid="toggle-project-panel"
-        @click="layoutStore.toggleProjectPanel"
-      >
-        <CodiconIcon
-          :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
-          :size="15"
-        />
-      </button>
-      <button
-        type="button"
-        class="title-action"
-        v-tooltip="'Settings'"
-        data-testid="open-settings"
-        aria-label="Settings"
-        @click="settingsStore.settingsOpen = true"
-      >
-        <CodiconIcon name="settings-gear" :size="15" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="title-action"
+            :class="{ 'is-on': layoutStore.panel.project.visible }"
+            data-testid="toggle-project-panel"
+            @click="layoutStore.toggleProjectPanel"
+          >
+            <CodiconIcon
+              :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
+              :size="15"
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Repositories</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="title-action"
+            data-testid="open-settings"
+            aria-label="Settings"
+            @click="settingsStore.settingsOpen = true"
+          >
+            <CodiconIcon name="settings-gear" :size="15" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Settings</TooltipContent>
+      </Tooltip>
     </div>
 
     <template #settings>
