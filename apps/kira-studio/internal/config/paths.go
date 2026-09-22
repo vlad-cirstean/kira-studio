@@ -1,24 +1,16 @@
 // Package config resolves the app's on-disk locations and dev/packaged mode.
 // Go analogue of src/main/storage/paths.ts and src/main/env.ts.
+//
+// The path logic itself (P100 Part 1) is repo-root internal/kirapaths, shared with
+// apps/kira-space — this file is a thin wrapper supplying Kira Studio's own env var (KIRA_HOME),
+// directory name (.kira-studio) and database file name (kira.db).
 package config
 
-import (
-	"os"
-	"path/filepath"
-)
+import "github.com/kirathecat/kira-studio/internal/kirapaths"
 
 // KiraHome is the app's data directory, honouring KIRA_HOME identically to the Electron build.
 func KiraHome() string {
-	if home := os.Getenv("KIRA_HOME"); home != "" {
-		return home
-	}
-	dir, err := os.UserHomeDir()
-	if err != nil {
-		// os.UserHomeDir only fails when neither $HOME nor the platform's user-registry lookup
-		// resolves — treat it the same as "no home", which every process on this machine hits.
-		dir = "."
-	}
-	return filepath.Join(dir, ".kira-studio")
+	return kirapaths.Home("KIRA_HOME", ".kira-studio")
 }
 
 // DbPath is the Go build's own database file, named kira.db. Originally chosen (P52 §5.1) so the
@@ -36,7 +28,7 @@ func DbPath() string {
 // caller (storage.OpenAt) resolve a path without going through $KIRA_HOME, so a test can run
 // t.Parallel() without t.Setenv's parallel-test panic (v1.4 P1).
 func DbPathAt(home string) string {
-	return filepath.Join(home, "kira.db")
+	return kirapaths.DbPathAt(home, "kira.db")
 }
 
 func LogsDir() string {
@@ -45,7 +37,7 @@ func LogsDir() string {
 
 // LogsDirAt is LogsDir against an explicit home dir — see DbPathAt.
 func LogsDirAt(home string) string {
-	return filepath.Join(home, "logs")
+	return kirapaths.LogsDirAt(home)
 }
 
 // EnsureLayout creates KIRA_HOME and its logs directory with the same permissions the Electron
@@ -56,13 +48,5 @@ func EnsureLayout() error {
 
 // EnsureLayoutAt is EnsureLayout against an explicit home dir — see DbPathAt.
 func EnsureLayoutAt(home string) error {
-	for _, dir := range []string{home, LogsDirAt(home)} {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return err
-		}
-		if err := os.Chmod(dir, 0o700); err != nil {
-			return err
-		}
-	}
-	return nil
+	return kirapaths.EnsureLayoutAt(home)
 }
