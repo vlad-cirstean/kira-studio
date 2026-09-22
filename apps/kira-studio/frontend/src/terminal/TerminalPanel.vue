@@ -224,84 +224,57 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .panel-title {
-  font-weight: 600;
+  @apply font-semibold;
 }
 
 .terminal-panel-body {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
+  @apply flex flex-col h-full overflow-y-auto;
 }
 
 .quick-command-list {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
 }
 
 .quick-command-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  cursor: default;
-  user-select: none;
+  @apply flex items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-3)] cursor-default select-none;
 }
 
 .quick-command-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .run-icon {
-  flex-shrink: 0;
-  color: var(--kira-fg-muted);
+  @apply shrink-0 text-muted;
 }
 
 .swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  @apply w-2.5 h-2.5 rounded-full shrink-0;
 }
 
 .quick-command-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex-1 min-w-0 flex flex-col;
 }
 
 .quick-command-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .quick-command-command {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-xs);
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-[length:var(--kira-t-xs)];
 }
 
 .quick-command-add {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex flex-col gap-[var(--kira-s-2)] p-[var(--kira-s-3)] border-b border-border;
 }
 
 .quick-command-add-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kira-s-2);
+  @apply flex justify-end gap-[var(--kira-s-2)];
 }
 
 .field-error {
-  color: var(--kira-error);
-  font-size: var(--kira-t-xs);
+  @apply text-error text-[length:var(--kira-t-xs)];
 }
 </style>
