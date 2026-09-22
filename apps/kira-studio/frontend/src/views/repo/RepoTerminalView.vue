@@ -1,22 +1,3 @@
-<script lang="ts">
-// Module scope (not <script setup>, which re-runs per instance) — mirrors editor/monaco.ts's own
-// loadMonaco: memoized so repeated mounts (a tab switched back to) don't reissue the import, reset
-// on failure so one transient error doesn't permanently break every terminal opened afterward in
-// this session.
-let terminalRendererPromise: Promise<typeof import('./terminalRenderer')> | null = null;
-
-// biome-ignore lint/correctness/noUnusedVariables: called from the <script setup> block below — Biome's Vue support does not link scope across a plain <script> and <script setup> block in one SFC.
-function loadTerminalRenderer(): Promise<typeof import('./terminalRenderer')> {
-  if (!terminalRendererPromise) {
-    terminalRendererPromise = import('./terminalRenderer').catch((err) => {
-      terminalRendererPromise = null;
-      throw err;
-    });
-  }
-  return terminalRendererPromise;
-}
-</script>
-
 <script setup lang="ts">
 // P83 §6.2/§6.3: the terminal tab view. The live xterm Terminal (and its Go-side pty) live in
 // terminalRenderer.ts's own module-level map, not here — a tab switch unmounts this component
@@ -27,6 +8,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useSettingsStore } from '../../state/settings';
 import { useTerminalsStore } from '../../state/terminals';
+import { loadTerminalRenderer } from './terminalRendererLoader';
 
 const props = defineProps<{ tab: TerminalTabRecord }>();
 const settingsStore = useSettingsStore();
@@ -72,6 +54,11 @@ async function mount(): Promise<void> {
 
   // No debounce needed — a ResizeObserver callback already coalesces synchronous layout thrash
   // into one notification per frame (SlickGridHost.vue's own precedent).
+  // P99 §9.3: not useResizeObserver — this construction sits after `await loadTerminalRenderer()`
+  // above, past the point Vue's synchronous "current instance" tracking a composable's automatic
+  // onUnmounted registration relies on; moving it earlier would mean guarding every callback
+  // invocation against `renderer` still being null, a real behavior change for a mechanical
+  // conversion. Declined, named per CLAUDE.md's library rule.
   resizeObserver = new ResizeObserver(() => {
     const d = mod.fitTerminal(props.tab.id);
     if (d) terminalsStore.resizeTerminal(props.tab.id, d.cols, d.rows);
@@ -158,40 +145,24 @@ async function onDismissHooksPrompt(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-terminal {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--kira-bg);
-  padding: var(--kira-s-2);
+  @apply flex flex-col h-full bg-bg p-[var(--kira-s-2)];
 }
 .terminal-host {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 .terminal-footer {
-  flex-shrink: 0;
-  padding: var(--kira-s-1) var(--kira-s-2);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
-  background: var(--kira-bg-chrome);
+  @apply shrink-0 text-muted text-[length:var(--kira-t-sm)] bg-[var(--kira-bg-chrome)] py-[var(--kira-s-1)] px-[var(--kira-s-2)];
 }
 .terminal-footer-error {
-  color: var(--kira-error);
+  @apply text-error;
 }
 .claude-code-hooks-prompt {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  flex-shrink: 0;
-  margin-bottom: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
-  background: var(--kira-bg-chrome);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
+  @apply flex items-center shrink-0 rounded-kira-sm bg-[var(--kira-bg-chrome)] text-muted text-[length:var(--kira-t-sm)] gap-[var(--kira-s-3)] mb-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-3)];
 }
 .claude-code-hooks-prompt span {
-  flex: 1;
+  @apply flex-1;
 }
 </style>

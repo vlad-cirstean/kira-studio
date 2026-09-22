@@ -202,7 +202,7 @@ onUnmounted(() => {
 }
 
 .fk-preview-header {
-  @apply flex items-center justify-between border-b border-border-strong shrink-0 grow-0 basis-auto gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
+  @apply flex items-center justify-between border-b border-border-strong flex-none gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
 }
 
 .fk-preview-title {
@@ -247,6 +247,6 @@ onUnmounted(() => {
    for), unscoped CSS reaching into any descendant regardless of which component rendered it. */
 
 .fk-preview-actions {
-  @apply flex border-b border-border-strong shrink-0 grow-0 basis-auto gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
+  @apply flex border-b border-border-strong flex-none gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
 }
 </style>

@@ -83,54 +83,30 @@ function submit(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .review-thread {
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  padding: 8px 12px;
-  background: var(--kira-bg-elevated);
-  border-top: var(--kira-border-width) solid var(--kira-border-strong);
-  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
-  color: var(--kira-fg);
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  overflow: auto;
   /* §3.1: Monaco's view-lines layer otherwise wins text selection inside this zone too. */
-  user-select: text;
+  @apply box-border w-full h-full bg-elevated border-t border-b border-border-strong text-fg text-xs flex flex-col gap-1.5 overflow-auto select-text py-2 px-3;
 }
 
 .review-thread-anchor {
-  color: var(--kira-warn);
-  font-style: italic;
+  @apply text-warn italic;
 }
 
 .review-thread-body {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  @apply whitespace-pre-wrap break-words;
 }
 
 .review-thread-input {
-  box-sizing: border-box;
-  width: 100%;
-  resize: vertical;
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-sm);
-  padding: 6px 8px;
-  font: inherit;
+  @apply box-border w-full resize-y bg-input text-fg border border-border-strong rounded-kira-sm font-[inherit] py-1.5 px-2;
 }
 
 .review-thread-input:focus {
-  outline: none;
-  border-color: var(--kira-focus);
+  @apply outline-none border-[var(--kira-focus)];
 }
 
 .review-thread-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
+  @apply flex justify-end gap-1.5;
 }
 </style>

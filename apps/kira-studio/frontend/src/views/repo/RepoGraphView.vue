@@ -115,8 +115,9 @@ onActivated(() => handle?.setVisible?.(true));
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-graph-host {
-  height: 100%;
-  width: 100%;
+  @apply h-full w-full;
 }
 </style>

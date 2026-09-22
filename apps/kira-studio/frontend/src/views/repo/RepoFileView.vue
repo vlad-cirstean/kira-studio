@@ -299,22 +299,19 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .monaco-host {
-  height: 100%;
-  width: 100%;
+  @apply h-full w-full;
 }
 
 /* D11: column flex only when a markdown file grows the Source/Reading toolbar — every other file
    type keeps the single unwrapped .monaco-host above, byte-identical to before this phase. */
 .repo-file {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
+  @apply flex flex-col h-full w-full;
 }
 .repo-file .monaco-host {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 /* D14: every value below is an existing --kira-* token — no new literal. Tailwind's preflight
@@ -322,18 +319,10 @@ onUnmounted(() => {
    every block element below restates its own spacing (and headings their own scale, P73 §7); that
    is expected here, not a workaround. */
 .md-reading {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--kira-s-6);
-  font-family: var(--kira-font-ui);
-  font-size: var(--kira-t-md);
-  line-height: 1.6;
-  color: var(--kira-fg);
-  background: var(--kira-bg);
+  @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-[family-name:var(--kira-font-ui)] text-[length:var(--kira-t-md)] leading-[1.6] p-[var(--kira-s-6)];
 }
 .md-reading > :deep(*) {
-  max-width: 72ch;
+  @apply max-w-[72ch];
 }
 .md-reading :deep(h1),
 .md-reading :deep(h2),
@@ -341,97 +330,70 @@ onUnmounted(() => {
 .md-reading :deep(h4),
 .md-reading :deep(h5),
 .md-reading :deep(h6) {
-  margin: var(--kira-s-6) 0 var(--kira-s-3);
-  font-weight: 600;
-  line-height: 1.3;
+  @apply font-semibold leading-[1.3] mt-[var(--kira-s-6)] mx-0 mb-[var(--kira-s-3)];
 }
 /* P73 §7(b): em, not --kira-t-xl (tokens.css: deliberately a 20px literal that ignores Appearance)
    — resolves against .md-reading's own font-size, so the scale tracks the Appearance font-size
    setting for free. Headings don't nest, so nothing compounds. */
 .md-reading :deep(h1) {
-  padding-bottom: var(--kira-s-3);
-  font-size: 1.6em;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply border-b border-border text-[1.6em] pb-[var(--kira-s-3)];
 }
 .md-reading :deep(h2) {
-  font-size: 1.4em;
+  @apply text-[1.4em];
 }
 .md-reading :deep(h3) {
-  font-size: 1.2em;
+  @apply text-[1.2em];
 }
 .md-reading :deep(h4) {
-  font-size: 1.05em;
+  @apply text-[1.05em];
 }
 .md-reading :deep(h5),
 .md-reading :deep(h6) {
-  font-size: 1em;
+  @apply text-[1em];
 }
 .md-reading :deep(p) {
-  margin: 0 0 var(--kira-s-4);
+  @apply mt-0 mx-0 mb-[var(--kira-s-4)];
 }
 .md-reading :deep(ul),
 .md-reading :deep(ol) {
-  margin: 0 0 var(--kira-s-4);
-  padding-left: var(--kira-s-6);
-  list-style: revert;
+  @apply list-[revert] mt-0 mx-0 mb-[var(--kira-s-4)] pl-[var(--kira-s-6)];
 }
 .md-reading :deep(li) {
-  margin: var(--kira-s-1) 0;
+  @apply my-[var(--kira-s-1)] mx-0;
 }
 .md-reading :deep(a) {
-  color: var(--kira-info);
-  cursor: pointer;
+  @apply text-info cursor-pointer;
 }
 .md-reading :deep(blockquote) {
-  margin: 0 0 var(--kira-s-4);
-  padding: 0 var(--kira-s-4);
-  border-left: 3px solid var(--kira-border);
-  color: var(--kira-fg-muted);
+  @apply border-l-[3px] border-border text-muted mt-0 mx-0 mb-[var(--kira-s-4)] py-0 px-[var(--kira-s-4)];
 }
 .md-reading :deep(hr) {
-  margin: var(--kira-s-6) 0;
-  border: none;
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply border-0 border-t border-border my-[var(--kira-s-6)] mx-0;
 }
 .md-reading :deep(code) {
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-  background: var(--kira-bg-input);
-  border-radius: var(--kira-radius-sm);
-  padding: 0.1em 0.35em;
+  @apply bg-input rounded-kira-sm font-[family-name:var(--kira-font-data)] text-[length:var(--kira-t-sm)] py-[0.1em] px-[0.35em];
 }
 .md-reading :deep(pre) {
-  margin: 0 0 var(--kira-s-4);
-  padding: var(--kira-s-4);
-  overflow: auto;
-  background: var(--kira-bg-input);
-  border-radius: var(--kira-radius-sm);
-  max-width: none;
+  @apply overflow-auto bg-input rounded-kira-sm max-w-none mt-0 mx-0 mb-[var(--kira-s-4)] p-[var(--kira-s-4)];
 }
 /* P73 §7(a): more specific than :deep(code) above, so fenced code wins without touching that
    rule — a fenced block matches Monaco's own size exactly. Inline code deliberately stays at
    --kira-t-sm (the step-down exists so a same-px monospace run doesn't outsize the prose around
    it, which doesn't apply inside a standalone block). */
 .md-reading :deep(pre code) {
-  background: none;
-  padding: 0;
-  font-size: var(--kira-t-md);
+  @apply bg-none p-0 text-[length:var(--kira-t-md)];
 }
 .md-reading :deep(table) {
-  margin: 0 0 var(--kira-s-4);
-  border-collapse: collapse;
-  max-width: none;
+  @apply border-collapse max-w-none mt-0 mx-0 mb-[var(--kira-s-4)];
 }
 .md-reading :deep(th),
 .md-reading :deep(td) {
-  padding: var(--kira-s-2) var(--kira-s-4);
-  border: var(--kira-border-width) solid var(--kira-border);
-  text-align: left;
+  @apply border border-border text-left py-[var(--kira-s-2)] px-[var(--kira-s-4)];
 }
 .md-reading :deep(thead) {
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply border-b border-border;
 }
 .md-reading :deep(img) {
-  max-width: 100%;
+  @apply max-w-full;
 }
 </style>

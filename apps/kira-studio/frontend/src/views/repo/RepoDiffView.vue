@@ -147,22 +147,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-diff-root {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  @apply h-full flex flex-col;
 }
 
 .diff-actions {
-  flex: 0 0 auto;
-  display: flex;
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex flex-none border-b border-border py-[var(--kira-s-2)] px-[var(--kira-s-3)];
 }
 
 .monaco-host {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
+  @apply flex-auto min-h-0 w-full;
 }
 </style>

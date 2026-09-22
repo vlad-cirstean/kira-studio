@@ -175,48 +175,29 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .repo-multi-diff-root {
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  @apply h-full overflow-y-auto flex flex-col;
 }
 
 .section {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex flex-none flex-col border-b border-border;
 }
 
 .section-header {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply flex flex-none items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-3)];
 }
 
 .path {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply font-semibold overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .path-dir {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
+  @apply flex-auto min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-muted text-[length:var(--kira-t-sm)];
 }
 
 .monaco-host {
-  flex: 0 0 auto;
-  height: 60vh;
-  width: 100%;
+  @apply flex-none h-[60vh] w-full;
 }
 </style>
