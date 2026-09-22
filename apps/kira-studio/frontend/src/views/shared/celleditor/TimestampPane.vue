@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import DateTimePicker from '../DateTimePicker.vue';
@@ -26,6 +28,9 @@ const props = defineProps<{ doc: string; format: CellFormat; readOnly: boolean }
 const emit = defineEmits<{ 'update:doc': [string] }>();
 
 const zone = ref<'local' | 'utc'>('local');
+function setZone(v: string): void {
+  zone.value = v as 'local' | 'utc';
+}
 const ZONE_OPTIONS = [
   { value: 'local' as const, label: 'Local', testid: 'cell-editor-timestamp-zone-local' },
   { value: 'utc' as const, label: 'UTC', testid: 'cell-editor-timestamp-zone-utc' },
@@ -73,55 +78,75 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 
 <template>
   <div class="ts-pane" data-testid="cell-editor-timestamp-pane">
-    <div class="ts-readings p-strip note" data-testid="cell-editor-timestamp">
-      <CodiconIcon name="clock" :size="13" />
-      <template v-if="reading">
-        <span
-          class="ts-reading"
-          :class="{ dim: zone !== 'local' }"
-          data-testid="cell-editor-timestamp-local"
-          >{{ reading.local }}</span
+    <Alert class="ts-readings strip-note" data-testid="cell-editor-timestamp">
+      <AlertDescription class="strip-note-text flex items-center gap-1">
+        <CodiconIcon name="clock" :size="13" />
+        <template v-if="reading">
+          <span
+            class="ts-reading"
+            :class="{ dim: zone !== 'local' }"
+            data-testid="cell-editor-timestamp-local"
+            >{{ reading.local }}</span
+          >
+          <span class="ts-sep">·</span>
+          <span
+            class="ts-reading"
+            :class="{ dim: zone !== 'utc' }"
+            data-testid="cell-editor-timestamp-utc"
+            >{{ reading.utc }}</span
+          >
+          <span class="ts-sep">·</span>
+          <span class="ts-reading dim" data-testid="cell-editor-timestamp-relative">{{
+            reading.relative
+          }}</span>
+        </template>
+        <span v-else class="ts-reading dim" data-testid="cell-editor-timestamp-unparseable"
+          >Not a recognizable {{ format }} value</span
         >
-        <span class="ts-sep">·</span>
-        <span
-          class="ts-reading"
-          :class="{ dim: zone !== 'utc' }"
-          data-testid="cell-editor-timestamp-utc"
-          >{{ reading.utc }}</span
-        >
-        <span class="ts-sep">·</span>
-        <span class="ts-reading dim" data-testid="cell-editor-timestamp-relative">{{
-          reading.relative
-        }}</span>
-      </template>
-      <span v-else class="ts-reading dim" data-testid="cell-editor-timestamp-unparseable"
-        >Not a recognizable {{ format }} value</span
-      >
-    </div>
+      </AlertDescription>
+    </Alert>
 
     <div class="ts-edit">
-      <SegmentedControl
-        v-model="zone"
-        :options="ZONE_OPTIONS"
+      <ToggleGroup
+        type="single"
+        :model-value="zone"
         data-testid="cell-editor-timestamp-zone"
-      />
+        @update:model-value="(v) => v && setZone(v as string)"
+      >
+        <ToggleGroupItem v-for="opt in ZONE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">
+          {{ opt.label }}
+        </ToggleGroupItem>
+      </ToggleGroup>
       <div class="ts-field">
-        <TextField
-          :model-value="fieldText"
-          :disabled="readOnly"
-          data-testid="cell-editor-timestamp-field"
-          v-tooltip="'YYYY-MM-DD HH:mm:ss, in the zone selected above'"
-          @update:model-value="onFieldInput"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Input
+              :model-value="fieldText"
+              :disabled="readOnly"
+              class="w-full"
+              data-testid="cell-editor-timestamp-field"
+              @update:model-value="onFieldInput(String($event))"
+            />
+          </TooltipTrigger>
+          <TooltipContent>YYYY-MM-DD HH:mm:ss, in the zone selected above</TooltipContent>
+        </Tooltip>
       </div>
       <span class="ts-calendar-anchor">
-        <IconButton
-          icon="calendar"
-          :disabled="readOnly"
-          data-testid="cell-editor-timestamp-calendar"
-          v-tooltip="'Pick a date and time'"
-          @click="calendarOpen = !calendarOpen"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Pick a date and time"
+              :disabled="readOnly"
+              data-testid="cell-editor-timestamp-calendar"
+              @click="calendarOpen = !calendarOpen"
+            >
+              <CodiconIcon name="calendar" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Pick a date and time</TooltipContent>
+        </Tooltip>
         <PopoverPanel
           v-if="calendarOpen"
           :width="228"
@@ -145,7 +170,7 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 }
 
 .ts-readings {
-  @apply shrink-0 items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-4)];
+  @apply shrink-0;
 }
 
 .ts-reading {
@@ -157,18 +182,23 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 }
 
 .ts-edit {
-  @apply flex-1 min-h-0 flex items-start gap-[var(--kira-s-2)] py-[var(--kira-s-3)] px-[var(--kira-s-4)];
+  @apply flex-1 min-h-0 flex items-start gap-1 py-1.5 px-2;
 }
 
 .ts-field {
   @apply flex-1 min-w-0;
 }
 
-.ts-field :deep(.p-input) {
-  @apply w-full;
-}
-
 .ts-calendar-anchor {
   @apply relative shrink-0;
+}
+
+/* Alert tone class replacing the raw .p-strip note marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 </style>

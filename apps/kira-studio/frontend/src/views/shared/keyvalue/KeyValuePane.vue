@@ -37,12 +37,12 @@ import {
   OBJECT_BODY_PREVIEW_BYTES,
 } from '@shared/protocol/page';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -52,13 +52,12 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
 import { useObjectStoreStore } from '../../../state/objectStore';
+import { useRunState } from '../../../state/runState';
 import { useSettingsStore } from '../../../state/settings';
 import type { KeyValueTabRecord } from '../../../state/tabDomain';
 import { browseInvalidate } from '../../../state/viewCommands';
-import MessageStrip from '../../../theme/primitives/MessageStrip.vue';
+import EngineIcon from '../../../theme/EngineIcon.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
-import ReconnectGate from '../../../theme/primitives/ReconnectGate.vue';
-import ViewChrome from '../../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { datasetNumber } from '../eventCoords';
 import SearchToolbar from '../page/SearchToolbar.vue';
@@ -119,6 +118,16 @@ const connRecord = computed(() => connectionsStore.connectionRecord(host.value?.
 // plus a dot (the view header) — never a tint or a full border. Mirrors Toolbar.vue/TreeRow.vue.
 const connColor = computed(() => connRecord.value?.color);
 const iconColor = computed(() => connColorVar(connColor.value) ?? 'var(--kira-info)');
+
+// P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart).
+const runState = useRunState(() => props.tab?.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 // The view header's breadcrumb: "connection / dbN / " for redis, "connection / bucket / " for
 // s3 — each engine's tree roots a key's/object's path at its own top-level segment kind (redis's
@@ -662,30 +671,81 @@ onUnmounted(() => {
 
 <template>
   <div class="keyvalue-pane" data-testid="keyvalue-pane" :class="{ embedded: !tab }">
-    <ViewChrome
-      v-if="tab"
-      :tab="tab"
-      :icon="page?.redisType === 'object' ? 'file' : 'key'"
-      :icon-color="iconColor"
-      :path="pathPrefix"
-      :name="targetTail?.name ?? tab.path"
-      target-testid="keyvalue-target"
-      refresh-testid="keyvalue-refresh"
-      stop-testid="keyvalue-stop"
-      :can-stop="running"
-      :can-refresh="true"
-      @refresh="onRefresh"
-      @stop="onStop"
-    />
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
+    <template v-if="tab">
+      <div class="p-view-head">
+        <span
+          v-if="connColor !== undefined"
+          class="p-conn-dot"
+          :class="{ none: !connColor || connColor === 'none' }"
+          :style="{ '--kira-rail': connColorVar(connColor) }"
+        />
+        <span v-if="connRecord?.kind" class="icon-box">
+          <EngineIcon :kind="connRecord.kind" :size="13" />
+        </span>
+        <span class="icon-box" :style="{ color: iconColor }">
+          <CodiconIcon :name="page?.redisType === 'object' ? 'file' : 'key'" :size="13" />
+        </span>
+        <span class="p-view-target" data-testid="keyvalue-target"
+          ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+          >{{ targetTail?.name ?? tab.path }}</span
+        >
+        <span class="p-push flex items-center gap-1" />
+      </div>
+      <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(connColor) }" />
+      <div class="p-toolbar last">
+        <div class="group">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="keyvalue-refresh" @click="onRefresh">
+                <CodiconIcon name="refresh" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'is-live': !!running }"
+                aria-label="Stop"
+                data-testid="keyvalue-stop"
+                :disabled="!running"
+                @click="onStop"
+              >
+                <CodiconIcon name="debug-stop" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Stop</TooltipContent>
+          </Tooltip>
+        </div>
+        <span class="p-push" />
+        <span
+          class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+          :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+        >
+          <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+          <span
+            class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+            :class="{
+              'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
+              'border-error': runState.status === 'error',
+            }"
+          />
+        </span>
+        <div class="group" />
+      </div>
+    </template>
 
     <!-- Item 4: only the body swaps for the reconnect gate — ViewChrome (when present) always
-         renders its own header, same discipline every other main-tab view follows. -->
-    <ReconnectGate
-      v-if="needsReconnect"
-      container-testid="keyvalue-reconnect"
-      button-testid="keyvalue-reconnect-load"
-      @reconnect="onReconnectAndLoad"
-    />
+         renders its own header, same discipline every other main-tab view follows.
+         P104 §3: ReconnectGate inlined (no library counterpart). -->
+    <Alert v-if="needsReconnect" class="empty-state" data-testid="keyvalue-reconnect">
+      <Button variant="dialog-primary" size="kira-lg" data-testid="keyvalue-reconnect-load" @click="onReconnectAndLoad">
+        Reconnect &amp; load
+      </Button>
+    </Alert>
     <template v-else>
       <div v-if="page" class="p-toolbar kv-badges" data-testid="keyvalue-badges">
         <span class="p-badge" data-testid="keyvalue-type">{{ page.redisType }}</span>
@@ -711,23 +771,37 @@ onUnmounted(() => {
                "there is nothing to paginate") — hidden rather than shown permanently disabled,
                same call StreamView.vue's isBatch makes for SQS. The status text stays: it's the
                only place the Count button's result (below) ever gets shown, for every engine. -->
-          <IconButton
-            v-if="!isSingleObjectPage"
-            icon="arrow-left"
-            data-testid="keyvalue-prev"
-            :disabled="prevDisabled"
-            v-tooltip="'Previous page'"
-            @click="keyValueViewStore.goPrev(viewKey)"
-          />
+          <Tooltip v-if="!isSingleObjectPage">
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Previous page"
+                data-testid="keyvalue-prev"
+                :disabled="prevDisabled"
+                @click="keyValueViewStore.goPrev(viewKey)"
+              >
+                <CodiconIcon name="arrow-left" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Previous page</TooltipContent>
+          </Tooltip>
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
-          <IconButton
-            v-if="!isSingleObjectPage"
-            icon="arrow-right"
-            data-testid="keyvalue-next"
-            :disabled="!rt?.hasMore"
-            v-tooltip="'Next page'"
-            @click="keyValueViewStore.goNext(viewKey)"
-          />
+          <Tooltip v-if="!isSingleObjectPage">
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Next page"
+                data-testid="keyvalue-next"
+                :disabled="!rt?.hasMore"
+                @click="keyValueViewStore.goNext(viewKey)"
+              >
+                <CodiconIcon name="arrow-right" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Next page</TooltipContent>
+          </Tooltip>
         </div>
 
         <template v-if="!isSingleObjectPage">
@@ -735,12 +809,16 @@ onUnmounted(() => {
 
           <!-- Page-size sits right after the pager, before the count/mutation groups — same slot
                DataToolbar.vue's own page-size segmented control occupies. -->
-          <SegmentedControl
-            :model-value="host?.pageSize ?? 100"
-            :options="PAGE_SIZE_OPTIONS"
+          <ToggleGroup
+            type="single"
+            :model-value="String(host?.pageSize ?? 100)"
             data-testid="keyvalue-page-size-picker"
-            @update:model-value="onPageSize"
-          />
+            @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
+          >
+            <ToggleGroupItem v-for="opt in PAGE_SIZE_OPTIONS" :key="opt.value" :value="String(opt.value)" :data-testid="opt.testid">
+              {{ opt.label }}
+            </ToggleGroupItem>
+          </ToggleGroup>
         </template>
 
         <div class="sep" />
@@ -748,12 +826,14 @@ onUnmounted(() => {
         <!-- DataToolbar's [count, columns] group — Redis has no columns/fields equivalent
              (a key has no schema), so this group is count alone, same slot as SQL/Document. -->
         <div class="group">
-          <IconButton
-            icon="symbol-number"
-            data-testid="keyvalue-count"
-            v-tooltip="'Exact count'"
-            @click="keyValueViewStore.runCount(viewKey)"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Exact count" data-testid="keyvalue-count" @click="keyValueViewStore.runCount(viewKey)">
+                <CodiconIcon name="symbol-number" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Exact count</TooltipContent>
+          </Tooltip>
         </div>
 
         <div class="sep" />
@@ -762,20 +842,22 @@ onUnmounted(() => {
              add-before-delete order), search trails, same as every other view. -->
         <div class="group">
           <div class="add-anchor">
-            <IconButton
-              icon="add"
-              data-testid="keyvalue-add"
-              :disabled="!canInsert"
-              v-tooltip="addTitle"
-              @click="openAdd"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
+                  <CodiconIcon name="add" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ addTitle }}</TooltipContent>
+            </Tooltip>
             <PopoverPanel v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Add key (string value)</div>
-                <TextField v-model="addName" placeholder="Key name" data-testid="keyvalue-add-name" />
-                <TextField
+                <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
+                <Input
                   v-model="addValue"
                   placeholder="Initial value"
+                  class="w-full"
                   data-testid="keyvalue-add-value"
                   @keydown.enter="submitAdd"
                   @keydown.escape="closeAdd"
@@ -784,27 +866,28 @@ onUnmounted(() => {
                   {{ addError }}
                 </div>
                 <div class="popover-actions">
-                  <AppButton kind="dialog" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</AppButton>
-                  <AppButton
-                    kind="dialog"
-                    variant="primary"
+                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-add-cancel" @click="closeAdd">Cancel</Button>
+                  <Button
+                    variant="dialog-primary"
+                    size="kira-lg"
                     data-testid="keyvalue-add-save"
                     :disabled="addSaving"
                     @click="submitAdd"
-                  >Save</AppButton>
+                  >Save</Button>
                 </div>
               </div>
             </PopoverPanel>
           </div>
 
           <div class="edit-anchor">
-            <IconButton
-              icon="edit"
-              data-testid="keyvalue-edit"
-              :disabled="editDisabled"
-              v-tooltip="editTitle"
-              @click="openEdit"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
+                  <CodiconIcon name="edit" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ editTitle }}</TooltipContent>
+            </Tooltip>
             <PopoverPanel
               v-if="editOpen && !isSingleObjectPage"
               test-id="keyvalue-edit-popover"
@@ -813,8 +896,9 @@ onUnmounted(() => {
             >
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Edit value</div>
-                <TextField
+                <Input
                   v-model="editDraft"
+                  class="w-full"
                   data-testid="keyvalue-edit-input"
                   @keydown.enter="saveEdit"
                   @keydown.escape="closeEdit"
@@ -823,84 +907,99 @@ onUnmounted(() => {
                   {{ editError }}
                 </div>
                 <div class="popover-actions">
-                  <AppButton kind="dialog" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</AppButton>
-                  <AppButton
-                    kind="dialog"
-                    variant="primary"
+                  <Button variant="dialog" size="kira-lg" data-testid="keyvalue-edit-cancel" @click="closeEdit">Cancel</Button>
+                  <Button
+                    variant="dialog-primary"
+                    size="kira-lg"
                     data-testid="keyvalue-edit-save"
                     :disabled="editSaving"
                     @click="saveEdit"
-                  >Save</AppButton>
+                  >Save</Button>
                 </div>
               </div>
             </PopoverPanel>
           </div>
 
-          <IconButton
-            icon="trash"
-            data-testid="keyvalue-delete"
-            :disabled="!canDelete"
-            v-tooltip="deleteTitle"
-            @click="onDeleteKey"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Delete" :disabled="!canDelete" data-testid="keyvalue-delete" @click="onDeleteKey">
+                <CodiconIcon name="trash" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ deleteTitle }}</TooltipContent>
+          </Tooltip>
 
-          <IconButton
-            v-if="canDownload"
-            icon="cloud-download"
-            data-testid="keyvalue-download"
-            v-tooltip="downloadTitle"
-            @click="onDownload"
-          />
+          <Tooltip v-if="canDownload">
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Download" data-testid="keyvalue-download" @click="onDownload">
+                <CodiconIcon name="cloud-download" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ downloadTitle }}</TooltipContent>
+          </Tooltip>
 
-          <IconButton
-            icon="search"
-            :active="!!rt?.searchOpen"
-            v-tooltip="'Search this page'"
-            data-testid="keyvalue-search"
-            @click="onToggleSearch"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'bg-input text-fg': !!rt?.searchOpen }"
+                aria-label="Search this page"
+                data-testid="keyvalue-search"
+                @click="onToggleSearch"
+              >
+                <CodiconIcon name="search" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Search this page</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
-      <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="keyvalue-error">
-        {{ rt.error.message }}
-      </MessageStrip>
+      <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="keyvalue-error">
+        <AlertDescription>{{ rt.error.message }}</AlertDescription>
+      </Alert>
       <!-- P43 F6/D7: a failed delete — the edit/add popovers already show their own failures
            inline (editError/objectSaveError/addError above); delete has no popover of its own
            to hold one, so it uses the shared per-tab field every other view's own strip does. -->
-      <MessageStrip v-if="rt?.actionError" tone="err" data-testid="keyvalue-action-error">
-        {{ rt.actionError }}
-      </MessageStrip>
+      <Alert v-if="rt?.actionError" variant="destructive" data-testid="keyvalue-action-error">
+        <AlertDescription>{{ rt.actionError }}</AlertDescription>
+      </Alert>
       <!-- P33 D4: an object over OBJECT_BODY_PREVIEW_BYTES has no Body row at all — this is the
            renderer's own honest explanation of that absence, gated on the same shared constant
            the adapter used, not a parsed string. -->
-      <MessageStrip
+      <Alert
         v-if="isSingleObjectPage && page && objectBodyRow === null && page.memoryBytes !== null"
-        tone="warn"
+        class="strip-warn"
         data-testid="keyvalue-object-too-large"
       >
-        Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
-        {{ formatBytes(OBJECT_BODY_PREVIEW_BYTES) }} limit) — use Download to save it locally.
-      </MessageStrip>
+        <AlertDescription class="strip-warn-text">
+          Too large to preview ({{ formatBytes(page.memoryBytes) }}, over the
+          {{ formatBytes(OBJECT_BODY_PREVIEW_BYTES) }} limit) — use Download to save it locally.
+        </AlertDescription>
+      </Alert>
       <!-- The S3 object body is edited through the docked cell editor below (onRowClick's
            onEdit stages into objectDraft, never writing to S3 directly) — this strip is the
            explicit Save/Discard step that turns the staged draft into a real PutObject. -->
-      <MessageStrip v-if="objectDraft !== null" tone="warn" data-testid="keyvalue-object-edit-pending">
-        <span data-testid="keyvalue-object-edit-note"
-          >Unsaved changes to this object's body<template v-if="objectSaveError">
-            — {{ objectSaveError }}</template
-          ></span
-        >
-        <AppButton
-          class="strip-action"
-          variant="primary"
-          data-testid="keyvalue-object-edit-save"
-          :disabled="objectSaving"
-          @click="saveObjectEdit"
-        >
-          Save
-        </AppButton>
-      </MessageStrip>
+      <Alert v-if="objectDraft !== null" class="strip-warn" data-testid="keyvalue-object-edit-pending">
+        <AlertDescription class="strip-warn-text flex items-start gap-1.5">
+          <span data-testid="keyvalue-object-edit-note"
+            >Unsaved changes to this object's body<template v-if="objectSaveError">
+              — {{ objectSaveError }}</template
+            ></span
+          >
+          <Button
+            variant="toolbar-primary"
+            size="kira"
+            class="ml-auto shrink-0"
+            data-testid="keyvalue-object-edit-save"
+            :disabled="objectSaving"
+            @click="saveObjectEdit"
+          >
+            Save
+          </Button>
+        </AlertDescription>
+      </Alert>
 
       <SearchToolbar
         v-if="rt?.searchOpen"
@@ -925,26 +1024,28 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="tbody" data-testid="keyvalue-list">
-          <EmptyState
-            v-if="!rt || rt.rowCount === 0"
-            :icon="rt ? 'database' : 'loading'"
-            :label="rt ? 'No data' : 'Loading…'"
-          />
+          <Alert v-if="!rt || rt.rowCount === 0" class="empty-state">
+            <CodiconIcon :name="rt ? 'database' : 'loading'" :size="24" class="text-subtle" />
+            <AlertTitle class="text-kira-md text-muted font-normal">{{ rt ? 'No data' : 'Loading…' }}</AlertTitle>
+          </Alert>
           <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
                from "no data loaded". -->
-          <EmptyState
+          <Alert
             v-else-if="displayRows && displayRows.length === 0"
-            icon="search"
-            label="No matching rows"
+            class="empty-state"
             data-testid="keyvalue-no-matching-rows"
           >
-            <AppButton
+            <CodiconIcon name="search" :size="24" class="text-subtle" />
+            <AlertTitle class="text-kira-md text-muted font-normal">No matching rows</AlertTitle>
+            <Button
+              variant="toolbar"
+              size="kira"
               data-testid="keyvalue-show-all-rows"
               @click="pageSearchFilterStore.setSearchFiltering(viewKey, false)"
             >
               Show all rows
-            </AppButton>
-          </EmptyState>
+            </Button>
+          </Alert>
           <VirtualList
             v-else
             ref="listRef"
@@ -961,31 +1062,42 @@ onUnmounted(() => {
                 @contextmenu="onRowContextMenuFromEvent"
               >
                 <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
-                <div
-                  class="p-td kv-col-field"
-                  :class="{
-                    'search-match': isSearchMatch(i, 'field'),
-                    'search-match-current': isCurrentSearchMatch(i, 'field'),
-                  }"
-                  v-tooltip="rowAt(i)?.field"
-                  data-testid="keyvalue-field"
-                >
-                  {{ rowAt(i)?.field }}
-                </div>
-                <div
-                  class="p-td kv-col-value"
-                  :class="{
-                    'search-match': isSearchMatch(i, 'value'),
-                    'search-match-current': isCurrentSearchMatch(i, 'value'),
-                  }"
-                  v-tooltip="rowAt(i)?.value"
-                  data-testid="keyvalue-value"
-                >
-                  {{ rowAt(i)?.value }}
-                  <span v-if="rowAt(i)?.isTruncated" class="p-chip truncated-chip" v-tooltip="'value truncated'"
-                    >truncated</span
-                  >
-                </div>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <div
+                      class="p-td kv-col-field"
+                      :class="{
+                        'search-match': isSearchMatch(i, 'field'),
+                        'search-match-current': isCurrentSearchMatch(i, 'field'),
+                      }"
+                      data-testid="keyvalue-field"
+                    >
+                      {{ rowAt(i)?.field }}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ rowAt(i)?.field }}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <div
+                      class="p-td kv-col-value"
+                      :class="{
+                        'search-match': isSearchMatch(i, 'value'),
+                        'search-match-current': isCurrentSearchMatch(i, 'value'),
+                      }"
+                      data-testid="keyvalue-value"
+                    >
+                      {{ rowAt(i)?.value }}
+                      <Tooltip v-if="rowAt(i)?.isTruncated">
+                        <TooltipTrigger as-child>
+                          <span class="p-chip truncated-chip">truncated</span>
+                        </TooltipTrigger>
+                        <TooltipContent>value truncated</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ rowAt(i)?.value }}</TooltipContent>
+                </Tooltip>
               </div>
             </template>
           </VirtualList>
@@ -1027,7 +1139,7 @@ onUnmounted(() => {
 }
 
 .kv-row {
-  @apply flex cursor-pointer h-[var(--kira-row-height)];
+  @apply flex cursor-pointer h-row;
 }
 
 .kv-row:hover {
@@ -1035,7 +1147,7 @@ onUnmounted(() => {
 }
 
 .truncated-chip {
-  @apply shrink-0 bg-input text-subtle ml-[var(--kira-s-3)];
+  @apply shrink-0 bg-input text-subtle ml-1.5;
 }
 
 .search-match {
@@ -1053,7 +1165,7 @@ onUnmounted(() => {
 }
 
 .popover-form {
-  @apply flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-3)];
+  @apply flex flex-col gap-1.5 p-1.5;
 }
 
 .popover-title {
@@ -1061,10 +1173,23 @@ onUnmounted(() => {
 }
 
 .popover-actions {
-  @apply flex justify-end gap-[var(--kira-s-2)];
+  @apply flex justify-end gap-1;
 }
 
 .popover-error {
   @apply text-error;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+
+/* Alert tone class replacing MessageStrip's warn marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

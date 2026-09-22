@@ -2,7 +2,8 @@
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -13,7 +14,6 @@ import { cellKey, type SelectedCell, useCellSelectionStore } from '../../../stat
 import { useConnectionsStore } from '../../../state/connections';
 import { typeClassColor } from '../../../theme/icons';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
-import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
 import EditBufferActions from '../EditBufferActions.vue';
 import ResponseFindBar, { type FindBarHost, type FindBarTarget } from '../ResponseFindBar.vue';
 import { sqlDialectFor } from '../sqlIdent';
@@ -471,44 +471,57 @@ const statusLine = computed(() => {
   >
     <!-- every non-grid view opens with the same 28px header (LAW 09) — identity, then facts as
          badges, then this panel's own controls, then the trailing group pushed to the edge.
-         ViewHeader's target has no separate prefix/suffix slot, so the row number rides along in
-         `name` itself (cell-editor-target's toContainText assertions don't care about styling). -->
-    <ViewHeader
-      icon="symbol-string"
-      :name="`${targetLabel} · row ${selectedCell.row + 1}`"
-      target-testid="cell-editor-target"
-    >
-      <span class="p-badge" v-tooltip="dataTypeHint" :style="{ color: dataTypeColor }">{{
-        selectedCell.column.dataType
-      }}</span>
+         ViewHeader inlined (P104 §3: layout container, no library counterpart) — the row number
+         rides along in the target text itself (cell-editor-target's toContainText assertions
+         don't care about styling). -->
+    <div class="p-view-head">
+      <span class="icon-box">
+        <CodiconIcon name="symbol-string" :size="13" />
+      </span>
+      <span class="p-view-target" data-testid="cell-editor-target"
+        >{{ `${targetLabel} · row ${selectedCell.row + 1}` }}</span
+      >
+      <Tooltip v-if="dataTypeHint">
+        <TooltipTrigger as-child>
+          <span class="p-badge" :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ dataTypeHint }}</TooltipContent>
+      </Tooltip>
+      <span v-else class="p-badge" :style="{ color: dataTypeColor }">{{ selectedCell.column.dataType }}</span>
       <span v-if="isNullValue" class="p-chip info" data-testid="cell-editor-badge-null">NULL</span>
       <span v-if="isEmptyValue" class="p-chip info" data-testid="cell-editor-badge-empty">empty</span>
       <span v-if="isTruncatedValue" class="p-chip warn" data-testid="cell-editor-badge-truncated">truncated</span>
-      <span class="p-badge status-badge" v-tooltip="statusLine" data-testid="cell-editor-status">{{
-        statusLine
-      }}</span>
-      <span
-        v-if="formatProblem"
-        class="p-chip err invalid-chip"
-        data-testid="cell-editor-invalid"
-        v-tooltip="formatProblem.message"
-        >{{ formatProblem.message }}</span
-      >
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="p-badge status-badge" data-testid="cell-editor-status">{{ statusLine }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ statusLine }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="formatProblem">
+        <TooltipTrigger as-child>
+          <span class="p-chip err invalid-chip" data-testid="cell-editor-invalid">{{ formatProblem.message }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ formatProblem.message }}</TooltipContent>
+      </Tooltip>
 
       <span class="format-group">
-        <button
-          type="button"
-          class="p-select bordered format-select"
-          data-testid="cell-editor-format"
-          :disabled="isNullValue"
-          v-tooltip="formatHint"
-          @click="openFormatMenu"
-        >
-          <span class="format-select-label">{{
-            override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
-          }}</span>
-          <CodiconIcon name="chevron-down" :size="12" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="p-select bordered format-select"
+              data-testid="cell-editor-format"
+              :disabled="isNullValue"
+              @click="openFormatMenu"
+            >
+              <span class="format-select-label">{{
+                override ? FORMAT_LABEL[override] : `Auto — ${FORMAT_LABEL[detectedFormat]}`
+              }}</span>
+              <CodiconIcon name="chevron-down" :size="12" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ formatHint }}</TooltipContent>
+        </Tooltip>
 
         <!-- P40 D13: neither affordance serves a purpose in viewer mode — nothing here exists to
              stage a write. showBytes=false (D31): the status badge above already carries a byte
@@ -516,13 +529,21 @@ const statusLine = computed(() => {
              said first — this row's own badge would be the same number shown twice. -->
         <template v-if="!viewerMode">
           <span class="generate-anchor">
-            <IconButton
-              icon="sparkle"
-              :disabled="!isEditable"
-              data-testid="cell-editor-generate"
-              v-tooltip="'Generate a value'"
-              @click="generatePanelOpen = !generatePanelOpen"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Generate a value"
+                  :disabled="!isEditable"
+                  data-testid="cell-editor-generate"
+                  @click="generatePanelOpen = !generatePanelOpen"
+                >
+                  <CodiconIcon name="sparkle" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Generate a value</TooltipContent>
+            </Tooltip>
             <PopoverPanel
               v-if="generatePanelOpen"
               :width="200"
@@ -532,17 +553,19 @@ const statusLine = computed(() => {
               @close="generatePanelOpen = false"
             >
               <div class="generate-menu">
-                <button
-                  v-for="gen in GENERATORS"
-                  :key="gen.id"
-                  type="button"
-                  class="p-row generate-item"
-                  :data-testid="`cell-editor-generate-${gen.id}`"
-                  v-tooltip="gen.hint"
-                  @click="applyGenerator(gen)"
-                >
-                  {{ gen.label }}
-                </button>
+                <Tooltip v-for="gen in GENERATORS" :key="gen.id">
+                  <TooltipTrigger as-child>
+                    <button
+                      type="button"
+                      class="p-row generate-item"
+                      :data-testid="`cell-editor-generate-${gen.id}`"
+                      @click="applyGenerator(gen)"
+                    >
+                      {{ gen.label }}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ gen.hint }}</TooltipContent>
+                </Tooltip>
               </div>
             </PopoverPanel>
           </span>
@@ -550,26 +573,45 @@ const statusLine = computed(() => {
         </template>
       </span>
 
-      <template #trailing>
-        <span v-if="readOnlyReason" class="p-chip warn" v-tooltip="readOnlyChipTitle">
+      <span class="p-push flex items-center gap-1">
+        <Tooltip v-if="readOnlyReason && readOnlyChipTitle">
+          <TooltipTrigger as-child>
+            <span class="p-chip warn">
+              <CodiconIcon name="lock" :size="13" />
+              {{ readOnlyChipText }}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ readOnlyChipTitle }}</TooltipContent>
+        </Tooltip>
+        <span v-else-if="readOnlyReason" class="p-chip warn">
           <CodiconIcon name="lock" :size="13" />
           {{ readOnlyChipText }}
         </span>
-        <IconButton
-          icon="search"
-          :active="findOpen"
-          data-testid="cell-editor-search-toggle"
-          v-tooltip="'Find in value'"
-          @click="toggleFind"
-        />
-        <IconButton
-          icon="close"
-          data-testid="cell-editor-close"
-          v-tooltip="'Close'"
-          @click="closePanel"
-        />
-      </template>
-    </ViewHeader>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': findOpen }"
+              aria-label="Find in value"
+              data-testid="cell-editor-search-toggle"
+              @click="toggleFind"
+            >
+              <CodiconIcon name="search" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Find in value</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" aria-label="Close" data-testid="cell-editor-close" @click="closePanel">
+              <CodiconIcon name="close" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Close</TooltipContent>
+        </Tooltip>
+      </span>
+    </div>
 
     <!-- Auto-stages on blur (onEditorBlur) — focusout bubbles, plain blur doesn't. Ctrl/Cmd+Enter
          (onEditorKeydown) stages without needing to move focus away; neither is on MonacoHost
@@ -658,7 +700,7 @@ const statusLine = computed(() => {
 /* the format select + beautify/reset trio: this panel's own controls, set off from the
    identity badges with the standard s-4 gutter (mirrors CellEditor.html's inline group) */
 .format-group {
-  @apply flex items-center shrink-0 gap-[var(--kira-s-3)] ml-[var(--kira-s-4)];
+  @apply flex items-center shrink-0 gap-1.5 ml-2;
 }
 
 /* P42 D27: an app-drawn menu trigger, not a native <select> — border/background/padding/cursor
@@ -688,7 +730,7 @@ const statusLine = computed(() => {
 }
 
 .generate-menu {
-  @apply flex flex-col gap-px p-[var(--kira-s-2)];
+  @apply flex flex-col gap-px p-1;
 }
 
 .generate-item {
@@ -720,7 +762,7 @@ const statusLine = computed(() => {
 }
 
 .translate-head {
-  @apply flex shrink-0 items-center gap-[var(--kira-s-2)] bg-elevated border-b border-border text-subtle text-[length:var(--kira-t-xs)] py-[var(--kira-s-1)] px-[var(--kira-s-4)];
+  @apply flex shrink-0 items-center gap-1 bg-elevated border-b border-border text-subtle text-kira-xs py-0.5 px-2;
 }
 
 .translate-pane {

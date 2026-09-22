@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import type { DocumentRowView } from './rows';
 
 // P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
@@ -44,13 +45,12 @@ defineEmits<{ toggle: []; select: [] }>();
       <span class="doc-id" data-testid="document-id">{{ view.idLabel }}</span>
       <span class="p-badge" data-testid="document-field-count">{{ view.fieldCount }} fields</span>
       <span class="p-badge" data-testid="document-byte-badge">{{ view.byteLabel }}</span>
-      <span
-        v-if="view.isTruncated"
-        class="p-badge warn"
-        v-tooltip="'value truncated'"
-        data-testid="document-truncated"
-        >truncated</span
-      >
+      <Tooltip v-if="view.isTruncated">
+        <TooltipTrigger as-child>
+          <span class="p-badge warn" data-testid="document-truncated">truncated</span>
+        </TooltipTrigger>
+        <TooltipContent>value truncated</TooltipContent>
+      </Tooltip>
       <slot name="actions" />
     </div>
     <slot name="body" />
@@ -70,7 +70,7 @@ defineEmits<{ toggle: []; select: [] }>();
 }
 
 .doc-head {
-  @apply flex shrink-0 items-center cursor-pointer gap-[var(--kira-s-3)] px-[var(--kira-s-4)] h-[var(--kira-h-md)];
+  @apply flex shrink-0 items-center cursor-pointer gap-1.5 px-2 h-6.5;
 }
 
 .doc-head:hover {
@@ -85,7 +85,7 @@ defineEmits<{ toggle: []; select: [] }>();
    copy — a left rail, never a full-row tint, so it stays legible under `.open`'s own background
    and a search match's highlight at the same time. */
 .doc-row.selected > .doc-head {
-  @apply shadow-[inset_2px_0_0_var(--kira-accent)];
+  @apply shadow-[inset_2px_0_0_var(--primary)];
 }
 
 /* P31 D20: the same color-mix tint / solid-current pair KeyValueView.vue uses (and the deleted
@@ -105,6 +105,6 @@ defineEmits<{ toggle: []; select: [] }>();
 }
 
 .doc-id {
-  @apply shrink-0 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-fg text-[length:var(--kira-t-md)] font-[family-name:var(--kira-font-data)];
+  @apply shrink-0 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-fg text-kira-md font-[family-name:var(--kira-font-data)];
 }
 </style>

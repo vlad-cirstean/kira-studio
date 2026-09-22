@@ -52,7 +52,7 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
    used to hand off to `.cell-dock`'s own border-top — one mechanism for "a splitter inside a view
    is visible" instead of two that happened to agree, same rendered line in the same place. */
 .cell-splitter {
-  @apply shrink-0 h-[var(--kira-s-2)];
+  @apply shrink-0 h-1;
 }
 
 .cell-dock {

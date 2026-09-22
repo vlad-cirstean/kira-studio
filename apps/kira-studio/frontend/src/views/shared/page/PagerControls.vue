@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 
 // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
@@ -64,48 +66,80 @@ function onJump(e: Event): void {
 
 <template>
   <div class="group pager" :data-testid="`${testidPrefix}pager`" :data-pagination="strategy">
-    <IconButton
-      icon="chevron-left"
-      v-tooltip="'First page'"
-      :data-testid="`${testidPrefix}pager-first`"
-      :disabled="pageIndex === 0"
-      @click="emit('first')"
-    />
-    <IconButton
-      icon="arrow-left"
-      v-tooltip="'Previous page'"
-      :data-testid="`${testidPrefix}pager-prev`"
-      :disabled="pageIndex === 0"
-      @click="emit('prev')"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          aria-label="First page"
+          :data-testid="`${testidPrefix}pager-first`"
+          :disabled="pageIndex === 0"
+          @click="emit('first')"
+        >
+          <CodiconIcon name="chevron-left" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>First page</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          aria-label="Previous page"
+          :data-testid="`${testidPrefix}pager-prev`"
+          :disabled="pageIndex === 0"
+          @click="emit('prev')"
+        >
+          <CodiconIcon name="arrow-left" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Previous page</TooltipContent>
+    </Tooltip>
     <span class="page-label p-sm muted">
       page
       <div class="page-input">
-        <TextField
+        <Input
           v-model="pageInputValue"
           type="number"
           min="1"
-          hide-stepper
+          class="w-full text-center"
           :data-testid="`${testidPrefix}pager-page-input`"
           @change="onJump"
         />
       </div>
       <template v-if="pageCount"> of {{ pageCount }}</template>
     </span>
-    <IconButton
-      icon="arrow-right"
-      v-tooltip="'Next page'"
-      :data-testid="`${testidPrefix}pager-next`"
-      :disabled="!hasMore"
-      @click="emit('next')"
-    />
-    <IconButton
-      icon="chevron-right"
-      v-tooltip="pageCount ? 'Last page' : lastTooltip"
-      :data-testid="`${testidPrefix}pager-last`"
-      :disabled="!pageCount"
-      @click="emit('last')"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          aria-label="Next page"
+          :data-testid="`${testidPrefix}pager-next`"
+          :disabled="!hasMore"
+          @click="emit('next')"
+        >
+          <CodiconIcon name="arrow-right" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Next page</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          aria-label="Last page"
+          :data-testid="`${testidPrefix}pager-last`"
+          :disabled="!pageCount"
+          @click="emit('last')"
+        >
+          <CodiconIcon name="chevron-right" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{{ pageCount ? 'Last page' : lastTooltip }}</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -113,34 +147,27 @@ function onJump(e: Event): void {
 @reference "@theme/base.css";
 
 .pager {
-  @apply gap-[var(--kira-s-1)];
+  @apply gap-0.5;
 }
 
 .page-label {
-  @apply inline-flex items-center whitespace-nowrap gap-[var(--kira-s-1)];
+  @apply inline-flex items-center whitespace-nowrap gap-0.5;
 }
 
-/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
-   (see TextField.vue's inheritAttrs:false), so the fixed width and centred text live on this
-   wrapper/its :deep() descendants instead of a class/style on the <TextField> tag itself. */
 .page-input {
   @apply w-[46px];
 }
 
-.page-input :deep(.p-input) {
-  @apply w-full px-[var(--kira-s-2)];
+.page-input :deep(input) {
+  @apply px-1;
 }
 
 /* P22 D2: F3 shows the page-number box is already the same 22px height as the icon buttons
    beside it — the complaint's real cause is visual weight, a bordered/filled box in a row of
    transparent icon buttons. At rest this drops the fill/border so all five pager controls read
-   as one weight; :focus-within/:hover restore both, the same "engaged control" idiom .p-select
+   as one weight; :focus/:hover restore both, the same "engaged control" idiom .p-select
    (borderless by default, .bordered opt-in) already uses. */
-.page-input :deep(.p-input:not(:focus-within):not(:hover)) {
+.page-input :deep(input:not(:focus):not(:hover)) {
   @apply bg-none border-transparent;
-}
-
-.page-input :deep(input) {
-  @apply text-center;
 }
 </style>

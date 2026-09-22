@@ -82,7 +82,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
   /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
      the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
      accounting (rows.ts) is untouched. */
-  @apply overflow-x-auto overflow-y-hidden text-[length:var(--kira-t-sm)] font-[family-name:var(--kira-font-data)];
+  @apply overflow-x-auto overflow-y-hidden text-kira-sm font-[family-name:var(--kira-font-data)];
   scrollbar-width: none;
   padding: var(--kira-s-2) 0;
 }
@@ -94,7 +94,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 .tree-line {
   /* A line only as wide as its own content grows the scroller's scrollWidth past the panel — a
      plain 100% width would clip at the viewport instead of revealing the rest on scroll. */
-  @apply flex items-center whitespace-nowrap w-max min-w-full gap-[var(--kira-s-1)] pr-[var(--kira-s-4)] h-[var(--kira-h-xs)];
+  @apply flex items-center whitespace-nowrap w-max min-w-full gap-0.5 pr-2 h-4.5;
 }
 
 .tree-twisty {

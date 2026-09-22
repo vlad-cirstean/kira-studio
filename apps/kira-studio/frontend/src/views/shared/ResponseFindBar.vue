@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
@@ -122,7 +123,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  void nextTick(() => findInput.value?.$el.querySelector('input')?.focus());
+  void nextTick(() => findInput.value?.$el.focus());
 });
 </script>
 
@@ -133,11 +134,12 @@ onMounted(() => {
       <CodiconIcon name="search" :size="13" />
     </span>
     <div class="find-input">
-      <TextField
+      <Input
         ref="findInput"
         v-model="query"
         placeholder="Find"
-        :invalid="invalid"
+        :aria-invalid="invalid"
+        class="w-full"
         data-testid="http-find-input"
       />
     </div>
@@ -145,50 +147,79 @@ onMounted(() => {
          same three codicons, tooltips and testid shape SearchToolbar.vue uses for the identical
          options in the data views. -->
     <div class="group">
-      <IconButton
-        icon="case-sensitive"
-        :active="matchCase"
-        v-tooltip="'Match case'"
-        data-testid="http-find-match-case"
-        @click="matchCase = !matchCase"
-      />
-      <IconButton
-        icon="whole-word"
-        :active="wholeWord"
-        v-tooltip="'Whole word'"
-        data-testid="http-find-whole-word"
-        @click="wholeWord = !wholeWord"
-      />
-      <IconButton
-        icon="regex"
-        :active="regex"
-        v-tooltip="'Regular expression'"
-        data-testid="http-find-regex"
-        @click="regex = !regex"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': matchCase }"
+            aria-label="Match case"
+            data-testid="http-find-match-case"
+            @click="matchCase = !matchCase"
+          >
+            <CodiconIcon name="case-sensitive" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Match case</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': wholeWord }"
+            aria-label="Whole word"
+            data-testid="http-find-whole-word"
+            @click="wholeWord = !wholeWord"
+          >
+            <CodiconIcon name="whole-word" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Whole word</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': regex }"
+            aria-label="Regular expression"
+            data-testid="http-find-regex"
+            @click="regex = !regex"
+          >
+            <CodiconIcon name="regex" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Regular expression</TooltipContent>
+      </Tooltip>
     </div>
     <span class="p-sm muted find-count" data-testid="http-find-count">
       {{ totalMatches === 0 ? '0 of 0' : `${displayIndex} of ${totalMatches}` }}
     </span>
-    <IconButton
-      icon="chevron-up"
-      v-tooltip="'Previous match'"
-      data-testid="http-find-prev"
-      @click="goPrev"
-    />
-    <IconButton
-      icon="chevron-down"
-      v-tooltip="'Next match'"
-      data-testid="http-find-next"
-      @click="goNext"
-    />
-    <IconButton
-      icon="close"
-      class="p-push"
-      v-tooltip="'Close'"
-      data-testid="http-find-close"
-      @click="close"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira-icon" aria-label="Previous match" data-testid="http-find-prev" @click="goPrev">
+          <CodiconIcon name="chevron-up" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Previous match</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira-icon" aria-label="Next match" data-testid="http-find-next" @click="goNext">
+          <CodiconIcon name="chevron-down" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Next match</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira-icon" class="p-push" aria-label="Close" data-testid="http-find-close" @click="close">
+          <CodiconIcon name="close" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Close</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -201,10 +232,6 @@ onMounted(() => {
 
 .find-input {
   @apply w-[200px] shrink-0;
-}
-
-.find-input :deep(.p-input) {
-  @apply w-full;
 }
 
 .find-count {

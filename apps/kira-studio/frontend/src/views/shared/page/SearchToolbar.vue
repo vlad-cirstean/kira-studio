@@ -1,7 +1,8 @@
 <script setup lang="ts" generic="M extends { row: number }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import type { SearchHandle } from './scan';
@@ -44,12 +45,10 @@ function toggleFilter(): void {
   pageSearchFilterStore.setSearchFiltering(props.tabId, !filtering.value);
 }
 
-// Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
-// read as a type-only use of the TextField import above — it's a real component, bound as a
-// value by the template below. See ConsoleSavedMenu.vue's promptInput for the same pattern:
-// TextField wraps the real <input> inside its own root <span> (P4) and isn't defineExpose'd, so
-// the focus target is reached via the component's $el, which Vue always exposes on a template
-// ref regardless of defineExpose.
+// Typed as the bare $el shape (rather than InstanceType<typeof Input>) so this ref doesn't read
+// as a type-only use of the Input import above — it's a real component, bound as a value by the
+// template below. Input's own root *is* the `<input>` itself, so `$el` is the focus target
+// directly, no inner-element lookup needed.
 const searchInput = ref<{ $el: HTMLElement } | null>(null);
 
 const query = ref('');
@@ -231,7 +230,7 @@ onMounted(() => {
   // This component is mounted fresh each time its host toolbar opens (both from the toolbar
   // button and from Cmd+F), so onMounted fires exactly then — the right place to autofocus so
   // typing can start immediately without an extra click into the field.
-  void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
+  void nextTick(() => searchInput.value?.$el.focus());
 });
 
 onUnmounted(() => {
@@ -261,12 +260,13 @@ onUnmounted(() => {
       <CodiconIcon name="search" :size="13" />
     </span>
     <div class="search-input">
-      <TextField
+      <Input
         ref="searchInput"
         v-model="query"
         placeholder="Find"
+        class="w-full"
         :data-testid="`${testidPrefix}search-input`"
-        :invalid="!!errorMessage"
+        :aria-invalid="!!errorMessage"
       />
     </div>
     <!-- Case/Word/Regex are three independent toggles (all three can be on at once), not a
@@ -274,27 +274,51 @@ onUnmounted(() => {
          only models "exactly one option selected") — the same three codicons VS Code's own
          find widget uses for this. -->
     <div class="group">
-      <IconButton
-        icon="case-sensitive"
-        :active="matchCase"
-        v-tooltip="'Match case'"
-        :data-testid="`${testidPrefix}search-match-case`"
-        @click="matchCase = !matchCase"
-      />
-      <IconButton
-        icon="whole-word"
-        :active="wholeWord"
-        v-tooltip="'Whole word'"
-        :data-testid="`${testidPrefix}search-whole-word`"
-        @click="wholeWord = !wholeWord"
-      />
-      <IconButton
-        icon="regex"
-        :active="regex"
-        v-tooltip="'Regular expression'"
-        :data-testid="`${testidPrefix}search-regex`"
-        @click="regex = !regex"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': matchCase }"
+            aria-label="Match case"
+            :data-testid="`${testidPrefix}search-match-case`"
+            @click="matchCase = !matchCase"
+          >
+            <CodiconIcon name="case-sensitive" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Match case</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': wholeWord }"
+            aria-label="Whole word"
+            :data-testid="`${testidPrefix}search-whole-word`"
+            @click="wholeWord = !wholeWord"
+          >
+            <CodiconIcon name="whole-word" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Whole word</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': regex }"
+            aria-label="Regular expression"
+            :data-testid="`${testidPrefix}search-regex`"
+            @click="regex = !regex"
+          >
+            <CodiconIcon name="regex" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Regular expression</TooltipContent>
+      </Tooltip>
     </div>
 
     <div class="sep" />
@@ -303,15 +327,23 @@ onUnmounted(() => {
          group, flanked by .sep on both sides, since case/word/regex say *how to match* and this
          (with prev/next) says *what to do with the matches*. -->
     <div class="group">
-      <IconButton
-        icon="filter"
-        :active="filtering"
-        v-tooltip="
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': filtering }"
+            aria-label="Show only matching rows"
+            :data-testid="`${testidPrefix}search-filter-rows`"
+            @click="toggleFilter"
+          >
+            <CodiconIcon name="filter" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{
           filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
-        "
-        :data-testid="`${testidPrefix}search-filter-rows`"
-        @click="toggleFilter"
-      />
+        }}</TooltipContent>
+      </Tooltip>
     </div>
 
     <div class="sep" />
@@ -348,18 +380,22 @@ onUnmounted(() => {
         </template>
         <template v-else>0 of 0</template>
       </span>
-      <IconButton
-        icon="chevron-up"
-        v-tooltip="'Previous match'"
-        :data-testid="`${testidPrefix}search-prev`"
-        @click="goPrev"
-      />
-      <IconButton
-        icon="chevron-down"
-        v-tooltip="'Next match'"
-        :data-testid="`${testidPrefix}search-next`"
-        @click="goNext"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="toolbar" size="kira-icon" aria-label="Previous match" :data-testid="`${testidPrefix}search-prev`" @click="goPrev">
+            <CodiconIcon name="chevron-up" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Previous match</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="toolbar" size="kira-icon" aria-label="Next match" :data-testid="`${testidPrefix}search-next`" @click="goNext">
+            <CodiconIcon name="chevron-down" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Next match</TooltipContent>
+      </Tooltip>
       <div class="sep" />
       <span class="p-xs dim" :data-testid="`${testidPrefix}search-scope`">
         <template v-if="filtering && filteredRowCount !== null">
@@ -375,13 +411,14 @@ onUnmounted(() => {
         search matches stored values, not displayed ones
       </span>
     </template>
-    <IconButton
-      icon="close"
-      class="p-push"
-      v-tooltip="'Close'"
-      :data-testid="`${testidPrefix}search-close`"
-      @click="close"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira-icon" class="p-push" aria-label="Close" :data-testid="`${testidPrefix}search-close`" @click="close">
+          <CodiconIcon name="close" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Close</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -392,16 +429,8 @@ onUnmounted(() => {
   @apply bg-elevated;
 }
 
-/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
-   (see TextField.vue's inheritAttrs:false), so the fixed width lives on this wrapper instead of
-   a class/style on the <TextField> tag itself (DocumentView.vue's own `.filter-field`
-   precedent). */
 .search-input {
   @apply w-[200px] shrink-0;
-}
-
-.search-input :deep(.p-input) {
-  @apply w-full;
 }
 
 .search-count {

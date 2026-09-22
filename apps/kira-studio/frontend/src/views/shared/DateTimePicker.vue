@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 
 // P24 D18: the app-owned month grid + clock steppers that replace the bare
@@ -199,11 +201,10 @@ const pageNextTitle = computed(() =>
   mode.value === 'days' ? 'Next month' : mode.value === 'months' ? 'Next year' : 'Next 16 years',
 );
 
-// The three clock steppers, each a writable computed so <TextField type="number"> can v-model
-// straight onto it — TextField already draws the app-owned up/down stepper (primitives.css's
-// .stepper), so nothing here needs to reinvent that chrome, only clamp what a hand-typed value
-// (as opposed to a stepper click, which stepUp/stepDown already keeps in range) can push out of
-// range.
+// The three clock steppers, each a writable computed so <Input type="number"> can v-model
+// straight onto it — the browser's own native number stepper handles the chrome, so nothing
+// here needs to reinvent it, only clamp what a hand-typed value (as opposed to a stepper click,
+// which stepUp/stepDown already keeps in range) can push out of range.
 const hourText = computed<string>({
   get: () => String(selected.value.h).padStart(2, '0'),
   set: (v) => {
@@ -236,27 +237,47 @@ const secondText = computed<string>({
 <template>
   <div class="dtp" data-testid="datetime-picker">
     <div class="dtp-month-row">
-      <IconButton
-        icon="chevron-left"
-        data-testid="datetime-picker-prev-month"
-        v-tooltip="pagePrevTitle"
-        @click="pagePrev"
-      />
-      <button
-        type="button"
-        class="dtp-month-label"
-        data-testid="datetime-picker-month"
-        v-tooltip="'Jump by month or year'"
-        @click="cycleMode"
-      >
-        {{ labelText }}
-      </button>
-      <IconButton
-        icon="chevron-right"
-        data-testid="datetime-picker-next-month"
-        v-tooltip="pageNextTitle"
-        @click="pageNext"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Previous"
+            data-testid="datetime-picker-prev-month"
+            @click="pagePrev"
+          >
+            <CodiconIcon name="chevron-left" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ pagePrevTitle }}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="dtp-month-label"
+            data-testid="datetime-picker-month"
+            @click="cycleMode"
+          >
+            {{ labelText }}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Jump by month or year</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Next"
+            data-testid="datetime-picker-next-month"
+            @click="pageNext"
+          >
+            <CodiconIcon name="chevron-right" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ pageNextTitle }}</TooltipContent>
+      </Tooltip>
     </div>
     <div class="dtp-body" data-testid="datetime-picker-mode" :data-mode="mode">
       <template v-if="mode === 'days'">
@@ -309,30 +330,40 @@ const secondText = computed<string>({
       </div>
     </div>
     <div class="dtp-clock">
-      <TextField
+      <Input
         v-model="hourText"
         type="number"
         min="0"
         max="23"
+        class="w-[52px]"
         data-testid="datetime-picker-hour"
       />
       <span class="dtp-clock-sep">:</span>
-      <TextField
+      <Input
         v-model="minuteText"
         type="number"
         min="0"
         max="59"
+        class="w-[52px]"
         data-testid="datetime-picker-minute"
       />
       <span class="dtp-clock-sep">:</span>
-      <TextField
+      <Input
         v-model="secondText"
         type="number"
         min="0"
         max="59"
+        class="w-[52px]"
         data-testid="datetime-picker-second"
       />
-      <IconButton icon="clock" data-testid="datetime-picker-now" v-tooltip="'Now'" @click="pickNow" />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="toolbar" size="kira-icon" aria-label="Now" data-testid="datetime-picker-now" @click="pickNow">
+            <CodiconIcon name="clock" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Now</TooltipContent>
+      </Tooltip>
     </div>
   </div>
 </template>
@@ -341,7 +372,7 @@ const secondText = computed<string>({
 @reference "@theme/base.css";
 
 .dtp {
-  @apply flex flex-col gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
+  @apply flex flex-col gap-1 p-1.5;
 }
 
 .dtp-month-row {
@@ -351,7 +382,7 @@ const secondText = computed<string>({
 /* P42 D33a: a plain <button> now, so the label itself is the mode-cycling control — reset to
    look like the <span> it replaces rather than a bordered control. */
 .dtp-month-label {
-  @apply border-0 bg-none rounded-kira-sm text-[length:var(--kira-t-sm)] font-[inherit] text-fg cursor-pointer py-[var(--kira-s-1)] px-[var(--kira-s-2)];
+  @apply border-0 bg-none rounded-kira-sm text-kira-sm font-[inherit] text-fg cursor-pointer py-0.5 px-1;
 }
 
 .dtp-month-label:hover {
@@ -370,29 +401,25 @@ const secondText = computed<string>({
 }
 
 .dtp-weekday {
-  @apply flex items-center justify-center text-subtle text-[length:var(--kira-t-xs)] h-[var(--kira-h-xs)];
+  @apply flex items-center justify-center text-subtle text-kira-xs h-4.5;
 }
 
 .dtp-day {
-  @apply w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-[var(--kira-h-sm)];
+  @apply w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-5.5;
 }
 
 .dtp-day.is-today {
   @apply border-border-strong;
 }
 
-/* text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to
-   --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */
+/* bg-primary/text-primary-foreground, never bg-accent: shadcn-bridge.css maps --color-accent to
+   --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input. */
 .dtp-day.is-selected {
-  @apply bg-[var(--kira-accent)] text-[var(--kira-accent-fg)];
+  @apply bg-primary text-primary-foreground;
 }
 
 .dtp-clock {
-  @apply flex items-center border-t border-border gap-[var(--kira-s-1)] pt-[var(--kira-s-2)];
-}
-
-.dtp-clock :deep(.p-input) {
-  @apply w-[52px];
+  @apply flex items-center border-t border-border gap-0.5 pt-1;
 }
 
 .dtp-clock-sep {

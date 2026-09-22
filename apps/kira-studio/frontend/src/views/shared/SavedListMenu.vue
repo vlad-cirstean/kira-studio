@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 
 // Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
@@ -63,19 +64,30 @@ defineSlots<{
         :data-testid="savedEntryTestId"
         @click="emit('apply', entry)"
       >
-        <button
-          type="button"
-          class="pin-button"
-          :class="{ pinned: isPinned(entry) }"
-          v-tooltip="'Pin'"
-          @click.stop="emit('togglePin', entry)"
-        >
-          <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="pin-button"
+              :class="{ pinned: isPinned(entry) }"
+              @click.stop="emit('togglePin', entry)"
+            >
+              <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Pin</TooltipContent>
+        </Tooltip>
         <slot name="entry" :entry="entry" />
         <span class="entry-actions">
           <slot name="entry-actions" :entry="entry" />
-          <IconButton icon="trash" v-tooltip="'Delete'" @click.stop="emit('delete', entry)" />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="toolbar" size="kira-icon" aria-label="Delete" @click.stop="emit('delete', entry)">
+                <CodiconIcon name="trash" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
         </span>
       </div>
 
@@ -107,7 +119,7 @@ defineSlots<{
 }
 
 .empty-row {
-  @apply py-[var(--kira-s-2)] px-[var(--kira-s-3)];
+  @apply py-1 px-1.5;
 }
 
 .entry-row {
@@ -129,6 +141,6 @@ defineSlots<{
 }
 
 .entry-actions {
-  @apply flex shrink-0 gap-[var(--kira-s-1)];
+  @apply flex shrink-0 gap-0.5;
 }
 </style>

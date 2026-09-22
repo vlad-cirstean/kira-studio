@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
@@ -42,11 +43,11 @@ const textPrompt = ref<{
   value: string;
   resolve: (v: string | null) => void;
 } | null>(null);
-const promptInput = ref<HTMLInputElement | null>(null);
+const promptInput = ref<{ $el: HTMLElement } | null>(null);
 function promptText(title: string, initial: string): Promise<string | null> {
   return new Promise((resolve) => {
     textPrompt.value = { title, value: initial, resolve };
-    void nextTick(() => promptInput.value?.focus());
+    void nextTick(() => promptInput.value?.$el.focus());
   });
 }
 function submitPrompt(): void {
@@ -159,26 +160,35 @@ async function saveCurrent(): Promise<void> {
       <!-- P31 D27/F27: full, untruncated text — the popover is 320px and a WHERE/ORDER BY clause
            routinely isn't, so truncation here is structural, not a sizing accident. AppTooltip is
            already max-width: 320px; white-space: pre-wrap, so a long clause wraps instead. -->
-      <span
-        v-if="isSaved(entry)"
-        class="entry-name"
-        v-tooltip="`${entry.name}\n${summarize(entry.body.where, entry.body.orderBy)}`"
-        >{{ entry.name }}</span
-      >
-      <span
-        v-else
-        class="entry-name mono"
-        v-tooltip="summarize(entry.where, entry.orderBy)"
-        >{{ summarize(entry.where, entry.orderBy) }}</span
-      >
+      <Tooltip v-if="isSaved(entry)">
+        <TooltipTrigger as-child>
+          <span class="entry-name">{{ entry.name }}</span>
+        </TooltipTrigger>
+        <TooltipContent class="whitespace-pre-wrap"
+          >{{ entry.name }}&#10;{{ summarize(entry.body.where, entry.body.orderBy) }}</TooltipContent
+        >
+      </Tooltip>
+      <Tooltip v-else>
+        <TooltipTrigger as-child>
+          <span class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ summarize(entry.where, entry.orderBy) }}</TooltipContent>
+      </Tooltip>
     </template>
     <template #entry-actions="{ entry }">
-      <IconButton
-        v-if="isSaved(entry)"
-        icon="edit"
-        v-tooltip="'Rename'"
-        @click.stop="rename(entry)"
-      />
+      <Tooltip v-if="isSaved(entry)">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Rename"
+            @click.stop="rename(entry)"
+          >
+            <CodiconIcon name="edit" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Rename</TooltipContent>
+      </Tooltip>
     </template>
     <template #footer>
       <div class="p-sep" />
@@ -192,27 +202,23 @@ async function saveCurrent(): Promise<void> {
   <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
     <div class="prompt-box p-float">
       <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-      <!-- Left as a raw .p-input-styled <input> rather than <TextField>: promptInput is a
-           template ref used imperatively (`promptInput.value?.focus()` above) to autofocus this
-           field when the prompt opens. TextField has no defineExpose, so a ref on it resolves to
-           the component instance, not the inner <input> — that focus() call would break
-           (rule 3: correctness over consistency). -->
-      <span class="p-input md">
-        <input
-          ref="promptInput"
-          v-model="textPrompt.value"
-          type="text"
-          data-testid="text-prompt-input"
-          @keydown="wrapSelectionOnType"
-          @keydown.enter="submitPrompt"
-          @keydown.escape="cancelPrompt"
-        />
-      </span>
+      <!-- Input's own root *is* the <input> itself, so promptInput's $el (used imperatively above
+           to autofocus this field when the prompt opens) reaches it directly. -->
+      <Input
+        ref="promptInput"
+        v-model="textPrompt.value"
+        type="text"
+        class="w-full"
+        data-testid="text-prompt-input"
+        @keydown="wrapSelectionOnType"
+        @keydown.enter="submitPrompt"
+        @keydown.escape="cancelPrompt"
+      />
       <div class="prompt-actions">
-        <AppButton kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </AppButton>
-        <AppButton kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
+        <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt">Cancel</Button>
+        <Button variant="dialog-primary" size="kira-lg" data-testid="text-prompt-ok" @click="submitPrompt">
           OK
-        </AppButton>
+        </Button>
       </div>
     </div>
   </div>
@@ -221,11 +227,10 @@ async function saveCurrent(): Promise<void> {
 <style scoped>
 @reference "@theme/base.css";
 
-/* text-[var(--kira-accent)], not the text-accent utility — shadcn-bridge.css maps --color-accent
-   to --kira-hover (grey), same precedent api/CollectionRow.vue's rename-input already documents
-   (Part 3). */
+/* text-primary, never text-accent — shadcn-bridge.css maps --color-accent to --kira-hover
+   (grey), same precedent api/CollectionRow.vue's rename-input already documents. */
 .save-current {
-  @apply w-full cursor-pointer text-[var(--kira-accent)];
+  @apply w-full cursor-pointer text-primary;
 }
 
 .prompt-scrim {
@@ -238,10 +243,10 @@ async function saveCurrent(): Promise<void> {
 }
 
 .prompt-box {
-  @apply w-[280px] flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
+  @apply w-[280px] flex flex-col gap-1.5 p-2;
 }
 
 .prompt-actions {
-  @apply flex justify-end gap-[var(--kira-s-3)];
+  @apply flex justify-end gap-1.5;
 }
 </style>
