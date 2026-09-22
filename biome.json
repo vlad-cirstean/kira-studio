@@ -367,6 +367,26 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/workbench/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["**/apps/**", "@/*"],
+                    "message": "P103 §10: packages/workbench is shared between both apps — it must not import either app's own code."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   ]
 }

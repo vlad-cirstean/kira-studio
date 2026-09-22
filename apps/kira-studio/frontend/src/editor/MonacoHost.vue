@@ -5,18 +5,18 @@
 // same shape as `CodeMirrorHost.vue`, restated for Monaco's own API rather than redesigned.
 
 import type { EditorLanguageId } from '@shared/domain/editor';
+import {
+  KIRA_EDITOR_THEME,
+  loadMonaco,
+  type MonacoModule,
+  overflowWidgetsContainer,
+} from '@workbench/editor/monaco';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import type { SqlDialect } from '../views/shared/sqlIdent';
 import type { EditorCompletionKind, EditorCompletionSource } from './completion';
 import type { ConsoleDiagnostic } from './diagnostics';
 import type { ConsoleHoverInfo } from './hoverInfo';
-import {
-  KIRA_EDITOR_THEME,
-  loadMonaco,
-  type MonacoModule,
-  overflowWidgetsContainer,
-} from './monaco';
 import { monacoLanguageIdFor } from './monacoLanguages';
 import type { RangeHighlight } from './ranges';
 

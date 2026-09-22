@@ -3,11 +3,11 @@ import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
 import AppButton from '@theme/primitives/AppButton.vue';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
-import { KIRA_EDITOR_THEME, loadMonaco } from '../../editor/monaco';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 

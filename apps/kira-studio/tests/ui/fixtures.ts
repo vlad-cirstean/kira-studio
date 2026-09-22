@@ -1,9 +1,14 @@
+import { resolve } from 'node:path';
 import { test as base, type Page } from '@playwright/test';
+import { startServer, type UiServer } from '@workbench/testing/ui/server';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { mergeBootSnapshots } from './support/bootSnapshots';
 import { type ControlMockHandle, installControlMocks } from './support/mockRuntime';
 import { installMockStream, type MockStreamHandle } from './support/mockStream';
-import { startServer, type UiServer } from './support/server';
+
+// P103 Part 4 (closing audit, §10): tests/ui/support/server.ts hoisted to
+// @workbench/testing/ui/server — see that file's own doc comment for why it now takes `distDir`.
+const DIST_DIR = resolve(__dirname, '../../frontend/dist');
 
 export interface KiraApp {
   window: Page;
@@ -48,7 +53,7 @@ export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
   uiServer: [
     // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
     async ({}, use) => {
-      const server = await startServer();
+      const server = await startServer(DIST_DIR);
       await use(server);
       await server.close();
     },

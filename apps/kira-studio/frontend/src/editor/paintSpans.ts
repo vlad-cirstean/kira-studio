@@ -1,4 +1,4 @@
-import type { MonacoModule } from './monaco';
+import type { MonacoModule } from '@workbench/editor/monaco';
 
 // P60a §5/D3: `AutocompleteField.vue`'s overlay is paint-only — a full editor per filter field is
 // the wrong shape (§5's own OQ-2 recommendation). `monaco.editor.colorize()` already does the

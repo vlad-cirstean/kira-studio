@@ -1,11 +1,11 @@
 import { VueQueryPlugin } from '@tanstack/vue-query';
+import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { useCodeReposStore } from './state/coderepos';
 import { useGitClientsStore } from './state/gitClients';
 import { useLayoutStore } from './state/layout';
 import { pinia } from './state/pinia';
-import { queryClient } from './state/queryClient';
 import { ensureWorkspaceShell } from './state/repoTabs';
 import { useSettingsStore } from './state/settings';
 import { useTabsStore } from './state/tabs';

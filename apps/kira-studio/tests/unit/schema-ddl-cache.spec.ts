@@ -13,7 +13,7 @@ import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { ensureDdl, saveDdl, schemaQueryKey } = await import('../../frontend/src/state/schemas');
-const { queryClient } = await import('../../frontend/src/state/queryClient');
+const { queryClient } = await import('@workbench/state/queryClient');
 
 function deferred<T>(): {
   promise: Promise<T>;

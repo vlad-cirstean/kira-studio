@@ -1,6 +1,7 @@
 import type { CacheStats, CountRequestWire, CountResponse } from '@shared/protocol/data-ops';
 import { pageChunks } from '@shared/protocol/page';
 import { VueQueryPlugin } from '@tanstack/vue-query';
+import { queryClient } from '@workbench/state/queryClient';
 import { createApp } from 'vue';
 import App from './App.vue';
 import { control } from './bridge/control';
@@ -18,7 +19,6 @@ import { useKeepAwakeStore } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
 import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
-import { queryClient } from './state/queryClient';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 import '@theme/base.css';

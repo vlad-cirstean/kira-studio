@@ -1,17 +1,26 @@
-// P60a §2.1/D2 (Kira Studio's own editor/monaco.ts): the engine-generic half of what
-// `views/repo/monaco.ts` (C5/C6) built — `loadMonaco`/`MonacoModule`/the theme definition.
+// P60a §2.1/D2: the engine-generic half of what `views/repo/monaco.ts` (C5/C6) built —
+// `loadMonaco`/`MonacoModule`/the theme definition — moved here so every editor surface in Kira
+// Studio (not only the repo workspace) shared the one memoised bootstrap. `views/repo/monaco.ts`
+// used to re-export everything below unchanged, so RepoFileView.vue/RepoDiffView.vue/navigation.ts
+// needed no edit; P100 Part 2 moved the repo workspace itself to apps/kira-space, taking its own
+// duplicate of this file with it (`monacoEntry.ts` moved alongside, since Kira Studio keeps its own
+// non-git Monaco bootstrap too).
 //
-// P103 Part 1: `monacoEntry.ts`/`monacoTheme.ts` (and the monarch grammars beneath them) — this
-// file's own header used to record why they were duplicated rather than shared (no package
-// boundary between the two frontends existed yet) — hoisted to `@workbench/editor/*`. This file's
-// own dynamic imports below point there now. `MonacoModule`/`KIRA_EDITOR_THEME` moved with
-// `monacoTheme.ts` — re-exported here unchanged so `views/repo/monaco.ts` and every other consumer
-// in this app keeps importing them from here. `cssVar` moved too but had no consumer outside
-// monacoTheme.ts itself in either app, so it isn't re-exported here.
-export type { MonacoModule } from '@workbench/editor/monacoTheme';
-export { KIRA_EDITOR_THEME } from '@workbench/editor/monacoTheme';
+// P103 Part 1: `monacoEntry.ts`/`monacoTheme.ts` (and the monarch grammars beneath them) hoisted to
+// `@workbench/editor/*`, byte-identical between both apps — this file's own dynamic imports below
+// point there. `MonacoModule`/`KIRA_EDITOR_THEME` moved with `monacoTheme.ts` — re-exported here
+// unchanged so every consumer keeps importing them from here. `cssVar` moved too but had no
+// consumer outside monacoTheme.ts itself in either app, so it isn't re-exported here.
+//
+// P103 Part 4 (closing audit, §10): this file itself had stayed a per-app duplicate through Parts
+// 1-3 — code-identical, comment-only diff — because it was never named in either part's own scope
+// (§4.3 deferred it to Part 2 "if either is a candidate", Part 2 never revisited it). No app-local
+// coupling of its own (only `@workbench/editor/*` imports), so it hoists here unchanged, closing
+// the last real gap the audit's comment-blind sweep found.
+export type { MonacoModule } from './monacoTheme';
+export { KIRA_EDITOR_THEME } from './monacoTheme';
 
-import type { MonacoModule } from '@workbench/editor/monacoTheme';
+import type { MonacoModule } from './monacoTheme';
 
 // D2 (from format.ts's own precedent): memoised so only the first editor surface in a session ever
 // pays the import cost — a session that opens neither an editor nor a repo file never downloads
@@ -67,10 +76,10 @@ export function overflowWidgetsContainer(): HTMLElement {
  *  load — every subsequent call reuses the same resolved module. */
 export function loadMonaco(): Promise<MonacoModule> {
   if (!monacoModule) {
-    monacoModule = import('@workbench/editor/monacoEntry')
+    monacoModule = import('./monacoEntry')
       .then(async (mod) => {
         wireWorker(mod);
-        const { defineKiraTheme } = await import('@workbench/editor/monacoTheme');
+        const { defineKiraTheme } = await import('./monacoTheme');
         defineKiraTheme(mod);
         return mod;
       })

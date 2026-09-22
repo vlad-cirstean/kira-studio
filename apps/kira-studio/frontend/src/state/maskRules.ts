@@ -11,8 +11,8 @@
 // whose own `enabled`/auto-fetch subsumes the old explicit "loaded?" check.
 
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
+import { queryClient } from '@workbench/state/queryClient';
 import { control } from '../bridge/control';
-import { queryClient } from './queryClient';
 
 export function maskRulesQueryKey(connectionId: string): readonly ['maskRules', string] {
   return ['maskRules', connectionId] as const;

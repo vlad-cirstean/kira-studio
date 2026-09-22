@@ -1,6 +1,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import { useMutation } from '@tanstack/vue-query';
+import { queryClient } from '@workbench/state/queryClient';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -8,7 +9,6 @@ import type { EditorCompletionSource } from '../editor/completion';
 import { type DdlSchema, EMPTY_DDL_SCHEMA, parseDdl } from '../views/console/ddl';
 import { sqlKeywordCompletionSource } from '../views/console/sqlKeywordCompletion';
 import { type SqlDialect, sqlDialectFor } from '../views/shared/sqlIdent';
-import { queryClient } from './queryClient';
 
 // P18 (v1.1) D2/D4: each connection's own pasted DDL document — app-wide like
 // connections/settings/layout (docs/ARCHITECTURE.md's Multi-window section), keyed by
