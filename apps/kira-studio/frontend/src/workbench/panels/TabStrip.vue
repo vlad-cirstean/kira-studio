@@ -111,7 +111,12 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
       label: 'Close to the right',
       run: () => tabsStore.closeToTheRight(tab.id),
     },
-    { type: 'item', id: 'close-all', label: 'Close all', run: () => tabsStore.closeAll() },
+    {
+      type: 'item',
+      id: 'close-all',
+      label: 'Close all',
+      run: () => tabsStore.closeAll(modeStore.active),
+    },
     { type: 'separator' },
     {
       type: 'item',

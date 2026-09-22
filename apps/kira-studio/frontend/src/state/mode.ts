@@ -4,7 +4,6 @@ import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { STUDIO_TAB_KIND_MODE, type TabRecord } from './tabDomain';
-import { TAB_KINDS } from './tabKinds';
 import { useTabsStore } from './tabs';
 
 // P100 Part 2: WorkspaceKey (packages/shared/domain/workspace.ts) collapsed into AppMode — 'git'
@@ -67,19 +66,10 @@ export function workspaceKeyOf(tab: TabRecord): AppMode {
   return (tab.workspaceId as AppMode | null) ?? (STUDIO_TAB_KIND_MODE[tab.kind] as AppMode);
 }
 
-/** Every tab in workspace `key` — a genuine stable partition (§6.1): every pinned-kind tab of
- *  `key` first (in their existing relative order), then
- *  the rest (ditto), regardless of where each sits in `tabsState.tabs`. Computed here rather than
- *  relied on as an insertion-order invariant, so the guarantee survives any past or future
- *  tab-insertion path (splice, restore, moveTab) without each one having to remember to preserve
- *  it. Two-pass filter/concat, not a comparator sort — a sort's stability is not a property to lean
- *  on here. */
+// P103 Part 2 (§5.2): the stable pinned-first partition itself moved into
+// packages/workbench/src/state/createTabsStore.ts's own `tabsForWorkspace` (identical logic, `K`
+// generic) — this stays a thin re-export so every existing `tabsForWorkspace(key)` call site here
+// is unchanged.
 export function tabsForWorkspace(key: AppMode): TabRecord[] {
-  const pinned: TabRecord[] = [];
-  const rest: TabRecord[] = [];
-  for (const t of useTabsStore().tabs) {
-    if (workspaceKeyOf(t) !== key) continue;
-    (TAB_KINDS[t.kind].pinned ? pinned : rest).push(t);
-  }
-  return [...pinned, ...rest];
+  return useTabsStore().tabsForWorkspace(key);
 }

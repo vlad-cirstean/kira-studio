@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["bun-types"],
+    // Each consuming app's own tsconfig already type-checks this package's source (its own
+    // "include" pulls in packages/workbench/src) — this file exists only so `bun test` can resolve
+    // a real (non-type-only) cross-package import reached with packages/workbench/src itself as
+    // the nearest tsconfig, the way createTerminalTabs.ts's canonicalPath import needs.
+    "paths": {
+      "@shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}
