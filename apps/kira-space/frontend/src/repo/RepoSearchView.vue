@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+// P104 §3.4: VirtualList's @tanstack/vue-virtual recipe is a genuinely separate, non-mechanical
+// piece of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, ref } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
@@ -88,53 +92,83 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
   <div class="repo-search-view">
     <div class="repo-search-toolbar" @keydown="onQueryKeydown">
       <div class="repo-search-input">
-        <TextField
-          v-model="query"
+        <Input
+          :model-value="query"
           placeholder="Search"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2"
           data-testid="repo-search-query"
-          :invalid="!!error"
+          :aria-invalid="!!error"
+          @update:model-value="(v) => (query = String(v))"
         />
       </div>
       <!-- Case/Word/Regex: three independent toggles, not a single-value picker — the same three
            codicons SearchToolbar.vue's own find widget uses, so the two surfaces read as one
            vocabulary (D13). -->
       <div class="group">
-        <IconButton
-          icon="case-sensitive"
-          :active="options.caseSensitive"
-          v-tooltip="'Match case'"
-          data-testid="repo-search-case"
-          @click="onToggleOption('caseSensitive')"
-        />
-        <IconButton
-          icon="whole-word"
-          :active="options.wholeWord"
-          v-tooltip="'Whole word'"
-          data-testid="repo-search-whole-word"
-          @click="onToggleOption('wholeWord')"
-        />
-        <IconButton
-          icon="regex"
-          :active="options.regex"
-          v-tooltip="'Regular expression'"
-          data-testid="repo-search-regex"
-          @click="onToggleOption('regex')"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': options.caseSensitive }"
+              data-testid="repo-search-case"
+              @click="onToggleOption('caseSensitive')"
+            >
+              <CodiconIcon name="case-sensitive" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Match case</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': options.wholeWord }"
+              data-testid="repo-search-whole-word"
+              @click="onToggleOption('wholeWord')"
+            >
+              <CodiconIcon name="whole-word" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Whole word</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': options.regex }"
+              data-testid="repo-search-regex"
+              @click="onToggleOption('regex')"
+            >
+              <CodiconIcon name="regex" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Regular expression</TooltipContent>
+        </Tooltip>
       </div>
-      <IconButton
-        v-if="running"
-        icon="debug-stop"
-        v-tooltip="'Stop'"
-        data-testid="repo-search-stop"
-        @click="repoSearchStore.cancelRepoSearch(repoId)"
-      />
-      <IconButton
-        v-else
-        icon="search"
-        v-tooltip="'Search'"
-        data-testid="repo-search-run"
-        @click="runSearch"
-      />
+      <Tooltip v-if="running">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            data-testid="repo-search-stop"
+            @click="repoSearchStore.cancelRepoSearch(repoId)"
+          >
+            <CodiconIcon name="debug-stop" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Stop</TooltipContent>
+      </Tooltip>
+      <Tooltip v-else>
+        <TooltipTrigger as-child>
+          <Button variant="toolbar" size="kira-icon" data-testid="repo-search-run" @click="runSearch">
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Search</TooltipContent>
+      </Tooltip>
     </div>
     <div v-if="error" class="p-strip note error-note" data-testid="repo-search-error">
       {{ error }}
@@ -168,15 +202,11 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 }
 
 .repo-search-toolbar {
-  @apply flex items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-4)];
+  @apply flex items-center gap-1 py-1 px-2;
 }
 
 .repo-search-input {
   @apply flex-1 min-w-0;
-}
-
-.repo-search-input :deep(.p-input) {
-  @apply w-full;
 }
 
 .group {
@@ -184,7 +214,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 }
 
 .repo-search-status {
-  @apply mt-0 mx-[var(--kira-s-4)] mb-[var(--kira-s-2)];
+  @apply mt-0 mx-2 mb-1;
 }
 
 .error-note {

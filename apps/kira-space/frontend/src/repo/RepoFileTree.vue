@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// P104 §3.4: same @tanstack/vue-virtual recipe VirtualList needs -- a genuinely separate,
+// non-mechanical piece of work, not attempted in this pass (same deferral as OperationsPanel.vue's
+// own).
 import TreeHost from '@theme/primitives/TreeHost.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';

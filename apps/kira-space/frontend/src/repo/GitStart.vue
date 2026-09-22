@@ -40,7 +40,7 @@ async function onImport(): Promise<void> {
 @reference "@theme/base.css";
 
 .start {
-  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-[var(--kira-s-6)];
+  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-4;
 }
 
 .start-inner {

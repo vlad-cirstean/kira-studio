@@ -2,12 +2,15 @@
 import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+// P104 §3.4/§3.1/§3.3: VirtualList's @tanstack/vue-virtual recipe, SegmentedControl's ToggleGroup
+// recipe, and PanelShell's inline-composition rewrite are each a genuinely separate, non-mechanical
+// piece of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
 import PanelShell from '@theme/primitives/PanelShell.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
@@ -123,11 +126,12 @@ const textPrompt = ref<{
   value: string;
   resolve: (v: string | null) => void;
 } | null>(null);
-const promptInput = ref<{ $el: HTMLElement } | null>(null);
+// ui/input's root IS the <input> element itself, unlike the old TextField's wrapping <span>.
+const promptInput = ref<{ $el: HTMLInputElement } | null>(null);
 function promptText(title: string, initial: string): Promise<string | null> {
   return new Promise((resolve) => {
     textPrompt.value = { title, value: initial, resolve };
-    void nextTick(() => promptInput.value?.$el.querySelector('input')?.focus());
+    void nextTick(() => promptInput.value?.$el.focus());
   });
 }
 function submitPrompt(): void {
@@ -361,24 +365,36 @@ onUnmounted(() => {
     </template>
     <template #actions>
       <!-- C5 §3.3/§3.4: no new dialog, no new native picker — reuses FilesService.ChooseFolder. -->
-      <IconButton
-        v-if="tab === 'repos'"
-        icon="repo"
-        aria-label="Import repository"
-        v-tooltip="'Import repository…'"
-        data-testid="import-repo"
-        @click="onImport"
-      />
+      <Tooltip v-if="tab === 'repos'">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Import repository"
+            data-testid="import-repo"
+            @click="onImport"
+          >
+            <CodiconIcon name="repo" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Import repository…</TooltipContent>
+      </Tooltip>
       <!-- Files mode only: in Search mode the panel's own tree filter is meaningless, and a tree
            refresh has nothing to do with a search result list. -->
-      <IconButton
-        v-if="tab === 'files' && view === 'files'"
-        icon="refresh"
-        aria-label="Refresh"
-        v-tooltip="'Refresh file tree'"
-        data-testid="repo-refresh"
-        @click="onRefresh"
-      />
+      <Tooltip v-if="tab === 'files' && view === 'files'">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Refresh"
+            data-testid="repo-refresh"
+            @click="onRefresh"
+          >
+            <CodiconIcon name="refresh" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Refresh file tree</TooltipContent>
+      </Tooltip>
     </template>
     <template #body>
       <div class="git-panel-body">
@@ -408,22 +424,33 @@ onUnmounted(() => {
                   />
                 </button>
                 <CodiconIcon name="source-control" :size="16" class="repo-icon" />
-                <span class="repo-name" v-tooltip="repo.root">{{ repo.name }}</span>
-                <span
-                  v-if="repoHeadsStore.repoHeadLabel(repo.id)"
-                  class="repo-head"
-                  v-tooltip="repoHeadsStore.repoHeadLabel(repo.id)"
-                >
-                  {{ repoHeadsStore.repoHeadLabel(repo.id) }}
-                </span>
-                <CodiconIcon
-                  v-if="terminalsStore.terminalCountAtPath(repo.root) > 0"
-                  name="terminal-bash"
-                  :size="12"
-                  class="worktree-badge-icon"
-                  data-testid="repo-terminal-indicator"
-                  v-tooltip="terminalTooltip(terminalsStore.terminalCountAtPath(repo.root))"
-                />
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <span class="repo-name">{{ repo.name }}</span>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ repo.root }}</TooltipContent>
+                </Tooltip>
+                <Tooltip v-if="repoHeadsStore.repoHeadLabel(repo.id)">
+                  <TooltipTrigger as-child>
+                    <span class="repo-head">
+                      {{ repoHeadsStore.repoHeadLabel(repo.id) }}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{{ repoHeadsStore.repoHeadLabel(repo.id) }}</TooltipContent>
+                </Tooltip>
+                <Tooltip v-if="terminalsStore.terminalCountAtPath(repo.root) > 0">
+                  <TooltipTrigger as-child>
+                    <CodiconIcon
+                      name="terminal-bash"
+                      :size="12"
+                      class="worktree-badge-icon"
+                      data-testid="repo-terminal-indicator"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>{{
+                    terminalTooltip(terminalsStore.terminalCountAtPath(repo.root))
+                  }}</TooltipContent>
+                </Tooltip>
               </div>
               <div
                 v-if="worktreesStore.isWorktreesExpanded(repo.id)"
@@ -445,23 +472,37 @@ onUnmounted(() => {
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
-                  <span class="worktree-label" v-tooltip="wt.path">{{ worktreeLabel(wt) }}</span>
-                  <span v-if="wt.isMain" class="worktree-badge" v-tooltip="'Main worktree'">main</span>
-                  <CodiconIcon
-                    v-if="terminalsStore.terminalCountAtPath(wt.path) > 0"
-                    name="terminal-bash"
-                    :size="12"
-                    class="worktree-badge-icon"
-                    data-testid="repo-terminal-indicator"
-                    v-tooltip="terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))"
-                  />
-                  <CodiconIcon
-                    v-if="wt.locked"
-                    name="lock"
-                    :size="12"
-                    class="worktree-badge-icon"
-                    v-tooltip="wt.locked.reason"
-                  />
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span class="worktree-label">{{ worktreeLabel(wt) }}</span>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ wt.path }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip v-if="wt.isMain">
+                    <TooltipTrigger as-child>
+                      <span class="worktree-badge">main</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Main worktree</TooltipContent>
+                  </Tooltip>
+                  <Tooltip v-if="terminalsStore.terminalCountAtPath(wt.path) > 0">
+                    <TooltipTrigger as-child>
+                      <CodiconIcon
+                        name="terminal-bash"
+                        :size="12"
+                        class="worktree-badge-icon"
+                        data-testid="repo-terminal-indicator"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{{
+                      terminalTooltip(terminalsStore.terminalCountAtPath(wt.path))
+                    }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip v-if="wt.locked">
+                    <TooltipTrigger as-child>
+                      <CodiconIcon name="lock" :size="12" class="worktree-badge-icon" />
+                    </TooltipTrigger>
+                    <TooltipContent>{{ wt.locked?.reason }}</TooltipContent>
+                  </Tooltip>
                 </div>
                 <div
                   v-if="worktreesStore.worktreesError(repo.id)"
@@ -536,19 +577,27 @@ onUnmounted(() => {
   <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
     <div class="prompt-box p-float">
       <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-      <TextField
+      <Input
         ref="promptInput"
-        v-model="textPrompt.value"
-        size="md"
+        :model-value="textPrompt.value"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2"
         data-testid="text-prompt-input"
-        @enter="submitPrompt"
+        @update:model-value="(v) => textPrompt && (textPrompt.value = String(v))"
+        @keydown.enter="submitPrompt"
         @keydown.escape="cancelPrompt"
       />
       <div class="prompt-actions">
-        <AppButton kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt">Cancel</AppButton>
-        <AppButton kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
+        <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt"
+          >Cancel</Button
+        >
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="text-prompt-ok"
+          @click="submitPrompt"
+        >
           OK
-        </AppButton>
+        </Button>
       </div>
     </div>
   </div>
@@ -570,7 +619,7 @@ onUnmounted(() => {
 /* P84 §8.2: the Files/Search/Review picker, moved out of the header into a strip above the Files
    tab's own body. */
 .view-strip {
-  @apply shrink-0 px-[var(--kira-s-3)] border-b border-border flex items-center h-[var(--kira-row-height)];
+  @apply shrink-0 px-1.5 border-b border-border flex items-center h-row;
 }
 
 .repo-list {
@@ -578,7 +627,7 @@ onUnmounted(() => {
 }
 
 .repo-row {
-  @apply h-[var(--kira-row-height)] flex items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] cursor-default select-none;
+  @apply h-row flex items-center gap-1 px-1.5 cursor-default select-none;
 }
 
 .repo-row:hover {
@@ -607,7 +656,7 @@ onUnmounted(() => {
    below, so a collapsed row's branch and its expanded children's read as the same class of
    information. */
 .repo-head {
-  @apply flex-none min-w-0 max-w-[45%] overflow-hidden text-ellipsis whitespace-nowrap text-[length:var(--kira-t-sm)] text-subtle;
+  @apply flex-none min-w-0 max-w-[45%] overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle;
 }
 
 .repo-twisty { /* RepoTreeRow.vue's .twisty, ported */
@@ -615,7 +664,7 @@ onUnmounted(() => {
 }
 
 .worktree-row {
-  @apply h-[var(--kira-row-height)] flex items-center gap-[var(--kira-s-2)] cursor-default select-none text-[length:var(--kira-t-sm)] text-muted;
+  @apply h-row flex items-center gap-1 cursor-default select-none text-kira-sm text-muted;
   /* Indent to the repo name's own left edge: the row's padding, plus the twisty and its gap. */
   padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
 }
@@ -645,7 +694,7 @@ onUnmounted(() => {
 }
 
 .worktree-badge {
-  @apply shrink-0 text-[length:var(--kira-t-sm)] text-subtle;
+  @apply shrink-0 text-kira-sm text-subtle;
 }
 
 .worktree-badge-icon {
@@ -653,7 +702,7 @@ onUnmounted(() => {
 }
 
 .worktree-note {
-  @apply text-[length:var(--kira-t-sm)] text-subtle;
+  @apply text-kira-sm text-subtle;
   padding: 0 var(--kira-s-3) 0 calc(var(--kira-s-3) + 14px + var(--kira-s-2));
 }
 .worktree-note.error {
@@ -676,10 +725,10 @@ onUnmounted(() => {
 }
 
 .prompt-box {
-  @apply w-[280px] p-[var(--kira-s-4)] flex flex-col gap-[var(--kira-s-3)];
+  @apply w-[280px] p-2 flex flex-col gap-1.5;
 }
 
 .prompt-actions {
-  @apply flex justify-end gap-[var(--kira-s-3)];
+  @apply flex justify-end gap-1.5;
 }
 </style>

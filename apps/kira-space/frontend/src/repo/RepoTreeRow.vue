@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoTreeRowVm } from './state/fileTree';
@@ -71,7 +72,12 @@ function onContextMenu(e: MouseEvent): void {
     </button>
     <CodiconIcon v-if="row.isDir" :name="dirIcon" :size="16" class="node-icon" />
     <span v-else class="node-icon" :style="fileIconStyle(row.path)" aria-hidden="true"></span>
-    <span class="label" v-tooltip="row.name">{{ row.name }}</span>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <span class="label">{{ row.name }}</span>
+      </TooltipTrigger>
+      <TooltipContent>{{ row.name }}</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -79,7 +85,7 @@ function onContextMenu(e: MouseEvent): void {
 @reference "@theme/base.css";
 
 .repo-tree-row {
-  @apply flex items-center relative cursor-default whitespace-nowrap select-none h-[var(--kira-row-height)] text-[length:var(--kira-t-md)] gap-[var(--kira-s-2)] pr-[var(--kira-s-4)];
+  @apply flex items-center relative cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pr-2;
 }
 
 .repo-tree-row:hover {

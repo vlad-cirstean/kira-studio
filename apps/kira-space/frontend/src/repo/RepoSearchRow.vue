@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoSearchRowVm } from './state/search';
@@ -66,16 +67,21 @@ function onDblClick(): void {
       <CodiconIcon :name="row.collapsed ? 'chevron-right' : 'chevron-down'" :size="13" />
     </button>
     <span class="node-icon" :style="fileIconStyle(row.path)" aria-hidden="true"></span>
-    <span class="label" v-tooltip="row.path">{{ fileName }}</span>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <span class="label">{{ fileName }}</span>
+      </TooltipTrigger>
+      <TooltipContent>{{ row.path }}</TooltipContent>
+    </Tooltip>
     <span class="p-xs dim match-count" data-testid="repo-search-match-count">{{
       row.matchCount
     }}</span>
-    <span
-      v-if="row.fileTruncated"
-      class="p-xs dim"
-      v-tooltip="'This file hit the per-file match cap — not every match is shown'"
-      >+</span
-    >
+    <Tooltip v-if="row.fileTruncated">
+      <TooltipTrigger as-child>
+        <span class="p-xs dim">+</span>
+      </TooltipTrigger>
+      <TooltipContent>This file hit the per-file match cap — not every match is shown</TooltipContent>
+    </Tooltip>
   </div>
   <div
     v-else
@@ -100,7 +106,7 @@ function onDblClick(): void {
 @reference "@theme/base.css";
 
 .repo-search-row {
-  @apply flex items-center cursor-default whitespace-nowrap select-none h-[var(--kira-row-height)] text-[length:var(--kira-t-md)] gap-[var(--kira-s-2)] pl-[var(--kira-s-2)] pr-[var(--kira-s-4)];
+  @apply flex items-center cursor-default whitespace-nowrap select-none h-row text-kira-md gap-1 pl-1 pr-2;
 }
 
 .repo-search-row:hover {
