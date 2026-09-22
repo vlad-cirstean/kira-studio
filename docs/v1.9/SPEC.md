@@ -1106,7 +1106,10 @@ pass with one correctness property (repo-wide count reaches zero), not four inde
 work. Verified against §6.2's own table, all counts re-measured against the real file rather than
 trusted from the plan:
 
-- **62** command ids `kiraVersion.<verb>` → `kiraSpace.<verb>` (matches the plan exactly), command
+- **47 command ids**, not the plan's estimated 62 — `git show 8e1402a:apps/kira-studio-vscode/package.json`
+  confirms the pre-rename manifest itself already had 47, so the plan's own 62 was stale before
+  this phase started, not a count this phase's work changed. All 47 `kiraVersion.<verb>` →
+  `kiraSpace.<verb>`, zero stragglers (`contributes.commands` parsed as JSON, not grepped). Command
   category "Kira Version" → "Kira Space".
 - Panel container id `kiraVersion` → `kiraSpace` (title stays "Kira", unchanged); activitybar
   container `kiraVersionReview` → `kiraSpaceReview`, title "Kira Version" → "Kira Space".
