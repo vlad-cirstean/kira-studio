@@ -23,6 +23,7 @@ import { useSettingsStore } from '../../state/settings';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
+import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { datasetNumber } from '../shared/eventCoords';
@@ -594,6 +595,9 @@ onUnmounted(() => {
         :class="{ none: !railColor || railColor === 'none' }"
         :style="{ '--kira-rail': connColorVar(railColor) }"
       />
+      <span v-if="connRecord?.kind" class="icon-box">
+        <EngineIcon :kind="connRecord.kind" :size="13" />
+      </span>
       <span class="icon-box" :style="{ color: iconColor }">
         <CodiconIcon name="broadcast" :size="13" />
       </span>
