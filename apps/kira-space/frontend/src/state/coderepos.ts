@@ -1,17 +1,9 @@
+import { canonicalPath } from '@shared/domain/path';
 import type { RepoSummary } from '@shared/domain/repo';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { useWorkspaceStore } from './workspace';
-
-/** P82: canonicalized the way gitpath.CleanNFC canonicalizes a repository root
- *  (internal/gitpath/gitpath.go:46) — `git worktree list` reports paths verbatim, while
- *  RepoSummary.root/.repoId come back NFC-normalized from gitclient.Identify. Exported so
- *  state/terminals.ts's terminalCountAtPath and openTerminalSession compare cwd the same way,
- *  instead of copying this logic a second time. */
-export function canonicalPath(p: string): string {
-  return p.normalize('NFC').replace(/[/\\]+$/, '');
-}
 
 // C5 §3.4: the repo list store, ConnectionsRepo's own shape for a repository entry — hydrate,
 // import, rename, remove. No connect/disconnect lifecycle (a repository is a path, not a live

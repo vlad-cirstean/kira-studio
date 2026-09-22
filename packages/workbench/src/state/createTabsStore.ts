@@ -146,8 +146,14 @@ export interface TabsHost<
    *  store's own `setup()`, so a listener registered here (Kira Studio's
    *  `control.onConnectionsChanged`/`onConnectionState`, its `tabIncognitoStore` listener) fires
    *  exactly when the original inline registration did — on first store access, not at module
-   *  load. */
-  extend?(actions: TabsStoreActions<K, R>): E;
+   *  load.
+   *
+   *  Required, even for a caller with nothing to add (`extend: () => ({})`) — a call that leaves
+   *  `E` at its default with no argument to infer it from breaks Pinia's own action/state
+   *  extraction for the *whole* store (every instantiation, not just that one), a real TS+Pinia
+   *  interaction found the hard way in P103 Part 2 (§5.3) — the fix as harmless as it is
+   *  unobvious, so it stays required rather than a trap for the next caller. */
+  extend(actions: TabsStoreActions<K, R>): E;
 }
 
 export function createTabsStore<
@@ -581,7 +587,7 @@ export function createTabsStore<
       saveNow,
     };
 
-    const extra = host.extend?.(actions) ?? ({} as E);
+    const extra = host.extend(actions);
 
     return {
       ...actions,
