@@ -176,7 +176,7 @@ func TestAutoFetch_ZeroIntervalPausesWithoutPermanentlyDisabling(t *testing.T) {
 // TestRegistry_ReconcileAutoFetch_RearmsEveryPausedEntry is G31 round-2 functional-correctness
 // review, finding #8: EnsureAutoFetch's own off→on re-arm (proven per-entry above) had exactly
 // one caller, Conn.Open — nothing called it when fetch.autoInterval changed for a repository
-// that was already open, since that instance-wide setting is written from Kira Studio's own
+// that was already open, since that instance-wide setting is written from Kira Space's own
 // settings pane (bridge/settings.go), a path gitsession cannot see. ReconcileAutoFetch is the
 // seam that lets bridge/settings.go's SettingsService.Set reach every already-open entry after
 // such a write, without either package needing to know about a specific repository. This proves

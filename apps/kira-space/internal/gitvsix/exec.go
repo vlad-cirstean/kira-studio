@@ -79,7 +79,7 @@ var killGroup = func(pid int, sig syscall.Signal) error {
 }
 
 // realRun is D13's argv-only spawn: os/exec never interprets args, so a `.vsix` path containing a
-// space (the app's own executable is literally "Contents/MacOS/Kira Studio", space included) is
+// space (the app's own executable is literally "Contents/MacOS/Kira Space", space included) is
 // passed as one argument by construction — no sh, no -c, no string command line, no
 // interpolation. Setpgid (not Setsid) matches gitclient/runner.go's own choice for a short-lived,
 // non-interactive spawn: a group signal reaches a stray grandchild without detaching from the

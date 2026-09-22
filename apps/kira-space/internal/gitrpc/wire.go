@@ -10,7 +10,7 @@ import (
 )
 
 // AppInitResult is the server contract's own app.init — the webview contract's AppInitResult minus
-// host/capabilities/settings, all three of which are properties of the editor, not of Kira Studio
+// host/capabilities/settings, all three of which are properties of the editor, not of Kira Space
 // (SPEC §5 item 3; D11). The extension composes the full result from its own ports plus this.
 type AppInitResult struct {
 	ContractVersion int                 `json:"contractVersion"`

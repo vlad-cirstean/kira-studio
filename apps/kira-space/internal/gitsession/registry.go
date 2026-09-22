@@ -249,7 +249,7 @@ func (reg *Registry) IsOpen(repoID string) bool {
 // Conn.Open (D23's own off→on path) — nothing at all calls it when fetch.autoInterval changes for
 // a repository that is already open, since that setting is instance-wide (Registry.Settings,
 // backed by storage/repos.SettingsRepo — a different store from the per-repo RepoSettingsGet/Set
-// pair above) and gets written from Kira Studio's own settings pane
+// pair above) and gets written from Kira Space's own settings pane
 // (bridge/settings.go's SettingsService.Set), a call this domain package cannot see or be called
 // from directly (it must not import internal/bridge, internal/layering_test.go's own rule) — so
 // the caller is main.go's own composition instead, via this method, mirroring how

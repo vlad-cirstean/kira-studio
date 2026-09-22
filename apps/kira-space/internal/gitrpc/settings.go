@@ -102,7 +102,7 @@ func (r *Router) handleRepoSettingsSet(_ context.Context, _ *gitsession.Conn, pa
 }
 
 // handleSettingsSetGitPath is G18 D11's own migration leg: writes kiraSpace.git.path's migrated
-// value through Kira Studio's own server-owned settings surface (storage/repos.SettingsRepo, via
+// value through Kira Space's own server-owned settings surface (storage/repos.SettingsRepo, via
 // r.deps.SetGitPath) rather than repoSettings.set, since git.path never lived in the per-repo
 // store (D15). Extension-only — proxyHandlers.ts never forwards a webview call here (the same
 // posture credential.provide's own doc comment states for a different reason).

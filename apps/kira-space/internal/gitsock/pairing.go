@@ -69,7 +69,7 @@ type pendingEntry struct {
 // Broker implements D8's queue/cooldown/injected-clock state machine — a FIFO of pending requests
 // (at most one "presented", always the head), a per-clientID cooldown map, and a
 // notify.Emitter[PairingSnapshot] fanning out every change. It knows nothing about whether any
-// Kira Studio window is open (F9) — "held with no window open yet" (SPEC §3.3) falls out for free:
+// Kira Space window is open (F9) — "held with no window open yet" (SPEC §3.3) falls out for free:
 // the request simply sits at the head, presented, until a window later calls Pending() and renders
 // it, or its deadline expires.
 type Broker struct {

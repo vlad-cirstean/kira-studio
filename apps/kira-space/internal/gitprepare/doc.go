@@ -29,7 +29,7 @@
 //
 // There is no container, no seatbelt/AppArmor profile, and no capability dropping anywhere in this
 // application. The prepare script runs as the same user, with the same filesystem access, as the
-// Kira Studio server process itself. What IS actually implemented, all of it in this package or in
+// Kira Space server process itself. What IS actually implemented, all of it in this package or in
 // gitsession's own orchestration around it, is:
 //
 //   - The working directory is validated against the repository's own `worktree list` output

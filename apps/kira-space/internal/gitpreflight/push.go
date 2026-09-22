@@ -16,7 +16,7 @@ type ProtectedMatch struct {
 // `release/1.2` but not `release/1.2/hotfix` or `releases/1.2`); anything else in the pattern is
 // literal. Case-sensitive — git refnames are. `**` is not a supported glob — it is matched
 // LITERALLY and reported once at warn (the setting is server-owned, D16, so a bad value is entered
-// in Kira Studio's own settings dialog, not somewhere upstream's client-side "settings problem"
+// in Kira Space's own settings dialog, not somewhere upstream's client-side "settings problem"
 // channel could surface it instead). Returns the first pattern branch matches, or nil.
 func MatchProtectedBranch(branch string, patterns []string) *ProtectedMatch {
 	for _, pattern := range patterns {
