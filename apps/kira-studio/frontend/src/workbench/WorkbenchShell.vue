@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import MainView from '@workbench/components/MainView.vue';
 import TabStrip from '@workbench/components/TabStrip.vue';
 import WorkbenchShellBase from '@workbench/components/WorkbenchShell.vue';
@@ -76,18 +77,22 @@ function onNewTab(): void {
       <TabStrip>
         <template #new-tab>
           <div v-if="showNewTab" class="tab-strip-actions" data-testid="tab-strip-actions">
-            <button
-              ref="newTabBtn"
-              type="button"
-              class="tab-new"
-              aria-label="New tab"
-              aria-haspopup="menu"
-              data-testid="tab-strip-new"
-              v-tooltip="'New tab'"
-              @click="onNewTab"
-            >
-              <CodiconIcon name="add" :size="13" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  ref="newTabBtn"
+                  type="button"
+                  class="tab-new"
+                  aria-label="New tab"
+                  aria-haspopup="menu"
+                  data-testid="tab-strip-new"
+                  @click="onNewTab"
+                >
+                  <CodiconIcon name="add" :size="13" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>New tab</TooltipContent>
+            </Tooltip>
           </div>
         </template>
       </TabStrip>

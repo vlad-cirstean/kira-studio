@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
 import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
@@ -106,55 +107,63 @@ const agentTooltip = computed(() =>
 <template>
   <StatusBarBase>
     <template #right>
-      <button
-        v-if="appUpdateStore.available"
-        class="p-status update"
-        data-testid="update-available"
-        v-tooltip="updateTooltip"
-        @click="onOpenReleasePage"
-      >
-        <CodiconIcon name="cloud-download" :size="13" />
-        Update {{ appUpdateStore.latestVersion }}
-      </button>
-      <span
-        v-if="agentCount > 0"
-        class="p-status"
-        data-testid="agent-sessions"
-        v-tooltip="agentTooltip"
-      >
-        <CodiconIcon name="sparkle" :size="13" />
-        {{ agentCount }}
-      </span>
-      <span
-        v-if="appMetricsStore.sample"
-        class="p-status"
-        data-testid="app-metrics"
-        v-tooltip="metricsTooltip"
-      >
-        <CodiconIcon name="pulse" :size="13" />
-        <span class="metric-value mono" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
-        <span class="metric-sep">·</span>
-        <span class="metric-value metric-mem mono" data-testid="app-metrics-mem">{{
-          memLabel
-        }}</span>
-      </span>
-      <span v-if="cacheSizeLabel" class="p-status" data-testid="cache-size" v-tooltip="cacheTitle">
-        <CodiconIcon name="database" :size="13" />
-        {{ cacheSizeLabel }}
-      </span>
-      <span
-        class="p-status"
-        data-testid="engine-status"
-        :data-status="engineStore.status"
-        v-tooltip="engineStore.lastPingMs !== null ? `${engineStore.lastPingMs} ms` : undefined"
-      >
-        <CodiconIcon
-          name="circle-large-filled"
-          :size="13"
-          :style="{ color: engineStore.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
-        />
-        engine {{ engineStore.status }}
-      </span>
+      <Tooltip v-if="appUpdateStore.available">
+        <TooltipTrigger as-child>
+          <button
+            class="p-status update"
+            data-testid="update-available"
+            @click="onOpenReleasePage"
+          >
+            <CodiconIcon name="cloud-download" :size="13" />
+            Update {{ appUpdateStore.latestVersion }}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ updateTooltip }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="agentCount > 0">
+        <TooltipTrigger as-child>
+          <span class="p-status" data-testid="agent-sessions">
+            <CodiconIcon name="sparkle" :size="13" />
+            {{ agentCount }}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent class="whitespace-pre-wrap">{{ agentTooltip }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="appMetricsStore.sample">
+        <TooltipTrigger as-child>
+          <span class="p-status" data-testid="app-metrics">
+            <CodiconIcon name="pulse" :size="13" />
+            <span class="metric-value mono" data-testid="app-metrics-cpu">{{ cpuLabel }}</span>
+            <span class="metric-sep">·</span>
+            <span class="metric-value metric-mem mono" data-testid="app-metrics-mem">{{
+              memLabel
+            }}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{{ metricsTooltip }}</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="cacheSizeLabel">
+        <TooltipTrigger as-child>
+          <span class="p-status" data-testid="cache-size">
+            <CodiconIcon name="database" :size="13" />
+            {{ cacheSizeLabel }}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{{ cacheTitle }}</TooltipContent>
+      </Tooltip>
+      <Tooltip :disabled="engineStore.lastPingMs === null">
+        <TooltipTrigger as-child>
+          <span class="p-status" data-testid="engine-status" :data-status="engineStore.status">
+            <CodiconIcon
+              name="circle-large-filled"
+              :size="13"
+              :style="{ color: engineStore.status === 'ok' ? 'var(--kira-ok)' : 'var(--kira-error)' }"
+            />
+            engine {{ engineStore.status }}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{{ engineStore.lastPingMs }} ms</TooltipContent>
+      </Tooltip>
     </template>
   </StatusBarBase>
 </template>

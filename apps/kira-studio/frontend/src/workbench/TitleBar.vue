@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import TitleBarBase from '@workbench/components/TitleBar.vue';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
@@ -78,55 +79,70 @@ const keepAwakeTooltip = computed(() => {
          icon + accent colour when a panel is visible, the codicon "-off" companion glyph plus the
          muted colour when it's not. -->
     <div class="title-bar-actions">
-      <button
-        type="button"
-        class="title-action"
-        :class="{ 'is-on': layoutStore.panel.project.visible }"
-        v-tooltip="'Connections'"
-        data-testid="toggle-project-panel"
-        @click="layoutStore.toggleProjectPanel"
-      >
-        <CodiconIcon
-          :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
-          :size="15"
-        />
-      </button>
-      <button
-        type="button"
-        class="title-action"
-        :class="{ 'is-on': layoutStore.panel.operations.visible }"
-        v-tooltip="'Operations'"
-        data-testid="toggle-operations-panel"
-        @click="layoutStore.toggleOperationsPanel"
-      >
-        <CodiconIcon
-          :name="layoutStore.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
-          :size="15"
-        />
-      </button>
-      <button
-        type="button"
-        class="title-action"
-        v-tooltip="'Settings'"
-        data-testid="open-settings"
-        aria-label="Settings"
-        @click="settingsStore.settingsOpen = true"
-      >
-        <CodiconIcon name="settings-gear" :size="15" />
-      </button>
-      <button
-        v-if="keepAwakeStore.status.supported"
-        type="button"
-        class="title-action"
-        :class="{ 'is-on': keepAwakeStore.status.manual }"
-        :aria-pressed="keepAwakeStore.status.manual"
-        v-tooltip="keepAwakeTooltip"
-        data-testid="toggle-keep-awake"
-        aria-label="Keep this Mac awake"
-        @click="onToggleKeepAwake"
-      >
-        <CodiconIcon name="coffee" :size="15" />
-      </button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="title-action"
+            :class="{ 'is-on': layoutStore.panel.project.visible }"
+            data-testid="toggle-project-panel"
+            @click="layoutStore.toggleProjectPanel"
+          >
+            <CodiconIcon
+              :name="layoutStore.panel.project.visible ? 'layout-sidebar-left' : 'layout-sidebar-left-off'"
+              :size="15"
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Connections</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="title-action"
+            :class="{ 'is-on': layoutStore.panel.operations.visible }"
+            data-testid="toggle-operations-panel"
+            @click="layoutStore.toggleOperationsPanel"
+          >
+            <CodiconIcon
+              :name="layoutStore.panel.operations.visible ? 'layout-panel' : 'layout-panel-off'"
+              :size="15"
+            />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Operations</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="title-action"
+            data-testid="open-settings"
+            aria-label="Settings"
+            @click="settingsStore.settingsOpen = true"
+          >
+            <CodiconIcon name="settings-gear" :size="15" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Settings</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="keepAwakeStore.status.supported">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="title-action"
+            :class="{ 'is-on': keepAwakeStore.status.manual }"
+            :aria-pressed="keepAwakeStore.status.manual"
+            data-testid="toggle-keep-awake"
+            aria-label="Keep this Mac awake"
+            @click="onToggleKeepAwake"
+          >
+            <CodiconIcon name="coffee" :size="15" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ keepAwakeTooltip }}</TooltipContent>
+      </Tooltip>
       <button
         type="button"
         class="title-action title-action--labelled"
