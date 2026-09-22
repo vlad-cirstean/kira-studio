@@ -176,43 +176,44 @@ function onTreeKeydown(e: KeyboardEvent): void {
 
 <template>
   <div class="project-tree">
-    <div
-      ref="scrollEl"
-      class="tree-body h-full overflow-auto"
-      data-testid="tree-background"
-      @scroll="onScroll"
-      @contextmenu.prevent="onBackgroundContextMenu"
-      @keydown="onTreeKeydown"
-    >
-      <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
-        <template v-for="slot in band" :key="slot.row.key">
-          <TreeRow
-            class="sticky-row"
-            :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
-            :row="slot.row"
-            :selected="treeStore.selected === slot.row.key"
-            :sticky="true"
-            @select="onSelect"
-            @toggle="onToggle"
-            @open="onOpen"
-            @contextmenu="onContextMenu"
-          />
-        </template>
-      </div>
-      <div :style="{ height: `${totalSize}px`, position: 'relative' }">
-        <template v-for="item in virtualItems" :key="String(item.key)">
-          <TreeRow
-            class="virtual-row"
-            :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
-            :row="treeStore.visibleRows[item.index]"
-            :selected="treeStore.selected === treeStore.visibleRows[item.index].key"
-            :sticky="false"
-            @select="onSelect"
-            @toggle="onToggle"
-            @open="onOpen"
-            @contextmenu="onContextMenu"
-          />
-        </template>
+    <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
+      <div
+        ref="scrollEl"
+        class="virtual-list h-full overflow-auto"
+        data-testid="virtual-list"
+        @scroll="onScroll"
+        @keydown="onTreeKeydown"
+      >
+        <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
+          <template v-for="slot in band" :key="slot.row.key">
+            <TreeRow
+              class="sticky-row"
+              :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
+              :row="slot.row"
+              :selected="treeStore.selected === slot.row.key"
+              :sticky="true"
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+            />
+          </template>
+        </div>
+        <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+          <template v-for="item in virtualItems" :key="String(item.key)">
+            <TreeRow
+              class="virtual-row"
+              :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+              :row="treeStore.visibleRows[item.index]"
+              :selected="treeStore.selected === treeStore.visibleRows[item.index].key"
+              :sticky="false"
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+            />
+          </template>
+        </div>
       </div>
     </div>
     <div
