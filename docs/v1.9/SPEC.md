@@ -1742,6 +1742,164 @@ No pre-existing failing test/lint/typecheck/hook surfaced by this phase's change
 fixed in the same pass. No new `docs/ARCHITECTURE.md` **Known open items** entry: `test:visual`'s
 5 failures are the pre-existing baseline this phase inherited, not caused, same as Part 1.
 
+## P103 Part 3 result
+
+Landed as 4 commits against `8648be5`: `99b713e` (terminal hoist), `85a57e7` (appevent + generic
+shell), `2fc80da` (appshell split, both `main.go` rewrites), `f94c5e0` (`kiratime`/`kirapaths` +
+the 28-call-site retarget), plus this section's own commit. Plan: `docs/v1.9/plans/
+P103-shared-app-base.md` §6. No plan-doc split needed — implemented as written, §6.1 through §6.4
+all landed.
+
+**Run in parallel with Part 2, by explicit user authorization for this phase only** (the repo's
+own one-phase-at-a-time rule stood down for this pair): this session worked in an isolated
+worktree (`.claude/worktrees/agent-abd611058a9f9b0d0`) on branch `v1.9`, touching only `.go` files
+under `apps/kira-studio/internal/`, `apps/kira-space/internal/` and new repo-root `internal/*`
+packages — never `.ts`/`.vue`/`.css`/`package.json`/`bun.lock`/`packages/workbench/src`, Part 2's
+own surface. `git fetch origin v1.9` before every commit stayed at `8648be5` through all 4 code
+commits — Part 2 had not pushed yet, so those needed no rebase. Between finishing this SPEC.md
+section and pushing, a fresh fetch found `origin/v1.9` had moved to `c40682e` (Part 2's own 4
+commits, including its own result section): `git pull --rebase origin v1.9` replayed all 5 of this
+session's commits cleanly except this one, which conflicted with Part 2's SPEC.md result section
+landing in the same tail region. Resolved by keeping Part 2's section exactly as pushed (diffed
+byte-identical against `origin/v1.9`'s own copy post-resolve) and placing this section directly
+after it, before `## Layout` — matching the ask's own ordering rule.
+
+**Scope deviation, disclosed in full rather than smoothed over: commit boundaries do not match
+each commit's own message.** `git add`'d paths were layered onto deletions already staged earlier
+in the session by prior `git rm` calls across the whole Part 3 footprint, so the first `git commit
+--no-verify` (`99b713e`, intended as "hoist `internal/terminal` only") actually carried 41 files —
+every old `apps/*/internal/shell/*.go` deletion, `config/{env,prod,prod_default}.go` and
+`storage/model/time.go` deletions across both apps, alongside the terminal move. The corresponding
+*additions* for that parameterized-shell work landed one commit later (`85a57e7`), and the tree
+does not build again until `2fc80da` (main.go rewrite) and fully build+test-clean until `f94c5e0`
+(`kiratime`/`kirapaths`). Each commit's own message names this honestly at the time — `85a57e7`:
+"this package still doesn't compile standalone... see this phase's own SPEC.md result section for
+why"; `2fc80da`: "the tree does not fully build until the next commit lands." Per the repo's own
+git safety protocol (new commits over amend), the 4-commit sequence was left as landed rather than
+rewritten — `git bisect` across these 4 commits is not reliable (2 of the 4 do not build in
+isolation), but `HEAD` after all 4 is verified clean below. No commit here is a clean "one hoist,
+one commit" unit the way Part 1's 3 commits were; this is the deviation to weigh against that
+precedent, named plainly rather than left for a reader to discover from the diffs.
+
+**§6.1 `internal/terminal`:** `session.go` (407 lines) + `session_test.go` (285) moved verbatim via
+`git mv`; `shell.go`'s two hardcoded strings became `TermProgram`/`TermProgramVersion` package
+vars, set once in each app's `main.go` before the first `Registry.Open` (`terminal.TermProgram =
+"Kira Studio"` / `"Kira Space"`, `TermProgramVersion = buildinfo.Version`). Both apps'
+`bridge/terminal.go` retarget their import; no other change.
+
+**§6.2 `internal/appevent`:** `Emitter` interface, `Events` core (`Signal`/`SignalTo`/`Broadcast`,
+`NewEvents`), the six byte-identical channel constants. Both apps' `appcore.Emitter` becomes `type
+Emitter = appevent.Emitter`; both apps' `bridge.Events` embed `*appevent.Events` and re-export the
+six constants as `const ChannelX = appevent.ChannelX` — no call site elsewhere in either app
+changed. Kira Studio's `bridge.Events` keeps its own `emit appcore.Emitter` field for `Attach`'s
+five producer subscriptions and `SettingsChanged`, neither exposed by the shared core, matching
+§6.2's own design.
+
+**§6.3 `internal/shell` + `apps/*/internal/appshell`:** shared package holds `registry.go`,
+`debounce.go`, `security.go`, `accel.go`, `quit.go`, `closeflush.go`, `window.go`, `menu.go`,
+`menutemplate.go` (type vocabulary only) behind the four seams the plan specifies (`Config`,
+`Signaller`, `WindowStore`, `WindowRecord`/`WindowBounds`), plus `deps.go` and `wails.go`
+(`emitter`, `Dialogs`, `browserOpener`, `AttachReopen` — pure-Wails, identical in both apps) and 6
+test files. `AttachCloseFlush` dropped its separate `emit` parameter once `NewCloseFlushCoordinator`
+started taking the `Signaller` directly (its sole caller). Each app's residue moved to its own
+`internal/appshell` (distinct package name, so one `main.go` imports both without an alias):
+Kira Studio — `menu.go` (`BuildTemplate`), `dialogs.go`, `stream.go` (`RegisterEngineStream`),
+`wake.go` (`AttachSystemWake`); Kira Space — `menu.go`, `dialogs.go`, `stream.go`
+(`RegisterGitStream`). Both apps' `main.go` rewritten to compose repo-root `internal/shell` +
+`internal/appevent` + their own `internal/appshell`, with a `windowStore`/`toShellWindowRecord`
+adapter at the one call site converting each app's own `storage/model` types into shell's shared
+seams. Both apps' `layering_test.go` exemption renamed `internal/shell` → `internal/appshell` —
+confirmed via a fresh `-v` run below that this is the only exemption either file now carries for
+this surface.
+
+**§6.4 the three small hoists:** `storage/model/time.go` (byte-identical, 32 lines) → repo-root
+`internal/kiratime`, unchanged. `config/{env.go,prod.go,prod_default.go}` (byte-identical) →
+repo-root `internal/kirapaths` (already owned `Home()`/`DbPathAt`/etc from P100 Part 1); each app's
+own `config` package keeps a one-line wrapper (`func IsDev() bool { return kirapaths.IsDev() }`).
+Every `model.NowISO`/`FormatISO`/`ParseISO` call site retargeted to `kiratime.X` across 28 files in
+both apps (`storage/repos/*`, `oplog/wire.go`, `tree/service.go`, `adapterhost/host.go`,
+`maskrules/service.go`, `connections/service.go`, `ipcfixture/harness.go`, and their test files,
+plus Kira Space's `bridge/codeworkspace.go`); the now-unused `storage/model` import dropped from
+the 4 files it had no other reason to import (`metadata_cache.go`, `metadata_cache_test.go`,
+`helpers_test.go`, `adapterhost/host.go` — the last caught by `go build`, not by the migration
+script's own `model\.` regex heuristic, which false-matched a comment referencing `model.OpKind`).
+
+**§1.2/§1.3 Go file cross-check, every row confirmed by name:** all 9 Tier A Go files (§1.2, 997
+lines) hoisted as listed above — `internal/terminal/{session.go,session_test.go}`,
+`internal/shell/{registry.go,debounce.go,security.go}`, `internal/storage/model/time.go`,
+`internal/config/{env.go,prod.go,prod_default.go}`. Of Tier B's 17 rows (§1.3): 6 fall inside
+Part 3's own §6 scope and are hoisted — `internal/shell/{closeflush.go,quit.go,window.go,menu.go,
+menutemplate.go}`, `internal/terminal/shell.go` — plus `internal/bridge/events.go`'s core and
+`internal/appcore/deps.go`'s `Emitter` alias per §6.2 (each app's own `Events`/`Deps` residue stays,
+as §6.2/§1.3 both specify). 4 are explicitly declined in the plan's own §2.3 table, confirmed still
+untouched: `internal/bridge/{lifecycle.go,link.go,tabs.go,layout.go}` (bound-service types drive
+`@bindings/*` generation), `internal/buildinfo/buildinfo.go` (`-ldflags -X` per-app version
+target), `internal/config/paths.go` (already parameterized; three literals left). The remaining 6 —
+`internal/storage/db.go`, `internal/storage/migrate.go`, `internal/storage/model/window.go`,
+`internal/bridge/settings.go` — are never named anywhere in §6 and carry real per-app differences
+(`config.KiraHome()` vs `KiraSpaceHome()`, Studio-only `Mode`/`NormalizeMode`, Studio-only
+`PushCacheConfig`); confirmed out of Part 3's scope by absence from §6.1-§6.4, left untouched, not
+silently dropped.
+
+**Two pre-existing test issues found running the real suite, handled per `CLAUDE.md`'s own rule —
+fix what this phase can, name what it can't:**
+
+- `internal/shell.TestSecondShouldQuitReturnsTrue` failed intermittently under the full parallel
+  `go test ./...` run (`teardown did not happen within 1s`). Diffed the moved file against `git
+  show 8648be5:apps/kira-studio/internal/shell/quit_test.go` — the test logic is byte-identical
+  (only the import path and 2 doc comments differ), proving the race predates this move. Root
+  cause: unlike its sibling tests, this one called `q.Flushed("main")` right after `wg.Wait()`
+  without first waiting for `flushThenQuit`'s async goroutine to populate the `pending` map, so
+  under scheduler contention the ack could race a still-nil map and be silently swallowed as an
+  unknown key. Fixed in `internal/shell/quit_test.go` with the same wait-loop pattern its siblings
+  already use, comment-flagged as a P103 Part 3 fix. Verified: `go test ./internal/shell/... -race
+  -count=5` clean, no failures, no new races.
+- `apps/kira-space/internal/gitsock.TestMatrix_M3_FullIndependence` failed once under full-suite
+  load (`A's event = worktreeChanged, want refsChanged`). `gitsock`/`gitclient` are untouched by
+  this phase (`git diff --stat 8648be5 f94c5e0 -- '**/gitsock/**' '**/gitclient/**'` — empty).
+  Re-run in isolation, `-count=5 -v`: 5/5 pass. This is an fsnotify timing flake under heavy
+  parallel load, not this phase's code — named here rather than silently ignored, not "fixed"
+  since there is nothing in this phase's diff to fix.
+
+**Pre-commit hook bypassed (`--no-verify`) on all 4 commits**, matching `docs/DEV_ENVIRONMENT.md`'s
+documented exception for a fresh worktree: `bun install` confirmed clean (`bun.lock`/`package.json`
+untouched), `bun run lint` (`biome check .` + `check-tokens.sh`) passes standalone every time, and
+the hook's own `bun run typecheck` fails only on missing Wails-generated `@bindings/*` modules
+(needing full `scripts/setup.sh` codegen for both apps) — unrelated to a Go-only change, exactly
+the scenario that doc names. No hook was bypassed with a real check left red.
+
+**Verification, run fresh against `HEAD` (`f94c5e0`) after all 4 commits, in the order `CLAUDE.md`
+requires — implement whole phase, then test once:**
+
+- `go build ./...`: exit 0, no output.
+- `go vet ./...`: exit 0, no output.
+- `bun run lint:go` (`golangci-lint run`): `0 issues.`
+- `bun run test:go`: every package `ok` (or `[no test files]`), repo-wide.
+- `go test ./apps/kira-studio/internal -run TestDomainPackagesDoNotImportBridge -v` and the Kira
+  Space equivalent: both `PASS`, `internal/appshell` confirmed the sole surviving bridge-import
+  exemption for this concern in both apps' subtest lists (`internal/shell` no longer appears).
+- `gofmt -l` scoped to this phase's 74 still-existing touched `.go` files (`git diff --name-status
+  8648be5 f94c5e0 -- '*.go'`, 91 entries including deletions/renames, filtered to what exists on
+  disk): empty output, all clean.
+- **Both binaries boot** (§9's Parts 3-4 row, the `-tags server` substitute this sandbox's no-GUI
+  environment requires): `go build -tags server -o <tmp>/kira-studio-server ./apps/kira-studio` and
+  the Kira Space equivalent both built clean (a gitignored placeholder `frontend/dist/index.html`
+  in each app satisfies `//go:embed all:frontend/dist`, confirmed never staged via `git
+  check-ignore -v`). Each binary run with `KIRA_HOME`/`KIRA_SPACE_HOME` pointed at a temp dir,
+  `KIRA_INSECURE_SECRETS=1`, `WAILS_SERVER_HOST=127.0.0.1` and a free port: both logged "Server mode
+  starting" and answered `GET /health` with `200` within 2s, then were killed. Kira Space logged one
+  unrelated warning — its `gitsock` unix-socket listener failed to bind under this session's own
+  deep scratchpad path (`bind: invalid argument`, a `sun_path` length artifact of this sandbox, not
+  a code issue; `gitsock` is untouched by this phase) — `/health` still answered `200` regardless.
+
+Deliberately **not** run as a gate here, per this phase's own scope: `bun run build`/`typecheck`/
+`test:unit` — Part 2's actively-changing frontend surface, explicitly out of this session's remit.
+
+No pre-existing failing test/lint/vet/hook surfaced by this phase's own diff that wasn't fixed in
+the same pass — the `quit_test.go` race is fixed above; the `gitsock` flake is named, confirmed
+pre-existing and outside this phase's diff, and left as `CLAUDE.md`'s own exception for work
+"genuinely outside the phase's own scope" allows.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
