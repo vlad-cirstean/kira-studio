@@ -292,6 +292,22 @@ libevent-2.1-7t64 libgstreamer-plugins-bad1.0-0 libflite1 gstreamer1.0-libav` at
 writing) — install exactly those, not a generic `playwright install-deps`, which pulls far more
 than `webkit` alone needs.
 
+## `tests/visual/*` pixel diffs — a sandbox font-package mismatch, not a code regression
+
+The `visual` Playwright project's baselines are captured on a specific CI Ubuntu image (P6 plan
+§2(a)/(c), `tests/visual/support/pin-fonts.css`'s own header comment) — a "CI-Linux-only baseline
+policy" precisely because even same-OS machines can disagree on font rendering. A sandbox/container
+session's own font packages can still differ from that CI image's (`fc-match sans-serif`/`fc-match
+monospace` resolve to whatever's installed here — DejaVu Sans/DejaVu Sans Mono at the time of
+writing, not necessarily the CI image's own resolution), which reads as a small (1-4% of pixels),
+uniform, whole-page glyph-antialiasing diff across every `tests/visual/*` spec — a chromatic-fringe
+texture on text, not a layout/element-position regression. Before concluding a `tests/visual/*`
+failure is a real regression: check whether the diff is this uniform text-rendering signature
+(every glyph on the page, not one specific element) rather than an element moving/resizing/changing
+color — the former is this sandbox's font drift, not a bug, and `--update-snapshots` run from here
+would corrupt the real CI baseline with this container's non-canonical rendering rather than fix
+anything. Confirmed 2026-09-22 (v1.9 P104 Stream A verification).
+
 ## `golangci-lint` / `knip` — code-quality tooling in this environment (P94)
 
 See `CLAUDE.md`'s `docs/v1.8/plans/P94-code-quality-tooling.md` for what these tools check and why
