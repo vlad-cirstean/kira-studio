@@ -1383,6 +1383,101 @@ decision, re-confirmed here rather than re-opened.
 P99, also a four-part phase, closed the same way with no rollup section, and nothing about this
 phase's own closure changes that precedent.
 
+## P102 result
+
+Landed as 2 commits against `aa34373`: `350300b` (dependency reclassification) and `05aa003`
+(the addon), plus this section's own commit. No separate plan doc under `plans/` — the row itself
+calls this phase small/mechanical/no-design-decision, one agent plans and implements in the same
+pass, noted here instead.
+
+**Part 1 — 11 packages moved `devDependencies` → `dependencies`, not the row's 9.** The row's own
+list (`vue`, `vite`, `@vitejs/plugin-vue`, `tailwindcss`, `@tailwindcss/vite`, `vue-tsc`,
+`sql-formatter`, `simple-icons`, `@wailsio/runtime`) was verified against the real import graph,
+not trusted as-is, per package:
+
+- `vue`: `from 'vue'` in ~140 files across both frontends and `packages/kira-ui`/`packages/theme`.
+- `vite`, `@vitejs/plugin-vue`, `tailwindcss`, `@tailwindcss/vite`: not `import`ed by any `.ts`/
+  `.vue` file (as expected — build-config/CSS-plugin surface), reachable instead through
+  `apps/*/frontend/vite.config.ts` (`import tailwindcss from '@tailwindcss/vite'`,
+  `import vue from '@vitejs/plugin-vue'`, `import { defineConfig } from 'vite'`) and
+  `packages/theme/src/base.css`'s `@import "tailwindcss"` — moved per the row's explicit
+  instruction, confirmed reachable from what actually ships, not from a static TS import.
+- `vue-tsc`: no runtime or build-script import found (`apps/*/frontend/package.json`'s own `build`
+  script is plain `vite build`, no type-check step) — moved anyway per the row's explicit,
+  unambiguous instruction naming it; not independently justified by import reachability the way
+  the others are.
+- `sql-formatter`: real import site is `views/console/sqlFormatterEntry.ts` (`export { … } from
+  'sql-formatter'`), not `format.ts` as the row states — `format.ts` dynamically `import()`s
+  `sqlFormatterEntry.ts`, one hop removed. Row's claim directionally right, file name imprecise.
+  `simple-icons` (`theme/EngineIcon.vue`) and `@wailsio/runtime` (type-only, via
+  `bridge/port.ts`'s `tsconfig.web.json` path-mapping onto `/wails/runtime.js`) confirmed exactly
+  as named.
+
+**Two more found beyond the row's list, independently verified real:**
+
+- `@faker-js/faker` — `from '@faker-js/faker/locale/en'` in
+  `apps/kira-studio/frontend/src/views/grid/fakeData/fakerEntry.ts` and
+  `packages/api-core/src/http/dynamic/fakerEntry.ts`, both dynamic-`import()` boundary files
+  (same P13/P15 pattern as `sql-formatter`'s own entry file) reached from shipped features: grid
+  "Generate Data" (`workbench/GenerateDataDialog.vue`, wired from `App.vue`) and HTTP/gRPC dynamic
+  request values (`views/httprequest`, `views/grpcrequest`). Confirmed both call sites are real app
+  code, not test-only (`grep` for `fakerEntry`/`fakeData/generate` under `apps/*/tests` finds only
+  two `import()`s inside unit-test specs exercising the same production module, no separate
+  test-only definition).
+- `@vscode/codicons` — no JS/TS import anywhere, but a real CSS `@import
+  "@vscode/codicons/dist/codicon.css"` in `packages/theme/src/base.css` and
+  `packages/git-ui/src/icons/codicon.css`, both compiled into the shipped CSS bundle. `knip.json`'s
+  own `ignoreDependencies` already carried an explanatory comment for exactly this ("CSS class-name
+  references only … used in both the root devDependency and packages/git-ui's own dependency") —
+  corroboration, not a new finding, that this one is genuine.
+
+**Checked and left in `devDependencies` (not moved):** `mariadb`/`pg` — the only real
+`from 'mariadb'`/`from 'pg'` imports are `packages/db-fixtures/support/{mariadb,postgres}.ts`, test
+fixture support, not shipped app code (every other `mariadb`/`pg` grep hit was a string/filename
+false positive — `planParsers/mariadb.ts`, `"MariaDB"` UI text, etc., not the npm packages).
+`typescript`, `@biomejs/biome`, `knip`, `@playwright/test`, `@types/*`, `testcontainers`,
+`@testcontainers/*`, `@typescript/native-preview`, `@vscode/vsce`, `bun-types` — confirmed no
+runtime import, build/lint/test/type tooling only, left as-is per the row's own instruction.
+
+**Part 2 — `@xterm/addon-web-links` added at `0.12.0`** (latest stable; no `peerDependencies` entry
+pins it below `@xterm/xterm@6.0.0`, same exact-pin convention as `@xterm/addon-fit@0.11.0`). Wired
+into `apps/kira-studio/frontend/src/views/terminal/terminalRenderer.ts`'s `getOrCreateTerminal`
+(`term.loadAddon(new WebLinksAddon())`, alongside the existing `term.loadAddon(fit)`) — not
+`terminal/TerminalPanel.vue` as the row's prose named; that file hosts the terminal tab UI chrome,
+the actual `Terminal`/`FitAddon` setup lives in `terminalRenderer.ts` (confirmed by `grep` for
+`FitAddon`/`xterm` — zero hits in `TerminalPanel.vue`). `apps/kira-space/frontend/src/views/repo/
+terminalRenderer.ts` is a byte-identical duplicate (`diff` confirmed empty before this phase's
+edit) — P103 Part 1's own plan already names this pair as a same-path-sweep miss it will hoist to
+`packages/workbench` later, but P103 hadn't landed yet at this phase's start (checked via `git log`
+and `ls apps/*/frontend/src` before editing), so both per-app copies got the identical edit here to
+stay byte-identical.
+
+**Verification, run for real:**
+
+- `bun install`: resolved cleanly both times (reclassification-only pass, then again with the
+  addon added), lockfile regenerated, no manual edits.
+- `bun run build`, `bun run build:space`, `bun run build:vscode`: all exit 0, no new warnings
+  beyond the repo's pre-existing "chunks larger than 500 kB" notice.
+  `terminalRenderer-*.js`'s built chunk size grew (336.10 kB vs. its pre-change size) confirming
+  `WebLinksAddon` actually bundled in.
+- `bun run typecheck`: exit 0 across all 8 parallel project checks.
+- `bun run lint`: `biome check .` — "Checked 1339 files … No fixes applied"; `check-tokens.sh` — all
+  `--kira-*`/`--kv-*`/`--kui-*` references resolve. Exit 0.
+- `bun run lint:dead`: exit 0, output identical before and after this phase's changes — 6 duplicate
+  exports, 6 configuration hints (baseline freshly re-confirmed on `aa34373` via `git stash` before
+  starting, not trusted as stale).
+- `bun run test:unit`: `1534 pass, 0 fail, 13649 expect() calls, 155 files` — identical count
+  measured on `aa34373` (via `git stash`) and again on the final tree.
+- Addon wiring confirmed at the source level: `grep -n "WebLinksAddon\|loadAddon"` on both
+  `terminalRenderer.ts` copies shows the import and both `loadAddon` calls.
+  `grpc-stream-terminal-race.spec.ts` (the one `tests/unit` spec touching terminal state): 4 pass,
+  0 fail, unaffected.
+- `git diff --stat aa34373..HEAD`: exactly `package.json`, `bun.lock`, and the two
+  `terminalRenderer.ts` files — no unintended touch.
+
+No pre-existing failing test/lint/typecheck/hook surfaced by this phase's changes — nothing to
+root-cause or defer.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
