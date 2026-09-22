@@ -1478,6 +1478,128 @@ stay byte-identical.
 No pre-existing failing test/lint/typecheck/hook surfaced by this phase's changes — nothing to
 root-cause or defer.
 
+## P103 Part 1 result
+
+Landed as 3 commits against `3c297b4`: `86e0b5c` (wiring/scaffolding), `776a9fc` (the frontend
+surface hoist), `8ac63ed` (the test-support hoist), plus this section's own commit. Plan:
+`docs/v1.9/plans/P103-shared-app-base.md` §4. No plan doc split needed — implemented as written.
+
+**Scope deviation, flagged up front: this part moved zero Go files, despite the phase's own
+task summary describing 10.** The plan's own §3 split table, §4 (this part's section — frontend
+only, never mentions Go) and §9 (verification table: `go build`/`go vet`/`gofmt` listed only under
+"Parts 3-4") are unambiguous that the Go shell hoist, `internal/terminal` included, is Part 3's
+job, not Part 1's. Re-checked before writing this section: `git log --stat` on this phase's 3
+commits touches no `apps/*/internal/*.go` file, and `find apps/kira-studio/internal
+apps/kira-space/internal -name '*.go' | xargs grep -l 'package terminal'` still shows both apps'
+own copies, untouched. Nothing Go-shaped shipped in Part 1.
+
+**`packages/workbench` (`@workbench/*`, `packages/theme`'s vite-alias/tsconfig-paths precedent,
+not `packages/git-ui`'s `exports` map) now holds 28 files, ~2,350 lines:** `components/`
+(`AppTooltip.vue`, `ConfirmDialog.vue`, `ContextMenu.vue`), `state/` (`confirmDialog.ts`,
+`contextMenu.ts`, `tabRuntime.ts`, `tooltip.ts`), `editor/` (`monacoEntry.ts`, `monacoTheme.ts`,
+`monarch/{decorators,mongo,redis}.ts`), `terminal/` (`terminalRenderer.ts`,
+`terminalRendererLoader.ts`), `bridge/rpc.ts`, `shortcuts/{commands,keys}.ts`, `util/`
+(`clipboard.ts`, `contextMenuKeys.ts`, `floatingPosition.ts`, `format.ts`, `wheelScroll.ts`,
+`window.ts`), and `testing/unit/{wailsRuntime,fakeSocket,restoreAfterEach,window}.ts`. Wired into
+both `knip.json` workspace blocks, `check-tokens.sh`'s `kira-` usage scan, the root workspace
+list, both apps' `vite.config.ts`/`tsconfig.json`, and both apps' unit/e2e test project configs.
+`workbench.css` carries only an `@source "./";` directive — Tailwind v4 doesn't content-scan a
+sibling package by default, confirmed a real trap and not a hypothetical one: `ConfirmDialog.vue`'s
+own `class="m-0 whitespace-pre-wrap"` would have compiled away silently without it (verified both
+ways — `grep` for `.m-0`/`.whitespace-pre-wrap` in both apps' built `dist/assets/index-*.css`).
+
+**Three files needed a real edit, not a mechanical `git mv` + import-path rewrite, each named in
+the plan or forced by a genuine structural dependency:**
+
+- `editor/monacoTheme.ts`: extracted `MonacoModule`, `KIRA_EDITOR_THEME` and the
+  `cssVar`/`normalizeColor`/`rgbaToHex8` apparatus out of each app's own `editor/monaco.ts` (which
+  stays per-app, deferred to Part 2, and now re-exports `MonacoModule`/`KIRA_EDITOR_THEME` for its
+  existing consumers). `cssVar` itself turned out to have no consumer outside `monacoTheme.ts` in
+  either app — `bun run lint:dead` caught this as a genuine unused-export finding on the first full
+  run (2 hits, one per app's re-export), fixed in the same pass by dropping it from both apps'
+  re-export rather than leaving it as a documented exception.
+- `terminal/terminalRenderer.ts`: took a new `TerminalRendererDeps` parameter
+  (`appearance()`/`onTerminalOutput()`/`writeTerminal()`) on `getOrCreateTerminal`/
+  `applyTerminalAppearance` in place of importing each app's own `state/settings`/`state/terminals`
+  directly, so the one shared renderer never depends on either app's private store shape. Both
+  `TerminalView.vue` (Studio) and `RepoTerminalView.vue` (Space) now build and pass this object at
+  their own call sites.
+- `state/contextMenu.ts` moved in this part rather than Part 2 as the plan's own file-tier table
+  first suggested — it is a forced dependency of `ContextMenu.vue`/`contextMenuKeys.ts` (both
+  genuinely Part 1 Tier A), and the plan's own §5.3 already separately specifies "no
+  parameterization — move whole" for this exact file, so moving it here rather than splitting one
+  component's dependency across two phases avoided a needless intermediate broken state.
+
+**A fourth, unplanned deviation, found only by running the real verification suite rather than
+trusting the tier classification: `state/pinia.ts` and `state/queryClient.ts` do NOT move,
+despite being byte-identical Tier A candidates the plan's own §1.2 named.** Each is `export const
+x = new Thing()` — a true module-level singleton, not a `defineStore`-wrapped composable. In
+production the two apps are separate Vite builds with no shared JS runtime, but `bun test` runs
+both apps' unit specs in one process sharing one module cache; hoisting `pinia.ts` made both apps'
+`useTabsStore()` (and others) register onto the literal same `Pinia` instance — since Pinia keys
+its store registry by id string alone, kira-space's own `'tabs'` store silently resolved to
+kira-studio's `'tabs'` store object instead of its own, whichever app's spec ran first in the
+shared process. This was not a hypothetical: it broke 9 of kira-space's own unit tests
+(`tabsStore.patchRepoFileTabState is not a function` and 6 more, all traced to the same collision)
+on the first full `bun run test:unit` pass — confirmed a genuine regression, not pre-existing, by
+re-running the identical suite via `git stash` on `3c297b4`: `1534 pass, 0 fail` there,
+`1525 pass, 9 fail` with `pinia.ts` hoisted. `queryClient.ts` was reverted alongside it on the same
+reasoning before it ever caused an observed failure — same singleton shape, same shared-process
+hazard for a `QueryClient` cache key collision, not worth shipping as a latent flake. Both stay
+duplicated per app, matching `state/terminals.ts`/`editor/monaco.ts`'s own established "duplicate,
+don't hoist" precedent. `state/tabRuntime.ts` stays hoisted despite the identical singleton shape
+(`const cleanups = new Set(...)`) — its own shape is a self-gated callback fan-out (each
+registered cleanup no-ops on a tabId it doesn't own), not an identity registry, and
+`terminal/terminalRenderer.ts` (itself correctly shared) imports it directly, so un-hoisting it
+would have meant re-litigating that file's own deps-injection design for no observed benefit.
+
+**Deferred to Part 2, per the plan's own §4.5/§5:** `tests/ui/support/{ipcChannels,mockRuntime}.ts`
+(real per-app divergence), `state/terminals.ts`, `state/terminalTabs.ts`, `editor/monaco.ts` (both
+apps' own remaining halves), and `state/pinia.ts`/`state/queryClient.ts` per the deviation above —
+Part 2 should re-examine whether either is a candidate for a factory-function redesign rather than
+treat this part's "stays duplicated" as the final word.
+
+**Verification, run for real, in the order `CLAUDE.md` requires (implement whole phase, then test
+once and fix what's found):**
+
+- `bun run typecheck`: exit 0 across all 8 parallel project checks, `@workbench/*` resolving in
+  every one. Two intermediate failures fixed in the same pass, not deferred: `packages/workbench/
+  src/testing/unit/*.ts` (imports `bun:test`) was pulled into both apps' `tsconfig.tests.json`
+  (Playwright/`tests/ui` project, `types: ["node"]`) by that config's own broad `packages/
+  workbench/src/**/*.ts` include glob — fixed with a narrow `exclude` on that one subpath in both
+  apps' `tsconfig.tests.json`, rather than widening `types` and pulling `bun-types` ambient
+  declarations into a project that has nothing to do with Bun's test runner.
+- `bun run lint`: `biome check .` clean after one `bunx biome check --write .` pass (123 files,
+  entirely import-order/organize-imports from the bulk consumer rewrite, no logic change) plus
+  `check-tokens.sh` — every `--kira-*` reference across both apps' `src`, `packages/theme/src` and
+  `packages/workbench/src` resolves to a real definition. Exit 0.
+- `bun run lint:dead`: exit 0. One new "vue extension not registered" configuration hint
+  (`packages/workbench`, expected per the plan's own §9 gate — the same hint every other
+  `.vue`-bearing knip workspace already carries), no new duplicate-export finding (the pre-existing
+  6 are all unrelated to this phase), the `cssVar` unused-export finding fixed as described above
+  rather than left as a hint.
+- `bun run build` / `bun run build:space`: both exit 0. One new informational Rolldown warning
+  (`INEFFECTIVE_DYNAMIC_IMPORT` on `monacoTheme.ts`, statically re-exporting `KIRA_EDITOR_THEME`
+  while `loadMonaco()` also dynamically imports `defineKiraTheme` from the same module) — not a
+  build failure; `KIRA_EDITOR_THEME` must stay synchronously available (`MonacoHost.vue`/
+  `ResponseDiffDialog.vue`/etc. read it as a plain prop value), so the file can't be split further
+  without breaking that, and `monacoTheme.ts` has no `monaco-editor` import of its own, so the
+  actual bundle-size cost of not code-splitting it is a few KB, not measured further per
+  `CLAUDE.md`'s own "skip a measurement that wouldn't change the decision" rule. Tailwind
+  sibling-scan trap confirmed avoided in both apps' built CSS, not just assumed from the
+  `@source` directive being present (see above).
+- `bun run test:unit`: `1534 pass, 0 fail, 13649 expect() calls, 155 files` — identical to the
+  `3c297b4` baseline (re-measured via `git stash`, not trusted as stale), after fixing the
+  `pinia.ts`/`queryClient.ts` regression described above. Without that fix: `1525 pass, 9 fail`.
+- `bun run test:webview`: `55 passed`, run twice to confirm stability — identical to baseline,
+  unaffected (this suite exercises `apps/kira-space-vscode`/`packages/git-ui`, neither touched by
+  this part).
+
+No pre-existing failing test/lint/typecheck/hook surfaced by this phase's changes that wasn't
+fixed in the same pass — the `cssVar` unused export and the `pinia.ts`/`queryClient.ts` singleton
+regression were both this phase's own, both root-caused and fixed here, not deferred or noted as
+"pre-existing."
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
