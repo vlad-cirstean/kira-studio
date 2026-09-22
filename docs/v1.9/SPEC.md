@@ -302,6 +302,110 @@ names — then, since `add` needs the same broken registry fetch, proved `@/lib/
 way: a throwaway file importing `cn` from `@/lib/utils` typechecked clean under `vue-tsc`, then was
 deleted (untracked, never committed, confirmed via `git status`).
 
+## P99 Part 1 result
+
+Landed per plan (`docs/v1.9/plans/P99-vue-migration.md` §0-§4, §5, §9-§14), 37 commits from
+`28a95a6` (shadcn-vue component set) through `2c7166d` (this section's closing fix), plus this
+section's own commit.
+
+**shadcn-vue component set (§4).** 17 primitives fetched via the direct-registry `curl` procedure
+P98 root-caused and this phase's own planning pass confirmed: `alert`, `button`, `checkbox`,
+`command`, `context-menu`, `dialog`, `dropdown-menu`, `input`, `input-group`, `label`, `popover`,
+`scroll-area`, `separator`, `textarea`, `toggle`, `toggle-group`, `tooltip`, under
+`frontend/src/components/ui/`. No app code imports them yet (Part 2 is the first consumer, §3.2) —
+`knip.json`'s 7 bootstrap `ignoreDependencies` entries stay, as documented at P98 landing.
+
+**Every module-level `reactive()`/`ref()` state module on Pinia (§5.1-§5.3).** Final count: **71
+`defineStore()` calls across 65 files** — the plan's own "45 modules → 41 stores" estimate was
+approximate going in (this section supersedes it, per that plan's own framing). Five modules split
+into two stores each, all for a real two-concern reason stated in the store's own code: `state/
+connections.ts` (connection records vs. the connect dialog's own UI state), `state/tabs.ts`,
+`api/state/curl.ts`, `api/state/variables.ts`, `project/state/tree.ts`. One pair of modules merged
+the other way: `views/grpcrequest/state.ts` declared two `createRuntimeStore` calls (the gRPC call
+runtime and the schema-browser runtime) sharing one `registerTabRuntimeCleanup` teardown — collapsed
+into one `useGrpcRequestViewStore`, since the plan's per-module 1:1 assumption doesn't hold once two
+runtimes are torn down as a single coupled unit. `state/schemas.ts` split along §5.5's own line
+(DDL fetch/save moved to TanStack Query; the dialog's own draft state stayed a Pinia store) rather
+than the two-Pinia-store split the plan's §1.3 guessed at.
+
+A closing empirical re-scan (`^const \w+ = (reactive|ref)\(` across every `.ts` under
+`frontend/src`, plus a direct check for leftover `createRuntimeStore`/`createHistoryStore` call
+sites) found zero unconverted module-level state. The only remaining `reactive()`/`ref()` call
+sites are the two generic factory *definitions* (`views/shared/viewOp.ts`'s `createRuntimeStore`,
+`api/state/history.ts`'s `createHistoryStore`) and four composable factories (`createPageSearch`,
+`createPageStore`, `useEditBuffer`, `useDiffEditor`) — each produces fresh state per call, not a
+module singleton, so none is in scope. `state/tabRuntime.ts`, `state/viewCommands.ts`,
+`state/repoOpenHold.ts`, `state/maskRules.ts`'s `correlationKeys` and similar plain `Map`/`Set`
+registries were left alone — never `reactive()`, out of scope by the plan's own definition.
+
+**The 13 broadcast subscriptions (§5.4) — plan text corrected.** The plan's own prose says "13 of
+them subscribe to a backend broadcast" but names only 10 modules; grepping `control\.on\w*Changed\(`
+across the converted tree confirms exactly those 10 (`state/connections.ts`, `customScripts.ts`,
+`dbmcp.ts`, `gitClients.ts`, `keepAwake.ts`, `layout.ts`, `schemas.ts`, `settings.ts`, `tabs.ts`,
+`project/state/tree.ts`) and no others — the plan's "13" was never accurate, not a count this phase
+regressed. All 10 still register their subscription the way they did before conversion (inside the
+store body, first-use), still write the same `reactive` field or (for `schemas.ts`'s
+`onSchemaChanged`, the one §5.4 exception) call `queryClient.invalidateQueries` instead — confirmed
+unchanged by re-reading each site.
+
+**TanStack Query (§5.5).** All three named migrations landed: `state/schemas.ts`'s `ensureDdl`/
+`saveDdl` (`cbf7445`), `state/maskRules.ts` (`c872a6f`), `views/grid/PreviewCommandPanel.vue`
+(`f5d8cdb`, confirmed via `useQuery` in place of the old `ref([])`/`loading`/`error` triple). One
+stated deviation from the plan's literal prescription: `maskRules.ts`'s `upsertMaskRule`/
+`removeMaskRule` re-call `loadMaskRules` synchronously rather than firing a `useMutation` with
+`invalidateQueries` in `onSuccess` — `invalidateQueries` only refetches an *active* `useQuery`
+observer, and not every caller (`menu.ts`'s `existingMaskRule` scan, `ConnectionDialog.vue`'s
+Privacy tab) has one; the synchronous cache write matches `schemas.ts`'s own `saveDdl` precedent.
+
+**Mechanical call-site sweep.** Every consumer of a converted module — `.vue` components, plain
+`.ts` modules, and the 9 `console/state.ts` unit test files — updated to `useXStore().foo()`. No
+primitive, styling or composable change rode along (confirmed per file: each diff touches only
+import lines, hoisted `useXStore()` instances, and call-site qualification). The sweep's own two
+recurring hazards, tracked across every batch: a blanket regex re-qualifying a function name
+mentioned in a comment (caught via `grep '// .*storeName\.'` after every sweep, reverted by hand)
+and a plain (non-paren-anchored) string replace on a bracket-access pattern doing the same to a
+backtick-quoted comment (`console-run-after-tab-close.spec.ts`, caught the same way). Zero
+`storeName.storeName` double-prefixes found in any final grep.
+
+**Found and fixed one hazard the conversion itself introduced.** Three plain `.ts` files —
+`views/browse/menu.ts`, `views/documents/menu.ts`, `api/reveal.ts` — hoisted
+`useConfirmDialogStore()` to true module scope with no explicit `pinia` argument. Each sits behind
+its own static import chain main.ts loads before `app.use(pinia)` runs — `menu.ts`'s two via
+`App.vue → WorkbenchShell.vue → MainView.vue → workbench/tabViews.ts → BrowseView.vue/
+DocumentView.vue → menu.ts`, `api/reveal.ts`'s via `workbench/tabViews.ts → state/tabKinds.ts →
+api/state/variables.ts → api/reveal.ts` — confirmed by tracing each import, so the call would throw
+at boot (`getActivePinia()` with no active Pinia). Each had exactly one call site, inside an async
+function invoked only at runtime — fixed by calling `useConfirmDialogStore()` inline at that one
+site instead of hoisting it, matching the per-call idiom the same files already use for their other
+stores (commit `2c7166d`). `repo/git/transport.ts`'s one other module-top-level store call
+(`useGitCredentialStore(pinia)`) already passed the explicit singleton correctly — confirmed via a
+repo-wide grep, no other instance of this hazard exists.
+
+**§4.4 — knip's 7 bootstrap `ignoreDependencies` entries.** Not deleted, per the plan's own note at
+each entry: they clear once Part 2 imports the first shadcn-vue primitive, not before. Confirmed
+still present and still needed (`bun run lint:dead` would newly flag all 7 as unused if removed
+now).
+
+**Verification (§12.1-§12.2).** `bun run typecheck` clean across all five projects. `bun run lint`
+— Biome 0 errors/warnings/infos over 1276 files, `check-tokens.sh` clean. `bun run build` and
+`bun run build:vscode` both clean (only the pre-existing chunk-size warning). `bun run test:unit`
+1535 passed, 0 failed (baseline: 1535). `bun run test:webview` 55 passed, 0 failed (baseline: 55).
+`bun run lint:dead` — knip unchanged from baseline (6 duplicate exports + 4 config hints, all
+pre-existing and unrelated). `bun run test:ui` — 311 total; three separate runs across this phase
+each hit exactly one failure, never the same test twice (`budgets.spec.ts`'s scroll-delta
+percentile, twice, and `slick-grid.spec.ts`'s pacing-histogram invariant, once), both in the
+`ui-timing`/pacing-budget class the tests' own comments already document as flaky under cross-file
+worker contention. Confirmed pre-existing and unrelated to this phase: `git diff --stat` against
+this phase's start commit (`de739aa`) touches neither `views/shared/slick/` nor
+`tests/ui/slick-grid.spec.ts`/`tests/ui/budgets.spec.ts`, and re-running each failing test in
+isolation passes clean. `bun run test:visual` — 5 failed (`connection-dialog`, `console`,
+`data-view`, `schema-dialog`, `workbench`), matching the documented pre-existing baseline exactly;
+unrelated to this phase (no `.vue` styling changed).
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry: the `test:ui` timing flakiness is already
+self-documented in the failing tests' own comments, not a new discovery, and `test:visual`'s 5
+failures are the pre-existing baseline this phase inherited, not caused.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
