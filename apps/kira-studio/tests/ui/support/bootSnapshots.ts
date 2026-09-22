@@ -1,6 +1,6 @@
 import { defaultLayout } from '@shared/domain/layout';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
-import { defaultSettings } from '@shared/domain/settings';
+import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
 import type { ControlSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
 

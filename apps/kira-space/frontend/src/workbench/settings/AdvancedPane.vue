@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Settings } from '@shared/domain/settings';
 import IconButton from '@theme/primitives/IconButton.vue';
+import type { GitLogLevel } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -10,8 +10,7 @@ const props = defineProps<SettingsPaneProps>();
 
 // P72 §9.2: kira-space's own diagnostic log verbosity — genuinely installation-wide.
 function onGitLogLevelChange(e: Event): void {
-  props.draft.advanced.gitLogLevel = (e.target as HTMLSelectElement)
-    .value as Settings['advanced']['gitLogLevel'];
+  props.draft.advanced.gitLogLevel = (e.target as HTMLSelectElement).value as GitLogLevel;
 }
 </script>
 

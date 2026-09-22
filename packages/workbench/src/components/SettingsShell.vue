@@ -9,8 +9,8 @@ import { computed, reactive, ref } from 'vue';
 // whole draft/dirty/reset engine (`cloneSections`/`baseline`/`draft`/`valuesEqual`/`diffSection`/
 // `pendingPatch`/`isDirty`/`isAtDefault`/`resetLeaf`/`onDismiss`/`saveError`/`onSave`) were
 // line-for-line identical across both files (§1.6's own "confirmed shared" survey) — moved here
-// generic over `T`, the app's own settings shape (a subset of `@shared/domain/settings`'s
-// `Settings` for Kira Space, the full type for Kira Studio).
+// generic over `T`, the app's own settings shape (each app's own `state/settingsDomain.ts` `Settings`
+// type, P103 Part 4 §7.3 — three sections for Kira Space, eight for Kira Studio).
 //
 // Two things the plan's own condensed sketch (§5.5) named that this file does differently, found
 // reading both apps' real files side by side rather than trusting the sketch:

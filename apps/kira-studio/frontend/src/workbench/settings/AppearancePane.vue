@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { FONT_SIZE_RANGE, type RowDensity, type Settings } from '@shared/domain/settings';
 import Checkbox from '@theme/primitives/Checkbox.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed } from 'vue';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../../fonts';
+import {
+  type AppearanceSettings,
+  FONT_SIZE_RANGE,
+  type RowDensity,
+} from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -57,7 +61,7 @@ function onInlineBlameChange(checked: boolean): void {
 // RepoSettingsDialog.vue — a reading preference about the person, not the repository.
 function onDateFormatChange(e: Event): void {
   props.draft.appearance.dateFormat = (e.target as HTMLSelectElement)
-    .value as Settings['appearance']['dateFormat'];
+    .value as AppearanceSettings['dateFormat'];
 }
 
 const rowPreviewHeight = computed(() => (props.draft.appearance.rowDensity === 'compact' ? 22 : 28));

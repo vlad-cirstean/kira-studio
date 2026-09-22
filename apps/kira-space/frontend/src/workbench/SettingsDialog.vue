@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { defaultSettings, type SettingsPatch } from '@shared/domain/settings';
 import AppButton from '@theme/primitives/AppButton.vue';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { onBeforeUnmount } from 'vue';
 import { sections, useSettingsStore } from '../state/settings';
+import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
 import AppearancePane from './settings/AppearancePane.vue';
 import ConnectedEditorsPane from './settings/ConnectedEditorsPane.vue';

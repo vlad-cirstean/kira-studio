@@ -25,10 +25,10 @@ import type {
   RepoSummary,
   SearchRequest,
 } from '@shared/domain/repo';
-import type { Settings } from '@shared/domain/settings';
 import { CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
@@ -120,7 +120,7 @@ const spaceControl = {
 // remaining ones (spaceControl, above) — every `control.xxx()` call site in the app is unchanged,
 // since neither the method names nor their bound-call FQNs moved.
 export const control = {
-  ...createCoreControl<Settings, Layout, TabRecord>({
+  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch>({
     settings: SettingsService,
     layout: LayoutService,
     tabs: TabsService,

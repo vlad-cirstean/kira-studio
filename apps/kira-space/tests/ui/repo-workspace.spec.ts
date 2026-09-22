@@ -1,4 +1,4 @@
-import { defaultSettings } from '@shared/domain/settings';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { installGitStreamMock } from './support/gitStreamMock';
 import {

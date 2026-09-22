@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { CACHE_L2_BUDGET_MB_RANGE } from '@shared/domain/settings';
 import AppButton from '@theme/primitives/AppButton.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
@@ -7,6 +6,7 @@ import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
 import { data } from '../../bridge/data';
 import { useCacheStatsStore } from '../../state/cacheStats';
+import { CACHE_L2_BUDGET_MB_RANGE } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own

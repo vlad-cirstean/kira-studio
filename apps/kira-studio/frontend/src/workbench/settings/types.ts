@@ -1,5 +1,5 @@
-import type { Settings } from '@shared/domain/settings';
 import type { ComputedRef, Ref } from 'vue';
+import type { Settings } from '../../state/settingsDomain';
 
 // P103 Part 2 (§5.5): the one prop contract every one of this app's eight settings panes takes,
 // factored out once rather than repeated eight times (CLAUDE.md's "code never duplicates") — the

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { Page, Route } from '@playwright/test';
 import { defaultLayout } from '@shared/domain/layout';
-import { defaultSettings } from '@shared/domain/settings';
+import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
 import { STUDIO_TAB_KIND_MODE, type StudioTabKind } from '../../../frontend/src/state/tabDomain';
 import type { ControlSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';

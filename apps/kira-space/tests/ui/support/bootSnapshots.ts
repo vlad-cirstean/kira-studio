@@ -1,5 +1,5 @@
 import { defaultLayout } from '@shared/domain/layout';
-import { defaultSettings } from '@shared/domain/settings';
+import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
 import { IPC } from './ipcChannels';
 import type { ControlSnapshot } from './types';
 

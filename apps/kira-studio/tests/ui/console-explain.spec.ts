@@ -1,7 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
-import { defaultSettings } from '@shared/domain/settings';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { editorText } from './support/editorText';

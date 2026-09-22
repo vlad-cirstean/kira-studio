@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { EXPENSIVE_QUERY_ROWS_RANGE, OP_LOG_RETENTION_DAYS_RANGE, type Settings } from '@shared/domain/settings';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed } from 'vue';
+import {
+  EXPENSIVE_QUERY_ROWS_RANGE,
+  type GitLogLevel,
+  OP_LOG_RETENTION_DAYS_RANGE,
+} from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -21,8 +25,7 @@ function onExpensiveQueryRowsInput(e: Event): void {
 // RepoSettingsDialog.vue's kiraVersion.log.level — genuinely installation-wide, not a per-repo
 // fact, so this is now the one control that sets it.
 function onGitLogLevelChange(e: Event): void {
-  props.draft.advanced.gitLogLevel = (e.target as HTMLSelectElement)
-    .value as Settings['advanced']['gitLogLevel'];
+  props.draft.advanced.gitLogLevel = (e.target as HTMLSelectElement).value as GitLogLevel;
 }
 
 const opLogRetentionError = computed<string | null>(() => {

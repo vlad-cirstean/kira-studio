@@ -1,6 +1,7 @@
 import { createSettingsStore } from '@workbench/state/createSettingsStore';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
+import { defaultSettings, type Settings, type SettingsPatch } from './settingsDomain';
 
 // P85 §10.1: moved out of SettingsDialog.vue so `Manage scripts…` (TabStrip.vue, workbench/) can
 // deep-link to the Scripts section without SettingsDialog.vue itself in scope — a workbench/ ->
@@ -28,7 +29,11 @@ export type Section = (typeof sections)[number];
 // re-measure signal views/shared/page/columns.ts takes as an explicit reactive dependency, so a
 // font change re-measures instead of reusing widths sized for whatever font was active when the
 // module first measured — is this app's own extra; Kira Space has no data grid to re-measure.
-export const useSettingsStore = createSettingsStore<Section>()(control, () => {
+// P103 Part 4 (§7.3): `<Section, Settings, SettingsPatch>` — this app's own settingsDomain.ts
+// shape, not one shared @shared/domain/settings type.
+export const useSettingsStore = createSettingsStore<Section, Settings, SettingsPatch>(
+  defaultSettings,
+)(control, () => {
   const appearanceVersion = reactive({ n: 0 });
   return {
     extra: { appearanceVersion },

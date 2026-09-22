@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import {
-  HTTP_VERSIONS,
-  MAX_REDIRECTS_RANGE,
-  MAX_RESPONSE_MB_RANGE,
-  REQUEST_TIMEOUT_MS_RANGE,
-  type Settings,
-} from '@shared/domain/settings';
 import Checkbox from '@theme/primitives/Checkbox.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed } from 'vue';
+import {
+  type ApiSettings,
+  HTTP_VERSIONS,
+  MAX_REDIRECTS_RANGE,
+  MAX_RESPONSE_MB_RANGE,
+  REQUEST_TIMEOUT_MS_RANGE,
+} from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -17,7 +17,7 @@ import type { SettingsPaneProps } from './types';
 const props = defineProps<SettingsPaneProps>();
 
 function onHttpVersionChange(e: Event): void {
-  props.draft.api.httpVersion = (e.target as HTMLSelectElement).value as Settings['api']['httpVersion'];
+  props.draft.api.httpVersion = (e.target as HTMLSelectElement).value as ApiSettings['httpVersion'];
 }
 function onRequestTimeoutMsInput(e: Event): void {
   props.draft.api.requestTimeoutMs = Number((e.target as HTMLInputElement).value);

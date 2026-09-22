@@ -48,12 +48,12 @@ import type {
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
-import type { Settings } from '@shared/domain/settings';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { type AppMetricsSample, CHANNEL } from '@shared/protocol/events';
 import { createCoreControl } from '@workbench/bridge/createCoreControl';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import type { Settings, SettingsPatch } from '../state/settingsDomain';
 import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
 
@@ -421,7 +421,7 @@ const studioControl = {
 // are disjoint by construction — §5.6's own 20-method survey), but studioControl last keeps this
 // line's own diff-history the smallest against the pre-§5.6 file.
 export const control = {
-  ...createCoreControl<Settings, Layout, TabRecord>({
+  ...createCoreControl<Settings, Layout, TabRecord, SettingsPatch>({
     settings: SettingsService,
     layout: LayoutService,
     tabs: TabsService,

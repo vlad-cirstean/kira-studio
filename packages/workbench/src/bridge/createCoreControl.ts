@@ -1,5 +1,4 @@
 import type { LayoutPatch } from '@shared/domain/layout';
-import type { SettingsPatch } from '@shared/domain/settings';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { CHANNEL, type TerminalEvent } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from './rpc';
@@ -75,19 +74,20 @@ interface FolderChoice {
   path: string | null;
 }
 
-// `S`/`L`/`T` are each app's own Settings, Layout and TabRecord shape. Settings and Layout are
-// actually the same type in both apps today (both import `@shared/domain/settings`'s `Settings`
-// and `@shared/domain/layout`'s `Layout` verbatim, with no bridge-level narrowing — unlike
-// SettingsShell.vue's own `Pick<Settings, …>` narrowing, which is a UI-layer concern §5.5 added,
-// not a bridge one), but TabRecord genuinely differs (each app's own `state/tabDomain.ts` declares
-// a different `z.discriminatedUnion`) — so all three stay generic, matching the plan's own
-// `createCoreControl<Settings, Layout, TabRecord>(...)` call-site shape, rather than only
-// genericizing the one that must be.
-export interface CoreControl<S, L, T> {
+// `S`/`L`/`T`/`P` are each app's own Settings, Layout, TabRecord and SettingsPatch shape. Layout is
+// actually the same type in both apps today (both import `@shared/domain/layout`'s `Layout`
+// verbatim, with no bridge-level narrowing — unlike SettingsShell.vue's own `Pick<Settings, …>`
+// narrowing, which is a UI-layer concern §5.5 added, not a bridge one), but TabRecord genuinely
+// differs (each app's own `state/tabDomain.ts` declares a different `z.discriminatedUnion`), and
+// Settings/SettingsPatch now genuinely differ too (P103 Part 4 §7.3: each app's own
+// `state/settingsDomain.ts`, not one shared `@shared/domain/settings` shape) — so all four stay
+// generic, matching the plan's own `createCoreControl<Settings, Layout, TabRecord, SettingsPatch>
+// (...)` call-site shape, rather than only genericizing the ones that must be.
+export interface CoreControl<S, L, T, P> {
   linkOpenExternal: (url: string) => Promise<void>;
 
   settingsGetAll: () => Promise<S>;
-  settingsSet: (patch: SettingsPatch) => Promise<S>;
+  settingsSet: (patch: P) => Promise<S>;
   onSettingsChanged: (cb: (settings: S) => void) => () => void;
 
   layoutGetAll: () => Promise<L>;
@@ -121,12 +121,12 @@ export interface CoreControl<S, L, T> {
   onTerminal: (cb: (event: TerminalEvent) => void) => () => void;
 }
 
-export function createCoreControl<S, L, T>(b: CoreBindings): CoreControl<S, L, T> {
+export function createCoreControl<S, L, T, P>(b: CoreBindings): CoreControl<S, L, T, P> {
   return {
     linkOpenExternal: (url: string): Promise<void> => unwrap(b.link.OpenExternal({ url })),
 
     settingsGetAll: (): Promise<S> => unwrap(b.settings.GetAll()).then((r) => trust<S>(r)),
-    settingsSet: (patch: SettingsPatch): Promise<S> =>
+    settingsSet: (patch: P): Promise<S> =>
       unwrap(b.settings.Set({ patch })).then((r) => trust<S>(r)),
     onSettingsChanged: (cb: (settings: S) => void): (() => void) => on(CHANNEL.settingsChanged, cb),
 

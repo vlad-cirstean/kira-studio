@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { defaultSettings } from '@shared/domain/settings';
+import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
 import { gridCell as gridCellAt } from './support/grid';

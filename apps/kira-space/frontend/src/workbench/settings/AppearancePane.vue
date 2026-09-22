@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { FONT_SIZE_RANGE, type RowDensity, type Settings } from '@shared/domain/settings';
 import Checkbox from '@theme/primitives/Checkbox.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed } from 'vue';
+import {
+  type AppearanceSettings,
+  FONT_SIZE_RANGE,
+  type RowDensity,
+} from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -31,7 +35,7 @@ function onInlineBlameChange(checked: boolean): void {
 // P72 §9.1: relative-vs-absolute commit timestamps in the git graph.
 function onDateFormatChange(e: Event): void {
   props.draft.appearance.dateFormat = (e.target as HTMLSelectElement)
-    .value as Settings['appearance']['dateFormat'];
+    .value as AppearanceSettings['dateFormat'];
 }
 
 // P17 D6: the draft accepts whatever is typed (@input, so the field never fights the user

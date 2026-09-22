@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { defaultSettings, FETCH_AUTO_INTERVAL_MINUTES_RANGE, FONT_SIZE_RANGE } from '@shared/domain/settings';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
+import {
+  defaultSettings,
+  FETCH_AUTO_INTERVAL_MINUTES_RANGE,
+  FONT_SIZE_RANGE,
+} from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
