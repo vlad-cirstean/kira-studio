@@ -773,7 +773,7 @@ onUnmounted(() => {
                 <CodiconIcon name="list-selection" :size="13" />
                 <span
                   v-if="tab.state.projection !== null"
-                  class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-[var(--kira-state-on)]"
+                  class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-state-on"
                 />
               </Button>
             </TooltipTrigger>
