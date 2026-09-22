@@ -3,10 +3,10 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
-import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
 import {
@@ -73,6 +73,7 @@ function onPick(date: Date): void {
 }
 
 const calendarOpen = ref(false);
+const calendarAnchorRef = ref<HTMLElement | null>(null);
 const pickerDate = computed(() => parsed.value?.date ?? new Date());
 </script>
 
@@ -133,35 +134,31 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
           <TooltipContent>YYYY-MM-DD HH:mm:ss, in the zone selected above</TooltipContent>
         </Tooltip>
       </div>
-      <span class="ts-calendar-anchor">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                aria-label="Pick a date and time"
-                :disabled="readOnly"
-                data-testid="cell-editor-timestamp-calendar"
-                @click="calendarOpen = !calendarOpen"
-              >
-                <CodiconIcon name="calendar" :size="13" />
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>Pick a date and time</TooltipContent>
-        </Tooltip>
-        <PopoverPanel
-          v-if="calendarOpen"
-          :width="228"
-          anchor="left"
-          test-id="cell-editor-timestamp-calendar-popover"
-          backdrop-testid="cell-editor-timestamp-calendar-backdrop"
-          @close="calendarOpen = false"
-        >
+      <Popover :open="calendarOpen" @update:open="calendarOpen = $event">
+        <span ref="calendarAnchorRef" class="ts-calendar-anchor">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Pick a date and time"
+                  :disabled="readOnly"
+                  data-testid="cell-editor-timestamp-calendar"
+                  @click="calendarOpen = !calendarOpen"
+                >
+                  <CodiconIcon name="calendar" :size="13" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Pick a date and time</TooltipContent>
+          </Tooltip>
+          <PopoverAnchor :reference="calendarAnchorRef ?? undefined" />
+        </span>
+        <PopoverContent align="start" class="w-[228px] gap-0 p-0" data-testid="cell-editor-timestamp-calendar-popover">
           <DateTimePicker :model-value="pickerDate" :zone="zone" @update:model-value="onPick" />
-        </PopoverPanel>
-      </span>
+        </PopoverContent>
+      </Popover>
     </div>
   </div>
 </template>

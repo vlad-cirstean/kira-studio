@@ -3,6 +3,7 @@ import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -102,6 +103,7 @@ const pendingCount = computed(() => {
   return p.edits.size + p.deletes.size + p.inserts.length;
 });
 const previewOpen = ref(false);
+const previewAnchorRef = ref<HTMLElement | null>(null);
 
 // P43 F5/D7: commitPending's own rejection (a constraint violation, a type error, a read-only
 // refusal) used to be an unhandled promise rejection — no try/catch here and no async-aware
@@ -262,26 +264,29 @@ function onCloseSearch(): void {
           <span class="p-chip warn"
             >{{ pendingCount }} row{{ pendingCount === 1 ? '' : 's' }} pending</span
           >
-          <div class="preview-anchor">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-                  <Button
-                    variant="toolbar"
-                    size="kira-icon"
-                    data-testid="toolbar-preview-command"
-                    :disabled="!isWritable"
-                    aria-label="Preview the SQL for pending changes"
-                    @click="previewOpen = !previewOpen"
-                  >
-                    <CodiconIcon name="eye" :size="13" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{{ isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only' }}</TooltipContent>
-            </Tooltip>
+          <Popover :open="previewOpen" @update:open="previewOpen = $event">
+            <div ref="previewAnchorRef" class="preview-anchor">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                    <Button
+                      variant="toolbar"
+                      size="kira-icon"
+                      data-testid="toolbar-preview-command"
+                      :disabled="!isWritable"
+                      aria-label="Preview the SQL for pending changes"
+                      @click="previewOpen = !previewOpen"
+                    >
+                      <CodiconIcon name="eye" :size="13" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{{ isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only' }}</TooltipContent>
+              </Tooltip>
+              <PopoverAnchor :reference="previewAnchorRef ?? undefined" />
+            </div>
             <PreviewCommandPanel v-if="previewOpen" :tab-id="tab.id" @close="previewOpen = false" />
-          </div>
+          </Popover>
           <Tooltip>
             <TooltipTrigger as-child>
               <span tabindex="0" class="inline-flex" :aria-describedby="undefined">

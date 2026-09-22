@@ -40,6 +40,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
@@ -57,7 +58,6 @@ import { useSettingsStore } from '../../../state/settings';
 import type { KeyValueTabRecord } from '../../../state/tabDomain';
 import { browseInvalidate } from '../../../state/viewCommands';
 import EngineIcon from '../../../theme/EngineIcon.vue';
-import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { datasetNumber } from '../eventCoords';
 import SearchToolbar from '../page/SearchToolbar.vue';
@@ -311,6 +311,7 @@ const objectEditGate = computed<ObjectEditGate>(() => {
 // --- edit popover: a single TextField pre-filled with the current string value, mutating
 // immediately on Save (no staged/pending edit set — mirrors documents/mutations.ts). -----------
 const editOpen = ref(false);
+const editAnchorRef = ref<HTMLElement | null>(null);
 const editDraft = ref('');
 const editSaving = ref(false);
 const editError = ref<string | null>(null);
@@ -436,6 +437,7 @@ async function onDownload(): Promise<void> {
 // For an S3 object page, Add instead opens the upload dialog (state/objectStore.ts) targeting
 // this object's own container — pathParent(host.path), the bucket or prefix it lives under. ---
 const addOpen = ref(false);
+const addAnchorRef = ref<HTMLElement | null>(null);
 const addName = ref('');
 const addValue = ref('');
 const addSaving = ref(false);
@@ -724,7 +726,7 @@ onUnmounted(() => {
         </div>
         <span class="p-push" />
         <span
-          class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+          class="p-run-state inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
           :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
         >
           <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
@@ -847,18 +849,21 @@ onUnmounted(() => {
         <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
              add-before-delete order), search trails, same as every other view. -->
         <div class="group">
-          <div class="add-anchor">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-                  <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
-                    <CodiconIcon name="add" :size="13" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{{ addTitle }}</TooltipContent>
-            </Tooltip>
-            <PopoverPanel v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
+          <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
+            <div ref="addAnchorRef" class="add-anchor">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                    <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
+                      <CodiconIcon name="add" :size="13" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{{ addTitle }}</TooltipContent>
+              </Tooltip>
+              <PopoverAnchor :reference="addAnchorRef ?? undefined" />
+            </div>
+            <PopoverContent align="start" class="w-[320px]" data-testid="keyvalue-add-popover">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Add key (string value)</div>
                 <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
@@ -884,26 +889,24 @@ onUnmounted(() => {
                   >Save</Button>
                 </div>
               </div>
-            </PopoverPanel>
-          </div>
+            </PopoverContent>
+          </Popover>
 
-          <div class="edit-anchor">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-                  <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
-                    <CodiconIcon name="edit" :size="13" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{{ editTitle }}</TooltipContent>
-            </Tooltip>
-            <PopoverPanel
-              v-if="editOpen && !isSingleObjectPage"
-              test-id="keyvalue-edit-popover"
-              :width="320"
-              @close="closeEdit"
-            >
+          <Popover :open="editOpen && !isSingleObjectPage" @update:open="(v) => !v && closeEdit()">
+            <div ref="editAnchorRef" class="edit-anchor">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                    <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
+                      <CodiconIcon name="edit" :size="13" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{{ editTitle }}</TooltipContent>
+              </Tooltip>
+              <PopoverAnchor :reference="editAnchorRef ?? undefined" />
+            </div>
+            <PopoverContent align="start" class="w-[320px]" data-testid="keyvalue-edit-popover">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Edit value</div>
                 <Input
@@ -927,8 +930,8 @@ onUnmounted(() => {
                   >Save</Button>
                 </div>
               </div>
-            </PopoverPanel>
-          </div>
+            </PopoverContent>
+          </Popover>
 
           <Tooltip>
             <TooltipTrigger as-child>

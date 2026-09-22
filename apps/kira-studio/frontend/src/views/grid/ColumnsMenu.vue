@@ -3,15 +3,14 @@ import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { nextProjectionFromSelectedColumns } from './menu';
 import { useGridViewStore } from './state';
 
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
-const emit = defineEmits<{ close: [] }>();
 const gridViewStore = useGridViewStore();
 
 const meta = computed(() => gridViewStore.runtime[props.tabId]?.meta ?? null);
@@ -85,7 +84,11 @@ function onDragEnd(): void {
   dragIndex.value = null;
 }
 
-function close(): void {
+// P104 §3: PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,
+// the toggle button) becomes onBeforeUnmount — DataToolbar.vue's Popover mounts this component
+// only while its own columnsOpen is true (v-if), so unmount fires exactly once, for the same set
+// of reasons, and commits whatever's staged in `selected`/`order` regardless of why it closed.
+onBeforeUnmount(() => {
   const nextProjection = nextProjectionFromSelectedColumns([...selected.value], columnNames.value);
   if (!sameProjection(nextProjection, currentProjection())) {
     void gridViewStore.setProjection(props.tabId, nextProjection);
@@ -104,18 +107,11 @@ function close(): void {
   if (orderChanged) {
     gridViewStore.setColumnOrder(props.tabId, nextOrder);
   }
-  emit('close');
-}
+});
 </script>
 
 <template>
-  <PopoverPanel
-    anchor="right"
-    :width="200"
-    test-id="columns-menu"
-    backdrop-test-id="columns-menu-backdrop"
-    @close="close"
-  >
+  <PopoverContent align="end" class="w-[200px] gap-0 p-0" data-testid="columns-menu">
     <div class="columns-menu-inner">
       <div class="columns-menu-header">
         <Button variant="toolbar" size="kira" data-testid="columns-select-all" @click="selectAll">All</Button>
@@ -165,7 +161,7 @@ function close(): void {
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>
     </div>
-  </PopoverPanel>
+  </PopoverContent>
 </template>
 
 <style scoped>

@@ -3,6 +3,7 @@ import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
@@ -13,7 +14,6 @@ import MonacoHost from '../../../editor/MonacoHost.vue';
 import { cellKey, type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
 import { typeClassColor } from '../../../theme/icons';
-import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import EditBufferActions from '../EditBufferActions.vue';
 import ResponseFindBar, { type FindBarHost, type FindBarTarget } from '../ResponseFindBar.vue';
 import { sqlDialectFor } from '../sqlIdent';
@@ -411,6 +411,7 @@ function openFormatMenu(e: MouseEvent): void {
 // onEditorBlur — this is a one-shot action like Ctrl+Enter, not a keystroke mid-edit, so it stages
 // immediately rather than waiting on a blur that will never come.
 const generatePanelOpen = ref(false);
+const generateAnchorRef = ref<HTMLElement | null>(null);
 function applyGenerator(gen: Generator): void {
   if (!isEditable.value) return;
   doc.value = gen.run(effectiveFormat.value);
@@ -530,32 +531,28 @@ const statusLine = computed(() => {
              figure, alongside the decoded reading/truncation/beautify-failure notes it already
              said first — this row's own badge would be the same number shown twice. -->
         <template v-if="!viewerMode">
-          <span class="generate-anchor">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-                  <Button
-                    variant="toolbar"
-                    size="kira-icon"
-                    aria-label="Generate a value"
-                    :disabled="!isEditable"
-                    data-testid="cell-editor-generate"
-                    @click="generatePanelOpen = !generatePanelOpen"
-                  >
-                    <CodiconIcon name="sparkle" :size="13" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Generate a value</TooltipContent>
-            </Tooltip>
-            <PopoverPanel
-              v-if="generatePanelOpen"
-              :width="200"
-              anchor="left"
-              test-id="cell-editor-generate-popover"
-              backdrop-testid="cell-editor-generate-backdrop"
-              @close="generatePanelOpen = false"
-            >
+          <Popover :open="generatePanelOpen" @update:open="generatePanelOpen = $event">
+            <span ref="generateAnchorRef" class="generate-anchor">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                    <Button
+                      variant="toolbar"
+                      size="kira-icon"
+                      aria-label="Generate a value"
+                      :disabled="!isEditable"
+                      data-testid="cell-editor-generate"
+                      @click="generatePanelOpen = !generatePanelOpen"
+                    >
+                      <CodiconIcon name="sparkle" :size="13" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Generate a value</TooltipContent>
+              </Tooltip>
+              <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
+            </span>
+            <PopoverContent align="start" class="w-[200px] gap-0 p-0" data-testid="cell-editor-generate-popover">
               <div class="generate-menu">
                 <Tooltip v-for="gen in GENERATORS" :key="gen.id">
                   <TooltipTrigger as-child>
@@ -571,8 +568,8 @@ const statusLine = computed(() => {
                   <TooltipContent>{{ gen.hint }}</TooltipContent>
                 </Tooltip>
               </div>
-            </PopoverPanel>
-          </span>
+            </PopoverContent>
+          </Popover>
           <EditBufferActions :buffer="buffer" testid-prefix="cell-editor" :show-bytes="false" />
         </template>
       </span>
