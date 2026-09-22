@@ -3,9 +3,9 @@ import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useDynamicValuesStore } from './state/dynamicValues';
@@ -64,14 +64,29 @@ function close(): void {
 </script>
 
 <template>
-  <DialogFrame
-    title="Dynamic values"
-    :width="480"
-    max-height="80vh"
-    test-id="dynamic-values-dialog"
-    close-test-id="dynamic-values-dialog-close"
-    @close="close"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && close()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="dynamic-values-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 480px; max-width: min(480px, calc(100% - 2rem)); max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Dynamic values</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="dynamic-values-dialog-close"
+            @click="close"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <div class="overflow-auto">
     <div class="p-dialog-body list dynamic-values-body">
       <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
@@ -112,13 +127,15 @@ function close(): void {
         <TooltipContent>Copy</TooltipContent>
       </Tooltip>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions end">
-        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="p-dialog-actions end">
+          <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -135,7 +152,7 @@ function close(): void {
 }
 
 .reference {
-  @apply shrink-0 text-fg font-[family-name:var(--kira-font-data)];
+  @apply shrink-0 text-fg font-data;
 }
 
 .sample {
