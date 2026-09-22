@@ -591,6 +591,185 @@ pre-existing baseline Part 1/Part 2 already documented, not a new discovery; the
 token distinction noted above is Part 2's own already-shipped, already-verified behavior, not a
 limitation this phase found or introduced.
 
+## P99 Part 4 result
+
+Landed per plan (`docs/v1.9/plans/P99-vue-migration.md` §8, §9-§14), 10 commits from `3f017d8`
+through `5883add`, plus this section's own commit. This is P99's last part — see the closing note at
+the end of this section for the phase as a whole.
+
+**`3f017d8` — `views/definition` (6), `views/documents` (2), `views/keyvalue` (1), `views/stream`
+(4), `views/browse` (1), 14 files.** Every `<style scoped>` block converted to `@apply`, no primitive
+swap needed (Part 2 already converted the primitives these files consume). `BrowseView.vue`'s
+`keyTypesDebounceTimer` setTimeout/clearTimeout pair → `useDebounceFn`, `onBeforeUnmount(() =>
+ensureKeyTypesDebounced.cancel())` per `SchemaDialog.vue`'s own precedent (Part 2). `StreamView.vue`'s
+inventoried "DEB" flag was a comment-only false positive (mentions `tabs.ts`'s own debounced save, no
+debounce in this file itself) — noted, not converted. `ConstraintsSection.vue`'s `.ref-link:hover`
+uses `text-[var(--kira-accent)]`, not the `text-accent` utility — the same accent/`--kira-hover`
+cascade-layer workaround `CollectionRow.vue`'s rename-input already documents (Part 3).
+
+**`1056b0d` — `views/shared`, 13 files.** `SearchToolbar.vue`'s `queryDebounceTimer` →
+`useDebounceFn` (`SchemaDialog.vue` precedent). `DateTimePicker.vue` keeps the shadcn calendar
+component declined, per the plan's own named call for that file — CSS/VueUse only, the calendar
+question itself out of scope. `FilterHistoryMenu.vue`/`DateTimePicker.vue`/`DocumentRow.vue` use the
+same accent-token workaround as above.
+
+**`c05271e` — `views/grid`, 7 files.** `SlickGridHost.vue` (2,723 lines, per the plan's own named
+note) carries **zero** `<style>` lines — VueUse-only. `scrollSaveTimer` → `useDebounceFn`
+(`persistScroll`), explicit `.cancel()` in `onUnmounted` replacing the old `clearTimeout`. Three
+patterns declined with an in-code, named reason each: (1) the `viewportEl` scroll listeners and the
+`ResizeObserver` — registration order against SlickGrid's own internal scroll listener is documented
+as load-bearing for the velocity sampler, and `onUnmounted`'s explicit "Order matters (§6 D3)"
+hand-ordered teardown can't safely take a composable's `onScopeDispose`-driven cleanup; (2) the
+header-cell `zone`/`sortIndicator` click listeners — SlickGrid itself creates and destroys these
+nodes per header-cell render, well after `setup()`'s effect-scope capture, not a stable Vue-tracked
+ref; (3) `onPaste`'s `navigator.clipboard.readText()` — `useClipboard`'s `read()` is a reactive-UI
+composable, not documented to preserve the exact promise-rejects-on-permission-denial contract the
+existing `try/catch` depends on, and no vendored VueUse source was reachable in this sandbox to
+verify against, nor any existing `useClipboard`-read precedent in the app. `FkPreviewPopover.vue`'s
+document-keydown-Escape listener → `useEventListener`, mirroring `PopoverPanel.vue`'s identical
+pattern (Part 2).
+
+**`2867a77` — `views/console`, 5 files.** `ConsoleSlickGrid.vue` (938 lines) mirrors
+`SlickGridHost.vue`'s own three declines verbatim (same reasoning, cited directly) and likewise
+carries zero `<style>` lines. `ConsoleSavedMenu.vue`'s `.save-current` uses the accent-token
+workaround.
+
+**`627289a` — six `views/repo/*.vue` files, a new `views/repo/terminalRendererLoader.ts`, and a
+`flex-none` normalization, all in one commit. Disclosed deviation, not hidden or amended:** the
+commit message only reads "style(frontend): normalize flex:0 0 auto to flex-none" — it names only
+the `FkPreviewPopover.vue` `flex-none` fixup (three-utility `shrink-0 grow-0 basis-auto` spellings,
+written before `OperationsPanel.vue`'s own `flex-none` precedent was found while converting
+`RepoDiffView.vue`, normalized via `sed`). It does not name the `views/repo/*.vue` work also in the
+same commit: `RepoDiffView.vue`, `RepoFileView.vue`, `RepoGraphView.vue`, `RepoMultiDiffView.vue`,
+`RepoTerminalView.vue`, `ReviewThread.vue` converted to `@apply`, and `RepoTerminalView.vue`'s dual
+`<script>` block fixed — its plain `<script lang="ts">` module block (lazy-loaded terminal-renderer
+state plus a P97 `biome-ignore lint/correctness/noUnusedVariables`, needed because Biome's Vue
+support can't link scope across a plain `<script>` and `<script setup>` block in one SFC) moved to
+the new sibling module `terminalRendererLoader.ts`, mirroring `repo/git/gitUiModule.ts`'s
+`loadGitUi()` shape and `editor/monaco.ts`'s `loadMonaco()` shape — eliminating both the dual-block
+SFC and the P97 `biome-ignore` it carried. `RepoTerminalView.vue`'s `ResizeObserver` (constructed
+inside `mount()` after `await loadTerminalRenderer()`) stays hand-rolled, declined: Vue's synchronous
+"current instance" tracking, which a composable's automatic `onUnmounted` registration relies on, is
+lost across that `await` gap — converting would need restructuring every callback to guard against
+`renderer` still being null, a real behavior change §9.4 forbids riding along with a conversion.
+**The commit's actual content is correct and fully verified** (typecheck/lint/tests all green both
+at commit time and in this phase's own closing re-verification) — only the message under-describes
+it. Not amended: `CLAUDE.md`'s git policy amends only on an explicit user request, and none was
+given: this section is that disclosure instead.
+
+**`2e9762f` — `repo/`, 8 files.** `GitPanel.vue`'s two raw `navigator.clipboard.writeText()` calls
+("Copy path" on a repo row and a worktree row) now go through the app's shared `copyText()` wrapper,
+the same convention `TabStrip.vue`/`OperationsPanel.vue`/etc. already use — these were not yet
+wrapped at all, distinct from the established "leave an existing `copyText()` call unconverted to
+`useClipboard`" precedent, which doesn't apply to a call that was never wrapped in the first place.
+`GitPanel.vue`'s `.prompt-scrim` keeps its literal `z-30` rather than `var(--kira-z-dialog)`: unlike
+`ConsoleSavedMenu.vue`'s own prompt-scrim (P28 D17(c), raised from inside a popover with its own
+full-viewport backdrop to clear), this prompt raises directly from the panel, so there is no cascade
+requirement forcing the dialog rung — preserved as-is per §9.4's "no behaviour change riding along."
+`RepoFileTree.vue`'s `searchDebounceTimer` → `useDebounceFn`. `GitStart.vue`, `QuickOpen.vue`,
+`RepoReviewView.vue`, `RepoSearchRow.vue`, `RepoSearchView.vue`, `RepoTreeRow.vue` — CSS only, no
+VueUse-eligible pattern in any of the six.
+
+**`002bee0` — `terminal/`, 2 files.** `TerminalPanel.vue`, `TerminalStart.vue` — CSS only, no
+addEventListener/observer/debounce/clipboard pattern in either.
+
+**`6c84476` — `editor/MonacoHost.vue`, wrapper CSS only, per the plan's own named note.** Only the
+host-wrapper rules (`.monaco-host`, `.monaco-host-pending`, `.monaco-host--single-line.monaco-host-
+pending`) convert to `@apply`. Everything past that stays plain CSS, undisturbed: rules reaching
+Monaco's own DOM (`:deep(.monaco-editor)`, `:global(.monaco-hover)`, `:global(.suggest-widget)`) or
+classes injected into Monaco's tokenizer output (`:deep(.kira-ed-*)`) — named in a comment added at
+the boundary between the two, so a future edit doesn't have to re-derive the line.
+
+**`4d54033`/`5883add` — the §12.3 phase-closing audit's own fixes, 10 files outside Part 4's own
+56-file inventory.** The audit runs whole-tree by its own design (§12.3: "Run each of these over
+`apps/kira-studio/frontend/src`"), so it surfaced hand-rolled patterns in files no part had ever been
+assigned — pre-existing, not something an earlier part skipped. Fixed: `api/state/collections.ts` and
+`project/state/tree.ts`'s watch+setTimeout search-debounce pairs → `refDebounced`; `state/mode.ts`,
+`state/layout.ts`, `views/repo/blameLine.ts` → `useDebounceFn` (single-timer shapes, `.cancel()`
+replacing the old `clearTimeout`); `state/tabs.ts`'s `saveDebounced`/`saveNow`/`flushPendingTabState`
+→ `useDebounceFn`, `.cancel()` replacing the two `clearTimeout` call sites while `saveNow`/
+`flushPendingTabState`'s own immediate-flush behavior is unchanged (they call the underlying save
+function directly, same as before). `repo/git/hostHandlers.ts`'s `clipboard.write` RPC handler → the
+same `copyText()` wrapper `GitPanel.vue` above now uses. **One real bug caught and fixed inside this
+same pass, before commit, not after:** converting `project/state/tree.ts`'s debounce moved the
+trim/lowercase step out of the debounced write and into `activeSearchQuery`'s own computed — but
+`searchResult`'s own computed still read the raw `debouncedQuery.value` directly, bypassing that
+step; fixed to read `activeSearchQuery.value` instead before the commit landed, so `TreeRow.vue`'s
+highlight and the row-matching query stay byte-identical to pre-conversion behavior, not a
+regression riding along with the conversion. Declined, named in-code: `views/httprequest/cookies.ts`'s
+per-`tabId` debounce map (`useDebounceFn` debounces one function identity; a per-key cache of
+debounced instances would be a new abstraction invented mid-pass for this one call site, which §9.4
+forbids outside a genuine multi-site finding) and `views/shared/slick/scrollTrace.ts`'s dev-tool
+clipboard write (its optional-chained `navigator.clipboard?` guard plus outer synchronous `try/catch`
+handle a context where the Clipboard API may be entirely absent — a dev-tool console hook, not a
+normal app surface — which `copyText()`/`useClipboard()` don't account for). `SlickGridHost.vue`'s
+insert-region `el.addEventListener('input'/'keydown', …)` listeners were missing their own
+declined-with-reasoning comment (the pattern was already declined in spirit — same hand-ordered
+`onUnmounted` teardown sequence as the `viewportEl` listeners two hunks above — just never written
+down); added, no behavior change.
+
+**§12.3 audit — every check, full accounting.**
+
+| Check | Result |
+|---|---|
+| No hand-rolled event wiring | Every `addEventListener` hit is inside a VueUse call, a non-component `.ts` module VueUse can't reach (`kiraSlickGrid.ts`, `reviewDecorations.ts`, `views/grid/slick/editor.ts`, `repo/git/transport.ts` — no active Vue effect scope), or a named decline (`SlickGridHost.vue`/`ConsoleSlickGrid.vue`'s order-dependent teardown listeners including the insert-region pair fixed above, the header-cell zone listeners, `RepoTerminalView.vue`'s async-boundary construction) |
+| No raw observers | Same — every `ResizeObserver` hit is `VirtualList.vue`'s existing `useResizeObserver` or one of the same named declines above |
+| No hand-rolled debounce/throttle | 6 hits fixed (`4d54033`), 1 declined with a named reason (`cookies.ts`) — see above |
+| No raw clipboard | 1 hit fixed (`5883add`), 1 declined with a named reason (`scrollTrace.ts`); the rest are `clipboard.ts` itself, `SlickGridHost.vue`'s already-declined read, and established component-local `copyText()` calls Parts 2/3 already left unconverted to `useClipboard` |
+| No `reactive()`/module `ref()` outside a store | Zero hits |
+| No manual loading/error/isLoading fetch triple | Zero hits |
+| Every component exactly one `<script>` block | Confirmed across all 269 `.vue` files in `apps/kira-studio/frontend/src` + `packages/git-ui/src` — exactly 1 real block each. `RepoGraphView.vue`'s `grep -c "<script"` hit of 2 is a comment mentioning `<script setup>`, not a second block — verified false positive |
+| Scoped-CSS residue vs. 7,125-line baseline | 5,260 lines (strict `^<style`/`^</style>` count), a 26% reduction. Sampled the 10 largest remaining blocks; categories: `:deep()` reaching third-party DOM (28 files, e.g. `MonacoHost.vue`), `:global()` (1 file, `MonacoHost.vue`), `@keyframes` (2 files: `FkPreviewPopover.vue`, `TreeRow.vue`), `grid-template` (7 files, e.g. `ConnectionDialog.vue`), `calc()` mixing a literal `14px` with `--kira-s-*` tokens (`GitPanel.vue`, this part), a deliberately-preserved literal `z-index: 30` (`GitPanel.vue`, distinguished above from `ConsoleSavedMenu.vue`'s `var(--kira-z-dialog)` case). **Informational, not fixed:** several already-shipped Part 2/3 files whose own result sections say "converted whole in one pass" (`SettingsDialog.vue`, `ConnectionDialog.vue`, `OperationsPanel.vue`, `TitleBar.vue`, `TabStrip.vue`, `FiltersDialog.vue`) still carry plain-CSS declarations using a `var(--kira-*)` token directly (e.g. `color: var(--kira-fg-muted);`) where a named Tailwind utility exists (`text-muted`) — not a skipped block, an idiom-consistency gap. Left alone: fixing it means re-touching and re-verifying already-shipped Part 2/3 files entirely outside Part 4's own 56-file assignment, which is work "genuinely outside this phase's own scope" per `CLAUDE.md`'s own carve-out for that exception — named here rather than silently dropped or blanket-fixed without re-running those files' own verification |
+| knip has none of P98's seven bootstrap ignores left | 3 of 7 removed in Part 2 (`@vueuse/core`/`reka-ui`/`class-variance-authority`); the other 4 (`tw-animate-css`/`@lucide/vue`/`clsx`/`tailwind-merge`) stay ignored per Part 2's own documented, still-accurate reason (no app file outside `src/components/ui/**`/`lib/utils.ts` imports any of the four directly) — re-confirmed by grep, still zero hits after Part 4's own work. `bun run lint:dead` clean, same 6 pre-existing duplicate exports + 4 config hints as every prior part's baseline |
+| No orphaned primitive | Zero — `git diff --diff-filter=D` against the pre-chapter commit is empty for `theme/primitives/`; no wrapper was deleted anywhere in v1.9 |
+| a11y side effect (informational, for P101) | `biome.json`'s `**/*.vue` `a11y: off` override removed, `bun run biome check` over `apps/kira-studio/frontend/src packages/git-ui/src packages/kira-ui/src`: **255 errors across 86 files** (P97's baseline: 255 across 85 files — same total error count, one additional file now shows a finding). Not fixed, per instruction. Override restored immediately after (`git diff biome.json` confirmed empty); `bun run lint` reconfirmed clean |
+
+**Verification (§12.1-§12.2).** `bun run typecheck` clean across all five projects. `bun run lint` —
+Biome 0 errors/warnings/infos over 1277 files, `check-tokens.sh` clean. `bun run build` and `bun run
+build:vscode` both clean (only the pre-existing chunk-size warning; `build:vscode` also confirms
+§2.2's scope check — `apps/kira-studio-vscode/` untouched by this phase). `bun run test:unit` 1535
+passed, 0 failed (baseline: 1535). `bun run test:webview` 55 passed, 0 failed (baseline: 55). `bun
+run lint:dead` — knip unchanged from baseline (6 duplicate exports + 4 config hints, all
+pre-existing). `bun run test:ui` — 306 passed, 1 failed, 4 did not run. Failure:
+`cell-editor.spec.ts`, `Error: locator.click: Target page, context or browser has been closed` —
+isolated with `--workers=1`, passes 3/3; a pre-existing, unmodified comment already inside
+`SlickGridHost.vue` names this exact failure signature as a known pre-existing timeout, and `git diff
+--stat` against the Part 3 boundary (`63e1aa0`) touches neither `cell-editor.spec.ts` nor
+`tests/ui/support/`. The 4 "did not run" are `ui-timing`'s own tests, skipped by Playwright's
+dependency-cascade default when `ui` has a failure (`ui-timing` has `dependencies: ['ui']`) — run
+`--no-deps` to check directly, and 1 of the 4 also failed: `budgets.spec.ts`'s scroll-response p50
+assertion (13ms measured against a 12ms budget), reproduced twice. **Investigated rather than waved
+through**, since this differs from Part 1's own claim that all 4 pass clean under `--no-deps`: the
+assertion's own in-file comment already documents it as contention-sensitive and tuned against a
+specific dev machine ("a real and reproducible 9-10ms under full-suite contention, not a one-off
+flake... the flakiness here is cross-file worker contention"), and Part 1's own result section
+independently hit this exact same `budgets.spec.ts` scroll-delta percentile flake twice across its
+three runs — the same pre-existing class, not new. Proved conclusively by reverting
+`SlickGridHost.vue` to its exact pre-Part-4 (`63e1aa0`) content and re-running the identical test: it
+failed identically (`Received: 13`), with zero Part 4 code in the file — confirming this is
+environmental/sandbox timing, not a regression from anything this phase changed. Reverted the file
+back to its committed Part 4 content afterward (`git diff` confirmed empty against the commit;
+typecheck/lint reconfirmed clean). `bun run test:visual` — 5 failed, exactly the same 5 specs as the
+documented baseline (`connection-dialog`, `console`, `data-view`, `schema-dialog`, `workbench`) — no
+new diff.
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry: every `test:ui`/`test:visual` deviation
+above was investigated and confirmed pre-existing/environmental, not a limitation this phase found or
+introduced. `docs/ARCHITECTURE.md`'s Stack row is updated by this same commit, "P99 migrates" →
+"P99 migrated" (§11's own instruction for Part 4).
+
+**P99 closing summary.** All four parts are done: Part 1 (libraries and state onto Pinia/TanStack
+Query), Part 2 (shell/chrome/primitives, 48 files), Part 3 (the API client surface, 39 files), Part 4
+(data/repo/terminal/editor views plus this phase-closing audit, 56 files + 10 more the audit itself
+surfaced) — every `.vue` file in `apps/kira-studio/frontend/src` (plus `packages/git-ui`'s one
+crossing, §2.3) is on Tailwind/shadcn-vue/VueUse/Pinia/TanStack Query, one pass each, none reopened.
+The phase-closing audit ran exactly once, at the end of this last part as planned (§8), over the
+whole tree rather than just this part's own files, and every one of its eleven checks is accounted
+for above — either converted or declined with the requirement named in code. The one open item it
+produced is informational, not a defect: the a11y recount (255 errors across 86 files, up from P97's
+255/85 by one file, same total count) is P101's own starting point, named here and nowhere else —
+this phase fixes none of it, per its own explicit instruction not to.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
