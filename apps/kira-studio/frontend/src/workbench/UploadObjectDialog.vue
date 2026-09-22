@@ -2,6 +2,7 @@
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import { decodePath } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
@@ -11,7 +12,6 @@ import { control } from '../bridge/control';
 import { useObjectStoreStore } from '../state/objectStore';
 import { useTabsStore } from '../state/tabs';
 import { browseInvalidate } from '../state/viewCommands';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 
 const objectStoreStore = useObjectStoreStore();
 const tabsStore = useTabsStore();
@@ -136,7 +136,9 @@ watch(
           <Input v-model="contentType" class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-content-type" />
         </template>
 
-        <MessageStrip v-if="error" tone="err" data-testid="upload-error">{{ error }}</MessageStrip>
+        <Alert v-if="error" variant="destructive" data-testid="upload-error">
+          <AlertDescription>{{ error }}</AlertDescription>
+        </Alert>
       </div>
 
       <DialogFooter class="border-t border-border">
