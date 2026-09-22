@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { HttpFormDataFieldState } from '@shared/domain/http';
 import { contentTypeForFilename } from '@shared/domain/object-store';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { formatBytes } from '@workbench/util/format';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
 import FieldRowsTable from './FieldRowsTable.vue';

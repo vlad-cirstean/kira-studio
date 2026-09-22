@@ -10,6 +10,7 @@ import {
   type HttpRequestTabState,
   httpRequestTabStateSchema,
 } from '@shared/domain/http';
+import type { VariableScope } from '@shared/domain/variables';
 import {
   asGrpcRequestTab,
   asHttpRequestTab,
@@ -17,8 +18,7 @@ import {
   type HttpRequestTabRecord,
   type VariableSetTabRecord,
   type VariableSetTabState,
-} from '@shared/domain/tabs';
-import type { VariableScope } from '@shared/domain/variables';
+} from '../state/tabDomain';
 import { type OpenTabResult, useTabsStore } from '../state/tabs';
 
 // P12 D9: the module's own tab helpers, moved out of state/tabs.ts (§1.4) — these are the

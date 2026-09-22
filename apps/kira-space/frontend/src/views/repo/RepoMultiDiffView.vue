@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
 // editor's counterpart. A scrolling column of per-file sections; each section's own diff editor
 // mounts only while that section is expanded, so a 60-file commit constructs at most a few live
@@ -15,11 +19,7 @@
 // property, breaking DiffEditorHandle's own type. Only the two plain per-path fields the template
 // actually reads — `expanded`, and each section's own copied-out state/error strings — need to be
 // reactive.
-import type { RepoMultiDiffTabRecord } from '@shared/domain/tabs';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
+import type { RepoMultiDiffTabRecord } from '../../state/tabDomain';
 import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { useDiffEditor } from './useDiffEditor';
 

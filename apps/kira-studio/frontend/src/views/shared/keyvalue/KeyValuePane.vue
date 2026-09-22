@@ -29,7 +29,7 @@
 // and this component's own badges/toolbar bands as its next sibling keeps every line of that
 // markup in one place, at the cost of badges no longer sitting inline with the header name —
 // still one coherent `.p-toolbar`-styled band, immediately below it.
-import type { KeyValueTabRecord, PageSize } from '@shared/domain/tabs';
+import type { PageSize } from '@shared/domain/tabs';
 import { decodePath, pathParent, pathTail } from '@shared/domain/tree';
 import {
   type ColumnDescriptor,
@@ -53,6 +53,7 @@ import { type SelectedCell, useCellSelectionStore } from '../../../state/cellSel
 import { useConnectionsStore } from '../../../state/connections';
 import { useObjectStoreStore } from '../../../state/objectStore';
 import { useSettingsStore } from '../../../state/settings';
+import type { KeyValueTabRecord } from '../../../state/tabDomain';
 import { browseInvalidate } from '../../../state/viewCommands';
 import MessageStrip from '../../../theme/primitives/MessageStrip.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import type { Page, Route } from '@playwright/test';
 import { defaultLayout } from '@shared/domain/layout';
 import { defaultSettings } from '@shared/domain/settings';
-import { TAB_KIND_MODE, type TabKind } from '@shared/domain/tabs';
+import { STUDIO_TAB_KIND_MODE, type StudioTabKind } from '../../../frontend/src/state/tabDomain';
 import type { ControlSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
 
@@ -516,7 +516,9 @@ export async function installControlMocks(
     if (!tabs || tabs.length === 0) return 'studio';
     const bootTab = tabs.find((t) => t.active) ?? tabs[0];
     const kind = bootTab?.kind;
-    return kind && kind in TAB_KIND_MODE ? TAB_KIND_MODE[kind as TabKind] : 'studio';
+    return kind && kind in STUDIO_TAB_KIND_MODE
+      ? STUDIO_TAB_KIND_MODE[kind as StudioTabKind]
+      : 'studio';
   }
 
   await page.route('**/wails/**', async (route) => {

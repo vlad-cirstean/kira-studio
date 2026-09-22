@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { definitionText } from '@shared/domain/definition';
-import type { DefinitionTabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AppButton from '@theme/primitives/AppButton.vue';
@@ -13,6 +12,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
+import type { DefinitionTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';

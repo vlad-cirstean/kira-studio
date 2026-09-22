@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
-import type { DataTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
+import type { DataTabRecord } from '../../state/tabDomain';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
-import type { DocumentTabRecord, PageSize } from '@shared/domain/tabs';
+import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { connColorVar } from '@theme/connColor';
 import AppButton from '@theme/primitives/AppButton.vue';
@@ -15,6 +15,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
+import type { DocumentTabRecord } from '../../state/tabDomain';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';

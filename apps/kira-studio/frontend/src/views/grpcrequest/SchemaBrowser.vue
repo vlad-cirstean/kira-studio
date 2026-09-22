@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
@@ -9,6 +8,7 @@ import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
+import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useGrpcRequestViewStore } from './state';
 

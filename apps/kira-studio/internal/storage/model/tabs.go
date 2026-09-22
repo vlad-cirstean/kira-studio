@@ -43,29 +43,16 @@ var RenderableTabKinds = map[string]bool{
 	// environment is created/renamed/duplicated/deleted/reordered. Same F8 warning as the line
 	// above: forget this and a row of this kind is silently dropped on restore.
 	"environments": true,
-	// C5 §3.1/§6.2: the two kinds that live inside a repo workspace, never studio/api's own strip
-	// — the pinned git-graph placeholder and an opened repository file. Same F8 warning: forget
-	// either and a row of that kind is silently dropped on restore.
-	"repo-graph": true,
-	"repo-file":  true,
-	// C6 §7/§8.1: a HEAD-vs-worktree diff tab, opened from "Open changes" — same repo-workspace
-	// scoping as the two kinds above. Same F8 warning: this is the one TypeScript's own
-	// exhaustiveness checks cannot catch a miss on (tests/unit/go-ts-vocabulary-parity.spec.ts).
-	"repo-diff": true,
-	// P92 item 5: one commit's whole changed-file set in one tab. Same repo-workspace scoping and
-	// same F8 warning as repo-diff above.
-	"repo-multi-diff": true,
 	// P83 §7.1: an embedded shell tab. Never actually reaches restore (persistableTabs() filters
 	// it out before save, tabs.ts:132) — still required here, same F8 warning: the parity test
 	// (go-ts-vocabulary-parity.spec.ts) demands a vocabulary complete regardless of what currently
 	// reaches it.
 	"terminal": true,
-}
-
-// repoTabKinds is the subset of RenderableTabKinds that must carry a non-nil WorkspaceID (D2) —
-// every other kind derives its workspace from TAB_KIND_MODE instead.
-var repoTabKinds = map[string]bool{
-	"repo-graph": true, "repo-file": true, "repo-diff": true, "repo-multi-diff": true, "terminal": true,
+	// P103 Part 2 (§5.1): repo-graph/repo-file/repo-diff/repo-multi-diff removed — P100 Part 2
+	// moved the whole repo workspace to Kira Space, so this app can no longer produce a tab of any
+	// of those four kinds. A pre-P100 row of one of them still in a user's `tabs` table now drops
+	// with a `warn` on restore (repos/tabs.go), which is this file's own documented posture for any
+	// unrecognised kind — no migration needed.
 }
 
 // IsRenderableTabKind reports whether kind is one of the renderable tab kinds.
@@ -101,7 +88,11 @@ func (t TabRecord) Validate() error {
 	if !IsJSONObject(t.State) {
 		return fmt.Errorf("model: tab %q: state must be a JSON object", t.ID)
 	}
-	if repoTabKinds[t.Kind] && (t.WorkspaceID == nil || *t.WorkspaceID == "") {
+	// P103 Part 2: repoTabKinds used to be a multi-entry subset (the four repo-* kinds plus
+	// terminal); with those four gone, 'terminal' is the only kind left that needs a workspaceId
+	// (every other kind derives its workspace from TAB_KIND_MODE instead), so this collapses to a
+	// single equality check rather than keeping a one-member map around.
+	if t.Kind == "terminal" && (t.WorkspaceID == nil || *t.WorkspaceID == "") {
 		return fmt.Errorf("model: tab %q: kind %q requires a workspaceId", t.ID, t.Kind)
 	}
 	return nil

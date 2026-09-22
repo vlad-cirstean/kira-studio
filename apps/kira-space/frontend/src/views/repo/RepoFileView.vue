@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// C5 §12: the real Monaco mount — lands together with monaco.ts's lazy init (S10's own note: no
-// separate stand-in file view ever ships in between).
-import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -9,6 +6,9 @@ import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { useSettingsStore } from '../../state/settings';
+// C5 §12: the real Monaco mount — lands together with monaco.ts's lazy init (S10's own note: no
+// separate stand-in file view ever ships in between).
+import type { RepoFileTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { registerEditor, unmountEditor } from './editors';

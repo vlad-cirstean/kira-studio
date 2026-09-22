@@ -18,7 +18,7 @@ restoreAfterEach(control);
 (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 
 const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');
-const { asRepoDiffTab } = await import('../../../../packages/shared/domain/tabs');
+const { asRepoDiffTab } = await import('../../frontend/src/state/tabDomain');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { openRepoReviewDiffTab } = await import('../../frontend/src/state/repoTabs');

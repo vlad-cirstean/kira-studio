@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import { registerCommand } from '@workbench/shortcuts/commands';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { gitRepoIdFor } from '../../repo/git/hostHandlers';
+import { gitTransportFor } from '../../repo/git/transport';
 // C6 §8.1: the diff editor mount, modelled on RepoFileView.vue line for line — same lazy Monaco
 // bootstrap, same read-only posture, same navigation registration. The one real difference is the
 // editor itself: a diff editor over two models (HEAD, worktree) instead of one.
@@ -12,13 +18,7 @@
 // shared with RepoMultiDiffView.vue's own per-file sections — this view keeps only what stays
 // single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
 // registrations, and review-decorations wiring.
-import type { RepoDiffTabRecord } from '@shared/domain/tabs';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import { registerCommand } from '@workbench/shortcuts/commands';
-import { onMounted, onUnmounted, ref } from 'vue';
-import { gitRepoIdFor } from '../../repo/git/hostHandlers';
-import { gitTransportFor } from '../../repo/git/transport';
+import type { RepoDiffTabRecord } from '../../state/tabDomain';
 import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';

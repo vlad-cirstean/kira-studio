@@ -1,5 +1,4 @@
 import type { ConnectionKind } from '@shared/domain/connection';
-import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import type { Page } from '@shared/protocol/page';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
@@ -7,6 +6,7 @@ import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
 import { useSettingsStore } from '../../state/settings';
+import type { ConsoleTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { useDocumentRowsStore } from '../shared/document/rows';
 import { applyLoadFailure, classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';

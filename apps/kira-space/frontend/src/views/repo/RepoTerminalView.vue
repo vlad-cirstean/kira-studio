@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { TerminalTabRecord } from '@shared/domain/tabs';
 // P83 §6.2/§6.3: the terminal tab view. The live xterm Terminal (and its Go-side pty) live in
 // terminalRenderer.ts's own module-level map, not here — a tab switch unmounts this component
 // (MainView.vue keeps only RepoGraphView alive) but must lose nothing, so mount only moves an
@@ -8,6 +7,7 @@ import type { TerminalRendererDeps } from '@workbench/terminal/terminalRenderer'
 import { loadTerminalRenderer } from '@workbench/terminal/terminalRendererLoader';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useSettingsStore } from '../../state/settings';
+import type { TerminalTabRecord } from '../../state/tabDomain';
 import { useTerminalsStore } from '../../state/terminals';
 
 const props = defineProps<{ tab: TerminalTabRecord }>();

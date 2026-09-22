@@ -16,7 +16,7 @@ const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 
-const { asRepoFileTab } = await import('../../../../packages/shared/domain/tabs');
+const { asRepoFileTab } = await import('../../frontend/src/state/tabDomain');
 const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');
 const { TAB_KINDS } = await import('../../frontend/src/state/tabKinds');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');

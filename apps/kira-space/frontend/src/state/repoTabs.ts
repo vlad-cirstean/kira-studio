@@ -1,3 +1,4 @@
+import { requestReveal } from '../views/repo/reveal';
 import {
   asRepoDiffTab,
   asRepoFileTab,
@@ -5,8 +6,7 @@ import {
   defaultRepoFileTabState,
   defaultRepoMultiDiffTabState,
   type ReviewRef,
-} from '@shared/domain/tabs';
-import { requestReveal } from '../views/repo/reveal';
+} from './tabDomain';
 import { type OpenTabResult, tabsForWorkspace, useTabsStore } from './tabs';
 import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
 import { repoWorkspaceKey, useWorkspaceStore } from './workspace';

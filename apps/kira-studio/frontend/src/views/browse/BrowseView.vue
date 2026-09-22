@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
@@ -12,6 +11,7 @@ import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
+import type { BrowseTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { nodeIcon, redisTypeIcon, redisTypeLabel } from '../../theme/icons';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

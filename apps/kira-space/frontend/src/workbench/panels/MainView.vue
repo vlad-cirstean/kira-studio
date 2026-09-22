@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import GitStart from '../../repo/GitStart.vue';
-import type { SpaceTabKind } from '../../state/tabKinds';
+import type { SpaceTabKind } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { useWorkspaceStore } from '../../state/workspace';
 import { TAB_VIEWS } from '../tabViews';

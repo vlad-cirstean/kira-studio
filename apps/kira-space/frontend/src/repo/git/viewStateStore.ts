@@ -18,7 +18,7 @@
  * (confirmed by Vite's own `INEFFECTIVE_DYNAMIC_IMPORT` build warning before this change).
  */
 import type { PersistedViewState, ViewStateStore } from '@kira/git-ui';
-import { asRepoGraphTab } from '@shared/domain/tabs';
+import { asRepoGraphTab } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 
 export class TabViewStateStore implements ViewStateStore {

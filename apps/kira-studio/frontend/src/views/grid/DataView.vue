@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { DataTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { connColorVar } from '@theme/connColor';
 import IconButton from '@theme/primitives/IconButton.vue';
@@ -7,6 +6,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
+import type { DataTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';

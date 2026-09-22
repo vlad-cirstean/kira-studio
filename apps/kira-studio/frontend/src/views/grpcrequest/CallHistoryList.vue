@@ -4,7 +4,6 @@ import {
   GRPC_HISTORY_PER_SCOPE_LIMIT,
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
-import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
@@ -12,6 +11,7 @@ import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
 import { computed, onMounted, ref } from 'vue';
+import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useGrpcCallHistoryStore } from './history';

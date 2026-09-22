@@ -1,9 +1,9 @@
 import type { AppMode } from '@shared/domain/mode';
-import { TAB_KIND_MODE, type TabRecord } from '@shared/domain/tabs';
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
+import { STUDIO_TAB_KIND_MODE, type TabRecord } from './tabDomain';
 import { TAB_KINDS } from './tabKinds';
 import { useTabsStore } from './tabs';
 
@@ -64,7 +64,7 @@ export const useModeStore = defineStore('mode', () => {
 // This one function is what replaces the mode filter at every read site tabsState used to scope
 // by mode alone.
 export function workspaceKeyOf(tab: TabRecord): AppMode {
-  return (tab.workspaceId as AppMode | null) ?? (TAB_KIND_MODE[tab.kind] as AppMode);
+  return (tab.workspaceId as AppMode | null) ?? (STUDIO_TAB_KIND_MODE[tab.kind] as AppMode);
 }
 
 /** Every tab in workspace `key` — a genuine stable partition (§6.1): every pinned-kind tab of

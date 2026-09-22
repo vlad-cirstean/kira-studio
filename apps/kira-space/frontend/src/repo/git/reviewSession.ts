@@ -13,7 +13,7 @@
  * `state/review.ts` define and validate their own `ReviewSessionSnapshot` shape (`@kira/git-ipc`'s
  * own type) — this module only stores and retrieves it, never parses it.
  */
-import { asRepoGraphTab } from '@shared/domain/tabs';
+import { asRepoGraphTab } from '../../state/tabDomain';
 import { tabsForWorkspace, useTabsStore } from '../../state/tabs';
 import { repoWorkspaceKey } from '../../state/workspace';
 

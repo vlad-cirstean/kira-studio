@@ -29,7 +29,6 @@
 // bit of state this `KeepAlive` exists to keep (layout, scroll position, loaded rows, the git
 // transport lease) is untouched, exactly as before.
 import type { MountHandle } from '@kira/git-ui';
-import type { RepoGraphTabRecord } from '@shared/domain/tabs';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
@@ -37,6 +36,7 @@ import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
 import { useSettingsStore } from '../../state/settings';
+import type { RepoGraphTabRecord } from '../../state/tabDomain';
 import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 
 defineOptions({ name: 'RepoGraphView' });

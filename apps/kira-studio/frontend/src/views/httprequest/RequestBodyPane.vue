@@ -8,7 +8,6 @@ import {
   userContentTypeHeader,
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import IconButton from '@theme/primitives/IconButton.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, ref } from 'vue';
@@ -20,6 +19,7 @@ import {
 import { patchHttpRequestTabState } from '../../api/tabs';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@shared/domain/color';
-import type { TabRecord } from '@shared/domain/tabs';
 import { connColorVar } from '@theme/connColor';
 import IconButton from '@theme/primitives/IconButton.vue';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useRunState } from '../../state/runState';
+import type { TabRecord } from '../../state/tabDomain';
 import RunState from './RunState.vue';
 import ViewHeader from './ViewHeader.vue';
 

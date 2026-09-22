@@ -1,10 +1,10 @@
 import type { SortSpec } from '@shared/domain/queries';
-import type { DocumentTabState } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { data } from '../../bridge/data';
 import { pinia } from '../../state/pinia';
+import type { DocumentTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabCount, registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@shared/domain/color';
-import type { VariableSetTabRecord } from '@shared/domain/tabs';
 import type { ApiVariable } from '@shared/domain/variables';
 import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
@@ -9,6 +8,7 @@ import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
+import type { VariableSetTabRecord } from '../state/tabDomain';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';

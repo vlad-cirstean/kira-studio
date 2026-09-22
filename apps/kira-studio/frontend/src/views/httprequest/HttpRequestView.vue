@@ -14,7 +14,6 @@ import {
   toSavedRequest,
 } from '@kira/api-core';
 import { type HttpMethod, type HttpRequestPane, httpMethodToken } from '@shared/domain/http';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import AppButton from '@theme/primitives/AppButton.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
@@ -35,6 +34,7 @@ import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/ranges';
 import { useSettingsStore } from '../../state/settings';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';

@@ -49,11 +49,12 @@ import type { ConnectionDdl } from '@shared/domain/schema';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
-import type { TabRecord, TerminalLaunchKind } from '@shared/domain/tabs';
+import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
 import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
+import type { TabRecord } from '../state/tabDomain';
 import { apiControl } from './apiControl';
 
 // bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports

@@ -1,25 +1,24 @@
-import {
-  defaultRepoGraphTabState,
-  type RepoFileTabState,
-  type RepoGraphTabState,
-  type TabRecord,
-} from '@shared/domain/tabs';
 import { useDebounceFn } from '@vueuse/core';
 import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
-import { type SpaceTabKind, TAB_KINDS } from './tabKinds';
+import {
+  defaultRepoGraphTabState,
+  type RepoFileTabState,
+  type RepoGraphTabState,
+  type SpaceTabKind,
+  type TabRecord,
+} from './tabDomain';
+import { TAB_KINDS } from './tabKinds';
 import { GENERAL_WORKSPACE, useWorkspaceStore, type WorkspaceKey } from './workspace';
 
-// TAB_KINDS (state/tabKinds.ts) is total over SpaceTabKind, this app's own five kinds — narrower
-// than the shared TabKind union above, which still carries every DB-client kind Kira Studio keeps.
-// This app's TabsService.Save/List only ever round-trips a SpaceTabKind row (the Go side has no
-// other kind to write), so indexing TAB_KINDS by a TabRecord's own `.kind` is always safe; this
-// one cast documents that trust boundary once instead of at each call site (rpc.ts's own `trust`
-// precedent).
+// P103 Part 2 (§5.1): `TabRecord` is now this app's own 5-member union (state/tabDomain.ts), not
+// a narrowed view onto a wider shared one — `tab.kind` already has type `SpaceTabKind`, so the
+// `as SpaceTabKind` trust-boundary cast this helper used to need is gone; `TAB_KINDS[tab.kind]`
+// is a plain, fully-typed lookup now.
 function kindDef(tab: Pick<TabRecord, 'kind'>) {
-  return TAB_KINDS[tab.kind as SpaceTabKind];
+  return TAB_KINDS[tab.kind];
 }
 
 // P100 Part 2: Kira Studio's own state/tabs.ts (state/tabs.ts, pre-Part-2), trimmed to this app's

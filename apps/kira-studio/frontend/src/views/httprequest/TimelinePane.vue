@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import { computed } from 'vue';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useHttpHistoryStore } from './history';
 import { useHttpRequestViewStore } from './state';

@@ -1,5 +1,5 @@
 import type { Component } from 'vue';
-import type { SpaceTabKind } from '../state/tabKinds';
+import type { SpaceTabKind } from '../state/tabDomain';
 import RepoDiffTabView from '../views/repo/RepoDiffView.vue';
 import RepoFileTabView from '../views/repo/RepoFileView.vue';
 import RepoGraphTabView from '../views/repo/RepoGraphView.vue';

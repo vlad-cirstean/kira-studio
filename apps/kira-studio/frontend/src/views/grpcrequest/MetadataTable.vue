@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
-import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import Checkbox from '@theme/primitives/Checkbox.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
+import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { type Completion, templateToken, wholeFieldToken } from '../../theme/primitives/completion';
 

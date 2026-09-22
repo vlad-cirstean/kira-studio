@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { HttpUrlEncodedFieldState } from '@shared/domain/http';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import FieldRowsTable from './FieldRowsTable.vue';
 
 // C7: over C6's shared table, wired to state.urlEncoded — Go already serializes this mode (C1)

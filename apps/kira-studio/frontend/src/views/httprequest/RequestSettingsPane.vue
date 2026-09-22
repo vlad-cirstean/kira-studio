@@ -5,12 +5,12 @@ import {
   MAX_RESPONSE_MB_RANGE,
   REQUEST_TIMEOUT_MS_RANGE,
 } from '@shared/domain/settings';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import Checkbox from '@theme/primitives/Checkbox.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 
 // P90 §2.6: one row per api settings leaf, in SPEC's own order — a control bound to
 // tab.state.settings.<leaf>, an "Inherit" checkbox (checked === the leaf is null), and helper text

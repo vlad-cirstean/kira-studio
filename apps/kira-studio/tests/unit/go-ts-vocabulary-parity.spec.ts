@@ -18,7 +18,7 @@ import { resolve } from 'node:path';
 import { GRPC_HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/grpc-history';
 import { opKindSchema } from '../../../../packages/shared/domain/ops';
 import { HISTORY_PER_SCOPE_LIMIT } from '../../../../packages/shared/domain/response-history';
-import { RENDERABLE_TAB_KINDS } from '../../../../packages/shared/domain/tabs';
+import { STUDIO_RENDERABLE_TAB_KINDS } from '../../frontend/src/state/tabDomain';
 
 /** Pulls every `"key": true` entry out of a Go `var <name> = map[string]bool{ ... }` literal —
  *  tolerant of comments and multi-entries-per-line (both present in the real source), not a full
@@ -45,13 +45,18 @@ function extractGoIntConst(source: string, constName: string): number {
 }
 
 describe('Go/TS tab- and op-kind vocabulary parity (P2 D10)', () => {
-  test('model.RenderableTabKinds (Go) matches RENDERABLE_TAB_KINDS (TS)', () => {
+  // P103 Part 2 (§5.1): this used to check the one shared 16-member RENDERABLE_TAB_KINDS against
+  // Kira Studio's own Go list — which passed only because both sides were equally wrong (Kira
+  // Studio's Go list still carried four kinds it can no longer produce, and nothing checked Kira
+  // Space at all). Now checks this app's own 12-member STUDIO_RENDERABLE_TAB_KINDS; Kira Space's
+  // own 5-member half lives at apps/kira-space/tests/unit/go-ts-vocabulary-parity.spec.ts.
+  test('model.RenderableTabKinds (Go) matches STUDIO_RENDERABLE_TAB_KINDS (TS)', () => {
     const source = readFileSync(
       resolve(import.meta.dir, '../../internal/storage/model/tabs.go'),
       'utf8',
     );
     const goKinds = extractGoStringSet(source, 'RenderableTabKinds');
-    expect(goKinds).toEqual(new Set(RENDERABLE_TAB_KINDS));
+    expect(goKinds).toEqual(new Set(STUDIO_RENDERABLE_TAB_KINDS));
   });
 
   test('model.opKinds (Go) matches opKindSchema (TS)', () => {

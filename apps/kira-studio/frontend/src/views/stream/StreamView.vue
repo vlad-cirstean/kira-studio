@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
+import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { connColorVar } from '@theme/connColor';
 import AppButton from '@theme/primitives/AppButton.vue';
@@ -17,6 +17,7 @@ import { control } from '../../bridge/control';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
 import { useSettingsStore } from '../../state/settings';
+import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

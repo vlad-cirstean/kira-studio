@@ -4,7 +4,6 @@ import {
   HISTORY_PER_SCOPE_LIMIT,
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import Checkbox from '@theme/primitives/Checkbox.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
@@ -14,6 +13,7 @@ import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { useHttpHistoryStore } from './history';
 

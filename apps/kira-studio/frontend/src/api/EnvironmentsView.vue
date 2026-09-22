@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { EnvironmentsTabRecord } from '@shared/domain/tabs';
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { connColorVar } from '@theme/connColor';
@@ -10,6 +9,7 @@ import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, reactive, ref, watch } from 'vue';
+import type { EnvironmentsTabRecord } from '../state/tabDomain';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import { useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';

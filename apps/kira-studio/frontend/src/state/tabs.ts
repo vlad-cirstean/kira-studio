@@ -1,4 +1,16 @@
 import type { AppMode } from '@shared/domain/mode';
+import { useDebounceFn } from '@vueuse/core';
+import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
+import { defineStore } from 'pinia';
+import { reactive, toRefs } from 'vue';
+import { control } from '../bridge/control';
+import { usePendingChangesStore } from '../views/grid/pendingChanges';
+import { useCellSelectionStore } from './cellSelection';
+import { useConnectionsStore } from './connections';
+import { useConsoleDefaultsStore } from './consoleDefaults';
+import { tabsForWorkspace, useModeStore, workspaceKeyOf } from './mode';
+import { pinia } from './pinia';
+import { useSettingsStore } from './settings';
 import {
   asBrowseTab,
   asConsoleTab,
@@ -24,24 +36,12 @@ import {
   defaultStreamTabState,
   type KeyValueTabRecord,
   type KeyValueTabState,
+  STUDIO_TAB_KIND_MODE,
   type StreamTabRecord,
   type StreamTabState,
-  TAB_KIND_MODE,
-  type TabKind,
+  type StudioTabKind,
   type TabRecord,
-} from '@shared/domain/tabs';
-import { useDebounceFn } from '@vueuse/core';
-import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
-import { defineStore } from 'pinia';
-import { reactive, toRefs } from 'vue';
-import { control } from '../bridge/control';
-import { usePendingChangesStore } from '../views/grid/pendingChanges';
-import { useCellSelectionStore } from './cellSelection';
-import { useConnectionsStore } from './connections';
-import { useConsoleDefaultsStore } from './consoleDefaults';
-import { tabsForWorkspace, useModeStore, workspaceKeyOf } from './mode';
-import { pinia } from './pinia';
-import { useSettingsStore } from './settings';
+} from './tabDomain';
 import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
 
@@ -95,7 +95,7 @@ export const useTabsStore = defineStore('tabs', () => {
   // every registered kind's own dropper rather than branching on the tab's kind, because by the
   // time closeTab() calls this the tab record has already been spliced out of tabsState.tabs (F12).
   function dropPageStoresForTab(id: string): void {
-    for (const kind of Object.keys(TAB_KINDS) as TabKind[]) {
+    for (const kind of Object.keys(TAB_KINDS) as StudioTabKind[]) {
       TAB_KINDS[kind].dropResources(id);
     }
   }
@@ -112,7 +112,7 @@ export const useTabsStore = defineStore('tabs', () => {
   const tabsState = reactive({
     tabs: [] as TabRecord[], // ordered, all modes interleaved
     // C5 D2/§4.2: widened from `Record<AppMode, string | null>` (unwidened back by P100 Part 2 —
-    // a tab's own workspace is workspaceKeyOf(tab), still not just TAB_KIND_MODE[tab.kind], but the
+    // a tab's own workspace is workspaceKeyOf(tab), still not just STUDIO_TAB_KIND_MODE[tab.kind], but the
     // key space it ranges over is AppMode again now that the repo workspace's third dimension
     // (WorkspaceKey, packages/shared/domain/workspace.ts) moved to apps/kira-space wholesale.
     activeIdByWorkspace: { studio: null, api: null } as Record<AppMode, string | null>,
@@ -447,7 +447,7 @@ export const useTabsStore = defineStore('tabs', () => {
     opts: OpenTabOpts,
   ): OpenTabResult {
     const workspaceId = opts.workspaceId ?? null;
-    const workspaceKey = (workspaceId ?? TAB_KIND_MODE[kind]) as AppMode;
+    const workspaceKey = (workspaceId ?? STUDIO_TAB_KIND_MODE[kind]) as AppMode;
 
     const reused = reuseExistingTab(kind, connectionId, path, workspaceId, workspaceKey, opts);
     if (reused) return reused;

@@ -71,6 +71,7 @@
         "@kira/git-core": "workspace:*",
         "@kira/git-ipc": "workspace:*",
         "@kira/git-ui": "workspace:*",
+        "zod": "4.6.5",
       },
     },
     "apps/kira-studio/frontend": {
@@ -78,6 +79,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@kira/api-core": "workspace:*",
+        "zod": "4.6.5",
       },
     },
     "packages/api-core": {

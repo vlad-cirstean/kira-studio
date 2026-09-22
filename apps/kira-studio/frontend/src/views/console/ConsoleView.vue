@@ -2,7 +2,6 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split';
-import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -16,6 +15,7 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
 import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
+import type { ConsoleTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';

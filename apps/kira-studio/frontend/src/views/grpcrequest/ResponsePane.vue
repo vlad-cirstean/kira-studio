@@ -5,7 +5,6 @@ import {
   grpcCodeClass,
   grpcCodeHint,
 } from '@shared/domain/grpc';
-import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
@@ -18,6 +17,7 @@ import { patchGrpcRequestTabState } from '../../api/tabs';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
+import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ResponseFindBar, {
   type FindBarHost,

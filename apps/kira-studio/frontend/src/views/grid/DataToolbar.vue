@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
+import type { PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
 import IconButton from '@theme/primitives/IconButton.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
@@ -7,6 +7,7 @@ import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
+import type { DataTabRecord } from '../../state/tabDomain';
 import PagerControls from '../shared/page/PagerControls.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';

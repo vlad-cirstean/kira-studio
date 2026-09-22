@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { TabRecord } from '@shared/domain/tabs';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { connColorVar } from '@theme/connColor';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -9,7 +8,8 @@ import { computed, nextTick, ref, watch } from 'vue';
 import { fileIconStyle } from '../../repo/fileIcon';
 import { useCodeReposStore } from '../../state/coderepos';
 import { openRepoTerminalTab } from '../../state/repoTabs';
-import { type SpaceTabKind, TAB_KINDS } from '../../state/tabKinds';
+import type { TabRecord } from '../../state/tabDomain';
+import { TAB_KINDS } from '../../state/tabKinds';
 import { tabsForWorkspace, useTabsStore } from '../../state/tabs';
 import { GENERAL_WORKSPACE, useWorkspaceStore } from '../../state/workspace';
 
@@ -25,15 +25,15 @@ const workspaceStore = useWorkspaceStore();
 const codeReposStore = useCodeReposStore();
 
 function isPinned(tab: TabRecord): boolean {
-  return TAB_KINDS[tab.kind as SpaceTabKind].pinned === true;
+  return TAB_KINDS[tab.kind].pinned === true;
 }
 
 function colorFor(tab: TabRecord): string | undefined {
-  return TAB_KINDS[tab.kind as SpaceTabKind].railColor(tab);
+  return TAB_KINDS[tab.kind].railColor(tab);
 }
 
 function titleFor(tab: TabRecord): string {
-  return TAB_KINDS[tab.kind as SpaceTabKind].title(tab);
+  return TAB_KINDS[tab.kind].title(tab);
 }
 
 function onClick(tab: TabRecord): void {
@@ -105,7 +105,7 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
       icon: 'copy',
       run: () => copyText(titleFor(tab)),
     },
-    ...TAB_KINDS[tab.kind as SpaceTabKind].menuExtras(tab),
+    ...TAB_KINDS[tab.kind].menuExtras(tab),
   ]);
 }
 
@@ -116,7 +116,7 @@ const tabs = computed(() => tabsForWorkspace(workspaceStore.active));
 // template below actually needs, the same split RepoTreeRow.vue's own fileIconStyle call site uses
 // for the identical marker.
 function resolveIcon(tab: TabRecord): { codicon: string } | { fileStyle: Record<string, string> } {
-  const icon = TAB_KINDS[tab.kind as SpaceTabKind].icon(tab);
+  const icon = TAB_KINDS[tab.kind].icon(tab);
   return typeof icon === 'string' ? { codicon: icon } : { fileStyle: fileIconStyle(icon.filePath) };
 }
 

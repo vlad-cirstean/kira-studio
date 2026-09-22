@@ -1,5 +1,4 @@
 import type { SortSpec } from '@shared/domain/queries';
-import type { DataTabState } from '@shared/domain/tabs';
 import type { ObjectMeta } from '@shared/domain/tree';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
@@ -7,6 +6,7 @@ import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
 import { data } from '../../bridge/data';
 import { pinia } from '../../state/pinia';
+import type { DataTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import {
   registerDataQueryCommands,

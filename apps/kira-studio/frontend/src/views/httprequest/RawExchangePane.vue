@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { defaultContentTypeFor, generateRawRequestFromStored } from '@kira/api-core';
 import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shared/domain/http';
-import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
+import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import type { FindBarHost } from '../shared/ResponseFindBar.vue';
 import { useHttpHistoryStore } from './history';

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { TabRecord } from '@shared/domain/tabs';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { connColorVar } from '@theme/connColor';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
@@ -8,6 +7,7 @@ import { wheelToHorizontal } from '@workbench/util/wheelScroll';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useAgentSessionsStore } from '../../state/agentSessions';
 import { tabsForWorkspace, useModeStore } from '../../state/mode';
+import type { TabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
