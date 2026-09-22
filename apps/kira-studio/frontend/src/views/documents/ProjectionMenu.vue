@@ -3,9 +3,8 @@ import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
-import { ref } from 'vue';
+import { onUnmounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { fieldNamesOnPage } from './page';
 import { useDocumentViewStore } from './state';
 
@@ -15,7 +14,6 @@ import { useDocumentViewStore } from './state';
 // union of the loaded page's own top-level field names, shared with DocumentView.vue's toolbar
 // badge so the two can't drift on how a body is parsed into field names.
 const props = defineProps<{ tabId: string; caps: Caps | null }>();
-const emit = defineEmits<{ close: [] }>();
 const documentViewStore = useDocumentViewStore();
 
 // A snapshot, not a computed: the picker's checkbox list shouldn't reshuffle under the user's
@@ -41,53 +39,48 @@ function selectNone(): void {
   selected.value = new Set();
 }
 
-function close(): void {
+// P104 §3: PopoverPanel's own close-commits-selection contract, preserved by committing on
+// unmount instead of on a `close` emit -- the caller's Popover (ui/popover) unmounts this
+// component's content on close for every reason (outside click, Escape, or the toolbar toggle
+// button), the same set PopoverPanel's own hand-rolled backdrop+Escape handling covered.
+onUnmounted(() => {
   const isEverything = selected.value.size === fieldNames.length;
   documentViewStore.setProjection(props.tabId, isEverything ? null : [...selected.value]);
-  emit('close');
-}
+});
 </script>
 
 <template>
-  <PopoverPanel
-    anchor="right"
-    :width="200"
-    test-id="document-projection-menu"
-    backdrop-test-id="document-projection-menu-backdrop"
-    @close="close"
-  >
-    <div class="columns-menu-inner">
-      <div class="columns-menu-header">
-        <Button variant="toolbar" size="kira" data-testid="document-projection-select-all" @click="selectAll"
-          >All</Button
-        >
-        <Button variant="toolbar" size="kira" data-testid="document-projection-select-none" @click="selectNone"
-          >None</Button
-        >
-      </div>
-      <div v-if="fieldNames.length === 0" class="columns-menu-loading p-sm muted">
-        No fields seen yet — load a page first.
-      </div>
-      <div v-else class="columns-menu-list">
-        <label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
-          <Checkbox
-            :model-value="selected.has(name)"
-            class="size-3.5"
-            data-testid="document-projection-menu-item"
-            @update:model-value="toggle(name)"
-          >
-            <CodiconIcon name="check" :size="10" />
-          </Checkbox>
-          {{ name }}
-        </label>
-      </div>
-      <div class="p-sep" />
-      <div class="columns-menu-footer p-xs dim" data-testid="document-projection-menu-footer">
-        {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }} — fields seen on the
-        loaded page; `_id` is always returned.
-      </div>
+  <div class="columns-menu-inner">
+    <div class="columns-menu-header">
+      <Button variant="toolbar" size="kira" data-testid="document-projection-select-all" @click="selectAll"
+        >All</Button
+      >
+      <Button variant="toolbar" size="kira" data-testid="document-projection-select-none" @click="selectNone"
+        >None</Button
+      >
     </div>
-  </PopoverPanel>
+    <div v-if="fieldNames.length === 0" class="columns-menu-loading p-sm muted">
+      No fields seen yet — load a page first.
+    </div>
+    <div v-else class="columns-menu-list">
+      <label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
+        <Checkbox
+          :model-value="selected.has(name)"
+          class="size-3.5"
+          data-testid="document-projection-menu-item"
+          @update:model-value="toggle(name)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
+        {{ name }}
+      </label>
+    </div>
+    <div class="p-sep" />
+    <div class="columns-menu-footer p-xs dim" data-testid="document-projection-menu-footer">
+      {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }} — fields seen on the
+      loaded page; `_id` is always returned.
+    </div>
+  </div>
 </template>
 
 <style scoped>
