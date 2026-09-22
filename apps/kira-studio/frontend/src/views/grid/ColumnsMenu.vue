@@ -154,46 +154,37 @@ function close(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .columns-menu-inner {
-  max-height: 320px;
-  display: flex;
-  flex-direction: column;
+  @apply max-h-[320px] flex flex-col;
 }
 
 .columns-menu-header {
-  display: flex;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex border-b border-border gap-[var(--kira-s-2)] p-[var(--kira-s-2)];
 }
 
 .columns-menu-loading {
-  padding: var(--kira-s-4);
+  @apply p-[var(--kira-s-4)];
 }
 
 .columns-menu-list {
-  overflow-y: auto;
-  padding: var(--kira-s-1);
+  @apply overflow-y-auto p-[var(--kira-s-1)];
 }
 
 .columns-menu-item {
-  cursor: pointer;
-  gap: var(--kira-s-2);
+  @apply cursor-pointer gap-[var(--kira-s-2)];
 }
 
 .columns-menu-item.is-dragging {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 
 .drag-handle {
-  display: flex;
-  align-items: center;
-  color: var(--kira-fg-subtle);
-  cursor: grab;
-  flex-shrink: 0;
+  @apply flex items-center shrink-0 text-subtle cursor-grab;
 }
 
 .columns-menu-footer {
-  padding: 0 var(--kira-s-3) var(--kira-s-3);
+  @apply px-[var(--kira-s-3)] pb-[var(--kira-s-3)];
 }
 </style>

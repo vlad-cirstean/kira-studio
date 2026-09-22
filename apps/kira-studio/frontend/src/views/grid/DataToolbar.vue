@@ -335,11 +335,13 @@ function onDeleteRow(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
    p-seg, p-input, p-chip, p-count) — the pager's own layout/page-jump-input styling lives in
    PagerControls.vue now; only the columns anchor's positioning is left here. */
 
 .columns-anchor {
-  position: relative;
+  @apply relative;
 }
 </style>

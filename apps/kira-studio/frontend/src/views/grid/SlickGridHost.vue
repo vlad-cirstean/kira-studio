@@ -4,6 +4,7 @@ import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { useQuery } from '@tanstack/vue-query';
+import { useDebounceFn } from '@vueuse/core';
 import type {
   Column,
   CustomDataView,
@@ -725,6 +726,11 @@ let selectionModel: SlickHybridSelectionModel | null = null;
 // genuinely overlapping the dock panel now painted below and intercepting its own clicks — the
 // concrete mechanism behind `cell-editor.spec.ts`'s pre-existing "Target page ... has been closed"
 // timeouts (a `.grid-canvas` element, still full-height, sat on top of the dock's own controls).
+// P99 §9.3: not VueUse's useResizeObserver — this file's own onUnmounted has an explicit "Order
+// matters (§6 D3)" teardown sequence (resizeObserver.disconnect() before grid.destroy(), listener
+// removal in a specific order relative to both); a composable's onScopeDispose-driven cleanup can't
+// be slotted into that hand-ordered sequence without risking the exact class of timing bug P22
+// fixed. Declined, named per CLAUDE.md's library rule.
 let resizeObserver: ResizeObserver | null = null;
 // D4's own one-shot flag, set by the header select zone immediately before it pushes ranges into
 // the model — mirrors DataGrid.vue's own `dragProducedRange` shape.
@@ -842,14 +848,15 @@ function onViewportScroll(): void {
   recordOffsetSample(el.scrollTop, now);
 }
 
-let scrollSaveTimer: ReturnType<typeof setTimeout> | null = null;
-function onViewportScrollPersist(): void {
+// SchemaDialog.vue's own useDebounceFn precedent (Part 2) — cancel() in onUnmounted replaces the
+// clearTimeout below.
+const persistScroll = useDebounceFn(() => {
   const el = viewportEl;
   if (!el) return;
-  if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
-  scrollSaveTimer = setTimeout(() => {
-    tabsStore.patchDataTabState(props.tabId, { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
-  }, 300);
+  tabsStore.patchDataTabState(props.tabId, { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
+}, 300);
+function onViewportScrollPersist(): void {
+  void persistScroll();
 }
 
 // §6 D2 — the visible-window report drives P5 C1's pruning. KiraSlickGrid.lastRenderedRowBounds is
@@ -1281,6 +1288,10 @@ function onHeaderCellRendered(_e: unknown, args: OnHeaderCellRenderedEventArgs):
   // built further down, whose own listener stops propagation before THIS zone's listener runs
   // (DOM order: the zone is a lower sibling in paint order via z-index, not later in the
   // listener chain, so both need their own stopPropagation independently).
+  // P99 §9.3: not useEventListener — `zone` (and `sortIndicator` below) is a node SlickGrid itself
+  // creates and destroys per header-cell render (onHeaderCellRendered fires repeatedly, well after
+  // setup()'s effect scope is captured), not a stable Vue-tracked ref; its own destruction is what
+  // tears the listener down (onBeforeHeaderCellDestroy's own comment). Declined, named exception.
   const zone = document.createElement('span');
   zone.className = 'header-select-zone';
   zone.dataset.testid = 'grid-header-select';
@@ -1860,6 +1871,10 @@ async function onPaste(): Promise<void> {
   if (!sel || !p) return;
   if (sel.kind !== 'cell' && sel.kind !== 'range' && sel.kind !== 'row') return;
 
+  // P99 §9.3: not useClipboard — its read() is a reactive-UI composable (a `text` ref synced on
+  // 'copy'/'cut' events for display), not documented to preserve the exact promise-rejects-on-
+  // permission-denial contract this catch depends on. Declined, named exception (correctness-
+  // critical path, no existing useClipboard-read precedent in this app to confirm against).
   let clipboardText: string;
   try {
     clipboardText = await navigator.clipboard.readText();
@@ -2219,6 +2234,11 @@ onMounted(() => {
   // already gives every other CSS layer via its own grid.render() call, above.
   refreshSearchLayer();
 
+  // P99 §9.3: not useEventListener, here and below — recordOffsetSample's own comment documents
+  // that registration order against SlickGrid's own internal scroll listener is load-bearing for
+  // the velocity sampler, and onUnmounted's "Order matters (§6 D3)" sequence removes these in a
+  // specific hand-ordered position relative to resizeObserver/eventHandler/grid.destroy(). Declined,
+  // named per CLAUDE.md's library rule — same reasoning as resizeObserver above.
   if (viewportEl) {
     scrollTrace.registerGrid(viewportEl, '.slick-row');
     viewportEl.addEventListener('scroll', onViewportScroll, { passive: true });
@@ -2280,7 +2300,7 @@ onUnmounted(() => {
   unregisterGridHost(props.tabId);
   resizeObserver?.disconnect();
   resizeObserver = null;
-  if (scrollSaveTimer) clearTimeout(scrollSaveTimer);
+  persistScroll.cancel();
   if (viewportEl) {
     viewportEl.removeEventListener('scroll', onViewportScroll);
     viewportEl.removeEventListener('scroll', onViewportScrollPersist);

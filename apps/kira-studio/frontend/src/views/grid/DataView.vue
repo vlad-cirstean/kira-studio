@@ -315,25 +315,21 @@ function onCloseSearch(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .data-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 .error-strip {
-  font-family: var(--kira-font-data);
-  white-space: pre-wrap;
+  @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
 }
 
 .grid-area {
-  flex: 1;
-  min-height: 0;
-  position: relative;
+  @apply flex-1 min-h-0 relative;
 }
 
 .preview-anchor {
-  position: relative;
+  @apply relative;
 }
 </style>

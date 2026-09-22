@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ForeignKeyMeta } from '@shared/domain/tree';
+import { useEventListener } from '@vueuse/core';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
@@ -106,14 +107,15 @@ function onOpenClick(): void {
   props.openInNewTab();
 }
 
+// PopoverPanel.vue's own precedent: useEventListener disposes itself on unmount.
+useEventListener(document, 'keydown', onKeydown, true);
+
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown, true);
   void position();
   void load();
 });
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown, true);
   // Belt and braces (§4.1): cancel is best-effort server-side, and `signal.cancelled` alone
   // already drops a response that lands after this — cancelling too costs nothing when the read
   // has already finished.
@@ -189,53 +191,32 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .fk-preview-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--kira-z-popover);
+  @apply fixed inset-0 z-[var(--kira-z-popover)];
 }
 
 .fk-preview {
-  position: fixed;
-  width: 320px;
-  max-height: var(--kira-float-max-h, none);
-  max-width: var(--kira-float-max-w, none);
-  display: flex;
-  flex-direction: column;
+  @apply fixed w-[320px] flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)];
 }
 
 .fk-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
-  flex: 0 0 auto;
+  @apply flex items-center justify-between border-b border-border-strong shrink-0 grow-0 basis-auto gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
 }
 
 .fk-preview-title {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply font-semibold overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .fk-preview-body {
-  padding: var(--kira-s-3);
-  flex: 1 1 auto;
   /* Load-bearing: without this a flex child refuses to shrink below its content height, and the
      panel overflows its own max-height instead of scrolling here. */
-  min-height: 0;
-  overflow-y: auto;
+  @apply flex-1 min-h-0 overflow-y-auto p-[var(--kira-s-3)];
 }
 
 .fk-preview-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  color: var(--kira-fg-muted);
+  @apply flex items-center justify-center h-10 text-muted;
 }
 
 .spin {
@@ -251,21 +232,13 @@ onUnmounted(() => {
 }
 
 .fk-preview-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--kira-t-sm);
+  @apply w-full border-collapse text-[length:var(--kira-t-sm)];
 }
 .fk-preview-table th {
-  text-align: left;
-  font-weight: 500;
-  color: var(--kira-fg-muted);
-  padding: var(--kira-s-1) var(--kira-s-2) var(--kira-s-1) 0;
-  white-space: nowrap;
-  vertical-align: top;
+  @apply text-left font-medium text-muted whitespace-nowrap align-top py-[var(--kira-s-1)] pl-0 pr-[var(--kira-s-2)];
 }
 .fk-preview-table td {
-  padding: var(--kira-s-1) 0;
-  word-break: break-word;
+  @apply break-words py-[var(--kira-s-1)];
 }
 
 /* .header-key/.header-key.is-fk: no rule here — this popover is always rendered inside
@@ -274,10 +247,6 @@ onUnmounted(() => {
    for), unscoped CSS reaching into any descendant regardless of which component rendered it. */
 
 .fk-preview-actions {
-  display: flex;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border-strong);
-  flex: 0 0 auto;
+  @apply flex border-b border-border-strong shrink-0 grow-0 basis-auto gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
 }
 </style>

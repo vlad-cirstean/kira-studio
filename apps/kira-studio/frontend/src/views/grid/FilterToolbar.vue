@@ -175,30 +175,30 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Height, padding and colour come from .p-toolbar/.p-input — only the two fields' own widths
    live here. TextField's root <span class="p-input"> only receives fallthrough attrs on its
    inner <input> (see TextField.vue's inheritAttrs:false), so each field's width lives on this
    wrapper instead of a class/style on the <TextField> tag itself (DocumentView.vue's same
    `.filter-field` precedent). */
 .history-anchor {
-  position: relative;
+  @apply relative;
 }
 
 .where-input {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .where-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .orderby-input {
-  width: 230px;
-  flex-shrink: 0;
+  @apply w-[230px] shrink-0;
 }
 
 .orderby-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 </style>

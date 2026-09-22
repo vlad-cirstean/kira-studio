@@ -88,28 +88,26 @@ function close(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .preview-panel-inner {
-  max-height: 360px;
-  display: flex;
-  flex-direction: column;
+  @apply max-h-[360px] flex flex-col;
 }
 
 .preview-panel-header {
-  text-transform: none;
-  letter-spacing: normal;
+  @apply normal-case tracking-normal;
 }
 
 .preview-panel-loading,
 .preview-panel-empty {
-  padding: var(--kira-s-4);
+  @apply p-[var(--kira-s-4)];
 }
 
 .preview-panel-error {
-  padding: var(--kira-s-4);
-  color: var(--kira-error);
+  @apply text-error p-[var(--kira-s-4)];
 }
 
 .preview-panel-body {
-  height: 240px;
+  @apply h-[240px];
 }
 </style>
