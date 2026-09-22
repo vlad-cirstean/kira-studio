@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/terminal"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
 // TerminalService is Kira Studio's own TerminalService (internal/bridge/terminal.go), trimmed: no

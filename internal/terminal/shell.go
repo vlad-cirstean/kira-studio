@@ -5,8 +5,15 @@ import (
 	"os"
 	"os/user"
 	"strings"
+)
 
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
+// TermProgram and TermProgramVersion are process-constant, set once by each app's main.go before
+// the first Registry.Open (P103 Part 3: this package is now shared, and sessionEnv is called per-
+// spawn from deep inside newSession — a Config struct threaded through every OpenParams call site
+// would be needless plumbing for a value that never varies for the life of the process).
+var (
+	TermProgram        = "Kira"
+	TermProgramVersion = ""
 )
 
 // loginShell resolves the shell a new session starts (P83 §2.3): $SHELL when it names an
@@ -53,7 +60,7 @@ func sessionEnv() []string {
 	return []string{
 		"TERM=xterm-256color",
 		"COLORTERM=truecolor",
-		"TERM_PROGRAM=Kira Space",
-		"TERM_PROGRAM_VERSION=" + buildinfo.Version,
+		"TERM_PROGRAM=" + TermProgram,
+		"TERM_PROGRAM_VERSION=" + TermProgramVersion,
 	}
 }

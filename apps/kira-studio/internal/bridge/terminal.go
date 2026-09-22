@@ -12,7 +12,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/terminal"
+	"github.com/kirathecat/kira-studio/internal/terminal"
 )
 
 // TerminalService is P83 §3.2's own bound surface over internal/terminal — a Wails service plus
