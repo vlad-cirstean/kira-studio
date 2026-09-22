@@ -407,6 +407,95 @@ No new `docs/ARCHITECTURE.md` **Known open items** entry: the `test:ui` timing f
 self-documented in the failing tests' own comments, not a new discovery, and `test:visual`'s 5
 failures are the pre-existing baseline this phase inherited, not caused.
 
+## P99 Part 2 result
+
+Landed per plan (`docs/v1.9/plans/P99-vue-migration.md` §6, §9-§14), 15 commits from `19a90ed`
+through `81b2351`, plus this section's own commit. All 48 files in §6/§10.1's inventory (`App.vue`,
+`theme/` 22, `workbench/` 17, `project/` 7, `shortcuts/` 1) converted, one pass each, never reopened.
+
+**`theme/` (22 files, `19a90ed`/`829f040`/`78c8a23`).** `19a90ed` fixed a pre-existing token
+collision (`--color-accent` shadowing shadcn's own menu-hover variable) surfaced while wiring the
+shadcn bridge in, ahead of the primitive sweep proper. `829f040` converted every `theme/primitives/*`
+except `AutocompleteField.vue`, each wrapper's public prop/emit/slot API unchanged per §6.2.
+`DialogFrame.vue` moved its internals onto reka-ui's `DialogRoot`/`DialogPortal`/`DialogOverlay`/
+`DialogContent`. `78c8a23` gave `AutocompleteField.vue` its own commit as directed — declined
+reka-ui/shadcn's `combobox` (Listbox+Popover shape assumes single-select; this field's own
+free-text-plus-suggestions model doesn't fit), documented inline.
+
+**`workbench/` (17 files, `6ce3c61` through `dca9c2f`).** `SettingsDialog.vue` (2,156 lines) landed
+first, as its own commit, converted whole in one pass — its 375-line `<style scoped>` block became
+`@apply` utilities under `@reference "@/theme/base.css";` rather than inlining 50+ template class
+usages individually. **Hard case, `ContextMenu.vue` (§6.3, `b6b338a`).** Tried `DropdownMenuRoot`
+with a zero-size anchor, then `ContextMenuRoot`; declined both, documented inline above
+`useContextMenuStore()`: reka-ui's item slot has no prop for this menu's swatch/checked/danger/
+shortcut/hint content, its trigger/content model assumes one owning trigger per menu against this
+singleton's point-anchored, many-call-site open, and forking the already-tuned roving-focus/hover-
+delay/Escape/blur-close keyboard model onto reka-ui's internal open state risked a §9.4 behavior
+regression. Kept the hand-rolled menu; replaced `document`/`window` listeners with
+`useEventListener` and the submenu open-delay timer with `useTimeoutFn`. **Hard case,
+`AppTooltip.vue`/`workbench/state/tooltip.ts` (§6.4, `952c959`).** Kept the directive-plus-singleton
+architecture per the plan's own recommendation, documented inline above `useTooltipStore`; replaced
+the rearm-delay timer with `useTimeoutFn` and `initTooltips()`'s seven listener pairs with
+`useEventListener`, keeping its own manual-teardown return contract (`leaks.spec.ts` and `App.vue`
+both rely on the explicit `() => void`, not implicit unmount cleanup). Remaining files: `setInterval`
+tickers in `GitPairingDialog.vue`/`DbMcpApprovalDialog.vue` replaced with `useIntervalFn`;
+`OperationsPanel.vue`'s local `@keyframes ops-spin` dropped for Tailwind's own `animate-spin`
+(confirmed identical 1s-linear-infinite rotate body; grepped tests first, none select it there).
+**Deviation:** the plan's primitives.css `.p-btn`/`.p-dlgbtn`/`.p-iconbtn` cleanup, assumed gated on
+`TitleBar.vue` converting, stays out of scope for this part entirely — grepped the whole `src` tree
+and found those classes still used in `terminal/`, `views/`, `api/`, `repo/`, none of them Part 2's.
+
+**`project/` (7 files, `4c0ff07`/`c74f1a7`).** **Near-miss, caught before commit:** `TreeRow.vue`'s
+template `class="spin"` was renamed to `class="animate-spin"` (mirroring the `OperationsPanel`
+precedent), then reverted on grep — `tests/ui/tree.spec.ts` and `tests/ui/support/tree.ts` select
+`.twisty .spin` directly. Fix: keep the selector name `.spin`, make its body `@apply animate-spin;`.
+Its local `@keyframes pulse` renamed to `@keyframes tree-row-pulse` — Vue scoped CSS doesn't scope
+`@keyframes` names, and Tailwind v4 (now bundled) defines its own global `pulse` for `animate-pulse`
+at a different timing; verified no collision in compiled output. `ErrorPopover.vue`'s two
+`document.addEventListener` calls at setup time (not inside `onMounted`) replaced with
+`useEventListener`, preserving the immediate-attach/auto-detach timing. `SchemaDialog.vue`'s
+400ms parse-summary debounce replaced with `useDebounceFn`, keeping its explicit
+`onBeforeUnmount(() => setDebouncedDraft.cancel())` (VueUse's `debounceFilter` has no built-in
+`tryOnScopeDispose`).
+
+**`shortcuts/CommandPalette.vue`, `App.vue` (`51af0a0`).** No VueUse-eligible patterns in either.
+`App.vue`'s `onMounted`/`onUnmounted` pairs are `control.on*()` IPC subscriptions, not DOM
+listeners/timers — left untouched, no VueUse equivalent applies. Its single-use `.app-frame` class
+inlined as `class="h-full flex flex-col"`; `<style scoped>` block removed.
+
+**`knip.json` (`81b2351`).** `@vueuse/core`, `reka-ui`, `class-variance-authority` dropped from
+`ignoreDependencies` — knip's own "Configuration hints" confirmed real usage outside
+`src/components/ui/**` once this part landed. `tw-animate-css`/`@lucide/vue`/`clsx`/`tailwind-merge`
+stay: no hard case ended up pulling in a ready-made `src/components/ui/**` component (`DialogFrame.vue`
+imports reka-ui's primitives directly, not through the registry wrapper), so their only importers
+are still `src/lib/utils.ts` and `src/components/ui/**` itself, both still in the workspace's own
+`ignore` list — a deviation from the plan's "Part 2 is the first consumer" framing, which assumed a
+registry component would be imported directly; none was.
+
+**Verification (§12.1-§12.2).** `bun run typecheck` clean across all five projects. `bun run lint`
+— Biome 0 errors/warnings/infos over 1276 files, `check-tokens.sh` clean. `bun run build` and
+`bun run build:vscode` both clean (only the pre-existing chunk-size warning). `bun run test:unit`
+1535 passed, 0 failed (baseline: 1535). `bun run test:webview` 55 passed, 0 failed (baseline: 55).
+`bun run lint:dead` — knip clean, only the same 6 pre-existing duplicate exports plus the same 4
+pre-existing config hints (no `ignoreDependencies` hint left). `bun run test:ui` — 311 total; three
+separate runs each hit 1-3 failures, never the same set twice (`repo-workspace.spec.ts`'s streamed-
+search test, `api-ui-consistency.spec.ts`'s hover z-index test, `sql-schema.spec.ts`'s no-completion
+test), the same cross-file-worker-contention timing-flake class Part 1's own result section
+documents. Confirmed pre-existing and unrelated: `git diff --stat` from `19a90ed` touches none of
+`tests/ui/`, `views/`, `repo/`, `api/`, or `editor/` (this part's own diff is confined to `App.vue`,
+`theme/`, `workbench/`, `project/`, `shortcuts/`, `knip.json`), and every failing test passes clean
+in isolation. `bun run test:visual` — 5 failed (`connection-dialog`, `console`, `data-view`,
+`schema-dialog`, `workbench`), same 5 specs as Part 1's baseline, each a ~0.01-ratio pixel diff
+consistent with `docs/ARCHITECTURE.md`'s own documented cause (glyph rendering outside the `ui` CI
+job's exact `ubuntu-latest` environment, baselines never re-captured from elsewhere) rather than a
+conversion regression — `workbench.spec.ts` and `schema-dialog.spec.ts` do exercise this part's own
+styling, so their diffs got the closer look: same failure mode, same pixel-count order of magnitude
+as the other three untouched specs, no new visual break.
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry: both failure classes are the same
+pre-existing, already-documented baselines Part 1 inherited and this part re-confirms, not a new
+discovery.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
