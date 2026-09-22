@@ -1,6 +1,14 @@
 <script setup lang="ts" generic="T extends Record<string, Record<string, unknown>>">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { Button } from '@theme/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter as UiDialogFooter,
+} from '@theme/components/ui/dialog';
 import type { ComputedRef, Ref } from 'vue';
 import { computed, reactive, ref } from 'vue';
 
@@ -175,92 +183,76 @@ async function onSave(): Promise<void> {
 </script>
 
 <template>
-  <DialogFrame
-    title="Settings"
-    :width="width"
-    :height="height"
-    test-id="settings-dialog"
-    close-test-id="settings-dialog-close"
-    @close="onDismiss"
-  >
-    <template #header>
-      <span class="icon-box muted"><CodiconIcon name="gear" :size="13" /></span>
-      <span>Settings</span>
-    </template>
+  <Dialog :open="true" @update:open="(v) => !v && onDismiss()">
+    <!-- DialogContent's own base classes cap max-width at sm:max-w-sm (384px) — an inline
+         max-width (always wins over a class, at any breakpoint) is the only way to actually get
+         the requested width. -->
+    <DialogContent
+      :show-close-button="false"
+      data-testid="settings-dialog"
+      class="flex flex-col p-0 gap-0"
+      :style="{
+        width: `${width ?? 640}px`,
+        maxWidth: `${width ?? 640}px`,
+        height: height !== undefined ? `${height}px` : undefined,
+        maxHeight: height === undefined ? '80vh' : undefined,
+      }"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <span class="flex items-center justify-center shrink-0 size-4 text-muted">
+          <CodiconIcon name="gear" :size="13" />
+        </span>
+        <DialogTitle class="text-kira-lg font-normal">Settings</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="settings-dialog-close"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
-    <div class="dialog-body-inner">
-      <nav class="section-list">
-        <button
-          v-for="section in sections"
-          :key="section"
-          type="button"
-          class="section-item"
-          :class="{ active: activeSection === section }"
-          :data-testid="`settings-section-${section}`"
-          @click="activeSection = section"
-        >
-          {{ section }}
-        </button>
-      </nav>
+      <div class="flex-1 min-h-0 flex">
+        <nav class="w-44 shrink-0 flex flex-col gap-px border-r border-border py-1.5 px-1">
+          <button
+            v-for="section in sections"
+            :key="section"
+            type="button"
+            class="text-left rounded-kira-sm bg-transparent border-none cursor-pointer h-5.5 px-1.5 text-muted text-kira-md hover:bg-hover"
+            :class="{ 'bg-select! text-fg!': activeSection === section }"
+            :data-testid="`settings-section-${section}`"
+            @click="activeSection = section"
+          >
+            {{ section }}
+          </button>
+        </nav>
 
-      <section class="section-pane">
+        <section class="flex-1 overflow-auto flex flex-col p-3 gap-2">
+          <slot
+            name="pane"
+            :active-section="activeSection"
+            :draft="draft"
+            :is-at-default="isAtDefault"
+            :reset-leaf="resetLeaf"
+            :register-field-error="registerFieldError"
+          />
+        </section>
+      </div>
+
+      <UiDialogFooter class="border-t border-border">
         <slot
-          name="pane"
-          :active-section="activeSection"
-          :draft="draft"
-          :is-at-default="isAtDefault"
-          :reset-leaf="resetLeaf"
-          :register-field-error="registerFieldError"
+          name="footer"
+          :is-dirty="isDirty"
+          :is-valid="isValid"
+          :save-error="saveError"
+          :on-save="onSave"
+          :on-dismiss="onDismiss"
         />
-      </section>
-    </div>
-
-    <template #footer>
-      <slot
-        name="footer"
-        :is-dirty="isDirty"
-        :is-valid="isValid"
-        :save-error="saveError"
-        :on-save="onSave"
-        :on-dismiss="onDismiss"
-      />
-    </template>
-  </DialogFrame>
+      </UiDialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
-
-<style scoped>
-@reference "@theme/base.css";
-
-.dialog-body-inner {
-  @apply h-full flex min-h-0;
-}
-
-.section-list {
-  @apply w-[176px] shrink-0 flex flex-col gap-px;
-  border-right: var(--kira-border-width) solid var(--kira-border);
-  padding: var(--kira-s-3) var(--kira-s-2);
-}
-
-.section-item {
-  @apply text-left rounded-[var(--kira-radius-sm)] bg-transparent border-none cursor-pointer;
-  height: var(--kira-h-sm);
-  padding: 0 var(--kira-s-3);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-md);
-}
-
-.section-item:hover {
-  background: var(--kira-hover);
-}
-
-.section-item.active {
-  background: var(--kira-select);
-  color: var(--kira-fg);
-}
-
-.section-pane {
-  @apply flex-1 overflow-auto flex flex-col;
-  padding: var(--kira-s-5);
-  gap: var(--kira-s-4);
-}
-</style>

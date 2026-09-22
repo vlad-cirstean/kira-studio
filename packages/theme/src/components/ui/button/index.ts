@@ -30,6 +30,8 @@ export const buttonVariants = cva(
         dialog: 'justify-center rounded-kira-sm border border-border-strong bg-input text-fg',
         'dialog-primary':
           'justify-center rounded-kira-sm border border-primary bg-primary text-primary-foreground disabled:opacity-45',
+        'dialog-danger':
+          'justify-center rounded-kira-sm border border-error bg-error/10 text-error hover:bg-error/20 disabled:opacity-45',
         danger: 'rounded-kira-sm text-error hover:bg-hover',
       },
       size: {
