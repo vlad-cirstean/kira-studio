@@ -4,7 +4,8 @@
 // the trigger, clamped into the viewport, flipped above on overflow) — the same call
 // ErrorPopover.vue makes, replacing the two's former shared 'callout' strategy in the deleted
 // anchoredPosition.ts.
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { nextTick, ref, watch } from 'vue';
 import { computeFloatPosition } from '../theme/floatingPosition';
 import { useTooltipStore } from './state/tooltip';
 
@@ -40,11 +41,9 @@ watch(
   },
 );
 
-function onResize(): void {
+useEventListener(window, 'resize', () => {
   if (tooltipStore.open) void position();
-}
-onMounted(() => window.addEventListener('resize', onResize));
-onUnmounted(() => window.removeEventListener('resize', onResize));
+});
 </script>
 
 <template>
@@ -78,21 +77,20 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* The top rung of theme/tokens.css's own floating-surface ladder (P28 D17(c)) — every other
    floating surface can host a hinted control, so anything lower would reproduce the "hint
    swallowed by an open overlay" bug in a new form. */
 .app-tooltip {
-  position: fixed;
+  /* The ground rule this whole phase exists to keep: a tooltip must never be able to eat the
+     click it is describing. */
+  @apply fixed max-w-80 whitespace-pre-wrap pointer-events-none;
   z-index: var(--kira-z-tooltip);
-  max-width: 320px;
   padding: var(--kira-s-2) var(--kira-s-3);
   color: var(--kira-fg);
   font-size: var(--kira-t-sm);
   line-height: 1.4;
-  white-space: pre-wrap;
-  /* The ground rule this whole phase exists to keep: a tooltip must never be able to eat the
-     click it is describing. */
-  pointer-events: none;
 }
 
 /* P42 D19: the structured half — a bold name, a muted mono type badge beside it on the same
@@ -101,13 +99,12 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
    .tip-meta are siblings (not nested) so each is independently queryable by its own text — a
    parent-child nesting would make .tip-title's own textContent include .tip-meta's. */
 .tip-head {
-  display: flex;
-  align-items: baseline;
+  @apply flex items-baseline;
   gap: var(--kira-s-2);
 }
 
 .tip-title {
-  font-weight: 600;
+  @apply font-semibold;
 }
 
 /* (regression pass, task batch P46-6): a plain --kira-fg-muted span at --kira-t-xs read as
@@ -117,21 +114,17 @@ onUnmounted(() => window.removeEventListener('resize', onResize));
    rounded corners, bolder weight and a full step up in size — instead of a second, unstyled text
    run is what gets it there; `metaColor` (columnTypeColor, when set) colours the text against it. */
 .tip-meta {
+  @apply inline-flex items-center font-semibold shrink-0 rounded-[var(--kira-radius-sm)];
   height: var(--kira-h-xs);
-  display: inline-flex;
-  align-items: center;
   padding: 0 var(--kira-s-3);
-  border-radius: var(--kira-radius-sm);
   background: var(--kira-bg-input);
   color: var(--kira-fg);
   font-family: var(--kira-font-data);
   font-size: var(--kira-t-sm);
-  font-weight: 600;
-  flex-shrink: 0;
 }
 
 .tip-body {
-  margin-top: var(--kira-s-1);
   color: var(--kira-fg-muted);
+  margin-top: var(--kira-s-1);
 }
 </style>

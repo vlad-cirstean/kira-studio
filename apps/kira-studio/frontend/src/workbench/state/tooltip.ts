@@ -1,3 +1,4 @@
+import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import type { ObjectDirective } from 'vue';
 import { reactive, toRefs } from 'vue';
@@ -20,6 +21,13 @@ export interface TooltipContent {
   body?: string;
 }
 
+// P99 Part 2 §6.4 hard case: directive-plus-singleton architecture kept as-is, per the plan's own
+// recommendation. D3's rAF-coalesced, elementFromPoint-based pointermove hit-test (below) is the
+// custom part with no VueUse equivalent — it exists specifically to reach disabled controls, which
+// Blink sends no pointer events on (F5), something a generic hover composable can't replicate.
+// What DID move to VueUse: the plain addEventListener/removeEventListener pairs in initTooltips()
+// to useEventListener (returning the same manual-teardown contract App.vue/leaks.spec.ts rely on),
+// and the D6 rearm-delay setTimeout/clearTimeout pair to useTimeoutFn.
 export const useTooltipStore = defineStore('tooltip', () => {
   /** F4/D6: the app's one hover-pause constant, shared with the editor's lint tooltip
    *  (CodeMirrorHost.vue's `delay: 400`). */
@@ -65,9 +73,22 @@ export const useTooltipStore = defineStore('tooltip', () => {
   let openHostEl: HTMLElement | null = null;
   let pendingHostEl: HTMLElement | null = null;
   let cachedHostRect: DOMRect | null = null;
-  let openTimer: ReturnType<typeof setTimeout> | null = null;
   let lastCloseAt = 0;
   let lastPointerTarget: EventTarget | null = null;
+
+  // D6's rearm-delay timer — VueUse's useTimeoutFn owns the setTimeout/clearTimeout pair;
+  // pendingHostEl is read at fire time (not closed over), same value either way since nothing
+  // else mutates it between the `pendingHostEl = host` below and this firing except
+  // clearOpenTimer, which also stops the timer.
+  const { start: startOpenTimer, stop: stopOpenTimer } = useTimeoutFn(
+    () => {
+      const host = pendingHostEl;
+      pendingHostEl = null;
+      if (host) openFor(host);
+    },
+    TOOLTIP_DELAY_MS,
+    { immediate: false },
+  );
 
   /** AppTooltip.vue's own placement (P23: @floating-ui/dom's computePosition, mirroring
    *  ErrorPopover.vue) reads the live trigger element at render time, not a rect computed ahead of
@@ -78,10 +99,7 @@ export const useTooltipStore = defineStore('tooltip', () => {
   }
 
   function clearOpenTimer(): void {
-    if (openTimer) {
-      clearTimeout(openTimer);
-      openTimer = null;
-    }
+    stopOpenTimer();
     pendingHostEl = null;
   }
 
@@ -143,10 +161,7 @@ export const useTooltipStore = defineStore('tooltip', () => {
       openFor(host);
     } else {
       pendingHostEl = host;
-      openTimer = setTimeout(() => {
-        pendingHostEl = null;
-        openFor(host);
-      }, TOOLTIP_DELAY_MS);
+      startOpenTimer();
     }
   }
 
@@ -225,22 +240,28 @@ export const useTooltipStore = defineStore('tooltip', () => {
       if (rafId === null) rafId = requestAnimationFrame(flush);
     }
 
-    document.addEventListener('pointermove', onPointerMove, { passive: true });
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown, true);
-    document.addEventListener('focusin', onFocusIn);
-    document.addEventListener('focusout', onFocusOut);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('blur', onWindowBlur);
+    // useEventListener's own returned stop() is the manual-teardown contract this function
+    // already promised its caller (App.vue's onMounted, tests/e2e/leaks.spec.ts) — called eagerly
+    // below rather than relying on component-unmount auto-cleanup, matching the addEventListener
+    // pairs this replaces exactly (same targets/events/capture flags).
+    const stopPointerMove = useEventListener(document, 'pointermove', onPointerMove, {
+      passive: true,
+    });
+    const stopPointerDown = useEventListener(document, 'pointerdown', onPointerDown, true);
+    const stopKeyDown = useEventListener(document, 'keydown', onKeyDown, true);
+    const stopFocusIn = useEventListener(document, 'focusin', onFocusIn);
+    const stopFocusOut = useEventListener(document, 'focusout', onFocusOut);
+    const stopScroll = useEventListener(window, 'scroll', onScroll, true);
+    const stopWindowBlur = useEventListener(window, 'blur', onWindowBlur);
 
     return () => {
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown, true);
-      document.removeEventListener('focusin', onFocusIn);
-      document.removeEventListener('focusout', onFocusOut);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('blur', onWindowBlur);
+      stopPointerMove();
+      stopPointerDown();
+      stopKeyDown();
+      stopFocusIn();
+      stopFocusOut();
+      stopScroll();
+      stopWindowBlur();
       if (rafId !== null) cancelAnimationFrame(rafId);
       clearOpenTimer();
       if (state.open) hideTooltip();
