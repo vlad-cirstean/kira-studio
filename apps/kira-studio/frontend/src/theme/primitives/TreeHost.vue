@@ -63,7 +63,7 @@ defineExpose({ revealKey });
 </script>
 
 <template>
-  <div class="tree-host" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
+  <div class="tree-host h-full" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
     <VirtualList ref="virtualListRef" :items="rows" :row-height="rowHeight" @scrollstate="onScrollState">
       <template #default="{ item }">
         <slot name="row" :row="item" :sticky="false" />
@@ -78,9 +78,3 @@ defineExpose({ revealKey });
     </VirtualList>
   </div>
 </template>
-
-<style scoped>
-.tree-host {
-  height: 100%;
-}
-</style>

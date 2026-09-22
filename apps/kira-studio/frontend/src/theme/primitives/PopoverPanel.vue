@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEventListener } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { autoUpdate, computeFloatPosition } from '../floatingPosition';
 
@@ -11,18 +12,11 @@ import { autoUpdate, computeFloatPosition } from '../floatingPosition';
 // Not for workbench/ContextMenu.vue: that menu is anchored to the mouse click point, not to a
 // trigger element — a different reference shape (../floatingPosition.ts's own `pointReference`),
 // even though P23 moved both onto the same underlying computePosition call.
-// Real-interaction fix (reported bug — an app dropdown rendered right-aligned when it should
-// have been left-aligned): this prop's own default used to be 'right' ('bottom-end'), silently
-// contradicting floatingPosition.ts's own documented intent for computeFloatPosition's default
-// placement ("'bottom-start' (below-left of the anchor) — what every call site but the
-// context-menu submenu wants") — dead advice as far as this component went, since every call
-// below always passes an explicit placement, never relying on that default. Of this component's
-// own consumers, 13 already pass `anchor` explicitly (left for a trigger with room to its right,
-// right for one flush against its own toolbar's right edge, `api/EnvironmentSelect.vue`'s own
-// real-interaction fix being the one place that was explicit but backwards) — the 2 that omitted
-// it (KeyValueView.vue's own Add/Edit popovers, triggers with room to their own right, not their
-// left) got 'right' by this stale default, silently opening the wrong way. 'left' now matches
-// what an omitted `anchor` should have meant all along.
+//
+// P99 Part 2 (§6.2/§6.3): kept as a hand-rolled wrapper — its 26 callers span Parts 2-4, so its
+// public props/emit/slot stay unchanged (deleting it would force edits outside this part).
+// Internals: `document.addEventListener`/`onUnmounted` teardown moved onto `useEventListener`
+// (auto-disposing); styling moved to Tailwind, `.p-float` kept as a marker.
 const props = withDefaults(
   defineProps<{
     anchor?: 'left' | 'right';
@@ -105,10 +99,11 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+useEventListener(document, 'keydown', onKeydown, true);
+
 let stopAutoUpdate: (() => void) | null = null;
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown, true);
   const anchorEl = backdropEl.value?.parentElement;
   const el = popoverEl.value;
   if (anchorEl && el) {
@@ -124,43 +119,25 @@ onMounted(() => {
     stopAutoUpdate = autoUpdate(anchorEl, el, reposition);
   }
 });
-onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown, true);
-  stopAutoUpdate?.();
-});
+// useEventListener above disposes itself on unmount; only autoUpdate's own teardown is manual.
+onUnmounted(() => stopAutoUpdate?.());
 </script>
 
 <template>
-  <div ref="backdropEl" class="menu-backdrop" :data-testid="backdropTestId" @click="close">
+  <div ref="backdropEl" class="menu-backdrop fixed inset-0 z-[var(--kira-z-popover)]" :data-testid="backdropTestId" @click="close">
     <div
       ref="popoverEl"
-      class="popover p-float"
+      class="popover p-float fixed overflow-y-auto rounded-kira border border-border-strong bg-elevated shadow-[var(--kira-shadow-dialog)]"
       :data-testid="testId"
-      :style="{ width: `${props.width}px`, ...popoverPosition }"
+      :style="{
+        width: `${props.width}px`,
+        maxHeight: 'var(--kira-float-max-h, none)',
+        maxWidth: 'var(--kira-float-max-w, none)',
+        ...popoverPosition,
+      }"
       @click.stop
     >
       <slot />
     </div>
   </div>
 </template>
-
-<style scoped>
-.menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--kira-z-popover);
-}
-
-/* top/left/right are set inline above, computed from the trigger's own bounding rect — see
-   reposition(). Fixed (not absolute) so those viewport-relative coordinates need no cooperating
-   positioned ancestor at all. */
-.popover {
-  position: fixed;
-  /* P28 D17(a): computeFloatPosition's size() middleware writes these; a menu that fits is
-     unaffected, one taller than the viewport scrolls instead of having its lower rows clipped away
-     by .p-float's own overflow: hidden. */
-  max-height: var(--kira-float-max-h, none);
-  max-width: var(--kira-float-max-w, none);
-  overflow-y: auto;
-}
-</style>

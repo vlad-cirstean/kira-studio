@@ -76,7 +76,7 @@ function onPanelKeydown(e: KeyboardEvent): void {
 
 <template>
   <div class="flex h-full flex-col" @keydown="onPanelKeydown">
-    <div class="p-panel-head">
+    <div class="p-panel-head h-[34px]">
       <slot name="title" />
       <IconButton
         v-if="searchable"
@@ -100,28 +100,11 @@ function onPanelKeydown(e: KeyboardEvent): void {
         <slot name="body" />
       </div>
     </template>
-    <div v-else class="side-empty">
+    <div
+      v-else
+      class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-[var(--kira-s-4)] p-[var(--kira-s-6)] text-center"
+    >
       <slot name="empty" />
     </div>
   </div>
 </template>
-
-<style scoped>
-/* This panel's own header only — matches WorkbenchShell.vue's .tab-strip-slot (34px) exactly,
-   rather than raising the shared .p-panel-head primitive every other panel still uses at 26px. */
-.p-panel-head {
-  height: 34px;
-}
-
-.side-empty {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--kira-s-4);
-  padding: var(--kira-s-6);
-  text-align: center;
-}
-</style>

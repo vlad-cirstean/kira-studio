@@ -1,5 +1,6 @@
 <script setup lang="ts" generic="T">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useResizeObserver } from '@vueuse/core';
+import { computed, onMounted, ref, watch } from 'vue';
 
 // P27 D18: `rowHeights`, when present, replaces the uniform `scrollTop / rowHeight` math below
 // with prefix-sum offsets and a binary search — document rows have a collapsed head and an
@@ -31,7 +32,6 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const viewportHeight = ref(0);
-let resizeObserver: ResizeObserver | null = null;
 
 function onScroll(): void {
   scrollTop.value = containerRef.value?.scrollTop ?? 0;
@@ -45,12 +45,10 @@ watch(
 
 onMounted(() => {
   viewportHeight.value = containerRef.value?.clientHeight ?? 0;
-  resizeObserver = new ResizeObserver(([entry]) => {
-    if (entry) viewportHeight.value = entry.contentRect.height;
-  });
-  if (containerRef.value) resizeObserver.observe(containerRef.value);
 });
-onUnmounted(() => resizeObserver?.disconnect());
+useResizeObserver(containerRef, ([entry]) => {
+  if (entry) viewportHeight.value = entry.contentRect.height;
+});
 
 // offsets[i] = the pixel top of row i; offsets[n] = the total content height. One array shared by
 // startIndex/endIndex/topSpacer/bottomSpacer/scrollToIndex below, recomputed only when the caller
@@ -147,7 +145,12 @@ defineExpose({ scrollToIndex });
 </script>
 
 <template>
-  <div ref="containerRef" class="virtual-list" data-testid="virtual-list" @scroll="onScroll">
+  <div
+    ref="containerRef"
+    class="virtual-list h-full overflow-auto"
+    data-testid="virtual-list"
+    @scroll="onScroll"
+  >
     <!-- P41 D1: must be the *first* child of the scroll content, not the last. A `position: sticky;
          top: 0` box is only ever offset downward, by just enough to keep its top edge `>= 0` from
          the scrollport's top — a box already at flow position 0 needs no offset once scrollTop > 0
@@ -158,14 +161,18 @@ defineExpose({ scrollToIndex });
          `position: sticky` inside the scroll container's own content box is what makes it an
          overlay rather than the in-flow #header slot below — it spans the rows and stops short of
          the scrollbar (P28 D2). Only ProjectTree.vue passes this today. -->
-    <div v-if="$slots.sticky" class="virtual-list-sticky" data-testid="virtual-list-sticky">
+    <div
+      v-if="$slots.sticky"
+      class="virtual-list-sticky sticky top-0 z-[2] h-0"
+      data-testid="virtual-list-sticky"
+    >
       <slot name="sticky" />
     </div>
     <!-- Sticky, not fixed: it stays in normal flow (so scrollTop-based indexing below is only
          off by its own height, well inside the default overscan) while visually pinning during
          vertical scroll — the console result grid's header row (§8.14) is the only caller that
          passes this slot; the two pre-existing single-column callers render nothing here. -->
-    <div v-if="$slots.header" class="virtual-list-header">
+    <div v-if="$slots.header" class="virtual-list-header sticky top-0 z-[1]">
       <slot name="header" />
     </div>
     <div :style="{ height: `${topSpacer}px` }" />
@@ -175,23 +182,3 @@ defineExpose({ scrollToIndex });
     <div :style="{ height: `${bottomSpacer}px` }" />
   </div>
 </template>
-
-<style scoped>
-.virtual-list {
-  height: 100%;
-  overflow: auto;
-}
-
-.virtual-list-header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.virtual-list-sticky {
-  position: sticky;
-  top: 0;
-  height: 0;
-  z-index: 2;
-}
-</style>

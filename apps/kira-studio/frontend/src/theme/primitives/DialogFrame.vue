@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { DialogContent, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui';
 import CodiconIcon from '../CodiconIcon.vue';
 
 // Shared chrome for every modal dialog (ConnectionDialog, FiltersDialog, SettingsDialog):
@@ -10,6 +10,12 @@ import CodiconIcon from '../CodiconIcon.vue';
 // `height` vs `maxHeight`: most dialogs size themselves to their content up to a cap
 // (`maxHeight`, e.g. "80vh"); SettingsDialog's two-pane layout instead needs a constant height
 // so switching sections never resizes the window (`height`, in px). Pass exactly one.
+//
+// P99 Part 2 (§6.2): internals moved onto reka-ui's DialogRoot/Portal/Overlay/Content — its own
+// focus trap, Escape and click-outside handling replace the hand-rolled `onKeydown`/`focusable()`
+// pair, on the app's own `.p-float`/--kira-shadow-dialog visual classes (not shadcn's own
+// DialogContent.vue, whose rounded-xl/animation vocabulary doesn't match this design system's
+// pixel-exact chrome). Public props/emit/slots unchanged, so every consumer needs zero edits.
 const props = withDefaults(
   defineProps<{
     title: string;
@@ -23,124 +29,52 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ close: [] }>();
-
-const dialogRef = ref<HTMLElement | null>(null);
-
-function focusable(): HTMLElement[] {
-  if (!dialogRef.value) return [];
-  return Array.from(
-    dialogRef.value.querySelectorAll<HTMLElement>(
-      'button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    ),
-  ).filter((el) => !el.hasAttribute('disabled'));
-}
-
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') {
-    emit('close');
-    return;
-  }
-  if (e.key !== 'Tab') return;
-  const items = focusable();
-  if (items.length === 0) return;
-  const first = items[0];
-  const last = items[items.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  }
-}
-
-onMounted(() => {
-  document.addEventListener('keydown', onKeydown);
-  dialogRef.value?.focus();
-});
-onUnmounted(() => document.removeEventListener('keydown', onKeydown));
 </script>
 
 <template>
-  <Teleport to="body">
-    <div class="scrim" :data-testid="testId" @click.self="emit('close')">
-      <div
-        ref="dialogRef"
-        class="dialog p-float"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="title"
-        tabindex="-1"
-        :style="{
-          width: `${props.width}px`,
-          maxHeight: props.height === undefined ? props.maxHeight : undefined,
-          height: props.height !== undefined ? `${props.height}px` : undefined,
-        }"
+  <DialogRoot :open="true" @update:open="(v) => !v && emit('close')">
+    <DialogPortal>
+      <DialogOverlay
+        class="scrim fixed inset-0 z-[var(--kira-z-dialog)] flex items-center justify-center bg-black/50"
+        :data-testid="testId"
       >
-        <div class="dialog-title">
-          <slot name="header"><span>{{ title }}</span></slot>
-          <button
-            type="button"
-            class="p-iconbtn p-push"
-            aria-label="Close"
-            :data-testid="closeTestId"
-            @click="emit('close')"
+        <DialogContent
+          class="dialog p-float flex flex-col rounded-kira border border-border-strong bg-elevated shadow-[var(--kira-shadow-dialog)] outline-none"
+          role="dialog"
+          :aria-label="title"
+          :style="{
+            width: `${props.width}px`,
+            maxHeight: props.height === undefined ? props.maxHeight : undefined,
+            height: props.height !== undefined ? `${props.height}px` : undefined,
+          }"
+        >
+          <div
+            class="dialog-title h-[var(--kira-h-lg)] shrink-0 flex items-center gap-[var(--kira-s-3)] pl-[var(--kira-s-5)] pr-[var(--kira-s-4)] border-b border-border text-[length:var(--kira-t-lg)] text-fg"
           >
-            <CodiconIcon name="close" :size="13" />
-          </button>
-        </div>
-        <div class="dialog-body">
-          <slot />
-        </div>
-        <div v-if="$slots.footer" class="dialog-footer">
-          <slot name="footer" />
-        </div>
-      </div>
-    </div>
-  </Teleport>
+            <slot name="header">
+              <DialogTitle as="span">{{ title }}</DialogTitle>
+            </slot>
+            <button
+              type="button"
+              class="p-iconbtn p-push ml-auto"
+              aria-label="Close"
+              :data-testid="closeTestId"
+              @click="emit('close')"
+            >
+              <CodiconIcon name="close" :size="13" />
+            </button>
+          </div>
+          <div class="dialog-body flex-1 min-h-0 overflow-auto">
+            <slot />
+          </div>
+          <div
+            v-if="$slots.footer"
+            class="dialog-footer h-[46px] shrink-0 px-[var(--kira-s-5)] flex items-center gap-[var(--kira-s-3)] border-t border-border"
+          >
+            <slot name="footer" />
+          </div>
+        </DialogContent>
+      </DialogOverlay>
+    </DialogPortal>
+  </DialogRoot>
 </template>
-
-<style scoped>
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--kira-z-dialog);
-}
-
-.dialog {
-  display: flex;
-  flex-direction: column;
-}
-
-.dialog-title {
-  height: var(--kira-h-lg);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4) 0 var(--kira-s-5);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  font-size: var(--kira-t-lg);
-  color: var(--kira-fg);
-}
-
-.dialog-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.dialog-footer {
-  height: 46px;
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-5);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  border-top: var(--kira-border-width) solid var(--kira-border);
-}
-</style>

@@ -92,7 +92,7 @@ function onEnter(e: KeyboardEvent): void {
   >
     <span v-if="icon" class="icon-box"><CodiconIcon :name="icon" :size="13" /></span>
     <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
-    <span v-if="grow" class="input-wrap" :data-value="modelValue">
+    <span v-if="grow" class="input-wrap min-w-0 flex-1" :data-value="modelValue">
       <textarea
         rows="1"
         wrap="soft"
@@ -144,13 +144,3 @@ function onEnter(e: KeyboardEvent): void {
     </span>
   </span>
 </template>
-
-<style scoped>
-/* P71 §8.1: only rendered under `grow` — sizes as a flex item of `.p-input`; primitives.css's own
-   `.p-input.is-grow .input-wrap` rule switches its *internal* display to grid for the auto-grow
-   trick (grid-area overlap between the textarea and the sizing replica). */
-.input-wrap {
-  flex: 1;
-  min-width: 0;
-}
-</style>

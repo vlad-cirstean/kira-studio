@@ -1,4 +1,11 @@
 <script setup lang="ts">
+// P99 Part 2 (§4.3): declined reka-ui/shadcn's `resizable` registry item. That component is a
+// panel-GROUP manager (ResizablePanelGroup/ResizablePanel/ResizableHandle) owning its own internal
+// size state; this component is a bare drag handle only — no panes of its own — controlled by an
+// external `size` prop and emitting a delta, so WorkbenchShell.vue's grid layout and every view's
+// own persisted size (state/layout.ts) stay the source of truth. Adopting `resizable` would mean
+// restructuring every splitter consumer's panes into ResizablePanel children, a structural change
+// far past a CSS/behaviour-preserving swap. Styling moved to Tailwind.
 const props = withDefaults(
   defineProps<{
     orientation: 'col' | 'row';
@@ -47,7 +54,7 @@ function onPointerUp(e: PointerEvent): void {
 
 <template>
   <div
-    class="splitter"
+    class="splitter bg-transparent hover:bg-focus active:bg-focus"
     :class="[
       orientation === 'col' ? 'cursor-col-resize' : 'cursor-row-resize',
       { 'has-divider': divider },
@@ -59,19 +66,12 @@ function onPointerUp(e: PointerEvent): void {
 </template>
 
 <style scoped>
-.splitter {
-  background: transparent;
-}
-
-.splitter:hover,
-.splitter:active {
-  background: var(--kira-focus);
-}
-
 /* P22 D13: the line is drawn as a centred inset box-shadow, not a border — a border would change
    the track's own box size and shift the panes it separates, and the track is a pointer target
    whose 4px height/width is load-bearing for grabbing it. --kira-border (not --kira-border-strong)
-   is the weight every other in-view boundary uses (.p-toolbar, .p-view-head, .cell-dock). */
+   is the weight every other in-view boundary uses (.p-toolbar, .p-view-head, .cell-dock).
+   Kept as hand CSS: a centred inset box-shadow, cleared on hover/active, has no Tailwind utility
+   (only edge box-shadows are expressible via the shadow-* scale). */
 .splitter.has-divider.cursor-row-resize {
   box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
 }

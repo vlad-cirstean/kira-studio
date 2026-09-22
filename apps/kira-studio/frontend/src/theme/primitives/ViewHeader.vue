@@ -45,7 +45,7 @@ const isNoColor = computed(() => !props.connColor || props.connColor === 'none')
       ><template v-else>{{ name }}</template>
     </span>
     <slot />
-    <span class="p-push" style="display: flex; align-items: center; gap: var(--kira-s-2)">
+    <span class="p-push flex items-center gap-[var(--kira-s-2)]">
       <slot name="trailing" />
     </span>
   </div>
