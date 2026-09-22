@@ -2,9 +2,9 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/logging"
 )
 
 type SettingsService struct {

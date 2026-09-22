@@ -3,9 +3,6 @@ package startupfail
 import (
 	"fmt"
 	"strings"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 )
 
 // RenderAlert composes the alert's title and body from a Message (D5). The title (item 1 of argv,
@@ -14,18 +11,20 @@ import (
 // folder — so a user staring at the alert with no other context knows both "what version am I
 // running" and "where would a log record of this be, if one exists".
 //
-// Pure: no I/O beyond reading buildinfo.Version and config.LogsDir(), both of which are plain,
-// non-fallible reads (F11) — safe to call from any of the nine boot-failure sites, including the
-// two that run before config.EnsureLayout has ever succeeded.
-func RenderAlert(msg Message) (title, body string) {
+// Pure: no I/O beyond reading info.Version and info.LogsDir(), both plain, non-fallible reads
+// (F11) — safe to call from any of the nine boot-failure sites, including the two that run before
+// EnsureLayout has ever succeeded.
+func RenderAlert(msg Message, info Info) (title, body string) {
 	var b strings.Builder
 	b.WriteString(msg.Advice)
 	b.WriteString("\n\nDetails: ")
 	b.WriteString(msg.Detail)
-	b.WriteString("\n\nKira Studio ")
-	b.WriteString(buildinfo.Version)
+	b.WriteString("\n\n")
+	b.WriteString(info.AppName)
+	b.WriteString(" ")
+	b.WriteString(info.Version)
 	b.WriteString("\nLog folder: ")
-	b.WriteString(config.LogsDir())
+	b.WriteString(info.logsDir())
 	return msg.Headline, b.String()
 }
 
@@ -34,16 +33,16 @@ func RenderAlert(msg Message) (title, body string) {
 // identifier, this build's version, the log folder, the database path, and the full, uncapped
 // error text (fullErr, not msg.Detail) — everything a bug report would need that the alert had to
 // abbreviate or omit entirely.
-func RenderClipboard(msg Message, fullErr error) string {
+func RenderClipboard(msg Message, info Info, fullErr error) string {
 	errText := ""
 	if fullErr != nil {
 		errText = fullErr.Error()
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "Kira Studio %s\n", buildinfo.Version)
+	fmt.Fprintf(&b, "%s %s\n", info.AppName, info.Version)
 	fmt.Fprintf(&b, "Step: %s\n", msg.Step)
-	fmt.Fprintf(&b, "Log folder: %s\n", config.LogsDir())
-	fmt.Fprintf(&b, "Database: %s\n", config.DbPath())
+	fmt.Fprintf(&b, "Log folder: %s\n", info.logsDir())
+	fmt.Fprintf(&b, "Database: %s\n", info.dbPath())
 	b.WriteString("\n")
 	b.WriteString(msg.Headline)
 	b.WriteString("\n")

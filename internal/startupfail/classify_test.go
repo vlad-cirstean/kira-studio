@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/startupfail"
+	"github.com/kirathecat/kira-studio/internal/startupfail"
 )
 
 // localSchemaTooNew is a LOCAL fake implementing the same two-int accessor method
@@ -20,6 +20,21 @@ type localSchemaTooNew struct {
 
 func (e *localSchemaTooNew) Error() string            { return e.msg }
 func (e *localSchemaTooNew) SchemaTooNew() (int, int) { return e.found, e.known }
+
+// testInfo is the fixed Info every test in this file threads through Classify — "Kira Studio" and
+// a fake home/logs/db path set, standing in for what apps/kira-studio/main.go's real Reporter
+// construction supplies. P100 Part 1 moved startupfail to repo-root internal/, so it can no longer
+// read internal/config or internal/buildinfo directly; every call site (real or test) now supplies
+// its own Info.
+func testInfo() startupfail.Info {
+	return startupfail.Info{
+		AppName: "Kira Studio",
+		Version: "9.9.9-test",
+		Home:    func() string { return "/tmp/kira-studio-test-home" },
+		LogsDir: func() string { return "/tmp/kira-studio-test-home/logs" },
+		DbPath:  func() string { return "/tmp/kira-studio-test-home/kira.db" },
+	}
+}
 
 // allSteps enumerates every Step constant step.go declares — classify_test.go's stand-in for the
 // compile-time exhaustiveness Go's own switch statement cannot provide (classify.go's own doc
@@ -41,7 +56,7 @@ func allSteps() []startupfail.Step {
 func TestClassifyCoversEveryStep(t *testing.T) {
 	for _, step := range allSteps() {
 		t.Run(string(step), func(t *testing.T) {
-			msg := startupfail.Classify(step, errors.New("boom"))
+			msg := startupfail.Classify(step, errors.New("boom"), testInfo())
 			if msg.Headline == "" {
 				t.Fatalf("Classify(%s, ...) returned an empty Headline", step)
 			}
@@ -70,7 +85,7 @@ func TestClassifyExpectedColumn(t *testing.T) {
 		startupfail.StepPlatform:     false,
 	}
 	for step, wantExpected := range want {
-		if got := startupfail.Classify(step, errors.New("boom")).Expected; got != wantExpected {
+		if got := startupfail.Classify(step, errors.New("boom"), testInfo()).Expected; got != wantExpected {
 			t.Errorf("Classify(%s).Expected = %v, want %v", step, got, wantExpected)
 		}
 	}
@@ -82,7 +97,7 @@ func TestClassifyHeadlineNeverContainsRawError(t *testing.T) {
 	const needle = "sentinel-raw-error-marker-9f3c2"
 	err := errors.New(needle + ": disk quota exceeded")
 	for _, step := range allSteps() {
-		if msg := startupfail.Classify(step, err); strings.Contains(msg.Headline, needle) {
+		if msg := startupfail.Classify(step, err, testInfo()); strings.Contains(msg.Headline, needle) {
 			t.Errorf("Classify(%s).Headline contains the raw error text: %q", step, msg.Headline)
 		}
 	}
@@ -92,7 +107,7 @@ func TestClassifyHeadlineNeverContainsRawError(t *testing.T) {
 // Advice says it's a bug, never something actionable it cannot actually promise.
 func TestClassifyExpectedFalseIsHonest(t *testing.T) {
 	for _, step := range allSteps() {
-		msg := startupfail.Classify(step, errors.New("boom"))
+		msg := startupfail.Classify(step, errors.New("boom"), testInfo())
 		if msg.Expected {
 			continue
 		}
@@ -110,7 +125,7 @@ func TestClassifySchemaTooNewArm(t *testing.T) {
 		msg:   "storage: database schema_version (19) is newer than this build knows about (17) — refusing to run against a downgraded app",
 		found: 19, known: 17,
 	}
-	msg := startupfail.Classify(startupfail.StepStorage, err)
+	msg := startupfail.Classify(startupfail.StepStorage, err, testInfo())
 	if !msg.Expected {
 		t.Fatalf("schema-too-new arm should be Expected: true")
 	}
@@ -125,7 +140,7 @@ func TestClassifySchemaTooNewArm(t *testing.T) {
 // TestClassifyStorageGenericArm confirms an ordinary (non-schema) storage.Open failure gets the
 // generic "couldn't open its database" wording, not the schema-too-new one.
 func TestClassifyStorageGenericArm(t *testing.T) {
-	msg := startupfail.Classify(startupfail.StepStorage, errors.New("disk I/O error"))
+	msg := startupfail.Classify(startupfail.StepStorage, errors.New("disk I/O error"), testInfo())
 	if !msg.Expected {
 		t.Fatalf("generic storage-open failure should be Expected: true")
 	}
@@ -146,7 +161,7 @@ func TestCollapseDetail(t *testing.T) {
 	if len(huge) < 10*1024 {
 		t.Fatalf("test fixture too small: %d bytes", len(huge))
 	}
-	msg := startupfail.Classify(startupfail.StepRepos, errors.New(huge))
+	msg := startupfail.Classify(startupfail.StepRepos, errors.New(huge), testInfo())
 	if strings.Contains(msg.Detail, "\n") {
 		t.Fatalf("Detail was not collapsed to one line: %q", msg.Detail)
 	}

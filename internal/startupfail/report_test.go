@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/startupfail"
+	"github.com/kirathecat/kira-studio/internal/startupfail"
 )
 
 // spawnCall records one invocation of a fake Deps.Run — enough to assert what was spawned, with
@@ -41,6 +41,7 @@ func TestReportOsascriptAbsent(t *testing.T) {
 		Stderr: &stderrBuf,
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	r.Report(startupfail.StepEnsureLayout, errors.New("disk full"))
@@ -76,6 +77,7 @@ func TestReportOsascriptPresentSpawnsExpectedArgv(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	err := errors.New("prepare failed: boom")
@@ -88,7 +90,7 @@ func TestReportOsascriptPresentSpawnsExpectedArgv(t *testing.T) {
 	if call.path != "/usr/bin/osascript" {
 		t.Fatalf("spawned %q, want /usr/bin/osascript", call.path)
 	}
-	wantTitle, wantBody := startupfail.RenderAlert(startupfail.Classify(startupfail.StepRepos, err))
+	wantTitle, wantBody := startupfail.RenderAlert(startupfail.Classify(startupfail.StepRepos, err, testInfo()), testInfo())
 	if len(call.args) < 3 {
 		t.Fatalf("argv too short: %#v", call.args)
 	}
@@ -131,6 +133,7 @@ func TestReportCopyDetailsSpawnsPbcopyWithClipboardPayload(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	err := errors.New("read settings: unique-clipboard-marker-7f2a")
@@ -146,7 +149,7 @@ func TestReportCopyDetailsSpawnsPbcopyWithClipboardPayload(t *testing.T) {
 	if pb.args != nil {
 		t.Fatalf("pbcopy should be spawned with no argv, got %#v", pb.args)
 	}
-	wantPayload := startupfail.RenderClipboard(startupfail.Classify(startupfail.StepSettings, err), err)
+	wantPayload := startupfail.RenderClipboard(startupfail.Classify(startupfail.StepSettings, err, testInfo()), testInfo(), err)
 	if string(pb.stdin) != wantPayload {
 		t.Fatalf("pbcopy stdin = %q, want %q", string(pb.stdin), wantPayload)
 	}
@@ -170,6 +173,7 @@ func TestReportOKPressedNoSecondSpawn(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	r.Report(startupfail.StepRepos, errors.New("boom"))
@@ -197,6 +201,7 @@ func TestReportOsascriptNonZeroExitNoPanic(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	r.Report(startupfail.StepRepos, errors.New("boom")) // must not panic
@@ -226,6 +231,7 @@ func TestReportEnvVarDisablesAlert(t *testing.T) {
 		Stderr: &stderrBuf,
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	r.Report(startupfail.StepRepos, errors.New("boom"))
@@ -259,6 +265,7 @@ func TestReportAlertOnceAtMostOneSpawnPerReporter(t *testing.T) {
 		Stderr: &bytes.Buffer{},
 		Log:    func(string, ...any) {},
 		Now:    fixedNow,
+		Info:   testInfo(),
 	})
 
 	r.Report(startupfail.StepRepos, errors.New("first"))
@@ -287,7 +294,8 @@ func TestReportLogsHeadlineAndStep(t *testing.T) {
 			loggedMsg = msg
 			loggedArgs = args
 		},
-		Now: fixedNow,
+		Now:  fixedNow,
+		Info: testInfo(),
 	})
 
 	r.Report(startupfail.StepLogging, errors.New("boom"))

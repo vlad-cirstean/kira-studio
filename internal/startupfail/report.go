@@ -26,10 +26,14 @@ type Deps struct {
 	// depending on log/slog's own global state.
 	Log func(msg string, args ...any)
 	Now func() time.Time
+	// Info is the app-identifying seam Classify/RenderAlert/RenderClipboard need (see info.go) —
+	// a zero-value Info renders empty AppName/Version/paths rather than panicking.
+	Info Info
 }
 
-// Reporter is D8's whole surface: constructed once over real Deps for the package-level
-// Fatal/Report/ReportPlatform functions below, and constructed fresh per test with fakes.
+// Reporter is D8's whole surface: constructed once over real Deps by each app's main.go (carrying
+// that app's own Info) for its Fatal/Report/ReportPlatform methods below, and constructed fresh
+// per test with fakes.
 type Reporter struct {
 	lookPath func(string) (string, error)
 	stat     func(string) (os.FileInfo, error)
@@ -38,6 +42,7 @@ type Reporter struct {
 	stderr   io.Writer
 	log      func(msg string, args ...any)
 	now      func() time.Time
+	info     Info
 
 	// alertOnce guards D7's "at most one alert is ever shown per process" — logging and the
 	// stderr write always happen on every call; only the actual osascript spawn is gated. Scoped
@@ -52,7 +57,7 @@ type Reporter struct {
 func NewReporter(d Deps) *Reporter {
 	r := &Reporter{
 		lookPath: d.LookPath, stat: d.Stat, run: d.Run, getenv: d.Getenv,
-		stderr: d.Stderr, log: d.Log, now: d.Now,
+		stderr: d.Stderr, log: d.Log, now: d.Now, info: d.Info,
 	}
 	if r.lookPath == nil {
 		r.lookPath = realLookPath
@@ -86,11 +91,11 @@ func NewReporter(d Deps) *Reporter {
 // alert. Order matters: log first, so a crash or hang inside the presenter can never lose the
 // diagnosis.
 func (r *Reporter) Report(step Step, err error) {
-	msg := Classify(step, err)
+	msg := Classify(step, err, r.info)
 
 	r.log(msg.Headline, "scope", "startup", "step", string(step), "err", err)
 
-	title, body := RenderAlert(msg)
+	title, body := RenderAlert(msg, r.info)
 	fmt.Fprintf(r.stderr, "[%s] kira-studio-shell: %s: %s\n\n%s\n\n",
 		r.now().UTC().Format(time.RFC3339), step, title, body)
 
@@ -143,7 +148,7 @@ func (r *Reporter) showAlert(msg Message, err error) {
 	if !ok {
 		return
 	}
-	title, body := RenderAlert(msg)
+	title, body := RenderAlert(msg, r.info)
 	ctx, cancel := context.WithTimeout(context.Background(), alertTimeout)
 	defer cancel()
 	stdout, runErr := r.run(ctx, path, alertArgv(title, body), nil)
@@ -166,27 +171,19 @@ func (r *Reporter) copyDetails(msg Message, err error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), alertTimeout)
 	defer cancel()
-	payload := RenderClipboard(msg, err)
+	payload := RenderClipboard(msg, r.info, err)
 	_, _ = r.run(ctx, path, nil, []byte(payload))
 }
 
-// defaultReporter is what the package-level Fatal/Report/ReportPlatform functions below use — the
-// real OS, exactly once per process, constructed at package init with an empty Deps{} (every
-// field falls back per NewReporter).
-var defaultReporter = NewReporter(Deps{})
-
 // Fatal is D6's whole boot-failure posture: Report, then exit 1 — the same exit code every
-// log.Fatalf call site it replaces already produced, preserved exactly.
-func Fatal(step Step, err error) {
-	defaultReporter.Report(step, err)
+// log.Fatalf call site it replaces already produced, preserved exactly. A *Reporter method rather
+// than a package-level function since P100 Part 1: each app constructs its own Reporter (carrying
+// its own Info) instead of this package holding a single process-wide defaultReporter — the
+// package can no longer default one itself, since it has no per-app config/buildinfo to build an
+// Info from.
+func (r *Reporter) Fatal(step Step, err error) {
+	r.Report(step, err)
 	os.Exit(1)
-}
-
-// Report logs, writes to stderr, and attempts the alert, without exiting — used by main.go's own
-// ErrorHandler wiring (via ReportPlatform below) where Wails' own os.Exit(1) follows immediately
-// afterward (D7): this function must never call os.Exit itself.
-func Report(step Step, err error) {
-	defaultReporter.Report(step, err)
 }
 
 // ReportPlatform is StepPlatform's own entry point (D7) — the one seam main.go's
@@ -194,6 +191,6 @@ func Report(step Step, err error) {
 // assertion (the only place in this package's contract that acknowledges pkg/application exists,
 // and it does so from the caller's side: this package imports nothing from pkg/application, per
 // internal/shell/app.go's documented rule that only main.go and internal/shell may).
-func ReportPlatform(err error) {
-	defaultReporter.Report(StepPlatform, err)
+func (r *Reporter) ReportPlatform(err error) {
+	r.Report(StepPlatform, err)
 }

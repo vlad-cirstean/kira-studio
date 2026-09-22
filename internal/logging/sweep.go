@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 )
 
 // LogRetentionDays mirrors log.ts's LOG_RETENTION_DAYS (D12): a fixed constant, not
@@ -14,12 +12,14 @@ import (
 // silently reusing it here would surprise a user who sets it low to keep the op log small.
 const LogRetentionDays = 30
 
-// Sweep deletes kira-*.log files older than LogRetentionDays by mtime — ageing by mtime rather
-// than parsing the date out of the filename covers any rotated or renamed file regardless of
-// naming scheme, matching log.ts's own comment. Best-effort and total: an unreadable or missing
+// Sweep deletes kira-*.log files older than LogRetentionDays by mtime under dir — ageing by mtime
+// rather than parsing the date out of the filename covers any rotated or renamed file regardless
+// of naming scheme, matching log.ts's own comment. Best-effort and total: an unreadable or missing
 // logs directory, or a single file that fails to stat/remove, never blocks startup.
-func Sweep() {
-	dir := config.LogsDir()
+//
+// dir is an explicit argument, not config.LogsDir() read directly, for the same repo-root
+// visibility reason Init above takes one (P100 Part 1).
+func Sweep(dir string) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return

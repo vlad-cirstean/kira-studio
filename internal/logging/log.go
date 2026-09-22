@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 )
 
 // dailyWriter re-resolves the dated log filename on every Write and reopens the file when the
@@ -55,19 +53,23 @@ func (w *dailyWriter) Write(p []byte) (int, error) {
 // zero value is slog.LevelInfo (both are 0), matching this app's own default.
 var level slog.LevelVar
 
-// Init installs a slog handler writing to KIRA_HOME/logs/kira-YYYY-MM-DD.log as the process
-// default, so every existing slog.Default() call in storage/repos and enginehost lands there
-// with zero change to those packages (P54 §1.6). In a dev build the same records also go to
-// stderr, mirroring electron-log's console transport (silenced only under NODE_ENV=test, which
-// has no Go analogue since tests here use their own captured logger, per P54's helpers_test.go).
-func Init() error {
-	dir := config.LogsDir()
+// Init installs a slog handler writing to dir/kira-YYYY-MM-DD.log as the process default, so every
+// existing slog.Default() call in storage/repos and enginehost lands there with zero change to
+// those packages (P54 §1.6). In a dev build (isDev) the same records also go to stderr, mirroring
+// electron-log's console transport (silenced only under NODE_ENV=test, which has no Go analogue
+// since tests here use their own captured logger, per P54's helpers_test.go).
+//
+// dir/isDev are explicit arguments, not read from internal/config directly, since P100 Part 1
+// hoisted this package to repo-root internal/ — it can no longer import either app's own
+// internal/config (Go's internal/ visibility rule). Each app's own main.go passes
+// config.LogsDir()/config.IsDev() in.
+func Init(dir string, isDev bool) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
 	var w io.Writer = newDailyWriter(dir, time.Now)
-	if config.IsDev() {
+	if isDev {
 		w = io.MultiWriter(w, os.Stderr)
 	}
 

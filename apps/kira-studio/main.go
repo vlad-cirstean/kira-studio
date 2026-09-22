@@ -40,7 +40,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/mcpinstall"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
@@ -48,12 +47,13 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/terminal"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 	// Aliased: main.go's own `events` local var (bridge.NewEvents) would otherwise shadow this
@@ -84,9 +84,24 @@ func main() {
 		os.Exit(gitaskpass.RunHelper(os.Args[2:], os.Environ(), os.Stdout))
 	}
 
+	// P100 Part 1: startupfail moved to repo-root internal/ and can no longer read
+	// internal/config/internal/buildinfo itself (Go's internal/ rule — a repo-root package cannot
+	// import anything under apps/kira-studio/internal), so this app constructs its own Reporter,
+	// carrying its own Info, and threads it through every boot-failure site below instead of
+	// startupfail holding a single process-wide default one.
+	reporter := startupfail.NewReporter(startupfail.Deps{
+		Info: startupfail.Info{
+			AppName: "Kira Studio",
+			Version: buildinfo.Version,
+			Home:    config.KiraHome,
+			LogsDir: config.LogsDir,
+			DbPath:  config.DbPath,
+		},
+	})
+
 	startedAt := time.Now()
 
-	core := openCore()
+	core := openCore(reporter)
 	db, cipher, authorizer := core.db, core.cipher, core.authorizer
 	repositories, secretsRepo, maskRulesSvc := core.repositories, core.secretsRepo, core.maskRulesSvc
 
@@ -111,7 +126,7 @@ func main() {
 	// before any user override exists — the cache budget below needs it.
 	settings, err := deps.Repos.Settings.GetAll()
 	if err != nil {
-		startupfail.Fatal(startupfail.StepSettings, err)
+		reporter.Fatal(startupfail.StepSettings, err)
 	}
 	// P72 §9.2: match the stored advanced.gitLogLevel rather than always booting at Info.
 	logging.SetLevel(settings.Advanced.GitLogLevel)
@@ -230,7 +245,7 @@ func main() {
 				return
 			}
 			platformErrorOnce.Do(func() {
-				startupfail.ReportPlatform(fatalErr.Unwrap())
+				reporter.ReportPlatform(fatalErr.Unwrap())
 			})
 		},
 	})
@@ -244,10 +259,11 @@ func main() {
 		startedAt: startedAt, events: events, windows: windows, closeFlush: closeFlush, quitter: quitter,
 		terminalSvc: terminalSvc, windowsSvc: windowsSvc, keepAwakeSvc: keepAwakeSvc, notifier: notifier,
 		attachDialogs: attachDialogs, setUnsubscribePairing: lifecycle.setUnsubscribePairing,
+		reporter: reporter,
 	})
 
 	if err := app.Run(); err != nil {
-		startupfail.Fatal(startupfail.StepRun, err)
+		reporter.Fatal(startupfail.StepRun, err)
 	}
 }
 
@@ -264,20 +280,20 @@ type coreOpened struct {
 
 // openCore runs main's own boot-order prefix: config.EnsureLayout -> logging.Init/Sweep ->
 // storage.Open (migrates) -> secrets.New -> repos.New + repos.NewSecrets/NewVariables/NewMaskKeys
-// -> maskrules.New. A failure at any startupfail.Fatal step here exits the process; it never
+// -> maskrules.New. A failure at any reporter.Fatal step here exits the process; it never
 // returns an error for the caller to handle.
-func openCore() coreOpened {
+func openCore(reporter *startupfail.Reporter) coreOpened {
 	if err := config.EnsureLayout(); err != nil {
-		startupfail.Fatal(startupfail.StepEnsureLayout, err)
+		reporter.Fatal(startupfail.StepEnsureLayout, err)
 	}
-	if err := logging.Init(); err != nil {
-		startupfail.Fatal(startupfail.StepLogging, err)
+	if err := logging.Init(config.LogsDir(), config.IsDev()); err != nil {
+		reporter.Fatal(startupfail.StepLogging, err)
 	}
-	logging.Sweep()
+	logging.Sweep(config.LogsDir())
 
 	db, err := storage.Open()
 	if err != nil {
-		startupfail.Fatal(startupfail.StepStorage, err)
+		reporter.Fatal(startupfail.StepStorage, err)
 	}
 
 	cipher := secrets.New()
@@ -287,7 +303,7 @@ func openCore() coreOpened {
 
 	repositories, err := repos.New(db.DB)
 	if err != nil {
-		startupfail.Fatal(startupfail.StepRepos, err)
+		reporter.Fatal(startupfail.StepRepos, err)
 	}
 	secretsRepo := repos.NewSecrets(db.DB, cipher)
 	// P5: the same "needs a Cipher, constructed separately from repos.New's aggregate" shape as
@@ -643,6 +659,7 @@ type postAppDeps struct {
 
 	attachDialogs         func(app *application.App, window func() application.Window)
 	setUnsubscribePairing func(func())
+	reporter              *startupfail.Reporter
 }
 
 // wireWindowsAndMenu runs main's own post-`app` block: the dialog attach point -> the git-pairing
@@ -695,12 +712,12 @@ func wireWindowsAndMenu(d postAppDeps) {
 	// one.
 	records, err := d.repositories.Windows.List()
 	if err != nil {
-		startupfail.Fatal(startupfail.StepWindowList, err)
+		d.reporter.Fatal(startupfail.StepWindowList, err)
 	}
 	if len(records) == 0 {
 		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
 		if err := d.repositories.Windows.Create(rec); err != nil {
-			startupfail.Fatal(startupfail.StepWindowCreate, err)
+			d.reporter.Fatal(startupfail.StepWindowCreate, err)
 		}
 		records = []model.WindowRecord{rec}
 	}

@@ -3,9 +3,6 @@ package startupfail
 import (
 	"fmt"
 	"strings"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 )
 
 // detailCap bounds Message.Detail (D5): the alert body carries a collapsed, single-line, truncated
@@ -74,26 +71,27 @@ func bugMessage(step Step, headline, detail string) Message {
 // enumerates every Step constant declared in step.go — is what actually catches a Step added
 // without a matching arm here; the one line after the switch is a safe, honest fallback for a Step
 // value nothing in this codebase ever constructs, not a substitute for that test.
-func Classify(step Step, err error) Message {
+func Classify(step Step, err error, info Info) Message {
 	detail := ""
 	if err != nil {
 		detail = collapse(err.Error(), detailCap)
 	}
+	app := info.AppName
 
 	switch step {
 	case StepEnsureLayout:
 		return Message{
 			Step: step, Expected: true,
-			Headline: "Kira Studio couldn't create its data folder.",
-			Advice: "Check that " + config.KiraHome() +
+			Headline: app + " couldn't create its data folder.",
+			Advice: "Check that " + info.home() +
 				" exists, is a folder you can write to, and that the disk isn't full.",
 			Detail: detail,
 		}
 	case StepLogging:
 		return Message{
 			Step: step, Expected: true,
-			Headline: "Kira Studio couldn't open its log folder.",
-			Advice: "Check that " + config.LogsDir() +
+			Headline: app + " couldn't open its log folder.",
+			Advice: "Check that " + info.logsDir() +
 				" exists, is a folder you can write to, and that the disk isn't full.",
 			Detail: detail,
 		}
@@ -102,42 +100,42 @@ func Classify(step Step, err error) Message {
 			found, known := tn.SchemaTooNew()
 			return Message{
 				Step: step, Expected: true,
-				Headline: "This copy of Kira Studio is older than your data.",
+				Headline: "This copy of " + app + " is older than your data.",
 				Advice: fmt.Sprintf(
-					"Your Kira Studio data is at format version %d; this copy (%s) understands up "+
-						"to %d. Open the newer version of Kira Studio, or update this one. Your "+
+					"Your %s data is at format version %d; this copy (%s) understands up "+
+						"to %d. Open the newer version of %s, or update this one. Your "+
 						"data has not been changed.",
-					found, buildinfo.Version, known,
+					app, found, info.Version, known, app,
 				),
 				Detail: detail,
 			}
 		}
 		return Message{
 			Step: step, Expected: true,
-			Headline: "Kira Studio couldn't open its database.",
-			Advice: "The database at " + config.DbPath() +
-				" may be damaged, unreadable, or in use by another copy of Kira Studio. Quit any " +
+			Headline: app + " couldn't open its database.",
+			Advice: "The database at " + info.dbPath() +
+				" may be damaged, unreadable, or in use by another copy of " + app + ". Quit any " +
 				"other copy and try again.",
 			Detail: detail,
 		}
 	case StepRepos:
-		return bugMessage(step, "Kira Studio couldn't prepare its database.", detail)
+		return bugMessage(step, app+" couldn't prepare its database.", detail)
 	case StepSettings:
-		return bugMessage(step, "Kira Studio couldn't read its settings.", detail)
+		return bugMessage(step, app+" couldn't read its settings.", detail)
 	case StepWindowList:
-		return bugMessage(step, "Kira Studio couldn't read its saved windows.", detail)
+		return bugMessage(step, app+" couldn't read its saved windows.", detail)
 	case StepWindowCreate:
 		return Message{
 			Step: step, Expected: true,
-			Headline: "Kira Studio couldn't save its window layout.",
-			Advice: "The disk may be full, or the database at " + config.DbPath() +
+			Headline: app + " couldn't save its window layout.",
+			Advice: "The disk may be full, or the database at " + info.dbPath() +
 				" may be read-only.",
 			Detail: detail,
 		}
 	case StepRun:
-		return bugMessage(step, "Kira Studio couldn't open its main window.", detail)
+		return bugMessage(step, app+" couldn't open its main window.", detail)
 	case StepPlatform:
-		return bugMessage(step, "Kira Studio couldn't start.", detail)
+		return bugMessage(step, app+" couldn't start.", detail)
 	}
-	return bugMessage(step, "Kira Studio couldn't start.", detail)
+	return bugMessage(step, app+" couldn't start.", detail)
 }
