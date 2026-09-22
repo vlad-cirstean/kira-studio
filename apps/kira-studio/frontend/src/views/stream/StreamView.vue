@@ -747,7 +747,7 @@ onUnmounted(() => {
         </div>
         <div class="filter-field">
           <div
-            class="flex items-center gap-1 w-full h-control-lg rounded-kira-sm border border-border-strong bg-input px-2"
+            class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-input px-2"
           >
             <span
               class="shrink-0 text-kira-xs"
@@ -822,7 +822,7 @@ onUnmounted(() => {
             <Tooltip :disabled="!timestampError">
               <TooltipTrigger as-child>
                 <div
-                  class="flex items-center gap-1 w-[160px] h-control-lg rounded-kira-sm border bg-input px-2"
+                  class="flex items-center gap-1 w-[160px] h-control rounded-kira-sm border bg-input px-2"
                   :class="timestampError ? 'border-error' : 'border-border-strong'"
                 >
                   <span

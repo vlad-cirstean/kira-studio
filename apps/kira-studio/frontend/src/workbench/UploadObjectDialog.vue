@@ -130,10 +130,10 @@ watch(
 
         <template v-if="chosenFile">
           <label class="p-sm muted p-0">Key</label>
-          <Input v-model="key" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-key" />
+          <Input v-model="key" class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-key" />
 
           <label class="p-sm muted p-0">Content type</label>
-          <Input v-model="contentType" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-content-type" />
+          <Input v-model="contentType" class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-content-type" />
         </template>
 
         <MessageStrip v-if="error" tone="err" data-testid="upload-error">{{ error }}</MessageStrip>

@@ -305,7 +305,7 @@ onMounted(() => {
       <template #strips>
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
           <div
-            class="flex items-center gap-1 w-full h-control-lg rounded-kira-sm border border-border-strong bg-input px-2"
+            class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-input px-2"
           >
             <CodiconIcon name="search" :size="13" class="shrink-0 text-fg-muted" />
             <Input

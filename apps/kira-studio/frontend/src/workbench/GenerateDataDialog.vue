@@ -234,7 +234,7 @@ function onSequenceStartChange(index: number, start: number): void {
         <Input
           :model-value="String(rowCount)"
           type="number"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
           data-testid="generate-data-row-count"
           :disabled="running"
           @update:model-value="(v) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
@@ -243,7 +243,7 @@ function onSequenceStartChange(index: number, start: number): void {
         <Input
           :model-value="String(seed)"
           type="number"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
           data-testid="generate-data-seed"
           :disabled="running"
           @update:model-value="(v) => (seed = Math.trunc(Number(v)) || 0)"
@@ -287,7 +287,7 @@ function onSequenceStartChange(index: number, start: number): void {
           <Input
             v-if="plan.recipe.kind === 'constant'"
             :model-value="plan.recipe.value"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             :data-testid="`generate-data-constant-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v) => onConstantChange(index, String(v))"
@@ -296,7 +296,7 @@ function onSequenceStartChange(index: number, start: number): void {
             v-else-if="plan.recipe.kind === 'sequence'"
             :model-value="String(plan.recipe.start)"
             type="number"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+            class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             :data-testid="`generate-data-sequence-start-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"

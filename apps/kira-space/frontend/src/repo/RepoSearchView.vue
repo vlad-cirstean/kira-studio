@@ -95,7 +95,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
         <Input
           :model-value="query"
           placeholder="Search"
-          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2"
+          class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2"
           data-testid="repo-search-query"
           :aria-invalid="!!error"
           @update:model-value="(v) => (query = String(v))"

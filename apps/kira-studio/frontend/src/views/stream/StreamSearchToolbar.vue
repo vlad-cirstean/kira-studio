@@ -102,7 +102,7 @@ onUnmounted(() => {
         ref="searchInput"
         :model-value="query"
         placeholder="Find"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
         data-testid="stream-search-input"
         @update:model-value="(v) => (query = String(v))"
       />
