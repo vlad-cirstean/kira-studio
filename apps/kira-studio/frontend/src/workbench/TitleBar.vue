@@ -86,6 +86,7 @@ const keepAwakeTooltip = computed(() => {
             class="title-action"
             :class="{ 'is-on': layoutStore.panel.project.visible }"
             data-testid="toggle-project-panel"
+            aria-label="Connections"
             @click="layoutStore.toggleProjectPanel"
           >
             <CodiconIcon
@@ -103,6 +104,7 @@ const keepAwakeTooltip = computed(() => {
             class="title-action"
             :class="{ 'is-on': layoutStore.panel.operations.visible }"
             data-testid="toggle-operations-panel"
+            aria-label="Operations"
             @click="layoutStore.toggleOperationsPanel"
           >
             <CodiconIcon

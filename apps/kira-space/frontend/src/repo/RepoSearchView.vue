@@ -112,6 +112,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
               size="kira-icon"
               :class="{ 'bg-input text-fg': options.caseSensitive }"
               data-testid="repo-search-case"
+              aria-label="Match case"
               @click="onToggleOption('caseSensitive')"
             >
               <CodiconIcon name="case-sensitive" :size="13" />
@@ -126,6 +127,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
               size="kira-icon"
               :class="{ 'bg-input text-fg': options.wholeWord }"
               data-testid="repo-search-whole-word"
+              aria-label="Whole word"
               @click="onToggleOption('wholeWord')"
             >
               <CodiconIcon name="whole-word" :size="13" />
@@ -140,6 +142,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
               size="kira-icon"
               :class="{ 'bg-input text-fg': options.regex }"
               data-testid="repo-search-regex"
+              aria-label="Regular expression"
               @click="onToggleOption('regex')"
             >
               <CodiconIcon name="regex" :size="13" />
@@ -154,6 +157,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
             variant="toolbar"
             size="kira-icon"
             data-testid="repo-search-stop"
+            aria-label="Stop"
             @click="repoSearchStore.cancelRepoSearch(repoId)"
           >
             <CodiconIcon name="debug-stop" :size="13" />
@@ -163,7 +167,13 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
       </Tooltip>
       <Tooltip v-else>
         <TooltipTrigger as-child>
-          <Button variant="toolbar" size="kira-icon" data-testid="repo-search-run" @click="runSearch">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            data-testid="repo-search-run"
+            aria-label="Search"
+            @click="runSearch"
+          >
             <CodiconIcon name="search" :size="13" />
           </Button>
         </TooltipTrigger>

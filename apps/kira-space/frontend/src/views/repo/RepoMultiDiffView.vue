@@ -133,6 +133,7 @@ onUnmounted(() => {
               variant="toolbar"
               size="kira-icon"
               data-testid="repo-multi-diff-toggle"
+              :aria-label="section.expanded ? 'Collapse' : 'Expand'"
               @click="toggle(section)"
             >
               <CodiconIcon :name="section.expanded ? 'chevron-down' : 'chevron-right'" :size="13" />

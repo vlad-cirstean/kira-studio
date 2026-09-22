@@ -24,6 +24,7 @@ const layoutStore = useLayoutStore();
             class="title-action"
             :class="{ 'is-on': layoutStore.panel.project.visible }"
             data-testid="toggle-project-panel"
+            aria-label="Repositories"
             @click="layoutStore.toggleProjectPanel"
           >
             <CodiconIcon
