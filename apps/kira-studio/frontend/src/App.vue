@@ -97,7 +97,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-frame">
+  <!-- P1 C8: the frame TitleBar + WorkbenchShell now share — WorkbenchShell.vue's own root swapped
+       `height: 100%` for `flex: 1; min-height: 0` to match. -->
+  <div class="h-full flex flex-col">
     <TitleBar />
     <WorkbenchShell />
   </div>
@@ -115,13 +117,3 @@ onUnmounted(() => {
   <QuickOpen />
   <AppTooltip />
 </template>
-
-<style scoped>
-/* P1 C8: the frame TitleBar + WorkbenchShell now share — WorkbenchShell.vue's own root swapped
-   `height: 100%` for `flex: 1; min-height: 0` to match. */
-.app-frame {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-</style>

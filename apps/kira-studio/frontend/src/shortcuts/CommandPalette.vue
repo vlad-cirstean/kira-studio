@@ -92,55 +92,44 @@ function onKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .palette-backdrop {
-  position: fixed;
-  inset: 0;
   /* P28 D17(c): the dialog rung — the palette is a modal over the whole workbench, and this was
      a bare 100, the literal DialogFrame used to carry. Same relationship, named. */
+  @apply fixed inset-0 flex items-start justify-center pt-[120px] bg-black/30;
   z-index: var(--kira-z-dialog);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 120px;
-  background: rgba(0, 0, 0, 0.3);
 }
 
 .palette {
-  width: 420px;
-  max-height: 360px;
-  display: flex;
-  flex-direction: column;
+  @apply w-[420px] max-h-[360px] flex flex-col;
 }
 
 /* Command palette — Menus.html: one bordered p-input inset in its own padded
    row, then the list below a hairline, rather than a borderless full-bleed
    field. */
 .palette-input-pad {
-  flex-shrink: 0;
+  @apply shrink-0;
   padding: var(--kira-s-3);
 }
 
 .palette-input {
-  width: 100%;
+  @apply w-full;
 }
 
 .palette-list {
-  overflow-y: auto;
+  @apply overflow-y-auto flex flex-col gap-px;
   padding: var(--kira-s-2);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
   border-top: var(--kira-border-width) solid var(--kira-border);
 }
 
 .palette-item {
-  white-space: nowrap;
+  @apply whitespace-nowrap;
 }
 
 .palette-empty {
+  @apply flex items-center;
   height: var(--kira-h-sm);
-  display: flex;
-  align-items: center;
   padding: 0 var(--kira-s-3);
   font-size: var(--kira-t-md);
 }

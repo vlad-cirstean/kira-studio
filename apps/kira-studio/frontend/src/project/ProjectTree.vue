@@ -202,16 +202,14 @@ function onTreeKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .project-tree {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 .tree-body {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 /* Positioned relative to VirtualList's own zero-height .virtual-list-sticky (itself
@@ -219,18 +217,15 @@ function onTreeKeydown(e: KeyboardEvent): void {
    correctly without this component needing to know anything about the scrollport (P28 D2). A row
    here is opaque and full-width so it fully occludes whatever real row has scrolled up behind it. */
 .sticky-row {
-  position: absolute;
-  left: 0;
-  right: 0;
+  @apply absolute left-0 right-0 z-[1];
   background: var(--kira-bg);
-  z-index: 1;
 }
 
 /* P24 D34: reuses .p-strip.note (primitives.css) for padding/font-size/colour/background — this
    note sits at the bottom of the tree, so its divider flips to the top edge, opposite .p-strip's
    own default. */
 .search-incomplete-note {
+  @apply border-b-0;
   border-top: var(--kira-border-width) solid var(--kira-border);
-  border-bottom: none;
 }
 </style>
