@@ -135,14 +135,6 @@ export const IPC = {
   collectionsSaveGrpcRequest: 'kira:collections:saveGrpcRequest',
   collectionsCreateGrpcItem: 'kira:collections:createGrpcItem',
 
-  gitClientsList: 'kira:git:clients:list',
-  gitClientsRevoke: 'kira:git:clients:revoke',
-  gitPairingPending: 'kira:git:pairing:pending',
-  gitPairingApprove: 'kira:git:pairing:approve',
-  gitPairingDeny: 'kira:git:pairing:deny',
-  gitVsixStatus: 'kira:git:vsix:status',
-  gitVsixInstall: 'kira:git:vsix:install',
-
   dbMcpStatus: 'kira:dbmcp:status',
   dbMcpSetEnabled: 'kira:dbmcp:setEnabled',
   dbMcpRegenerate: 'kira:dbmcp:regenerate',
@@ -204,8 +196,6 @@ export const IPC = {
   schemaChanged: 'kira:schema:changed',
   opUpdate: 'kira:op:update',
   appMetrics: 'kira:app:metrics',
-  gitPairing: 'kira:git:pairing',
-  gitClientsChanged: 'kira:git:clients',
   dbMcpApproval: 'kira:dbmcp:approval',
   // P83 §3.2: one terminal's coalesced output and its exit, EmitTo'd to one window — codeSearch's
   // own shape, restated for a byte payload. No FQN_SUFFIX_BY_IPC_KEY entry (it's a push channel,

@@ -42,18 +42,18 @@ No dependency was added for this — the library survey (`docs/v1.6/plans/P60b-s
 | Validation | Zod (TypeScript side) / hand-written model decoders (Go side) | Zod's remaining TypeScript-side job is connection-dialog input — the engine wire protocol it used to guard (`src/engine/{control,rpc,data,stdio-main}.ts`) went with `src/engine/`'s deletion (P58f). Rows read back out of SQLite are validated in Go (`apps/kira-studio/internal/storage/model/`) |
 | Lint + format | Biome (TS/Vue, incl. its `performance` rule group as of P94 pass 1 and `complexity/noExcessiveCognitiveComplexity` at `maxAllowedComplexity: 30` as of P94 pass 3), `golangci-lint` (Go — `bodyclose`, `copyloopvar`, `gocognit`, `gocritic`'s performance tag, `gocyclo`, `govet`, `ineffassign`, `makezero`, `prealloc`, `unconvert`, `unused`; `gocognit`/`gocyclo` at `min-complexity: 30` as of P94 pass 2), `knip` (TS/Vue dead files/dependencies/duplicate exports, plus unused exports/types/binaries as of P94 pass 3) | Biome for TS/Vue formatting stays the single tool there, no ESLint/Prettier; the other two are pre-push-hook/CI-only (`.githooks/pre-push`, `docs/DEV_ENVIRONMENT.md`), not per-commit |
 | Storage | SQLite at `~/.kira-studio/kira.db`, accessed **from Go** | `database/sql` + `modernc.org/sqlite` (pure-Go, no cgo — the same driver the sqlite adapter package already used for browsing external files, now also backing the app's own database); `SetMaxOpenConns(1)`. No ORM — the Drizzle dependency and every consumer of it are gone |
-| Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no auto-update, no notarization; no `runtime/` tree to vendor or sign any more (P58f). The `.dmg` also carries `Contents/Resources/kira-version.vsix` (the packaged VS Code extension, `@vscode/vsce`, G10) — copied in before the ad-hoc sign so the signature covers it — installed from the *Connected editors* pane's own "Install VS Code Integration" button (`internal/gitvsix`), which shells out to `code --install-extension` or falls back to revealing the file in Finder |
+| Packaging | `wails3 task darwin:package:dmg` + `scripts/sign-bundle.sh` | ad-hoc signed (identity `-`), both the `.app` and the `.dmg` around it; ships as a styled disk image with an `/Applications` shortcut (P10), no auto-update, no notarization; no `runtime/` tree to vendor or sign any more (P58f). **As of P100, this DMG carries no `.vsix` at all** — the packaged VS Code extension (`@vscode/vsce`, G10) and its "Install VS Code Integration" button (`internal/gitvsix`) both moved to Kira Space's own DMG, since the extension is Kira Space's frontend now, not a companion to this app |
 | DB tests | Testcontainers, driven from Bun | `packages/db-fixtures/` no longer holds per-engine specs (P58f D1) — it survives as the shared fixture corpus (`fixtures/*.sql`, `support/*.ts`) that Go's `testsupport` package and `apps/kira-studio/tests/e2e-real/` both seed from; real containers, real data; Colima |
 | UI tests | Playwright against the built bundle, real WebKit | every change validated |
 | Logging | Go `log/slog` | a daily-rolling file under `~/.kira-studio/logs/`, mirroring the configuration `electron-log` used to hold — single log file, single source of truth |
 | Data/console grid rendering (P22 Pass B cutover; P30 §3 extended it) | `slickgrid@5.20.0`'s core engine (MIT, `6pac/SlickGrid`), core `SlickGrid` class only — no `SlickDataView`, no plugin, no `slickgrid-vue` | **the only grid engine** — `views/grid/DataGrid.vue`, `GridRow.vue` and `__kiraGridEngine` are gone (P22 Pass B). `views/grid/SlickGridHost.vue` hosts a data tab (full parity: sort, editor, selection ranges, FK/PK nav, clipboard — P67: a left-click on an outbound-FK cell's nav button now opens a read-only preview popover first (`views/grid/FkPreviewPopover.vue`, positioned via `theme/floatingPosition.ts`'s own point-anchored route, ContextMenu.vue's, not `PopoverPanel.vue`'s, since the nav button is imperative DOM with no Vue parent to render a sibling into; fetched with one tab-free, attribution-only `data.read`, `views/grid/fkPreview.ts`), whose own two actions are `Open in new tab` (P7's unchanged `navigateForeignKey` jump, one click further in) and `Edit this record` (`editReferencedRow`, `views/grid/menu.ts` — opens a new, pre-filtered tab on the referenced table and lands the caret on its first non-key column in edit mode via a pending-focus handshake, `views/grid/focusRequest.ts`, ported from `views/repo/reveal.ts`'s own pattern; routes into that ordinary data tab because it already *is* the edit surface — no second editor exists); a multi-candidate click still opens the same right-click ContextMenu, each item now opening the preview for its own edge rather than navigating directly. The PK-side "Referenced by" button/submenu is untouched — it names tables, plural, with no single record to preview); `views/console/ConsoleSlickGrid.vue` hosts the query console's tabular results (P30 §3) over the same reusable layer, ~300 lines instead of a second 2000+-line host: `views/shared/slick/kiraSlickGrid.ts` (the tuned scroll/runway/chase mechanism, inherited unmodified), `views/shared/slick/dataSource.ts` (the `CustomDataView` bridge; its data-tab-specific half, `createDisplayValueExtractor`/`pendingRowClasses`, stays in `views/grid/slick/dataSource.ts`, which re-exports the rest), `views/shared/slick/slickTheme.css`, `views/shared/page/columns.ts` and `theme/cellClass.ts`. The console host has no selection-range model, sort, editor, context menu, clipboard, FK nav or persisted column widths — a console result has none of what those exist to serve. `@tanstack/vue-virtual` is no longer a dependency (P30 §3.6 C7) |
 | Outbound HTTP client (P2, body modes P3, request timeline P10) | plain `net/http` (`apps/kira-studio/internal/httpclient/`), **no client/retry/URL-parsing/multipart-builder dependency at all** | the same "no driver dependency" shape the ClickHouse adapter already established (below): one package-level `*http.Client`, a 30s timeout applied via `context.WithTimeout` rather than `Client.Timeout` (so the Stop button and a timeout abort an in-flight body read the same way), redirects followed and every hop recorded up to 10, TLS verification always on, `http.ProxyFromEnvironment`. Reachable only from Go — the webview's own `fetch` is never used (`docs/ARCHITECTURE.md`'s own "Go owns the network" invariant, below). P3 adds every body mode this app's request builder supports — none/raw/code/urlencoded/formdata/file (`internal/httpclient/body.go`) — over the same one dependency-free package: a two-pass `mime/multipart` writer computes an *exact* `Content-Length` from a fixed boundary's deterministic framing before streaming a single byte, so a form-data or binary send is never chunked and never guesses. P10 adds one `net/http/httptrace.ClientTrace`, stdlib, installed once per send: every redirect hop's own DNS/connect/TLS/wait/download phases, bucketed by the same `checkRedirect` that already threads `Response.Redirects` through (below) |
 | Outbound gRPC client (P11) | `google.golang.org/grpc` + `google.golang.org/protobuf` (`dynamicpb`/`protojson`/`protodesc`/`protoregistry`, grpc-go's own reflection client) + `bufbuild/protocompile`, all in `apps/kira-studio/internal/grpcclient/` — **no generated `.pb.go` code, no `protoc`/`buf` build step** | dynamic, schema-at-runtime: a method is discovered via server reflection or a supplied `.proto` (compiled by `protocompile`, the same compiler `buf` uses, with no codegen), then called through `dynamicpb`/`protojson` against a descriptor `grpc.NewClient` never needed ahead of time. Unary and server-streaming only — client- and bidi-streaming are out of scope. The largest single dependency this app has taken, **≈14.2 MB** of binary (measured `linux/amd64`, no flags) — the *same order* as `pgx` + `mongo-driver/v2` + both AWS SDK clients + `franz-go` combined (≈13.5 MB), in a binary that already links ten database adapters. Every descriptor source (a reflection round-trip, a compiled `.proto`) gets its **own** private `*protoregistry.Files` — never `protoregistry.GlobalFiles`, which panics outright on a duplicate file path, a realistic outcome for two users' `.proto` files both declaring the same `package` |
-| Git module transport (v1.3) | A Unix domain socket plus `internal/bridge/rpcstream`'s correlated-RPC-with-credits protocol — JSON control frames, FlatBuffers bulk payloads (`"KIG1"`) | The git module is **headless**: the backend is in this binary, the frontend is a separately-installed VS Code extension (`apps/kira-studio-vscode`) reached over `${KIRA_HOME}/git.sock`. **The transport itself took no new runtime dependency** — `net` and `encoding/json` plus the FlatBuffers runtimes P11 already put in the graph. What the module *did* add: `github.com/fsnotify/fsevents` (the darwin repo watcher, `darwin && cgo`, G9), `golang.org/x/text/unicode/norm` (NFC path normalization, G27), and `@vscode/vsce` as a build-time-only packager. See the Git module section below |
+| Git module transport (v1.3) | Moved to Kira Space in its entirety as of v1.9 P100 — this is no longer part of Kira Studio's own stack. See "Git module" below for the current, Kira-Space-scoped description |
 | MCP server (M1; the repo-map MCP server this row used to also cover was removed in v1.9 P97) | `github.com/modelcontextprotocol/go-sdk` (Apache-2.0, MIT for un-relicensed contributions), v1.7.0, over the SDK's own **Streamable HTTP** transport, not stdio | The protocol org's own reference implementation, at a stable v1 — the axis that matters for a wire format that keeps moving; `mark3labs/mcp-go` (MIT, real and widely used, but the second implementation, not the reference one) and hand-rolling JSON-RPC framing were both declined (`CLAUDE.md`'s library-first rule finds nothing hand-rolling would earn its keep against here — stdio framing, initialize/capabilities, tool listing, cancellation and schema validation are exactly what the SDK already does). Streamable HTTP, not the SDK's own stdio transport, because the server is one long-running process serving as many concurrent clients/tool calls as connect (`internal/dbmcp`), never a process spawned fresh per client; the SDK's own `auth.RequireBearerToken` middleware gates every request, reused rather than hand-rolled for the same reason. `mcp.AddTool[In, Out]` derives each tool's input schema from a Go struct's own tags, so every tool's schema has exactly one source. The original **+12.38 MB** (`linux/amd64`, unstripped) binary-size measurement at C3 covered `internal/repomap`, `internal/mcpauth`, `internal/mcpinstall` and the SDK's own dependency graph (`golang.org/x/oauth2`, `google/jsonschema-go`, `segmentio/encoding`, `yosida95/uritemplate`, `golang-jwt/jwt`) together; it is now historical, since `internal/repomap` is gone and `internal/dbmcp` (M1) was always app code on top of the same already-linked SDK graph, not a separate cost of its own — not re-measured for that reason |
 | Native file viewer + diff (C5/C6) | `monaco-editor` (MIT, pinned 0.56.0), npm | Added to the root `package.json`'s `dependencies`, beside `slickgrid` — the precedent for a bundled runtime UI library. **Read-only in the native code workspace specifically** (C5/C6's own repo file viewer and diff tabs stay viewer-only) — P60a (v1.6) reuses this same dependency for every other studio/api editor surface, most of them genuinely editable (the request/message body editors, the cell editor, the bulk variables editor), so "Monaco = read-only" is a C5/C6-local fact about the repo workspace, not a property of the dependency itself; see the Stack table's own "Text editing / viewing" row. Reached through `edcore.main.js`'s modern equivalent in this pinned version — the package restructured its internal layout entirely since the plan researching C5 was written (no `edcore.main.js` exists any more; `monaco-editor/features/register.all.js` is upstream's own "every standard contribution, no language service, no worker" bundle, verified against the source) — never the package root (`editor.main.js`, which still pulls in all four language *services* and every one of ~180 language grammars eagerly). Exactly one worker ships (`editor.worker`, backing `IEditorWorkerService`); C5 shipped the chunk and confirmed it exists in `dist/assets`, and **C6's diff editor (`mod.editor.createDiffEditor`, `hideUnchangedRegions.enabled`/`renderSideBySide` both on, `renderMarginRevertIcon`/`renderGutterMenu` both off) is its first real consumer** — the diff contribution was already inside `register.all.js`, so the Monaco chunk is unchanged by C6 (measured, `bun run build`: `monacoEntry-*.js` 3.81 MB raw / 972 KB gzip and `editor.worker-*.js` 300 KB raw, identical to C5's own recorded figures). All 84 basic languages Monaco ships get a registered Monarch grammar as of P67c (`views/repo/monacoEntry.ts`'s own `register.all.js` import, up from 19); `.json`/`.jsonc` color via Monaco's own worker-free JSON tokenizer, not the JavaScript grammar (Monaco ships no JSON basic-language in this version either); `.vue`/`.svelte` color as plain HTML (no grammar exists for either). See "Native code workspace (C5)" and "Diff tabs (C6)" below |
 | Quick open fuzzy matching (C9) | `fuzzysort` (MIT, pinned 4.0.2), npm, zero transitive dependencies | Added to the root `package.json`'s `dependencies`, statically imported (`repo/state/quickOpen.ts`) rather than behind Monaco's dynamic `import()` boundary — measured 8.4 KB gzip, not the ~972 KB payload that boundary exists for. Declined: the app's own substring filters (`CommandPalette.vue`, the tree's own name filter) are not fuzzy matchers at all; Monaco's own internal `fuzzyScorer.js` ships no typings for that module and no item-level (basename-vs-path) ranking on top of it. See "Quick open (C9)" below |
-| Git graph in the native workspace (C10) | The four `packages/*` workspaces the VS Code extension already used — `@kira/git-ui`, `@kira/git-ipc`, `@kira/git-core`, `@kira/kira-ui` — added to `apps/kira-studio/frontend/package.json` as `workspace:*`, plus `seti-icons` (a `git-ui` dependency) | No reimplementation and no new runtime dependency of its own: `git-ui` publishes `main: ./src/index.ts` and compiles from source the same way `@shared` does, so there is no separate build step, but its `.vue` files now typecheck under `typecheck:web` too. Statically imported (`RepoGraphView.vue`), not behind a dynamic `import()` boundary — the graph is the pinned first tab of every repo workspace, not an occasional feature — so its cost lands in the eager `index-*.js`/`index-*.css` bundle rather than a lazy chunk: measured (`bun run build`, this phase's own before/after), **+507 KB raw / +159 KB gzip** JS and **+72 KB raw / +11 KB gzip** CSS, plus one new `layout.worker-*.js` chunk (5 KB raw, git-ui's own graph lane-layout worker, loaded as a Worker script the same way `editor.worker` already is, so it carries no separate gzip line). The `monacoEntry-*.js` chunk (C5/C6) is untouched — Monaco's own dynamic-import boundary is unaffected. See "Git graph in the native workspace (C10)" below |
+| Git graph, native workspace (C10, historical) | Moved to Kira Space as of v1.9 P100 — `apps/kira-studio/frontend/package.json` no longer depends on `@kira/git-ui`/`@kira/git-ipc`/`@kira/git-core`/`@kira/kira-ui`/`seti-icons`, and the bundle-size deltas this row used to record no longer apply to this binary. See "Git graph in the native workspace (C10)" below, now describing Kira Space's own frontend |
 
 Driver libraries — the best-maintained option per engine, **Go-native for all ten kinds as of P58e
 M9.3** (checkpoint C2): `jackc/pgx/v5` (postgres), `go-sql-driver/mysql` (mariadb/mysql, via a shared
@@ -452,9 +452,11 @@ connection-flow change out of scope for this pass.
 
 ## Storage
 
-`~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`), `logs/`, the git module's own
-`review.db`, `git.sock`/`git.sock.lock`, and the DB MCP server's own token `mcp-db-token.json` (one
-per `KIRA_HOME`, no slug) — each covered in its own paragraph below.
+`~/.kira-studio/` (dir `0700`), containing `kira.db` (`0600`), `logs/`, and the DB MCP server's own
+token `mcp-db-token.json` (one per `KIRA_HOME`, no slug) — each covered in its own paragraph below.
+**As of P100, this directory holds no git state at all**: `review.db`, `git.sock`/`git.sock.lock`
+moved to Kira Space's own `~/.kira-space/` under `KIRA_SPACE_HOME` (see the Git module section
+below).
 
 Credentials in the `connections` table's `password` column are **encrypted at rest** (P25), now from
 Go rather than through Electron's `safeStorage`. The design `safeStorage` used is kept deliberately,
@@ -609,14 +611,19 @@ windows(key, order, bounds_json)                        -- one row per workbench
 tabs(id, connection_id, path, kind, state_json, order, active, window_key, workspace_id)
                                                        -- session restore, window_key ON DELETE
                                                        -- CASCADE into windows. workspace_id (C5,
-                                                       -- migration 0018): NULL for every studio/api
-                                                       -- tab (unchanged since before this column
-                                                       -- existed), 'repo:<code_repos.id>' for one
-                                                       -- scoped to that repository's own workspace
-                                                       -- -- a key, not a row reference, so no FK;
-                                                       -- CodeReposRepo.Remove deletes that
-                                                       -- workspace's tab rows in the same
-                                                       -- transaction instead
+                                                       -- migration 0018) used to carry
+                                                       -- 'repo:<code_repos.id>' for a tab scoped to
+                                                       -- a repository's own workspace; as of P100's
+                                                       -- git-module extraction and its
+                                                       -- 0026_p100_drop_git_tables.sql, code_repos
+                                                       -- is gone from this DB and every remaining
+                                                       -- row parses as workspace_id IS NULL -- the
+                                                       -- column itself was kept rather than dropped
+                                                       -- (no behavioural gain from rewriting the
+                                                       -- whole table, and NormalizeMode already
+                                                       -- degrades an unrecognised value the same
+                                                       -- way), so a pre-P100 DB needs no migration
+                                                       -- of its own here
 api_collections(id, name, sort_order, origin_json, variables_promoted,
                  created_at, updated_at)                -- P4; variables_promoted added P5
 api_items(id, collection_id, parent_id, kind, name, sort_order, method, url, protocol,
@@ -655,39 +662,14 @@ grpc_call_history(id, item_id, tab_id, scope_key, called_at, target, method, str
                                                        -- row per *completed* call — unary or
                                                        -- streaming, cancelled-with-partial-
                                                        -- messages counts as completed (D11)
-git_clients(id, label, token_hash, token_salt, created_at, last_seen_at, revoked_at)
-                                                       -- G1; the paired VS Code editors' trust
-                                                       -- store. Only sha256(salt||token) is ever
-                                                       -- stored, never the plaintext. Revoke sets
-                                                       -- revoked_at; a re-pair clears it on the
-                                                       -- same row, so rows are never deleted.
-                                                       -- Timestamps are epoch-millisecond
-                                                       -- integers rather than this schema's usual
-                                                       -- ISO TEXT -- a new table with no prior
-                                                       -- rows anywhere to stay consistent with
-git_repo_settings(repo_id, key, value)                  -- G18; per-(repository, leaf) display
-                                                       -- settings, shaped like `settings`' own
-                                                       -- per-leaf-row pattern plus a repo_id
-                                                       -- column -- one row per leaf, never a blob
-                                                       -- per repository. repo_id = '' is the
-                                                       -- reserved "not scoped to any repository"
-                                                       -- sentinel (a real RepoID can never be
-                                                       -- empty), so the one non-per-repo key
-                                                       -- needs no schema change
-code_repos(id, name, root, repo_id, sort_order, created_at, mcp_enabled)  -- C5, migration 0018;
-                                                       -- a repo entry imported into the native code
-                                                       -- workspace -- a parallel list to
-                                                       -- `connections`, never an extension of it (a
-                                                       -- repository needs none of that table's other
-                                                       -- fields). repo_id (gitclient's own identity,
-                                                       -- UNIQUE) is what tabs.workspace_id's
-                                                       -- 'repo:<id>' values key off this table's own
-                                                       -- `id`, not repo_id itself. mcp_enabled (P67d,
-                                                       -- migration 0019): 0/1, this repository's own
-                                                       -- MCP access grant -- default 0, so nothing is
-                                                       -- shared with an MCP client until a user grants
-                                                       -- it explicitly
 ```
+
+**`git_clients`, `git_repo_settings` and `code_repos` lived here through P99** — the paired VS Code
+editors' trust store (G1), per-(repository, leaf) display settings (G18), and the native code
+workspace's own repo entry list (C5, migration 0018) respectively. **P100 dropped all three**
+(`0026_p100_drop_git_tables.sql`) as part of extracting the whole git module into Kira Space, a
+separate app with its own `kira.db` and its own copies of these tables under its own migration
+sequence (`apps/kira-space/internal/storage/migrations/`) — see the Git module section below.
 
 `kira.db` is at migration **0023** as of M5: `0020` added `connections.mcp_enabled`
 (deny-by-default MCP exposure); `0021` added the three independent permission columns
@@ -695,7 +677,9 @@ code_repos(id, name, root, repo_id, sort_order, created_at, mcp_enabled)  -- C5,
 `mcp_auto_explain` (auto-force-EXPLAIN on `run_query`); `0023` created `connection_mask_rules` and
 added `connections.mask_correlation_key`. Prior high-water mark: migration **0019** as of P67d
 (`0019_p67d_repo_map_access.sql`) — `code_repos.mcp_enabled` on top of C5's `code_repos` plus
-`tabs.workspace_id` (above).
+`tabs.workspace_id` (above). Current high-water mark is **0026** (`0024_p85_custom_scripts.sql`,
+`0025_p97_drop_repo_map.sql`, `0026_p100_drop_git_tables.sql` — the last one is this phase's own,
+above).
 
 Migrations are forward-only numbered SQL files (`apps/kira-studio/internal/storage/migrations/`) applied on
 startup. Table access is hand-written `database/sql` in `apps/kira-studio/internal/storage/repos/` — there is
@@ -880,8 +864,10 @@ wondering what still consumes it. The same judgement applies to `ui_layout`'s ow
 leaf: P8's `0002_p8_windows.sql` seeds the first `windows` row from it and then leaves the
 now-inert leaf row in place rather than deleting it.
 
-**A second SQLite file, `review.db`, deliberately not a table in `kira.db` (G11/G13).** The git
-module's incremental-review state lives in its own file under `${KIRA_HOME}`, because its lifecycle
+**A second SQLite file, `review.db`, deliberately not a table in `kira.db` (G11/G13) — as of P100,
+this is Kira Space's own file, not Kira Studio's; kept here since the reasoning is unchanged from
+before the split.** The git module's incremental-review state lives in its own file under
+`${KIRA_SPACE_HOME}`, because its lifecycle
 is nothing like the rest of the app's data: bulk blob content, and TTL purges that want to reclaim
 space aggressively without holding a lock on the main database while they do it. Construction is
 free — the file is neither created nor opened until the first request that actually needs one, so
@@ -898,12 +884,28 @@ window starts clean, by design rather than as an error case.
 
 ### The native code workspace (C5-C9)
 
+**As of P100, this whole subsection describes Kira Space, not Kira Studio.** C5-C9 built the
+native code/git workspace (repo import, tab isolation, project tree, Monaco viewer, diff tabs,
+search, markdown reading) inside what was then Kira Studio's own Wails window, as one `AppMode`
+beside `studio`/`api` (P67b, below). P100 extracted the whole feature — Go's
+`internal/codeworkspace` and its own `internal/pathsafe` dependents, plus the frontend's
+`views/repo/*`/`repo/*` trees — into Kira Space, a separate standalone app with no `studio`/`api`
+sibling modules of its own (Kira Space's `WorkbenchShell.vue`: "this app has exactly one module").
+The port kept the identical relative paths (`views/repo/RepoFileView.vue` is the same path under
+`apps/kira-space/frontend/src` it was under `apps/kira-studio/frontend/src`), so every claim below
+about *what* this feature does and *how* it is built stays accurate; only the *hosting app* changed
+— read every unqualified "this app"/"the app" below as Kira Space, not Kira Studio. Kira Studio
+itself has none of this any more — no repo import, no project tree, no diff tabs, no code search —
+confirmed by the phase-closing audit's own grep, below.
+
 **Native code workspace (C5): repo import, tab isolation, project tree, Monaco viewer — read-only
 throughout.** Import a git repository and click it to open it as its own independent workspace: its
-own tab set, never interleaved with another open repo's or with studio/api's shared strip. **P67b:**
+own tab set, never interleaved with another open repo's or with studio/api's shared strip (as it
+was through P100 — see the note above for what changed since). **P67b:**
 the repo list itself lives in `repo/GitPanel.vue` — the Git module's own left panel — not in
-`ProjectPanel.vue` (Studio's), which C5 originally placed it in; see "Git module (v1.3)" below for
-the nav-level reason (a repository is an instance inside the Git module, not a sibling of it).
+`ProjectPanel.vue` (Studio's, when this ran inside Kira Studio), which C5 originally placed it in;
+see "Git module (v1.3)" below for the nav-level reason (a repository is an instance inside the Git
+module, not a sibling of it).
 
 - **Tab isolation is a new orthogonal *workspace* dimension, not a new `AppMode`.** Two open
   repositories share the exact same two tab kinds (`repo-graph`, `repo-file`), which a mode-per-kind
@@ -1253,11 +1255,16 @@ cap did not, and the column that can hold arbitrary user text had no ceiling at 
 | `api_response_history` | sends | 256 KiB/body, 30/scope, 128 MiB table, orphan sweep at launch |
 | `grpc_call_history` | calls | 64 KiB/msg, 100 msgs/entry, 30/scope, 32 MiB table, orphan sweep |
 | `op_log` | every DB operation | 30 days, 20,000 rows, **64 KiB command + 8 KiB error**, **32 MiB table** |
-| `git_clients` | pairings | one row per paired editor identity, ever; written only by an explicit human approval, never by machinery |
-| `git_repo_settings` | user action | a closed key set times the repositories a user has actually opened settings on |
 | the file itself | — | **`auto_vacuum=INCREMENTAL` on new databases + a startup `incremental_vacuum` above 16 MiB of freelist** |
 | `kira.db-wal` | one transaction | **`journal_size_limit` = 4 MiB** |
 | `logs/` | one file per day | 30 days by mtime (`logging.Sweep`) |
+
+**`git_clients` and `git_repo_settings` were both in this table as of P23** (bounded the same way:
+`git_clients` by "written only by an explicit human approval, never by machinery", `git_repo_settings`
+by "a closed key set times the repositories a user has actually opened settings on") — both are gone
+from `kira.db` as of P100's `0026_p100_drop_git_tables.sql` (above), along with `code_repos`
+(unbounded-growth question moot for the same reason). Kira Space's own `kira.db` now carries the
+equivalent tables under its own growth-bound rules, not audited here.
 
 **The standard a new table has to meet, stated once so it does not have to be re-derived each
 time**: if a table's rows are written by *machinery* rather than by a person, it needs a count
@@ -1457,6 +1464,16 @@ comes from `TabRecord.workspaceId` instead (`workspaceKeyOf`), and `tabsState.ac
 `previewIdsByWorkspace` replaced the old per-mode-only maps. Nothing above changed in effect for
 studio/api: `workspaceId` is `null` for both, so `workspaceKeyOf` falls straight back to
 `TAB_KIND_MODE[kind]` and every one of these six functions is byte-identical for them.
+
+**As of P100, this `'repo'` scope has no live consumer inside Kira Studio itself.** `packages/shared/
+domain/tabs.ts` stays a genuinely cross-app package — Kira Space's own `apps/kira-space/frontend/src/
+state/tabs.ts` imports the identical `@shared/domain/tabs` module and is the scope's real user now,
+mapping its own `repo-graph`/`repo-file`/`repo-diff`/`repo-multi-diff` kinds onto it exactly as
+described above. Kira Studio's own `state/tabKinds.ts` keeps all four as guard entries
+(`unreachableTabKind(...)`), never a real mapping, and `packages/shared/domain/mode.ts`'s `AppMode`
+itself dropped `'git'` outright (now `'studio' | 'api' | 'terminal'`) — the type union needs `'repo'`
+as a sentinel distinct from `AppMode` only because the shared package still serves the app that
+actually uses it.
 
 **Incognito request tabs are a property of the tab system, not a subsystem (P71).** The flag is
 per-tab and in-memory only (`state/tabIncognito.ts`'s `incognitoState.ids`), exactly like
@@ -2209,9 +2226,11 @@ should be re-evaluated.
 ## Process model
 
 Two processes for the Studio and Api modules: the **webview** running the Vue renderer, and the
-**Go shell** owning the window, all app state, and now every database driver too. The git module
-adds a third this app does not own — a separately-installed VS Code extension host, reached
-over a Unix socket rather than through either of the two planes below (see Git module, above).
+**Go shell** owning the window, all app state, and now every database driver too. **As of P100,
+this is the whole of Kira Studio's own process model** — the git module (and its own third process,
+a separately-installed VS Code extension host reached over a Unix socket) moved out entirely into
+Kira Space, a separate app with its own identical two-process shape plus that same third one (see
+Git module, above).
 
 ```
 ┌──────────────────────┐
@@ -2247,8 +2266,9 @@ it converts "the app disappears" into "one operation failed" for the panics it c
 and no per-connection Go process exists either — the adapter host multiplexes every open
 connection through its own registry and cache regardless of how many are open at once.
 
-**Keep-awake is a fourth short-lived child process the Go shell can spawn**, beside
-`internal/startupfail`'s `osascript`/`pbcopy` and `internal/gitvsix`'s `code` (P87). `internal/
+**Keep-awake is a short-lived child process the Go shell can spawn**, beside
+`internal/startupfail`'s `osascript`/`pbcopy` (`internal/gitvsix`'s `code` spawn moved to Kira
+Space with the rest of the git module, v1.9 P100 — this binary no longer has it, P87). `internal/
 keepawake` composes two independent, level-shaped reasons — the titlebar toggle and
 `claudeCode.keepAwakeWithAgents` being on while at least one Claude Code session is live — onto one
 `Controller`, a set of held reasons rather than a refcount (a refcount double-acquires the moment
@@ -2399,19 +2419,28 @@ made a real candidate worth re-weighing, and adopted FlatBuffers:
   `docs/v1.1/plans/P11-flatbuffers-data-plane.md` (current).
 
 **The Go side is `apps/kira-studio/`.** `apps/kira-studio/main.go` builds the `application.New`
-options, registers **twenty-two** bound services under `apps/kira-studio/internal/bridge/`.
-Thirteen are Studio's and the shell's — `AppService`, `SettingsService`, `LayoutService`,
-`TabsService`, `WindowsService` (P8: a page's own boot-time window registration, see Process
-model's multi-window subsection below), `ConnectionsService`, `TreeService`, `EngineService`,
-`OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService` (P18: the
-per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL language service
-described below). Seven are the Api module's — `HttpService` (P2: `Send`, the outbound HTTP path —
-see the op-log paragraph below and Stack, above), `GrpcService` (P11), `CollectionsService` and
-`VariablesService` (P4/P5), `ResponseHistoryService` (P8), `GrpcHistoryService` (P11), and
-`DataGripService` (P25's connection import). One is the git module's — `GitClientsService`, the
-*Connected editors* pane's whole surface (list, revoke, install the bundled `.vsix`), and the only
-bound service the headless git module has, since everything else it does crosses its own socket
-rather than the bindings (see Git module, above). `LifecycleService` is the twenty-second.
+options, registering **29** bound services under `apps/kira-studio/internal/bridge/`
+(`grep -c application.NewService apps/kira-studio/main.go`) — not the twenty-two this paragraph
+used to enumerate by name; several later phases each added their own service (M1's `DbMcpService`,
+`AgentHooksService`, `KeepAwakeService`, P83's `TerminalService`, P85's `CustomScriptsService`,
+P66's `UpdateService`/`LinkService`, and `MaskRulesService`) without folding back into this count —
+pre-existing staleness this phase found but did not fully re-audit, out of P100's own scope.
+Thirteen of the original twenty-two are Studio's and the shell's — `AppService`, `SettingsService`,
+`LayoutService`, `TabsService`, `WindowsService` (P8: a page's own boot-time window registration,
+see Process model's multi-window subsection below), `ConnectionsService`, `TreeService`,
+`EngineService`, `OpsService`, `FiltersService`, `FilesService`, `QueriesService`, `SchemaService`
+(P18: the per-connection DDL document store backing `connection_ddl` and the DDL-driven SQL
+language service described below). Seven are the Api module's — `HttpService` (P2: `Send`, the
+outbound HTTP path — see the op-log paragraph below and Stack, above), `GrpcService` (P11),
+`CollectionsService` and `VariablesService` (P4/P5), `ResponseHistoryService` (P8),
+`GrpcHistoryService` (P11), and `DataGripService` (P25's connection import). **One used to be the
+git module's — `GitClientsService`, gone as of P100.** It was the *Connected editors* pane's whole
+surface (list, revoke, install the bundled `.vsix`), and the only bound service the headless git
+module had, since everything else it did crossed its own socket rather than the bindings; that
+whole surface, and the service itself, moved to Kira Space along with the rest of the module (see
+Git module, above) — Kira Studio's `main.go` binds no git-related service of any kind any more,
+confirmed by the grep above and the phase-closing audit's own service-list check, below.
+`LifecycleService` was the twenty-second of the original count, still bound today.
 `EngineService.Status()` has
 zero renderer callers (the status pill reads the data-plane `ping` above, not this) but stays bound
 rather than deleted, since removing it would mean regenerating bindings and editing `control.ts` for
@@ -2555,42 +2584,32 @@ is unaffected — LAW 14 governs it, not this feature.
   validates nothing itself and macOS `open` will act on any scheme it recognises — `safeReleaseURL`
   is the only check that ever runs before a URL reaches it.
 
-## Git module (v1.3)
+## Git module (v1.3), Kira Space's own app as of P100
 
-The third top-level module, beside `studio` and `api`, and the one whose *backend* runs headless: the
-git logic lives in this Go binary, and the primary frontend is a separately-installed VS Code
-extension connecting as an external client. **As of C10, Kira Studio's own Wails window also mounts
-a second frontend onto the identical backend** — the pinned first tab of every repo workspace
-shows the same commit graph the VS Code extension does, over a second, in-process transport (see
-"Git graph in the native workspace (C10)" below). The window's other git-facing surfaces are
-unchanged: the Settings dialog's *Connected editors* pane (pairing, revocation, extension install)
-and its *Git* section (the two server-owned remote-op settings below) — both there because Kira
-Studio is the trust authority and owner of those settings. **As of P67e, the native mount is a
-writing git client**: it admits every operation that writes through git itself (fetch, pull, push,
-force-push, merge/rebase as pull strategies, undo, restack, stash, worktree add/remove, and the
-sequencer verbs a conflict needs to carry on) — the same surface any ordinary git GUI client
-offers, per the app owner's own request that read-only was "about modifying files", not about git
-operations themselves. What replaces "provably read-only" as the safety property is a two-way
-correspondence, not a blanket refusal: nothing the UI can reach fails at the allowlist layer, and
-nothing the allowlist admits has no reachable affordance (see below).
-
-**P67b: `git` is a peer `AppMode`, not a per-repo title-bar tab.** Before this phase, opening a
-repository added one extra tab to the title bar per open repository, beside the two module tabs
-(`Studio | Api | <repo> | <repo> | …`) — a repository (an instance) sat at the same level as a
-module. The title bar now reads exactly `Studio | Api | Git`, always three tabs: `AppMode` gained a
-third member, `'git'` (`packages/shared/domain/mode.ts`), and every open repository's own workspace
-lives *inside* it. The repo switcher — the row of open/importable repositories, a click opens or
-activates one — moved into `repo/GitPanel.vue`, the Git module's own left panel (mirroring
-`ProjectPanel.vue` for Studio and `api/CollectionsPanel.vue` for Api); `workspaceState.lastRepoKey`
-(session-only, not persisted) is what makes leaving Git for another module and clicking back on it
-return to the same repository, the same "return to where you were" property the old per-repo tabs
-gave for free. `moduleOfWorkspace(key)` (`packages/shared/domain/workspace.ts`) is the one-line
-map every repo `WorkspaceKey` folds onto `'git'` through — `WorkbenchShell.vue`/`MainView.vue` each
-dispatch on it alone now, with no `isRepoWorkspace` special case. `internal/storage/model/window.go`'s
-`validWindowModes` gained `"git"` as its third legal value; `windows.mode` needed no migration, since
-the column has always been unconstrained `TEXT` (only the Go-side allowlist narrows it), and
-`NormalizeMode` already falls back to `"studio"` for anything it doesn't recognise — an older binary
-reading a `'git'`-mode window degrades cleanly.
+**Kira Space, not Kira Studio, from here to the end of this section.** Through v1.3-v1.9 P99, git
+was the third top-level module of Kira Studio itself, beside `studio` and `api` — the paragraphs
+below describe exactly how that worked, and every technical claim in them (the transport, the
+session model, the Go packages, the extension, the native mount, code review, inline blame) is
+still true today. **P100 changed only *which app* it runs in and *what sits beside it*:** the whole
+module — every `internal/git*` Go package (plus `internal/ghclient`/`internal/codeworkspace`), the
+VS Code extension, and `packages/git-ui`/`packages/git-core`/`packages/git-ipc`/`packages/kira-ui`'s
+consumers — moved out of `apps/kira-studio` into `apps/kira-space`, a **separate, standalone macOS
+app** with its own binary, its own `~/.kira-space/` home (`KIRA_SPACE_HOME`), its own `kira.db` and
+`review.db`, and its own `git.sock`. Kira Space has **no `studio`/`api` sibling modules of its
+own** — its `WorkbenchShell.vue` says so directly ("this app has exactly one module"), so every
+"beside `studio` and `api`"/"peer `AppMode`"/"title bar reads `Studio | Api | Git`" claim below
+describes Kira Studio's history through P99, not Kira Space's present structure: **Kira Space's own
+window doesn't have a title-bar mode switcher at all — the repo workspace this section describes
+*is* the whole app**, mounted directly rather than living behind a `'git'` `AppMode` inside a
+bigger shell. Every "Kira Studio" below that means *this app, the one whose window hosts the git
+UI* now means Kira Space; every "Kira Studio" that means *the DB/API client, a different app
+entirely* (the Settings dialog's *Connected editors* pane and *Git* section, the trust authority,
+the pairing approval prompt) also now means Kira Space, for the same reason — Kira Studio itself
+holds none of this any more, confirmed by the phase-closing audit's own grep, below. The primary
+frontend is still a separately-installed VS Code extension (`apps/kira-space-vscode`, renamed from
+`apps/kira-studio-vscode` at P100 Part 3) connecting as an external client, dialing the same Unix
+socket the native window's own in-process stream also reaches (see "Git graph in the native
+workspace (C10)" below).
 
 **Why headless, structurally.** An in-process Wails stream is unreachable from another process, and
 the frontend this module wanted already existed as a VS Code extension. So the module was cut at a
@@ -2598,18 +2617,47 @@ transport seam instead of a UI one: `rpcstream`'s `Conn{Send([]byte) error; Rece
 error)}` is the whole of what the protocol needs from a channel, so the same `Handlers` serve a
 Unix socket today and would serve an in-process Wails stream unchanged. An embedded git UI is out
 of scope and stays additive rather than a rework — the same "additive, not a rework" shape the
-`-tags server` build tag already gives the `studio` data plane.
+`-tags server` build tag already gives the `studio` data plane. `-tags server` itself is a Wails v3
+platform facility (`pkg/application`), not per-app source (`docs/DEV_ENVIRONMENT.md`'s own "zero
+source changes" note) — Kira Space gets the identical `go build -tags server` substitute for free,
+verified booting the same way Kira Studio's own does (P100 Part 2's own verification).
+
+**P67b (historical, while this ran inside Kira Studio): `git` is a peer `AppMode`, not a per-repo
+title-bar tab.** Before P67b, opening a repository added one extra tab to the title bar per open
+repository, beside the two module tabs (`Studio | Api | <repo> | <repo> | …`) — a repository (an
+instance) sat at the same level as a module. The title bar then read exactly `Studio | Api | Git`,
+always three tabs: `AppMode` gained a third member, `'git'` (`packages/shared/domain/mode.ts`), and
+every open repository's own workspace lived *inside* it. The repo switcher — the row of
+open/importable repositories, a click opens or activates one — lived in `repo/GitPanel.vue`, the
+Git module's own left panel (mirroring `ProjectPanel.vue` for Studio and `api/CollectionsPanel.vue`
+for Api); `workspaceState.lastRepoKey` (session-only, not persisted) made leaving Git for another
+module and clicking back on it return to the same repository, the "return to where you were"
+property the old per-repo tabs gave for free. `moduleOfWorkspace(key)`
+(`packages/shared/domain/workspace.ts`) was the one-line map every repo `WorkspaceKey` folded onto
+`'git'` through — `WorkbenchShell.vue`/`MainView.vue` each dispatched on it alone, with no
+`isRepoWorkspace` special case. **As of P100, none of this exists in Kira Studio any more**:
+`AppMode` dropped `'git'` outright (`'studio' | 'api' | 'terminal'`, see UI architecture's own
+`TabScope` paragraph above), `WorkspaceKey` was deleted rather than trimmed (no repo-prefixed
+workspace can occur in this app again), and `internal/storage/model/window.go`'s
+`validWindowModes` dropped `"git"` as a legal value — a stored `git`-mode window degrades to
+`"studio"` through the same `NormalizeMode` fallback that already covered any unrecognised value,
+so no migration was needed. **Kira Space itself never had this peer-`AppMode` design at all**: it
+was built directly as a single-module app (per the note above), so P67b's whole mechanism is purely
+historical — a fact about how this feature evolved inside Kira Studio before it moved, not a
+description of Kira Space's own frontend.
 
 ### Transport
 
-**One Unix domain socket at `${KIRA_HOME}/git.sock`** (default `~/.kira-studio/git.sock`), mode
-0600, inside the 0700 directory `config.EnsureLayout` already owns. There is **no discovery or
-announce mechanism**: the extension dials the fixed path, and a connection failure means Kira
-Studio isn't running — that is the entire signal, with nothing further to distinguish. This
-app is macOS-only, so a Unix socket is unconditionally viable with no cross-platform fallback.
+**One Unix domain socket at `${KIRA_SPACE_HOME}/git.sock`** (default `~/.kira-space/git.sock`, its
+own separate home directory and env var as of P100 — never `KIRA_HOME`/`~/.kira-studio`, which is
+Kira Studio's own, unrelated home), mode 0600, inside the 0700 directory `config.EnsureLayout`
+already owns. There is **no discovery or announce mechanism**: the extension dials the fixed path,
+and a connection failure means Kira Space isn't running — that is the entire signal, with nothing
+further to distinguish. This app is macOS-only, so a Unix socket is unconditionally viable with no
+cross-platform fallback.
 
 **Stale-socket recovery is an `flock`, not a liveness probe.** At startup the app takes an
-exclusive lock on `${KIRA_HOME}/git.sock.lock`. Lock acquired: any `git.sock` still on disk is a
+exclusive lock on `${KIRA_SPACE_HOME}/git.sock.lock`. Lock acquired: any `git.sock` still on disk is a
 crash leftover — unlink it and listen. Lock already held: another instance is serving, and this one
 does not listen. Either way the app still boots; `main.go` logs the listener's error and never
 `Fatal`s on it. A `SIGKILL`ed instance's flock is released by the kernel, so the next launch
@@ -2619,7 +2667,7 @@ startup sweep, since it is inert.
 **Pairing is the auth model, and there is no pre-shared token file.** A client's `hello` carries
 its identity and, if it has one, an opaque token; the server answers `ready`, `versionMismatch`,
 `tokenRejected`, or `pairingRequired`. An unrecognised or invalid token raises an approval prompt
-**in Kira Studio's own window** — Kira Studio is the trust authority, not the requesting editor —
+**in Kira Space's own window** — Kira Space is the trust authority, not the requesting editor —
 one prompt on screen at a time with concurrent requests queued and counted, a 120 s window per
 request measured from enqueue (a request arriving before any window exists is *held*, not
 auto-denied), and a 60 s cooldown after an explicit denial so a reconnecting extension cannot
@@ -2635,10 +2683,11 @@ human approval always re-admits.
 
 **Version compatibility is hard lockstep, negotiated in that same handshake.**
 `gitrpc.ContractVersion` and `packages/git-ipc/src/validate.ts`'s `CONTRACT_VERSION` are one number
-(**30** today), asserted equal by tests on both sides, and it is the *sole* compatibility
-authority — not the app version, not a side file. A mismatch is a blocking panel in the extension
-naming both versions, never a degraded mode: this app has no auto-update and the extension installs
-separately, so "run an older method set" has no honest meaning here.
+(**40** today, since P100 Part 3's `kiraVersion.*` → `kiraSpace.*` wire-key rename bumped it from
+39), asserted equal by tests on both sides, and it is the *sole* compatibility authority — not the
+app version, not a side file. A mismatch is a blocking panel in the extension naming both versions,
+never a degraded mode: this app has no auto-update and the extension installs separately, so "run
+an older method set" has no honest meaning here.
 
 **Two frame shapes over that one socket — the same split the `studio` data plane already uses, not
 a second design.** Control frames (the whole `rpcstream` envelope, every request, and every small
@@ -2656,14 +2705,19 @@ rather than `gitWire.fbs` because `flatc`'s TypeScript generator names its entry
 filename and its barrel after the namespace, and two names differing only in case collide on a
 case-insensitive filesystem.
 
-**`internal/bridge/rpcstream` is module-agnostic infrastructure, and the one deliberate exception
-to the module-boundary rule.** It is a correlated-RPC-with-credits state machine —
+**`rpcstream` is module-agnostic infrastructure, and the one deliberate exception to the
+module-boundary rule.** It is a correlated-RPC-with-credits state machine —
 `req`/`res`/`evt`/`open`/`chunk`/`end`/`credit`/`cancel` in a versioned envelope, a
 delete-before-respond guard against a request racing its own cancellation, and an
 aborted-versus-real-error split on a stream's `end` — transcribed field-for-field from the
 TypeScript `rpc.ts` beside it, so its correctness is checkable by reading the two together rather
 than re-deriving the protocol. It never learns what a method means; that is entirely `Handlers`'
-job, which is what makes reuse by a second module free rather than a fork.
+job, which is what makes reuse by a second module free rather than a fork. **As of P100, it lives
+at repo-root `internal/rpcstream`**, not `apps/kira-studio/internal/bridge/rpcstream` — hoisted out
+alongside `ipcerr`/`notify`/`pathsafe` specifically because it needed to be importable by both
+`apps/kira-studio` and `apps/kira-space` at once (Go's `internal/` visibility rule blocks
+cross-app imports otherwise), the clearest possible confirmation that "module-agnostic" already
+meant "app-agnostic too," not just "agnostic across `studio`/`api`/`git` within one binary."
 
 ### Session model
 
@@ -2755,8 +2809,11 @@ properties at all**.
 
 ### Go packages
 
-Every git package is its own `internal/git*` (plus `internal/ghclient` and `internal/startupfail`),
-and no phase merged git code into a shared file where a per-module one would do.
+Every git package is its own `internal/git*` (plus `internal/ghclient`), and no phase merged git
+code into a shared file where a per-module one would do. `startupfail` is not a git package at all
+— it is repo-root shared infrastructure (P100 Part 1 hoisted it, above), reused by both apps' boot
+sequences; it is listed in the table below only because Kira Space's own boot depends on it, not
+because it belongs to this module.
 `internal/layering_test.go`'s `TestDomainPackagesDoNotImportBridge` covers them exactly as it
 covers the Studio and Api domain packages — no `internal/git*` package imports `internal/bridge`,
 none imports or is imported by an adapter package.
@@ -2773,15 +2830,15 @@ none imports or is imported by an adapter package.
 | `gitsearch` | The cancellable, time-boxed tail scan and the Go matcher, plus the RE2/`RegExp` dialect reconciliation (below) |
 | `gitreview` | `review.db`'s whole surface: compressed content snapshots, fast/slow-path diff selection, partial-review ranges, the flat AI-comment list, and the TTL reaper (Storage, above) |
 | `gitsession` | `Registry`, `RepoEntry`, `Conn`, `Walk` — the session model above. Imports `gitclient`, `gitpreflight`, `gitreview`, `ghclient` and stdlib only |
-| `gitrpc` | The method table (**56 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion`, and the wire types |
+| `gitrpc` | The method table (**51 request methods**, `app.init` through `stack.cancelRestack`, plus the one `graph.stream` stream method), `ContractVersion` (40 as of this chapter), and the wire types |
 | `gitsock` | The Unix listener, length-prefixed framing, the handshake, the pairing broker, the trust store and stale-socket recovery |
 | `gitwire` | Generated FlatBuffers code for the git data plane |
 | `gitaskpass` | The credential broker and its `GIT_ASKPASS` shim, over its own private socket, with a bounded wait |
 | `gitprepare` | The worktree prepare script's execution seam — the one shell exception, below |
-| `gitvsix` | Locating the `.vsix` bundled inside a packaged `Kira Studio.app` and installing it via `code --install-extension`, or revealing it in Finder when `code` isn't on `PATH` |
+| `gitvsix` | Locating the `.vsix` bundled inside a packaged `Kira Space.app` and installing it via `code --install-extension`, or revealing it in Finder when `code` isn't on `PATH` |
 | `ghclient` | `gh` CLI discovery and spawn discipline mirroring `gitclient`'s own `Locator`/probe/TTL-cache shape, a `GhStatus` classification, and PR lookup through `gh api` |
-| `startupfail` | Native, pre-window failure alerts for every boot step (below) |
-| `bridge/rpcstream` | The correlated-RPC-with-credits protocol (above) — module-agnostic by design |
+| `startupfail` (repo-root, shared — not a git package, see above) | Native, pre-window failure alerts for every boot step (below) |
+| `rpcstream` (repo-root, shared) | The correlated-RPC-with-credits protocol (above) — module-agnostic by design, hoisted out of `apps/kira-studio/internal/bridge` at P100 so both apps import it |
 | `bridge/gitclients.go` | `GitClientsService`, the bound Wails service behind the *Connected editors* pane |
 
 **One deliberate exception to argv-only spawning, and exactly one.** Every other spawn in this
@@ -2883,11 +2940,15 @@ surface with a working answer already.
 
 ### The extension and its packages
 
-`apps/kira-studio-vscode` is the whole frontend. It contributes a **Git Graph** webview in the
-panel and a **Kira Version** webview in the activity bar, **46 commands** (every mutating operation
+`apps/kira-space-vscode` (`apps/kira-studio-vscode` through P100 Part 3's rename) is the whole
+frontend. It contributes a **Git Graph** webview in the panel and a **Kira Space** webview in the
+activity bar (renamed from "Kira Version" at P100 Part 3, alongside the rest of the
+`kiraVersion.*` → `kiraSpace.*` sweep, below), **47 commands** (every mutating operation
 has one — the command-palette audit establishing this happens once, and each later phase
-registers its own), SCM-title / editor-title / editor-context / comment-thread menus, keybindings
-and colors, and — as above — **no configuration properties**. It reaches Go through
+registers its own; P100 Part 3's own re-count against the real manifest corrected an earlier
+estimate of 46/62 found stale at two different points in this repo's history — the real,
+JSON-parsed number is 47), SCM-title / editor-title / editor-context / comment-thread menus,
+keybindings and colors, and — as above — **no configuration properties**. It reaches Go through
 `packages/git-ipc`'s `socketChannel.ts`: `net.connect` plus length-prefixed framing behind the same
 `MessageChannelLike` seam a `webview.postMessage` channel satisfies, which is why swapping the
 transport was a channel change rather than a rewrite. A handful of host-capability calls — dialogs,
@@ -2934,20 +2995,29 @@ because one of its mechanisms is.
 pixels.** A shipped build once rendered the graph with a correct `aria-rowcount` while the panel
 was collapsed to roughly 75 px, because nothing in the emitted document or the bundled CSS ever
 gave `html`/`body`/`#app` a height, so the components' own `height: 100%` resolved to `auto`
-against an ancestor chain with none. `apps/kira-studio-vscode/tests/layout/` asserts **real
+against an ancestor chain with none. `apps/kira-space-vscode/tests/layout/` asserts **real
 rendered box height** via `getBoundingClientRect()` against the real emitted document and the real
 built bundle. DOM shape is exactly the kind of proxy that passes while the thing it stands for is
 broken — this tier exists because that happened.
 
-**The extension ships in the DMG, not through a marketplace.** `bun run package:vscode` produces
-`kira-version.vsix`; the packaging task copies it to `Contents/Resources/kira-version.vsix` before
-the ad-hoc signature is applied, so the signature covers it; and the *Connected editors* pane's
-*Install VS Code Integration* button shells out to `code --install-extension <path>` — argv-only,
-matching every other spawn in this module — with a reveal-in-Finder fallback when the `code` CLI
-isn't on `PATH`. The filename carries no version: the version lives inside the manifest, where
-`code` reads it.
+**The extension ships in Kira Space's own DMG, not through a marketplace.** `bun run
+package:vscode` produces `kira-space.vsix` (renamed from `kira-version.vsix` at P100 Part 3); the
+packaging task copies it to `Contents/Resources/kira-space.vsix` before the ad-hoc signature is
+applied, so the signature covers it; and the *Connected editors* pane's *Install VS Code
+Integration* button shells out to `code --install-extension <path>` — argv-only, matching every
+other spawn in this module — with a reveal-in-Finder fallback when the `code` CLI isn't on `PATH`.
+The filename carries no version: the version lives inside the manifest, where `code` reads it.
+**Kira Studio's own DMG carries no `.vsix` at all as of P100** — `apps/kira-studio/build/darwin/
+Taskfile.yml`'s copy-and-fail-loudly block, and `build:vsix`'s own dependency edge into it, were
+both removed at P100 Part 3, since the extension it used to bundle is Kira Space's now.
 
 ### Git graph in the native workspace (C10)
+
+**As of P100, this section describes Kira Space, not Kira Studio** — C10 built on the native code
+workspace (C5-C9, above), which the same phase moved out of Kira Studio in full. (One pre-existing,
+phase-unrelated naming drift: a few paragraphs below call the host component `RepoPanel.vue`; the
+file living under `apps/kira-space/frontend/src/repo/` today is `GitPanel.vue` — predates P100, out
+of this phase's own scope to chase further.)
 
 The pinned first tab of every repo workspace (`views/repo/RepoGraphView.vue`, reserved empty by C5)
 mounts `packages/git-ui`'s own graph — the identical Vue components the VS Code extension runs,
@@ -3094,6 +3164,8 @@ pseudo-element for the check mark. No markup change across the 9 dialogs.
 
 ### Code review, ported natively (C11)
 
+**As of P100, this section describes Kira Space, not Kira Studio** — same move as C10, above.
+
 C10's native graph left the review sidebar out — `review.open` had no native surface and
 `review.*` was absent from `gitstream.go`'s allowlist by design. C11 builds both, porting
 `git-ui`'s existing `components/review/*`/`state/review*.ts` unchanged (the SPEC requirement) and
@@ -3204,13 +3276,15 @@ built: a user writes plain-text comments on lines, they render as gutter icons a
 
 ### Git blame, inline (P62)
 
+**As of P100, this section describes Kira Space, not Kira Studio** — same move as C10/C11, above.
+
 **Reuses v1.4 P5's backend outright — no Go change, no contract bump for this phase.** `blame.line`
 (one line per `git blame` spawn, working tree only, no `atSha`) already answers the extension's
 status-bar widget; `views/repo/blameAnnotation.ts` calls the identical method over the identical
 wire. P62 itself bumped neither `ContractVersion` nor `gitstream.go`'s allowlist — the only Go
 touched by this phase at all is `internal/storage/{model,repos}/settings.go`, for the unrelated
-reason below. (Both moved later, for unrelated reasons: `ContractVersion` is 39 as of this chapter,
-and the allowlist gained `pr.browserUrl`, P74 §3.3.)
+reason below. (Both moved later, for unrelated reasons: `ContractVersion` was 39 as of this chapter
+— 40 as of P100, above — and the allowlist gained `pr.browserUrl`, P74 §3.3.)
 
 **Where it surfaces — the status bar shipped too, just not the way this paragraph used to expect.**
 The annotation renders as injected text at the end of the cursor's line in
@@ -3422,6 +3496,13 @@ permission except clipboard reads, set `JavaScriptCanOpenWindowsAutomatically` f
 | `grantFileProtocolExtraPrivileges` | **No subject, and the whole class with it.** Assets are no longer served over `file://` — `apps/kira-studio/main.go` embeds `frontend/dist` and serves it through a plain Go `http.Handler` (`AssetOptions.Handler`), so the `file://`-module-CORS trap that made this fuse mandatory does not exist. |
 | The three Electron fuses (`runAsNode` and friends) | **No subject.** There is no Electron binary to re-run as Node. |
 
+**As of P100, the next paragraph describes Kira Space's renderer, not Kira Studio's** —
+`packages/git-ui` moved there in full, and `apps/kira-studio/frontend` no longer depends on it at
+all. Kira Studio's own `LinkService`/`link.go` (below) is still bound (`main.go`), but with no
+git-ui commit-body link left to open, it currently has no live caller in Kira Studio's own
+frontend — a known, harmless leftover from the extraction, not a bug; removing the now-unused bind
+is left for a future pass rather than done here, out of this phase's own icon/docs/audit scope.
+
 **The `<a href>`/`window.open`/`target="_blank"` posture now extends to `packages/git-ui` too
 (P74 §3, P79 batch B).** That package used to be outside the `window.open` deny row's own scope.
 Every externally-openable link in the git UI is a `<button>` calling a host capability, never an
@@ -3487,12 +3568,30 @@ repo's CI runs.
 
 ## Testing
 
-Four suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`; a fifth under
-`apps/kira-studio-vscode/tests/` for the git webviews; plus the Go suite in `apps/kira-studio/`
-(`bun run test:go`). `packages/db-fixtures/` is a shared fixture corpus, not a suite of its own
-(see below). `ipc/` is the odd one out among the first four — it is two suites in one directory, a
-Go backend half and a Playwright frontend half per adapter, sharing one fixture module by design
-(P50, below).
+Four suites under `apps/kira-studio/tests/`: `unit/`, `ipc/`, `ui/`, `e2e-real/`; plus the Go suite
+in `apps/kira-studio/` (`bun run test:go`). `packages/db-fixtures/` is a shared fixture corpus, not
+a suite of its own (see below). `ipc/` is the odd one out among the first four — it is two suites in
+one directory, a Go backend half and a Playwright frontend half per adapter, sharing one fixture
+module by design (P50, below).
+
+**As of P100, Kira Space is a second, separate app with its own test tree, not a fifth suite
+alongside these four.** `apps/kira-space/tests/unit/` and `apps/kira-space/tests/ui/` (`bun run
+test:ui:space`) mirror Kira Studio's own `tests/unit/`/`tests/ui/` shape, running against Kira
+Space's own built bundle; `apps/kira-space/internal/` has its own Go suite too, covered by the same
+`bun run test:go` (it runs both apps' packages together — see below). `apps/kira-space-vscode/tests/` (renamed from `apps/kira-studio-vscode/tests/` at P100 Part 3) is
+the git module's own frontend tier, unchanged in shape by the move — full detail below. Kira Space has no
+`ipc/`/`e2e-real/` tier of its own: it has no database adapters to exercise the `ipc/` wire-boundary
+split against, and no real-container-per-engine coverage need to justify porting `e2e-real/`'s
+infrastructure (its own Go suite already builds real repositories under `t.TempDir()`, below) —
+**one exception, a real gap, not a design choice**: `git-pairing-real.spec.ts`, the one spec that
+proved pairing/token-reuse/revocation against a real `-tags server` binary and a real socket, was
+never ported when the rest of the module moved; it stayed behind in `apps/kira-studio/tests/e2e-real/`
+where it could no longer pass (no `gitsock` left in that binary to dial), so this phase deleted it
+rather than leave a broken spec in the tree. Porting a real `e2e-real/` tier for Kira Space — its own
+fixtures, a `playwright.config.ts` project, a `git-pairing-real.spec.ts` that dials Kira Space's own
+socket (the `-tags server` substitute itself needs no new work, above) — is real missing coverage,
+out of this phase's own icon/docs/audit scope; named here for a future phase rather than silently
+dropped.
 
 **Isolation from the dev server.** The container-backed and UI suites run against their own
 `KIRA_HOME` and their own Testcontainers-provisioned databases, never the developer's real
@@ -3660,11 +3759,11 @@ animations before capture; a small test-only stylesheet (`tests/visual/support/p
 loaded via `stylePath`, `ui`'s own specs unaffected) collapses `--kira-font-ui`/`--kira-font-data`
 to their trailing generic keyword, removing a multi-hop fontconfig fallback's own run-to-run
 ambiguity on the CI image. `docs/v1.4/plans/P6-visual-regression.md` is the full design record,
-including what's deliberately out of scope (the `apps/kira-studio-vscode` webview tier — no CI job
-runs it at all today, and its VS-Code-theme-following palette is a different baselining problem
-than this app's single hard-coded dark theme).
+including what's deliberately out of scope (the extension's webview tier, `apps/kira-space-vscode/
+tests/` as of P100's rename — no CI job runs it at all today, and its VS-Code-theme-following
+palette is a different baselining problem than this app's single hard-coded dark theme).
 
-**`apps/kira-studio-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
+**`apps/kira-space-vscode/tests/`** (`bun run test:webview`) is the git module's own frontend tier
 — Playwright against the extension's real emitted webview documents and its real built bundle, in
 two projects, with no VS Code, no backend and no container. `layout` asserts **rendered box
 heights** rather than DOM shape, for a specific reason recorded in the Git module section above: a
@@ -3673,7 +3772,8 @@ collapsed to roughly 75 px, and every existing check passed. `interaction` cover
 columns, the file tree, the review panel and the shared Floating-UI geometry.
 
 **The git module's Go coverage needs no container, and one part of it is opt-in.** Every
-`internal/git*` package builds real repositories under `t.TempDir()` against the `git` on `PATH`
+`internal/git*` package (`apps/kira-space/internal/git*` as of P100) builds real repositories under
+`t.TempDir()` against the `git` on `PATH`
 and self-skips without one (the app's own 2.38 floor applies to the tests too, so an older `git`
 skips more than it runs). `gitclient/porcelain` is guarded by a committed **golden-byte corpus** —
 recorded real `git` output, the same pattern `internal/postman`'s round-trip tests use — because a
@@ -3754,6 +3854,12 @@ place. `CLAUDE.md` states the process rule; this is the list itself.
   is called. So a genuinely first-ever launch still gets the unclamped 1280×800 default until the
   window is resized once. Fixing this needs deferring startup window creation until after that
   event fires — a materially larger structural change than this fix.
+
+**As of P100, every item from here through "No debounce on the quick-open palette's keystroke
+handler" below (including the Correctness: and Performance: subsections) describes Kira Space, not
+Kira Studio** — the native code workspace and git module both moved there in full, unchanged, so
+each limitation moved with the code it describes. Only the final item below (the dbmcp bearer
+token) is still Kira Studio's own.
 
 - **C5's native project tree does not follow the filesystem** (§7.1). It refreshes on workspace
   open and on an explicit Refresh action only — a file created, deleted or modified outside the app
@@ -3846,6 +3952,13 @@ Performance:
   debounce in C13-6, quick-open did not) — low severity, 20-35ms per keystroke measured even at the
   file-count cap.
 
+- **Kira Studio's own `LinkService`/`link.openExternal` bind has no live caller** (found during
+  P100 Part 4's docs sweep). `packages/git-ui`'s commit-body link opening was the only consumer;
+  it moved to Kira Space with the rest of the git module, and `frontend/src/bridge/index.ts`'s
+  `linkOpenExternal` wrapper is still exported with nothing calling it. Harmless — it is still a
+  well-formed, tested bound method, just unreachable from any UI — and removing the bind (Go
+  service, its `main.go` registration, the frontend wrapper) is left for a future pass rather than
+  attempted here, out of this phase's own icon/docs/audit scope.
 - **The dbmcp bearer token reaches `claude mcp add` in plaintext argv** (`internal/mcpinstall/
   install.go`'s `Install`/`Command`, M6 round-1 finding), visible to any other local process or
   user that can list argv (`ps`, `/proc/<pid>/cmdline`) for the short window the `claude mcp add`

@@ -385,9 +385,10 @@ type DbMcpApprovalArgs struct {
 	RequestID string `json:"requestId"`
 }
 
-// ApproveQuery and DenyQuery never return a Go error — a decision is a value (GitClientsService's
-// own precedent) — and return the current snapshot rather than an action-result enum, so the
-// clicking window updates immediately instead of waiting for its own broadcast to arrive.
+// ApproveQuery and DenyQuery never return a Go error — a decision is a value (Kira Space's own
+// GitClientsService.Approve/Deny set this precedent first) — and return the current snapshot
+// rather than an action-result enum, so the clicking window updates immediately instead of
+// waiting for its own broadcast to arrive.
 func (s *DbMcpService) ApproveQuery(args DbMcpApprovalArgs) (DbMcpApprovalSnapshot, error) {
 	if args.RequestID == "" {
 		return DbMcpApprovalSnapshot{}, ipcerr.BadRequest("requestId is required")

@@ -140,14 +140,6 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
   collectionsSaveGrpcRequest: 'CollectionsService.SaveGrpcRequest',
   collectionsCreateGrpcItem: 'CollectionsService.CreateGrpcItem',
 
-  gitClientsList: 'GitClientsService.List',
-  gitClientsRevoke: 'GitClientsService.Revoke',
-  gitPairingPending: 'GitClientsService.PendingPairing',
-  gitPairingApprove: 'GitClientsService.Approve',
-  gitPairingDeny: 'GitClientsService.Deny',
-  gitVsixStatus: 'GitClientsService.VsixStatus',
-  gitVsixInstall: 'GitClientsService.InstallVsCodeIntegration',
-
   dbMcpStatus: 'DbMcpService.Status',
   dbMcpSetEnabled: 'DbMcpService.SetEnabled',
   dbMcpRegenerate: 'DbMcpService.Regenerate',
@@ -324,31 +316,19 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // (C4), so "no history yet for a request never seen before" is the right default rather than a
   // fixture miss.
   [IPC.historyList]: '[]',
-  // G1: main.ts's bootstrap() awaits hydrateGitClients() alongside every other hydrate* call,
-  // unconditionally, on every boot — no committed fixture will ever snapshot these (nothing in
-  // tests/ui/ exercises pairing), so "no editors paired, nothing pending" is the same "correct
-  // empty answer for a spec with no fixture of its own" every other unawaited-by-a-spec boot call
-  // above already gets, not a fixture miss.
-  [IPC.gitClientsList]: '[]',
-  [IPC.gitPairingPending]: JSON.stringify({ pending: null, queued: 0 }),
-  // M2: hydrateDbMcpApprovals() joins the same unconditional-every-boot list as gitPairingPending
-  // just above, same reasoning — nothing in tests/ui/ exercises a prompt-mode approval queue, so
-  // "nothing pending" is the correct empty answer for a spec with no fixture of its own.
+  // M2: hydrateDbMcpApprovals() joins the same unconditional-every-boot Promise.all every other
+  // hydrate* call in main.ts's bootstrap() does — nothing in tests/ui/ exercises a prompt-mode
+  // approval queue, so "nothing pending" is the correct empty answer for a spec with no fixture of
+  // its own, the same reasoning every other unawaited-by-a-spec boot call above already gets.
+  //
+  // P100: the sibling git*/dbMcp entries this comment block used to cover (gitClientsList,
+  // gitPairingPending, gitVsixStatus) are gone -- hydrateGitClients() and the whole git module it
+  // hydrated moved to Kira Space; confirmed via grep, apps/kira-studio/frontend/src has no
+  // hydrateGitClients call left to answer for.
   [IPC.dbMcpPendingApprovals]: JSON.stringify({ pending: null, queued: 0 }),
-  // G10: hydrateGitClients() now also fetches VsixStatus on every boot — the same
-  // no-committed-fixture-will-ever-snapshot-this reasoning as the two entries above. "not
-  // bundled, code not found" is the honest default for a dev-server run under Playwright, which
-  // is never a packaged .app.
-  [IPC.gitVsixStatus]: JSON.stringify({
-    bundled: false,
-    vsixPath: '',
-    codeAvailable: false,
-    probed: [],
-    command: '',
-  }),
   // M1 §6.2: hydrateDbMcp() joins the same unconditional-every-boot Promise.all as
-  // gitVsixStatus above, same reasoning — nothing in tests/ui/ seeds a dbmcp fixture, so "off,
-  // nothing running" is the honest default for a dev-server run under Playwright.
+  // dbMcpPendingApprovals above, same reasoning — nothing in tests/ui/ seeds a dbmcp fixture, so
+  // "off, nothing running" is the honest default for a dev-server run under Playwright.
   [IPC.dbMcpStatus]: JSON.stringify({
     running: false,
     command: '',
@@ -358,7 +338,7 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
     error: '',
   }),
   // P66: initAppUpdate() polls this unconditionally right after mount, on every boot — the same
-  // no-committed-fixture-will-ever-snapshot-this reasoning as gitVsixStatus above. "no update" is
+  // no-committed-fixture-will-ever-snapshot-this reasoning as dbMcpStatus above. "no update" is
   // the honest default for a dev-server run under Playwright, which never reports a tagged release
   // version.
   [IPC.updateStatus]: JSON.stringify({
