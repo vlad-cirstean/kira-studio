@@ -30,13 +30,16 @@ import {
 } from './commands.ts';
 
 const VSCODE_APP_DIR = join(import.meta.dir, '..');
-const OPS_GO = join(VSCODE_APP_DIR, '..', 'kira-studio', 'internal', 'gitsession', 'ops.go');
-const REMOTE_GO = join(VSCODE_APP_DIR, '..', 'kira-studio', 'internal', 'gitsession', 'remote.go');
+// P100 Part 1 moved gitsession from kira-studio to kira-space (the git module's own new home,
+// 'refactor(kira-studio): drop the git module now owned by kira-space') — this extraction still
+// reads the real served Go source, just from its new location.
+const OPS_GO = join(VSCODE_APP_DIR, '..', 'kira-space', 'internal', 'gitsession', 'ops.go');
+const REMOTE_GO = join(VSCODE_APP_DIR, '..', 'kira-space', 'internal', 'gitsession', 'remote.go');
 // G26 D13/F11: a THIRD Go source — `stack.restack` is served by its own dedicated executor
 // (`RunRestack`), neither an `opTable` kind nor a `RunRemote` switch arm, so neither of the two
 // extractions above can ever discover it. Proven served the same way the other two are: by
 // grepping the Go source itself, not by trusting the TS side's own claim.
-const STACK_GO = join(VSCODE_APP_DIR, '..', 'kira-studio', 'internal', 'gitsession', 'stack.go');
+const STACK_GO = join(VSCODE_APP_DIR, '..', 'kira-space', 'internal', 'gitsession', 'stack.go');
 const PACKAGE_JSON = join(VSCODE_APP_DIR, 'package.json');
 
 interface ManifestCommand {
