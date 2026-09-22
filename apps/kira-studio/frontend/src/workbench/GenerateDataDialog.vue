@@ -234,7 +234,7 @@ function onSequenceStartChange(index: number, start: number): void {
       :show-close-button="false"
       data-testid="generate-data-dialog"
       class="flex flex-col p-0 gap-0"
-      style="width: 680px; max-width: 680px; max-height: 82vh"
+      style="width: 680px; max-width: min(680px, calc(100% - 2rem)); max-height: 82vh"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal">Generate data</DialogTitle>

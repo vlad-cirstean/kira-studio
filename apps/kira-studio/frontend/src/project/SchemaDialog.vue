@@ -119,7 +119,7 @@ async function onSave(): Promise<void> {
       :show-close-button="false"
       data-testid="schema-dialog"
       class="flex flex-col p-0 gap-0"
-      style="width: 720px; max-width: 720px; max-height: 80vh"
+      style="width: 720px; max-width: min(720px, calc(100% - 2rem)); max-height: 80vh"
     >
       <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
         <DialogTitle class="text-kira-lg font-normal"
