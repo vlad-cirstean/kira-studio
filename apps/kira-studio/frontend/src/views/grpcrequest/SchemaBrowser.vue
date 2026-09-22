@@ -202,75 +202,53 @@ function selectMethod(service: string, method: string): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .schema-browser {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: auto;
+  @apply flex h-full min-h-0 flex-col overflow-auto;
 }
 
 .source-row {
-  gap: var(--kira-s-2);
+  @apply gap-[var(--kira-s-2)];
 }
 
 .import-paths {
-  padding: var(--kira-s-2) var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex flex-col gap-[var(--kira-s-1)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 /* D14: a real cap + scroll, so a large .proto tree's import list can never push the source row
    and the whole service browser off the pane. */
 .import-path-list {
-  max-height: 132px;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
+  @apply flex max-h-[132px] flex-col overflow-auto;
 }
 
 .import-path-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .add-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex items-center gap-[var(--kira-s-2)];
 }
 
 .service-list {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply flex-1 min-h-0 overflow-auto px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .service-group {
-  margin-bottom: var(--kira-s-3);
+  @apply mb-[var(--kira-s-3)];
 }
 
 .service-name {
-  padding: var(--kira-s-1) 0;
+  @apply py-[var(--kira-s-1)];
 }
 
 /* p-row supplies height/display/align-items/gap/padding/border-radius/color/font-size/cursor
    and its own hover + is-selected states; this button only needs what .p-row does not supply. */
 .method-row {
-  width: 100%;
-  justify-content: space-between;
-  background: none;
-  border: none;
-  text-align: left;
-  font: inherit;
+  @apply w-full justify-between border-0 bg-none text-left font-[inherit];
 }
 
 .method-name {
-  font-size: var(--kira-t-sm);
+  @apply text-[length:var(--kira-t-sm)];
 }
 </style>

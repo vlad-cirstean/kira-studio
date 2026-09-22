@@ -395,93 +395,59 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .response-pane {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 .response-status-row {
-  gap: var(--kira-s-2);
+  @apply gap-[var(--kira-s-2)];
 }
 
 .status-message {
-  padding: 0 var(--kira-s-3) var(--kira-s-2);
+  @apply px-[var(--kira-s-3)] pt-0 pb-[var(--kira-s-2)];
 }
 
 .message-list {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .message-virtual-list {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 .message-entry {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
 }
 
 /* height (not padding) so this row's own rendered height stays exactly MESSAGE_ROW_HEIGHT
    (22px, the script's own numeric constant, kept equal to --kira-h-sm here) — VirtualList
    positions every row assuming that exact height, border included via box-sizing. */
 .message-header {
-  width: 100%;
-  height: var(--kira-h-sm);
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: 0 var(--kira-s-3);
-  background: none;
-  border: none;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  cursor: pointer;
-  font: inherit;
-  color: var(--kira-fg);
+  @apply box-border flex w-full items-center gap-[var(--kira-s-2)] border-0 border-b border-border bg-none px-[var(--kira-s-3)] font-[inherit] text-fg h-[var(--kira-h-sm)] cursor-pointer;
 }
 
 .message-header:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 /* Fixed height (not auto-grow) for the same reason .message-header's is — MUST stay numerically
    equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON document taller than this
    scrolls inside MonacoHost's own scroller instead of growing the row. */
 .message-detail {
-  height: 200px;
-  box-sizing: border-box;
-  overflow: auto;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply box-border h-[200px] overflow-auto border-b border-border;
 }
 
 .metadata-groups {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: var(--kira-s-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-4);
+  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-4)] overflow-auto p-[var(--kira-s-3)];
 }
 
 .metadata-group-title {
-  margin-bottom: var(--kira-s-1);
+  @apply mb-[var(--kira-s-1)];
 }
 
-
 .history-hint-link {
-  margin-top: var(--kira-s-2);
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--kira-accent);
-  cursor: pointer;
-  font-size: var(--kira-t-sm);
+  @apply mt-[var(--kira-s-2)] cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
 }
 </style>

@@ -145,42 +145,30 @@ async function onClear(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .history-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .history-toolbar {
-  gap: var(--kira-s-2);
+  @apply gap-[var(--kira-s-2)];
 }
 
 .history-rows {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col overflow-auto;
 }
 
 .history-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  cursor: pointer;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex cursor-pointer items-center gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .history-row:hover,
 .history-row.is-viewing {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .history-cap-note {
-  flex-shrink: 0;
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply shrink-0 border-t border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 </style>
