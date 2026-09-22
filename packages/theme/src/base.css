@@ -61,6 +61,28 @@
   --radius-kira: var(--kira-radius);
   --radius-kira-lg: var(--kira-radius-lg);
   --radius-kira-pill: var(--kira-radius-pill);
+
+  /* P104 §7.2: runtime-settable (Appearance) or a deliberate one-edit design seam -- must stay
+     indirect, so a static Tailwind scale step is never an option for these (unlike the raw
+     --kira-s-* / --kira-h-* tokens, which map onto the default scale with zero @theme entries,
+     per §7.1). */
+  --spacing-control: var(--kira-control-h);
+  --spacing-control-lg: var(--kira-control-h-lg);
+  --spacing-control-sm: var(--kira-control-h-sm);
+  --spacing-row: var(--kira-row-height);
+  --spacing-bar: var(--kira-bar-h);
+
+  --text-kira-xs: var(--kira-t-xs);
+  --text-kira-sm: var(--kira-t-sm);
+  --text-kira-md: var(--kira-t-md);
+  --text-kira-lg: var(--kira-t-lg);
+  --text-kira-xl: var(--kira-t-xl);
+
+  --font-data: var(--kira-font-data);
+  --font-ui: var(--kira-font-ui);
+
+  --shadow-kira: var(--kira-shadow);
+  --shadow-kira-dialog: var(--kira-shadow-dialog);
 }
 
 html,
