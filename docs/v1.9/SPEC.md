@@ -496,6 +496,101 @@ No new `docs/ARCHITECTURE.md` **Known open items** entry: both failure classes a
 pre-existing, already-documented baselines Part 1 inherited and this part re-confirms, not a new
 discovery.
 
+## P99 Part 3 result
+
+Landed per plan (`docs/v1.9/plans/P99-vue-migration.md` §7, §9-§14), 7 commits from `54197ef`
+through `c1e19e0`, plus this section's own commit. All 39 files in §7/§10.2's inventory (`api/` 19,
+`views/httprequest` 15, `views/grpcrequest` 5) converted, one pass each, never reopened. Part 2
+already converted every primitive these files consume with an unchanged public API, so no primitive
+usage needed touching here — every diff is scoped to each file's own `<style scoped>` block plus,
+where present, a hand-rolled debounce/timer.
+
+**`54197ef`, `ab9cf05`, `d0d8f25` — the three request-view/table commits budgeted first per the
+plan's own note that they were likely largest.** `FieldRowsTable.vue`/`FormDataTable.vue`/
+`MetadataTable.vue` (`54197ef`) converted their `@apply`-eligible cell/row rules;
+`FieldRowsTable.vue`'s `<script setup lang="ts" generic="...">` kept unchanged, per the plan's own
+named note. `QueryParamsTable.vue`/`RequestHeadersTable.vue`/`UrlEncodedTable.vue` needed no edit at
+all (no `<style>`, no VueUse-eligible pattern). `HttpRequestView.vue` (`ab9cf05`) and
+`GrpcRequestView.vue` (`d0d8f25`) converted next, each its own commit; `GrpcRequestView.vue` also
+replaced its manual `setTimeout`/`clearTimeout` schema-load debounce with `useDebounceFn` plus
+explicit `.cancel()` calls (before reschedule and on unmount). `.request-pane`/`.request-splitter`/
+`.url-field`/`.grpc-target-field`/`.grpc-method-field` kept their class names as test markers
+(`api-ui-consistency.spec.ts`, `http-request.spec.ts`, `grpc-request.spec.ts` poll/select them
+directly) — their CSS still converted to `@apply`, only the selector survives unchanged.
+
+**`api/` dialogs and start screen (`a40d9fd`, 8 files).** `ApiStart.vue`/`CopyAsCurlDialog.vue`/
+`SaveRequestDialog.vue` inlined their one-or-two-rule `<style>` blocks directly into template
+classes and dropped the block entirely, rather than `@apply` — too small to earn a `<style>` block
+of their own. `BulkVariablesEditor.vue`/`DynamicValuesDialog.vue`/`ImportReportStrip.vue` converted
+to `@apply`. `ApiDialogs.vue` needed no edit (no `<style>`, no VueUse-eligible pattern).
+**Debounce-shape deviation (named in the plan's own §7 note), resolved per-file, matching Part 2's
+own precedent of deciding case by case rather than forcing one shape onto both):**
+`EditRawRequestDialog.vue` mirrors `SchemaDialog.vue`'s exact `useDebounceFn` + explicit setter +
+`onBeforeUnmount(() => setDebouncedText.cancel())` shape, because its dialog-open handler must write
+both the live and debounced value immediately, bypassing the delay — `refDebounced` has no hook for
+that immediate write. `ImportCurlDialog.vue` has no such external-immediate-write requirement, so it
+takes `refDebounced` directly, exactly as the plan's own text suggested for that one file.
+
+**`api/` collections/variables panels (`1cd95fb`, 10 files).** `CollectionRow.vue`,
+`CollectionsPanel.vue`, `CollectionsTree.vue`, `EnvironmentSelect.vue`, `EnvironmentsView.vue`,
+`MethodSelect.vue`, `VariableHistoryMenu.vue`, `VariableRow.vue`, `VariableSetView.vue`,
+`VariablesOverviewPanel.vue` — every `<style scoped>` block converted to `@apply`; `.twisty` and
+`.node-icon` in `CollectionRow.vue` kept their class names (test markers in `mutations.spec.ts`/
+`fake-data.spec.ts`/`tree.spec.ts`). `VariableRow.vue`'s and `VariableSetView.vue`'s
+`grid-template-columns` literal stayed plain CSS beside the `@apply` line (Tailwind has no named
+utility for an explicit fixed/fractional column template) — the same "plain CSS declaration
+alongside `@apply`" shape Part 2's `CollectionsPanel.vue`-adjacent files already established for
+`all: unset`. `CollectionsTree.vue`'s `copyUrl` and `VariablesOverviewPanel.vue`'s `onCopy` keep
+their existing `copyText()` calls unconverted — confirmed via grep across Part 2's own shipped files
+(`TabStrip.vue`, `OperationsPanel.vue`, `ErrorPopover.vue`) that Part 2 never converted a
+component-local clipboard write to `useClipboard()`, so this follows that precedent rather than
+making an independent call.
+
+**Informational observation, not a fix:** `CollectionRow.vue`'s `.rename-input` border uses the
+arbitrary-value `border-[var(--kira-accent)]` rather than the Tailwind utility `border-accent`,
+because `shadcn-bridge.css` maps `--color-accent` to `--kira-hover` (grey), not `--kira-accent`
+(brand blue). Confirmed empirically (`bun run build`, grepping the compiled `dist/assets/*.css`):
+`.bg-accent` compiles to `background-color: var(--accent)` (grey), and `.text-accent-fg` does not
+compile to any rule at all. This is not a live rendering bug in Part 2's own `AppButton.vue`/
+`IconButton.vue`, which use `bg-accent`/`text-accent-fg` for their primary variant — `primitives.css`'s
+unscoped, unlayered `.p-btn.primary`/`.p-dlgbtn.primary` rules still supply the real
+`background: var(--kira-accent)` styling, and Tailwind v4's cascade layers mean unlayered author CSS
+always wins there regardless of source order or specificity. Out of this phase's scope (an
+already-shipped, already-verified Part 2 file); noted here only so a future phase touching those two
+files doesn't rediscover it as a surprise.
+
+**`views/httprequest` body/response panes (`5d3eca5`, 9 files).** `BinaryBodyPicker.vue` inlined its
+two-rule `<style>` directly into template classes. `CookiesPane.vue`, `RawExchangePane.vue`,
+`RequestBodyPane.vue`, `RequestSettingsPane.vue`, `ResponseDiffDialog.vue`,
+`ResponseHistoryList.vue`, `ResponsePane.vue`, `TimelinePane.vue` converted to `@apply`.
+`.response-body` and `.response-status-row` kept their class names — `api-ui-consistency.spec.ts`
+and three `http-*.spec.ts` files select on them directly via `page.locator('.response-body')` etc.
+`RawExchangePane.vue`'s `onCopyRequest`/`onCopyResponse` keep their `copyText()` calls unconverted,
+same precedent as above.
+
+**`views/grpcrequest` panes (`c1e19e0`, 3 files).** `CallHistoryList.vue`, `ResponsePane.vue`,
+`SchemaBrowser.vue` converted to `@apply`. `ResponsePane.vue`'s `.response-status-row` kept its class
+name for consistency with the http-side component of the same name, even though no grpc-specific
+test currently selects on it directly.
+
+**Verification (§12.1-§12.2).** `bun run typecheck` clean across all five projects. `bun run lint` —
+Biome 0 errors/warnings/infos over 1276 files, `check-tokens.sh` clean. `bun run build` and
+`bun run build:vscode` both clean (only the pre-existing chunk-size warning). `bun run test:unit`
+1535 passed, 0 failed (baseline: 1535). `bun run test:webview` 55 passed, 0 failed (baseline: 55).
+`bun run lint:dead` — knip unchanged from baseline (6 duplicate exports + 4 config hints, all
+pre-existing and unrelated; none touch a file this phase changed). `bun run test:ui` — 311 total,
+311 passed, 0 failed — no flakiness surfaced this run (Part 1/Part 2's own result sections document
+the `ui-timing`/pacing-budget class as flaky under cross-file worker contention; this run simply
+didn't hit it). `bun run test:visual` — 5 failed, exactly the same 5 specs as Part 1/Part 2's own
+documented baseline (`connection-dialog`, `console`, `data-view`, `schema-dialog`, `workbench`), 0
+of the visual suite's 5 tests passing either before or after this phase — no new diff, no spec this
+phase's own styling touches showing a different failure shape than its own pre-existing one.
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry: the `test:visual` failures are the same
+pre-existing baseline Part 1/Part 2 already documented, not a new discovery; the accent/primary
+token distinction noted above is Part 2's own already-shipped, already-verified behavior, not a
+limitation this phase found or introduced.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
