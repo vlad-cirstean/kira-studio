@@ -960,27 +960,25 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .document-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
    (see TextField.vue's inheritAttrs:false), so the permanent filter row's "grow to fill" sizing
    moves onto this wrapper instead of a style attribute on the component tag itself. */
 .history-anchor {
-  position: relative;
+  @apply relative;
 }
 
 .filter-field {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .filter-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 /* FilterToolbar.vue's orderby-input precedent: a fixed width beside the filter field that grows
@@ -988,35 +986,27 @@ onUnmounted(() => {
    SQL-style box's 230px — a Mongo sort document (`{ createdAt: -1, name: 1 }`) runs a bit longer
    than the old `field ASC, field2 DESC` text it replaced. */
 .sort-field {
-  width: 280px;
-  flex-shrink: 0;
+  @apply w-[280px] shrink-0;
 }
 
 .sort-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .projection-anchor {
-  position: relative;
+  @apply relative;
 }
 
 .new-doc-panel {
-  height: 220px;
-  flex-shrink: 0;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-elevated);
-  display: flex;
-  flex-direction: column;
+  @apply h-[220px] shrink-0 flex flex-col border-b border-border bg-elevated;
 }
 
 .list-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  @apply flex-1 min-h-0 overflow-y-auto;
 }
 
 .document-virtual-list {
-  height: 100%;
+  @apply h-full;
 }
 
 /* P48 F10-F12: the row shell and its head (.doc-row/.doc-head and friends, .expand-toggle,
@@ -1025,13 +1015,8 @@ onUnmounted(() => {
    documentRows.ts's rowHeight() (P27 D20) — CSS only distributes it between the fixed-height
    head and whatever's left for the body, never restates the number itself. */
 .doc-preview-match {
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-[length:var(--kira-t-sm)] font-[family-name:var(--kira-font-data)];
   padding: 0 var(--kira-s-4) var(--kira-s-2);
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* .doc-preview-match's own `color` above otherwise wins over the row's (specificity, not
@@ -1039,54 +1024,36 @@ onUnmounted(() => {
    :deep() on the ancestor half: `.doc-row.search-match-current` is DocumentRow.vue's own root
    now, outside this component's scope-id — only `.doc-preview-match` itself needs scoping. */
 :deep(.doc-row.search-match-current) .doc-preview-match {
-  color: var(--kira-bg);
+  @apply text-bg;
 }
 
 .doc-preview-match mark {
-  background: var(--kira-warn);
-  color: var(--kira-bg);
-  border-radius: var(--kira-radius-sm);
+  @apply rounded-kira-sm bg-warn text-bg;
 }
 
 /* Pushes .doc-row-actions to the trailing edge, the same role .doc-preview played before D1
    emptied that slot. */
 .doc-head-spacer {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .doc-row-actions {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex shrink-0 items-center gap-[var(--kira-s-2)];
 }
 
 /* flex: 1 over the row's own inline height (above) rather than a literal number — matches
    HEAD_H + visibleLines().length * LINE_H (or the fixed editing height) exactly, whichever this
    row currently is. */
 .doc-body {
-  flex: 1;
-  min-height: 0;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  background: var(--kira-bg-elevated);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  @apply flex-1 min-h-0 flex flex-col overflow-hidden border-t border-border bg-elevated;
 }
 
 .edit-actions {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-2) var(--kira-s-4);
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply flex shrink-0 items-center gap-[var(--kira-s-3)] border-t border-border py-[var(--kira-s-2)] px-[var(--kira-s-4)];
 }
 
 /* Pushes Save/Cancel to the trailing edge, past P27 D28's EditBufferActions row. */
 .edit-actions-spacer {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 </style>

@@ -86,60 +86,49 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Only these two — the vertical column dividers — aren't in the shared .def-table td rule
    (primitives.css): Validation/Properties are plain key-value tables that don't want them. */
 .def-table td {
-  border-right: var(--kira-border-width) solid var(--kira-border);
+  @apply border-r border-border;
 }
 .def-table td:last-child {
-  border-right: none;
+  @apply border-r-0;
 }
 
 .def-col-icon {
-  width: var(--kira-icon-box);
-  color: var(--kira-fg-muted);
+  @apply text-muted w-[var(--kira-icon-box)];
 }
 
 .def-col-key {
-  width: 24px;
+  @apply w-6;
 }
 
 .header-key {
-  color: var(--kira-warn);
-  font-size: var(--kira-t-xs);
+  @apply text-warn text-[length:var(--kira-t-xs)];
 }
 .header-key.is-fk {
-  color: var(--kira-info);
+  @apply text-info;
 }
 
 .def-col-type {
-  color: var(--kira-fg-muted);
-  white-space: nowrap;
+  @apply whitespace-nowrap text-muted;
 }
 
 .type-info {
-  color: var(--kira-fg-subtle);
-  vertical-align: middle;
-  margin-left: var(--kira-s-1);
-  cursor: help;
+  @apply align-middle cursor-help text-subtle ml-[var(--kira-s-1)];
 }
 
 .def-col-null {
-  width: 76px;
-  white-space: nowrap;
-  color: var(--kira-fg-muted);
+  @apply whitespace-nowrap text-muted w-[76px];
 }
 
 .def-col-default {
-  color: var(--kira-fg-muted);
-  white-space: nowrap;
+  @apply whitespace-nowrap text-muted;
 }
 
 .def-col-comment {
-  color: var(--kira-fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 240px;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted max-w-[240px];
 }
 </style>

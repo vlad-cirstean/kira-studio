@@ -122,44 +122,33 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .compose-inner {
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-col;
 }
 
 .compose-header {
-  text-transform: none;
-  letter-spacing: normal;
+  @apply normal-case tracking-normal;
 }
 
 .compose-body {
-  padding: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
+  @apply flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex flex-col gap-[var(--kira-s-1)];
 }
 
 .field-inline {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex-row items-center gap-[var(--kira-s-2)];
 }
 
 .error-text {
-  color: var(--kira-error);
+  @apply text-error;
 }
 
 .compose-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-3) var(--kira-s-4);
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply flex justify-end gap-[var(--kira-s-3)] border-t border-border py-[var(--kira-s-3)] px-[var(--kira-s-4)];
 }
 </style>

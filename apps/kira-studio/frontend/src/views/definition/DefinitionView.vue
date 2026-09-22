@@ -362,35 +362,25 @@ const breadcrumb = computed(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .definition-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 .err-message {
-  font-family: var(--kira-font-data);
-  white-space: pre-wrap;
+  @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
 }
 
 .notes-list {
-  margin: 0;
-  padding-left: var(--kira-s-5);
+  @apply m-0 pl-[var(--kira-s-5)];
 }
 
 .editor-body {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 
 .structure-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-6);
-  padding: var(--kira-s-5);
+  @apply flex-1 min-h-0 overflow-y-auto flex flex-col gap-[var(--kira-s-6)] p-[var(--kira-s-5)];
 }
 </style>

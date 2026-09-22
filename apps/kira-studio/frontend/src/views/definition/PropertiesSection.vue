@@ -32,13 +32,13 @@ defineProps<{
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .def-prop-name {
-  color: var(--kira-fg-muted);
-  white-space: nowrap;
+  @apply whitespace-nowrap text-muted;
 }
 
 .def-prop-detail {
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-sm);
+  @apply text-subtle text-[length:var(--kira-t-sm)];
 }
 </style>

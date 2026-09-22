@@ -20,10 +20,9 @@ defineProps<{ tab: KeyValueTabRecord }>();
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .keyvalue-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 </style>

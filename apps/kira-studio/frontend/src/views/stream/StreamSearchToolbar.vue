@@ -137,20 +137,21 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .stream-search-toolbar {
-  background: var(--kira-bg-elevated);
+  @apply bg-elevated;
 }
 
 .search-input {
-  width: 200px;
-  flex-shrink: 0;
+  @apply w-[200px] shrink-0;
 }
 
 .search-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .search-count {
-  white-space: nowrap;
+  @apply whitespace-nowrap;
 }
 </style>

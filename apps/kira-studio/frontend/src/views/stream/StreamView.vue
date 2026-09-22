@@ -978,49 +978,43 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .stream-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 /* view header: 28px, connection colour appears only as the dot (LAW — see template comment) */
 .path {
-  color: var(--kira-fg-subtle);
+  @apply text-subtle;
 }
 
 /* Task #64: the compose-message popover was rendered as a sibling of ViewChrome, far from the
    "Add message" button that opens it — PopoverPanel.vue anchors to its own DOM parent, so it needs to
    be a sibling of the trigger, same wrapper shape as .columns-anchor/.add-anchor elsewhere. */
 .add-message-anchor {
-  position: relative;
+  @apply relative;
 }
 
 /* tabular body shared shape (P16's .thead/.th/.td law) — .p-thead/.p-th/.p-td come from
    primitives.css; the flex row container and the scrolling wrapper around it are local glue,
    same as the source design's own (unshared) .tbody/.tr rules. */
 .tbody-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  @apply flex-1 min-h-0 overflow-auto;
 }
 
 .stream-row {
   /* P49 F7/D5: previously unset (sized off whatever text a cell happened to hold) — now fixed,
      matching the density-driven rowHeight computed VirtualList's offset math needs. */
-  height: var(--kira-row-height);
-  display: flex;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-  cursor: pointer;
+  @apply flex border-b border-border cursor-pointer h-[var(--kira-row-height)];
 }
 
 .stream-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .stream-row.selected {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 /* P31 D21: adopts the same color-mix tint / solid-current pair as KeyValueView.vue (and the
@@ -1030,107 +1024,80 @@ onUnmounted(() => {
 }
 
 .stream-row.search-match-current {
+  @apply text-bg;
   background: var(--kira-search-match-current);
-  color: var(--kira-bg);
 }
 
 /* body column: monospace and slightly muted, matching the mockup's `.msg-body` */
 .msg-body {
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
+  @apply text-muted text-[length:var(--kira-t-sm)] font-[family-name:var(--kira-font-data)];
 }
 
 .list-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
   /* Positioning context for the EmptyState siblings below (`.no-rows` class, slickTheme.css's
      unscoped `position: absolute; inset: 0` rule) — without it inset:0 has no positioned ancestor
      anywhere up to <body>, so the placeholder expands to cover the whole app window instead of
      just this row list, intercepting pointer events app-wide (the tree sidebar included) whenever
      a stream view shows an empty state. Same fix SlickGridHost.vue already applies to its own
      `.slick-grid-host` for the identical shared class. */
-  position: relative;
+  @apply relative flex-1 min-h-0 flex flex-col overflow-hidden;
 }
 
 .list-body .p-empty {
-  height: 100%;
+  @apply h-full;
 }
-
 
 .history-anchor,
 .partition-anchor {
-  position: relative;
+  @apply relative;
 }
 
 .filter-field {
-  width: 160px;
-  flex-shrink: 0;
+  @apply w-[160px] shrink-0;
 }
 
 .filter-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 /* P31 D12/D13: the "since" field's own wrapper — not `.filter-field` (that class's fixed 160px
    width and 100%-wide input are sized for a single bare TextField; this one also carries a
    calendar trigger beside the input and an error line below it). */
 .timestamp-filter-field {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex-shrink: 0;
+  @apply flex flex-col gap-0.5 shrink-0;
 }
 
 .ts-input-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-1);
+  @apply flex items-center gap-[var(--kira-s-1)];
 }
 
 .ts-input-row :deep(.p-input) {
-  width: 160px;
+  @apply w-[160px];
 }
 
 .ts-calendar-anchor {
-  position: relative;
-  flex-shrink: 0;
+  @apply relative shrink-0;
 }
 
 .filter-field-error {
-  color: var(--kira-error);
-  font-size: var(--kira-t-xs);
-  white-space: nowrap;
+  @apply whitespace-nowrap text-error text-[length:var(--kira-t-xs)];
 }
 
 /* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-PopoverPanel shape. */
 .partition-menu {
-  display: flex;
-  flex-direction: column;
-  max-height: 240px;
-  overflow-y: auto;
-  padding: var(--kira-s-2);
-  gap: var(--kira-s-1);
+  @apply flex flex-col max-h-[240px] overflow-y-auto gap-[var(--kira-s-1)] p-[var(--kira-s-2)];
 }
 
 .partition-menu-empty {
-  padding: var(--kira-s-2);
+  @apply p-[var(--kira-s-2)];
 }
 
 .partition-option {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-1) var(--kira-s-2);
-  border-radius: var(--kira-radius);
-  cursor: pointer;
+  @apply flex items-center gap-[var(--kira-s-2)] rounded-kira cursor-pointer py-[var(--kira-s-1)] px-[var(--kira-s-2)];
 }
 
 .partition-option:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 /* Item 4: a resize handle on the right edge of the four fixed-width header cells (mirrors the
@@ -1143,16 +1110,10 @@ onUnmounted(() => {
    `right: -2px`) keeps the whole 4px handle inside `.p-th`'s own box instead of half-clipped by
    that overflow. */
 .p-th {
-  position: relative;
+  @apply relative;
 }
 
 .resize-handle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 4px;
-  height: 100%;
-  cursor: col-resize;
-  z-index: 1;
+  @apply absolute top-0 right-0 w-1 h-full cursor-col-resize z-[1];
 }
 </style>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
@@ -186,28 +187,23 @@ function keyType(path: string): string | undefined {
 // the round trip itself. Debounced by the same 150ms blameAnnotation.ts's own DEBOUNCE_MS already
 // uses, so a fling settles on one ensureKeyTypes call for its final window instead of one per frame.
 const KEY_TYPES_DEBOUNCE_MS = 150;
-let keyTypesDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+const ensureKeyTypesDebounced = useDebounceFn((range: { start: number; end: number }) => {
+  const nodes = filteredNodes.value;
+  const paths: string[] = [];
+  for (let i = range.start; i < range.end && i < nodes.length; i++) {
+    const node = nodes[i];
+    if (node && node.kind === 'key') paths.push(node.path);
+  }
+  if (paths.length > 0) browseViewStore.ensureKeyTypes(props.tab.id, paths);
+}, KEY_TYPES_DEBOUNCE_MS);
+onBeforeUnmount(() => ensureKeyTypesDebounced.cancel());
 
 // VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
 // per §4.3, never the whole (up to 200 000-key) level.
 function onVisibleRange(range: { start: number; end: number }): void {
   if (!supportsKeyTypes.value) return;
-  if (keyTypesDebounceTimer !== undefined) clearTimeout(keyTypesDebounceTimer);
-  keyTypesDebounceTimer = setTimeout(() => {
-    keyTypesDebounceTimer = undefined;
-    const nodes = filteredNodes.value;
-    const paths: string[] = [];
-    for (let i = range.start; i < range.end && i < nodes.length; i++) {
-      const node = nodes[i];
-      if (node && node.kind === 'key') paths.push(node.path);
-    }
-    if (paths.length > 0) browseViewStore.ensureKeyTypes(props.tab.id, paths);
-  }, KEY_TYPES_DEBOUNCE_MS);
+  void ensureKeyTypesDebounced(range);
 }
-
-onUnmounted(() => {
-  if (keyTypesDebounceTimer !== undefined) clearTimeout(keyTypesDebounceTimer);
-});
 
 // D12: a container descends; a leaf opens the existing keyvalue tab — the same tab kind the tree
 // has always opened a redis key / s3 object into.
@@ -424,125 +420,82 @@ onMounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .browse-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply h-full flex flex-col min-h-0;
 }
 
 .breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  min-width: 0;
-  overflow: hidden;
+  @apply flex items-center min-w-0 overflow-hidden gap-[var(--kira-s-1)];
 }
 
 .crumb {
-  background: none;
-  border: none;
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-  cursor: pointer;
-  padding: 0 var(--kira-s-1);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply cursor-pointer overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-muted text-[length:var(--kira-t-sm)] px-[var(--kira-s-1)];
 }
 
 .crumb:hover {
-  color: var(--kira-fg);
-  text-decoration: underline;
+  @apply text-fg underline;
 }
 
 .crumb.is-current {
-  color: var(--kira-fg);
-  cursor: default;
+  @apply text-fg cursor-default;
 }
 
 .crumb.is-current:hover {
-  text-decoration: none;
+  @apply no-underline;
 }
 
 .crumb-sep {
-  color: var(--kira-fg-subtle);
+  @apply text-subtle;
 }
 
 /* P63 §2.1: list pane (left) | splitter | detail pane (right) — the vertical split. */
 .browse-body {
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  min-height: 0;
+  @apply flex flex-row flex-1 min-h-0;
 }
 
 .list-pane {
-  flex-shrink: 0;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply shrink-0 min-w-0 flex flex-col min-h-0;
 }
 
 .detail-pane {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex-1 min-w-0 flex flex-col min-h-0;
 }
 
 .body-panel {
-  flex: 1;
-  min-height: 0;
-  border: none;
-  border-radius: 0;
+  @apply flex-1 min-h-0 border-0 rounded-none;
 }
 
 .body {
-  height: 100%;
+  @apply h-full;
 }
 
 .empty {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--kira-t-sm);
+  @apply h-full flex items-center justify-center text-[length:var(--kira-t-sm)];
 }
 
 .browse-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: 0 var(--kira-s-4);
-  cursor: default;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex items-center cursor-default border-b border-border gap-[var(--kira-s-2)] px-[var(--kira-s-4)];
 }
 
 .browse-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .browse-row.selected {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
 .row-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .row-detail {
-  flex-shrink: 0;
-  font-size: var(--kira-t-xs);
+  @apply shrink-0 text-[length:var(--kira-t-xs)];
 }
 
 .row-type-badge {
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 </style>

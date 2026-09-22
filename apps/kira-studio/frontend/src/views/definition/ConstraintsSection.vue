@@ -81,40 +81,35 @@ function onNavigate(c: ConstraintRow): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Only these two aren't in the shared .def-table td rule (primitives.css) — see
    ColumnsSection.vue's own comment on why. */
 .def-table td {
-  border-right: var(--kira-border-width) solid var(--kira-border);
+  @apply border-r border-border;
 }
 .def-table td:last-child {
-  border-right: none;
+  @apply border-r-0;
 }
 
 .header-key {
-  color: var(--kira-warn);
-  font-size: var(--kira-t-xs);
+  @apply text-warn text-[length:var(--kira-t-xs)];
 }
 .header-key.is-fk {
-  color: var(--kira-info);
+  @apply text-info;
 }
 
 .def-con-detail {
-  color: var(--kira-fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted;
 }
 
 .ref-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--kira-info);
-  text-decoration: underline;
-  cursor: pointer;
-  font: inherit;
+  @apply border-0 bg-none p-0 cursor-pointer underline font-[inherit] text-info;
 }
+/* text-[var(--kira-accent)], not the text-accent utility — shadcn-bridge.css maps --color-accent
+   to --kira-hover (grey), the same cascade-layer precedent api/CollectionRow.vue's rename-input
+   already documents (Part 3). */
 .ref-link:hover {
-  color: var(--kira-accent);
+  @apply text-[var(--kira-accent)];
 }
 </style>

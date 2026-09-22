@@ -52,16 +52,13 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .def-val-desc {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .def-raw {
-  margin: 0;
-  padding: var(--kira-s-4);
-  background: var(--kira-bg-input);
-  border-radius: var(--kira-radius-sm);
-  white-space: pre-wrap;
-  color: var(--kira-fg);
+  @apply m-0 whitespace-pre-wrap rounded-kira-sm bg-input text-fg p-[var(--kira-s-4)];
 }
 </style>

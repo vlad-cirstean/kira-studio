@@ -37,16 +37,18 @@ defineProps<{
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Only these two aren't in the shared .def-table td rule (primitives.css) — see
    ColumnsSection.vue's own comment on why. */
 .def-table td {
-  border-right: var(--kira-border-width) solid var(--kira-border);
+  @apply border-r border-border;
 }
 .def-table td:last-child {
-  border-right: none;
+  @apply border-r-0;
 }
 
 .def-idx-columns {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 </style>
