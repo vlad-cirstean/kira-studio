@@ -22,8 +22,9 @@ reason v1.6/v1.8 give: independent, unrelated phases, not one cohesive subsystem
 | **P100 Part 3: the extension rename, retarget and packaging** | Plan §6, §8-§11. `apps/kira-studio-vscode` → `apps/kira-space-vscode`, package `kira-space-vscode`, `displayName` "Kira Space", and every identifier renamed to the `kiraSpace.`/`kira-space` prefix: 62 command ids, 2 view containers, 2 views, 14 colours, 2 context keys, a comment controller, a menu group, 4 keybindings' `when` clauses and the `kira-version` virtual-document URI scheme — 373 `kiraVersion` sites plus 19 `kira-version`, 35 "Kira Version" and 77 "Kira Studio" across the extension and the four git packages, swept per-file (a repo-wide replace would rewrite the DB client's own name in `docs/`, `scripts/demo-dbs/` and `NOTICES.md`). The 11 `kiraVersion.*` settings keys are **not just VS Code identifiers** — they are `RepoSettingsSnapshot`'s key space in `packages/git-ipc/src/contract.ts` and the literal `key` column in `git_repo_settings`, so the rename is a contract change (`CONTRACT_VERSION` 39 → 40, both sides, plus its pinning test) **and** a data migration. Packaging needs no new mechanism: the `.vsix` already ships inside the app bundle and installs from the *Connected editors* pane, so the existing five-link chain is retargeted at `apps/kira-space/bin/kira-space.vsix` → `Kira Space.app/Contents/Resources/`. `.github/workflows/` changes go through `docs/pending-changes/` | Sequenced after Part 2 so the rename lands on a tree where Kira Space is already a real app |
 | **P100 Part 4: the icon, the docs, and the phase-closing audit** | Plan §7, §10. The mark: Kira Space's own copy of the SVG changes its `#bg` stops from tan (`#D2A97C`/`#A3794C`) to the repo's own blues (`#3B9BE8`/`#0A5FA8`), deletes **all four** client glyphs at lines 31-55 — the database stack and sql cell grid by instruction, and **the document braces and message queue too**: a JSON-document mark and a Kafka/SQS mark say nothing on a git icon, and the four were drawn as one set — and replaces them with the commit-graph mark lifted verbatim from the extension's own `resources/icon.svg`, so app and extension become literally the same drawing. Kira Studio's icon is untouched. No rasterizer exists in this container (`rsvg-convert`/`inkscape`/`convert`/`magick`/`cairosvg`/`resvg`/`sips` all absent), so the two PNGs are rendered through Playwright's Chromium, with an explicit stop rather than a placeholder if it cannot install. Then `docs/ARCHITECTURE.md`'s seven git sections, `PACKAGING.md`, `DEV_ENVIRONMENT.md`, both READMEs — including three stale facts this phase's investigation found there (`startupfail` listed as a git package, "46 commands" for 62, `ContractVersion` 30 for 39). Ends with the eleven-check audit | Last part, so the audit covers all four |
 | **P102 Reclassify root `package.json`'s `dependencies`/`devDependencies` split by actual import reachability; add the xterm links addon** | Root `package.json` currently sorts several genuinely runtime-imported packages under `devDependencies` — at minimum `vue`, `vite`, `@vitejs/plugin-vue`, `tailwindcss`, `@tailwindcss/vite`, `vue-tsc`, `sql-formatter` (`views/console/format.ts`), `simple-icons` (`theme/EngineIcon.vue`), `@wailsio/runtime` (`bridge/port.ts`) — found by cross-checking every `devDependencies` entry against the frontend's real import graph (Vite bundles by reachability, not by which `package.json` list a package sits in, so a stale placement is a doc-accuracy bug, not a build bug). Move every package genuinely `import`ed by shipped app code (`apps/kira-studio/frontend/src/**`, excluding tests) into `dependencies`; leave build-only/lint/test/type tooling (`typescript`, `@biomejs/biome`, `knip`, `@playwright/test`, `@types/*`, `testcontainers`, and similar) in `devDependencies`. Also add `@xterm/addon-web-links` alongside the existing `@xterm/addon-fit`, wired into `terminal/TerminalPanel.vue`'s existing `Terminal`/`FitAddon` setup. One agent writes a short plan and implements it in the same pass — small, mechanical, no design decision at stake | Doc-accuracy/hygiene fix surfaced during P99's own dependency work, plus a small missing terminal feature (clickable links in terminal output) bundled in since it touches the same dependency-list area |
-| **P103 Delete every hand-rolled UI primitive for shadcn-vue's own components, and normalize spacing/sizing onto Tailwind's default scale in the same pass** | One file touched once, both changes landed together — not two phases opening the same `.vue` file twice. Per file: (1) delete the hand-rolled `theme/primitives/*.vue` wrapper (or whatever other hand-rolled primitive it calls) and repoint the call site directly at `components/ui/*`'s shadcn-vue component — the 18 components P99 fetched into `components/ui/` but never actually called from any app-level file (`button`, `dialog`, `checkbox`, `dropdown-menu`, `popover`, `tooltip`, `command`, `context-menu`, and more); no wrapper layer, nothing fetched-but-unused left behind. (2) In that same edit, replace the file's arbitrary-bracket `[...var(--kira-*)...]` spacing/sizing utilities (P99 preserved 425 of these across 115 files verbatim, by that phase's own pixel-identical gate) with Tailwind's own default scale, extending `theme/base.css`'s `@theme` block — which today maps only `--color-*`/`--radius-kira-*`, never spacing — to a coherent set as needed. **No hand-rolled fallback, anywhere, for any component — this is the instruction, not a default to weigh against a library rule.** Explicitly re-opens the three cases P99 declined with a named reason: `Checkbox` (`CheckboxRoot` renders `<button role="checkbox">`, not a real `<input>`, breaking Playwright `.check()` calls and native form semantics), `workbench/ContextMenu.vue` (reka-ui's trigger-anchored model vs. this app's point-anchored singleton), and `AppTooltip.vue` (directive-plus-singleton architecture). None gets to stay hand-rolled: each is solved by composing, deriving or lightly modifying reka-ui/shadcn-vue primitives — layering a positioning wrapper over `PopoverAnchor`/`DropdownMenuContent` for the point-anchored menu, building the tooltip's rearm-delay/singleton behavior on top of `TooltipRoot`/`TooltipProvider` instead of the directive, accepting `CheckboxRoot`'s `<button role="checkbox">` and updating the ~331 class-based Playwright selectors plus whatever native-form-semantics reliance that breaks. Styling/DOM shape is free to change wherever the swap requires it — only functionality must be preserved, found through a different implementation on top of the library, not by keeping the old one. Visual output is expected to change on both axes at once — new `test:visual` baselines get recorded per changed surface, with the reason stated per baseline, not treated as a diff to chase back to zero | User request: P99 fetched shadcn-vue's components without ever calling them (the real call surface stayed the hand-rolled wrapper layer) and converted CSS syntax without normalizing the spacing values it referenced — both are this chapter's own follow-up work, merged into one pass per the user's explicit instruction not to touch the same file twice for two separate phases. No-fallback is the user's own explicit override of P99's precedent, not this chapter's default judgment call |
-| **P101 Fix the remaining `.vue` accessibility findings and delete the `a11y: off` override** | P97 turned `lint/a11y/*` off for `**/*.vue` (`biome.json`'s override) rather than hand-fixing 255 findings across 85 files that P99's shadcn-vue migration was about to rewrite anyway; P99's own recount after landing found 255 across 86 files — effectively unmoved, since P99 only wired `reka-ui` into the existing hand-rolled wrapper layer rather than swapping to shadcn-vue's own components. Sequenced to run last, after P103: re-run `biome check` with the override's `a11y: off` entry removed only once P103's full primitive swap has landed, fix whatever finding remains at that point (`noLabelWithoutControl`, `useSemanticElements`, `useButtonType`, `noNoninteractiveElementToInteractiveRole`, `noStaticElementInteractions`, `useKeyWithClickEvents`, `useFocusableInteractive`, `noAutofocus`, and whatever else P103's component swaps introduce or remove along the way), and delete the override entry — its removal is this phase's own acceptance test, not a separate check | Moved to the very end on purpose: P103, not P99, is what actually lands shadcn-vue's own components (correct roles/labels built in) across every primitive — fixing findings before that would mean hand-fixing markup P103 deletes and rewrites wholesale anyway. No point solving by hand what moving to shadcn already solves |
+| **P103 Share the identical app base between Kira Studio and Kira Space instead of two copies** | P100 split the two apps but left both bases duplicated rather than shared, since P100's own scope was extraction, not dedup, and Go's `internal/` rule already forced the pure-infrastructure packages into a shared repo-root `internal/`. Two tiers here. **Confirmed byte-identical, no design work** (fold into the currently-running P100 Part 2 pass, not this phase, since these files sit inside its own diff already — this row documents them, doesn't schedule a separate touch): `theme/tokens.css`, `theme/base.css`, all 18 `components/ui/*` shadcn-vue generated components, `lib/utils.ts`, and the 12 verbatim-identical `theme/primitives/*` ports (`AppButton`, `Checkbox`, `DialogFrame`, `EmptyState`, `IconButton`, `PanelShell`, `SegmentedControl`, `TextField`, `TreeHost`, `VirtualList`, `PanelSearchBox`, `PanelSplitter`) plus `stickyBand.ts`, `connColor.ts`, `wrapSelection.ts`, `CodiconIcon.vue` — hoisted to `packages/theme` (`@theme/*`), each app importing rather than owning its own copy. Landed as part of the P100 Part 2 pass this row points at — see that phase's own result section for the exact mechanism (122 files, one package, both apps' vite/tsconfig/`components.json`/`knip.json` retargeted). **Deviates from this row's own list on two names**: `ColorPicker` and `completion.ts` are absent — both were already deleted from `apps/kira-space/frontend` as genuinely dead code (zero callers, found independently of this row) before the dedup pass ran, so neither exists to hoist; `connColor.ts`/`wrapSelection.ts` were found identical during the pass and added in their place, not named here originally. **Real design work, this phase's own scope**: (1) Frontend — a shared `packages/workbench` for `WorkbenchShell`, `TitleBar`, `StatusBar`, `TabStrip`, `ContextMenu`, `AppTooltip`, `ConfirmDialog`; `state/{tabs,tabKinds}.ts`'s tab-kind registry parameterized so each app supplies its own kind set rather than forking the file; `SettingsDialog.vue` split into a shared shell (layout, search, nav) with each app slotting in its own content panes; `bridge/*` given a generic wrapper pattern so each app's own Wails-generated bindings satisfy one shared interface instead of the bridge layer being hand-copied per app. (2) Go — `internal/shell` (window/menu/dialog control, confirmed genuinely duplicated with real per-app differences: Kira Studio's has a per-window flush handshake, `Dialogs`, `AttachSystemWake`, a fuller menu; Kira Space's is trimmed) hoisted to a shared repo-root `internal/shell`, parameterized for those differences rather than forcing one behavior on both. `model.Settings` given a shared base for the fields both apps carry (`Appearance`, `Advanced.GitLogLevel`, `Git`), each app composing its own extras on top rather than keeping two independent struct copies. Sequenced **before P104**, not after: `ContextMenu.vue` and `AppTooltip.vue` sit in both this phase's dedup scope and P104's no-fallback shadcn rework — deduping first means P104 reworks one shared copy once, not two per-app copies twice, honoring the same "never touch the same file twice for two phases" rule P104 itself already follows | User request: "the point of a monorepo is to reuse as much as possible... the entire base of the app is mostly identical" — confirmed by direct diff (byte-identical CSS/components) and by `internal/shell`/`model.Settings` carrying real, only partly-divergent logic in two copies rather than one |
+| **P104 Delete every hand-rolled UI primitive for shadcn-vue's own components, and normalize spacing/sizing onto Tailwind's default scale in the same pass** | One file touched once, both changes landed together — not two phases opening the same `.vue` file twice. Per file: (1) delete the hand-rolled `theme/primitives/*.vue` wrapper (or whatever other hand-rolled primitive it calls) and repoint the call site directly at `components/ui/*`'s shadcn-vue component — the 18 components P99 fetched into `components/ui/` but never actually called from any app-level file (`button`, `dialog`, `checkbox`, `dropdown-menu`, `popover`, `tooltip`, `command`, `context-menu`, and more); no wrapper layer, nothing fetched-but-unused left behind. (2) In that same edit, replace the file's arbitrary-bracket `[...var(--kira-*)...]` spacing/sizing utilities (P99 preserved 425 of these across 115 files verbatim, by that phase's own pixel-identical gate) with Tailwind's own default scale, extending `theme/base.css`'s `@theme` block — which today maps only `--color-*`/`--radius-kira-*`, never spacing — to a coherent set as needed. **No hand-rolled fallback, anywhere, for any component — this is the instruction, not a default to weigh against a library rule.** Explicitly re-opens the three cases P99 declined with a named reason: `Checkbox` (`CheckboxRoot` renders `<button role="checkbox">`, not a real `<input>`, breaking Playwright `.check()` calls and native form semantics), `workbench/ContextMenu.vue` (reka-ui's trigger-anchored model vs. this app's point-anchored singleton), and `AppTooltip.vue` (directive-plus-singleton architecture). None gets to stay hand-rolled: each is solved by composing, deriving or lightly modifying reka-ui/shadcn-vue primitives — layering a positioning wrapper over `PopoverAnchor`/`DropdownMenuContent` for the point-anchored menu, building the tooltip's rearm-delay/singleton behavior on top of `TooltipRoot`/`TooltipProvider` instead of the directive, accepting `CheckboxRoot`'s `<button role="checkbox">` and updating the ~331 class-based Playwright selectors plus whatever native-form-semantics reliance that breaks. Styling/DOM shape is free to change wherever the swap requires it — only functionality must be preserved, found through a different implementation on top of the library, not by keeping the old one. Visual output is expected to change on both axes at once — new `test:visual` baselines get recorded per changed surface, with the reason stated per baseline, not treated as a diff to chase back to zero | User request: P99 fetched shadcn-vue's components without ever calling them (the real call surface stayed the hand-rolled wrapper layer) and converted CSS syntax without normalizing the spacing values it referenced — both are this chapter's own follow-up work, merged into one pass per the user's explicit instruction not to touch the same file twice for two separate phases. No-fallback is the user's own explicit override of P99's precedent, not this chapter's default judgment call |
+| **P101 Fix the remaining `.vue` accessibility findings and delete the `a11y: off` override** | P97 turned `lint/a11y/*` off for `**/*.vue` (`biome.json`'s override) rather than hand-fixing 255 findings across 85 files that P99's shadcn-vue migration was about to rewrite anyway; P99's own recount after landing found 255 across 86 files — effectively unmoved, since P99 only wired `reka-ui` into the existing hand-rolled wrapper layer rather than swapping to shadcn-vue's own components. Sequenced to run last, after P104: re-run `biome check` with the override's `a11y: off` entry removed only once P104's full primitive swap has landed, fix whatever finding remains at that point (`noLabelWithoutControl`, `useSemanticElements`, `useButtonType`, `noNoninteractiveElementToInteractiveRole`, `noStaticElementInteractions`, `useKeyWithClickEvents`, `useFocusableInteractive`, `noAutofocus`, and whatever else P104's component swaps introduce or remove along the way), and delete the override entry — its removal is this phase's own acceptance test, not a separate check | Moved to the very end on purpose: P104, not P99, is what actually lands shadcn-vue's own components (correct roles/labels built in) across every primitive — fixing findings before that would mean hand-fixing markup P104 deletes and rewrites wholesale anyway. No point solving by hand what moving to shadcn already solves |
 
 ## P96 result
 
@@ -917,6 +918,168 @@ cleanly.
 No new `docs/ARCHITECTURE.md` **Known open items** entry — that file is explicitly Part 4's to
 edit, not this phase's; the one open item this phase produced (the deferred first-boot import,
 above) is recorded here instead, for the orchestrating session to route.
+
+## P100 Part 2 result
+
+Landed per plan (`docs/v1.9/plans/P100-kira-space-extraction.md` §5, §8-§11), plus the P103
+byte-identical-tier dedup folded into this pass per that row's own instruction. 5 commits,
+`5864d79` (the shared theme package) through `98912aa` (root wiring), plus this section's own
+commit. 465 files changed against `dd3ec62`, 5504 insertions(+), 7754 deletions(-).
+
+**`packages/theme`, one package, one commit (`5864d79`), not two.** 122 files: `tokens.css`,
+`base.css`, all 18 `components/ui/*` shadcn-vue components (`alert`, `button`, `checkbox`,
+`command`, `context-menu`, `dialog`, `dropdown-menu`, `input`, `input-group`, `label`, `popover`,
+`scroll-area`, `separator`, `textarea`, `toggle`, `toggle-group`, `tooltip`, plus `lib/utils.ts`
+alongside them), the 12 verbatim-identical `primitives/*` ports (`AppButton`, `Checkbox`,
+`DialogFrame`, `EmptyState`, `IconButton`, `PanelShell`, `SegmentedControl`, `TextField`,
+`TreeHost`, `VirtualList`, `PanelSearchBox`, `PanelSplitter`) plus `stickyBand.ts`, `connColor.ts`,
+`wrapSelection.ts`, `CodiconIcon.vue` — exactly the P103 row's list, with its own two stated
+deviations (`ColorPicker`/`completion.ts` absent, both already-dead before the pass; `connColor.ts`/
+`wrapSelection.ts` added, found identical during the pass) confirmed against the actual file list
+above. Kira Studio then adopts it (`c50a613`): 240 files changed, 7995 deletions(-) — its own
+`components/ui/*` and `theme/primitives/*`/`theme/*.css`/`theme/*.ts` copies deleted outright, not
+kept alongside the new import. 325 `from '@theme/...'` import lines added across both frontends
+(measured via `git diff dd3ec62..HEAD -- apps/kira-studio/frontend apps/kira-space/frontend | grep
+-c "^+.*from '@theme/"` — a floor, not a ceiling: it only matches single-import lines, so a
+destructured multi-symbol import counts once). `vite.config.ts`, `tsconfig.json`, `components.json`
+in both frontends retargeted at the shared package.
+
+**Two Tailwind v4 bugs found and fixed while wiring the shared package, not pre-existing.** (1)
+Tailwind v4's automatic content scan roots at the Vite project root and never reaches a sibling
+monorepo package — `packages/theme/src`'s own classes were invisible to either app's build until an
+explicit `@source "./";` directive was added to `packages/theme/src/base.css`, placed after every
+`@import` per CSS's own at-rule ordering rule (`noInvalidPositionAtImportRule`). (2) Tailwind v4's
+bracket-integer arbitrary-value form generates no CSS at all in this setup — `z-[1]`/`z-[2]`
+produced nothing; the bare-integer form `z-1`/`z-2` works. Fixed across
+`packages/theme/src/primitives/VirtualList.vue`, `apps/kira-studio/frontend/src/project/
+ProjectTree.vue`, `apps/kira-studio/frontend/src/views/stream/StreamView.vue`,
+`apps/kira-space/frontend/src/repo/RepoFileTree.vue`. Bug (2) was the exact cause of a real,
+pre-existing-labelled UI-suite failure — `tests/ui/tree.spec.ts:182`'s sticky-band stacking-order
+assertion — root-caused and fixed as part of this same pass, then reconfirmed clean (3 isolated
+reruns, no flake).
+
+**A genuine regression found only once Wails bindings were cleanly regenerated, not caught by the
+"already green" list this phase started from.** `sh scripts/setup.sh`'s `wails3 task
+common:generate:bindings -clean=true` deletes and rebuilds `frontend/bindings/` (gitignored) from
+current Go source; doing so removed three binding files —`gitclientsservice.js`, `githubservice.js`,
+`codeworkspaceservice.js` — that Kira Studio's `frontend/src/bridge/index.ts` was still silently
+importing, services P100 Part 1 had already moved to Kira Space. `bun run build` had stayed green
+only because the stale, no-longer-matching binding artifacts were still present on disk from before
+Part 1's move; a clean regeneration surfaced the break. Root-caused as genuinely dead code (zero
+remaining callers anywhere in the app, confirmed by grep) and removed from `bridge/index.ts`: the
+three service imports, the `HeadState` type import, four `@shared/domain/{git,repo}` type-import
+blocks, `githubOpenPullRequestUrl`, the `gitClients*`/`gitPairing*`/`gitVsix*` method block, and the
+`codeWorkspace*` method block (~70 lines total). Cascaded one dependency fix: removing `HeadState`'s
+import left `apps/kira-studio/frontend/package.json`'s `@kira/git-ipc` dependency genuinely unused,
+caught by `bun run lint:dead` (knip) immediately — removed, `bun install` re-run, lockfile updated.
+Both fixes are part of `c50a613`, not a separate commit, since they were required to make that same
+commit's shared-theme adoption build at all.
+
+**`apps/kira-space` stands up its own workbench (`5b96d1b`), port not hoist, per §5.2's own
+decision.** 201 files changed, 4756 insertions(+), 6323 deletions(-) (the deletions are the local
+theme/`components/ui` copies §5.1 says to port once and then not duplicate a second time inside the
+new frontend). 89 files under `apps/kira-space/frontend/src`, 25 under `apps/kira-space/tests`.
+Confirmed dead before the port and correctly left out, not silently dropped: `ColorPicker.vue`,
+`completion.ts` (zero callers in `apps/kira-space/frontend` before this commit touched it),
+`repo/QuickOpen.vue`/`repo/state/quickOpen.ts`/`tests/unit/quick-open-index-truncated-reactive.spec.ts`
+(no quick-open surface in Kira Space's own workbench).
+
+**`apps/kira-studio-vscode/src/commands.test.ts` fixed (`c4cfc74`), a Part 1 leftover, not this
+phase's own new code.** Its `OPS_GO`/`REMOTE_GO`/`STACK_GO` fixture paths still pointed at
+`kira-studio/internal/gitsession/*`; Part 1 had already moved that package to `kira-space` without
+updating this one test file's constants. Fixed on the spot per `CLAUDE.md`'s standing rule (a
+failing/stale reference gets fixed when found, not left for a later phase), confirmed via
+`git diff --stat` against `dd3ec62` that this file was untouched by any of Part 1's own commits.
+
+**Root wiring (`98912aa`)**: `CLAUDE.md`'s own `packages/theme` mention, root `package.json`'s
+workspace list plus new `dev:space`/`build:space`/`package:space`/`typecheck:space-*`/`test:ui:space`
+scripts and a `fuzzysort` dependency drop (dead since P100 Part 1 moved its only consumer),
+`knip.json`'s new `apps/kira-space/frontend` and `packages/theme` workspace blocks, `check-tokens.sh`
+extended to resolve `--kira-*`/`--kui-*` references inside `packages/theme/src` too, `sign-bundle.sh`
+taught about the second bundle, `go.mod`/`go.sum` (`go mod tidy` drops
+`git.sr.ht/~jackmordaunt/go-toast/v2`, unused since Part 1).
+
+**`apps/kira-space/frontend/dist/index.html` untracked, matching Kira Studio's own precedent.** Part
+1 force-added it past `.gitignore`'s `frontend/dist` entry as a placeholder so Go's
+`//go:embed all:frontend/dist` would compile before Part 2 had a real frontend. Part 2 now produces
+a real Vite build there; `git rm --cached` brings it in line with Kira Studio (0 tracked files under
+its own `frontend/dist/`) — `apps/kira-space/.gitignore` already carries the same entry, so nothing
+new was added to ignore it.
+
+**A false-alarm investigated and closed, not a bug this phase fixed.** An earlier pass in this same
+session had flagged `tests/ui/sql-schema.spec.ts:143` as failing deterministically, even under
+serial (`--workers=1`) isolated execution. Re-investigated this session with temporary debug
+instrumentation (reverted cleanly, confirmed via `git diff --stat` showing zero residual diff): the
+test passed once instrumented, then passed 8/8 in clean isolated reruns and 12/12 in the full-file
+run at normal parallelism, including the exact assertion and the four originally-flagged contention
+failures elsewhere in the same file. The earlier "deterministic" claim was itself an artifact of
+concurrent heavy load during that investigation (other builds/tests running at the same time), the
+same resource-contention pattern this repo's own sandbox notes already document — not a real bug,
+and no code changed for this finding.
+
+**Both apps launched and produced a real DOM boot**, via this sandbox's established `-tags server`
+substitute (`docs/DEV_ENVIRONMENT.md`; no display in this container). Both Go backends answer
+`/health` cleanly; `go build -tags server` succeeds for both. Kira Studio boots with zero console
+errors via the plain fallback `?window=main` — its `WindowsService.Ensure()` auto-provisions that
+row. Kira Space has no `WindowsService` at all (a pre-existing, already-documented design
+simplification in `main.ts`'s own comment, not introduced by this phase — confirmed via grep, no
+`apps/kira-space/internal/bridge/windows.go` exists) so a plain `?window=main` request 400s with
+`"unknown window: main"`; retried with the real Startup-created window UUID read directly from its
+fresh SQLite DB, which booted a correct, title-and-status-bar-present DOM. The real native shell is
+unaffected either way — `internal/shell/window.go` always navigates with `URL: "/?window=" + w.Key`
+against a row Startup already created, so this gap is specific to this ad hoc plain-URL diagnostic
+technique, not a product defect. Kira Space then showed 4 first-run console errors (`422` resource
+loads ×2, `"codeworkspace: git is unavailable: notFound"` unhandled rejections ×2) — expected for a
+fresh `KIRA_SPACE_HOME` with no repos imported and no git-client config yet (`/usr/bin/git` 2.43.0
+is genuinely installed and on `PATH`, confirmed directly; the error is an internal git-client-config
+probe finding nothing configured, not a missing binary) — not chased further, out of this
+verification task's scope.
+
+**Verification (§9).** Every row of the plan's own table, re-run in this session rather than
+trusted from an earlier claim:
+
+- `go build ./...`, `go vet ./...`: clean, both apps, no output.
+- `bun run lint:go` (golangci-lint): `0 issues.`
+- `bun run test:go`: 66 packages `ok`, 0 `FAIL`.
+- `bun run typecheck`: clean across all **eight** projects (`typecheck:tests`, `typecheck:web`,
+  `typecheck:space-web`, `typecheck:unit`, `typecheck:space-unit`, `typecheck:api-core`,
+  `typecheck:git`, `typecheck:space-tests`) — the new `typecheck:space-web`/`typecheck:space-unit`/
+  `typecheck:space-tests` are this phase's own addition, per the plan's own note.
+- `bun run lint` (Biome + `check-tokens.sh`): `Checked 1340 files in 5s. No fixes applied.`; every
+  `--kira-*`/`--kv-*`/`--kui-*` reference resolves across `apps/kira-studio/frontend/src`,
+  `apps/kira-space/frontend/src`, `packages/theme/src`, `packages/git-ui/src`,
+  `packages/kira-ui/src`.
+- `bun run lint:dead` (knip): exit 0, same 6 duplicate-export warnings as the pre-phase baseline.
+  Configuration hints went from the plan's stated 4 to **6** — the two new entries are
+  `apps/kira-space/frontend` and `packages/theme` each getting their own ".vue extension not
+  registered as compiler" informational line, one per new `knip.json` workspace block. The plan's
+  §9 table says the new workspace block "must not add a finding"; these are knip's own
+  informational config-hints category (exit 0, not a failure or an unused-code finding), but they
+  are new output this phase's own wiring introduced, named here rather than glossed over.
+- `bun run build`: clean, `✓ built in 6.00s` (only the pre-existing >500kB chunk-size advisory,
+  unrelated to this phase).
+- `bun run build:space`: clean, `✓ built in 3.25s`, same advisory.
+- `bun run build:vscode`: clean, `✓ built in 1.07s`, both bundles produced (this extension is still
+  `kira-studio-vscode` — the rename is Part 3's own job, not touched here).
+- `bun run verify:packaging`: `all checks passed` — S1/S2/S5 static checks green; A1/A3-A6/N2-N3
+  artifact checks skipped (no built `.app`/`.dmg` in this sandbox, the same documented precedent
+  Part 1's own verification used).
+- `bun run test:unit`: 1534 pass, 0 fail, 13649 `expect()` calls, 155 files (the plan's own §9
+  baseline states 1535 — a 1-test drift against a four-week-old planning-time number, not something
+  this phase's own diff touched, and not chased further since every test present passes clean).
+- `bun run test:ui` (Kira Studio): 279 passed, 0 failed, across both the `ui` and `ui-timing`
+  Playwright projects.
+- `bun run test:ui:space`: 20 passed, 0 failed — the exact 2 moved spec files
+  (`repo-graph-lifecycle.spec.ts`, `repo-workspace.spec.ts`).
+- `bun run test:webview`: 55 passed, 0 failed — matches the plan's own baseline exactly, no
+  failures surfaced by this phase's changes.
+- `bun run test:visual`: 5 failed / 5 total, each a small (~1%) pixel-diff ratio — the same
+  pre-existing baseline count the task's own gate named, no sixth failure introduced by the
+  `workbench`/title-bar/settings-dialog changes this phase made.
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry from this phase specifically — the one
+carried-forward item (the deferred first-boot pairings/repo-list import) remains Part 1's own,
+recorded in that section above, not duplicated here.
 
 ## Layout
 
