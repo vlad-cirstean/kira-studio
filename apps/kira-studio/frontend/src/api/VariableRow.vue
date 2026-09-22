@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { ref, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
@@ -89,12 +90,15 @@ function onDescriptionInput(v: string): void {
 }
 
 const showHistory = ref(false);
+const historyAnchorRef = ref<HTMLElement | null>(null);
 function onHistoryClick(): void {
   showHistory.value = true;
   emit('history');
 }
-function onHistoryClose(): void {
+function onHistoryOpenChange(open: boolean): void {
+  if (open) return;
   showHistory.value = false;
+  variableSetStore.closeHistoryMenu();
 }
 
 // D14: Alt+↑/↓ moves the focused row — a drag-only affordance is unusable from the keyboard, and
@@ -195,29 +199,32 @@ function onKeydown(e: KeyboardEvent): void {
       </TooltipTrigger>
       <TooltipContent>{{ secretsUnavailable ? 'Secret storage is unavailable' : 'Secret' }}</TooltipContent>
     </Tooltip>
-    <div class="history-anchor">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :disabled="trailing"
-              aria-label="History"
-              data-testid="variable-history"
-              @click="onHistoryClick"
-            >
-              <CodiconIcon name="history" :size="13" />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>History</TooltipContent>
-      </Tooltip>
-      <VariableHistoryMenu
-        v-if="showHistory && variableSetStore.variableId === row.id"
-        @close="onHistoryClose"
-      />
-    </div>
+    <Popover
+      :open="showHistory && variableSetStore.variableId === row.id"
+      @update:open="onHistoryOpenChange"
+    >
+      <div class="history-anchor">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span ref="historyAnchorRef" tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :disabled="trailing"
+                aria-label="History"
+                data-testid="variable-history"
+                @click="onHistoryClick"
+              >
+                <CodiconIcon name="history" :size="13" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>History</TooltipContent>
+        </Tooltip>
+        <PopoverAnchor :reference="historyAnchorRef ?? undefined" />
+      </div>
+      <VariableHistoryMenu v-if="variableSetStore.variableId === row.id" />
+    </Popover>
     <Tooltip>
       <TooltipTrigger as-child>
         <span tabindex="0" class="inline-flex" :aria-describedby="undefined">

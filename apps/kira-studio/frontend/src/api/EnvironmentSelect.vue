@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { connColorVar } from '@theme/connColor';
 import { computed, onMounted, ref } from 'vue';
-import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useVariablesStore } from './state/variables';
 
 const variablesStore = useVariablesStore();
@@ -65,29 +65,29 @@ function manage(): void {
 </script>
 
 <template>
-  <div class="environment-anchor p-push">
-    <button
-      type="button"
-      class="p-select bordered environment-select"
-      data-testid="api-environment-select"
-      :data-value="activeEnvironmentId"
-      @click="open = !open"
-    >
-      <span
-        class="p-conn-dot"
-        :class="{ none: !activeEnvironment?.color || activeEnvironment.color === 'none' }"
-        :style="{ '--kira-rail': connColorVar(activeEnvironment?.color) }"
-      />
-      <span class="environment-select-label">{{ activeEnvironment?.name ?? 'No environment' }}</span>
-      <CodiconIcon name="chevron-down" :size="12" />
-    </button>
-    <PopoverPanel
-      v-if="open"
-      :width="200"
-      anchor="right"
-      test-id="api-environment-menu"
-      backdrop-test-id="api-environment-menu-backdrop"
-      @close="open = false"
+  <Popover v-model:open="open">
+    <div class="environment-anchor p-push">
+      <PopoverTrigger as-child>
+        <button
+          type="button"
+          class="p-select bordered environment-select"
+          data-testid="api-environment-select"
+          :data-value="activeEnvironmentId"
+        >
+          <span
+            class="p-conn-dot"
+            :class="{ none: !activeEnvironment?.color || activeEnvironment.color === 'none' }"
+            :style="{ '--kira-rail': connColorVar(activeEnvironment?.color) }"
+          />
+          <span class="environment-select-label">{{ activeEnvironment?.name ?? 'No environment' }}</span>
+          <CodiconIcon name="chevron-down" :size="12" />
+        </button>
+      </PopoverTrigger>
+    </div>
+    <PopoverContent
+      align="end"
+      class="w-[200px] gap-0 p-0"
+      data-testid="api-environment-menu"
     >
       <div class="environment-menu">
         <button
@@ -132,8 +132,8 @@ function manage(): void {
           <span class="label">Manage environments…</span>
         </button>
       </div>
-    </PopoverPanel>
-  </div>
+    </PopoverContent>
+  </Popover>
 </template>
 
 <style scoped>

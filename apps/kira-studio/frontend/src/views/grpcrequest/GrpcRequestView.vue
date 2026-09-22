@@ -4,6 +4,7 @@ import { grpcRequestTitle } from '@shared/domain/grpc';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
@@ -248,6 +249,7 @@ function toggleFieldDescriptions(): void {
 
 // P17 D20/item 8: same component-local flag as HttpRequestView.vue's own.
 const overviewOpen = ref(false);
+const overviewAnchorRef = ref<HTMLElement | null>(null);
 
 function onMessageInput(value: string): void {
   patchGrpcRequestTabState(props.tab.id, { message: value });
@@ -491,22 +493,25 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>{{ tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions' }}</TooltipContent>
       </Tooltip>
-      <div class="overview-anchor">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-input text-fg': overviewOpen }"
-              aria-label="Variables"
-              data-testid="grpc-variables-overview-toggle"
-              @click="overviewOpen = !overviewOpen"
-            >
-              <CodiconIcon name="variable-group" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Variables</TooltipContent>
-        </Tooltip>
+      <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
+        <div ref="overviewAnchorRef" class="overview-anchor">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'bg-input text-fg': overviewOpen }"
+                aria-label="Variables"
+                data-testid="grpc-variables-overview-toggle"
+                @click="overviewOpen = !overviewOpen"
+              >
+                <CodiconIcon name="variable-group" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Variables</TooltipContent>
+          </Tooltip>
+          <PopoverAnchor :reference="overviewAnchorRef ?? undefined" />
+        </div>
         <VariablesOverviewPanel
           v-if="overviewOpen"
           :collection-id="collectionId"
@@ -514,7 +519,7 @@ onUnmounted(() => {
           :can-edit="!incognito"
           @close="overviewOpen = false"
         />
-      </div>
+      </Popover>
       <EnvironmentSelect :tab-id="tab.id" />
     </div>
 

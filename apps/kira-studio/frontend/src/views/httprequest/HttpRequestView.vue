@@ -22,6 +22,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@theme/components/ui/input-group';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
@@ -385,6 +386,7 @@ const fieldFilterQuery = ref('');
 // P17 D20/item 8: the unified overview panel's own open flag — component-local, same "a lens, not
 // a setting" rule as fieldFilterOpen just above.
 const overviewOpen = ref(false);
+const overviewAnchorRef = ref<HTMLElement | null>(null);
 // P90 §2.6: rewritten as an explicit allow-list — the two new panes (Settings, Cookies) have no
 // rows to filter, and the old `!== 'body'` shorthand would otherwise leave the filter/descriptions
 // toggles on screen over them.
@@ -708,22 +710,25 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>Find in the request body</TooltipContent>
       </Tooltip>
-      <div class="overview-anchor">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              :class="{ 'bg-input text-fg': overviewOpen }"
-              aria-label="Variables"
-              data-testid="http-variables-overview-toggle"
-              @click="overviewOpen = !overviewOpen"
-            >
-              <CodiconIcon name="variable-group" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Variables</TooltipContent>
-        </Tooltip>
+      <Popover :open="overviewOpen" @update:open="overviewOpen = $event">
+        <div ref="overviewAnchorRef" class="overview-anchor">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'bg-input text-fg': overviewOpen }"
+                aria-label="Variables"
+                data-testid="http-variables-overview-toggle"
+                @click="overviewOpen = !overviewOpen"
+              >
+                <CodiconIcon name="variable-group" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Variables</TooltipContent>
+          </Tooltip>
+          <PopoverAnchor :reference="overviewAnchorRef ?? undefined" />
+        </div>
         <VariablesOverviewPanel
           v-if="overviewOpen"
           :collection-id="collectionId"
@@ -731,7 +736,7 @@ onUnmounted(() => {
           :can-edit="!incognito"
           @close="overviewOpen = false"
         />
-      </div>
+      </Popover>
       <EnvironmentSelect :tab-id="tab.id" />
     </div>
 

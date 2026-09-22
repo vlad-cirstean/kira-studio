@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PaletteColor } from '@shared/domain/color';
+import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
@@ -17,7 +17,6 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
 import type { VariableSetTabRecord } from '../state/tabDomain';
-import ColorPicker from '../theme/primitives/ColorPicker.vue';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useCollectionsStore } from './state/collections';
 import { useVariableSetStore, useVariablesStore } from './state/variables';
@@ -438,7 +437,7 @@ function onBulkClose(): void {
       </InputGroup>
       <span class="p-push" />
       <span
-        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        class="p-run-state inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
         :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
       >
         <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
@@ -516,12 +515,31 @@ function onBulkClose(): void {
             @blur="onEnvFieldBlur"
           />
         </label>
-        <ColorPicker
-          :model-value="owningEnvironment.color"
-          label="Environment color"
+        <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
+             call site rather than kept as a shared primitive (theme/primitives/ColorPicker.vue). -->
+        <div
+          class="color-picker flex h-6.5 flex-wrap items-center gap-1"
+          role="radiogroup"
+          aria-label="Environment color"
           data-testid="environment-color-picker"
-          @update:model-value="onEnvColorChange"
-        />
+        >
+          <Tooltip v-for="color in PALETTE_COLOR_CHOICES" :key="color">
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+                :class="{ 'outline outline-2 outline-offset-2 outline-fg': owningEnvironment.color === color, none: color === 'none' }"
+                :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                :aria-label="color === 'none' ? 'No colour' : color"
+                role="radio"
+                :aria-checked="owningEnvironment.color === color"
+                :data-testid="`color-${color}`"
+                @click="onEnvColorChange(color)"
+              />
+            </TooltipTrigger>
+            <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
+          </Tooltip>
+        </div>
         <Button variant="toolbar" size="kira" data-testid="environment-duplicate" @click="onDuplicateEnvironment">
           Duplicate
         </Button>
@@ -568,6 +586,19 @@ function onBulkClose(): void {
 
 .variable-set-view {
   @apply flex h-full min-h-0 flex-col;
+}
+
+/* Inlined from theme/primitives/ColorPicker.vue (P104 §3): the "no colour" swatch's diagonal
+   slash, never a 13th hue standing in for "nothing chosen". */
+.swatch.none {
+  border: 1.5px solid var(--kira-fg-muted);
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
 }
 
 .p-dialog-body.list {
