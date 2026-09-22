@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { useQuery } from '@tanstack/vue-query';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
@@ -101,11 +102,14 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
          "enabling is never a silent action"). -->
     <label class="field checkbox">
       <Checkbox
+        class="size-3.5"
         :model-value="settingsStore.dbMcp.serverEnabled"
         :disabled="dbMcpToggling"
         data-testid="settings-db-mcp-enabled"
-        @update:model-value="onToggleDbMcpEnabled"
-      />
+        @update:model-value="(v) => onToggleDbMcpEnabled(v === true)"
+      >
+        <CodiconIcon name="check" :size="10" />
+      </Checkbox>
       <span>Enable the database MCP server</span>
       <span class="helper-text"
         >Lets an AI client list, browse and query the connections exposed below, through
@@ -122,14 +126,15 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
         <p class="mono command-text" data-testid="db-mcp-command">
           {{ dbMcpStore.status.command }}
         </p>
-        <AppButton
-          kind="dialog"
+        <Button
+          variant="dialog"
+          size="kira-lg"
           class="action-button"
           :disabled="dbMcpInstalling"
           data-testid="db-mcp-install-button"
           @click="onInstallDbMcpClaudeCode"
         >{{ dbMcpStore.status.claudeAvailable ? 'Register with Claude Code' : 'Copy command above' }}
-        </AppButton>
+        </Button>
         <p v-if="dbMcpInstallMessage" class="helper-text" data-testid="db-mcp-install-outcome">
           {{ dbMcpInstallMessage }}
         </p>
@@ -139,15 +144,16 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
           This server restarted since it was last enabled; its registration command needs a
           fresh token to show again.
         </p>
-        <AppButton
-          kind="dialog"
+        <Button
+          variant="dialog"
+          size="kira-lg"
           class="action-button"
           :disabled="dbMcpRegenerating"
           data-testid="db-mcp-regenerate-button"
           @click="onRegenerateDbMcpToken"
         >
           Regenerate token
-        </AppButton>
+        </Button>
       </template>
       <p
         v-if="dbMcpStore.status.running && dbMcpStore.status.expiresAt"
@@ -209,10 +215,13 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
           >
         </div>
         <Checkbox
+          class="size-3.5"
           :model-value="conn.mcpEnabled"
           :data-testid="`db-mcp-connection-${conn.id}`"
-          @update:model-value="(v: boolean) => onToggleConnectionMcpEnabled(conn.id, v)"
-        />
+          @update:model-value="(v) => onToggleConnectionMcpEnabled(conn.id, v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
       </li>
     </ul>
     <p v-else class="muted-note" data-testid="db-mcp-connections-empty">

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import {
   EXPENSIVE_QUERY_ROWS_RANGE,
@@ -54,20 +56,30 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
     <label class="field">
       <div class="field-head">
         <span>Operation log retention (days)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-advanced-opLogRetentionDays"
-          :disabled="isAtDefault('advanced', 'opLogRetentionDays')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('advanced', 'opLogRetentionDays')"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'opLogRetentionDays') }">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="settings-reset-advanced-opLogRetentionDays"
+                :disabled="isAtDefault('advanced', 'opLogRetentionDays')"
+                aria-label="Reset to default"
+                @click="resetLeaf('advanced', 'opLogRetentionDays')"
+              >
+                <CodiconIcon name="discard" :size="13" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="OP_LOG_RETENTION_DAYS_RANGE.min"
         :max="OP_LOG_RETENTION_DAYS_RANGE.max"
-        size="md"
-        :invalid="!!opLogRetentionError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!opLogRetentionError || undefined"
         data-testid="settings-oplog-retention"
         :model-value="String(draft.advanced.opLogRetentionDays)"
         @input="onOpLogRetentionInput"
@@ -81,20 +93,30 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
     <label class="field">
       <div class="field-head">
         <span>Expensive query threshold (rows)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-advanced-expensiveQueryRows"
-          :disabled="isAtDefault('advanced', 'expensiveQueryRows')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('advanced', 'expensiveQueryRows')"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'expensiveQueryRows') }">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="settings-reset-advanced-expensiveQueryRows"
+                :disabled="isAtDefault('advanced', 'expensiveQueryRows')"
+                aria-label="Reset to default"
+                @click="resetLeaf('advanced', 'expensiveQueryRows')"
+              >
+                <CodiconIcon name="discard" :size="13" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="EXPENSIVE_QUERY_ROWS_RANGE.min"
         :max="EXPENSIVE_QUERY_ROWS_RANGE.max"
-        size="md"
-        :invalid="!!expensiveQueryRowsError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!expensiveQueryRowsError || undefined"
         data-testid="settings-expensive-query-rows"
         :model-value="String(draft.advanced.expensiveQueryRows)"
         @input="onExpensiveQueryRowsInput"
@@ -116,13 +138,23 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
     <label class="field">
       <div class="field-head">
         <span>Git log level</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-advanced-gitLogLevel"
-          :disabled="isAtDefault('advanced', 'gitLogLevel')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('advanced', 'gitLogLevel')"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="settings-reset-advanced-gitLogLevel"
+                :disabled="isAtDefault('advanced', 'gitLogLevel')"
+                aria-label="Reset to default"
+                @click="resetLeaf('advanced', 'gitLogLevel')"
+              >
+                <CodiconIcon name="discard" :size="13" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <select
         class="p-select bordered md"

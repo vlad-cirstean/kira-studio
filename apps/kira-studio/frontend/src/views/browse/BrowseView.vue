@@ -8,9 +8,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 // (a @tanstack/vue-virtual recipe and a ui/alert composition respectively) -- not attempted in
 // this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-// PanelSplitter is not one of the 20 forbidden primitives -- it wraps no old primitive, has no
-// v-tooltip, and its own styling already moved to Tailwind in P99 Part 2 (see its own header
-// comment). Kept as-is.
+// P104 §3.3: the plan scopes the reka-Splitter conversion to WorkbenchShell.vue's own CSS-grid
+// shell splitters (project/ops, already converted) -- not to every PanelSplitter call site. This
+// one (a plain two-pane list/detail split, no shell grid or layout-store involvement) stays on the
+// primitive as-is, same as every other non-shell caller.
 import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { useDebounceFn } from '@vueuse/core';

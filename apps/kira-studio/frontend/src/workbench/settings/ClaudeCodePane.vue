@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import Checkbox from '@theme/primitives/Checkbox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Checkbox } from '@theme/components/ui/checkbox';
 import { ref } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useKeepAwakeStore } from '../../state/keepAwake';
@@ -47,11 +48,14 @@ async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
          line, never mixed with it. -->
     <label class="field checkbox">
       <Checkbox
+        class="size-3.5"
         :model-value="settingsStore.claudeCode.hooksEnabled"
         :disabled="claudeCodeHooksToggling"
         data-testid="settings-claude-code-hooks"
-        @update:model-value="onToggleAgentHooksEnabled"
-      />
+        @update:model-value="(v) => onToggleAgentHooksEnabled(v === true)"
+      >
+        <CodiconIcon name="check" :size="10" />
+      </Checkbox>
       <span>Report session activity to Kira Studio</span>
       <span class="helper-text"
         >A Claude Code tab launches with a `--settings` flag pointing at a file this app
@@ -82,11 +86,14 @@ async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
          the hooks toggle just above. -->
     <label class="field checkbox">
       <Checkbox
+        class="size-3.5"
         :model-value="settingsStore.claudeCode.keepAwakeWithAgents"
         :disabled="keepAwakeAgentAwareToggling"
         data-testid="settings-claude-code-keep-awake"
-        @update:model-value="onToggleKeepAwakeAgentAware"
-      />
+        @update:model-value="(v) => onToggleKeepAwakeAgentAware(v === true)"
+      >
+        <CodiconIcon name="check" :size="10" />
+      </Checkbox>
       <span>Keep this Mac awake while a Claude Code session is running</span>
       <span class="helper-text"
         >Prevents idle sleep, and system sleep on AC power, for as long as at least one
