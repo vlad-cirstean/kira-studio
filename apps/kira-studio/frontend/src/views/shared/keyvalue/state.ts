@@ -1,9 +1,9 @@
 import type { PageSize } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { data } from '../../../bridge/data';
 import { pinia } from '../../../state/pinia';
-import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 import { registerTabReload } from '../../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../viewOp';
 import { keyValueHost } from './host';

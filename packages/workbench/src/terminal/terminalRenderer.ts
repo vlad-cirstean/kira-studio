@@ -7,15 +7,28 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { useSettingsStore } from '../../state/settings';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
-import { useTerminalsStore } from '../../state/terminals';
+import { registerTabRuntimeCleanup } from '../state/tabRuntime';
 
 interface Attached {
   term: Terminal;
   fit: FitAddon;
   host: HTMLDivElement;
   off: () => void;
+}
+
+// P103 Part 1: `useSettingsStore`/`useTerminalsStore` used to be imported directly (each app's own
+// `state/settings.ts`/`state/terminals.ts`, neither hoisted here — both are real per-app stores,
+// `settings.ts` genuinely diverges in section count and `terminals.ts` needs the workspace-key
+// parameterization P103 Part 2 does). This module has no package-boundary way to reach either
+// app's own store directly, so the two values/methods it actually touches are passed in instead —
+// a real parameterization, not a plain move, forced by that boundary. Each app's own TerminalView
+// component (which already holds both stores for its own use) passes them through unchanged. */
+export interface TerminalRendererDeps {
+  /** Live-read at call time (both call sites read it fresh, matching the pre-move behaviour of
+   *  reading `settingsStore.appearance` directly). */
+  appearance(): { fontFamily: string; fontSize: number };
+  onTerminalOutput(tabId: string, cb: (bytes: Uint8Array) => void): () => void;
+  writeTerminal(tabId: string, bytes: Uint8Array): void;
 }
 
 // Module-level, not held by the Vue component (§5.2/§6.2): a tab switch unmounts
@@ -61,7 +74,7 @@ const encoder = new TextEncoder();
  *  detached `<div>` — RepoTerminalView.vue appends it to its container on mount and never calls
  *  `term.open()` a second time (§6.2: the one mechanically safe way to reattach an xterm across
  *  unmounts, since whether `open()` itself is re-entrant is never relied on). */
-export function getOrCreateTerminal(tabId: string): Attached {
+export function getOrCreateTerminal(tabId: string, deps: TerminalRendererDeps): Attached {
   const existing = byTabId.get(tabId);
   if (existing) return existing;
 
@@ -69,14 +82,13 @@ export function getOrCreateTerminal(tabId: string): Attached {
   host.style.height = '100%';
   host.style.width = '100%';
 
-  const settingsStore = useSettingsStore();
-  const terminalsStore = useTerminalsStore();
+  const appearance = deps.appearance();
   const term = new Terminal({
     scrollback: 5000,
     cursorBlink: true,
     allowProposedApi: false,
-    fontFamily: settingsStore.appearance.fontFamily,
-    fontSize: settingsStore.appearance.fontSize,
+    fontFamily: appearance.fontFamily,
+    fontSize: appearance.fontSize,
     theme: terminalTheme(),
   });
   const fit = new FitAddon();
@@ -84,17 +96,17 @@ export function getOrCreateTerminal(tabId: string): Attached {
   term.loadAddon(new WebLinksAddon());
   term.open(host);
 
-  const off = terminalsStore.onTerminalOutput(tabId, (bytes) => term.write(bytes));
+  const off = deps.onTerminalOutput(tabId, (bytes) => term.write(bytes));
   // onData is real text (typed characters, paste, escape sequences) — UTF-8 encoded before it
   // crosses the wire. onBinary is xterm's own byte-per-char convention (mouse reports, Alt-meta) —
   // each JS char code already IS the intended byte value, so it is never UTF-8 encoded, only
   // reinterpreted 1:1 into a Uint8Array. Getting these two swapped would corrupt typed non-ASCII
   // text (mis-encoding it) or corrupt binary escape sequences (double-UTF-8-encoding raw bytes).
-  term.onData((d) => terminalsStore.writeTerminal(tabId, encoder.encode(d)));
+  term.onData((d) => deps.writeTerminal(tabId, encoder.encode(d)));
   term.onBinary((d) => {
     const bytes = new Uint8Array(d.length);
     for (let i = 0; i < d.length; i++) bytes[i] = d.charCodeAt(i) & 0xff;
-    terminalsStore.writeTerminal(tabId, bytes);
+    deps.writeTerminal(tabId, bytes);
   });
 
   const attached: Attached = { term, fit, host, off };
@@ -116,11 +128,14 @@ export function fitTerminal(tabId: string): { cols: number; rows: number } | nul
 /** §6.3: re-applies the live "Data font" setting to an already-open terminal and re-fits it —
  *  the settings watch's own target (RepoTerminalView.vue). A no-op for an id with no attached
  *  terminal. */
-export function applyTerminalAppearance(tabId: string): { cols: number; rows: number } | null {
+export function applyTerminalAppearance(
+  tabId: string,
+  deps: TerminalRendererDeps,
+): { cols: number; rows: number } | null {
   const attached = byTabId.get(tabId);
   if (!attached) return null;
-  const settingsStore = useSettingsStore();
-  attached.term.options.fontFamily = settingsStore.appearance.fontFamily;
-  attached.term.options.fontSize = settingsStore.appearance.fontSize;
+  const appearance = deps.appearance();
+  attached.term.options.fontFamily = appearance.fontFamily;
+  attached.term.options.fontSize = appearance.fontSize;
   return fitTerminal(tabId);
 }

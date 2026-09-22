@@ -1,5 +1,5 @@
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { reactive } from 'vue';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 
 // P12 D12: the per-tab history runtime the two protocols shared byte-for-byte (F9) — same
 // {entries, loading, stale, viewing, error} shape, same seven functions, differing only in the

@@ -56,6 +56,7 @@ import {
   variableSetTabStateSchema,
 } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import type { MenuItem } from '@workbench/state/contextMenu';
 import { useTreeStore } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
@@ -63,7 +64,6 @@ import { drop as dropGridPagesForTab } from '../views/grid/page';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
 import { useConnectionsStore } from './connections';
-import type { MenuItem } from './contextMenu';
 import { useSettingsStore } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
 import { useTerminalsStore } from './terminals';

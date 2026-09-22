@@ -4,11 +4,11 @@
 import type { RepoFileTabRecord } from '@shared/domain/tabs';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import { registerCommand } from '@workbench/shortcuts/commands';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
-import { registerCommand } from '../../shortcuts/commands';
 import { useSettingsStore } from '../../state/settings';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { registerEditor, unmountEditor } from './editors';

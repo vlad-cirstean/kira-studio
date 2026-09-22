@@ -8,6 +8,9 @@ import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useDebounceFn } from '@vueuse/core';
+import { shortcutFor } from '@workbench/shortcuts/keys';
+import { type MenuItem, runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import type {
   Column,
   CustomDataView,
@@ -22,11 +25,8 @@ import type {
 } from 'slickgrid';
 import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { copyText } from '../../clipboard';
-import { shortcutFor } from '../../shortcuts/keys';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
-import { type MenuItem, runMenuShortcut, useContextMenuStore } from '../../state/contextMenu';
 import { correlationKeyFor, loadMaskRules, maskRulesFor, maskRulesQueryKey } from '../../state/maskRules';
 import { useSettingsStore } from '../../state/settings';
 import { useTabsStore } from '../../state/tabs';

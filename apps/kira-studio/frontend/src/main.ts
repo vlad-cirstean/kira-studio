@@ -22,6 +22,8 @@ import { queryClient } from './state/queryClient';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 import '@theme/base.css';
+import '@workbench/workbench.css';
+import { useTooltipStore } from '@workbench/state/tooltip';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useSettingsStore } from './state/settings';
@@ -54,7 +56,6 @@ import {
   totalRetainedBytes as streamRetainedBytes,
 } from './views/stream/page';
 import { useStreamSearchStore } from './views/stream/search';
-import { useTooltipStore } from './workbench/state/tooltip';
 
 /** P5 C1: what `window.__kiraRetention` reports for one of the five page stores — the decode/view
  *  caches `__kiraRetainedBytes` cannot see, since that sums `page.byteSize` only (F2). */

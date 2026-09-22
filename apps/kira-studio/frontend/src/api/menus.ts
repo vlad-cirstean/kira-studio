@@ -1,4 +1,4 @@
-import type { MenuItem } from '../state/contextMenu';
+import type { MenuItem } from '@workbench/state/contextMenu';
 import type { CollectionRowVm } from './state/collections';
 
 // P4 D13: the row and background context menus, built with the existing MenuItem type from

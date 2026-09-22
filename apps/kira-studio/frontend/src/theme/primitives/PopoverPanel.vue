@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useEventListener } from '@vueuse/core';
+import { autoUpdate, computeFloatPosition } from '@workbench/util/floatingPosition';
 import { onMounted, onUnmounted, ref } from 'vue';
-import { autoUpdate, computeFloatPosition } from '../floatingPosition';
 
 // Shared chrome for every trigger-anchored popover/menu (ColumnsMenu, FilterHistoryMenu,
 // ConsoleSavedMenu, PreviewCommandPanel): a full-viewport transparent backdrop that closes the

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { wheelToHorizontal } from '@workbench/util/wheelScroll';
 import { computed, ref } from 'vue';
-import { wheelToHorizontal } from '../../../wheelScroll';
 import { useDocumentRowsStore } from './rows';
 
 // One expanded document's body, rendered as flat indented key/value lines out of visibleLines()

@@ -25,8 +25,8 @@ import type {
   ReviewSessionSnapshot,
   Transport,
 } from '@kira/git-ipc';
+import { copyText } from '@workbench/util/clipboard';
 import { control } from '../../bridge/control';
-import { copyText } from '../../clipboard';
 import { useCodeReposStore } from '../../state/coderepos';
 import { useLayoutStore } from '../../state/layout';
 import {

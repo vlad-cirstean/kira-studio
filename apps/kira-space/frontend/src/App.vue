@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import AppTooltip from '@workbench/components/AppTooltip.vue';
+import ConfirmDialog from '@workbench/components/ConfirmDialog.vue';
+import ContextMenu from '@workbench/components/ContextMenu.vue';
+import { useTooltipStore } from '@workbench/state/tooltip';
 import { onMounted, onUnmounted } from 'vue';
-import AppTooltip from './workbench/AppTooltip.vue';
-import ConfirmDialog from './workbench/ConfirmDialog.vue';
-import ContextMenu from './workbench/ContextMenu.vue';
 import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
 import GitPairingDialog from './workbench/GitPairingDialog.vue';
-import { useTooltipStore } from './workbench/state/tooltip';
 import TitleBar from './workbench/TitleBar.vue';
 import WorkbenchShell from './workbench/WorkbenchShell.vue';
 

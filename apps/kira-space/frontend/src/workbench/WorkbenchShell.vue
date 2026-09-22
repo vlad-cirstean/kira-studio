@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import { useEventListener } from '@vueuse/core';
+import { runCommand } from '@workbench/shortcuts/commands';
+import { shortcutFor } from '@workbench/shortcuts/keys';
 import { computed } from 'vue';
 import GitPanel from '../repo/GitPanel.vue';
-import { runCommand } from '../shortcuts/commands';
-import { shortcutFor } from '../shortcuts/keys';
 import { useLayoutStore } from '../state/layout';
 import MainView from './panels/MainView.vue';
 import TabStrip from './panels/TabStrip.vue';

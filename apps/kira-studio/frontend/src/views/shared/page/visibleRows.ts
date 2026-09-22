@@ -1,4 +1,4 @@
-import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 
 // P42 D39: a tab's currently-visible page-row window, reported by whichever view renders it
 // (the deleted DataGrid.vue's own visiblePageRowBounds watch, VirtualList.vue's visible-range

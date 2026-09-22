@@ -1,6 +1,6 @@
+import { formatBytes } from '@workbench/util/format';
 import { type ComputedRef, computed, type Ref, ref } from 'vue';
 import type { BeautifyMode, BeautifyResult } from '../../beautify';
-import { formatBytes } from '../../format';
 
 export interface EditBufferOptions {
   /** The stored value the buffer seeds from and Revert returns to. */

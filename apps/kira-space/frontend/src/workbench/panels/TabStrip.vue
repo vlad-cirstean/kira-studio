@@ -2,16 +2,16 @@
 import type { TabRecord } from '@shared/domain/tabs';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { connColorVar } from '@theme/connColor';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
+import { wheelToHorizontal } from '@workbench/util/wheelScroll';
 import { computed, nextTick, ref, watch } from 'vue';
-import { copyText } from '../../clipboard';
 import { fileIconStyle } from '../../repo/fileIcon';
 import { useCodeReposStore } from '../../state/coderepos';
-import { useContextMenuStore } from '../../state/contextMenu';
 import { openRepoTerminalTab } from '../../state/repoTabs';
 import { type SpaceTabKind, TAB_KINDS } from '../../state/tabKinds';
 import { tabsForWorkspace, useTabsStore } from '../../state/tabs';
 import { GENERAL_WORKSPACE, useWorkspaceStore } from '../../state/workspace';
-import { wheelToHorizontal } from '../../wheelScroll';
 
 // P100 Part 2: Kira Studio's own workbench/panels/TabStrip.vue, trimmed — this app has no
 // AgentSessions store (no Claude Code hook integration, apps/kira-space/internal/terminal's own

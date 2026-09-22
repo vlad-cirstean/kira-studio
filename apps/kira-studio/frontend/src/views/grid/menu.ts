@@ -1,8 +1,8 @@
 import type { MaskKind, MaskRule } from '@shared/domain/mask';
 import type { ForeignKeyMeta, ObjectMeta } from '@shared/domain/tree';
 import { decodePath } from '@shared/domain/tree';
-import { copyText } from '../../clipboard';
-import type { MenuItem } from '../../state/contextMenu';
+import type { MenuItem } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { maskRulesFor, removeMaskRule, upsertMaskRule } from '../../state/maskRules';
 import { useTabsStore } from '../../state/tabs';
 import {

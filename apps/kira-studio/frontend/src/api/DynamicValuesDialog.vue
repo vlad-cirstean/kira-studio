@@ -4,8 +4,8 @@ import AppButton from '@theme/primitives/AppButton.vue';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import { copyText } from '@workbench/util/clipboard';
 import { computed, onMounted, reactive, ref } from 'vue';
-import { copyText } from '../clipboard';
 import { useDynamicValuesStore } from './state/dynamicValues';
 
 const dynamicValuesStore = useDynamicValuesStore();

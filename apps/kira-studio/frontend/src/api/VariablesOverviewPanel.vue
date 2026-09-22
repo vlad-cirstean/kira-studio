@@ -2,8 +2,8 @@
 import { connColorVar } from '@theme/connColor';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
-import { copyText } from '../clipboard';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useCollectionsStore } from './state/collections';
 import { useVariableSetStore, useVariablesStore, type VariableOverviewRow } from './state/variables';

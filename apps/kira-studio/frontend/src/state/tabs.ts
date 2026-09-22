@@ -31,6 +31,7 @@ import {
   type TabRecord,
 } from '@shared/domain/tabs';
 import { useDebounceFn } from '@vueuse/core';
+import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
@@ -43,7 +44,6 @@ import { pinia } from './pinia';
 import { useSettingsStore } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
-import { cleanupTabRuntime } from './tabRuntime';
 
 export interface RecentTableEntry {
   connectionId: string;

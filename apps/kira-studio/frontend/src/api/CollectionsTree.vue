@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import TreeHost from '@theme/primitives/TreeHost.vue';
+import { shortcutFor } from '@workbench/shortcuts/keys';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
-import { copyText } from '../clipboard';
-import { shortcutFor } from '../shortcuts/keys';
-import { useConfirmDialogStore } from '../state/confirmDialog';
-import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';

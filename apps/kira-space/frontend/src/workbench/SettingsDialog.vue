@@ -13,9 +13,9 @@ import Checkbox from '@theme/primitives/Checkbox.vue';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import TextField from '@theme/primitives/TextField.vue';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { formatRelative } from '@workbench/util/format';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
-import { formatRelative } from '../format';
-import { useConfirmDialogStore } from '../state/confirmDialog';
 import { useGitClientsStore } from '../state/gitClients';
 import { type Section, sections, useSettingsStore } from '../state/settings';
 

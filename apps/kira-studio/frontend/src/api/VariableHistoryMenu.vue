@@ -2,7 +2,7 @@
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
-import { formatRelative } from '../format';
+import { formatRelative } from '@workbench/util/format';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useVariableSetStore } from './state/variables';
 

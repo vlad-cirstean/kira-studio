@@ -38,7 +38,7 @@ import type {
   VariableScope,
 } from '@shared/domain/variables';
 import { CHANNEL } from '@shared/protocol/events';
-import { on, trust, unwrap, windowKey } from './rpc';
+import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 
 // P12 D11: the module's own binding surface, split out of control.ts's single 605-line file
 // (F13) — the 39 of 106 methods whose prefix is httpSend, grpc*, onGrpcCall, collections*,

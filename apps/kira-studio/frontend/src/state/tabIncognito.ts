@@ -1,6 +1,6 @@
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
-import { registerTabRuntimeCleanup } from './tabRuntime';
 
 // P71 §2.1: a per-tab in-memory flag suppressing every persistence write path a request tab can
 // reach (§1.1 of the plan) — one flag, checked at each write site, rather than a parallel

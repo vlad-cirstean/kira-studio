@@ -1,3 +1,4 @@
+import { runCommand } from '@workbench/shortcuts/commands';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
@@ -6,7 +7,6 @@ import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
-import { runCommand } from './commands';
 
 interface PaletteCommand {
   id: string;

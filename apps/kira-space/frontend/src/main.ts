@@ -12,7 +12,8 @@ import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 import { GENERAL_WORKSPACE, useWorkspaceStore } from './state/workspace';
 import '@theme/base.css';
-import { useTooltipStore } from './workbench/state/tooltip';
+import '@workbench/workbench.css';
+import { useTooltipStore } from '@workbench/state/tooltip';
 
 // P100 Part 2: Kira Studio's own main.ts bootstrap, trimmed to this app's own state layer — no
 // __KIRA_DEBUG_HOOKS__ block (that whole retention-probe apparatus is data-grid/query-result

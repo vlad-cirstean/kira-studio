@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import TreeHost from '@theme/primitives/TreeHost.vue';
+import { shortcutFor } from '@workbench/shortcuts/keys';
+import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onMounted, ref, watch } from 'vue';
-import { shortcutFor } from '../shortcuts/keys';
 import { useConnectionsStore } from '../state/connections';
-import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { useSchemaColumnsStore } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
 import { useSettingsStore } from '../state/settings';

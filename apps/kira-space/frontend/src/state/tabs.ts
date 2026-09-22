@@ -5,11 +5,11 @@ import {
   type TabRecord,
 } from '@shared/domain/tabs';
 import { useDebounceFn } from '@vueuse/core';
+import { cleanupTabRuntime } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { type SpaceTabKind, TAB_KINDS } from './tabKinds';
-import { cleanupTabRuntime } from './tabRuntime';
 import { GENERAL_WORKSPACE, useWorkspaceStore, type WorkspaceKey } from './workspace';
 
 // TAB_KINDS (state/tabKinds.ts) is total over SpaceTabKind, this app's own five kinds — narrower

@@ -5,8 +5,8 @@ import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { type ComponentPublicInstance, computed, nextTick, ref, watch } from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import { computeFloatPosition, pointReference } from '../theme/floatingPosition';
-import { CONTEXT_MENU_KEY_HANDLERS, type ContextMenuKeyContext } from './contextMenuKeys';
+import { CONTEXT_MENU_KEY_HANDLERS, type ContextMenuKeyContext } from '../util/contextMenuKeys';
+import { computeFloatPosition, pointReference } from '../util/floatingPosition';
 
 // P99 Part 2 §6.3 hard case: stays hand-rolled, DropdownMenuRoot/ContextMenuRoot both declined.
 // (1) This is one shared singleton menu opened imperatively from useContextMenuStore() by many

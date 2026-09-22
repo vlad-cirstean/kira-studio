@@ -4,8 +4,8 @@ import type { HttpCodeLanguage, HttpResponseWire, HttpWireFidelity } from '@shar
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
+import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
-import { copyText } from '../../clipboard';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';

@@ -15,10 +15,10 @@
 import type { RepoDiffTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
+import { registerCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
-import { registerCommand } from '../../shortcuts/commands';
 import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';

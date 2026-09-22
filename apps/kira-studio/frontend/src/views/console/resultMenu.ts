@@ -1,6 +1,6 @@
+import type { MenuItem } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { beautifyJson } from '../../beautify';
-import { copyText } from '../../clipboard';
-import type { MenuItem } from '../../state/contextMenu';
 import {
   columnsToTsv,
   type RowSnapshot,

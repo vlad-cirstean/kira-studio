@@ -3,7 +3,7 @@ import type { PortEvent, PortRequest, PortResponse } from '@shared/protocol/port
 // tsconfig.web.json maps this specifier onto @wailsio/runtime's real types (D8) and resolves it
 // cleanly; tests/unit/tsconfig.json has no such mapping (a "paths" entry there breaks Bun's own
 // mock.module interception for every file that transitively imports this one, not just the
-// declaring project — see tests/unit/support/wailsRuntime.ts), so this import is unresolvable
+// declaring project — see @workbench/testing/unit/wailsRuntime), so this import is unresolvable
 // under that project, and TypeScript forbids an ambient `declare module` for a path-like
 // specifier, leaving no clean per-project fix. The directive below deliberately stays the
 // suppress-if-present kind rather than the require-an-error kind, which would itself fail as

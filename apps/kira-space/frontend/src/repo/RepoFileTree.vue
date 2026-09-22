@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import TreeHost from '@theme/primitives/TreeHost.vue';
 import { useDebounceFn } from '@vueuse/core';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useContextMenuStore } from '../state/contextMenu';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
 import { menuForRepoRow } from './menus';

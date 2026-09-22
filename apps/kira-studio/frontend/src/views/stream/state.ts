@@ -1,11 +1,11 @@
 import { encodeKafkaStreamFilter } from '@shared/domain/streamFilter';
 import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
 import type { PageCursor } from '@shared/protocol/data-ops';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { data } from '../../bridge/data';
 import { useConnectionsStore } from '../../state/connections';
 import { pinia } from '../../state/pinia';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
 import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';

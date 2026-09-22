@@ -1,9 +1,9 @@
 import type { ObjectDefinition } from '@shared/domain/definition';
 import type { ObjectMeta } from '@shared/domain/tree';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import { createRuntimeStore } from '../shared/viewOp';
 

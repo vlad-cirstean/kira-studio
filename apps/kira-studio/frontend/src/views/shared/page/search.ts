@@ -1,5 +1,5 @@
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { type ComputedRef, computed, shallowReactive } from 'vue';
-import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 import type { SearchHandle, SearchQuery } from './scan';
 import { usePageSearchFilterStore } from './searchFilter';
 

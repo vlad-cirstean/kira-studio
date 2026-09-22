@@ -1,8 +1,8 @@
 import type { HttpCookieWire } from '@shared/domain/http';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { control } from '../../bridge/control';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 
 // P90 item 2's request-mode runtime: what the shared jar would send for a tab's current URL right
 // now — the answer to "will my session cookie go out on the next send" (CookiesPane.vue). Shared

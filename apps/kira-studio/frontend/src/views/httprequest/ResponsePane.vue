@@ -6,14 +6,14 @@ import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import { registerCommand } from '@workbench/shortcuts/commands';
+import { formatBytes } from '@workbench/util/format';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { beautifyJson, beautifyXml } from '../../beautify';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
-import { formatBytes } from '../../format';
-import { registerCommand } from '../../shortcuts/commands';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ResponseFindBar, {
   type FindBarHost,

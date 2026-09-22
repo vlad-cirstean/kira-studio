@@ -10,10 +10,10 @@ import Checkbox from '@theme/primitives/Checkbox.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
 import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import { formatBytes, formatRelative } from '../../format';
-import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { useHttpHistoryStore } from './history';
 

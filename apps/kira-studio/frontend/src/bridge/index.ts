@@ -53,8 +53,8 @@ import type { TabRecord, TerminalLaunchKind } from '@shared/domain/tabs';
 import type { ObjectMeta, RelationColumns, TreeNode } from '@shared/domain/tree';
 import type { TreeVisibility } from '@shared/domain/tree-filter';
 import { type AppMetricsSample, CHANNEL, type TerminalEvent } from '@shared/protocol/events';
+import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 import { apiControl } from './apiControl';
-import { on, trust, unwrap, windowKey } from './rpc';
 
 // bridge/index.ts is the composition root (round-1 review finding 19): the only file that imports
 // both halves — Studio's own 67-method surface, defined right here, and the Api module's 39

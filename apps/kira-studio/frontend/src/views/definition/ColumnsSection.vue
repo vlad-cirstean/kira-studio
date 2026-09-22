@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { useContextMenuStore } from '../../state/contextMenu';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';

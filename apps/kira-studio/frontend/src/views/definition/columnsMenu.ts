@@ -1,5 +1,5 @@
-import { copyText } from '../../clipboard';
-import type { MenuItem } from '../../state/contextMenu';
+import type { MenuItem } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { useModeStore } from '../../state/mode';
 import { useTabsStore } from '../../state/tabs';
 import { dataQueryCommands } from '../../state/viewCommands';

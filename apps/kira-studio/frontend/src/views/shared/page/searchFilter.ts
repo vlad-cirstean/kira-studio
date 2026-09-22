@@ -1,6 +1,6 @@
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
-import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 
 // P31 D16: hoisted out of views/grid/search.ts, whose own P24 D2 toggle four other search
 // modules (documents/keyvalue/stream) were about to duplicate verbatim — the exact drift P24's

@@ -1,5 +1,68 @@
-import type { MonacoModule } from './monaco';
-import { cssVar, KIRA_EDITOR_THEME } from './monaco';
+// P103 Part 1: `MonacoModule`/`cssVar`/`KIRA_EDITOR_THEME` used to live in each app's own
+// editor/monaco.ts (P60a §2.1/D2), byte-identical there in both apps save for one header comment —
+// moved here, this file's own sole real consumer, when this file (and monacoEntry.ts alongside it)
+// hoisted to packages/workbench. Each app's own monaco.ts now re-exports `cssVar`/
+// `KIRA_EDITOR_THEME` from here unchanged, so every existing external consumer of either symbol
+// (MonacoHost.vue, ResponseDiffDialog.vue, useDiffEditor.ts, RepoFileView.vue, …) needs no edit.
+export type MonacoModule = typeof import('./monacoEntry');
+
+// §9.3: read once from getComputedStyle against tokens.css — this app has one fixed (dark) visual
+// design with no light/dark toggle today (its own tokens.css literally maps each value to VS
+// Code's own theme keys, e.g. "--kira-bg: #1f1f1f; /* editor.background */"), so `base: 'vs-dark'`
+// is correct and there is only one theme to define.
+export const KIRA_EDITOR_THEME = 'kira-editor';
+
+// C6 dogfooding finding (§13.5's own live-verification pass, real WebKit — the engine the packaged
+// app's WKWebView actually embeds, matching playwright.config.ts's own choice of `webkit` for
+// UI-fidelity projects), **widened by a second P60a dogfooding finding**: WebKit's
+// `getComputedStyle` canonicalises a custom property's own color value to whatever it considers
+// its *shortest* serialization — a 3-digit hex shorthand for `--kira-fg: #cccccc` (C6's own
+// finding, `#ccc`), but a bare CSS colour *keyword* when one exactly matches, e.g.
+// `--kira-syntax-meta: #808080` comes back as the literal string `"gray"`. Monaco's `defineTheme`
+// validates a token rule's `foreground` strictly as a hex string, throwing on either form
+// ("Illegal value for token color: #ccc" / "... gray") and rejecting `loadMonaco()`'s own memoised
+// promise *permanently* — every MonacoHost on the page is left showing its pending `<pre>` forever,
+// no error surface at all (worse than C5's own described "missing worker" failure mode, since
+// nothing here even logs past the one console error). Chromium does not canonicalise either way,
+// which is why both forms went unnoticed until a real WebKit run.
+//
+// A canvas 2D context's own `fillStyle` setter/getter accepts the full CSS `<color>` grammar (any
+// keyword, any hex length, `rgb()`/`hsl()`/...) and is spec-required to serialize an opaque colour
+// back out as `#rrggbb` on read — a general normalizer that subsumes the narrower hex-shorthand-only
+// fix this replaces, rather than special-casing named colours as a second regex.
+let normalizeCanvasCtx: CanvasRenderingContext2D | null | undefined;
+
+// D6 (P67c §3.2) — the alpha trap: a translucent token (`--kira-scrollbar: #79797966`, or a
+// `color-mix(… transparent)` token like `--kira-search-match`) comes back from the canvas
+// normalizer above as `rgba(r, g, b, a)`, never `#rrggbb`. `editor.defineTheme`'s `colors` values
+// go through `Color.fromHex` (`StandaloneTheme.getColors()`, standaloneThemeService.js), which
+// accepts only `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` and returns *red* — not an error — on anything
+// else. Re-encoding as 8-digit hex here, once, is what lets `defineKiraTheme` map a translucent
+// `--kira-*` token at all without silently painting a widget bright red.
+const RGBA_PATTERN = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/;
+function rgbaToHex8(rgba: string): string | undefined {
+  const match = RGBA_PATTERN.exec(rgba);
+  if (!match) return undefined;
+  const [, r, g, b, a] = match;
+  const byte = (n: number): string => Math.round(n).toString(16).padStart(2, '0');
+  return `#${byte(Number(r))}${byte(Number(g))}${byte(Number(b))}${byte(Number(a) * 255)}`;
+}
+
+function normalizeColor(color: string): string {
+  if (normalizeCanvasCtx === undefined) {
+    normalizeCanvasCtx = document.createElement('canvas').getContext('2d');
+  }
+  if (!normalizeCanvasCtx) return color; // no canvas 2D support — pass through rather than throw
+  normalizeCanvasCtx.fillStyle = '#000000'; // known-good reset, so an invalid `color` leaves this
+  normalizeCanvasCtx.fillStyle = color;
+  const normalized = normalizeCanvasCtx.fillStyle;
+  return rgbaToHex8(normalized) ?? normalized;
+}
+
+export function cssVar(name: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return normalizeColor(value || fallback);
+}
 
 // P60a §4.1: `theme.ts`'s 283 CodeMirror lines split three ways. This file carries the first two —
 // editor chrome colours and token colours — as one Monaco `defineTheme` call. The third

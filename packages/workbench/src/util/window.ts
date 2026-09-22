@@ -10,7 +10,7 @@
 // which has no `location` global at all (no DOM, no webview): control.ts imports this module at
 // its own top level, so a hard `location.search` reference here would throw during module
 // evaluation and poison every other spec that imports control transitively (its shared module
-// registry, per tests/unit/support/wailsRuntime.ts's own comment on that exact hazard).
+// registry, per @workbench/testing/unit/wailsRuntime's own comment on that exact hazard).
 export const windowKey =
   typeof location === 'undefined'
     ? 'main'

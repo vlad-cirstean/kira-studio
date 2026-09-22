@@ -2,9 +2,9 @@
 import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-core';
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
 import AppButton from '@theme/primitives/AppButton.vue';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
-import { useConfirmDialogStore } from '../state/confirmDialog';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useVariableSetStore } from './state/variables';
 

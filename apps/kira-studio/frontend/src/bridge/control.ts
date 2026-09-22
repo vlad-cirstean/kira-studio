@@ -6,5 +6,6 @@
 // and this file is a thin re-export so every existing `import { control } from '.../bridge/control'`
 // call site — and anything reaching for the shared rpc.ts primitives through this path — is
 // unchanged.
+
+export { unwrap } from '@workbench/bridge/rpc';
 export { control } from './index';
-export { unwrap } from './rpc';

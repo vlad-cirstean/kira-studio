@@ -15,13 +15,13 @@ import type {
   HttpResponseWire,
   HttpTimeline,
 } from '@shared/domain/http';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { useCollectionsStore } from '../../api/state/collections';
 import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { useHttpHistoryStore } from './history';
 

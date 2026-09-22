@@ -1,7 +1,7 @@
 import { cellText, isNull, type StreamPage } from '@shared/protocol/page';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage } from './page';
 

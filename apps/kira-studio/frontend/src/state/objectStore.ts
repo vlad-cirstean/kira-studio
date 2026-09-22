@@ -4,12 +4,12 @@ import {
   OBJECT_KEY_SENTINEL,
 } from '@shared/domain/object-store';
 import { decodePath, encodePath, pathTail } from '@shared/domain/tree';
+import type { MenuItem } from '@workbench/state/contextMenu';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
 import { useConnectionsStore } from './connections';
-import type { MenuItem } from './contextMenu';
 
 // P33 D17: lives in state/ (not views/keyvalue/) because project/menus.ts must be able to open
 // the upload dialog without importing a views/ module sideways (§11's dependency rule, F17) — the

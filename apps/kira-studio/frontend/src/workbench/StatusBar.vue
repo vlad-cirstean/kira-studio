@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
-import { formatBytes } from '../format';
 import { useAgentSessionsStore } from '../state/agentSessions';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';

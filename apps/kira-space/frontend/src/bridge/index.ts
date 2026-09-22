@@ -29,7 +29,7 @@ import type {
 import type { Settings, SettingsPatch } from '@shared/domain/settings';
 import type { TabRecord, TerminalLaunchKind } from '@shared/domain/tabs';
 import { CHANNEL, type TerminalEvent } from '@shared/protocol/events';
-import { on, trust, unwrap, windowKey } from './rpc';
+import { on, trust, unwrap, windowKey } from '@workbench/bridge/rpc';
 
 // bridge/index.ts is this app's own composition root — Kira Studio's own bridge/index.ts, trimmed
 // to the 10 services apps/kira-space/main.go actually binds (Part 1's own service list, plus

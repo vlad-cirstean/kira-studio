@@ -21,9 +21,9 @@ import IconButton from '@theme/primitives/IconButton.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import TextField from '@theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
-import { useConfirmDialogStore } from '../state/confirmDialog';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import {
   loadMaskRules,

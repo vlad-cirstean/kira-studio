@@ -23,9 +23,9 @@ import {
   type TerminalTabState,
   terminalTabStateSchema,
 } from '@shared/domain/tabs';
+import type { MenuItem } from '@workbench/state/contextMenu';
 import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
 import { useCodeReposStore } from './coderepos';
-import type { MenuItem } from './contextMenu';
 import { useTerminalsStore } from './terminals';
 
 // P100 Part 2: kira-space's own tab-kind registry — the same split-from-workbench/tabViews.ts

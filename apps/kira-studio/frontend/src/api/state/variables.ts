@@ -7,11 +7,11 @@ import type {
   ApiVariableHistoryEntry,
   VariableScope,
 } from '@shared/domain/variables';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { computed, reactive, toRefs } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { runReveal } from '../reveal';
 import { closeVariableSetTabsForOwner, openEnvironmentsTab, renameVariableSetTabs } from '../tabs';
 import { createRevealExpiry } from './revealExpiry';

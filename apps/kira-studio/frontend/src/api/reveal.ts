@@ -1,5 +1,5 @@
 import type { RevealResult } from '@shared/domain/variables';
-import { useConfirmDialogStore } from '../state/confirmDialog';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 
 // P12 D13 (closing P5 OQ-2 + P9 OQ-4): the one reveal loop the module's three call sites share —
 // revealVariable and revealHistoryEntry (state/variables.ts) and the Copy as curl loop

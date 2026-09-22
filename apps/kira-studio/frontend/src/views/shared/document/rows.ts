@@ -3,10 +3,11 @@
 // never reactive (§0, D21) — with `rowsVersion` as the one reactive surface, mirroring documents/page.ts's
 // own `pageVersion`. A `reactive()` tree here would put a Proxy around every node of every document
 // on the page, which is exactly the frame budget this phase exists to protect.
+
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
+import { formatBytes } from '@workbench/util/format';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
-import { formatBytes } from '../../../format';
-import { registerTabRuntimeCleanup } from '../../../state/tabRuntime';
 import { type BsonType, type DocNode, parseDocument, parseIdLabel } from './ejson';
 
 // P42 D9: this module used to import documentRow from views/documents/page.ts directly — the one

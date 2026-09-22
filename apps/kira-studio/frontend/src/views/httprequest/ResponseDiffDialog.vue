@@ -3,12 +3,12 @@ import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
 import AppButton from '@theme/primitives/AppButton.vue';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
 import { KIRA_EDITOR_THEME, loadMonaco } from '../../editor/monaco';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
-import { formatBytes, formatRelative } from '../../format';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 
 // P8 D12: two entries, three levels of difference, one dialog. `ids` are the two selections from

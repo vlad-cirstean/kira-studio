@@ -2,9 +2,9 @@
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
 import AppButton from '@theme/primitives/AppButton.vue';
 import IconButton from '@theme/primitives/IconButton.vue';
+import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
-import { formatBytes } from '../../format';
 import { chooseBodyFile } from './files';
 
 // P3 C9/D4: the binary (Postman `file`) body — one whole local file, sent as the entire request

@@ -1,6 +1,6 @@
 import type { ObjectMeta } from '@shared/domain/tree';
 import type { TabularPage } from '@shared/protocol/page';
-import type { MenuItem } from '../../../state/contextMenu';
+import type { MenuItem } from '@workbench/state/contextMenu';
 import type { RowSnapshot } from '../../shared/clipboardFormats';
 import { pageColumnIndexFor } from '../../shared/page/columns';
 import type { Selection } from '../../shared/slick/selection';

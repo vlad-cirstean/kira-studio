@@ -1,8 +1,8 @@
 import type { TreeNode } from '@shared/domain/tree';
-import { copyText } from '../../clipboard';
-import { useConfirmDialogStore } from '../../state/confirmDialog';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import type { MenuItem } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { useConnectionsStore } from '../../state/connections';
-import type { MenuItem } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { useTabsStore } from '../../state/tabs';
 import { nodeIcon } from '../../theme/icons';

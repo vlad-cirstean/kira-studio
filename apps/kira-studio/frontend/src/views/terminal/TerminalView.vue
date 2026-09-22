@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TerminalTabRecord } from '@shared/domain/tabs';
 // P83 §6.2/§6.3: the terminal tab view. The live xterm Terminal (and its Go-side pty) live in
 // terminalRenderer.ts's own module-level map, not here — a tab switch unmounts this component but
 // must lose nothing, so mount only moves an already-live DOM subtree into this component's own
@@ -17,20 +18,28 @@
 // own copy (apps/kira-space/frontend/src/views/repo/RepoTerminalView.vue) drops the Claude Code
 // hooks banner below (its own TerminalService has no AgentHooks integration); this copy, staying
 // in Kira Studio, keeps it unchanged.
-import type { TerminalTabRecord } from '@shared/domain/tabs';
+import type { TerminalRendererDeps } from '@workbench/terminal/terminalRenderer';
+import { loadTerminalRenderer } from '@workbench/terminal/terminalRendererLoader';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useSettingsStore } from '../../state/settings';
 import { useTerminalsStore } from '../../state/terminals';
-import { loadTerminalRenderer } from './terminalRendererLoader';
 
 const props = defineProps<{ tab: TerminalTabRecord }>();
 const settingsStore = useSettingsStore();
 const terminalsStore = useTerminalsStore();
+// P103 Part 1: terminalRenderer.ts hoisted to @workbench/terminal — it has no package-boundary
+// way to reach this app's own settings/terminals stores directly any more, so the two it needs are
+// passed in here instead (§4.3's own deps seam).
+const rendererDeps: TerminalRendererDeps = {
+  appearance: () => settingsStore.appearance,
+  onTerminalOutput: terminalsStore.onTerminalOutput,
+  writeTerminal: terminalsStore.writeTerminal,
+};
 
 const container = ref<HTMLElement | null>(null);
 let resizeObserver: ResizeObserver | null = null;
-let renderer: typeof import('./terminalRenderer') | null = null;
+let renderer: typeof import('@workbench/terminal/terminalRenderer') | null = null;
 
 const session = computed(() => terminalsStore.terminalSession(props.tab.id));
 const footerText = computed(() => {
@@ -47,7 +56,7 @@ async function mount(): Promise<void> {
   if (!container.value) return;
   renderer = mod;
 
-  const { host } = mod.getOrCreateTerminal(props.tab.id);
+  const { host } = mod.getOrCreateTerminal(props.tab.id, rendererDeps);
   container.value.appendChild(host);
 
   // §7.3/§7.4: openTerminalSession only on the tab's very first mount — a remount (switching back
@@ -96,7 +105,7 @@ onUnmounted(() => {
 watch(
   () => [settingsStore.appearance.fontFamily, settingsStore.appearance.fontSize] as const,
   () => {
-    const d = renderer?.applyTerminalAppearance(props.tab.id);
+    const d = renderer?.applyTerminalAppearance(props.tab.id, rendererDeps);
     if (d) terminalsStore.resizeTerminal(props.tab.id, d.cols, d.rows);
   },
 );

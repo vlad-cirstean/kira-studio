@@ -1,7 +1,7 @@
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import type { MenuItem } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { beautifyJson } from '../../beautify';
-import { copyText } from '../../clipboard';
-import { useConfirmDialogStore } from '../../state/confirmDialog';
-import type { MenuItem } from '../../state/contextMenu';
 import { parseIdLabel, toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
 import { useDocumentViewStore } from './state';

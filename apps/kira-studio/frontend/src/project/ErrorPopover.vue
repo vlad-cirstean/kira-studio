@@ -5,9 +5,9 @@ import AppButton from '@theme/primitives/AppButton.vue';
 // native title tooltip (unreadable for multi-line/long messages, and unreachable on touch).
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
 import { useEventListener } from '@vueuse/core';
+import { copyText } from '@workbench/util/clipboard';
+import { autoUpdate, computeFloatPosition } from '@workbench/util/floatingPosition';
 import { nextTick, onUnmounted, ref, watch } from 'vue';
-import { copyText } from '../clipboard';
-import { autoUpdate, computeFloatPosition } from '../theme/floatingPosition';
 
 const props = defineProps<{ message: string }>();
 

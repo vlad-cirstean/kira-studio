@@ -13,7 +13,7 @@
 // biome-ignore lint/suspicious/noTsIgnore: an "unused directive" kind fails where this resolves fine (see comment above)
 // @ts-ignore
 import { Events } from '/wails/runtime.js';
-import { windowKey as windowKeyValue } from '../state/window';
+import { windowKey as windowKeyValue } from '../util/window';
 
 // P57 D5. Wails delivers a bound method's error as a RuntimeError whose .message is
 // ipcerr.Error's own JSON encoding and whose .cause is that same {code, message} as an object

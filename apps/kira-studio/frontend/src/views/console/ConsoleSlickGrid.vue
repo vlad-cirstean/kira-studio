@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { TabularPage } from '@shared/protocol/page';
+import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import type {
   Column,
   CustomDataView,
@@ -10,9 +12,7 @@ import type {
 } from 'slickgrid';
 import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { copyText } from '../../clipboard';
 import { useCellSelectionStore } from '../../state/cellSelection';
-import { useContextMenuStore } from '../../state/contextMenu';
 import { useSettingsStore } from '../../state/settings';
 import { classesFrom } from '../../theme/cellClass';
 import { categoryForTypeClass } from '../../theme/icons';

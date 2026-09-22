@@ -1,12 +1,12 @@
 import { CONNECTION_COLOR_CHOICES } from '@shared/domain/connection';
 import { decodePath } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
+import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import type { MenuItem } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
 import { control } from '../bridge/control';
-import { copyText } from '../clipboard';
-import { useConfirmDialogStore } from '../state/confirmDialog';
 import { useConnectionDialogStore, useConnectionsStore } from '../state/connections';
 import { useConsoleDefaultsStore } from '../state/consoleDefaults';
-import type { MenuItem } from '../state/contextMenu';
 import { useObjectStoreStore } from '../state/objectStore';
 import { schemaDialectFor, useSchemaDialogStore } from '../state/schemas';
 import { useTabsStore } from '../state/tabs';

@@ -7,6 +7,7 @@ import type {
   GrpcRequestTabState,
   GrpcSchemaWire,
 } from '@shared/domain/grpc';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { useCollectionsStore } from '../../api/state/collections';
@@ -14,7 +15,6 @@ import { useVariableSetStore, useVariablesStore } from '../../api/state/variable
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { useGrpcCallHistoryStore } from './history';
 

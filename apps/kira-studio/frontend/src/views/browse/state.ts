@@ -1,10 +1,10 @@
 import type { PageSize } from '@shared/domain/tabs';
 import { pathParent, type TreeNode } from '@shared/domain/tree';
+import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
 import { pinia } from '../../state/pinia';
-import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
 import { registerBrowseInvalidate, registerTabReload } from '../../state/viewCommands';
 import { classifyLoadError, createRuntimeStore } from '../shared/viewOp';

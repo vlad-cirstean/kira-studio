@@ -2,8 +2,8 @@
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { connColorVar } from '@theme/connColor';
+import { formatRelative } from '@workbench/util/format';
 import { computed } from 'vue';
-import { formatRelative } from '../../format';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useDatagripImportStore } from '../../state/datagripImport';
 import { type RecentTableEntry, useRecentTablesStore, useTabsStore } from '../../state/tabs';

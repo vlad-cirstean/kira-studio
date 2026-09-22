@@ -6,8 +6,8 @@
 // anchoredPosition.ts.
 import { useEventListener } from '@vueuse/core';
 import { nextTick, ref, watch } from 'vue';
-import { computeFloatPosition } from '../theme/floatingPosition';
-import { useTooltipStore } from './state/tooltip';
+import { useTooltipStore } from '../state/tooltip';
+import { computeFloatPosition } from '../util/floatingPosition';
 
 const tooltipStore = useTooltipStore();
 const tipRef = ref<HTMLElement | null>(null);

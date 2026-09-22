@@ -2,17 +2,17 @@
 import type { TabRecord } from '@shared/domain/tabs';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { connColorVar } from '@theme/connColor';
+import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
+import { copyText } from '@workbench/util/clipboard';
+import { wheelToHorizontal } from '@workbench/util/wheelScroll';
 import { computed, nextTick, ref, watch } from 'vue';
-import { copyText } from '../../clipboard';
 import { useAgentSessionsStore } from '../../state/agentSessions';
-import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { tabsForWorkspace, useModeStore } from '../../state/mode';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
 import { useTerminalsStore } from '../../state/terminals';
 import { openTerminalTab } from '../../state/terminalTabs';
-import { wheelToHorizontal } from '../../wheelScroll';
 
 const contextMenuStore = useContextMenuStore();
 
