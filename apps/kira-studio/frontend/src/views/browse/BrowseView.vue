@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+// P104 §3.4: VirtualList/EmptyState are each a genuinely separate, non-mechanical piece of work
+// (a @tanstack/vue-virtual recipe and a ui/alert composition respectively) -- not attempted in
+// this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+// PanelSplitter is not one of the 20 forbidden primitives -- it wraps no old primitive, has no
+// v-tooltip, and its own styling already moved to Tailwind in P99 Part 2 (see its own header
+// comment). Kept as-is.
 import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { useDebounceFn } from '@vueuse/core';
@@ -264,29 +271,66 @@ onMounted(() => {
         <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
              pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps
              only what is view-scoped: filter, upload, and (ViewChrome's own built-in) refresh. -->
-        <IconButton
-          icon="search"
-          :active="filterOpen"
-          v-tooltip="'Filter'"
-          data-testid="browse-filter-toggle"
-          @click="toggleFilter"
-        />
-        <IconButton
-          v-if="canUpload"
-          icon="cloud-upload"
-          data-testid="browse-upload"
-          v-tooltip="'Upload file…'"
-          @click="onUploadClick"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': filterOpen }"
+              aria-label="Filter"
+              data-testid="browse-filter-toggle"
+              @click="toggleFilter"
+            >
+              <CodiconIcon name="search" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Filter</TooltipContent>
+        </Tooltip>
+        <Tooltip v-if="canUpload">
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Upload file…"
+              data-testid="browse-upload"
+              @click="onUploadClick"
+            >
+              <CodiconIcon name="cloud-upload" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Upload file…</TooltipContent>
+        </Tooltip>
       </template>
 
       <template #strips>
-        <PanelSearchBox
-          v-if="filterOpen"
-          v-model="filterText"
-          placeholder="Filter"
-          testid="browse-filter"
-        />
+        <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
+          <div
+            class="flex items-center gap-1 w-full h-control-lg rounded-kira-sm border border-border-strong bg-input px-2"
+          >
+            <CodiconIcon name="search" :size="13" class="shrink-0 text-fg-muted" />
+            <Input
+              :model-value="filterText"
+              placeholder="Filter"
+              class="h-full w-full border-0 bg-transparent p-0 font-ui focus-visible:ring-0"
+              data-testid="browse-filter"
+              @update:model-value="(v) => (filterText = String(v))"
+            />
+            <Tooltip v-if="filterText">
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Clear search"
+                  data-testid="browse-filter-clear"
+                  @click="filterText = ''"
+                >
+                  <CodiconIcon name="close" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Clear search</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
         <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="browse-error">
           {{ rt.error.message }}
         </MessageStrip>
@@ -320,13 +364,23 @@ onMounted(() => {
                styling (the same 26px in-view band every other toolbar already is) rather than
                inventing a header. -->
           <div class="p-toolbar list-head" data-testid="browse-list-head">
-            <IconButton
-              icon="chevron-left"
-              data-testid="browse-up"
-              :disabled="atRoot"
-              v-tooltip="'Back'"
-              @click="onUp"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span tabindex="0" class="inline-flex">
+                  <Button
+                    variant="toolbar"
+                    size="kira-icon"
+                    :disabled="atRoot"
+                    aria-label="Back"
+                    data-testid="browse-up"
+                    @click="onUp"
+                  >
+                    <CodiconIcon name="chevron-left" :size="13" />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Back</TooltipContent>
+            </Tooltip>
             <span class="breadcrumb">
               <template v-for="(crumb, i) in crumbs" :key="crumb.path">
                 <span v-if="i > 0" class="crumb-sep">/</span>
@@ -427,11 +481,11 @@ onMounted(() => {
 }
 
 .breadcrumb {
-  @apply flex items-center min-w-0 overflow-hidden gap-[var(--kira-s-1)];
+  @apply flex items-center min-w-0 overflow-hidden gap-0.5;
 }
 
 .crumb {
-  @apply cursor-pointer overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-muted text-[length:var(--kira-t-sm)] px-[var(--kira-s-1)];
+  @apply cursor-pointer overflow-hidden whitespace-nowrap text-ellipsis border-0 bg-none text-muted text-kira-sm px-0.5;
 }
 
 .crumb:hover {
@@ -472,11 +526,11 @@ onMounted(() => {
 }
 
 .empty {
-  @apply h-full flex items-center justify-center text-[length:var(--kira-t-sm)];
+  @apply h-full flex items-center justify-center text-kira-sm;
 }
 
 .browse-row {
-  @apply flex items-center cursor-default border-b border-border gap-[var(--kira-s-2)] px-[var(--kira-s-4)];
+  @apply flex items-center cursor-default border-b border-border gap-1 px-2;
 }
 
 .browse-row:hover {
@@ -492,7 +546,7 @@ onMounted(() => {
 }
 
 .row-detail {
-  @apply shrink-0 text-[length:var(--kira-t-xs)];
+  @apply shrink-0 text-kira-xs;
 }
 
 .row-type-badge {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
@@ -19,17 +20,23 @@ function onNewTerminal(): void {
   <div class="start" data-testid="terminal-start">
     <div class="start-inner">
       <EmptyState icon="terminal-bash" label="No terminal open">
-        <button
-          type="button"
-          class="p-dlgbtn primary"
-          data-testid="terminal-start-new"
-          :disabled="terminalsStore.terminalDefaults.cwd === ''"
-          v-tooltip="terminalsStore.terminalDefaults.cwd === '' ? 'Home directory unavailable' : undefined"
-          @click="onNewTerminal"
-        >
-          <span class="icon-box"><CodiconIcon name="terminal-bash" :size="13" /></span>
-          New terminal
-        </button>
+        <Tooltip :disabled="terminalsStore.terminalDefaults.cwd !== ''">
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': terminalsStore.terminalDefaults.cwd === '' }">
+              <button
+                type="button"
+                class="p-dlgbtn primary"
+                data-testid="terminal-start-new"
+                :disabled="terminalsStore.terminalDefaults.cwd === ''"
+                @click="onNewTerminal"
+              >
+                <span class="icon-box"><CodiconIcon name="terminal-bash" :size="13" /></span>
+                New terminal
+              </button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Home directory unavailable</TooltipContent>
+        </Tooltip>
       </EmptyState>
     </div>
   </div>
@@ -39,7 +46,7 @@ function onNewTerminal(): void {
 @reference "@theme/base.css";
 
 .start {
-  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-[var(--kira-s-6)];
+  @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-4;
 }
 
 .start-inner {
