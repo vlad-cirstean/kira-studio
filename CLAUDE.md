@@ -71,6 +71,18 @@ duplicated here; this file only points at them.
   only when genuinely independent" allowance above is scoped to splitting one phase's own
   implementation work, never to running two different phases (or their planning and
   implementation) at the same time.
+- **The orchestrating session verifies before accepting — a plan or an implementation isn't done
+  because a subagent says so.** Before marking a phase's plan, or its implementation, complete,
+  check the result against the full original ask: the `SPEC.md` row's own wording, the user's own
+  request, and every standing rule this file states (library adoption, primitive replacement,
+  scope boundaries) — not just that hooks/tests pass. Verify with a real check (a grep for actual
+  usage, a build, a count against the plan's own numbers), not by re-reading the subagent's result
+  section and trusting its prose — a claim like "X now uses library Y" gets confirmed by finding a
+  real caller of Y, not by X being present in the repo. Anything short of the full ask — a
+  narrowed scope nobody agreed to, a requirement quietly dropped, a library "adopted" only as
+  unused scaffolding — goes back to a subagent to fix, same phase, same number. Never accept a
+  partial result and move on, and never silently re-scope the ask down to match what was
+  delivered; only the user narrows their own request.
 - **A failing test, lint finding, typecheck error, or any other code-quality/hook check gets fixed
   on the spot, pre-existing or not.** "Pre-existing" justifies skipping root-cause investigation of
   whether *this phase* caused it, never skipping the fix itself. Confirm it predates the phase (e.g.
