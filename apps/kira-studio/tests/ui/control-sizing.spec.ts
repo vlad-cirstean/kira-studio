@@ -97,7 +97,7 @@ test('every control in the pager toolbar row is one height, equal to --kira-cont
 
   const pageInputHeight = await page
     .locator('[data-testid="pager-page-input"]')
-    .evaluate((el) => el.closest('.p-input')?.getBoundingClientRect().height);
+    .evaluate((el) => el.getBoundingClientRect().height);
   expect(pageInputHeight).toBeCloseTo(controlH, 0);
 
   for (const testid of ['pager-first', 'pager-prev', 'pager-next', 'pager-last']) {
@@ -123,9 +123,13 @@ test('the .md control family in SettingsDialog is one height, equal to --kira-co
   const controlHLg = await rootVar(page, '--kira-control-h-lg');
   expect(controlHLg).toBeGreaterThan(0);
 
+  // P104 §2: settings-font-size is now InputGroupInput's own borderless leaf, nested one level
+  // inside the bordered InputGroup box (the stepper recipe's own box-model split) -- the group's
+  // own root is what actually renders at --kira-control-h-lg, so that's what this measures.
   const fontSizeInputHeight = await page
     .locator('[data-testid="settings-font-size"]')
-    .evaluate((el) => el.closest('.p-input')?.getBoundingClientRect().height);
+    .locator('xpath=ancestor::div[@data-slot="input-group"][1]')
+    .evaluate((el) => el.getBoundingClientRect().height);
   expect(fontSizeInputHeight).toBeCloseTo(controlHLg, 0);
 
   const saveHeight = await page
@@ -146,7 +150,7 @@ test('the role layer changes no rendered control height at the default font size
 
   const pInputHeight = await page
     .locator('[data-testid="pager-page-input"]')
-    .evaluate((el) => el.closest('.p-input')?.getBoundingClientRect().height);
+    .evaluate((el) => el.getBoundingClientRect().height);
   expect(pInputHeight).toBeCloseTo(22, 0);
 
   const pIconbtnHeight = await page

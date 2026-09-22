@@ -18,11 +18,16 @@ import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 // call, the pre-migration escape hatch — `window.kira` no longer exists post-M2/M3 (CLAUDE.md's
 // P57 finding), so both connections here are created through the real dialog instead, the same
 // flow mutations.spec.ts's own read-only-connection scenario already uses. Everything else is one
-// continuous session with no relaunch(), so it all ports unchanged: the app-owned tooltip
-// mechanism itself (workbench/state/tooltip.ts + AppTooltip.vue) is exactly this spec's subject,
-// hit-testing a disabled control (scenario 2, F5/D3 — Blink dispatches no pointer events on one)
-// and a control inside an already-open popover (scenario 3, F3(a) — the popover's own backdrop
-// must not swallow the hit test).
+// continuous session with no relaunch(), so it all ports unchanged.
+//
+// P104 §6.5: scenarios 1-4 (below) exercise controls already converted to the real
+// Tooltip/TooltipTrigger/TooltipContent trio (reka's TooltipProvider owns delay/rearm now —
+// state/tooltip.ts's own timers are gone from these call sites), hit-testing a disabled control
+// (scenario 2, §6.3's span-wrapper pattern) and a control inside an already-open popover
+// (scenario 3, F3(a) — the popover's own backdrop must not swallow the hit test). Scenario 5 and
+// the two geometry tests below stay on the OLD app-owned mechanism (workbench/state/tooltip.ts +
+// AppTooltip.vue) on purpose: SlickGrid's own header cells (§6.4) are the one residue that still
+// goes through it, and that wiring is explicitly out of this pass's scope.
 
 const DB_PATH = 'database:kira_test';
 const APP_PATH = `${DB_PATH}/schema:app`;
@@ -102,19 +107,28 @@ const CONTROL: ControlSnapshot[] = [
 
 const PORT: PortSnapshot[] = [...FIXTURE.port, ...RO_FIXTURE.port];
 
+// Scenario 5 and the geometry tests below still hit the OLD app-owned singleton (§6.4's grid-
+// header residue) — this locator stays for them.
 const tooltip = (page: Page): Locator => page.locator('[data-testid="app-tooltip"]');
 
-/** Hovers `trigger` and asserts the app tooltip becomes visible with `text`, well within the
- *  400 ms open delay (TOOLTIP_DELAY_MS). Scenario 1 below additionally checks the "before" side
- *  of that delay; the other scenarios only care that it eventually shows the right thing. */
+// Scenarios 1-4: the real reka tooltip, rendered through a TooltipPortal — `[data-slot=
+// "tooltip-content"]` is `ui/tooltip`'s own TooltipContent.vue marker (§6.5's named migration
+// selector), not tied to any one call site's DOM.
+const tooltipContent = (page: Page): Locator => page.locator('[data-slot="tooltip-content"]');
+
+/** Hovers `trigger` and asserts the real tooltip becomes visible with `text`, well within
+ *  TooltipProvider's 400 ms delayDuration. Scenario 1 below additionally checks the "before" side
+ *  of that delay; the other scenarios only care that it eventually shows the right thing.
+ *  toContainText, not toHaveText: reka's own TooltipContent renders a visually-hidden a11y mirror
+ *  span alongside the visible text, so a bare .textContent read sees the text doubled. */
 async function assertTooltipShows(
   page: Page,
   trigger: Locator,
   text: string | RegExp,
 ): Promise<void> {
   await trigger.hover();
-  await expect(tooltip(page)).toBeVisible({ timeout: 1_000 });
-  await expect(tooltip(page)).toHaveText(text);
+  await expect(tooltipContent(page)).toBeVisible({ timeout: 1_000 });
+  await expect(tooltipContent(page)).toContainText(text);
 }
 
 test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y', async ({
@@ -156,19 +170,25 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   const refreshButton = page.locator('[data-testid="toolbar-refresh"]');
   await refreshButton.hover();
   await page.waitForTimeout(150);
-  await expect(tooltip(page)).toHaveCount(0);
-  await expect(tooltip(page)).toBeVisible({ timeout: 1_000 });
-  await expect(tooltip(page)).toHaveText('Refresh');
+  await expect(tooltipContent(page)).toHaveCount(0);
+  await expect(tooltipContent(page)).toBeVisible({ timeout: 1_000 });
+  // reka's own TooltipContent renders a visually-hidden a11y mirror span alongside the visible
+  // text, so a bare .textContent read (toHaveText) sees "RefreshRefresh" — toContainText reads
+  // the visible text node correctly without depending on that internal duplication.
+  await expect(tooltipContent(page)).toContainText('Refresh');
 
   await page.mouse.move(4, 4);
   await page.waitForTimeout(100);
-  await expect(tooltip(page)).toHaveCount(0);
+  await expect(tooltipContent(page)).toHaveCount(0);
 
   // --- scenario 3: over an overlay — a popover's own backdrop must not swallow the hit test ---
-  // (F3(a)). ColumnsMenu's PK checkbox carries a hint only when it's the locked one.
+  // (F3(a)). ColumnsMenu's PK checkbox carries a hint only when it's the locked one. Checkbox is
+  // reka's own CheckboxRoot now (role="checkbox" on a <button>, not a native <input>).
   await page.click('[data-testid="toolbar-columns"]');
   await expect(page.locator('[data-testid="columns-menu"]')).toBeVisible();
-  const pkCheckbox = page.locator('.columns-menu-item.is-pk input[type="checkbox"]').first();
+  const pkCheckbox = page
+    .locator('.columns-menu-item.is-pk [data-testid="columns-menu-item"]')
+    .first();
   await expect(pkCheckbox).toBeVisible();
   await assertTooltipShows(page, pkCheckbox, /Primary key — always shown/);
   await page.keyboard.press('Escape');
@@ -206,14 +226,20 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
 
   const addRowButton = page.locator('[data-testid="toolbar-add-row"]');
   await expect(addRowButton).toBeDisabled();
-  await assertTooltipShows(page, addRowButton, 'Connection is read-only');
+  // §6.3's own pattern: the disabled <button> itself receives no pointer events in Blink, so the
+  // never-disabled wrapper <span> is the real trigger and hit target.
+  await assertTooltipShows(page, addRowButton.locator('xpath=..'), 'Connection is read-only');
 
-  // --- scenario 4: pointer-events: none (D4) + accessibility (D7) --------------------------
+  // --- scenario 4: pointer-events: none (D4/disable-hoverable-content) + accessibility (D7) ---
   const projectPanel = page.locator('[data-testid="project-panel"]');
   const wasVisible = (await projectPanel.count()) > 0;
   const toggleButton = page.locator('[data-testid="toggle-project-panel"]');
   await assertTooltipShows(page, toggleButton, 'Connections');
-  await expect(toggleButton).toHaveAttribute('aria-describedby', 'app-tooltip');
+  // reka generates the content id itself (no fixed "app-tooltip" id any more) — assert the
+  // trigger's aria-describedby actually resolves to real, matching content, not a literal string.
+  const describedById = await toggleButton.getAttribute('aria-describedby');
+  expect(describedById).toBeTruthy();
+  await expect(page.locator(`#${describedById}`)).toContainText('Connections');
   await expect(toggleButton).toHaveAttribute('aria-label', 'Connections');
 
   // The tooltip sits at a higher z-index than everything else in the app, directly over the
@@ -245,7 +271,7 @@ test('tooltips — app-owned surface: delay, disabled controls, popovers, a11y',
   await page.mouse.move(4, 4);
   await page.waitForTimeout(350);
   await assertTooltipShows(page, refreshButton, 'Refresh');
-  await expect(tooltip(page).locator('.tip-title')).toHaveCount(0);
+  await expect(tooltipContent(page).locator('.tip-title')).toHaveCount(0);
 
   expect(consoleErrors).toEqual([]);
 });
