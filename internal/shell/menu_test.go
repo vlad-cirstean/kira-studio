@@ -3,8 +3,8 @@ package shell_test
 import (
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
+	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -25,17 +25,47 @@ func allMenuItems(m *application.Menu) []*application.MenuItem {
 	}
 }
 
+// acceleratorTemplate exercises every ItemKind BuildMenu understands, including the
+// "Control+Tab"-shaped trap (§1.4) a verbatim accelerator string would hit — Kira Studio's own
+// BuildTemplate is app-specific (apps/kira-studio/internal/appshell) and out of reach for the
+// shared package (P103 Part 3), so this is a synthetic template covering the same accelerator
+// vocabulary rather than a real app's menu.
+func acceleratorTemplate() []shell.Section {
+	return []shell.Section{
+		{
+			Label: "Test",
+			Items: []shell.Item{
+				{Kind: shell.ItemRole, Role: application.About},
+				{Kind: shell.ItemSeparator},
+				{Kind: shell.ItemEmit, Label: "Emit Item", Accelerator: "CmdOrCtrl+E", Channel: "test:emit"},
+				{Kind: shell.ItemQuit, Label: "Quit Test", Accelerator: "CmdOrCtrl+Q"},
+				{Kind: shell.ItemNewWindow, Label: "New Window", Accelerator: "CmdOrCtrl+Shift+N"},
+			},
+		},
+		{
+			Label: "Window",
+			Items: []shell.Item{
+				{Kind: shell.ItemRole, Role: application.Minimise},
+				// Wails' parseAccelerator accepts "Ctrl", never "Control" — the exact trap this
+				// test exists to catch (menuitem.go:275-287 drops an unparseable accelerator
+				// silently rather than erroring).
+				{Kind: shell.ItemRole, Role: application.CloseWindow, Accelerator: "Ctrl+Tab"},
+			},
+		},
+	}
+}
+
 // TestBuildMenuAcceleratorsAllParse walks the real built *application.Menu alongside the
-// Wails-free template that produced it (same appName/isDev, so the same items in the same
-// order — BuildMenu appends exactly one built item per template item, separators included) and
-// asserts that every template item carrying a non-empty Accelerator actually parsed: this is the
-// test that catches SetAccelerator's silent failure mode (menuitem.go:275-287); without it a
-// mistranslation (e.g. the "Control+Tab" trap, §1.4) is invisible.
+// Wails-free template that produced it (same item count and order — BuildMenu appends exactly one
+// built item per template item, separators included) and asserts that every template item
+// carrying a non-empty Accelerator actually parsed: this is the test that catches
+// SetAccelerator's silent failure mode (menuitem.go:275-287); without it a mistranslation is
+// invisible.
 func TestBuildMenuAcceleratorsAllParse(t *testing.T) {
-	const appName = "Kira Studio Test"
-	events := bridge.NewEvents(noopEmitter{})
-	menu := shell.BuildMenu(shell.MenuDeps{AppName: appName, IsDev: true, Events: events, Quit: func() {}})
-	template := shell.BuildTemplate(appName, true)
+	const appName = "Shell Test"
+	events := appevent.NewEvents(noopEmitter{})
+	template := acceleratorTemplate()
+	menu := shell.BuildMenu(shell.MenuDeps{AppName: appName, IsDev: true, Template: template, OnEmit: events.Signal, Quit: func() {}, NewWindow: func() {}})
 
 	builtSections := allMenuItems(menu)
 	if len(builtSections) != len(template) {

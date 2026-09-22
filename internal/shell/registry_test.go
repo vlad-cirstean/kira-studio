@@ -3,7 +3,7 @@ package shell_test
 import (
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
+	"github.com/kirathecat/kira-studio/internal/shell"
 )
 
 // Real-interaction fix (item 8 — a webview process outlives its window, and duplicates on

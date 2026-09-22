@@ -3,8 +3,7 @@ package shell_test
 import (
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -38,7 +37,7 @@ func TestHarden_DenyByDefaultPosture(t *testing.T) {
 // widen the webview's OS-level attack surface for a feature nothing uses. Regression test for the
 // P2 R1 finding where this had drifted to true.
 func TestOptions_FileDropDisabled(t *testing.T) {
-	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"}, nil)
+	opts := shell.Options(shell.Harden(), shell.WindowRecord{Key: "main"}, nil, shell.Config{WindowTitle: "Shell Test"})
 
 	if opts.EnableFileDrop {
 		t.Error("EnableFileDrop = true, want false (§1.6: no data-file-drop-target consumer exists)")

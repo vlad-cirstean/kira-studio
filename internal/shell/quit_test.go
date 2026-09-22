@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
+	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/shell"
 )
 
 // quitEmitter records every Emit call — quit_test.go only cares about
-// bridge.ChannelFlushBeforeClose, but recording everything makes a wrong-channel bug visible too.
+// appevent.ChannelFlushBeforeClose, but recording everything makes a wrong-channel bug visible too.
 type quitEmitter struct {
 	mu     sync.Mutex
 	events []string
@@ -25,7 +25,7 @@ func (e *quitEmitter) Emit(name string, _ any) {
 	e.events = append(e.events, name)
 }
 
-// EmitTo and EmitFocused satisfy appcore.Emitter's other two methods (P8 C6/C9/D6) — no
+// EmitTo and EmitFocused satisfy appevent.Emitter's other two methods (P8 C6/C9/D6) — no
 // quit_test.go case drives either directly (Quitter only ever calls Broadcast, C9's
 // deliberately-still-Emit path), so they just record like Emit does, keeping the package
 // compiling with one double.
@@ -77,7 +77,7 @@ func (o *order) snapshot() []string {
 // below covers that shape without every existing call site having to spell out `[]string{"main"}`.
 func newTestQuitter(timeout time.Duration, keys []string) (q *shell.Quitter, emitter *quitEmitter, ord *order, teardownDone chan struct{}) {
 	emitter = &quitEmitter{}
-	events := bridge.NewEvents(emitter)
+	events := appevent.NewEvents(emitter)
 	ord = &order{}
 	done := make(chan struct{})
 
@@ -167,7 +167,7 @@ func TestFlushTimeoutStillTearsDown(t *testing.T) {
 // calls must all decline and start exactly one flush, and only the post-teardown pass may return
 // true. None of them may block — ShouldQuit runs on the same thread the ack arrives on (D2).
 func TestSecondShouldQuitReturnsTrue(t *testing.T) {
-	q, _, _, done := newTestQuitter1(time.Second)
+	q, emitter, _, done := newTestQuitter1(time.Second)
 
 	// A burst of concurrent calls while the flush is in flight must all return false and start
 	// exactly one flush.
@@ -185,6 +185,17 @@ func TestSecondShouldQuitReturnsTrue(t *testing.T) {
 		if got {
 			t.Errorf("concurrent ShouldQuit()[%d] = true, want false (flush not yet complete)", i)
 		}
+	}
+
+	// Pre-existing race, fixed here (P103 Part 3): flushThenQuit populates the pending set and
+	// broadcasts the flush signal on its own goroutine, asynchronously to ShouldQuit() returning
+	// above — wait for that broadcast (as TestFlushAckCompletesTeardown/TestQuitWaitsForEveryWindowAck
+	// already do) before acking, so Flushed("main") can't race a still-nil pending set and get
+	// silently swallowed as an unknown key under heavy scheduler contention (e.g. the full `go test
+	// ./...` run, not this package in isolation).
+	deadline := time.Now().Add(time.Second)
+	for len(emitter.names()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
 	}
 
 	q.Flushed("main")

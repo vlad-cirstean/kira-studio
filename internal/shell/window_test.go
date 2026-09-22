@@ -1,66 +1,60 @@
 package shell_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
-// newAttachedWindow builds a real *repos.WindowsRepo on a temp DB (0002_p8_windows.sql's
-// migration seeds the "main" row every fresh database gets, so Attach's SetBounds("main", …) has
-// a row to update with no manual seeding here) and a real, display-less
-// *application.WebviewWindow (testApp never calls Run(), so its impl stays nil). HandleWindowEvent
-// still dispatches to registered listeners the same way a real resize/move would — WindowClosing is
-// the one event this can't safely exercise here: Wails registers its own internal WindowClosing
-// listener on every window (webview_window.go's NewWindow) that calls InvokeSync against the main
-// thread dispatcher app.Run() would normally be pumping, which panics once nothing is pumping it,
-// regardless of anything this package does.
-func newAttachedWindow(t *testing.T) (*application.WebviewWindow, *repos.WindowsRepo) {
-	t.Helper()
-	t.Setenv("KIRA_HOME", t.TempDir())
+// fakeWindowStore is a plain in-memory shell.WindowStore — P103 Part 3 turned WindowDeps.Windows
+// into an interface (exactly the methods window.go's Attach actually calls: SetBounds), so a test
+// double replaces the real *repos.WindowsRepo/SQLite round trip this file used before the hoist:
+// Attach's own logic never touches SQL, only calls through the interface, so a fake proves the
+// same debounce/detach behaviour without a per-app storage package the shared package cannot
+// import.
+type fakeWindowStore struct {
+	mu     sync.Mutex
+	bounds map[string]shell.WindowBounds
+}
 
-	db, err := storage.Open()
-	if err != nil {
-		t.Fatalf("storage.Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
+func newFakeWindowStore() *fakeWindowStore {
+	return &fakeWindowStore{bounds: map[string]shell.WindowBounds{}}
+}
 
-	r, err := repos.New(db.DB)
-	if err != nil {
-		t.Fatalf("repos.New: %v", err)
-	}
-	t.Cleanup(func() { _ = r.Close() })
+func (f *fakeWindowStore) SetBounds(key string, b shell.WindowBounds) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bounds[key] = b
+	return nil
+}
 
-	win := testApp.Window.NewWithOptions(application.WebviewWindowOptions{})
-	return win, r.Windows
+func (f *fakeWindowStore) boundsOf(key string) (shell.WindowBounds, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	b, ok := f.bounds[key]
+	return b, ok
 }
 
 // sentinelBounds lets a test tell "persist() ran and overwrote this" apart from "persist() never
 // ran": win.Bounds() always reports the zero Rect{} in these tests (no native window backs it), so
 // two persisted writes are otherwise indistinguishable by value.
-var sentinelBounds = &model.WindowBounds{X: 111, Y: 222, Width: 333, Height: 444}
+var sentinelBounds = shell.WindowBounds{X: 111, Y: 222, Width: 333, Height: 444}
 
-// boundsOf finds the "main" record's stored bounds among windows' List() result — nil if the
-// window has never persisted a rectangle.
-func boundsOf(t *testing.T, windows *repos.WindowsRepo) *model.WindowBounds {
+// newAttachedWindow builds a fake WindowStore and a real, display-less *application.WebviewWindow
+// (testApp never calls Run(), so its impl stays nil). HandleWindowEvent still dispatches to
+// registered listeners the same way a real resize/move would — WindowClosing is the one event
+// this can't safely exercise here: Wails registers its own internal WindowClosing listener on
+// every window (webview_window.go's NewWindow) that calls InvokeSync against the main thread
+// dispatcher app.Run() would normally be pumping, which panics once nothing is pumping it,
+// regardless of anything this package does.
+func newAttachedWindow(t *testing.T) (*application.WebviewWindow, *fakeWindowStore) {
 	t.Helper()
-	records, err := windows.List()
-	if err != nil {
-		t.Fatalf("Windows.List: %v", err)
-	}
-	for _, rec := range records {
-		if rec.Key == "main" {
-			return rec.Bounds
-		}
-	}
-	t.Fatal(`Windows.List() has no "main" record — 0002_p8_windows.sql should have seeded one`)
-	return nil
+	win := testApp.Window.NewWithOptions(application.WebviewWindowOptions{})
+	return win, newFakeWindowStore()
 }
 
 // TestAttach_PersistsResizeAfterDebounce is the positive control for the regression test below: it
@@ -73,7 +67,7 @@ func TestAttach_PersistsResizeAfterDebounce(t *testing.T) {
 	win.HandleWindowEvent(uint(events.Common.WindowDidResize))
 	time.Sleep(500 * time.Millisecond)
 
-	if boundsOf(t, windows) == nil {
+	if _, ok := windows.boundsOf("main"); !ok {
 		t.Fatal("resize on an attached window was never persisted")
 	}
 }
@@ -82,10 +76,11 @@ func TestAttach_PersistsResizeAfterDebounce(t *testing.T) {
 // main.go used to discard shell.Attach's returned detach entirely, instead of wiring it into
 // beforeFlush the way Attach's own doc comment says it must be — a resize or move landing during
 // the shutdown flush-wait (after beforeFlush runs but before teardown closes the DB) could still
-// fire persist() against a LayoutRepo whose DB was mid-close. main.go's own wiring isn't something
-// a test can exercise (there is no seam short of standing up the whole app), but the invariant it
-// now relies on is: once detach runs, nothing it unsubscribed fires persist() again. This proves
-// that half directly — a WindowDidResize dispatched after detach() no longer calls Layout.Set.
+// fire persist() against a store whose backing DB was mid-close. main.go's own wiring isn't
+// something a test can exercise (there is no seam short of standing up the whole app), but the
+// invariant it now relies on is: once detach runs, nothing it unsubscribed fires persist() again.
+// This proves that half directly — a WindowDidResize dispatched after detach() no longer calls
+// SetBounds.
 func TestAttach_DetachStopsPersisting(t *testing.T) {
 	win, windows := newAttachedWindow(t)
 	detach := shell.Attach(win, shell.WindowDeps{Windows: windows, StartedAt: time.Now()}, "main")
@@ -95,17 +90,17 @@ func TestAttach_DetachStopsPersisting(t *testing.T) {
 	// Seed a known, distinctive value: if a stray persist() still fires, it overwrites this with
 	// the zero Rect{} win.Bounds() reports in this test, revealing it even though the two values
 	// are otherwise indistinguishable in this environment.
-	if err := windows.SetBounds("main", *sentinelBounds); err != nil {
-		t.Fatalf("Windows.SetBounds (seed): %v", err)
+	if err := windows.SetBounds("main", sentinelBounds); err != nil {
+		t.Fatalf("windows.SetBounds (seed): %v", err)
 	}
 
 	win.HandleWindowEvent(uint(events.Common.WindowDidResize))
 	win.HandleWindowEvent(uint(events.Common.WindowDidMove))
 	time.Sleep(500 * time.Millisecond)
 
-	got := boundsOf(t, windows)
-	if *got != *sentinelBounds {
-		t.Fatalf("persist ran after detach: bounds = %+v, want unchanged sentinel %+v", got, sentinelBounds)
+	got, ok := windows.boundsOf("main")
+	if !ok || got != sentinelBounds {
+		t.Fatalf("persist ran after detach: bounds = %+v (ok=%v), want unchanged sentinel %+v", got, ok, sentinelBounds)
 	}
 }
 
@@ -170,7 +165,7 @@ func TestDefaultBounds(t *testing.T) {
 // Frameless (which would silently hide the traffic lights, F2) or to the stale #18181B background
 // (F3) is never silent, the same shape TestHarden_DenyByDefaultPosture (security_test.go) uses.
 func TestOptions_CustomTitleBarPosture(t *testing.T) {
-	opts := shell.Options(shell.Harden(), model.WindowRecord{Key: "main"}, nil)
+	opts := shell.Options(shell.Harden(), shell.WindowRecord{Key: "main"}, nil, shell.Config{WindowTitle: "Shell Test"})
 
 	if opts.Mac.TitleBar != application.MacTitleBarHidden {
 		t.Errorf("Mac.TitleBar = %+v, want MacTitleBarHidden", opts.Mac.TitleBar)
@@ -188,13 +183,13 @@ func TestOptions_CustomTitleBarPosture(t *testing.T) {
 // rectangle path: a window with a persisted rectangle restores it exactly, regardless of what the
 // primary screen's work area would otherwise clamp the default to.
 func TestOptions_StoredBoundsOverrideTheClamp(t *testing.T) {
-	rec := model.WindowRecord{
+	rec := shell.WindowRecord{
 		Key:    "main",
-		Bounds: &model.WindowBounds{X: 10, Y: 20, Width: 2000, Height: 1500},
+		Bounds: &shell.WindowBounds{X: 10, Y: 20, Width: 2000, Height: 1500},
 	}
 	small := &application.Rect{Width: 320, Height: 240}
 
-	opts := shell.Options(shell.Harden(), rec, small)
+	opts := shell.Options(shell.Harden(), rec, small, shell.Config{WindowTitle: "Shell Test"})
 
 	if opts.Width != 2000 || opts.Height != 1500 || opts.X != 10 || opts.Y != 20 {
 		t.Fatalf("Options with stored bounds = %+v, want the stored rectangle unclamped", opts)

@@ -14,6 +14,6 @@ import (
 var testApp *application.App
 
 func TestMain(m *testing.M) {
-	testApp = application.New(application.Options{Name: "Kira Studio Test"})
+	testApp = application.New(application.Options{Name: "Shell Test"})
 	os.Exit(m.Run())
 }
