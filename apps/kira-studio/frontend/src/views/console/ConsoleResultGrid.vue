@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
+// P104 §3.4: VirtualList's @tanstack/vue-virtual recipe is a genuinely separate, non-mechanical
+// piece of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref, watch } from 'vue';
@@ -404,7 +406,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
      no-rows/ConsoleSlickGrid/VirtualList is the actual body — a plain block stack would let that
      sibling's height double-count against the 100% above, so this becomes a column and the body
      takes what's left. */
-  @apply h-full min-h-0 flex flex-col text-[length:var(--kira-t-md)] font-[family-name:var(--kira-font-data)];
+  @apply h-full min-h-0 flex flex-col text-kira-md font-data;
 }
 
 .body {
@@ -440,11 +442,11 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 }
 
 .no-rows {
-  @apply h-full flex items-center justify-center text-muted text-[length:var(--kira-t-sm)];
+  @apply h-full flex items-center justify-center text-muted text-kira-sm;
 }
 
 .doc-body {
-  @apply p-[var(--kira-s-2)];
+  @apply p-1;
 }
 
 /* P48 F10-F12: the row shell and its head now live in views/shared/document/DocumentRow.vue —
@@ -465,14 +467,14 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 }
 
 .doc-body-text {
-  @apply m-0 whitespace-pre-wrap break-words font-[family-name:var(--kira-font-data)] py-[var(--kira-s-2)] px-[var(--kira-s-4)];
+  @apply m-0 whitespace-pre-wrap break-words font-data py-1 px-2;
 }
 
 .kv-field {
-  @apply w-[200px] flex items-center text-muted text-ellipsis px-[var(--kira-s-4)];
+  @apply w-[200px] flex items-center text-muted text-ellipsis px-2;
 }
 
 .kv-value {
-  @apply flex-1 flex items-center whitespace-pre-wrap break-words px-[var(--kira-s-4)];
+  @apply flex-1 flex items-center whitespace-pre-wrap break-words px-2;
 }
 </style>

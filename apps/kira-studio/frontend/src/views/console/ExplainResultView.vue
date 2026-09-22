@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useSettingsStore } from '../../state/settings';
@@ -105,13 +106,12 @@ const rawLanguage = computed(() =>
           <CodiconIcon :name="plan.overThreshold ? 'warning' : 'check'" :size="14" />
           <span>{{ verdict }}</span>
         </div>
-        <span
-          v-if="nativeCostLabel"
-          class="native-cost"
-          data-testid="explain-native-cost"
-          v-tooltip="'Not comparable to another engine’s own cost figure — see the plan doc’s F17.'"
-          >{{ nativeCostLabel }}</span
-        >
+        <Tooltip v-if="nativeCostLabel">
+          <TooltipTrigger as-child>
+            <span class="native-cost" data-testid="explain-native-cost">{{ nativeCostLabel }}</span>
+          </TooltipTrigger>
+          <TooltipContent>Not comparable to another engine’s own cost figure — see the plan doc’s F17.</TooltipContent>
+        </Tooltip>
       </div>
       <p class="statement-excerpt mono" data-testid="explain-statement">{{ result.statement }}</p>
 
@@ -152,13 +152,21 @@ const rawLanguage = computed(() =>
       </div>
 
       <div class="raw-toggle-row">
-        <IconButton
-          icon="code"
-          :active="showRaw"
-          data-testid="explain-raw-toggle"
-          v-tooltip="'Show the raw EXPLAIN output the server returned'"
-          @click="showRaw = !showRaw"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': showRaw }"
+              aria-label="Show the raw EXPLAIN output"
+              data-testid="explain-raw-toggle"
+              @click="showRaw = !showRaw"
+            >
+              <CodiconIcon name="code" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Show the raw EXPLAIN output the server returned</TooltipContent>
+        </Tooltip>
         <span class="p-sm muted">Raw</span>
       </div>
       <div v-if="showRaw" class="raw-body" data-testid="explain-raw">
@@ -173,15 +181,15 @@ const rawLanguage = computed(() =>
 @reference "@theme/base.css";
 
 .explain-view {
-  @apply h-full overflow-auto flex flex-col text-[length:var(--kira-t-sm)] gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
+  @apply h-full overflow-auto flex flex-col text-kira-sm gap-1.5 p-2;
 }
 
 .explain-header {
-  @apply flex items-center flex-wrap gap-[var(--kira-s-4)];
+  @apply flex items-center flex-wrap gap-2;
 }
 
 .verdict {
-  @apply flex items-center text-ok gap-[var(--kira-s-2)];
+  @apply flex items-center text-ok gap-1;
 }
 
 .verdict.warn {
@@ -189,19 +197,19 @@ const rawLanguage = computed(() =>
 }
 
 .native-cost {
-  @apply text-muted text-[length:var(--kira-t-xs)] cursor-default;
+  @apply text-muted text-kira-xs cursor-default;
 }
 
 .statement-excerpt {
-  @apply text-muted text-[length:var(--kira-t-xs)] whitespace-pre-wrap break-words;
+  @apply text-muted text-kira-xs whitespace-pre-wrap break-words;
 }
 
 .issue-list {
-  @apply flex flex-col list-none m-0 p-0 gap-[var(--kira-s-2)];
+  @apply flex flex-col list-none m-0 p-0 gap-1;
 }
 
 .issue-list li {
-  @apply flex items-start gap-[var(--kira-s-2)];
+  @apply flex items-start gap-1;
 }
 
 .issue-list li.warn {
@@ -218,11 +226,11 @@ const rawLanguage = computed(() =>
 }
 
 .plan-tree {
-  @apply border border-border rounded-kira-sm py-[var(--kira-s-2)];
+  @apply border border-border rounded-kira-sm py-1;
 }
 
 .plan-row {
-  @apply flex items-baseline flex-wrap gap-[var(--kira-s-3)] py-0.5 px-[var(--kira-s-3)];
+  @apply flex items-baseline flex-wrap gap-1.5 py-0.5 px-1.5;
 }
 
 .plan-row:hover {
@@ -235,19 +243,19 @@ const rawLanguage = computed(() =>
 }
 
 .plan-label {
-  @apply font-[family-name:var(--kira-font-data)];
+  @apply font-data;
 }
 
 .muted {
-  @apply text-muted text-[length:var(--kira-t-xs)];
+  @apply text-muted text-kira-xs;
 }
 
 .plan-detail {
-  @apply text-subtle text-[length:var(--kira-t-xs)];
+  @apply text-subtle text-kira-xs;
 }
 
 .raw-toggle-row {
-  @apply flex items-center gap-[var(--kira-s-2)];
+  @apply flex items-center gap-1;
 }
 
 .raw-body {
