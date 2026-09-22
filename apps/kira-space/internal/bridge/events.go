@@ -1,10 +1,12 @@
 package bridge
 
-import "github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
+import "github.com/kirathecat/kira-studio/internal/appevent"
 
 // ChannelCodeSearch is C7 D7's own push channel — a repository-wide search's coalesced file
-// groups, delivered with EmitTo (one window only).
-const ChannelCodeSearch = "kira:code:search"
+// groups, delivered with EmitTo (one window only). P103 Part 3: byte-identical to Kira Studio's
+// own channel of the same name, hoisted to repo-root internal/appevent and re-exported here so no
+// call site in this package has to change.
+const ChannelCodeSearch = appevent.ChannelCodeSearch
 
 // ChannelGitPairing and ChannelGitClientsChanged are G1's own two push channels — the pairing
 // prompt's live queue snapshot, and the Connected editors pane's list. P100 Part 2's own
@@ -18,48 +20,32 @@ const (
 // ChannelSettingsChanged/ChannelLayoutChanged are SettingsService.Set/LayoutService.Set's own
 // broadcasts — Kira Studio's own two channels of the same name, unchanged shape.
 const (
-	ChannelSettingsChanged = "kira:settings:changed"
-	ChannelLayoutChanged   = "kira:layout:changed"
+	ChannelSettingsChanged = appevent.ChannelSettingsChanged
+	ChannelLayoutChanged   = appevent.ChannelLayoutChanged
 )
 
 // ChannelFlushBeforeClose/ChannelWindowFlushBeforeClose are the quit-wide and per-window flush
 // handshakes' own trigger channels — Kira Studio's own two channels of the same name
 // (internal/shell/quit.go, internal/shell/closeflush.go).
 const (
-	ChannelFlushBeforeClose       = "kira:app:flush-before-close"
-	ChannelWindowFlushBeforeClose = "kira:window:flush-before-close"
+	ChannelFlushBeforeClose       = appevent.ChannelFlushBeforeClose
+	ChannelWindowFlushBeforeClose = appevent.ChannelWindowFlushBeforeClose
 )
 
 // ChannelTerminal is the embedded terminal's own push channel — Kira Studio's own
 // ChannelTerminal (internal/bridge/terminal.go's own coalescer), EmitTo'd to the one window that
 // opened it.
-const ChannelTerminal = "kira:terminal:data"
+const ChannelTerminal = appevent.ChannelTerminal
 
 // Events is the Go->renderer push wrapper every bridge service that emits goes through — Kira
 // Studio's own bridge.Events (internal/bridge/events.go), trimmed: this app has no
-// Connections/Oplog/Metrics/DbMcp producers to Attach, so this copy keeps only the signal/
-// broadcast primitives and the settings/layout convenience wrappers those two services use.
+// Connections/Oplog/Metrics/DbMcp producers to Attach. Signal/SignalTo/Broadcast come entirely
+// from the embedded *appevent.Events core (P103 Part 3) — this app has no per-service wrapper
+// method that needs a raw Emit of its own, unlike Kira Studio's SettingsChanged.
 type Events struct {
-	emit appcore.Emitter
+	*appevent.Events
 }
 
-func NewEvents(e appcore.Emitter) *Events {
-	return &Events{emit: e}
-}
-
-// Signal emits a payload-free channel to the focused window only — the menu's own commands.
-func (ev *Events) Signal(channel string) {
-	ev.emit.EmitFocused(channel, nil)
-}
-
-// SignalTo is Signal's single-window analogue, aimed by key rather than by focus — the per-window
-// close-flush handshake's own trigger.
-func (ev *Events) SignalTo(windowKey, channel string) {
-	ev.emit.EmitTo(windowKey, channel, nil)
-}
-
-// Broadcast emits a payload-free channel to every window — the quit handshake's own trigger
-// (ChannelFlushBeforeClose): every window must flush before quitting, not only the focused one.
-func (ev *Events) Broadcast(channel string) {
-	ev.emit.Emit(channel, nil)
+func NewEvents(e appevent.Emitter) *Events {
+	return &Events{Events: appevent.NewEvents(e)}
 }

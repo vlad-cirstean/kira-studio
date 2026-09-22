@@ -21,9 +21,10 @@ type FilesChooseFolderResult struct {
 // OpenDirectoryRequest is the platform-neutral ask — Kira Studio's own bridge.OpenDirectoryRequest.
 type OpenDirectoryRequest struct{ Title string }
 
-// Dialogs is the native-dialog seam — internal/shell implements it over app.Dialog with the main
-// window attached for modality (Kira Studio's own bridge.Dialogs interface, trimmed to the one
-// method this app calls). Returns "" for a cancelled dialog, the only cancel signal Wails gives.
+// Dialogs is the native-dialog seam — internal/appshell adapts it over repo-root
+// internal/shell.Dialogs (app.Dialog with the main window attached for modality, P103 Part 3;
+// Kira Studio's own bridge.Dialogs interface, trimmed to the one method this app calls). Returns
+// "" for a cancelled dialog, the only cancel signal Wails gives.
 type Dialogs interface {
 	OpenDirectory(req OpenDirectoryRequest) (string, error)
 }

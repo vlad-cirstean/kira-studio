@@ -24,17 +24,19 @@ func shortPkgName(full string) string {
 // packagesExemptFromBridgeCheck are the packages that sit *at or above* internal/bridge in the
 // intended layering, so a bridge import from them is not a boundary violation: internal/bridge
 // itself, internal/ipcfixture (a test fixture that wires the bound services together — the same
-// composition internal/shell does for the real binary), internal/shell (the app's own composition
-// root), and the bare "internal" package (this file's own directory; it holds no non-test code).
-// rpcstream (SPEC §7's one deliberate module-agnostic-RPC exception) moved out from under
-// internal/bridge to the repo-root internal/rpcstream in P100 Part 1, so it and internal/gitsock
-// (which only needed the exemption for its rpcstream dependency) no longer need entries here —
-// go list -deps no longer reports either as depending on anything under .../internal/bridge.
+// composition internal/appshell does for the real binary), internal/appshell (the app's own
+// composition-root residue — P103 Part 3 moved the generic half to repo-root internal/shell, which
+// this go list scope no longer even sees), and the bare "internal" package (this file's own
+// directory; it holds no non-test code). rpcstream (SPEC §7's one deliberate module-agnostic-RPC
+// exception) moved out from under internal/bridge to the repo-root internal/rpcstream in P100
+// Part 1, so it and internal/gitsock (which only needed the exemption for its rpcstream dependency)
+// no longer need entries here — go list -deps no longer reports either as depending on anything
+// under .../internal/bridge.
 var packagesExemptFromBridgeCheck = map[string]bool{
 	"internal":            true,
 	"internal/bridge":     true,
 	"internal/ipcfixture": true,
-	"internal/shell":      true,
+	"internal/appshell":   true,
 }
 
 // TestDomainPackagesDoNotImportBridge used to walk a hand-maintained slice of "the domain

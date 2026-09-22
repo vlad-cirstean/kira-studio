@@ -5,11 +5,14 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 )
 
 // Channel holds today's exact IPC channel strings (packages/shared/protocol/ipc.ts's IPC const), which
 // are the Wails event names verbatim (P52 §7.1) — the renderer's subscribe mechanism changes, the
-// wire name does not.
+// wire name does not. The six re-exported below (P103 Part 3) are byte-identical strings shared
+// with Kira Space, now defined once in repo-root internal/appevent — re-exported under their own
+// names here so no call site anywhere in this package has to change.
 const (
 	ChannelOpenSettings           = "kira:open-settings"
 	ChannelNewConnection          = "kira:menu:new-connection"
@@ -27,13 +30,13 @@ const (
 	ChannelViewRun                = "kira:menu:view-run"
 	ChannelViewRunAll             = "kira:menu:view-run-all"
 	ChannelViewFormat             = "kira:menu:view-format"
-	ChannelFlushBeforeClose       = "kira:app:flush-before-close"
-	ChannelWindowFlushBeforeClose = "kira:window:flush-before-close"
+	ChannelFlushBeforeClose       = appevent.ChannelFlushBeforeClose
+	ChannelWindowFlushBeforeClose = appevent.ChannelWindowFlushBeforeClose
 	ChannelConnectionState        = "kira:connection:state"
 	ChannelMetadataInvalidated    = "kira:connection:metadataInvalidated"
 	ChannelConnectionsChanged     = "kira:connections:changed"
-	ChannelSettingsChanged        = "kira:settings:changed"
-	ChannelLayoutChanged          = "kira:layout:changed"
+	ChannelSettingsChanged        = appevent.ChannelSettingsChanged
+	ChannelLayoutChanged          = appevent.ChannelLayoutChanged
 	ChannelOpUpdate               = "kira:op:update"
 	ChannelAppMetrics             = "kira:app:metrics"
 	ChannelSchemaChanged          = "kira:schema:changed"
@@ -51,14 +54,14 @@ const (
 	// groups, delivered with EmitTo (one window only) exactly the shape ChannelGrpcCall (P11 D8)
 	// established: flush on 60ms/256 matches/the terminal event, one producer (StartSearch's own
 	// goroutine), no Sources entry.
-	ChannelCodeSearch = "kira:code:search"
+	ChannelCodeSearch = appevent.ChannelCodeSearch
 	// ChannelDbMcpApproval is M2 §7.1's own push channel — the prompt-mode approval queue's live
 	// snapshot, ChannelGitPairing's own shape applied to run_query's approval broker.
 	ChannelDbMcpApproval = "kira:dbmcp:approval"
 	// ChannelTerminal is P83's own push channel — one terminal's output and its exit, EmitTo'd to
 	// the one window that opened it, exactly like ChannelCodeSearch above (internal/bridge/
 	// terminal.go's own coalescer).
-	ChannelTerminal = "kira:terminal:data"
+	ChannelTerminal = appevent.ChannelTerminal
 	// ChannelCustomScriptsChanged is P85's own list-changed broadcast — CustomScriptsService's own
 	// Create/Update/Remove Emit (not EmitTo) the full list, ChannelConnectionsChanged's own shape,
 	// so every window's tab-strip dropdown stays in sync with a script added or removed elsewhere.
@@ -107,12 +110,16 @@ type Sources struct {
 
 // Events is the Go analogue of the five push-side listeners src/main/index.ts wires (:58, :99-
 // 102) plus the menu/quit signal channels. It is the only thing in this package that emits.
+// Signal/SignalTo/Broadcast come from the embedded *appevent.Events core (P103 Part 3); emit is
+// kept alongside it for Attach's five producer subscriptions and SettingsChanged below, neither of
+// which the shared core exposes a raw Emit for.
 type Events struct {
+	*appevent.Events
 	emit appcore.Emitter
 }
 
 func NewEvents(e appcore.Emitter) *Events {
-	return &Events{emit: e}
+	return &Events{Events: appevent.NewEvents(e), emit: e}
 }
 
 // Attach subscribes to every producer in s and returns one detach that unsubscribes all of them.
@@ -148,32 +155,15 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 	}
 }
 
-// Signal emits a payload-free channel (D6: nil, not {}) to the focused window only — Electron's
-// own sendToFocusedWindow(channel) (18fe7bb^:src/main/menu.ts:5-8; preload's onSignal discards
-// arguments, src/preload/index.ts:35-39). The menu's twelve signal channels are its only caller
-// (P8 C9): a background window no longer reacts to a command aimed at whichever window the user
-// was actually looking at — Cmd+W closing a tab in every open window, or Cmd+Return running a
-// console statement in a window the user never touched, were the concrete symptoms (F2).
-//
-// This is the split C9 exists for: Broadcast below (the quit handshake's own trigger) and the six
-// state-change broadcasts in Attach/SettingsChanged/LayoutService.Set all stay on Emit — every
-// window genuinely needs those, unlike a menu command.
-func (ev *Events) Signal(channel string) {
-	ev.emit.EmitFocused(channel, nil)
-}
-
-// SignalTo is Signal's single-window analogue, aimed by key rather than by focus (P8 C6/D6's
-// EmitTo): the per-window close-flush handshake's own trigger.
-func (ev *Events) SignalTo(windowKey, channel string) {
-	ev.emit.EmitTo(windowKey, channel, nil)
-}
-
-// Broadcast emits a payload-free channel to every window — the quit handshake's own trigger
-// (ChannelFlushBeforeClose): every window genuinely must flush before quitting, not only the
-// focused one, so this deliberately does not go through Signal's focused-only delivery.
-func (ev *Events) Broadcast(channel string) {
-	ev.emit.Emit(channel, nil)
-}
+// Signal/SignalTo/Broadcast (D6: nil payloads, not {}) come from the embedded *appevent.Events
+// core — Electron's own sendToFocusedWindow(channel) (18fe7bb^:src/main/menu.ts:5-8; preload's
+// onSignal discards arguments, src/preload/index.ts:35-39). The menu's twelve signal channels are
+// Signal's only caller (P8 C9): a background window no longer reacts to a command aimed at
+// whichever window the user was actually looking at — Cmd+W closing a tab in every open window, or
+// Cmd+Return running a console statement in a window the user never touched, were the concrete
+// symptoms (F2). This is the split C9 exists for: Broadcast (the quit handshake's own trigger) and
+// the six state-change broadcasts in Attach/SettingsChanged/LayoutService.Set all stay on Emit —
+// every window genuinely needs those, unlike a menu command.
 
 // SettingsChanged broadcasts the merged settings unconditionally — SettingsService.Set's own
 // job, factored out here so its own file stays a thin wrapper.

@@ -9,16 +9,14 @@ package appcore
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 )
 
-// Emitter is the Go->renderer push seam (Kira Studio's own appcore.Emitter, same three methods) —
-// internal/shell implements it over *application.App's Event.Emit/DispatchWailsEvent; bridge
-// stays the only real consumer package, so no bridge file has to import Wails.
-type Emitter interface {
-	Emit(name string, data any)
-	EmitTo(windowKey string, name string, data any)
-	EmitFocused(name string, data any)
-}
+// Emitter is the Go->renderer push seam — repo-root internal/appevent.Emitter (P103 Part 3:
+// identical in both apps, hoisted there). internal/shell implements it over *application.App's
+// Event.Emit/DispatchWailsEvent; bridge stays the only real consumer package, so no bridge file
+// has to import Wails.
+type Emitter = appevent.Emitter
 
 // Deps is embedded by value into every bound service struct.
 type Deps struct {

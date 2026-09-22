@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appshell"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/buildinfo"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
@@ -20,13 +21,13 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitvsix"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/shell"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/apps/kira-space/internal/terminal"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
+	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -64,6 +65,11 @@ func main() {
 		},
 	})
 
+	// P103 Part 3: repo-root internal/terminal's own two process-constant vars, set once before
+	// any Registry.Open.
+	terminal.TermProgram = "Kira Space"
+	terminal.TermProgramVersion = buildinfo.Version
+
 	startedAt := time.Now()
 
 	if err := config.EnsureLayout(); err != nil {
@@ -98,7 +104,8 @@ func main() {
 	events := bridge.NewEvents(emitter)
 
 	browserOpener, attachBrowser := shell.NewDeferredBrowser()
-	dialogsSvc, attachDialogs := shell.NewDeferredDialogs()
+	rawDialogs, attachDialogs := shell.NewDeferredDialogs()
+	dialogsSvc := appshell.NewDialogs(rawDialogs)
 
 	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
 		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
@@ -120,7 +127,7 @@ func main() {
 	// coordinate (no tabs, no layout); the quit-wide handshake below needs windows.Keys, and each
 	// window's own close needs closeFlush's ack routing (shell/closeflush.go).
 	windows := shell.NewWindowRegistry()
-	closeFlush := shell.NewCloseFlushCoordinator()
+	closeFlush := shell.NewCloseFlushCoordinator(events)
 
 	beforeFlush := sync.OnceFunc(func() {
 		windows.DetachAll()
@@ -195,13 +202,12 @@ func main() {
 	}
 	attachDialogs(app, windowToActOn)
 
-	shell.RegisterGitStream(app, gitRouter)
+	appshell.RegisterGitStream(app, gitRouter)
 
 	opener := &windowOpener{
 		app:          app,
-		windowDeps:   shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt},
+		windowDeps:   shell.WindowDeps{Windows: windowStore{repositories.Windows}, StartedAt: startedAt},
 		windows:      windows,
-		events:       events,
 		closeFlush:   closeFlush,
 		quitter:      quitter,
 		terminalSvc:  terminalSvc,
@@ -210,7 +216,8 @@ func main() {
 	shell.AttachReopen(app, opener.reopen)
 
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
-		AppName: "Kira Space", Quit: quitter.RequestQuit, NewWindow: opener.openNew,
+		AppName: "Kira Space", Template: appshell.BuildTemplate("Kira Space"),
+		Quit: quitter.RequestQuit, NewWindow: opener.openNew,
 	}))
 
 	records, err := repositories.Windows.List()
@@ -303,11 +310,31 @@ type windowOpener struct {
 	app          *application.App
 	windowDeps   shell.WindowDeps
 	windows      *shell.WindowRegistry
-	events       *bridge.Events
 	closeFlush   *shell.CloseFlushCoordinator
 	quitter      *shell.Quitter
 	terminalSvc  *bridge.TerminalService
 	repositories *repos.Repos
+}
+
+// windowStore adapts *repos.WindowsRepo to shell.WindowStore (P103 Part 3 §6.3) — a plain struct
+// conversion at the call site (model.WindowBounds and shell.WindowBounds are field-for-field
+// identical), not a behaviour change.
+type windowStore struct{ repo *repos.WindowsRepo }
+
+func (w windowStore) SetBounds(key string, b shell.WindowBounds) error {
+	return w.repo.SetBounds(key, model.WindowBounds(b))
+}
+
+// toShellWindowRecord converts this app's own storage/model.WindowRecord into the two fields
+// repo-root internal/shell's window building actually reads (P103 Part 3 §6.3) — a plain struct
+// conversion, not hoisting the storage model.
+func toShellWindowRecord(rec model.WindowRecord) shell.WindowRecord {
+	var bounds *shell.WindowBounds
+	if rec.Bounds != nil {
+		b := shell.WindowBounds(*rec.Bounds)
+		bounds = &b
+	}
+	return shell.WindowRecord{Key: rec.Key, Bounds: bounds}
 }
 
 // open opens one workbench from an already-persisted record and registers it. Its own
@@ -319,10 +346,11 @@ func (o *windowOpener) open(rec model.WindowRecord) {
 	if screen := o.app.Screen.GetPrimary(); screen != nil {
 		primaryWorkArea = &screen.WorkArea
 	}
-	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
+	cfg := shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"}
+	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), toShellWindowRecord(rec), primaryWorkArea, cfg))
 	detach := shell.Attach(win, o.windowDeps, rec.Key)
 	o.windows.Add(rec.Key, win, detach)
-	shell.AttachCloseFlush(win, rec.Key, o.events, o.closeFlush, func() bool { return o.windows.Count() == 1 })
+	shell.AttachCloseFlush(win, rec.Key, o.closeFlush, func() bool { return o.windows.Count() == 1 })
 	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
 		// A window that closes mid-quit-handshake without ever acking through the flush channel is
 		// removed from the pending set here rather than being waited out for the full timeout — a
@@ -351,7 +379,12 @@ func (o *windowOpener) openNew() {
 			order = r.Order + 1
 		}
 	}
-	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: shell.CascadeFrom(o.app.Window.Current())}
+	var bounds *model.WindowBounds
+	if b := shell.CascadeFrom(o.app.Window.Current()); b != nil {
+		mb := model.WindowBounds(*b)
+		bounds = &mb
+	}
+	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: bounds}
 	if err := o.repositories.Windows.Create(rec); err != nil {
 		slog.Error("create window", "scope", "window", "err", err)
 		return

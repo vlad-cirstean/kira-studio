@@ -21,6 +21,7 @@ import (
 	_ "github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters/sqs"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appshell"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
@@ -36,14 +37,14 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/terminal"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
 	"github.com/kirathecat/kira-studio/internal/logging"
+	"github.com/kirathecat/kira-studio/internal/shell"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
+	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	// Aliased: main.go's own `events` local var (bridge.NewEvents) would otherwise shadow this
 	// package for the rest of the function, exactly where openWindow's WindowClosing listener
@@ -80,6 +81,11 @@ func main() {
 			DbPath:  config.DbPath,
 		},
 	})
+
+	// P103 Part 3: repo-root internal/terminal's own two process-constant vars, set once before
+	// any Registry.Open — a spawned shell's own TERM_PROGRAM/TERM_PROGRAM_VERSION env.
+	terminal.TermProgram = "Kira Studio"
+	terminal.TermProgramVersion = buildinfo.Version
 
 	startedAt := time.Now()
 
@@ -118,7 +124,8 @@ func main() {
 	// returned, well before Run() lets the renderer or any signal path actually call through it.
 	emitter, attachEmitter := shell.NewDeferredEmitter()
 	deps.Events = emitter
-	dialogs, attachDialogs := shell.NewDeferredDialogs()
+	rawDialogs, attachDialogs := shell.NewDeferredDialogs()
+	dialogs := appshell.NewDialogs(rawDialogs)
 	browserOpener, attachBrowser := shell.NewDeferredBrowser()
 
 	// P66: the update-availability checker — no network call at all from a dev/test build
@@ -452,7 +459,7 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 	// closeFlush routes each window's own "flush before close" ack back to whichever
 	// shell.AttachCloseFlush hook is waiting for it (P8 C6, F8's fix) — a separate handshake from
 	// the quit one below: at most one window is ever waiting at a time.
-	closeFlush := shell.NewCloseFlushCoordinator()
+	closeFlush := shell.NewCloseFlushCoordinator(events)
 
 	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
 	// before the flush wait rather than after it — P56 D3/index.ts:156).
@@ -527,21 +534,23 @@ func wireWindowsAndMenu(d postAppDeps) {
 	}
 	d.attachDialogs(app, windowToActOn)
 
-	shell.RegisterEngineStream(app, d.router)
+	appshell.RegisterEngineStream(app, d.router)
 
 	opener := &windowOpener{
-		app: app, windowDeps: shell.WindowDeps{Windows: d.repositories.Windows, StartedAt: d.startedAt},
-		windows: d.windows, events: d.events, closeFlush: d.closeFlush, quitter: d.quitter,
+		app:        app,
+		windowDeps: shell.WindowDeps{Windows: windowStore{d.repositories.Windows}, StartedAt: d.startedAt},
+		windows:    d.windows, closeFlush: d.closeFlush, quitter: d.quitter,
 		terminalSvc: d.terminalSvc, repositories: d.repositories,
 	}
 	d.windowsSvc.OpenNewWindow = opener.openNew
 	shell.AttachReopen(app, opener.reopen)
 	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
-	shell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.keepAwakeSvc) })
+	appshell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.keepAwakeSvc) })
 
 	isDev := app.Env.Info().Debug
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
-		AppName: "Kira Studio", IsDev: isDev, Events: d.events, Quit: d.quitter.RequestQuit, NewWindow: opener.openNew,
+		AppName: "Kira Studio", IsDev: isDev, Template: appshell.BuildTemplate("Kira Studio", isDev),
+		OnEmit: d.events.Signal, Quit: d.quitter.RequestQuit, NewWindow: opener.openNew,
 	}))
 
 	// Startup: one window per stored record (C1's migration guarantees at least the "main" row on
@@ -571,11 +580,31 @@ type windowOpener struct {
 	app          *application.App
 	windowDeps   shell.WindowDeps
 	windows      *shell.WindowRegistry
-	events       *bridge.Events
 	closeFlush   *shell.CloseFlushCoordinator
 	quitter      *shell.Quitter
 	terminalSvc  *bridge.TerminalService
 	repositories *repos.Repos
+}
+
+// windowStore adapts *repos.WindowsRepo to shell.WindowStore (P103 Part 3 §6.3) — a plain struct
+// conversion at the call site (model.WindowBounds and shell.WindowBounds are field-for-field
+// identical), not a behaviour change.
+type windowStore struct{ repo *repos.WindowsRepo }
+
+func (w windowStore) SetBounds(key string, b shell.WindowBounds) error {
+	return w.repo.SetBounds(key, model.WindowBounds(b))
+}
+
+// toShellWindowRecord converts this app's own storage/model.WindowRecord into the two fields
+// repo-root internal/shell's window building actually reads (P103 Part 3 §6.3) — a plain struct
+// conversion, not hoisting the storage model.
+func toShellWindowRecord(rec model.WindowRecord) shell.WindowRecord {
+	var bounds *shell.WindowBounds
+	if rec.Bounds != nil {
+		b := shell.WindowBounds(*rec.Bounds)
+		bounds = &b
+	}
+	return shell.WindowRecord{Key: rec.Key, Bounds: bounds}
 }
 
 // open opens one workbench from an already-persisted record and registers it — the one path every
@@ -602,14 +631,15 @@ func (o *windowOpener) open(rec model.WindowRecord) {
 	if screen := o.app.Screen.GetPrimary(); screen != nil {
 		primaryWorkArea = &screen.WorkArea
 	}
-	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
+	cfg := shell.Config{AppName: "Kira Studio", WindowTitle: "Kira Studio"}
+	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), toShellWindowRecord(rec), primaryWorkArea, cfg))
 	detach := shell.Attach(win, o.windowDeps, rec.Key)
 	o.windows.Add(rec.Key, win, detach)
 	// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
 	// window's own close-flush wait completes (closeflush.go's own doc comment) — this window is
 	// still counted (RemoveAndCount, below, is what removes it, and only once a real Close()
 	// actually goes through), so `== 1` means "I am the only one left".
-	shell.AttachCloseFlush(win, rec.Key, o.events, o.closeFlush, func() bool { return o.windows.Count() == 1 })
+	shell.AttachCloseFlush(win, rec.Key, o.closeFlush, func() bool { return o.windows.Count() == 1 })
 	win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
 		// A window that closes mid-quit-handshake without ever acking through the flush channel is
 		// removed from the pending set here rather than being waited out for the full timeout
@@ -641,7 +671,12 @@ func (o *windowOpener) openNew() {
 			order = r.Order + 1
 		}
 	}
-	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: shell.CascadeFrom(o.app.Window.Current())}
+	var bounds *model.WindowBounds
+	if b := shell.CascadeFrom(o.app.Window.Current()); b != nil {
+		mb := model.WindowBounds(*b)
+		bounds = &mb
+	}
+	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: bounds}
 	if err := o.repositories.Windows.Create(rec); err != nil {
 		slog.Error("create window", "scope", "window", "err", err)
 		return

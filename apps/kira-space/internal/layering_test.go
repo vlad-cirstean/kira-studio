@@ -19,11 +19,13 @@ func shortPkgName(full string) string {
 // packagesExemptFromBridgeCheck are the packages that sit at or above internal/bridge in the
 // intended layering. Kira Studio's own exemption set also carries internal/ipcfixture (a test
 // fixture that wires the bound services together) — this app has no such fixture yet, so it is
-// left out rather than exempting a package that does not exist.
+// left out rather than exempting a package that does not exist. internal/appshell (P103 Part 3)
+// replaces internal/shell here — the generic half of the app's own composition root moved to
+// repo-root internal/shell, outside this go list scope; appshell is what's left importing bridge.
 var packagesExemptFromBridgeCheck = map[string]bool{
-	"internal":        true,
-	"internal/bridge": true,
-	"internal/shell":  true,
+	"internal":          true,
+	"internal/bridge":   true,
+	"internal/appshell": true,
 }
 
 // TestDomainPackagesDoNotImportBridge is Kira Studio's own test (see its own doc comment for the

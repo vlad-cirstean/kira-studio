@@ -46,9 +46,10 @@ type OpenFileRequest struct{ Title, FilterName, FilterPattern string }
 // its own type since a filter makes no sense for a directory chooser.
 type OpenDirectoryRequest struct{ Title string }
 
-// Dialogs is the native-dialog seam. internal/shell implements it over app.Dialog with the main
-// window attached for modality; files_test.go implements it with a recorder. Every method returns
-// "" for a cancelled dialog, which is the only cancel signal Wails gives (P56 §1.2).
+// Dialogs is the native-dialog seam. internal/appshell adapts it over repo-root
+// internal/shell.Dialogs (app.Dialog with the main window attached for modality, P103 Part 3);
+// files_test.go implements it with a recorder. Every method returns "" for a cancelled dialog,
+// which is the only cancel signal Wails gives (P56 §1.2).
 type Dialogs interface {
 	SaveFile(req SaveFileRequest) (string, error)
 	OpenFile(req OpenFileRequest) (string, error)

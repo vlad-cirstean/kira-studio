@@ -11,9 +11,11 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/tree"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 )
 
-// Emitter is the Go→renderer push seam (P56 D1/D4). internal/shell implements it over
+// Emitter is the Go→renderer push seam (P56 D1/D4) — repo-root internal/appevent.Emitter
+// (P103 Part 3: identical in both apps, hoisted there). internal/shell implements it over
 // *application.App's Event.Emit/DispatchWailsEvent; bridge/events.go is its one real consumer
 // package, so no bridge file has to import Wails. Deps carries the bare interface, not a
 // *bridge.Events, since bridge already imports appcore — a *bridge.Events field here would be an
@@ -22,11 +24,7 @@ import (
 // is currently key/focused, the successor to Electron's own sendToFocusedWindow — the menu's
 // twelve signal channels use it so a background window no longer reacts to a command the user
 // aimed at the window they were actually looking at.
-type Emitter interface {
-	Emit(name string, data any)
-	EmitTo(windowKey string, name string, data any)
-	EmitFocused(name string, data any)
-}
+type Emitter = appevent.Emitter
 
 // Deps is embedded by value into every bound service struct, matching src/main/ipc/deps.ts's
 // IpcDeps shape as closely as each phase's scope allows. P52's deps.ts row also lists Secrets and
