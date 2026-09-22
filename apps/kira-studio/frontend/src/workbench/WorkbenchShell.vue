@@ -82,13 +82,14 @@ const gridStyle = computed(() => ({
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .workbench-shell {
   /* P1 C8: a flex child of App.vue's new .app-frame (TitleBar + WorkbenchShell), not a lone
-     fill-parent block any more. */
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  display: grid;
+     fill-parent block any more. Grid-template-areas/columns/rows stay hand CSS — the columns/rows
+     are driven by :style-bound custom properties (gridStyle above), which Tailwind's utility
+     scale has no way to express. */
+  @apply flex-1 min-h-0 box-border grid;
   grid-template-areas:
     'project splitproj main'
     'splitops splitops splitops'
@@ -111,23 +112,15 @@ const gridStyle = computed(() => ({
 }
 
 .panel-surface {
-  border-radius: var(--kira-radius);
+  @apply overflow-hidden min-w-0 min-h-0 rounded-[var(--kira-radius)];
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg);
-  overflow: hidden;
-  min-width: 0;
-  min-height: 0;
 }
 
 .editor-area {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  border-radius: var(--kira-radius);
+  @apply flex flex-col min-w-0 min-h-0 overflow-hidden rounded-[var(--kira-radius)];
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg);
-  overflow: hidden;
 }
 
 .tab-strip-slot {
@@ -142,15 +135,12 @@ const gridStyle = computed(() => ({
      without `min-height: 0` its default `min-height: auto` lets the tab buttons' own intrinsic
      height push it taller than the `height` above, which is what let individual tabs render past
      this row's bottom edge despite it being tall enough on paper. */
-  min-height: 0;
-  overflow: hidden;
-  flex-shrink: 0;
+  @apply min-h-0 overflow-hidden shrink-0;
   border-bottom: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg-chrome);
 }
 
 .main-view {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 </style>

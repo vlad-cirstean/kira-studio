@@ -204,18 +204,19 @@ const agentTooltip = computed(() =>
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* Fixed, right-aligned slots (monospace, so `ch` is an exact character width) — as the CPU%/
    memory readouts gain digits (0% -> 100%, 12.0 MB -> 1234.5 MB) they grow into their own
    reserved space instead of pushing cache-size/engine-status/the toggle group sideways. */
 .metric-value {
-  display: inline-block;
-  text-align: right;
+  @apply inline-block text-right;
 }
 .metric-value:not(.metric-mem) {
-  min-width: 4ch; /* "100%" */
+  @apply min-w-[4ch]; /* "100%" */
 }
 .metric-mem {
-  min-width: 9ch; /* "1234.5 MB" */
+  @apply min-w-[9ch]; /* "1234.5 MB" */
 }
 .metric-sep {
   color: var(--kira-fg-subtle);
@@ -226,7 +227,7 @@ const agentTooltip = computed(() =>
    height/padding/border-radius/cursor. --kira-info (already used by .p-td.fk) reads as actionable
    against the bar's own --kira-fg-muted. */
 .update {
-  background: none;
+  @apply bg-none;
   font: inherit;
   color: var(--kira-info);
 }
@@ -238,17 +239,14 @@ const agentTooltip = computed(() =>
    come free); its UA chrome reset is that rule's, reused. Unlike .update, no accent color — a
    blame readout is informational, not something needing attention. */
 .blame {
-  background: none;
+  @apply bg-none;
   font: inherit;
   color: var(--kira-fg);
 }
 .blame:disabled {
-  cursor: default;
+  @apply cursor-default;
 }
 .blame-text {
-  max-width: 48ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply max-w-[48ch] overflow-hidden text-ellipsis whitespace-nowrap;
 }
 </style>

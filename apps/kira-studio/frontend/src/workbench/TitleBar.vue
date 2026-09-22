@@ -153,21 +153,20 @@ const keepAwakeTooltip = computed(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* P1 D2/C8: the root carries --wails-draggable: drag (drag.ts:98-108) so the bar behaves like a
    native title bar — dragging it moves the window, double-clicking it zooms/minimises per System
    Settings, both for free. On Linux (wails3 task dev) and under tests/ui (a static file server,
    no Wails window at all) the custom property is simply inert and this renders as ordinary DOM. */
 .title-bar {
+  @apply relative flex items-center shrink-0;
   --wails-draggable: drag;
   height: var(--kira-titlebar-h);
   min-height: var(--kira-titlebar-h);
-  position: relative;
-  display: flex;
-  align-items: center;
   padding-left: var(--kira-titlebar-inset-left);
   padding-right: var(--kira-s-3);
   background: var(--kira-bg-chrome);
-  flex-shrink: 0;
 }
 
 /* No app title (removed — HideTitle already drops AppKit's own, and a second wordmark read as
@@ -177,13 +176,7 @@ const keepAwakeTooltip = computed(() => {
    visibly off-centre. --kira-titlebar-inset-left's own reserved zone stays real (nothing else
    renders there) — this just stops depending on it for centering math. */
 .mode-tabs {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  gap: 2px;
+  @apply absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-0.5;
 }
 
 /* CRITICAL (D2): --wails-draggable inherits from .title-bar above, and isDraggableEvent
@@ -242,28 +235,21 @@ const keepAwakeTooltip = computed(() => {
    has none of .mode-tabs' centering problem, since there's nothing on the far side to be
    asymmetric against. */
 .title-bar-actions {
+  @apply flex items-center gap-0.5 ml-auto;
   --wails-draggable: none;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 
 .title-action {
+  @apply inline-flex items-center justify-center cursor-pointer rounded-[var(--kira-radius-sm)];
   --wails-draggable: none;
   height: var(--kira-h-sm);
   width: var(--kira-h-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   /* A real (transparent) border at rest, not `border: none` — so .is-on below only swaps the
      border's colour, never adds one, and the button never resizes/shifts between the two
      states. Same technique .p-tab uses for the identical reason (primitives.css:365). */
   border: var(--kira-border-width) solid transparent;
-  border-radius: var(--kira-radius-sm);
   background: none;
   color: var(--kira-fg-muted);
-  cursor: pointer;
 }
 .title-action:hover {
   background: var(--kira-hover);
@@ -271,7 +257,7 @@ const keepAwakeTooltip = computed(() => {
 /* P92 item 3: the one .title-action with a visible label, not just an icon — overrides the fixed
    square (:width, above) back to content width. */
 .title-action--labelled {
-  width: auto;
+  @apply w-auto;
   padding: 0 var(--kira-s-2);
   gap: var(--kira-s-2);
   font-size: var(--kira-t-sm);
