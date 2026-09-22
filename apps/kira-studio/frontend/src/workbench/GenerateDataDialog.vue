@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
@@ -203,28 +204,46 @@ function onSequenceStartChange(index: number, start: number): void {
 </script>
 
 <template>
-  <DialogFrame
-    title="Generate data"
-    :width="680"
-    max-height="82vh"
-    test-id="generate-data-dialog"
-    close-test-id="generate-data-close"
-    @close="onClose"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && onClose()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="generate-data-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 680px; max-width: 680px; max-height: 82vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Generate data</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="generate-data-close"
+            @click="onClose"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+
+      <div class="overflow-auto">
     <div class="generate-form">
       <div class="run-fields">
         <label class="field-label p-sm muted">Rows</label>
-        <TextField
+        <Input
           :model-value="String(rowCount)"
           type="number"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
           data-testid="generate-data-row-count"
           :disabled="running"
           @update:model-value="(v) => (rowCount = Math.max(1, Math.trunc(Number(v)) || 1))"
         />
         <label class="field-label p-sm muted">Seed</label>
-        <TextField
+        <Input
           :model-value="String(seed)"
           type="number"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
           data-testid="generate-data-seed"
           :disabled="running"
           @update:model-value="(v) => (seed = Math.trunc(Number(v)) || 0)"
@@ -265,17 +284,19 @@ function onSequenceStartChange(index: number, start: number): void {
               {{ opt.label }}
             </option>
           </select>
-          <TextField
+          <Input
             v-if="plan.recipe.kind === 'constant'"
             :model-value="plan.recipe.value"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             :data-testid="`generate-data-constant-${plan.column.name}`"
             :disabled="running"
-            @update:model-value="(v) => onConstantChange(index, v)"
+            @update:model-value="(v) => onConstantChange(index, String(v))"
           />
-          <TextField
+          <Input
             v-else-if="plan.recipe.kind === 'sequence'"
             :model-value="String(plan.recipe.start)"
             type="number"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             :data-testid="`generate-data-sequence-start-${plan.column.name}`"
             :disabled="running"
             @update:model-value="(v) => onSequenceStartChange(index, Math.trunc(Number(v)) || 0)"
@@ -341,35 +362,37 @@ function onSequenceStartChange(index: number, start: number): void {
         {{ runError }}
       </MessageStrip>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions end p-push">
-        <RunState
-          v-if="running"
-          status="running"
-          :elapsed-ms="null"
-          :title="`${committedRows} / ${rowCount} rows committed`"
-        />
-        <AppButton v-if="running" kind="dialog" data-testid="generate-data-stop" @click="onStop">
-          Stop
-        </AppButton>
-        <template v-else>
-          <AppButton kind="dialog" data-testid="generate-data-cancel" @click="onClose">
-            Cancel
-          </AppButton>
-          <AppButton
-            kind="dialog"
-            variant="primary"
-            data-testid="generate-data-submit"
-            :disabled="rowCount < 1 || noUsableColumns"
-            @click="onGenerate"
-          >
-            Generate
-          </AppButton>
-        </template>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="flex items-center gap-1 ml-auto">
+          <RunState
+            v-if="running"
+            status="running"
+            :elapsed-ms="null"
+            :title="`${committedRows} / ${rowCount} rows committed`"
+          />
+          <Button v-if="running" variant="dialog" size="kira-lg" data-testid="generate-data-stop" @click="onStop">
+            Stop
+          </Button>
+          <template v-else>
+            <Button variant="dialog" size="kira-lg" data-testid="generate-data-cancel" @click="onClose">
+              Cancel
+            </Button>
+            <Button
+              variant="dialog-primary"
+              size="kira-lg"
+              data-testid="generate-data-submit"
+              :disabled="rowCount < 1 || noUsableColumns"
+              @click="onGenerate"
+            >
+              Generate
+            </Button>
+          </template>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>

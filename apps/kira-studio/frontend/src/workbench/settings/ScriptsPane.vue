@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@shared/domain/color';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, reactive, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../state/customScripts';
@@ -151,10 +152,10 @@ async function onAddScript(): Promise<void> {
       >
         <div class="script-row-top">
           <div class="script-name">
-            <TextField
+            <Input
               v-model="scriptDrafts[script.id].name"
               placeholder="Name"
-              size="md"
+              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
               data-testid="custom-script-name"
               @blur="onScriptFieldBlur(script)"
             />
@@ -164,28 +165,35 @@ async function onAddScript(): Promise<void> {
             label="Script colour"
             @update:model-value="(color) => onScriptColorChange(script, color)"
           />
-          <IconButton
-            icon="trash"
-            data-testid="custom-script-remove"
-            v-tooltip="'Remove this script'"
-            @click="onRemoveScript(script)"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Remove this script"
+                data-testid="custom-script-remove"
+                @click="onRemoveScript(script)"
+              >
+                <CodiconIcon name="trash" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Remove this script</TooltipContent>
+          </Tooltip>
         </div>
         <div class="script-command">
-          <TextField
+          <Input
             v-model="scriptDrafts[script.id].command"
             placeholder="Command"
-            size="md"
-            class="mono"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             data-testid="custom-script-command"
             @blur="onScriptFieldBlur(script)"
           />
         </div>
         <div class="script-workingdir">
-          <TextField
+          <Input
             v-model="scriptDrafts[script.id].workingDir"
             placeholder="Active repository"
-            size="md"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             data-testid="custom-script-workingdir"
             @blur="onScriptFieldBlur(script)"
           />
@@ -199,36 +207,36 @@ async function onAddScript(): Promise<void> {
     <div class="custom-script-add">
       <div class="script-row-top">
         <div class="script-name">
-          <TextField
+          <Input
             v-model="newScriptName"
             placeholder="Name"
-            size="md"
+            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             data-testid="custom-script-add-name"
           />
         </div>
         <ColorPicker v-model="newScriptColor" label="Script colour" />
-        <AppButton
-          kind="dialog"
+        <Button
+          variant="dialog"
+          size="kira-lg"
           :disabled="!canAddScript"
           data-testid="custom-script-add"
           @click="onAddScript"
-          >Add</AppButton
+          >Add</Button
         >
       </div>
       <div class="script-command">
-        <TextField
+        <Input
           v-model="newScriptCommand"
           placeholder="Command"
-          size="md"
-          class="mono"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
           data-testid="custom-script-add-command"
         />
       </div>
       <div class="script-workingdir">
-        <TextField
+        <Input
           v-model="newScriptWorkingDir"
           placeholder="Active repository"
-          size="md"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
           data-testid="custom-script-add-workingdir"
         />
       </div>
