@@ -1,0 +1,98 @@
+<script setup lang="ts">
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import { ref } from 'vue';
+import { useAgentHooksStore } from '../../state/agentHooks';
+import { useKeepAwakeStore } from '../../state/keepAwake';
+import { useSettingsStore } from '../../state/settings';
+import type { SettingsPaneProps } from './types';
+
+// P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
+// `v-else-if="activeSection === 'Claude Code'"` branch. Both leaves here bypass draft/Save
+// entirely (P86 §9.3/P87 §9) — each both persists and starts/stops a live effect (the embedded
+// hook listener; the keep-awake assertion) in one call.
+defineProps<SettingsPaneProps>();
+
+const agentHooksStore = useAgentHooksStore();
+const keepAwakeStore = useKeepAwakeStore();
+const settingsStore = useSettingsStore();
+
+const claudeCodeHooksToggling = ref(false);
+async function onToggleAgentHooksEnabled(enabled: boolean): Promise<void> {
+  claudeCodeHooksToggling.value = true;
+  try {
+    await agentHooksStore.setAgentHooksEnabled(enabled);
+  } finally {
+    claudeCodeHooksToggling.value = false;
+  }
+}
+
+// P87 §9: independent of the title bar's own keep-awake button — either source is enough to hold
+// the assertion.
+const keepAwakeAgentAwareToggling = ref(false);
+async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
+  keepAwakeAgentAwareToggling.value = true;
+  try {
+    await keepAwakeStore.setKeepAwakeAgentAware(enabled);
+  } finally {
+    keepAwakeAgentAwareToggling.value = false;
+  }
+}
+</script>
+
+<template>
+  <div class="settings-pane" v-show="active">
+    <!-- P86 §9.3: instant-action only, same posture as Connected editors/Database MCP —
+         this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
+         hook listener in one call, so it belongs on the action side of the draft/Save
+         line, never mixed with it. -->
+    <label class="field checkbox">
+      <Checkbox
+        :model-value="settingsStore.claudeCode.hooksEnabled"
+        :disabled="claudeCodeHooksToggling"
+        data-testid="settings-claude-code-hooks"
+        @update:model-value="onToggleAgentHooksEnabled"
+      />
+      <span>Report session activity to Kira Studio</span>
+      <span class="helper-text"
+        >A Claude Code tab launches with a `--settings` flag pointing at a file this app
+        owns — no project file is written. Turning this off affects only the next launch;
+        a session already running simply stops reporting.</span
+      >
+    </label>
+
+    <template v-if="settingsStore.claudeCode.hooksEnabled">
+      <p
+        v-if="agentHooksStore.status.error"
+        class="muted-note"
+        data-testid="claude-code-hooks-error"
+      >
+        {{ agentHooksStore.status.error }}
+      </p>
+      <p
+        v-else-if="agentHooksStore.status.running"
+        class="mono command-text"
+        data-testid="claude-code-hooks-path"
+      >
+        {{ agentHooksStore.status.settingsPath }}
+      </p>
+    </template>
+
+    <!-- P87 §9: independent of the title bar's own keep-awake button — either source is
+         enough to hold the assertion, and this leaf's own instant-action posture mirrors
+         the hooks toggle just above. -->
+    <label class="field checkbox">
+      <Checkbox
+        :model-value="settingsStore.claudeCode.keepAwakeWithAgents"
+        :disabled="keepAwakeAgentAwareToggling"
+        data-testid="settings-claude-code-keep-awake"
+        @update:model-value="onToggleKeepAwakeAgentAware"
+      />
+      <span>Keep this Mac awake while a Claude Code session is running</span>
+      <span class="helper-text"
+        >Prevents idle sleep, and system sleep on AC power, for as long as at least one
+        Claude Code tab is live. Independent of the title bar's own keep-awake button —
+        either one is enough to keep the machine awake.</span
+      >
+    </label>
+  </div>
+</template>
