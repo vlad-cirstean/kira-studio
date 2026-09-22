@@ -2,6 +2,7 @@
 import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
+import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useCollectionsStore } from '../../api/state/collections';
@@ -101,17 +102,17 @@ function onMethodSelect(e: Event): void {
 // finished string. loadSchema's own generation-id guard (state.ts) is still what makes a stale
 // response harmless if one lands late regardless.
 const SCHEMA_LOAD_DEBOUNCE_MS = 150;
-let schemaLoadTimer: ReturnType<typeof setTimeout> | undefined;
+const loadSchemaDebounced = useDebounceFn(() => {
+  void grpcRequestViewStore.loadSchema(props.tab.id);
+}, SCHEMA_LOAD_DEBOUNCE_MS);
 watch(
   () =>
     [props.tab.state.descriptorMode, props.tab.state.target, props.tab.state.protoPath] as const,
   ([mode, target, protoPath]) => {
-    clearTimeout(schemaLoadTimer);
+    loadSchemaDebounced.cancel();
     if (mode === 'reflection' && !target) return;
     if (mode === 'proto' && !protoPath) return;
-    schemaLoadTimer = setTimeout(() => {
-      void grpcRequestViewStore.loadSchema(props.tab.id);
-    }, SCHEMA_LOAD_DEBOUNCE_MS);
+    void loadSchemaDebounced();
   },
   { immediate: true },
 );
@@ -253,7 +254,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   for (const off of unregisterCommands) off();
-  clearTimeout(schemaLoadTimer);
+  loadSchemaDebounced.cancel();
 });
 </script>
 
@@ -479,14 +480,16 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* P18 D14/F14: HttpRequestView.vue's own .url-field idiom, verbatim — the wrapper (not the inner
-   input) is what actually sizes in the toolbar row. */
+   input) is what actually sizes in the toolbar row. api-ui-consistency.spec.ts selects
+   `.grpc-target-field` directly — kept as a marker class. */
 .grpc-target-field {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .grpc-target-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 /* P22b D10: the method select's own sibling of .grpc-target-field above — a bare <select> has no
@@ -494,54 +497,40 @@ onUnmounted(() => {
    target field above): the <select> is a plain element in this component's own template, not
    behind a child component's scoping boundary. */
 .grpc-method-field {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .grpc-method-field .p-select {
-  width: 100%;
+  @apply w-full;
 }
 
 .overview-anchor {
-  position: relative;
-  display: flex;
+  @apply relative flex;
 }
 
 .grpc-request-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 .request-response-split {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 .request-pane {
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  @apply flex min-h-0 flex-col overflow-hidden;
 }
 
 /* P22 D13 (F22): the request/response boundary used to be 4px of nothing until the pointer
-   crossed it — `divider` (above) draws the line HttpRequestView.vue's own twin comment names. */
+   crossed it — `divider` (above) draws the line HttpRequestView.vue's own twin comment names.
+   grpc-request.spec.ts polls `.request-splitter`'s box-shadow — kept as a marker class. */
 .request-splitter {
-  height: var(--kira-s-2);
-  flex-shrink: 0;
+  @apply shrink-0 h-[var(--kira-s-2)];
 }
 
 .dirty-mark {
-  color: var(--kira-warn);
-  font-size: var(--kira-t-lg);
-  line-height: 1;
+  @apply text-warn leading-none text-[length:var(--kira-t-lg)];
 }
 
 .response-pane-slot {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
 </style>
