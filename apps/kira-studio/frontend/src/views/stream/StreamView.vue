@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
+// P104 §3.4/§3.1: VirtualList's @tanstack/vue-virtual recipe and SegmentedControl's ToggleGroup
+// recipe are each a genuinely separate, non-mechanical piece of work -- not attempted in this
+// pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -592,31 +596,53 @@ onUnmounted(() => {
         <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
              in this same main toolbar (there is no separate DataToolbar-equivalent for streams). -->
         <div class="group">
-          <IconButton
-            icon="symbol-number"
-            data-testid="stream-count"
-            v-tooltip="'Count'"
-            @click="streamViewStore.runCount(tab.id)"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Count"
+                data-testid="stream-count"
+                @click="streamViewStore.runCount(tab.id)"
+              >
+                <CodiconIcon name="symbol-number" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Count</TooltipContent>
+          </Tooltip>
           <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
-          <AppButton
-            v-if="isBatch"
-            icon="arrow-swap"
-            active
-            data-testid="stream-poll"
-            v-tooltip="'Poll for messages'"
-            @click="onPoll"
-          >
-            Poll
-          </AppButton>
-          <IconButton
-            v-else
-            icon="arrow-right"
-            data-testid="stream-next"
-            :disabled="!rt?.hasMore"
-            v-tooltip="'Next page'"
-            @click="streamViewStore.goNext(tab.id)"
-          />
+          <Tooltip v-if="isBatch">
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira"
+                class="bg-input text-fg"
+                data-testid="stream-poll"
+                @click="onPoll"
+              >
+                <CodiconIcon name="arrow-swap" :size="13" />
+                Poll
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Poll for messages</TooltipContent>
+          </Tooltip>
+          <Tooltip v-else>
+            <TooltipTrigger as-child>
+              <span tabindex="0" class="inline-flex">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  :disabled="!rt?.hasMore"
+                  aria-label="Next page"
+                  data-testid="stream-next"
+                  @click="streamViewStore.goNext(tab.id)"
+                >
+                  <CodiconIcon name="arrow-right" :size="13" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Next page</TooltipContent>
+          </Tooltip>
         </div>
 
         <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
@@ -635,13 +661,20 @@ onUnmounted(() => {
 
         <div class="group">
           <div class="add-message-anchor">
-            <IconButton
-              v-if="canInsert"
-              icon="add"
-              data-testid="stream-add-message"
-              v-tooltip="isKafka ? 'Produce a message' : 'Send a message'"
-              @click="composeOpen = !composeOpen"
-            />
+            <Tooltip v-if="canInsert">
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Add message"
+                  data-testid="stream-add-message"
+                  @click="composeOpen = !composeOpen"
+                >
+                  <CodiconIcon name="add" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ isKafka ? 'Produce a message' : 'Send a message' }}</TooltipContent>
+            </Tooltip>
             <StreamComposeMessage
               v-if="composeOpen && canInsert"
               :tab-id="tab.id"
@@ -649,21 +682,40 @@ onUnmounted(() => {
               @close="composeOpen = false"
             />
           </div>
-          <IconButton
-            v-if="canDelete"
-            icon="trash"
-            data-testid="stream-delete-message"
-            :disabled="!hasSelectedRow"
-            v-tooltip="hasSelectedRow ? 'Delete the selected message' : 'Select a message first'"
-            @click="onDeleteMessage"
-          />
-          <IconButton
-            icon="search"
-            :active="rt?.searchOpen"
-            v-tooltip="'Search this page'"
-            data-testid="stream-search-toggle"
-            @click="onToggleSearch"
-          />
+          <Tooltip v-if="canDelete">
+            <TooltipTrigger as-child>
+              <span tabindex="0" class="inline-flex">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  :disabled="!hasSelectedRow"
+                  aria-label="Delete message"
+                  data-testid="stream-delete-message"
+                  @click="onDeleteMessage"
+                >
+                  <CodiconIcon name="trash" :size="13" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{{
+              hasSelectedRow ? 'Delete the selected message' : 'Select a message first'
+            }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'bg-input text-fg': rt?.searchOpen }"
+                aria-label="Search this page"
+                data-testid="stream-search-toggle"
+                @click="onToggleSearch"
+              >
+                <CodiconIcon name="search" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Search this page</TooltipContent>
+          </Tooltip>
         </div>
       </template>
 
@@ -672,12 +724,20 @@ onUnmounted(() => {
              offset concept, per connection.kind above). Applies only to a *fresh* browse
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
         <div class="history-anchor">
-          <IconButton
-            icon="history"
-            v-tooltip="'Filter history'"
-            data-testid="stream-filter-history-button"
-            @click="filterHistoryOpen = !filterHistoryOpen"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Filter history"
+                data-testid="stream-filter-history-button"
+                @click="filterHistoryOpen = !filterHistoryOpen"
+              >
+                <CodiconIcon name="history" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Filter history</TooltipContent>
+          </Tooltip>
           <StreamFilterHistoryMenu
             v-if="filterHistoryOpen"
             :tab-id="tab.id"
@@ -686,26 +746,41 @@ onUnmounted(() => {
           />
         </div>
         <div class="filter-field">
-          <TextField
-            v-model="offsetText"
-            prefix="offset"
-            :prefix-active="!!tab.state.offsetFilter"
-            placeholder="e.g. 1000"
-            data-testid="stream-filter-offset"
-            @enter="onApplyFilter"
-            @blur="onApplyFilter"
-          />
+          <div
+            class="flex items-center gap-1 w-full h-control-lg rounded-kira-sm border border-border-strong bg-input px-2"
+          >
+            <span
+              class="shrink-0 text-kira-xs"
+              :class="tab.state.offsetFilter ? 'text-[var(--kira-state-on)]' : 'text-fg-muted'"
+              >offset</span
+            >
+            <Input
+              :model-value="offsetText"
+              placeholder="e.g. 1000"
+              class="h-full w-full border-0 bg-transparent p-0 font-data focus-visible:ring-0"
+              data-testid="stream-filter-offset"
+              @update:model-value="(v) => (offsetText = String(v))"
+              @keydown.enter="onApplyFilter"
+              @blur="onApplyFilter"
+            />
+          </div>
         </div>
         <div class="partition-anchor">
-          <AppButton
-            icon="filter"
-            data-testid="stream-filter-partition"
-            v-tooltip="'Filter by partition'"
-            :style="selectedPartitions.length ? { color: 'var(--kira-state-on)' } : undefined"
-            @click="onTogglePartitionMenu"
-          >
-            {{ partitionButtonLabel }}
-          </AppButton>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="stream-filter-partition"
+                :style="selectedPartitions.length ? { color: 'var(--kira-state-on)' } : undefined"
+                @click="onTogglePartitionMenu"
+              >
+                <CodiconIcon name="filter" :size="13" />
+                {{ partitionButtonLabel }}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Filter by partition</TooltipContent>
+          </Tooltip>
           <PopoverPanel
             v-if="partitionMenuOpen"
             anchor="left"
@@ -731,9 +806,12 @@ onUnmounted(() => {
                 :data-testid="`stream-filter-partition-option-${p}`"
               >
                 <Checkbox
+                  class="size-3.5"
                   :model-value="isPartitionSelected(p)"
                   @update:model-value="onTogglePartition(p)"
-                />
+                >
+                  <CodiconIcon name="check" :size="10" />
+                </Checkbox>
                 <span>partition {{ p }}</span>
               </label>
             </div>
@@ -741,24 +819,45 @@ onUnmounted(() => {
         </div>
         <div class="timestamp-filter-field">
           <div class="ts-input-row">
-            <TextField
-              v-model="timestampText"
-              prefix="since"
-              :prefix-active="!!tab.state.timestampFilter"
-              placeholder="ISO timestamp"
-              data-testid="stream-filter-timestamp"
-              :invalid="!!timestampError"
-              v-tooltip="timestampError ?? undefined"
-              @enter="onApplyFilter"
-              @blur="onApplyFilter"
-            />
+            <Tooltip :disabled="!timestampError">
+              <TooltipTrigger as-child>
+                <div
+                  class="flex items-center gap-1 w-[160px] h-control-lg rounded-kira-sm border bg-input px-2"
+                  :class="timestampError ? 'border-error' : 'border-border-strong'"
+                >
+                  <span
+                    class="shrink-0 text-kira-xs"
+                    :class="tab.state.timestampFilter ? 'text-[var(--kira-state-on)]' : 'text-fg-muted'"
+                    >since</span
+                  >
+                  <Input
+                    :model-value="timestampText"
+                    placeholder="ISO timestamp"
+                    class="h-full w-full border-0 bg-transparent p-0 font-data focus-visible:ring-0"
+                    data-testid="stream-filter-timestamp"
+                    @update:model-value="(v) => (timestampText = String(v))"
+                    @keydown.enter="onApplyFilter"
+                    @blur="onApplyFilter"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{{ timestampError }}</TooltipContent>
+            </Tooltip>
             <span class="ts-calendar-anchor">
-              <IconButton
-                icon="calendar"
-                data-testid="stream-filter-timestamp-calendar"
-                v-tooltip="'Pick a date and time'"
-                @click="timestampCalendarOpen = !timestampCalendarOpen"
-              />
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Button
+                    variant="toolbar"
+                    size="kira-icon"
+                    aria-label="Pick a date and time"
+                    data-testid="stream-filter-timestamp-calendar"
+                    @click="timestampCalendarOpen = !timestampCalendarOpen"
+                  >
+                    <CodiconIcon name="calendar" :size="13" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Pick a date and time</TooltipContent>
+              </Tooltip>
               <PopoverPanel
                 v-if="timestampCalendarOpen"
                 :width="228"
@@ -778,9 +877,14 @@ onUnmounted(() => {
             >{{ timestampError }}</span
           >
         </div>
-        <AppButton data-testid="stream-filter-clear" v-tooltip="'Empty every field and refetch'" @click="onClearFilter">
-          Clear
-        </AppButton>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira" data-testid="stream-filter-clear" @click="onClearFilter">
+              Clear
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Empty every field and refetch</TooltipContent>
+        </Tooltip>
       </template>
 
       <!-- The one destructive truth of this view, stated once at the top. -->
@@ -842,12 +946,14 @@ onUnmounted(() => {
           label="No matching rows"
           data-testid="stream-no-matching-rows"
         >
-          <AppButton
+          <Button
+            variant="toolbar"
+            size="kira"
             data-testid="stream-show-all-rows"
             @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
           >
             Show all rows
-          </AppButton>
+          </Button>
         </EmptyState>
         <template v-else>
           <div class="p-thead">
@@ -963,9 +1069,12 @@ onUnmounted(() => {
                   @click.stop="onBodyCellClickFromEvent"
                 >
                   {{ rowAt(i)?.body }}
-                  <span v-if="rowAt(i)?.isTruncated" class="p-xs muted" v-tooltip="'body truncated'"
-                    >(truncated)</span
-                  >
+                  <Tooltip v-if="rowAt(i)?.isTruncated">
+                    <TooltipTrigger as-child>
+                      <span class="p-xs muted">(truncated)</span>
+                    </TooltipTrigger>
+                    <TooltipContent>body truncated</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </template>
@@ -1031,7 +1140,7 @@ onUnmounted(() => {
 
 /* body column: monospace and slightly muted, matching the mockup's `.msg-body` */
 .msg-body {
-  @apply text-muted text-[length:var(--kira-t-sm)] font-[family-name:var(--kira-font-data)];
+  @apply text-muted text-kira-sm font-data;
 }
 
 .list-body {
@@ -1057,10 +1166,6 @@ onUnmounted(() => {
   @apply w-[160px] shrink-0;
 }
 
-.filter-field :deep(.p-input) {
-  @apply w-full;
-}
-
 /* P31 D12/D13: the "since" field's own wrapper — not `.filter-field` (that class's fixed 160px
    width and 100%-wide input are sized for a single bare TextField; this one also carries a
    calendar trigger beside the input and an error line below it). */
@@ -1069,11 +1174,7 @@ onUnmounted(() => {
 }
 
 .ts-input-row {
-  @apply flex items-center gap-[var(--kira-s-1)];
-}
-
-.ts-input-row :deep(.p-input) {
-  @apply w-[160px];
+  @apply flex items-center gap-0.5;
 }
 
 .ts-calendar-anchor {
@@ -1081,20 +1182,20 @@ onUnmounted(() => {
 }
 
 .filter-field-error {
-  @apply whitespace-nowrap text-error text-[length:var(--kira-t-xs)];
+  @apply whitespace-nowrap text-error text-kira-xs;
 }
 
 /* Item 1's partition checkbox list — mirrors ColumnsMenu.vue's own list-inside-a-PopoverPanel shape. */
 .partition-menu {
-  @apply flex flex-col max-h-[240px] overflow-y-auto gap-[var(--kira-s-1)] p-[var(--kira-s-2)];
+  @apply flex flex-col max-h-[240px] overflow-y-auto gap-0.5 p-1;
 }
 
 .partition-menu-empty {
-  @apply p-[var(--kira-s-2)];
+  @apply p-1;
 }
 
 .partition-option {
-  @apply flex items-center gap-[var(--kira-s-2)] rounded-kira cursor-pointer py-[var(--kira-s-1)] px-[var(--kira-s-2)];
+  @apply flex items-center gap-1 rounded-kira cursor-pointer py-0.5 px-1;
 }
 
 .partition-option:hover {

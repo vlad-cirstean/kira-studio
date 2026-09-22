@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
@@ -33,10 +34,11 @@ function toggleFilter(): void {
 const query = ref('');
 const entry = computed(() => streamSearchStore.searchState[props.tabId]);
 
-// See views/shared/page/SearchToolbar.vue's identical ref/onMounted pair for why $el is the focus
-// target (TextField wraps its <input> in its own root <span>, P4) and why onMounted is the
-// right place to autofocus (this component is mounted fresh each time the toolbar opens).
-const searchInput = ref<{ $el: HTMLElement } | null>(null);
+// See views/shared/page/SearchToolbar.vue's identical ref/onMounted pair for why onMounted is the
+// right place to autofocus (this component is mounted fresh each time the toolbar opens). $el is
+// already the <input> itself — ui/input's root IS the <input> element, unlike the old TextField's
+// wrapping <span>.
+const searchInput = ref<{ $el: HTMLInputElement } | null>(null);
 
 watch(query, (q) => {
   streamSearchStore.runSearch(props.tabId, q);
@@ -80,7 +82,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 onMounted(() => {
-  void nextTick(() => searchInput.value?.$el.querySelector('input')?.focus());
+  void nextTick(() => searchInput.value?.$el.focus());
 });
 
 onUnmounted(() => {
@@ -96,11 +98,13 @@ onUnmounted(() => {
   <div class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar" @keydown="onKeydown">
     <span class="icon-box muted"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
-      <TextField
+      <Input
         ref="searchInput"
-        v-model="query"
+        :model-value="query"
         placeholder="Find"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
         data-testid="stream-search-input"
+        @update:model-value="(v) => (query = String(v))"
       />
     </div>
     <span class="p-sm muted search-count" data-testid="stream-search-count">
@@ -109,21 +113,43 @@ onUnmounted(() => {
       </template>
       <template v-else>0 of 0</template>
     </span>
-    <IconButton icon="chevron-up" v-tooltip="'Previous match'" data-testid="stream-search-prev" @click="prev" />
-    <IconButton icon="chevron-down" v-tooltip="'Next match'" data-testid="stream-search-next" @click="next" />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira-icon" aria-label="Previous match" data-testid="stream-search-prev" @click="prev">
+          <CodiconIcon name="chevron-up" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Previous match</TooltipContent>
+    </Tooltip>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button variant="toolbar" size="kira-icon" aria-label="Next match" data-testid="stream-search-next" @click="next">
+          <CodiconIcon name="chevron-down" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Next match</TooltipContent>
+    </Tooltip>
     <div class="sep" />
     <!-- P31 D17: same filter *mode* as views/shared/page/SearchToolbar.vue (P24 D1/D9) — hides every
          non-matching row. -->
     <div class="group">
-      <IconButton
-        icon="filter"
-        :active="filtering"
-        v-tooltip="
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': filtering }"
+            aria-label="Show only matching rows"
+            data-testid="stream-search-filter-rows"
+            @click="toggleFilter"
+          >
+            <CodiconIcon name="filter" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{
           filtering ? 'Showing only matching rows — click to show all' : 'Show only matching rows'
-        "
-        data-testid="stream-search-filter-rows"
-        @click="toggleFilter"
-      />
+        }}</TooltipContent>
+      </Tooltip>
     </div>
     <div class="sep" />
     <span class="p-xs dim" data-testid="stream-search-scope">
@@ -132,7 +158,21 @@ onUnmounted(() => {
       </template>
       <template v-else>in the {{ loadedRowCount.toLocaleString() }} loaded rows</template>
     </span>
-    <IconButton icon="close" class="p-push" v-tooltip="'Close'" data-testid="stream-search-close" @click="close" />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          class="p-push"
+          aria-label="Close"
+          data-testid="stream-search-close"
+          @click="close"
+        >
+          <CodiconIcon name="close" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Close</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -145,10 +185,6 @@ onUnmounted(() => {
 
 .search-input {
   @apply w-[200px] shrink-0;
-}
-
-.search-input :deep(.p-input) {
-  @apply w-full;
 }
 
 .search-count {
