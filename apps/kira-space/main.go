@@ -98,6 +98,7 @@ func main() {
 	events := bridge.NewEvents(emitter)
 
 	browserOpener, attachBrowser := shell.NewDeferredBrowser()
+	dialogsSvc, attachDialogs := shell.NewDeferredDialogs()
 
 	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
 		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
@@ -149,6 +150,7 @@ func main() {
 			application.NewService(gitClientsSvc),
 			application.NewService(codeWorkspaceSvc),
 			application.NewService(gitHubSvc),
+			application.NewService(&bridge.FilesService{Dialogs: dialogsSvc}),
 			application.NewService(settingsSvc),
 			application.NewService(layoutSvc),
 			application.NewService(tabsSvc),
@@ -177,6 +179,19 @@ func main() {
 	attachEmitter(app)
 	attachBrowser(app)
 	quitter.Attach(app)
+
+	// The sheet a folder-picker dialog attaches to is the window that actually asked — Current()
+	// resolves the real key window on darwin; the registry fallback only matters where Current()
+	// can't resolve one (this sandbox's Linux build, mid-startup before any window is focused).
+	// Kira Studio's own main.go carries the identical fallback (wireWindowsAndMenu's
+	// windowToActOn).
+	windowToActOn := func() application.Window {
+		if w := app.Window.Current(); w != nil {
+			return w
+		}
+		return windows.Any()
+	}
+	attachDialogs(app, windowToActOn)
 
 	shell.RegisterGitStream(app, gitRouter)
 

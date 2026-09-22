@@ -11,10 +11,9 @@ import (
 )
 
 // app.go is the Wails adapter layer — Kira Studio's own shell/app.go, trimmed to what this app's
-// four bridge services need: an appcore.Emitter, a Browser for GitHubService, the git stream
-// registration and the Dock-reopen handler. Kira Studio's own copy also builds Dialogs (no
-// FilesService here yet) and a system-wake hook (no keep-awake service here yet) — both Part 2's
-// job, if this app ever needs either.
+// bridge services need: an appcore.Emitter, a Browser for GitHubService, Dialogs for FilesService
+// (P100 Part 2), the git stream registration and the Dock-reopen handler. Kira Studio's own copy
+// also builds a system-wake hook (no keep-awake service in this app).
 
 // emitter satisfies appcore.Emitter. app is nil until attach runs — see NewDeferredEmitter.
 type emitter struct {
@@ -74,6 +73,33 @@ func (b *browserOpener) OpenURL(url string) error {
 func NewDeferredBrowser() (b bridge.Browser, attach func(*application.App)) {
 	bo := &browserOpener{}
 	return bo, func(app *application.App) { bo.app = app }
+}
+
+// dialogs satisfies bridge.Dialogs, attaching the panel to the main window so it opens as a sheet
+// rather than a free-floating modal — Kira Studio's own shell/app.go dialogs type, trimmed to the
+// one panel this app needs (OpenDirectory only; bridge/files.go's own doc comment says why).
+type dialogs struct {
+	app    *application.App
+	window func() application.Window
+}
+
+func (d *dialogs) OpenDirectory(req bridge.OpenDirectoryRequest) (string, error) {
+	dlg := d.app.Dialog.OpenFile().AttachToWindow(d.window()).CanChooseFiles(false).CanChooseDirectories(true)
+	if req.Title != "" {
+		dlg.SetTitle(req.Title)
+	}
+	return dlg.PromptForSingleSelection()
+}
+
+// NewDeferredDialogs is NewDeferredEmitter's counterpart for FilesService: built into the Services
+// list passed to application.New, before the *App (and the main window func) a dialog needs
+// exist. attach must be called with both immediately after New returns.
+func NewDeferredDialogs() (d bridge.Dialogs, attach func(app *application.App, window func() application.Window)) {
+	da := &dialogs{}
+	return da, func(app *application.App, window func() application.Window) {
+		da.app = app
+		da.window = window
+	}
 }
 
 // RegisterGitStream registers the git stream — Kira Studio's own RegisterGitStream, carrying
