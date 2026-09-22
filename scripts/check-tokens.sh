@@ -45,11 +45,18 @@ check_layer() {
 }
 
 FRONTEND_SRC=apps/kira-studio/frontend/src
+SPACE_SRC=apps/kira-space/frontend/src
+THEME_SRC=packages/theme/src
 GIT_UI_SRC=packages/git-ui/src
 KIRA_UI_SRC=packages/kira-ui/src
 
-check_layer 'kira-' "$FRONTEND_SRC" \
-  "$FRONTEND_SRC/theme/tokens.css $FRONTEND_SRC/theme/base.css $FRONTEND_SRC/theme/primitives.css" kira
+# P103 (byte-identical tier, folded into P100 Part 2): tokens.css/base.css/primitives.css moved
+# out of apps/kira-studio/frontend/src/theme into packages/theme/src, shared verbatim by both
+# apps — definitions read from their real new location. Usage now scans both apps' own src (kira-
+# space is a real --kira-* consumer, not just Studio) plus packages/theme/src itself, whose own
+# components/primitives reference the same tokens.
+check_layer 'kira-' "$FRONTEND_SRC $SPACE_SRC $THEME_SRC" \
+  "$THEME_SRC/tokens.css $THEME_SRC/base.css $THEME_SRC/primitives.css" kira
 check_layer 'kv-' "$GIT_UI_SRC" \
   "$GIT_UI_SRC/theme/vscode-tokens.css $GIT_UI_SRC/theme/density.css $GIT_UI_SRC/theme/kira-structure.css" kv
 check_layer 'kui-' "$KIRA_UI_SRC $GIT_UI_SRC" "$GIT_UI_SRC/theme/kui-bridge.css" kui

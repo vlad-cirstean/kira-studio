@@ -4,20 +4,27 @@
 # Kafka included, is served in-process by native Go since P58e/P58f. One deep sign over the whole
 # bundle is all that is left.
 #
-# Paths are apps/kira-studio/build/darwin/Taskfile.yml's create:app:bundle output layout, not P52's — that
+# Paths are <app dir>/build/darwin/Taskfile.yml's create:app:bundle output layout, not P52's — that
 # plan explicitly warned its own paths were written from an earlier session and would need
 # re-verifying against a real packaged bundle rather than copied. macOS only.
+#
+# P100 Part 2: takes the app dir (relative to the repo root) and app name as $1/$2, so
+# package:space (apps/kira-space, "Kira Space") reuses this instead of a second near-identical
+# script — defaults preserve the original apps/kira-studio/"Kira Studio" call unchanged.
 set -eu
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=./lib.sh
 . "$SCRIPT_DIR/lib.sh"
 
-APP="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.app"
-DMG="$ROOT_DIR/apps/kira-studio/bin/Kira Studio.dmg"
+APP_DIR="${1:-apps/kira-studio}"
+APP_NAME="${2:-Kira Studio}"
+
+APP="$ROOT_DIR/$APP_DIR/bin/$APP_NAME.app"
+DMG="$ROOT_DIR/$APP_DIR/bin/$APP_NAME.dmg"
 
 if [ ! -d "$APP" ]; then
-  echo "sign-bundle.sh: \"$APP\" not found — run 'bun run package' (or 'cd apps/kira-studio && wails3 task darwin:package:dmg') first" >&2
+  echo "sign-bundle.sh: \"$APP\" not found — run 'cd $APP_DIR && wails3 task darwin:package:dmg' first" >&2
   exit 1
 fi
 
