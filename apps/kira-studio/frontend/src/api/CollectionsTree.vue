@@ -177,18 +177,16 @@ const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplica
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .collections-tree {
-  height: 100%;
+  @apply h-full;
 }
 
 /* Positioned relative to VirtualList's own zero-height .virtual-list-sticky, exactly as
    ProjectTree.vue's own sticky row is — opaque and full-width so it fully occludes whatever real
    row has scrolled up behind it. */
 .sticky-row {
-  position: absolute;
-  left: 0;
-  right: 0;
-  background: var(--kira-bg);
-  z-index: 1;
+  @apply absolute inset-x-0 z-1 bg-bg;
 }
 </style>

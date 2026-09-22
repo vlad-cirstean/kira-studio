@@ -182,21 +182,17 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .panel-body {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 /* P22b D8: the collections tree's own category — flex: 1 always, so its own collapse (a rarer
    action than environments', which starts collapsed by default) never fights environments-
    category's fixed 40% cap below for space. */
 .panel-category {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  @apply flex flex-1 min-h-0 flex-col;
 }
 
 /* No new primitive (F12): reuses primitives.css's own .def-section-title idiom (uppercase/muted/
@@ -204,30 +200,17 @@ onUnmounted(() => {
    category shape (P18's own "promote when a second consumer appears" rule). */
 .panel-category-head {
   all: unset;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  height: var(--kira-control-h);
-  flex-shrink: 0;
-  padding: 0 var(--kira-s-3);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
+  @apply flex shrink-0 cursor-pointer items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] text-muted uppercase tracking-[0.05em] h-[var(--kira-control-h)] text-[length:var(--kira-t-sm)];
 }
 .panel-category-head:hover {
-  color: var(--kira-fg);
+  @apply text-fg;
 }
 
 .tree-body {
-  flex: 1;
-  min-height: 0;
+  @apply flex-1 min-h-0;
 }
-
 
 .side-empty-text {
-  line-height: 1.5;
+  @apply leading-normal;
 }
-
 </style>

@@ -202,56 +202,45 @@ function onKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* P22b D9: a grid, not independent flex items — F13's own finding was that adjacent rows' name/
    value/description columns never lined up, since each field carried its own `flex` value and a
    secret row's reveal button (inside the value cell) shifted its neighbours. Named, fixed-fraction
    columns: handle, name, value, description, secret toggle, history, remove. */
 .variable-row {
-  display: grid;
   grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply grid items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .variable-row.is-dragging {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 
 .drag-handle {
-  display: flex;
-  align-items: center;
-  cursor: grab;
-  color: var(--kira-fg-subtle);
+  @apply flex cursor-grab items-center text-subtle;
 }
 
 .drag-handle.is-disabled {
-  visibility: hidden;
+  @apply invisible;
 }
 
 .cell {
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
+  @apply flex min-w-0 items-center gap-[var(--kira-s-2)];
 }
 .cell :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .masked-value {
-  flex: 1;
-  color: var(--kira-fg-subtle);
-  letter-spacing: 2px;
+  @apply flex-1 text-subtle tracking-[2px];
 }
 
 .secret-toggle {
-  display: flex;
-  align-items: center;
+  @apply flex items-center;
 }
 
 .history-anchor {
-  position: relative;
-  display: flex;
+  @apply relative flex;
 }
 </style>

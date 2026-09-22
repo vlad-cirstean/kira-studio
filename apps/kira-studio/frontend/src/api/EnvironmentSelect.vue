@@ -137,45 +137,33 @@ function manage(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .environment-anchor {
-  position: relative;
-  display: flex;
-  flex: 0 1 auto;
-  min-width: 0;
+  @apply relative flex min-w-0 flex-[0_1_auto];
 }
 
 .environment-select {
-  min-width: 0;
+  @apply min-w-0;
 }
 
 .environment-select-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .environment-menu {
-  display: flex;
-  flex-direction: column;
-  padding: var(--kira-s-1);
+  @apply flex flex-col p-[var(--kira-s-1)];
 }
 
 .environment-menu-item {
-  width: 100%;
-  border-radius: var(--kira-radius-sm);
-  gap: var(--kira-s-2);
+  @apply w-full gap-[var(--kira-s-2)] rounded-kira-sm;
 }
 
 .environment-menu-item .label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .environment-menu-separator {
-  height: var(--kira-border-width);
-  background: var(--kira-border);
-  margin: var(--kira-s-1) 0;
+  @apply my-[var(--kira-s-1)] bg-border h-[var(--kira-border-width)];
 }
 </style>

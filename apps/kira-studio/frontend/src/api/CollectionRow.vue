@@ -163,84 +163,50 @@ function onTwistyClick(e: MouseEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .tree-row {
-  height: var(--kira-row-height);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding-right: var(--kira-s-4);
-  position: relative;
-  cursor: default;
-  white-space: nowrap;
-  font-size: var(--kira-t-md);
-  user-select: none;
+  @apply relative flex cursor-default items-center gap-[var(--kira-s-2)] whitespace-nowrap select-none pr-[var(--kira-s-4)] text-[length:var(--kira-t-md)] h-[var(--kira-row-height)];
 }
 
 .tree-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .tree-row.selected {
-  background: var(--kira-select);
+  @apply bg-select;
 }
 
+/* mutations.spec.ts/fake-data.spec.ts/tree.spec.ts select `.twisty` directly — kept as a marker
+   class. */
 .twisty {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  padding: 0;
-  cursor: pointer;
+  @apply flex h-3.5 w-3.5 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0 text-muted;
 }
 
 .twisty.invisible {
-  visibility: hidden;
+  @apply invisible;
 }
 
 .node-icon {
-  flex-shrink: 0;
-  color: var(--kira-fg-muted);
+  @apply shrink-0 text-muted;
 }
 
 /* A fixed width so every row's name starts at the same x — an unaligned ragged edge is exactly
    what makes a long request list hard to scan, which is the reason the chip exists at all. */
 .method {
-  flex-shrink: 0;
-  width: 52px;
-  text-align: center;
-  font-size: var(--kira-t-xs);
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply w-[52px] shrink-0 overflow-hidden text-center text-ellipsis tracking-[0.02em] text-[length:var(--kira-t-xs)];
 }
 
 .label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  @apply min-w-0 overflow-hidden text-ellipsis;
 }
 
 .label mark {
   /* The same yellow search-match tint every other search-capable view in the app uses. */
-  background: var(--kira-search-match);
-  color: inherit;
-  border-radius: var(--kira-radius-sm);
+  @apply rounded-kira-sm text-inherit bg-[var(--kira-search-match)];
 }
 
 .rename-input {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  color: var(--kira-fg);
-  background: var(--kira-bg-input);
-  border: var(--kira-border-width) solid var(--kira-accent);
-  border-radius: var(--kira-radius-sm);
-  padding: 0 var(--kira-s-1);
-  outline: none;
+  @apply min-w-0 flex-1 rounded-kira-sm border px-[var(--kira-s-1)] py-0 font-[inherit] text-fg bg-input outline-none border-[var(--kira-accent)];
 }
 </style>

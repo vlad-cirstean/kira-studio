@@ -519,54 +519,38 @@ function onBulkClose(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .variable-set-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 .p-dialog-body.list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  @apply flex-1 min-h-0 overflow-y-auto;
 }
 
 .env-fields {
-  display: flex;
   /* P28 D16(b): flex-end, not center — each labelled field is now a two-row column, and centering
      would misalign the inputs against the colour picker and Duplicate button beside them. */
-  align-items: flex-end;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex items-end gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .env-field {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex min-w-0 flex-1 flex-col gap-[var(--kira-s-1)];
 }
 
 .env-field-label {
-  padding-left: var(--kira-s-1);
+  @apply pl-[var(--kira-s-1)];
 }
 .env-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 /* P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
    description, secret, history, remove) so the labels sit above their columns; the four
    non-labelled cells are blank placeholders for the columns that carry no header text. */
 .header-row {
-  display: grid;
   grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-sm);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply grid gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)] text-subtle text-[length:var(--kira-t-sm)];
 }
 </style>

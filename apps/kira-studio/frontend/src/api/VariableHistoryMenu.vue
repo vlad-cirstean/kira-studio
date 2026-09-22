@@ -84,42 +84,29 @@ function close(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .history-menu {
-  display: flex;
-  flex-direction: column;
-  max-height: 320px;
-  overflow: auto;
-  padding: var(--kira-s-2);
+  @apply flex max-h-[320px] flex-col overflow-auto p-[var(--kira-s-2)];
 }
 
 .history-entry {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply flex items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .entry-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply flex min-w-0 flex-1 flex-col gap-[var(--kira-s-1)];
 }
 
 .entry-time {
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-sm);
+  @apply text-subtle text-[length:var(--kira-t-sm)];
 }
 
 .entry-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .entry-value.masked {
-  color: var(--kira-fg-subtle);
-  letter-spacing: 2px;
+  @apply text-subtle tracking-[2px];
 }
 </style>

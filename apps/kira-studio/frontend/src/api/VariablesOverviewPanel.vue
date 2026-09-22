@@ -166,18 +166,14 @@ function editEnvironmentVariables(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .overview-panel {
-  display: flex;
-  flex-direction: column;
-  max-height: 420px;
+  @apply flex max-h-[420px] flex-col;
 }
 
 .overview-list {
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  padding: var(--kira-s-2);
-  gap: var(--kira-s-1);
+  @apply flex flex-col gap-[var(--kira-s-1)] overflow-y-auto p-[var(--kira-s-2)];
 }
 
 /* P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover has no use
@@ -186,74 +182,43 @@ function editEnvironmentVariables(): void {
    four that renders conditionally (F13/D9): a missing trailing grid item just leaves its own cell
    empty rather than shifting `scope` into its place, which an *earlier* optional column would. */
 .overview-row {
-  display: grid;
   grid-template-columns: 1.2fr 2fr auto 1.5fr;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-1) var(--kira-s-2);
-  border-radius: var(--kira-radius-sm);
-  min-width: 0;
+  @apply grid min-w-0 items-center gap-[var(--kira-s-2)] rounded-kira-sm px-[var(--kira-s-2)] py-[var(--kira-s-1)];
 }
 
 .overview-row.shadowed {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 
 .reference {
-  cursor: pointer;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply min-w-0 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .overview-value {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg-subtle);
+  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle;
 }
 
 .overview-description {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-xs);
+  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-[length:var(--kira-t-xs)];
 }
 
 .scope-chip {
-  justify-self: start;
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-muted);
+  @apply justify-self-start bg-input text-muted;
 }
 .scope-chip.environment {
   background: rgba(55, 148, 255, 0.16);
-  color: var(--kira-info);
+  @apply text-info;
 }
 
 .overview-footer {
-  display: flex;
-  flex-direction: column;
-  border-top: var(--kira-border-width) solid var(--kira-border);
-  padding: var(--kira-s-2);
-  gap: var(--kira-s-1);
+  @apply flex flex-col gap-[var(--kira-s-1)] border-t border-border p-[var(--kira-s-2)];
 }
 
 .overview-link {
   all: unset;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  cursor: pointer;
-  color: var(--kira-info);
-  font-size: var(--kira-t-sm);
+  @apply inline-flex cursor-pointer items-center gap-[var(--kira-s-2)] text-info text-[length:var(--kira-t-sm)];
 }
 .overview-link:disabled {
-  cursor: default;
-  color: var(--kira-fg-subtle);
-  opacity: 0.6;
+  @apply cursor-default text-subtle opacity-60;
 }
 </style>

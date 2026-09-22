@@ -72,33 +72,29 @@ function select(method: HttpMethod): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .method-anchor {
-  position: relative;
-  display: flex;
+  @apply relative flex;
 }
 
 /* F12's own comment, restated: border/background/padding/cursor come from .p-select.bordered
    (unaffected by the element swap); the chevron is drawn explicitly since a <button> has no
    ::picker-icon of its own to rely on. */
 .method-select {
-  font-family: var(--kira-font-data);
-  font-weight: 600;
+  @apply font-semibold font-[family-name:var(--kira-font-data)];
 }
 
 .method-menu {
-  display: flex;
-  flex-direction: column;
-  padding: var(--kira-s-1);
+  @apply flex flex-col p-[var(--kira-s-1)];
 }
 
 .method-menu-item {
-  width: 100%;
-  font-weight: 600;
-  border-radius: var(--kira-radius-sm);
+  @apply w-full rounded-kira-sm font-semibold;
 }
 
 .method-menu-item .label {
-  flex: 1;
+  @apply flex-1;
 }
 
 /* P22 D7: .p-method no longer paints its own fill (colour only), so this row no longer needs a

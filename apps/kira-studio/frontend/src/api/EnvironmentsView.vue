@@ -270,44 +270,34 @@ function onKeydown(e: KeyboardEvent, id: string): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .environments-view {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col;
 }
 
 .list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  @apply flex-1 min-h-0 overflow-y-auto;
 }
 
 .environment-row {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply flex items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .environment-row.is-dragging {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 
 .drag-handle {
-  display: flex;
-  align-items: center;
-  cursor: grab;
-  color: var(--kira-fg-subtle);
+  @apply flex cursor-grab items-center text-subtle;
 }
 
 .name-field,
 .description-field {
-  flex: 1;
-  min-width: 0;
+  @apply min-w-0 flex-1;
 }
 .name-field :deep(.p-input),
 .description-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 </style>
