@@ -10,6 +10,7 @@
         "@lucide/vue": "1.47.0",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/vue-query": "5.103.2",
+        "@tanstack/vue-virtual": "3.13.39",
         "@vitejs/plugin-vue": "6.0.9",
         "@vscode/codicons": "0.0.46-24",
         "@vueuse/core": "15.0.0",
