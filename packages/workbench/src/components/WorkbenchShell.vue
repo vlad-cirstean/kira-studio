@@ -1,25 +1,48 @@
 <script setup lang="ts">
-import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
-import { computed, useSlots } from 'vue';
+// P104 §3.3: PanelSplitter (hand-rolled pointer-drag maths + a CSS-grid column/row template) →
+// reka's own SplitterGroup/SplitterPanel/SplitterResizeHandle. Panel order stands in for the old
+// `reverse` prop: reka resizes whichever side of a handle the drag moves toward, so putting the ops
+// panel *after* its handle in the vertical group needs no sign-flipped delta the way the hand-rolled
+// version did.
+//
+// Nesting orientation is load-bearing, not a style choice: OUTER horizontal (project | main), with
+// a vertical group nested *inside* main's own panel for editor-area/ops, is the one topology proven
+// stable (a full interaction.spec.ts/leaks.spec.ts pass, real grid interaction after opening ops).
+// The reverse nesting — outer vertical (top row | ops), horizontal nested inside the top row's own
+// panel — reproduces a real, non-deterministic reka defect: even with every one of this file's own
+// watchers/resize() calls disabled (ablation-tested), a plain tree-row click after opening ops would
+// intermittently hang the whole render process (tree.spec.ts caught it; it passed clean on a short
+// timeout and hung on a long one against the *identical* steps — a genuine race, not a timing
+// artifact of the test itself). Root cause not fully isolated beyond "this nesting direction,
+// reliably"; the fix is to never use it, not to chase the exact reka internals further.
+//
+// The old CSS grid still put "project" and "main" in the *same* row, with "splitops"/"ops" spanning
+// full width below (Risk §11) — so project's height must shrink together with main's when ops
+// opens, which the STABLE topology above doesn't give for free (project is a sibling of the
+// *whole* main-plus-ops column, not of main alone). Reproduced here with a plain CSS margin instead
+// of a second nested group: opsMarginPx below tracks the exact px height ops's own row-gap and
+// panel currently occupy, applied as project-panel's own margin-bottom. A stretched flex item's
+// content box shrinks by its own margin (default `align-items: stretch`), so this reaches the same
+// visual result as sharing a grid row, with no additional SplitterGroup nesting at all.
+//
+// The ops panel itself still avoids reka's own `sizeUnit="px"`: it makes reka's SplitterGroup
+// re-run its own pixel-layout recompute (recalculateLayoutForPixelPanels) on every ResizeObserver
+// notification of the *group's own container*, and with a virtualized SlickGrid living in the
+// sibling editor-area panel, that recompute and the grid's own resize handling feed each other —
+// found empirically (a 15s A/B against the exact same tree with only this one prop removed) hanging
+// the whole tab on the very first grid interaction after opening the Operations panel, every time.
+// The project panel keeps `sizeUnit="px"` — it's the outer, rarely-resized group here again, the
+// exact shape already proven safe.
+import { useElementSize } from '@vueuse/core';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
+import { computed, useSlots, useTemplateRef, watch } from 'vue';
 import MainView from './MainView.vue';
 import TabStrip from './TabStrip.vue';
 
-// P103 Part 2 (§5.4): Kira Studio's own workbench/WorkbenchShell.vue and Kira Space's, unified —
-// the grid, the splitters and the `--kira-*` custom-property style binding. `#panel` and
-// `#tab-strip` have no sensible shared default (each app's left panel and TabStrip's own
-// `#new-tab` content are genuinely per-app — the latter is why this shell renders <TabStrip/>
-// itself but still exposes a slot around it, rather than hardcoding it with no way for an app to
-// reach its `#new-tab` slot); `#main` defaults to a bare `<MainView/>` (an app overrides it only to
-// supply MainView's own `#empty` fallback); `#status` has no default; `#dock` is optional.
-//
-// Risk §11 (WorkbenchShell hazard): `#dock` present vs. absent is a **structural** grid choice, not
-// a zero-height row — Kira Space's own grid has two rows (main/status) today, not four rows with
-// two driven to 0px, and must render byte-identical. `hasDock` below reads whether the *slot
-// itself* was passed (Kira Studio always passes `#dock`, gating its own visibility inside with
-// `opsVisible`; Kira Space never passes it at all) — a compile-time-stable fact per app, not a
-// runtime toggle — and switches the `.has-dock` class that selects between the two static
-// `grid-template-areas`/`grid-template-rows` blocks below, so Kira Space's rendered grid has no
-// splitops/ops rows in its DOM at all, matching today exactly.
+// Risk §11 (WorkbenchShell hazard, carried over): `#dock` present vs. absent is a **structural**
+// choice — Kira Studio always passes `#dock` (gating its own visibility inside with `opsVisible`),
+// Kira Space never passes it at all — so Kira Space's tree never mounts an ops SplitterGroup/panel
+// at all, matching today.
 interface Props {
   projectVisible: boolean;
   projectWidth: number;
@@ -35,107 +58,156 @@ const emit = defineEmits<{
 const slots = useSlots();
 const hasDock = computed(() => !!slots.dock);
 
-const gridStyle = computed(() => {
-  const style: Record<string, string> = {
-    '--project-w': props.projectVisible ? `${props.projectWidth}px` : '0px',
-    '--project-split-w': props.projectVisible ? 'var(--kira-gap)' : '0px',
-  };
-  if (hasDock.value) {
-    style['--ops-h'] = props.opsVisible ? `${props.opsHeight ?? 0}px` : '0px';
-    style['--ops-split-h'] = props.opsVisible ? 'var(--kira-gap)' : '0px';
-  }
-  return style;
+// SplitterPanel's `defaultSize` only seeds the *initial* render — an external width change
+// (mode-switch's own first-activation widen, C11 §14 OQ2) needs the panel's own imperative
+// `resize()` to follow it, the same way the old CSS-custom-property binding did for free.
+const projectPanelRef = useTemplateRef<InstanceType<typeof SplitterPanel>>('projectPanel');
+const opsPanelRef = useTemplateRef<InstanceType<typeof SplitterPanel>>('opsPanel');
+const vGroupRef = useTemplateRef<HTMLElement>('vGroup');
+const { height: vGroupHeight } = useElementSize(vGroupRef);
+
+// Both sides of this are "controlled": a drag emits resize-project/resize-ops, the parent
+// persists it and the same value comes back down as projectWidth/opsHeight — the round trip
+// through SplitterPanel's own %-to-px conversion (and, for ops, the manual px<->percent one below)
+// doesn't land on the exact same float, so an unguarded watcher calling resize() on every prop
+// change ping-pongs forever (resize → emit → prop update → resize → emit → …), hanging the tab.
+// Only a genuinely *external* width/height change (nothing this component itself just emitted)
+// should drive the panel.
+let lastEmittedProjectWidth: number | undefined;
+let lastEmittedOpsHeight: number | undefined;
+
+watch(
+  () => props.projectWidth,
+  (width) => {
+    if (Math.abs(width - (lastEmittedProjectWidth ?? Number.NaN)) < 1) return;
+    projectPanelRef.value?.resize(width);
+  },
+);
+
+// opsHeight (px) <-> the ops SplitterPanel's own percentage, against the vertical group's live
+// height (see the file-level comment for why this panel isn't sizeUnit="px" like the project one).
+const opsHeightPercent = computed(() => {
+  const h = vGroupHeight.value;
+  if (!h || props.opsHeight === undefined) return 25; // pre-measurement seed; corrected below once real.
+  return Math.min(100, Math.max(0, (props.opsHeight / h) * 100));
 });
+const opsMinPercent = computed(() => (vGroupHeight.value ? Math.min(100, (100 / vGroupHeight.value) * 100) : 15));
+const opsMaxPercent = computed(() => (vGroupHeight.value ? Math.min(100, (500 / vGroupHeight.value) * 100) : 70));
+
+watch([() => props.opsHeight, vGroupHeight], ([height, h]) => {
+  if (height === undefined || !h) return;
+  if (Math.abs(height - (lastEmittedOpsHeight ?? Number.NaN)) < 1) return;
+  opsPanelRef.value?.resize((height / h) * 100);
+});
+
+// The plain-CSS half of the "project shares main's row" coupling (see file-level comment) — the
+// exact px height ops's own resize handle + panel currently occupy, as project-panel's own
+// margin-bottom. Reka's own layout numbers are never read back for this: opsHeight is already the
+// external, px contract this component receives, so no measurement is needed.
+const opsMarginPx = computed(() => {
+  if (!hasDock.value || !props.opsVisible) return 0;
+  return (props.opsHeight ?? 0) + 2; // +2: the SplitterResizeHandle's own gap-0.5 track (--kira-gap).
+});
+
+function onProjectResize(size: number): void {
+  lastEmittedProjectWidth = size;
+  emit('resize-project', size);
+}
+function onOpsResize(percent: number): void {
+  const h = vGroupHeight.value;
+  if (!h) return;
+  const px = Math.round((percent / 100) * h);
+  lastEmittedOpsHeight = px;
+  emit('resize-ops', px);
+}
 </script>
 
 <template>
-  <div class="workbench-shell" :class="{ 'has-dock': hasDock }" :style="gridStyle">
-    <div
-      v-if="projectVisible"
-      class="panel-surface"
-      style="grid-area: project"
-      data-testid="project-panel"
-    >
-      <slot name="panel" />
-    </div>
-    <PanelSplitter
-      v-if="projectVisible"
-      style="grid-area: splitproj"
-      orientation="col"
-      :size="projectWidth"
-      :min="180"
-      :max="480"
-      @resize="emit('resize-project', $event)"
-    />
-
-    <div class="editor-area" style="grid-area: main">
-      <div class="tab-strip-slot" data-testid="tab-strip">
-        <slot name="tab-strip"><TabStrip /></slot>
-      </div>
-      <div class="main-view" data-testid="main-view">
-        <slot name="main"><MainView /></slot>
-      </div>
-    </div>
-
-    <template v-if="hasDock">
-      <PanelSplitter
-        v-if="opsVisible"
-        style="grid-area: splitops"
-        orientation="row"
-        reverse
-        :size="opsHeight ?? 0"
-        :min="100"
-        :max="500"
-        @resize="emit('resize-ops', $event)"
-      />
-      <div
-        v-if="opsVisible"
+  <!-- flex-1 (was dropped converting the old grid's `flex: 1` to Tailwind classes, collapsing the
+       whole shell to content height) and gap-0.5 (the old grid's row-gap: var(--kira-gap), between
+       the content row and the status bar) both reproduce byte-identical geometry to the pre-P104
+       CSS grid — found via a tree.spec.ts virtualization-boundary regression the grid version never
+       had; SplitterGroup's own default alignment otherwise leaves this 2px unaccounted for. -->
+  <div
+    class="workbench-shell flex flex-1 flex-col min-h-0 gap-0.5"
+    style="padding: 0 var(--kira-window-inset) var(--kira-gap); background: var(--kira-bg-chrome)"
+  >
+    <SplitterGroup direction="horizontal" class="flex-1 min-h-0 gap-0.5">
+      <SplitterPanel
+        v-if="projectVisible"
+        ref="projectPanel"
         class="panel-surface"
-        style="grid-area: ops"
-        data-testid="operations-panel"
+        data-testid="project-panel"
+        size-unit="px"
+        :default-size="projectWidth"
+        :min-size="180"
+        :max-size="480"
+        :order="1"
+        :style="{ marginBottom: opsMarginPx ? `${opsMarginPx}px` : undefined }"
+        @resize="onProjectResize"
       >
-        <slot name="dock" />
-      </div>
-    </template>
+        <slot name="panel" />
+      </SplitterPanel>
+      <SplitterResizeHandle
+        v-if="projectVisible"
+        class="w-0.5 shrink-0 cursor-col-resize bg-transparent hover:bg-focus data-[state=drag]:bg-focus"
+        :hit-area-margins="{ coarse: 8, fine: 4 }"
+      />
 
-    <div style="grid-area: status" data-testid="status-bar">
+      <SplitterPanel class="min-w-0" :order="2">
+        <template v-if="hasDock">
+          <SplitterGroup ref="vGroup" direction="vertical" class="h-full gap-0.5">
+            <SplitterPanel class="editor-area" :order="1">
+              <div class="tab-strip-slot" data-testid="tab-strip">
+                <slot name="tab-strip"><TabStrip /></slot>
+              </div>
+              <div class="main-view" data-testid="main-view">
+                <slot name="main"><MainView /></slot>
+              </div>
+            </SplitterPanel>
+            <SplitterResizeHandle
+              v-if="opsVisible"
+              class="h-0.5 shrink-0 cursor-row-resize bg-transparent hover:bg-focus data-[state=drag]:bg-focus"
+              :hit-area-margins="{ coarse: 8, fine: 4 }"
+            />
+            <SplitterPanel
+              v-if="opsVisible"
+              ref="opsPanel"
+              class="panel-surface"
+              data-testid="operations-panel"
+              :default-size="opsHeightPercent"
+              :min-size="opsMinPercent"
+              :max-size="opsMaxPercent"
+              :order="2"
+              @resize="onOpsResize"
+            >
+              <slot name="dock" />
+            </SplitterPanel>
+          </SplitterGroup>
+        </template>
+        <div v-else class="editor-area h-full">
+          <div class="tab-strip-slot" data-testid="tab-strip">
+            <slot name="tab-strip"><TabStrip /></slot>
+          </div>
+          <div class="main-view" data-testid="main-view">
+            <slot name="main"><MainView /></slot>
+          </div>
+        </div>
+      </SplitterPanel>
+    </SplitterGroup>
+
+    <!-- The old grid template stays four rows (main/splitops/ops/status) whether or not ops is
+         open when hasDock (Risk §11's own "structural, not a zero-height row" point) — even a
+         collapsed splitops/ops row still consumes its own row-gap. mt-1 (4px = two more
+         --kira-gap) reproduces that reserved space exactly; gap-0.5 above already accounts for
+         one. Kira Space (no #dock slot) never adds it, matching its own two-row grid exactly. -->
+    <div class="shrink-0 h-statusbar" :class="{ 'mt-1': hasDock }" data-testid="status-bar">
       <slot name="status" />
     </div>
   </div>
 </template>
 
 <style scoped>
-.workbench-shell {
-  /* P1 C8: a flex child of App.vue's own .app-frame (TitleBar + WorkbenchShell). Grid-template-*
-     stays hand CSS — the columns/rows are driven by :style-bound custom properties (gridStyle
-     above), which Tailwind's utility scale has no way to express. */
-  flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  display: grid;
-  grid-template-areas:
-    'project splitproj main'
-    'status status status';
-  grid-template-columns: var(--project-w) var(--project-split-w) 1fr;
-  grid-template-rows: 1fr var(--kira-statusbar-h);
-  gap: var(--kira-gap);
-  /* Right/left inset from the window edge (P31 D8) is its own token, deliberately not --kira-gap —
-     that token also sizes the splitter track. Bottom stays --kira-gap: the status bar reads as
-     seated on the window edge. */
-  padding: 0 var(--kira-window-inset) var(--kira-gap);
-  background: var(--kira-bg-chrome);
-}
-
-/* Risk §11: a structural row-set change, not a zero-height row — see the script comment above. */
-.workbench-shell.has-dock {
-  grid-template-areas:
-    'project splitproj main'
-    'splitops splitops splitops'
-    'ops ops ops'
-    'status status status';
-  grid-template-rows: 1fr var(--ops-split-h) var(--ops-h) var(--kira-statusbar-h);
-}
-
 .panel-surface {
   overflow: hidden;
   min-width: 0;
@@ -154,6 +226,10 @@ const gridStyle = computed(() => {
   border-radius: var(--kira-radius);
   border: var(--kira-border-width) solid var(--kira-border);
   background: var(--kira-bg);
+}
+
+.h-statusbar {
+  height: var(--kira-statusbar-h);
 }
 
 .tab-strip-slot {

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
 import { nextTick, ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
@@ -22,16 +23,16 @@ const codeReposStore = useCodeReposStore();
 // persisted, or read by anything other than answerCredential's own synchronous call.
 
 const value = ref('');
-// Bare $el shape (SearchToolbar.vue's own precedent) — TextField's root is one <span>, its real
-// <input> is one query away.
-const inputField = ref<{ $el: HTMLElement } | null>(null);
+const inputField = ref<InstanceType<typeof Input> | null>(null);
 
 watch(
   () => gitCredentialStore.active,
   (active) => {
     value.value = '';
     if (active) {
-      void nextTick(() => inputField.value?.$el.querySelector('input')?.focus());
+      // Input.vue's own root IS the <input> element, unlike TextField's wrapping <span> --
+      // $el already is the real input, no querySelector needed.
+      void nextTick(() => (inputField.value?.$el as HTMLInputElement | undefined)?.focus());
     }
   },
 );
@@ -50,50 +51,62 @@ function onCancel(): void {
 </script>
 
 <template>
-  <DialogFrame
-    v-if="gitCredentialStore.active"
-    title="Git credentials"
-    :width="440"
-    test-id="git-credential-dialog"
-    close-test-id="git-credential-dialog-close"
-    @close="onCancel"
-  >
-    <div class="flex flex-col" style="gap: var(--kira-s-2); padding: var(--kira-s-4) var(--kira-s-5)">
-      <p class="m-0" style="color: var(--kira-fg-subtle)" data-testid="git-credential-repo">
-        {{ codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name }}
-      </p>
-      <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
-      <p
-        class="mono whitespace-pre-wrap"
-        style="margin: 0 0 var(--kira-s-1)"
-        data-testid="git-credential-prompt"
-      >
-        {{ gitCredentialStore.active.prompt }}
-      </p>
-      <TextField
-        ref="inputField"
-        v-model="value"
-        :type="gitCredentialStore.active.masked ? 'password' : 'text'"
-        size="md"
-        data-testid="git-credential-input"
-        @enter="onSubmit"
-      />
-    </div>
+  <Dialog v-if="gitCredentialStore.active" :open="true" @update:open="(v) => !v && onCancel()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="git-credential-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 440px; max-width: 440px; max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Git credentials</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="git-credential-dialog-close"
+            @click="onCancel"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
-    <template #footer>
-      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
-        <AppButton kind="dialog" data-testid="git-credential-cancel" @click="onCancel">
-          Cancel
-        </AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          data-testid="git-credential-submit"
-          @click="onSubmit"
-        >
-          Continue
-        </AppButton>
-      </span>
-    </template>
-  </DialogFrame>
+      <div class="flex flex-col gap-1 px-3 py-2 overflow-auto">
+        <p class="m-0 text-subtle" data-testid="git-credential-repo">
+          {{ codeReposStore.codeRepoRecord(gitCredentialStore.active.codeRepoId)?.name }}
+        </p>
+        <!-- git's own text, rendered verbatim — never reformatted, never parsed. -->
+        <p class="mono whitespace-pre-wrap mb-0.5" data-testid="git-credential-prompt">
+          {{ gitCredentialStore.active.prompt }}
+        </p>
+        <Input
+          ref="inputField"
+          v-model="value"
+          :type="gitCredentialStore.active.masked ? 'password' : 'text'"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          data-testid="git-credential-input"
+          @keydown.enter="onSubmit"
+        />
+      </div>
+
+      <DialogFooter class="border-t border-border">
+        <span class="flex items-center gap-1 ml-auto">
+          <Button variant="dialog" size="kira-lg" data-testid="git-credential-cancel" @click="onCancel">
+            Cancel
+          </Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="git-credential-submit"
+            @click="onSubmit"
+          >
+            Continue
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

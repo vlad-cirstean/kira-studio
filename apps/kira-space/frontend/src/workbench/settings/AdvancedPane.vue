@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import type { GitLogLevel } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
 
@@ -19,13 +21,23 @@ function onGitLogLevelChange(e: Event): void {
     <label class="field">
       <div class="field-head">
         <span>Git log level</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-advanced-gitLogLevel"
-          :disabled="isAtDefault('advanced', 'gitLogLevel')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('advanced', 'gitLogLevel')"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('advanced', 'gitLogLevel') }">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                data-testid="settings-reset-advanced-gitLogLevel"
+                :disabled="isAtDefault('advanced', 'gitLogLevel')"
+                aria-label="Reset to default"
+                @click="resetLeaf('advanced', 'gitLogLevel')"
+              >
+                <CodiconIcon name="discard" :size="13" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <select
         class="p-select bordered md"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -113,17 +114,30 @@ async function onSave(): Promise<void> {
 </script>
 
 <template>
-  <DialogFrame
-    title="Schema (DDL)"
-    :width="720"
-    max-height="80vh"
-    test-id="schema-dialog"
-    close-test-id="schema-dialog-close"
-    @close="schemaDialogStore.closeSchemaDialog"
-  >
-    <template #header>
-      <span>Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></span>
-    </template>
+  <Dialog :open="true" @update:open="(v) => !v && schemaDialogStore.closeSchemaDialog()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="schema-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 720px; max-width: 720px; max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal"
+          >Schema (DDL)<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
+        >
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="schema-dialog-close"
+            @click="schemaDialogStore.closeSchemaDialog"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
     <div class="p-dialog-body schema-dialog-body">
       <span class="help">
@@ -157,19 +171,20 @@ async function onSave(): Promise<void> {
       </div>
     </div>
 
-    <template #footer>
-      <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
-        saveError
-      }}</span>
-      <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
-      <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</AppButton>
-        <AppButton kind="dialog" variant="primary" :disabled="saving" @click="onSave">
-          Save schema
-        </AppButton>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span v-if="saveError" class="field-error" data-testid="schema-save-error">{{
+          saveError
+        }}</span>
+        <span v-else class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+        <span class="flex items-center gap-1 ml-auto">
+          <Button variant="dialog" size="kira-lg" :disabled="saving" @click="schemaDialogStore.closeSchemaDialog">Cancel</Button>
+          <Button variant="dialog-primary" size="kira-lg" :disabled="saving" @click="onSave">
+            Save schema
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -196,12 +211,12 @@ async function onSave(): Promise<void> {
 }
 
 .editor-wrap {
-  @apply flex-1 min-h-0 overflow-hidden rounded-[var(--kira-radius-sm)];
+  @apply flex-1 min-h-0 overflow-hidden rounded-kira-sm;
   border: var(--kira-border-width) solid var(--kira-border);
 }
 
 .summary-strip {
-  @apply self-stretch rounded-[var(--kira-radius-sm)];
+  @apply self-stretch rounded-kira-sm;
   border: var(--kira-border-width) solid var(--kira-border);
 }
 

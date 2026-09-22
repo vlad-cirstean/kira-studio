@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -21,13 +23,23 @@ function onDefaultPageSizeChange(e: Event): void {
     <label class="field">
       <div class="field-head">
         <span>Default page size</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-data-defaultPageSize"
-          :disabled="isAtDefault('data', 'defaultPageSize')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('data', 'defaultPageSize')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('data', 'defaultPageSize') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-data-defaultPageSize"
+              :disabled="isAtDefault('data', 'defaultPageSize')"
+              aria-label="Reset to default"
+              @click="resetLeaf('data', 'defaultPageSize')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <select
         class="p-select bordered md"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -130,19 +131,29 @@ function onContextMenu(e: MouseEvent): void {
     </button>
 
     <span v-if="row.kind === 'connection'" class="icon-box">
-      <span class="status-dot" :data-status="row.status" v-tooltip="statusTitle" />
+      <Tooltip :disabled="!statusTitle">
+        <TooltipTrigger as-child>
+          <span class="status-dot" :data-status="row.status" />
+        </TooltipTrigger>
+        <TooltipContent v-if="statusTitle">{{ statusTitle }}</TooltipContent>
+      </Tooltip>
     </span>
     <span v-if="connectionKind" class="icon-box">
       <EngineIcon :kind="connectionKind" :size="13" />
     </span>
     <CodiconIcon v-else-if="row.kind !== 'connection'" :name="icon" :size="13" class="node-icon" />
 
-    <span class="label" v-tooltip="row.name">
-      <template v-for="(part, i) in parts" :key="i">
-        <mark v-if="part.hit">{{ part.text }}</mark>
-        <template v-else>{{ part.text }}</template>
-      </template>
-    </span>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <span class="label">
+          <template v-for="(part, i) in parts" :key="i">
+            <mark v-if="part.hit">{{ part.text }}</mark>
+            <template v-else>{{ part.text }}</template>
+          </template>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{{ row.name }}</TooltipContent>
+    </Tooltip>
 
     <span v-if="row.badges?.length" class="badges">
       <span v-for="badge in row.badges" :key="badge" class="p-count">{{ badge }}</span>
@@ -155,13 +166,12 @@ function onContextMenu(e: MouseEvent): void {
          (a 8px hit target), with no visible text at all. Truncated-with-hover-detail, matching
          OperationsPanel.vue's own `error-text`/`v-tooltip` pattern for the same "errors are
          truncated by default, full text on hover" shape. -->
-    <span
-      v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail"
-      class="detail error-text"
-      data-testid="connection-error-detail"
-      v-tooltip="row.statusDetail"
-      >{{ row.statusDetail }}</span
-    >
+    <Tooltip v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail">
+      <TooltipTrigger as-child>
+        <span class="detail error-text" data-testid="connection-error-detail">{{ row.statusDetail }}</span>
+      </TooltipTrigger>
+      <TooltipContent>{{ row.statusDetail }}</TooltipContent>
+    </Tooltip>
     <span v-else-if="row.detail" class="detail">{{ row.detail }}</span>
   </div>
 </template>

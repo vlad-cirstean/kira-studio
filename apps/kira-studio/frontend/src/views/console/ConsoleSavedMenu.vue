@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { SavedConsoleQuery } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabsStore } from '../../state/tabs';
@@ -28,17 +28,16 @@ const textPrompt = ref<{
   value: string;
   resolve: (v: string | null) => void;
 } | null>(null);
-// Typed as the bare $el shape (rather than InstanceType<typeof TextField>) so this ref doesn't
-// read as a type-only use of the TextField import above — it's a real component, bound as a value
-// by the template below.
-const promptInput = ref<{ $el: HTMLElement } | null>(null);
+// Typed as the bare $el shape (rather than InstanceType<typeof Input>) so this ref doesn't read as
+// a type-only use of the Input import above — it's a real component, bound as a value by the
+// template below.
+const promptInput = ref<{ $el: HTMLInputElement } | null>(null);
 function promptText(title: string, initial: string): Promise<string | null> {
   return new Promise((resolve) => {
     textPrompt.value = { title, value: initial, resolve };
-    // TextField wraps the real <input> inside its own root <span> (P4) and isn't defineExpose'd,
-    // so the focus target is reached the same way any plain DOM query would find it — via the
-    // component's $el, which Vue always exposes on a template ref regardless of defineExpose.
-    void nextTick(() => promptInput.value?.$el.querySelector('input')?.focus());
+    // ui/input's root IS the <input> element itself (unlike the old TextField, which wrapped it in
+    // a <span>), so $el is already the focus target — no querySelector needed.
+    void nextTick(() => promptInput.value?.$el.focus());
   });
 }
 function submitPrompt(): void {
@@ -114,10 +113,27 @@ async function saveCurrent(): Promise<void> {
     <template #entry="{ entry }">
       <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's
            own note (the 320px popover is structurally too narrow for a saved query's full text). -->
-      <span class="entry-name" v-tooltip="`${entry.name}\n${entry.body.text}`">{{ entry.name }}</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="entry-name">{{ entry.name }}</span>
+        </TooltipTrigger>
+        <TooltipContent class="whitespace-pre-wrap">{{ `${entry.name}\n${entry.body.text}` }}</TooltipContent>
+      </Tooltip>
     </template>
     <template #entry-actions="{ entry }">
-      <IconButton icon="edit" v-tooltip="'Rename'" @click.stop="rename(entry)" />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Rename"
+            @click.stop="rename(entry)"
+          >
+            <CodiconIcon name="edit" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Rename</TooltipContent>
+      </Tooltip>
     </template>
     <template #footer>
       <div class="p-sep" />
@@ -131,19 +147,26 @@ async function saveCurrent(): Promise<void> {
   <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
     <div class="prompt-box p-float">
       <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-      <TextField
+      <Input
         ref="promptInput"
-        v-model="textPrompt.value"
-        size="md"
+        :model-value="textPrompt.value"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-ui"
         data-testid="text-prompt-input"
-        @enter="submitPrompt"
+        @update:model-value="(v) => { if (textPrompt) textPrompt.value = String(v); }"
+        @keydown.enter="submitPrompt"
         @keydown.escape="cancelPrompt"
       />
       <div class="prompt-actions">
-        <AppButton kind="dialog" data-testid="text-prompt-cancel" @click="cancelPrompt"> Cancel </AppButton>
-        <AppButton kind="dialog" variant="primary" data-testid="text-prompt-ok" @click="submitPrompt">
-          OK
-        </AppButton>
+        <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt"
+          >Cancel</Button
+        >
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
+          data-testid="text-prompt-ok"
+          @click="submitPrompt"
+          >OK</Button
+        >
       </div>
     </div>
   </div>
@@ -168,10 +191,10 @@ async function saveCurrent(): Promise<void> {
 }
 
 .prompt-box {
-  @apply w-[280px] flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-4)];
+  @apply w-[280px] flex flex-col gap-1.5 p-2;
 }
 
 .prompt-actions {
-  @apply flex justify-end gap-[var(--kira-s-3)];
+  @apply flex justify-end gap-1.5;
 }
 </style>

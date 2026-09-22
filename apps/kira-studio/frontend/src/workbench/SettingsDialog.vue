@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Button } from '@theme/components/ui/button';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
 import { onBeforeUnmount } from 'vue';
 import { sections, useSettingsStore } from '../state/settings';
@@ -127,17 +127,17 @@ async function save(patch: SettingsPatch): Promise<void> {
           · Unsaved changes</template></span
         >
       </span>
-      <span class="p-dialog-actions">
-        <AppButton kind="dialog" data-testid="settings-cancel" @click="f.onDismiss">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
+      <span class="flex items-center gap-1">
+        <Button variant="dialog" size="kira-lg" data-testid="settings-cancel" @click="f.onDismiss">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
           data-testid="settings-save"
           :disabled="!f.isValid"
           @click="f.onSave"
         >
           Save
-        </AppButton>
+        </Button>
       </span>
     </template>
   </SettingsShell>
@@ -168,7 +168,7 @@ async function save(patch: SettingsPatch): Promise<void> {
 }
 
 .segmented {
-  @apply inline-flex overflow-hidden self-start rounded-[var(--kira-radius-sm)];
+  @apply inline-flex overflow-hidden self-start rounded-kira-sm;
   height: var(--kira-h-md);
   border: var(--kira-border-width) solid var(--kira-border-strong);
 }
@@ -202,7 +202,7 @@ async function save(patch: SettingsPatch): Promise<void> {
 /* Command-before-button transparency (C3 §7.2/§7.5): a copyable, wrapped command string, shown
    ahead of every Install button that follows one. */
 .command-text {
-  @apply m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-[var(--kira-radius-sm)];
+  @apply m-0 leading-normal whitespace-pre-wrap break-all select-all rounded-kira-sm;
   padding: var(--kira-s-2);
   background: var(--kira-bg-input);
   border: var(--kira-border-width) solid var(--kira-border);
@@ -227,7 +227,7 @@ async function save(patch: SettingsPatch): Promise<void> {
 }
 
 .db-mcp-connection-row {
-  @apply flex items-center justify-between rounded-[var(--kira-radius-sm)];
+  @apply flex items-center justify-between rounded-kira-sm;
   gap: var(--kira-s-3);
   padding: var(--kira-s-2) var(--kira-s-3);
   border: var(--kira-border-width) solid var(--kira-border);
@@ -246,7 +246,7 @@ async function save(patch: SettingsPatch): Promise<void> {
 
 /* SettingsDialog.html's row-density preview strip */
 .row-preview {
-  @apply overflow-hidden rounded-[var(--kira-radius-sm)];
+  @apply overflow-hidden rounded-kira-sm;
   border: var(--kira-border-width) solid var(--kira-border);
 }
 

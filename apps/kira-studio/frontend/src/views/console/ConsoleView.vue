@@ -5,8 +5,8 @@ import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split'
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
@@ -562,75 +562,118 @@ const statusLine = computed(() => {
            to reconnect, and is only ever the reconnect trigger while gated, so it's never a dead,
            permanently-grey button sitting in the rail for no reason a user can see. -->
       <template #toolbar>
-        <AppButton
-          icon="play"
-          variant="primary"
-          data-testid="console-run-statement"
-          :disabled="running"
-          v-tooltip="'Run the statement under the cursor'"
-          @click="runStatement"
-        >
-          Run
-        </AppButton>
-        <AppButton
-          icon="run-all"
-          data-testid="console-run-all"
-          :disabled="running"
-          v-tooltip="'Run every statement in the editor'"
-          @click="runAll"
-        >
-          Run all
-        </AppButton>
-        <AppButton
-          v-if="canFormat"
-          icon="indent"
-          data-testid="console-format"
-          :disabled="!tab.state.text.trim()"
-          v-tooltip="'Format the query text'"
-          @click="onFormat"
-        >
-          Format
-        </AppButton>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex">
+              <Button
+                variant="toolbar-primary"
+                size="kira"
+                data-testid="console-run-statement"
+                :disabled="running"
+                @click="runStatement"
+              >
+                <CodiconIcon name="play" :size="13" />
+                Run
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Run the statement under the cursor</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex">
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="console-run-all"
+                :disabled="running"
+                @click="runAll"
+              >
+                <CodiconIcon name="run-all" :size="13" />
+                Run all
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Run every statement in the editor</TooltipContent>
+        </Tooltip>
+        <Tooltip v-if="canFormat">
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex">
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="console-format"
+                :disabled="!tab.state.text.trim()"
+                @click="onFormat"
+              >
+                <CodiconIcon name="indent" :size="13" />
+                Format
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Format the query text</TooltipContent>
+        </Tooltip>
         <!-- P18 D12: SQL-only (unlike Format, which also covers the Mongo console) — absent, not
              disabled, on a non-SQL console; disabled-with-tooltip (not hidden) on a SQL console
              whose statement at the cursor isn't a SELECT/WITH, since Explain applies to this
              console and just not to this particular statement. -->
-        <AppButton
-          v-if="dialect"
-          icon="list-tree"
-          data-testid="console-explain"
-          :disabled="!canExplain"
-          v-tooltip="explainTooltip"
-          @click="onExplain"
-        >
-          Explain
-        </AppButton>
+        <Tooltip v-if="dialect">
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex">
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="console-explain"
+                :disabled="!canExplain"
+                @click="onExplain"
+              >
+                <CodiconIcon name="list-tree" :size="13" />
+                Explain
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ explainTooltip }}</TooltipContent>
+        </Tooltip>
         <div class="sep"></div>
         <!-- P40 D6, default re-flipped back on P46-2: append a new result set instead of replacing
              the current ones. On (appending) by default and per-tab, shown unpressed — pressing
              this is what makes a run replace the last result set instead of stacking a new one,
              so the pressed/"active" look tracks *replace* mode, the inverse of the stored flag. -->
-        <IconButton
-          icon="layers"
-          :active="!tab.state.newResultSet"
-          data-testid="console-new-result-toggle"
-          v-tooltip="
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': !tab.state.newResultSet }"
+              aria-label="New result set toggle"
+              data-testid="console-new-result-toggle"
+              @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
+            >
+              <CodiconIcon name="layers" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{
             tab.state.newResultSet
               ? 'Running adds a new result set — click to replace instead'
               : 'Running replaces the current result sets — click to add a new one instead'
-          "
-          @click="setNewResultSet(tab.id, !tab.state.newResultSet)"
-        />
+          }}</TooltipContent>
+        </Tooltip>
         <div class="sep"></div>
         <div class="saved-anchor">
-          <AppButton
-            icon="bookmark"
-            data-testid="console-saved-toggle"
-            v-tooltip="'Saved queries'"
-            @click="savedMenuOpen = !savedMenuOpen"
-          >
-            Saved queries
-          </AppButton>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira"
+                data-testid="console-saved-toggle"
+                @click="savedMenuOpen = !savedMenuOpen"
+              >
+                <CodiconIcon name="bookmark" :size="13" />
+                Saved queries
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Saved queries</TooltipContent>
+          </Tooltip>
           <!-- PopoverPanel.vue anchors itself to its own DOM parent (see its own comment) — this menu
                used to render several levels away from its trigger button (a direct child of
                ViewChrome's default slot, down by .editor-body), so it opened pinned to a corner
@@ -641,14 +684,21 @@ const statusLine = computed(() => {
         <div class="sep"></div>
         <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button
              is gated off the same way expand/collapse-all above is gated on document-ness. -->
-        <IconButton
-          v-if="!activeResultIsPlan"
-          icon="search"
-          :active="!!rt?.searchOpen"
-          v-tooltip="'Find in the active result set'"
-          data-testid="console-search"
-          @click="onToggleSearch"
-        />
+        <Tooltip v-if="!activeResultIsPlan">
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': !!rt?.searchOpen }"
+              aria-label="Find in the active result set"
+              data-testid="console-search"
+              @click="onToggleSearch"
+            >
+              <CodiconIcon name="search" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Find in the active result set</TooltipContent>
+        </Tooltip>
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
@@ -754,18 +804,34 @@ const statusLine = computed(() => {
                a document row's only other way to reveal its full body (the cell editor dock) is
                gone as a redundant second copy of this same DocumentTree (P42 D11). -->
           <template v-if="activeResultIsDocument">
-            <IconButton
-              icon="expand-all"
-              v-tooltip="'Expand all'"
-              data-testid="console-expand-all"
-              @click="onExpandAllResults"
-            />
-            <IconButton
-              icon="collapse-all"
-              v-tooltip="'Collapse all'"
-              data-testid="console-collapse-all"
-              @click="onCollapseAllResults"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Expand all"
+                  data-testid="console-expand-all"
+                  @click="onExpandAllResults"
+                >
+                  <CodiconIcon name="expand-all" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Expand all</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  aria-label="Collapse all"
+                  data-testid="console-collapse-all"
+                  @click="onCollapseAllResults"
+                >
+                  <CodiconIcon name="collapse-all" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Collapse all</TooltipContent>
+            </Tooltip>
           </template>
         </div>
         <SearchToolbar
@@ -814,7 +880,7 @@ const statusLine = computed(() => {
 /* p-strip.err already carries the error's own look; only the parent's error message text needs
    pre-wrap so a long adapter error still wraps instead of scrolling. */
 .p-strip.err {
-  @apply whitespace-pre-wrap font-[family-name:var(--kira-font-data)];
+  @apply whitespace-pre-wrap font-data;
 }
 
 .auto-explain-message {
@@ -856,11 +922,11 @@ const statusLine = computed(() => {
    `.p-push`'s margin-left: auto now pushes within that fixed-width row, not the chips' own
    scrolling content, so the status text stays pinned in view no matter how many chips pile up. */
 .result-strip-row {
-  @apply gap-[var(--kira-s-2)];
+  @apply gap-1;
 }
 
 .result-strip {
-  @apply flex items-center flex-1 min-w-0 overflow-x-auto gap-[var(--kira-s-2)];
+  @apply flex items-center flex-1 min-w-0 overflow-x-auto gap-1;
   scrollbar-width: none;
 }
 
@@ -869,7 +935,7 @@ const statusLine = computed(() => {
 }
 
 .result-tab {
-  @apply max-w-[140px] h-[var(--kira-h-sm)] text-[length:var(--kira-t-xs)];
+  @apply max-w-[140px] h-5.5 text-kira-xs;
 }
 
 .result-tab:hover:not(.is-active) {

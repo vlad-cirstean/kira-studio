@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
@@ -12,7 +13,7 @@ const dbMcpStore = useDbMcpStore();
 // decides, the same semantics pairing's own trust prompt has, so this reuses that answer rather
 // than a dock or a notification queue. Renders nothing while dbMcpStore.approval.pending is null.
 
-const denyButton = ref<{ $el: HTMLElement } | null>(null);
+const denyButton = ref<InstanceType<typeof Button> | null>(null);
 const now = ref(Date.now());
 
 // Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
@@ -94,67 +95,79 @@ async function onApprove(): Promise<void> {
 </script>
 
 <template>
-  <DialogFrame
-    v-if="dbMcpStore.approval.pending"
-    :title="dialogTitle"
-    :width="520"
-    test-id="db-mcp-approval-dialog"
-    @close="onDeny"
-  >
-    <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="message">
-      {{ heavyLede }}
-    </p>
-    <p v-else class="message">
-      <strong>{{ dbMcpStore.approval.pending.connectionName }}</strong>
-      ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
-      MCP server.
-    </p>
-    <pre class="mono statement" data-testid="db-mcp-approval-statement">{{
-      dbMcpStore.approval.pending.statement
-    }}</pre>
+  <Dialog v-if="dbMcpStore.approval.pending" :open="true" @update:open="(v) => !v && onDeny()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="db-mcp-approval-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 520px; max-width: 520px; max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">{{ dialogTitle }}</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" @click="onDeny">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
-    <div v-if="dbMcpStore.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
-      <p class="detail" data-testid="db-mcp-approval-plan-rows">
-        <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
-          Estimated {{ dbMcpStore.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
-          read — threshold {{ dbMcpStore.approval.pending.plan.thresholdRows.toLocaleString() }}.
-        </template>
-        <template v-else> No row estimate available for this plan. </template>
-      </p>
-      <p
-        v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
-        :key="i"
-        class="detail plan-issue"
-        data-testid="db-mcp-approval-plan-issue"
-      >
-        <strong>{{ issue.severity }}</strong> {{ issue.message }}
-      </p>
-      <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" class="detail">
-        +{{ dbMcpStore.approval.pending.plan.issuesOmitted }} more
-      </p>
-    </div>
+      <div class="overflow-auto">
+        <p v-if="dbMcpStore.approval.pending.reason === 'heavy'" class="message">
+          {{ heavyLede }}
+        </p>
+        <p v-else class="message">
+          <strong>{{ dbMcpStore.approval.pending.connectionName }}</strong>
+          ({{ dbMcpStore.approval.pending.kind }}) wants to run {{ classWord }} through the database
+          MCP server.
+        </p>
+        <pre class="mono statement" data-testid="db-mcp-approval-statement">{{
+          dbMcpStore.approval.pending.statement
+        }}</pre>
 
-    <p class="detail" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
-    <p v-if="dbMcpStore.approval.queued > 1" class="detail" data-testid="db-mcp-approval-queue-count">
-      1 of {{ dbMcpStore.approval.queued }} waiting
-    </p>
+        <div v-if="dbMcpStore.approval.pending.plan" class="plan-block" data-testid="db-mcp-approval-plan">
+          <p class="detail" data-testid="db-mcp-approval-plan-rows">
+            <template v-if="dbMcpStore.approval.pending.plan.estimatedRowsRead !== null">
+              Estimated {{ dbMcpStore.approval.pending.plan.estimatedRowsRead.toLocaleString() }} rows
+              read — threshold {{ dbMcpStore.approval.pending.plan.thresholdRows.toLocaleString() }}.
+            </template>
+            <template v-else> No row estimate available for this plan. </template>
+          </p>
+          <p
+            v-for="(issue, i) in dbMcpStore.approval.pending.plan.issues"
+            :key="i"
+            class="detail plan-issue"
+            data-testid="db-mcp-approval-plan-issue"
+          >
+            <strong>{{ issue.severity }}</strong> {{ issue.message }}
+          </p>
+          <p v-if="dbMcpStore.approval.pending.plan.issuesOmitted > 0" class="detail">
+            +{{ dbMcpStore.approval.pending.plan.issuesOmitted }} more
+          </p>
+        </div>
 
-    <template #footer>
-      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
-        <AppButton ref="denyButton" kind="dialog" data-testid="db-mcp-approval-deny" @click="onDeny">
-          Deny
-        </AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          data-testid="db-mcp-approval-approve"
-          @click="onApprove"
-        >
-          Approve
-        </AppButton>
-      </span>
-    </template>
-  </DialogFrame>
+        <p class="detail" data-testid="db-mcp-approval-expires">Expires in {{ remainingSeconds }}s</p>
+        <p v-if="dbMcpStore.approval.queued > 1" class="detail" data-testid="db-mcp-approval-queue-count">
+          1 of {{ dbMcpStore.approval.queued }} waiting
+        </p>
+      </div>
+
+      <DialogFooter class="border-t border-border">
+        <span class="flex items-center gap-1 ml-auto">
+          <Button ref="denyButton" variant="dialog" size="kira-lg" data-testid="db-mcp-approval-deny" @click="onDeny">
+            Deny
+          </Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="db-mcp-approval-approve"
+            @click="onApprove"
+          >
+            Approve
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -167,7 +180,7 @@ async function onApprove(): Promise<void> {
 }
 
 .statement {
-  @apply max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[var(--kira-radius-sm)];
+  @apply max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-kira-sm;
   margin: 0 var(--kira-s-5) var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
   background: var(--kira-bg-input);

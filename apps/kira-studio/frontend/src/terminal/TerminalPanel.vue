@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import type { CustomScript } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import AppButton from '@theme/primitives/AppButton.vue';
 import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+// P104 §3: PanelShell is a forbidden shared primitive (packages/theme/src/primitives/) -- not
+// converted in this pass, same deferral as ProjectPanel.vue's own: its type-ahead-redirect/
+// search-reveal logic is real app behavior that would need extracting into a shared composable
+// before inlining at its 3 call sites without tripling that logic.
 import PanelShell from '@theme/primitives/PanelShell.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { computed, ref } from 'vue';
@@ -135,46 +139,59 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
         <span class="panel-title">Quick commands</span>
       </template>
       <template #actions>
-        <IconButton
-          icon="add"
-          aria-label="Add a quick command"
-          v-tooltip="'Add a quick command'"
-          data-testid="quick-command-add"
-          @click="openAddRow"
-        />
-        <IconButton
-          icon="settings-gear"
-          aria-label="Manage scripts"
-          v-tooltip="'Manage scripts…'"
-          data-testid="quick-commands-manage"
-          @click="settingsStore.openSettingsAt('Scripts')"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Add a quick command"
+              data-testid="quick-command-add"
+              @click="openAddRow"
+            >
+              <CodiconIcon name="add" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Add a quick command</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Manage scripts"
+              data-testid="quick-commands-manage"
+              @click="settingsStore.openSettingsAt('Scripts')"
+            >
+              <CodiconIcon name="settings-gear" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Manage scripts…</TooltipContent>
+        </Tooltip>
       </template>
       <template #body>
         <div class="terminal-panel-body">
           <div v-if="adding" class="quick-command-add" data-testid="quick-command-add-row">
-            <TextField
+            <Input
               v-model="newName"
               placeholder="Name"
-              size="md"
+              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
               data-testid="quick-command-add-name"
             />
-            <TextField
+            <Input
               v-model="newCommand"
               placeholder="Command"
-              size="md"
-              class="mono"
+              class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
               data-testid="quick-command-add-command"
             />
             <div class="quick-command-add-actions">
-              <AppButton kind="dialog" @click="cancelAdd">Cancel</AppButton>
-              <AppButton
-                kind="dialog"
-                variant="primary"
+              <Button variant="dialog" size="kira-lg" @click="cancelAdd">Cancel</Button>
+              <Button
+                variant="dialog-primary"
+                size="kira-lg"
                 :disabled="!canAdd"
                 data-testid="quick-command-add-confirm"
                 @click="onAdd"
-                >Add</AppButton
+                >Add</Button
               >
             </div>
             <span v-if="addError" class="field-error">{{ addError }}</span>
@@ -239,7 +256,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 }
 
 .quick-command-row {
-  @apply flex items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-3)] cursor-default select-none;
+  @apply flex items-center gap-1 py-1 px-1.5 cursor-default select-none;
 }
 
 .quick-command-row:hover {
@@ -263,18 +280,18 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 }
 
 .quick-command-command {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-[length:var(--kira-t-xs)];
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-kira-xs;
 }
 
 .quick-command-add {
-  @apply flex flex-col gap-[var(--kira-s-2)] p-[var(--kira-s-3)] border-b border-border;
+  @apply flex flex-col gap-1 p-1.5 border-b border-border;
 }
 
 .quick-command-add-actions {
-  @apply flex justify-end gap-[var(--kira-s-2)];
+  @apply flex justify-end gap-1;
 }
 
 .field-error {
-  @apply text-error text-[length:var(--kira-t-xs)];
+  @apply text-error text-kira-xs;
 }
 </style>

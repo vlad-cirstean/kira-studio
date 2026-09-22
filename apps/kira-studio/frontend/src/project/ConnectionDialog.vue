@@ -14,12 +14,14 @@ import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+// P104 §3.1: SegmentedControl's ToggleGroup recipe is a genuinely separate, non-mechanical piece
+// of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -186,7 +188,7 @@ function setMode(mode: 'fields' | 'uri'): void {
   d.uri = null;
 }
 
-// TextField's modelValue is always a string; the port field's own type is number|null (D27's
+// Input's own modelValue type is string|number; the port field's own type is number|null (D27's
 // per-kind default), so this mirrors what v-model.number did on the raw <input type="number">
 // (parse on the way in, fall back rather than write a non-numeric value into a numeric field).
 function setPort(value: string): void {
@@ -355,7 +357,7 @@ async function onSave(): Promise<void> {
   }
 }
 
-// P28 §5.6: TextField's modelValue is always a string, so this mirrors setPort's parse-on-input.
+// P28 §5.6: mirrors setPort's own parse-on-input, same Input modelValue-type reason.
 function setThrottlePerSec(value: string): void {
   const d = draft.value;
   if (!d) return;
@@ -536,84 +538,106 @@ const preconnectText = computed({
 </script>
 
 <template>
-  <DialogFrame
-    v-if="draft"
-    :title="
-      step === 'engine'
-        ? isEdit
-          ? 'Change engine'
-          : 'New connection'
-        : `${isEdit ? 'Edit' : 'New'} ${KIND_LABEL[draft.kind]} connection`
-    "
-    :width="620"
-    :height="520"
-    test-id="connection-dialog"
-    close-test-id="connection-dialog-close"
-    @close="connectionDialogStore.closeDialog"
-  >
-    <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
-    <template v-if="step === 'engine'" #header>
-      <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
-      <span>{{ isEdit ? 'Change engine' : 'New connection' }}</span>
-      <span class="title-mid p-push">
-        <span v-if="!isEdit" class="steps">
-          <span class="step on"><span class="n">1</span>Engine</span>
-          <span class="dim">›</span>
-          <span class="step"><span class="n">2</span>Details</span>
+  <Dialog v-if="draft" :open="true" @update:open="(v) => !v && connectionDialogStore.closeDialog()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="connection-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 620px; max-width: 620px; height: 520px"
+    >
+      <!-- Step 1: NewConnection.html — a grid of engine tiles, each with its own mark. -->
+      <DialogHeader v-if="step === 'engine'" class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
+        <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Change engine' : 'New connection' }}</DialogTitle>
+        <span class="title-mid p-push">
+          <span v-if="!isEdit" class="steps">
+            <span class="step on"><span class="n">1</span>Engine</span>
+            <span class="dim">›</span>
+            <span class="step"><span class="n">2</span>Details</span>
+          </span>
         </span>
-      </span>
-      <AppButton v-if="isEdit" icon="chevron-left" @click="step = 'details'">Back</AppButton>
-    </template>
-    <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
-         is identity here, not a control (changed via "Change engine" back to step 1). -->
-    <template v-else #header>
-      <span class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
-        <EngineIcon :kind="draft.kind" :size="13" />
-      </span>
-      <span>{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</span>
-      <AppButton
-        icon="chevron-left"
-        class="p-push"
-        v-tooltip="'Pick a different engine'"
-        @click="step = 'engine'"
-      >
-        Change engine
-      </AppButton>
-    </template>
+        <Button v-if="isEdit" variant="toolbar" size="kira" @click="step = 'details'">
+          <CodiconIcon name="chevron-left" :size="13" />
+          Back
+        </Button>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close"
+            data-testid="connection-dialog-close"
+            @click="connectionDialogStore.closeDialog"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <!-- Step 2: ConnectionDialog.html — only the chosen engine's fields; the engine itself
+           is identity here, not a control (changed via "Change engine" back to step 1). -->
+      <DialogHeader v-else class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <span class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[draft.kind]})` }">
+          <EngineIcon :kind="draft.kind" :size="13" />
+        </span>
+        <DialogTitle class="text-kira-lg font-normal">{{ isEdit ? 'Edit' : 'New' }} {{ KIND_LABEL[draft.kind] }} connection</DialogTitle>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira" class="p-push" @click="step = 'engine'">
+              <CodiconIcon name="chevron-left" :size="13" />
+              Change engine
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Pick a different engine</TooltipContent>
+        </Tooltip>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close"
+            data-testid="connection-dialog-close"
+            @click="connectionDialogStore.closeDialog"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
+      <div class="flex-1 min-h-0 overflow-auto">
     <template v-if="step === 'engine'">
       <div class="p-dialog-body engine-body">
-        <TextField
-          v-model="engineSearch"
-          icon="search"
-          ui
-          size="md"
-          placeholder="Search engines"
-          data-testid="connection-engine-search"
-        />
+        <div class="flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-input px-2">
+          <CodiconIcon name="search" :size="13" class="shrink-0 text-fg-muted" />
+          <Input
+            v-model="engineSearch"
+            placeholder="Search engines"
+            class="h-full w-full border-0 bg-transparent p-0 font-ui focus-visible:ring-0"
+            data-testid="connection-engine-search"
+          />
+        </div>
 
         <div class="kind-grid" role="radiogroup" aria-label="Connection kind" data-testid="connection-kind">
-          <button
-            v-for="kind in filteredKinds"
-            :key="kind"
-            type="button"
-            class="kind"
-            :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
-            :disabled="!SUPPORTED_KINDS.has(kind)"
-            role="radio"
-            :aria-checked="draft.kind === kind"
-            v-tooltip="KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported')"
-            :data-testid="`connection-kind-${kind}`"
-            @click="pickKind(kind)"
-          >
-            <span
-              class="kind-ic"
-              :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
-            >
-              <EngineIcon :kind="kind" :size="22" />
-            </span>
-            <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
-          </button>
+          <Tooltip v-for="kind in filteredKinds" :key="kind">
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="kind"
+                :class="{ 'is-off': !SUPPORTED_KINDS.has(kind), 'is-selected': draft.kind === kind }"
+                :disabled="!SUPPORTED_KINDS.has(kind)"
+                role="radio"
+                :aria-checked="draft.kind === kind"
+                :data-testid="`connection-kind-${kind}`"
+                @click="pickKind(kind)"
+              >
+                <span
+                  class="kind-ic"
+                  :style="{ color: SUPPORTED_KINDS.has(kind) ? `var(--kira-conn-${KIND_ACCENT[kind]})` : undefined }"
+                >
+                  <EngineIcon :kind="kind" :size="22" />
+                </span>
+                <span class="kind-name">{{ KIND_LABEL[kind] }}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{{ KIND_LABEL[kind] + (SUPPORTED_KINDS.has(kind) ? '' : ' — not yet supported') }}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </template>
@@ -681,7 +705,7 @@ const preconnectText = computed({
           <div class="field-row">
             <div class="field name-field">
               <label>Name</label>
-              <TextField v-model="draft.name" ui size="md" data-testid="connection-name" />
+              <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-ui" data-testid="connection-name" />
             </div>
             <div class="field color-field">
               <label>Color</label>
@@ -721,17 +745,16 @@ const preconnectText = computed({
               <label>Database file</label>
               <div class="password-row">
                 <div class="password-input">
-                  <TextField
+                  <Input
                     :model-value="draft.database ?? ''"
-                    size="md"
-                    class="mono"
+                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                     data-testid="connection-database"
-                    @update:model-value="draft.database = $event"
+                    @update:model-value="draft.database = String($event)"
                   />
                 </div>
-                <AppButton kind="dialog" data-testid="connection-browse" @click="onBrowseDatabaseFile">
+                <Button variant="dialog" size="kira-lg" data-testid="connection-browse" @click="onBrowseDatabaseFile">
                   Browse…
-                </AppButton>
+                </Button>
               </div>
             </div>
             <span v-if="fieldErrors.database" class="field-error">{{ fieldErrors.database }}</span>
@@ -740,21 +763,21 @@ const preconnectText = computed({
             <div v-if="!isAwsStyle" class="field-row">
               <div class="field">
                 <label>Host</label>
-                <TextField
+                <Input
                   :model-value="draft.host ?? ''"
-                  size="md"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                   data-testid="connection-host"
-                  @update:model-value="draft.host = $event"
+                  @update:model-value="draft.host = String($event)"
                 />
               </div>
               <div class="field port-field">
                 <label>Port</label>
-                <TextField
+                <Input
                   :model-value="draft.port != null ? String(draft.port) : ''"
                   type="number"
-                  size="md"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                   data-testid="connection-port"
-                  @update:model-value="setPort"
+                  @update:model-value="(v) => setPort(String(v))"
                 />
               </div>
             </div>
@@ -762,62 +785,69 @@ const preconnectText = computed({
             <div v-if="isAwsStyle" class="field-row">
               <div class="field">
                 <label>Region</label>
-                <TextField
+                <Input
                   :model-value="draft.database ?? ''"
-                  size="md"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                   data-testid="connection-database"
-                  @update:model-value="draft.database = $event"
+                  @update:model-value="draft.database = String($event)"
                 />
               </div>
               <div class="field">
                 <label>AWS profile (optional)</label>
-                <TextField
+                <Input
                   :model-value="draft.username ?? ''"
-                  size="md"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                   data-testid="connection-username"
-                  @update:model-value="draft.username = $event"
+                  @update:model-value="draft.username = String($event)"
                 />
               </div>
             </div>
             <template v-else>
               <div class="field">
                 <label>Database</label>
-                <TextField
+                <Input
                   :model-value="draft.database ?? ''"
-                  size="md"
+                  class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                   data-testid="connection-database"
-                  @update:model-value="draft.database = $event"
+                  @update:model-value="draft.database = String($event)"
                 />
               </div>
               <div class="field-row">
                 <div class="field">
                   <label>User</label>
-                  <TextField
+                  <Input
                     :model-value="draft.username ?? ''"
-                    size="md"
+                    class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                     data-testid="connection-username"
-                    @update:model-value="draft.username = $event"
+                    @update:model-value="draft.username = String($event)"
                   />
                 </div>
                 <div class="field">
                   <label>Password</label>
                   <div class="password-row">
                     <div class="password-input">
-                      <TextField
+                      <Input
                         :model-value="draft.password ?? ''"
                         :type="showPassword ? 'text' : 'password'"
-                        size="md"
+                        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                         :placeholder="revealed ? undefined : 'Unchanged — click the eye to reveal'"
                         data-testid="connection-password"
-                        @update:model-value="onPasswordInput"
+                        @update:model-value="(v) => onPasswordInput(String(v))"
                       />
                     </div>
-                    <IconButton
-                      :icon="showPassword ? 'eye-closed' : 'eye'"
-                      v-tooltip="showPassword ? 'Hide password' : 'Show password'"
-                      :aria-label="showPassword ? 'Hide password' : 'Show password'"
-                      @click="onEyeClick"
-                    />
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button
+                          variant="toolbar"
+                          size="kira-icon"
+                          :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                          @click="onEyeClick"
+                        >
+                          <CodiconIcon :name="showPassword ? 'eye-closed' : 'eye'" :size="13" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{{ showPassword ? 'Hide password' : 'Show password' }}</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </div>
@@ -826,12 +856,11 @@ const preconnectText = computed({
           <template v-else>
             <div class="field">
               <label>Connection URI</label>
-              <TextField
+              <Input
                 :model-value="draft.uri ?? ''"
-                size="md"
-                class="mono"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
                 data-testid="connection-uri"
-                @update:model-value="setUri"
+                @update:model-value="(v) => setUri(String(v))"
                 @blur="refreshUriNote"
               />
             </div>
@@ -841,13 +870,27 @@ const preconnectText = computed({
 
           <div v-else-if="activeTab === 'Advanced'" class="tab-pane" role="tabpanel">
           <label class="field checkbox">
-            <Checkbox v-model="draft.readOnly" data-testid="connection-readonly" />
+            <Checkbox
+              :model-value="draft.readOnly"
+              class="size-3.5"
+              data-testid="connection-readonly"
+              @update:model-value="(v) => { if (draft) draft.readOnly = v === true; }"
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
             <span>Read-only</span>
             <span class="helper-text">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
           </label>
 
           <label v-if="isSqlKind" class="field checkbox">
-            <Checkbox v-model="draft.autoExplain" data-testid="connection-auto-explain" />
+            <Checkbox
+              :model-value="draft.autoExplain"
+              class="size-3.5"
+              data-testid="connection-auto-explain"
+              @update:model-value="(v) => { if (draft) draft.autoExplain = v === true; }"
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
             <span>Auto-explain SELECT queries</span>
             <span class="helper-text">
               Runs the database's own EXPLAIN before each SELECT this connection issues from a
@@ -860,16 +903,16 @@ const preconnectText = computed({
           <div class="field">
             <label>Throttle commands <span class="dim">— per second</span></label>
             <div class="size-input">
-              <TextField
+              <Input
                 type="number"
                 :min="0"
                 :max="CONNECTION_THROTTLE_RANGE.max"
                 step="0.5"
-                size="md"
-                :invalid="!!throttlePerSecError"
+                class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+                :aria-invalid="!!throttlePerSecError"
                 data-testid="connection-throttle"
                 :model-value="String(draft.throttlePerSec)"
-                @update:model-value="setThrottlePerSec"
+                @update:model-value="(v) => setThrottlePerSec(String(v))"
               />
             </div>
             <span v-if="throttlePerSecError" class="field-error" data-testid="connection-throttle-error">
@@ -904,7 +947,14 @@ const preconnectText = computed({
           <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
 
           <label v-if="preconnectText" class="field checkbox">
-            <Checkbox v-model="draft.preconnectSidecar" data-testid="connection-preconnect-sidecar" />
+            <Checkbox
+              :model-value="draft.preconnectSidecar"
+              class="size-3.5"
+              data-testid="connection-preconnect-sidecar"
+              @update:model-value="(v) => { if (draft) draft.preconnectSidecar = v === true; }"
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
             <span>Keep it running, disconnect if it dies</span>
             <span class="helper-text">
               On: the command stays alive for the whole session — e.g. a port-forward — and this
@@ -917,7 +967,14 @@ const preconnectText = computed({
 
           <div v-else-if="activeTab === 'MCP'" class="tab-pane" role="tabpanel">
           <label class="field checkbox">
-            <Checkbox v-model="draft.mcpEnabled" data-testid="connection-mcp-enabled" />
+            <Checkbox
+              :model-value="draft.mcpEnabled"
+              class="size-3.5"
+              data-testid="connection-mcp-enabled"
+              @update:model-value="(v) => { if (draft) draft.mcpEnabled = v === true; }"
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
             <span>Expose to the database MCP server</span>
             <span class="helper-text">
               Nothing is exposed by default. The same switch lives in Settings' Database MCP
@@ -944,10 +1001,14 @@ const preconnectText = computed({
 
           <label class="field checkbox">
             <Checkbox
-              v-model="draft.mcpAutoExplain"
+              :model-value="draft.mcpAutoExplain"
               :disabled="!draft.mcpEnabled || !mcpExplainSupported"
+              class="size-3.5"
               data-testid="connection-mcp-auto-explain"
-            />
+              @update:model-value="(v) => { if (draft) draft.mcpAutoExplain = v === true; }"
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
             <span>Plan queries before running them</span>
             <span v-if="!mcpExplainSupported" class="helper-text">
               This engine has no query plan this app can read.
@@ -1019,33 +1080,47 @@ const preconnectText = computed({
                 <label v-if="KEEP_HINT_LABEL[rule.kind]" class="field checkbox mask-rule-flag">
                   <Checkbox
                     :model-value="rule.keepHint"
+                    class="size-3.5"
                     data-testid="mask-rule-keep-hint"
                     @update:model-value="onToggleMaskRuleFlag(rule.id, 'keepHint')"
-                  />
+                  >
+                    <CodiconIcon name="check" :size="10" />
+                  </Checkbox>
                   <span>{{ KEEP_HINT_LABEL[rule.kind] }}</span>
                 </label>
                 <label class="field checkbox mask-rule-flag">
                   <Checkbox
                     :model-value="rule.correlate"
                     :disabled="rule.kind === 'number'"
+                    class="size-3.5"
                     data-testid="mask-rule-correlate"
                     @update:model-value="onToggleMaskRuleFlag(rule.id, 'correlate')"
-                  />
+                  >
+                    <CodiconIcon name="check" :size="10" />
+                  </Checkbox>
                   <span>Correlate</span>
                 </label>
-                <IconButton
-                  icon="trash"
-                  data-testid="mask-rule-remove"
-                  v-tooltip="'Not PII — remove this rule'"
-                  @click="onRemoveMaskRule(rule.id)"
-                />
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="danger"
+                      size="kira-icon"
+                      aria-label="Remove this rule"
+                      data-testid="mask-rule-remove"
+                      @click="onRemoveMaskRule(rule.id)"
+                    >
+                      <CodiconIcon name="trash" :size="13" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Not PII — remove this rule</TooltipContent>
+                </Tooltip>
               </div>
             </div>
             <p v-else class="helper-text">No masking rules yet on this connection.</p>
 
             <div class="mask-rule-add field-row">
-              <TextField v-model="newMaskTable" placeholder="*" size="md" data-testid="mask-rule-add-table" />
-              <TextField v-model="newMaskColumn" placeholder="column" size="md" data-testid="mask-rule-add-column" />
+              <Input v-model="newMaskTable" placeholder="*" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="mask-rule-add-table" />
+              <Input v-model="newMaskColumn" placeholder="column" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="mask-rule-add-column" />
               <select v-model="newMaskKind" class="p-select bordered" data-testid="mask-rule-add-kind">
                 <option value="name">Name</option>
                 <option value="email">Email</option>
@@ -1054,14 +1129,14 @@ const preconnectText = computed({
                 <option value="date">Date</option>
                 <option value="redact">Redact</option>
               </select>
-              <AppButton kind="dialog" data-testid="mask-rule-add" @click="onAddMaskRule">Add</AppButton>
+              <Button variant="dialog" size="kira-lg" data-testid="mask-rule-add" @click="onAddMaskRule">Add</Button>
             </div>
             <p class="helper-text">{{ MASK_KIND_EXPLANATION[newMaskKind] }}</p>
             <span v-if="maskRuleError" class="field-error" data-testid="mask-rule-error">{{ maskRuleError }}</span>
 
-            <AppButton kind="dialog" data-testid="mask-regenerate-key" @click="onRegenerateMaskKey">
+            <Button variant="dialog" size="kira-lg" class="self-start" data-testid="mask-regenerate-key" @click="onRegenerateMaskKey">
               Regenerate correlation key
-            </AppButton>
+            </Button>
 
             <template v-if="!isFileStyle">
               <MessageStrip
@@ -1113,51 +1188,57 @@ const preconnectText = computed({
           </template>
       </div>
     </template>
+      </div>
 
-    <template v-if="step === 'engine'" #footer>
-      <span class="p-dialog-actions footer-actions p-push">
-        <AppButton kind="dialog" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</AppButton>
-        <AppButton kind="dialog" variant="primary" @click="continueToDetails">
-          Continue
-          <span class="icon-box"><CodiconIcon name="chevron-right" :size="13" /></span>
-        </AppButton>
-      </span>
-    </template>
-    <template v-else #footer>
-      <div class="test-area">
-        <AppButton kind="dialog" icon="plug" data-testid="connection-test" @click="onTest">
-          Test connection
-        </AppButton>
-        <span
-          v-if="testState.status !== 'idle'"
-          class="test-chip p-chip"
-          :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
-          data-testid="connection-test-result"
-          v-tooltip="testState.status === 'error' ? (testState.message ?? '') : undefined"
-        >
-          {{
-            testState.status === 'testing'
-              ? 'Testing…'
-              : testState.status === 'ok'
-                ? `OK — ${testState.message}`
-                : testState.message
-          }}
+      <DialogFooter v-if="step === 'engine'" class="border-t border-border">
+        <span class="flex items-center gap-1 ml-auto">
+          <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="continueToDetails">
+            Continue
+            <CodiconIcon name="chevron-right" :size="13" />
+          </Button>
         </span>
-      </div>
-      <div class="p-dialog-actions footer-actions">
-        <AppButton kind="dialog" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          data-testid="connection-save"
-          :disabled="!isValid"
-          @click="onSave"
-        >
-          Save
-        </AppButton>
-      </div>
-    </template>
-  </DialogFrame>
+      </DialogFooter>
+      <DialogFooter v-else class="border-t border-border">
+        <div class="test-area">
+          <Button variant="dialog" size="kira-lg" data-testid="connection-test" @click="onTest">
+            <CodiconIcon name="plug" :size="13" />
+            Test connection
+          </Button>
+          <Tooltip v-if="testState.status !== 'idle'" :disabled="testState.status !== 'error'">
+            <TooltipTrigger as-child>
+              <span
+                class="test-chip p-chip"
+                :class="testState.status === 'ok' ? 'ok' : testState.status === 'error' ? 'err' : 'info'"
+                data-testid="connection-test-result"
+              >
+                {{
+                  testState.status === 'testing'
+                    ? 'Testing…'
+                    : testState.status === 'ok'
+                      ? `OK — ${testState.message}`
+                      : testState.message
+                }}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent v-if="testState.status === 'error'">{{ testState.message ?? '' }}</TooltipContent>
+          </Tooltip>
+        </div>
+        <div class="flex items-center gap-1 ml-auto">
+          <Button variant="dialog" size="kira-lg" data-testid="connection-cancel" @click="connectionDialogStore.closeDialog">Cancel</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="connection-save"
+            :disabled="!isValid"
+            @click="onSave"
+          >
+            Save
+          </Button>
+        </div>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -1201,10 +1282,6 @@ const preconnectText = computed({
   width: 96px;
 }
 
-.size-input :deep(.p-input) {
-  width: 100%;
-}
-
 .name-field {
   flex: 2;
 }
@@ -1235,16 +1312,9 @@ const preconnectText = computed({
   gap: var(--kira-s-2);
 }
 
-/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
-   (see TextField.vue's inheritAttrs:false), so growing it to fill the row next to the show/hide
-   IconButton moves onto this wrapper instead of a style attribute on the component tag itself. */
 .password-input {
   flex: 1;
   min-width: 0;
-}
-
-.password-input :deep(.p-input) {
-  width: 100%;
 }
 
 .segmented {

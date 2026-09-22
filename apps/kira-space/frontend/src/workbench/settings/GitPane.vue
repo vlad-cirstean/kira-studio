@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 import {
   defaultSettings,
@@ -79,13 +81,23 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
     <label class="field">
       <div class="field-head">
         <span>Protected branch patterns (one per line)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-git-protectedBranches"
-          :disabled="isAtDefault('git', 'protectedBranches')"
-          v-tooltip="'Reset to default'"
-          @click="resetProtectedBranches"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'protectedBranches') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-git-protectedBranches"
+              :disabled="isAtDefault('git', 'protectedBranches')"
+              aria-label="Reset to default"
+              @click="resetProtectedBranches"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <textarea
         v-model="protectedBranchesText"
@@ -102,20 +114,30 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
     <label class="field">
       <div class="field-head">
         <span>Auto-fetch interval (minutes)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-git-fetchAutoIntervalMinutes"
-          :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'fetchAutoIntervalMinutes') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-git-fetchAutoIntervalMinutes"
+              :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
+              aria-label="Reset to default"
+              @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
         :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
-        size="md"
-        :invalid="!!fetchAutoIntervalError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!fetchAutoIntervalError || undefined"
         data-testid="settings-git-fetch-auto-interval"
         :model-value="String(draft.git.fetchAutoIntervalMinutes)"
         @input="onFetchAutoIntervalInput"
@@ -136,15 +158,30 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
     <label class="field">
       <div class="field-head">
         <span>Git executable path</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-git-gitPath"
-          :disabled="isAtDefault('git', 'gitPath')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('git', 'gitPath')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'gitPath') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-git-gitPath"
+              :disabled="isAtDefault('git', 'gitPath')"
+              aria-label="Reset to default"
+              @click="resetLeaf('git', 'gitPath')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField type="text" size="md" data-testid="settings-git-path" v-model="draft.git.gitPath" />
+      <Input
+        type="text"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        data-testid="settings-git-path"
+        v-model="draft.git.gitPath"
+      />
       <span class="helper-text"
         >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
         time, never cached, so a change here takes effect on the next one.</span
@@ -154,20 +191,30 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
     <label class="field">
       <div class="field-head">
         <span>Font size</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-git-graphFontSize"
-          :disabled="isAtDefault('git', 'graphFontSize')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('git', 'graphFontSize')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'graphFontSize') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-git-graphFontSize"
+              :disabled="isAtDefault('git', 'graphFontSize')"
+              aria-label="Reset to default"
+              @click="resetLeaf('git', 'graphFontSize')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="FONT_SIZE_RANGE.min"
         :max="FONT_SIZE_RANGE.max"
-        size="md"
-        :invalid="!!graphFontSizeError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!graphFontSizeError || undefined"
         data-testid="settings-git-graphFontSize"
         :model-value="String(draft.git.graphFontSize)"
         @input="onGraphFontSizeInput"

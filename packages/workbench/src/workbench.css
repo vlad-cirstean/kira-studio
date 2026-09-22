@@ -1,12 +1,22 @@
-/* P103 Part 1: Tailwind v4's automatic content scan roots at the consuming app's own Vite project
- * and never reaches a sibling package (P100 Part 2's own finding, fixed the same way for
- * packages/theme/src/base.css). `@source "./";` tells Tailwind to scan this package's own src/ too,
- * so a utility class used only inside a moved workbench component (ContextMenu.vue, AppTooltip.vue,
- * ConfirmDialog.vue, …) still generates its CSS. Each app's own main.ts imports this file directly
- * after `@theme/base.css` — no `@import` here to keep `@source` first is required, so if one is
- * ever added, `@source` must stay after it (`noInvalidPositionAtImportRule`). Deliberately NOT
- * referenced from packages/theme/src/base.css — that would couple theme to workbench, the wrong
- * direction (plan §4.4). */
+/* P103 Part 1 set out to fix Tailwind v4's automatic content scan rooting at the consuming app's
+ * own Vite project and never reaching a sibling package, with `@source "./";` below plus each
+ * app's main.ts importing this file as a second, independent stylesheet straight after
+ * `@theme/base.css`. P104 found that half didn't actually work: `@tailwindcss/vite` compiles each
+ * CSS file Vite imports as its own independent root, and only follows a file's *own* `@import`
+ * chain to collect `@source` directives — a file with no `@import "tailwindcss"` of its own (this
+ * one) has no Tailwind engine running over it at all, so `@source` here was inert the whole time.
+ * Confirmed empirically: a canary utility class used only in this package (nothing else in the
+ * repo referencing it) generated no CSS before this fix, and does after.
+ *
+ * Fix: pull this file into the *same* compiled root as `@theme/base.css` via a real CSS `@import`,
+ * so the compiler that already runs over base.css follows into this file's own `@source` too. This
+ * package already depends on packages/theme (CodiconIcon, components/ui/*), so workbench.css
+ * importing theme's base.css is the existing dependency direction, not a new one — P103's own
+ * "don't couple theme to workbench" rule is about the reverse edge (base.css importing this file)
+ * and still holds; nothing here adds that edge. Each app's main.ts now imports only this file, not
+ * `@theme/base.css` directly — importing both would compile base.css as two separate roots and
+ * double every one of its utilities in the output. */
+@import "@theme/base.css";
 @source "./";
 
 /* P103 Part 2 (§5.4): TabStrip.vue's own trailing "new tab" affordance is per-app slot content

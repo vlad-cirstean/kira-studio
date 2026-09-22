@@ -2,11 +2,16 @@
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import AppButton from '@theme/primitives/AppButton.vue';
+// P104 §3.1/§3.4: SegmentedControl (ToggleGroup recipe), VirtualList (@tanstack/vue-virtual
+// recipe, a new dependency not yet added) and EmptyState (ui/alert composition) are each a
+// genuinely separate, non-mechanical piece of work -- not attempted in this pass. Only the
+// mechanical AppButton/TextField/v-tooltip conversions below are done here.
 import EmptyState from '@theme/primitives/EmptyState.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
@@ -170,22 +175,23 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 <template>
   <div class="ops-panel">
     <div class="ops-header">
-      <div class="filter-input">
-        <TextField
+      <div class="filter-input flex items-center gap-1 h-control-lg rounded-kira-sm border border-border-strong bg-input px-2">
+        <CodiconIcon name="filter" :size="13" class="shrink-0 text-fg-muted" />
+        <Input
           v-model="opsStore.filterText"
-          icon="filter"
           placeholder="Filter"
+          class="h-full w-full border-0 bg-transparent p-0 font-data focus-visible:ring-0"
           data-testid="ops-filter"
         />
       </div>
       <SegmentedControl v-model="opsStore.statusFilter" :options="statusFilterOptions" />
       <span class="running-count">{{ opsStore.runningCount }} running</span>
-      <AppButton
-        v-tooltip="'Clears the in-memory ring only — op_log retention is automatic'"
-        @click="opsStore.clearOps"
-      >
-        Clear
-      </AppButton>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="dialog" size="kira-lg" @click="opsStore.clearOps">Clear</Button>
+        </TooltipTrigger>
+        <TooltipContent>Clears the in-memory ring only — op_log retention is automatic</TooltipContent>
+      </Tooltip>
     </div>
 
     <div v-if="opsStore.visibleOps.length === 0" class="min-h-0 flex-1">
@@ -249,10 +255,18 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
               </span>
               <span>{{ formatDuration(item.record.durationMs) }}</span>
               <span>{{ item.record.rows ?? '—' }}</span>
-              <span v-if="item.record.status === 'error'" class="mono truncate error-text" v-tooltip="item.record.error ?? ''">
-                {{ item.record.error }}
-              </span>
-              <span v-else class="mono truncate" v-tooltip="item.record.command ?? ''">{{ item.record.command ?? '—' }}</span>
+              <Tooltip v-if="item.record.status === 'error'">
+                <TooltipTrigger as-child>
+                  <span class="mono truncate error-text block">{{ item.record.error }}</span>
+                </TooltipTrigger>
+                <TooltipContent>{{ item.record.error ?? '' }}</TooltipContent>
+              </Tooltip>
+              <Tooltip v-else>
+                <TooltipTrigger as-child>
+                  <span class="mono truncate block">{{ item.record.command ?? '—' }}</span>
+                </TooltipTrigger>
+                <TooltipContent>{{ item.record.command ?? '' }}</TooltipContent>
+              </Tooltip>
             </div>
             <div v-else-if="item.kind === 'detail-command'" class="ops-detail-row ops-detail-cm">
               <MonacoHost
@@ -297,15 +311,8 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
   border-bottom: var(--kira-border-width) solid var(--kira-border);
 }
 
-/* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
-   (see TextField.vue's inheritAttrs:false), so the fixed-width sizing moves onto this wrapper
-   instead of a style/class attribute on the component tag itself (DocumentView.vue precedent). */
 .filter-input {
   @apply flex-none w-40;
-}
-
-.filter-input :deep(.p-input) {
-  @apply w-full;
 }
 
 .running-count {

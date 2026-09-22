@@ -77,10 +77,12 @@ const CONTROL: ControlSnapshot[] = [
 async function menuItemIds(page: import('@playwright/test').Page): Promise<string[]> {
   const menu = page.locator('[data-testid="context-menu"]');
   return menu
-    .locator(':scope > div')
+    .locator(
+      '[data-testid^="menu-item-"]:not([data-testid$="-shortcut"]), [data-slot="dropdown-menu-separator"]',
+    )
     .evaluateAll((els) =>
       els.map((el) =>
-        el.classList.contains('p-sep')
+        el.getAttribute('data-slot') === 'dropdown-menu-separator'
           ? '--separator--'
           : (el.getAttribute('data-testid') ?? '').replace('menu-item-', ''),
       ),

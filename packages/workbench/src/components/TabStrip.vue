@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type TabLike, useWorkbenchHost } from '../host';
@@ -189,26 +190,28 @@ function onDragEnd(): void {
          tooltip/`aria-label` (`titleFor`), the chrome is one glyph. Never draggable (§6.1) and
          never has a close button, so neither is wired here at all rather than guarded per-tab. -->
     <div v-if="pinnedTabs.length > 0" class="tab-strip-pinned" data-testid="tab-strip-pinned">
-      <button
-        v-for="{ tab, icon } in pinnedTabs"
-        :key="tab.id"
-        type="button"
-        class="p-tab is-pinned"
-        :class="{ 'is-active': tab.active }"
-        data-testid="tab"
-        :data-tab-id="tab.id"
-        :data-tab-kind="tab.kind"
-        :data-active="tab.active"
-        data-pinned="true"
-        :draggable="false"
-        :aria-label="titleFor(tab)"
-        v-tooltip="titleFor(tab)"
-        @click="onClick(tab)"
-        @contextmenu.prevent="onContextMenu($event, tab)"
-      >
-        <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
-        <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
-      </button>
+      <Tooltip v-for="{ tab, icon } in pinnedTabs" :key="tab.id">
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="p-tab is-pinned"
+            :class="{ 'is-active': tab.active }"
+            data-testid="tab"
+            :data-tab-id="tab.id"
+            :data-tab-kind="tab.kind"
+            :data-active="tab.active"
+            data-pinned="true"
+            :draggable="false"
+            :aria-label="titleFor(tab)"
+            @click="onClick(tab)"
+            @contextmenu.prevent="onContextMenu($event, tab)"
+          >
+            <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
+            <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ titleFor(tab) }}</TooltipContent>
+      </Tooltip>
       <span class="tab-strip-separator" aria-hidden="true"></span>
     </div>
     <div ref="stripRef" class="tab-strip" data-testid="tab-strip-row" @wheel="onWheel">
@@ -243,22 +246,19 @@ function onDragEnd(): void {
         <span class="p-tab-rail" />
         <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
         <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
-        <CodiconIcon
-          v-if="indicatorFor(tab)"
-          :name="indicatorFor(tab)!.icon"
-          :size="12"
-          class="tab-incognito"
-          v-tooltip="indicatorFor(tab)!.tooltip"
-        />
+        <Tooltip v-if="indicatorFor(tab)">
+          <TooltipTrigger as-child>
+            <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="tab-incognito" />
+          </TooltipTrigger>
+          <TooltipContent>{{ indicatorFor(tab)!.tooltip }}</TooltipContent>
+        </Tooltip>
         <span class="tab-title">{{ titleFor(tab) }}</span>
-        <CodiconIcon
-          v-if="badgeFor(tab)"
-          :name="badgeFor(tab)!.icon"
-          :size="12"
-          class="tab-badge"
-          v-tooltip="badgeFor(tab)!.tooltip"
-          data-testid="tab-badge"
-        />
+        <Tooltip v-if="badgeFor(tab)">
+          <TooltipTrigger as-child>
+            <CodiconIcon :name="badgeFor(tab)!.icon" :size="12" class="tab-badge" data-testid="tab-badge" />
+          </TooltipTrigger>
+          <TooltipContent>{{ badgeFor(tab)!.tooltip }}</TooltipContent>
+        </Tooltip>
         <span
           class="tab-close"
           role="button"
@@ -378,7 +378,7 @@ function onDragEnd(): void {
 }
 
 .tab-close {
-  @apply shrink-0 flex items-center justify-center w-4 h-4 opacity-0 rounded-[var(--kira-radius-sm)];
+  @apply shrink-0 flex items-center justify-center w-4 h-4 opacity-0 rounded-kira-sm;
 }
 
 .p-tab:hover .tab-close,

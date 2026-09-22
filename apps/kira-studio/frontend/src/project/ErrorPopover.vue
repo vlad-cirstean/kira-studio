@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Button } from '@theme/components/ui/button';
 // Misc-fixes: a reusable "click for full text" replacement for truncated inline error text +
 // native title tooltip (unreadable for multi-line/long messages, and unreachable on touch).
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
@@ -94,8 +94,8 @@ onUnmounted(() => {
       >
         <div class="error-popover-body">{{ props.message }}</div>
         <div class="p-toolbar last error-popover-actions">
-          <AppButton class="p-push" @click="copyText(props.message)">Copy</AppButton>
-          <AppButton @click="close">Close</AppButton>
+          <Button variant="toolbar" size="kira" class="p-push" @click="copyText(props.message)">Copy</Button>
+          <Button variant="toolbar" size="kira" @click="close">Close</Button>
         </div>
       </div>
     </Teleport>

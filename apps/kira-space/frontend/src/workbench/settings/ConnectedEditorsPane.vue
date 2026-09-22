@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
 import { computed, ref } from 'vue';
@@ -72,8 +73,9 @@ const vsixOutcomeMessage = computed(() => {
         <p class="mono command-text" data-testid="git-vsix-command">
           {{ gitClientsStore.vsix.command }}
         </p>
-        <AppButton
-          kind="dialog"
+        <Button
+          variant="dialog"
+          size="kira-lg"
           class="action-button"
           :disabled="vsixInstalling"
           data-testid="git-vsix-install-button"
@@ -84,7 +86,7 @@ const vsixOutcomeMessage = computed(() => {
               ? 'Install VS Code Integration'
               : 'Reveal Extension in Finder'
           }}
-        </AppButton>
+        </Button>
       </template>
       <p v-if="vsixOutcomeMessage" class="helper-text" data-testid="git-vsix-outcome">
         {{ vsixOutcomeMessage }}
@@ -117,14 +119,20 @@ const vsixOutcomeMessage = computed(() => {
             <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
           </span>
         </div>
-        <IconButton
-          v-if="!client.revokedAt"
-          icon="trash"
-          tone="danger"
-          :data-testid="`git-client-revoke-${client.id}`"
-          v-tooltip="'Revoke'"
-          @click="onRevokeGitClient(client.id, client.label)"
-        />
+        <Tooltip v-if="!client.revokedAt">
+          <TooltipTrigger as-child>
+            <Button
+              variant="danger"
+              size="kira-icon"
+              :data-testid="`git-client-revoke-${client.id}`"
+              aria-label="Revoke"
+              @click="onRevokeGitClient(client.id, client.label)"
+            >
+              <CodiconIcon name="trash" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Revoke</TooltipContent>
+        </Tooltip>
       </li>
     </ul>
   </div>

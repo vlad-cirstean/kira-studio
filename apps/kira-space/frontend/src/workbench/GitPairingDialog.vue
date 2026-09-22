@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useGitClientsStore } from '../state/gitClients';
@@ -10,10 +11,7 @@ const gitClientsStore = useGitClientsStore();
 // G1 D17: a separate, always-mounted dialog at App.vue's root, the same precedent ConfirmDialog
 // sets — a pairing request must be able to appear with nothing else open. Renders nothing while
 // gitClientsStore.pending is null.
-
-// Bare $el shape (SearchToolbar.vue's own precedent) so this ref doesn't read as a type-only use
-// of AppButton above — it's a real component, bound as a value by the template below.
-const denyButton = ref<{ $el: HTMLElement } | null>(null);
+const denyButton = ref<InstanceType<typeof Button> | null>(null);
 const now = ref(Date.now());
 
 // Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
@@ -67,53 +65,55 @@ async function onApprove(): Promise<void> {
 </script>
 
 <template>
-  <DialogFrame
-    v-if="gitClientsStore.pending"
-    title="Editor wants to connect"
-    :width="420"
-    test-id="git-pairing-dialog"
-    @close="onDeny"
-  >
-    <p class="whitespace-pre-wrap" style="margin: 0 0 var(--kira-s-2); padding: var(--kira-s-4) var(--kira-s-5) 0">
-      <strong>{{ gitClientsStore.pending.label || 'A VS Code editor' }}</strong> wants to connect
-      to this repository's git data over <span class="mono">~/.kira-studio/git.sock</span>.
-      Approving lets it read and change git state in repositories it opens.
-    </p>
-    <p
-      class="m-0"
-      style="padding: 0 var(--kira-s-5) var(--kira-s-4); color: var(--kira-fg-subtle)"
-      data-testid="git-pairing-expires"
+  <Dialog v-if="gitClientsStore.pending" :open="true" @update:open="(v) => !v && onDeny()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="git-pairing-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 420px; max-width: 420px; max-height: 80vh"
     >
-      Expires in {{ remainingSeconds }}s
-    </p>
-    <p
-      v-if="gitClientsStore.queued > 1"
-      class="m-0"
-      style="padding: 0 var(--kira-s-5) var(--kira-s-4); color: var(--kira-fg-subtle)"
-      data-testid="git-pairing-queue-count"
-    >
-      1 of {{ gitClientsStore.queued }} waiting
-    </p>
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Editor wants to connect</DialogTitle>
+        <DialogClose as-child>
+          <Button variant="ghost" size="icon-sm" class="ml-auto" aria-label="Close" @click="onDeny">
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
-    <template #footer>
-      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
-        <AppButton
-          ref="denyButton"
-          kind="dialog"
-          data-testid="git-pairing-deny"
-          @click="onDeny"
+      <div class="overflow-auto">
+        <p class="whitespace-pre-wrap mb-1.5 px-3 pt-2">
+          <strong>{{ gitClientsStore.pending.label || 'A VS Code editor' }}</strong> wants to connect
+          to this repository's git data over <span class="mono">~/.kira-studio/git.sock</span>.
+          Approving lets it read and change git state in repositories it opens.
+        </p>
+        <p class="m-0 text-subtle px-3 pb-2" data-testid="git-pairing-expires">
+          Expires in {{ remainingSeconds }}s
+        </p>
+        <p
+          v-if="gitClientsStore.queued > 1"
+          class="m-0 text-subtle px-3 pb-2"
+          data-testid="git-pairing-queue-count"
         >
-          Deny
-        </AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          data-testid="git-pairing-approve"
-          @click="onApprove"
-        >
-          Approve
-        </AppButton>
-      </span>
-    </template>
-  </DialogFrame>
+          1 of {{ gitClientsStore.queued }} waiting
+        </p>
+      </div>
+
+      <DialogFooter class="border-t border-border">
+        <span class="flex items-center gap-1 ml-auto">
+          <Button ref="denyButton" variant="dialog" size="kira-lg" data-testid="git-pairing-deny" @click="onDeny">
+            Deny
+          </Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="git-pairing-approve"
+            @click="onApprove"
+          >
+            Approve
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>

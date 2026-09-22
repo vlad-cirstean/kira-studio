@@ -114,7 +114,7 @@ useEventListener(window, 'resize', () => {
    rounded corners, bolder weight and a full step up in size — instead of a second, unstyled text
    run is what gets it there; `metaColor` (columnTypeColor, when set) colours the text against it. */
 .tip-meta {
-  @apply inline-flex items-center font-semibold shrink-0 rounded-[var(--kira-radius-sm)];
+  @apply inline-flex items-center font-semibold shrink-0 rounded-kira-sm;
   height: var(--kira-h-xs);
   padding: 0 var(--kira-s-3);
   background: var(--kira-bg-input);

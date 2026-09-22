@@ -2,10 +2,14 @@
 import type { SortSpec } from '@shared/domain/queries';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import AppButton from '@theme/primitives/AppButton.vue';
+// P104 §3.4/§3.1: VirtualList's @tanstack/vue-virtual recipe and SegmentedControl's ToggleGroup
+// recipe are each a genuinely separate, non-mechanical piece of work -- not attempted in this
+// pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
 import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -662,21 +666,43 @@ onUnmounted(() => {
         <!-- DataToolbar's [count, columns, preview] group — this collection's equivalents are
              the exact count, the fields/projection menu, and expand/collapse-all. -->
         <div class="group">
-          <IconButton
-            icon="symbol-number"
-            data-testid="document-count"
-            v-tooltip="'Run an exact countDocuments() — the estimate above is metadata'"
-            @click="documentViewStore.runCount(tab.id)"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Run an exact count"
+                data-testid="document-count"
+                @click="documentViewStore.runCount(tab.id)"
+              >
+                <CodiconIcon name="symbol-number" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Run an exact countDocuments() — the estimate above is metadata</TooltipContent>
+          </Tooltip>
           <div class="projection-anchor">
-            <IconButton
-              icon="list-selection"
-              data-testid="document-toolbar-projection"
-              :indicator="tab.state.projection !== null"
-              :active="projectionOpen"
-              v-tooltip="projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'"
-              @click="projectionOpen = !projectionOpen"
-            />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  class="relative"
+                  :class="{ 'bg-input text-fg': projectionOpen }"
+                  aria-label="Fields"
+                  data-testid="document-toolbar-projection"
+                  @click="projectionOpen = !projectionOpen"
+                >
+                  <CodiconIcon name="list-selection" :size="13" />
+                  <span
+                    v-if="tab.state.projection !== null"
+                    class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-[var(--kira-state-on)]"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{
+                projectionCountLabel ? `Fields — ${projectionCountLabel} shown` : 'Fields'
+              }}</TooltipContent>
+            </Tooltip>
             <ProjectionMenu
               v-if="projectionOpen"
               :tab-id="tab.id"
@@ -684,37 +710,71 @@ onUnmounted(() => {
               @close="projectionOpen = false"
             />
           </div>
-          <IconButton
-            icon="expand-all"
-            v-tooltip="'Expand all'"
-            data-testid="document-expand-all"
-            @click="onExpandAll"
-          />
-          <IconButton
-            icon="collapse-all"
-            v-tooltip="'Collapse all'"
-            data-testid="document-collapse-all"
-            @click="onCollapseAll"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Expand all"
+                data-testid="document-expand-all"
+                @click="onExpandAll"
+              >
+                <CodiconIcon name="expand-all" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Expand all</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Collapse all"
+                data-testid="document-collapse-all"
+                @click="onCollapseAll"
+              >
+                <CodiconIcon name="collapse-all" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Collapse all</TooltipContent>
+          </Tooltip>
         </div>
         <div class="sep"></div>
         <!-- DataToolbar's [add-row, delete-row, search] group — this collection has no delete
              affordance in the toolbar (deletion lives on the row's own context menu). -->
         <div class="group">
-          <IconButton
-            icon="add"
-            data-testid="document-add"
-            :disabled="!canInsert"
-            v-tooltip="insertTitle"
-            @click="onAddDocument"
-          />
-          <IconButton
-            icon="search"
-            :active="rt?.searchOpen"
-            v-tooltip="'Search this page'"
-            data-testid="document-toolbar-search"
-            @click="onToggleSearch"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span tabindex="0" class="inline-flex">
+                <Button
+                  variant="toolbar"
+                  size="kira-icon"
+                  :disabled="!canInsert"
+                  aria-label="Add a document"
+                  data-testid="document-add"
+                  @click="onAddDocument"
+                >
+                  <CodiconIcon name="add" :size="13" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{{ insertTitle }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :class="{ 'bg-input text-fg': rt?.searchOpen }"
+                aria-label="Search this page"
+                data-testid="document-toolbar-search"
+                @click="onToggleSearch"
+              >
+                <CodiconIcon name="search" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Search this page</TooltipContent>
+          </Tooltip>
         </div>
       </template>
 
@@ -726,12 +786,20 @@ onUnmounted(() => {
            used to have neither. -->
       <template #toolbar-2>
         <div class="history-anchor">
-          <IconButton
-            icon="history"
-            v-tooltip="'Saved & recent filters'"
-            data-testid="document-filter-history-button"
-            @click="filterHistoryOpen = !filterHistoryOpen"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Saved & recent filters"
+                data-testid="document-filter-history-button"
+                @click="filterHistoryOpen = !filterHistoryOpen"
+              >
+                <CodiconIcon name="history" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Saved & recent filters</TooltipContent>
+          </Tooltip>
           <FilterHistoryMenu
             v-if="filterHistoryOpen"
             :connection-id="tab.connectionId"
@@ -743,38 +811,51 @@ onUnmounted(() => {
           />
         </div>
         <div class="filter-field">
-          <AutocompleteField
-            v-model="searchText"
-            prefix="FILTER"
-            :prefix-active="tab.state.search.trim() !== ''"
-            placeholder="{ name: 'a' }"
-            v-tooltip="'Mongo filter document — the query find() runs'"
-            data-testid="document-search"
-            :candidates="filterCandidates"
-            language="mongo"
-            @enter="onSearchInput"
-            @escape="onSearchEscape"
-            @blur="onSearchInput"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <AutocompleteField
+                v-model="searchText"
+                prefix="FILTER"
+                :prefix-active="tab.state.search.trim() !== ''"
+                placeholder="{ name: 'a' }"
+                data-testid="document-search"
+                :candidates="filterCandidates"
+                language="mongo"
+                @enter="onSearchInput"
+                @escape="onSearchEscape"
+                @blur="onSearchInput"
+              />
+            </TooltipTrigger>
+            <TooltipContent>Mongo filter document — the query find() runs</TooltipContent>
+          </Tooltip>
         </div>
         <div class="sort-field">
-          <AutocompleteField
-            v-model="sortText"
-            prefix="SORT"
-            :prefix-active="!!tab.state.sort"
-            placeholder="{ createdAt: -1, name: 1 }"
-            v-tooltip="'Mongo sort document: 1 = ascending, -1 = descending'"
-            data-testid="document-sort"
-            :candidates="sortCandidates"
-            language="mongo"
-            @enter="onSortInput"
-            @escape="onSortEscape"
-            @blur="onSortInput"
-          />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <AutocompleteField
+                v-model="sortText"
+                prefix="SORT"
+                :prefix-active="!!tab.state.sort"
+                placeholder="{ createdAt: -1, name: 1 }"
+                data-testid="document-sort"
+                :candidates="sortCandidates"
+                language="mongo"
+                @enter="onSortInput"
+                @escape="onSortEscape"
+                @blur="onSortInput"
+              />
+            </TooltipTrigger>
+            <TooltipContent>Mongo sort document: 1 = ascending, -1 = descending</TooltipContent>
+          </Tooltip>
         </div>
-        <AppButton v-tooltip="'Empty both fields and refetch'" data-testid="document-filter-clear" @click="onClearFilter">
-          Clear
-        </AppButton>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira" data-testid="document-filter-clear" @click="onClearFilter"
+              >Clear</Button
+            >
+          </TooltipTrigger>
+          <TooltipContent>Empty both fields and refetch</TooltipContent>
+        </Tooltip>
       </template>
 
       <template #strips>
@@ -815,10 +896,12 @@ onUnmounted(() => {
         <div class="edit-actions">
           <EditBufferActions :buffer="newBuffer" testid-prefix="document-new" :show-compact="false" />
           <span class="edit-actions-spacer"></span>
-          <AppButton variant="primary" data-testid="document-new-save" @click="commitCreate">
-            Save
-          </AppButton>
-          <AppButton data-testid="document-new-cancel" @click="cancelCreate"> Cancel </AppButton>
+          <Button variant="toolbar-primary" size="kira" data-testid="document-new-save" @click="commitCreate"
+            >Save</Button
+          >
+          <Button variant="toolbar" size="kira" data-testid="document-new-cancel" @click="cancelCreate"
+            >Cancel</Button
+          >
         </div>
       </div>
 
@@ -836,12 +919,13 @@ onUnmounted(() => {
           label="No matching rows"
           data-testid="document-no-matching-rows"
         >
-          <AppButton
+          <Button
+            variant="toolbar"
+            size="kira"
             data-testid="document-show-all-rows"
             @click="pageSearchFilterStore.setSearchFiltering(tab.id, false)"
+            >Show all rows</Button
           >
-            Show all rows
-          </AppButton>
         </EmptyState>
         <!-- D1/D19: the row shows only its `_id` and two facts (field count, size) — no part of
              the body — until expanded; an expanded document renders through DocumentTree.vue's
@@ -887,21 +971,41 @@ onUnmounted(() => {
                 <span class="doc-head-spacer"></span>
                 <div class="doc-row-actions">
                   <span v-if="editingRow === item" class="p-chip warn">editing</span>
-                  <IconButton
-                    icon="edit"
-                    :active="editingRow === item"
-                    data-testid="document-edit"
-                    :disabled="!editGate.editable"
-                    v-tooltip="editGate.editable ? 'Edit' : editGate.label"
-                    @click.stop="startEdit(item, rowAt(item)!.view.id, rowAt(item)!.body)"
-                  />
-                  <IconButton
-                    icon="trash"
-                    data-testid="document-delete"
-                    :disabled="!canDelete"
-                    v-tooltip="deleteTitle"
-                    @click.stop="onDeleteRow(rowAt(item)!.view.id)"
-                  />
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span tabindex="0" class="inline-flex">
+                        <Button
+                          variant="toolbar"
+                          size="kira-icon"
+                          :class="{ 'bg-input text-fg': editingRow === item }"
+                          :disabled="!editGate.editable"
+                          aria-label="Edit"
+                          data-testid="document-edit"
+                          @click.stop="startEdit(item, rowAt(item)!.view.id, rowAt(item)!.body)"
+                        >
+                          <CodiconIcon name="edit" :size="13" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ editGate.editable ? 'Edit' : editGate.label }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span tabindex="0" class="inline-flex">
+                        <Button
+                          variant="toolbar"
+                          size="kira-icon"
+                          :disabled="!canDelete"
+                          aria-label="Delete"
+                          data-testid="document-delete"
+                          @click.stop="onDeleteRow(rowAt(item)!.view.id)"
+                        >
+                          <CodiconIcon name="trash" :size="13" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ deleteTitle }}</TooltipContent>
+                  </Tooltip>
                 </div>
               </template>
               <template #body>
@@ -932,12 +1036,12 @@ onUnmounted(() => {
                     <div class="edit-actions">
                       <EditBufferActions :buffer="editBuffer" testid-prefix="document-edit" :show-compact="false" />
                       <span class="edit-actions-spacer"></span>
-                      <AppButton variant="primary" data-testid="document-edit-save" @click="commitEdit">
-                        Save
-                      </AppButton>
-                      <AppButton data-testid="document-edit-cancel" @click="cancelEdit">
-                        Cancel
-                      </AppButton>
+                      <Button variant="toolbar-primary" size="kira" data-testid="document-edit-save" @click="commitEdit"
+                        >Save</Button
+                      >
+                      <Button variant="toolbar" size="kira" data-testid="document-edit-cancel" @click="cancelEdit"
+                        >Cancel</Button
+                      >
                     </div>
                   </template>
                   <DocumentTree
@@ -1016,7 +1120,7 @@ onUnmounted(() => {
    documentRows.ts's rowHeight() (P27 D20) — CSS only distributes it between the fixed-height
    head and whatever's left for the body, never restates the number itself. */
 .doc-preview-match {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-[length:var(--kira-t-sm)] font-[family-name:var(--kira-font-data)];
+  @apply overflow-hidden text-ellipsis whitespace-nowrap text-muted text-kira-sm font-data;
   padding: 0 var(--kira-s-4) var(--kira-s-2);
 }
 
@@ -1039,7 +1143,7 @@ onUnmounted(() => {
 }
 
 .doc-row-actions {
-  @apply flex shrink-0 items-center gap-[var(--kira-s-2)];
+  @apply flex shrink-0 items-center gap-1;
 }
 
 /* flex: 1 over the row's own inline height (above) rather than a literal number — matches
@@ -1050,7 +1154,7 @@ onUnmounted(() => {
 }
 
 .edit-actions {
-  @apply flex shrink-0 items-center gap-[var(--kira-s-3)] border-t border-border py-[var(--kira-s-2)] px-[var(--kira-s-4)];
+  @apply flex shrink-0 items-center gap-1.5 border-t border-border py-1 px-2;
 }
 
 /* Pushes Save/Cancel to the trailing edge, past P27 D28's EditBufferActions row. */

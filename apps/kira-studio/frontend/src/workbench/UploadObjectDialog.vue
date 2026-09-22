@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import { decodePath } from '@shared/domain/tree';
-import AppButton from '@theme/primitives/AppButton.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
 import { formatBytes } from '@workbench/util/format';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
@@ -96,47 +97,62 @@ watch(
 </script>
 
 <template>
-  <DialogFrame
-    title="Upload file"
-    :width="480"
-    test-id="upload-dialog"
-    close-test-id="upload-close"
-    @close="onClose"
-  >
-    <div class="flex flex-col" style="gap: var(--kira-s-3); padding: var(--kira-s-4) var(--kira-s-5)">
-      <AppButton kind="dialog" data-testid="upload-choose-file" @click="chooseFile">
-        Choose file…
-      </AppButton>
-      <div v-if="chosenFile" class="p-sm muted p-0" data-testid="upload-chosen-file">
-        {{ chosenFile.name }} ({{ formatBytes(chosenFile.size) }})
+  <Dialog :open="true" @update:open="(v) => !v && onClose()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="upload-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 480px; max-width: 480px; max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Upload file</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="upload-close"
+            @click="onClose"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+
+      <div class="flex flex-col gap-1.5 px-3 py-2 overflow-auto">
+        <Button variant="dialog" size="kira-lg" class="self-start" data-testid="upload-choose-file" @click="chooseFile">
+          Choose file…
+        </Button>
+        <div v-if="chosenFile" class="p-sm muted p-0" data-testid="upload-chosen-file">
+          {{ chosenFile.name }} ({{ formatBytes(chosenFile.size) }})
+        </div>
+
+        <template v-if="chosenFile">
+          <label class="p-sm muted p-0">Key</label>
+          <Input v-model="key" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-key" />
+
+          <label class="p-sm muted p-0">Content type</label>
+          <Input v-model="contentType" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-content-type" />
+        </template>
+
+        <MessageStrip v-if="error" tone="err" data-testid="upload-error">{{ error }}</MessageStrip>
       </div>
 
-      <template v-if="chosenFile">
-        <label class="p-sm muted p-0">Key</label>
-        <TextField v-model="key" data-testid="upload-key" />
-
-        <label class="p-sm muted p-0">Content type</label>
-        <TextField v-model="contentType" data-testid="upload-content-type" />
-      </template>
-
-      <MessageStrip v-if="error" tone="err" data-testid="upload-error">{{ error }}</MessageStrip>
-    </div>
-
-    <template #footer>
-      <!-- p-dialog-actions.end supplies display/align-items/justify-content/width; this dialog
-           keeps its own tighter s-2 gap rather than the shared s-3. -->
-      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
-        <AppButton kind="dialog" data-testid="upload-cancel" @click="onClose">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
-          data-testid="upload-submit"
-          :disabled="!chosenFile || !key.trim() || saving"
-          @click="onUpload"
-        >
-          Upload
-        </AppButton>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="flex items-center gap-1 ml-auto">
+          <Button variant="dialog" size="kira-lg" data-testid="upload-cancel" @click="onClose">Cancel</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="upload-submit"
+            :disabled="!chosenFile || !key.trim() || saving"
+            @click="onUpload"
+          >
+            Upload
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
