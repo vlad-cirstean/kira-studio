@@ -131,16 +131,17 @@ duplicated here; this file only points at them.
   for a split into new, separate `P` numbers directly (P98/P99 in v1.9 is exactly that, done at the
   user's own request before this rule existed) — that call is the user's to make, not a subagent's
   or the orchestrating session's own to infer.
-- **A new phase inserted before existing ones renumbers those, not just repositions them —
-  table position and `P` number stay in lockstep.** Adding a phase that must run earlier than
-  already-numbered ones (a dependency discovered later, a phase whose files a later one would
-  otherwise touch twice) means the new phase takes the earlier slot's number and every phase from
-  there on shifts up by one — never a higher number placed earlier in the table than a lower one
-  it now precedes. Sole standing exception: a phase explicitly reordered to run out of number
-  order at the user's own direct request (v1.9's P101, moved to the very end on request) — that
-  stays as the user asked, not renumbered to match its position. Update every cross-reference to
-  a renumbered phase in the same pass (other rows' prose, not just titles) so nothing in `SPEC.md`
-  still points at the old number.
+- **Table position and `P` number stay in lockstep, no exceptions.** A phase that must run earlier
+  than already-numbered ones (a dependency discovered later, a phase whose files a later one would
+  otherwise touch twice) takes the earlier slot's number and every phase from there on shifts up by
+  one. A phase that must run later than its original slot (a dependency on a later phase's own work
+  landing first, discovered after numbering) is renumbered to its new position instead — the highest
+  number, if it moves to the end. Never a number that contradicts table position, in either
+  direction; there is no reordering that skips the renumber (v1.9's P101 was briefly treated as an
+  exception, then reversed and renumbered to P105 once this contradiction was noticed — that
+  precedent stands for "renumber," not "leave a gap"). Update every cross-reference to a renumbered
+  phase in the same pass (other rows' prose, not just titles) so nothing in `SPEC.md` still points at
+  the old number.
 - **Implementation proceeds in the table's top-to-bottom order, full stop, unless the user
   explicitly says otherwise for that phase.** The row order is the execution order — not a
   suggestion to weigh against convenience, in-flight subagent scope, or judgment about what seems
