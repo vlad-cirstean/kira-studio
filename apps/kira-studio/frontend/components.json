@@ -7,7 +7,7 @@
   "pointer": false,
   "tailwind": {
     "config": "",
-    "css": "src/theme/shadcn-bridge.css",
+    "css": "../../../packages/theme/src/shadcn-bridge.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
@@ -15,10 +15,10 @@
   "typescript": true,
   "aliases": {
     "components": "@/components",
-    "ui": "@/components/ui",
+    "ui": "@theme/components/ui",
     "composables": "@/composables",
-    "lib": "@/lib",
-    "utils": "@/lib/utils"
+    "lib": "@theme/lib",
+    "utils": "@theme/lib/utils"
   },
   "menuColor": "default",
   "menuAccent": "subtle",

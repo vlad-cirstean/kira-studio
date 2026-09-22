@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelShell from '@theme/primitives/PanelShell.vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
 import { useTreeStore } from '../../project/state/tree';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useSchemaDialogStore } from '../../state/schemas';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PanelShell from '../../theme/primitives/PanelShell.vue';
 
 const connectionsStore = useConnectionsStore();
 const connectionDialogStore = useConnectionDialogStore();

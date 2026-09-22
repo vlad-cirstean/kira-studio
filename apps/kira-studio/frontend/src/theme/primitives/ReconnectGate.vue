@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AppButton from './AppButton.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
 
 // §8.4: a restored tab shows only this gate until pressed — nothing loads automatically. Every
 // data/stream/keyvalue/document/definition/console view opens on exactly the same `.p-empty` +

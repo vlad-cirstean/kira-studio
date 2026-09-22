@@ -1,6 +1,5 @@
 import * as AgentHooksService from '@bindings/agenthooksservice.js';
 import * as AppService from '@bindings/appservice.js';
-import * as CodeWorkspaceService from '@bindings/codeworkspaceservice.js';
 import * as ConnectionsService from '@bindings/connectionsservice.js';
 import * as CustomScriptsService from '@bindings/customscriptsservice.js';
 import * as DataGripService from '@bindings/datagripservice.js';
@@ -8,8 +7,6 @@ import * as DbMcpService from '@bindings/dbmcpservice.js';
 import * as EngineService from '@bindings/engineservice.js';
 import * as FilesService from '@bindings/filesservice.js';
 import * as FiltersService from '@bindings/filtersservice.js';
-import * as GitClientsService from '@bindings/gitclientsservice.js';
-import * as GitHubService from '@bindings/githubservice.js';
 import * as KeepAwakeService from '@bindings/keepawakeservice.js';
 import * as LayoutService from '@bindings/layoutservice.js';
 import * as LifecycleService from '@bindings/lifecycleservice.js';
@@ -26,7 +23,6 @@ import * as TreeService from '@bindings/treeservice.js';
 import * as UpdateService from '@bindings/updateservice.js';
 import * as WindowsService from '@bindings/windowsservice.js';
 import type * as DataGripModels from '@bindings-internal/datagrip/models.js';
-import type { HeadState } from '@kira/git-ipc';
 import type { AgentEvent, AgentSessionsEvent } from '@shared/domain/agent';
 import type {
   ConnectionInput,
@@ -36,13 +32,6 @@ import type {
 import type { DataGripPreview, DataGripReport } from '@shared/domain/datagrip';
 import type { DbMcpApprovalSnapshot, DbMcpInstallResult, DbMcpStatus } from '@shared/domain/dbmcp';
 import type { ObjectDefinition } from '@shared/domain/definition';
-import type {
-  GitClient,
-  GitPairingActionResult,
-  GitPairingSnapshot,
-  GitVsixInstallResult,
-  GitVsixStatus,
-} from '@shared/domain/git';
 import type { Layout, LayoutPatch } from '@shared/domain/layout';
 import type { MaskRule, MaskRuleFields } from '@shared/domain/mask';
 import type { AppMode } from '@shared/domain/mode';
@@ -56,14 +45,6 @@ import type {
   SavedQuery,
   SortSpec,
 } from '@shared/domain/queries';
-import type {
-  CodeSearchEvent,
-  DiffContent,
-  FileContent,
-  FileListing,
-  RepoSummary,
-  SearchRequest,
-} from '@shared/domain/repo';
 import type { ConnectionDdl } from '@shared/domain/schema';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import type { SecretStorageStatus } from '@shared/domain/secrets';
@@ -85,10 +66,6 @@ const studioControl = {
   appInfo: (): Promise<WailsModels.AppInfo> => unwrap(AppService.Info()),
   updateStatus: (): Promise<WailsModels.UpdateStatus> => unwrap(UpdateService.Status()),
   updateOpenReleasePage: (): Promise<void> => unwrap(UpdateService.OpenReleasePage()),
-  // P74 §3.3: pr.openExternal's own OS-browser leg — the renderer names a PR by number over the
-  // git socket (pr.browserUrl composes the URL server-side); this is only the final "open it" hop.
-  githubOpenPullRequestUrl: (url: string): Promise<void> =>
-    unwrap(GitHubService.OpenPullRequestURL({ url })),
   // P79 finding 4: link.openExternal's own OS-browser leg — linkify.ts's message-body URLs are
   // untrusted renderer-visible text (unlike a PR URL), so LinkService.OpenExternal validates the
   // URL's own shape (a well-formed http(s) URL) rather than composing or re-checking a host.
@@ -323,26 +300,6 @@ const studioControl = {
       trust<TreeVisibility>(r),
     ),
 
-  gitClientsList: (): Promise<GitClient[]> =>
-    unwrap(GitClientsService.List()).then((r) => trust<GitClient[]>(r ?? [])),
-  gitClientsRevoke: (id: string): Promise<void> => unwrap(GitClientsService.Revoke({ id })),
-  onGitClientsChanged: (cb: (clients: GitClient[]) => void): (() => void) =>
-    on(CHANNEL.gitClientsChanged, cb),
-  gitPairingPending: (): Promise<GitPairingSnapshot> =>
-    unwrap(GitClientsService.PendingPairing()).then((r) => trust<GitPairingSnapshot>(r)),
-  gitPairingApprove: (id: string): Promise<GitPairingActionResult> =>
-    unwrap(GitClientsService.Approve({ id })).then((r) => trust<GitPairingActionResult>(r)),
-  gitPairingDeny: (id: string): Promise<GitPairingActionResult> =>
-    unwrap(GitClientsService.Deny({ id })).then((r) => trust<GitPairingActionResult>(r)),
-  onGitPairingChanged: (cb: (snap: GitPairingSnapshot) => void): (() => void) =>
-    on(CHANNEL.gitPairing, cb),
-  gitVsixStatus: (): Promise<GitVsixStatus> =>
-    unwrap(GitClientsService.VsixStatus()).then((r) => trust<GitVsixStatus>(r)),
-  gitVsixInstall: (): Promise<GitVsixInstallResult> =>
-    unwrap(GitClientsService.InstallVsCodeIntegration()).then((r) =>
-      trust<GitVsixInstallResult>(r),
-    ),
-
   dbMcpStatus: (): Promise<DbMcpStatus> =>
     unwrap(DbMcpService.Status()).then((r) => trust<DbMcpStatus>(r)),
   dbMcpSetEnabled: (enabled: boolean): Promise<DbMcpStatus> =>
@@ -464,62 +421,6 @@ const studioControl = {
     unwrap(SchemaService.Set({ connectionId, ddl })).then((r) => trust<ConnectionDdl>(r)),
   onSchemaChanged: (cb: (ddl: ConnectionDdl) => void): (() => void) =>
     on(CHANNEL.schemaChanged, cb),
-
-  // C5 §3.3: the native code-viewing workspace's bound surface — repo import/rename/remove plus
-  // the two read primitives (ListFiles/ReadFile). A rejected ImportRepo/RenameRepo call carries a
-  // structured ipcerr (E_INVALID/E_ALREADY_IMPORTED/E_NOT_FOUND/E_GIT_UNAVAILABLE) that unwrap()
-  // already turns into a rejected promise — every call site here just lets it propagate.
-  codeWorkspaceListRepos: (): Promise<RepoSummary[]> =>
-    unwrap(CodeWorkspaceService.ListRepos()).then((r) => trust<RepoSummary[]>(r ?? [])),
-  // P83 plan §12.2: every imported repository's checked-out branch in one batched call — GitPanel
-  // .vue's own repo-row label. `ids` omitted answers every row; repo/state/repoHeads.ts's
-  // refsChanged trigger passes one id to refresh a single row instead.
-  codeWorkspaceRepoHeads: (
-    ids?: string[],
-  ): Promise<Array<{ id: string; head: HeadState | null; error?: string }>> =>
-    unwrap(CodeWorkspaceService.RepoHeads({ ids: ids ?? null })).then((r) =>
-      trust<Array<{ id: string; head: HeadState | null; error?: string }>>(r ?? []),
-    ),
-  // P84 plan §4.2/§4.3: each imported repository's worktree anchor in one batched call —
-  // GitPanel.vue's dedup filter reads parentId to hide a row that renders nested instead.
-  codeWorkspaceRepoWorktreeLinks: (): Promise<
-    Array<{ id: string; parentId: string; error?: string }>
-  > =>
-    unwrap(CodeWorkspaceService.RepoWorktreeLinks()).then((r) =>
-      trust<Array<{ id: string; parentId: string; error?: string }>>(r ?? []),
-    ),
-  codeWorkspaceImportRepo: (path: string): Promise<RepoSummary> =>
-    unwrap(CodeWorkspaceService.ImportRepo({ path })).then((r) => trust<RepoSummary>(r)),
-  codeWorkspaceRenameRepo: (id: string, name: string): Promise<RepoSummary> =>
-    unwrap(CodeWorkspaceService.RenameRepo({ id, name })).then((r) => trust<RepoSummary>(r)),
-  codeWorkspaceRemoveRepo: (id: string): Promise<void> =>
-    unwrap(CodeWorkspaceService.RemoveRepo({ id })),
-  codeWorkspaceListFiles: (id: string): Promise<FileListing> =>
-    unwrap<Awaited<ReturnType<typeof CodeWorkspaceService.ListFiles>>>(
-      CodeWorkspaceService.ListFiles({ id }),
-    ).then((r) => trust<FileListing>({ ...r, paths: r.paths ?? [], status: r.status ?? {} })),
-  codeWorkspaceReadFile: (id: string, path: string): Promise<FileContent> =>
-    unwrap(CodeWorkspaceService.ReadFile({ id, path })).then((r) => trust<FileContent>(r)),
-
-  // C6 §7/§8.5: the index lifecycle (fire-and-forget from the renderer's own point of view — a
-  // failed start/stop must never block opening or leaving a workspace) plus the diff read.
-  codeWorkspaceOpenWorkspace: (id: string): Promise<void> =>
-    unwrap(CodeWorkspaceService.OpenWorkspace({ id })),
-  codeWorkspaceCloseWorkspace: (id: string): Promise<void> =>
-    unwrap(CodeWorkspaceService.CloseWorkspace({ id })),
-  codeWorkspaceReadDiff: (id: string, path: string): Promise<DiffContent> =>
-    unwrap(CodeWorkspaceService.ReadDiff({ id, path })).then((r) => trust<DiffContent>(r)),
-
-  // C7 §5/D7: StartSearch returns as soon as the background scan starts — its own searchId is how
-  // the renderer matches a later onCodeSearch event to the run that's waiting on it. windowKey
-  // addresses the coalesced push channel at this window only, exactly like grpcCall.
-  codeWorkspaceStartSearch: (id: string, req: SearchRequest): Promise<{ searchId: string }> =>
-    unwrap(CodeWorkspaceService.StartSearch({ id, windowKey, ...req })).then((r) =>
-      trust<{ searchId: string }>(r),
-    ),
-  codeWorkspaceCancelSearch: (id: string): Promise<void> =>
-    unwrap(CodeWorkspaceService.CancelSearch({ id })),
-  onCodeSearch: (cb: (event: CodeSearchEvent) => void): (() => void) => on(CHANNEL.codeSearch, cb),
 
   // P91 §7: the Terminal module's own unscoped-launch default — the user's home directory,
   // hydrated once at boot (state/terminals.ts's hydrateTerminalDefaults).

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { copyText } from '../clipboard';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import { useDynamicValuesStore } from './state/dynamicValues';
 
 const dynamicValuesStore = useDynamicValuesStore();
@@ -108,7 +108,7 @@ function close(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* p-dialog-body.list supplies display/flex-direction/padding/gap; this body also needs to scroll
    within the dialog's own fixed max-height. */

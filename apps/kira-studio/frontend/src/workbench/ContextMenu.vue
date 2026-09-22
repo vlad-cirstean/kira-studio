@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { type ComponentPublicInstance, computed, nextTick, ref, watch } from 'vue';
 import { formatShortcut } from '../shortcuts/keys';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import { connColorVar } from '../theme/connColor';
 import { computeFloatPosition, pointReference } from '../theme/floatingPosition';
 import { CONTEXT_MENU_KEY_HANDLERS, type ContextMenuKeyContext } from './contextMenuKeys';
 
@@ -303,7 +303,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* P16 design system: every floating surface is the same primitive (Menus.html) — .p-float
    supplies bg-elevated / border-strong / radius / shadow, overflow: hidden included. P23: the

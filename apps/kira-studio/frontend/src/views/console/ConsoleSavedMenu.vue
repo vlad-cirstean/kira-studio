@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { SavedConsoleQuery } from '@shared/domain/queries';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import SavedListMenu from '../shared/SavedListMenu.vue';
 import { setText } from './state';
 
@@ -150,7 +150,7 @@ async function saveCurrent(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to --kira-hover
    (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */

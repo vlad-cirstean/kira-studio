@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import { decodePath } from '@shared/domain/tree';
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
 import { useObjectStoreStore } from '../state/objectStore';
 import { useTabsStore } from '../state/tabs';
 import { browseInvalidate } from '../state/viewCommands';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import TextField from '../theme/primitives/TextField.vue';
 
 const objectStoreStore = useObjectStoreStore();
 const tabsStore = useTabsStore();

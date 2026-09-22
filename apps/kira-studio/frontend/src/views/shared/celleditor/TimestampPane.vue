@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
-import CodiconIcon from '../../../theme/CodiconIcon.vue';
-import IconButton from '../../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
-import SegmentedControl from '../../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../../theme/primitives/TextField.vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
 import {
@@ -138,7 +138,7 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .ts-pane {
   @apply flex flex-col h-full min-h-0;

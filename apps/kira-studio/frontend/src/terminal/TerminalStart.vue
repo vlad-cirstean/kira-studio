@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
 
 const terminalsStore = useTerminalsStore();
 
@@ -36,7 +36,7 @@ function onNewTerminal(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .start {
   @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-[var(--kira-s-6)];

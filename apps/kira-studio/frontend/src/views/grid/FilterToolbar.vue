@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { SortSpec } from '@shared/domain/queries';
 import type { DataTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { useConnectionsStore } from '../../state/connections';
-import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import FilterHistoryMenu from '../shared/FilterHistoryMenu.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import {
@@ -175,7 +175,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* Height, padding and colour come from .p-toolbar/.p-input — only the two fields' own widths
    live here. TextField's root <span class="p-input"> only receives fallthrough attrs on its

@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import { computed } from 'vue';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
-import PanelSplitter from '../theme/primitives/PanelSplitter.vue';
 import { MODES } from './modes';
 import MainView from './panels/MainView.vue';
 import OperationsPanel from './panels/OperationsPanel.vue';
@@ -81,7 +81,7 @@ const gridStyle = computed(() => ({
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .workbench-shell {
   /* P1 C8: a flex child of App.vue's new .app-frame (TitleBar + WorkbenchShell), not a lone

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { type HttpResponsePane, statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { beautifyJson, beautifyXml } from '../../beautify';
@@ -9,12 +14,7 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
@@ -470,7 +470,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .response-pane {
   @apply flex h-full min-h-0 flex-col;

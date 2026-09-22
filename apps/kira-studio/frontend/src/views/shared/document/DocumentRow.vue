@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '../../../theme/CodiconIcon.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import type { DocumentRowView } from './rows';
 
 // P48 F10-F12: the Mongo document row's head — down to its five shared data-testids — duplicated
@@ -58,7 +58,7 @@ defineEmits<{ toggle: []; select: [] }>();
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* P48 F11: the nine rules DocumentView.vue and ConsoleResultGrid.vue each declared for this row
    and its head, one of which had already drifted (`.doc-head`'s own padding, D12 — the document

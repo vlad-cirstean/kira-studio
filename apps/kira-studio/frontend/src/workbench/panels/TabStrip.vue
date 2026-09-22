@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
 import { useAgentSessionsStore } from '../../state/agentSessions';
@@ -10,8 +12,6 @@ import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
 import { useTerminalsStore } from '../../state/terminals';
 import { openTerminalTab } from '../../state/terminalTabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
 
 const contextMenuStore = useContextMenuStore();
@@ -364,7 +364,7 @@ function terminalModuleMenuItems(): MenuItem[] {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* P72 §7: the actual flex row — `.tab-strip-pinned` (fixed) and `.tab-strip` (scrolling) are its
    two children, so the pinned tab sits outside the latter's own `overflow-x` entirely instead of

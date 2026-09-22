@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
-import IconButton from '../../../theme/primitives/IconButton.vue';
-import TextField from '../../../theme/primitives/TextField.vue';
 
 // P48 F4: the first/prev/page-jump/next/last pager DataToolbar.vue and DocumentView.vue each
 // wrote out — same five controls, same order, same pageDisplay/pageInputValue/pageCount/onJump
@@ -110,7 +110,7 @@ function onJump(e: Event): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .pager {
   @apply gap-[var(--kira-s-1)];

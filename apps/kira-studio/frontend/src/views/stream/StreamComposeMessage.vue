@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
+import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, ref } from 'vue';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
-import TextField from '../../theme/primitives/TextField.vue';
-import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
 // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
@@ -122,7 +122,7 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .compose-inner {
   @apply flex flex-col;

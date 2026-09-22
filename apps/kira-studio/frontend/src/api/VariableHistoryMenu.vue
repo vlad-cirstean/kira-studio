@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { formatRelative } from '../format';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useVariableSetStore } from './state/variables';
 
@@ -84,7 +84,7 @@ function close(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .history-menu {
   @apply flex max-h-[320px] flex-col overflow-auto p-[var(--kira-s-2)];

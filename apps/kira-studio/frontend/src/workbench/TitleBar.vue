@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
 
@@ -148,7 +148,7 @@ const keepAwakeTooltip = computed(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* P1 D2/C8: the root carries --wails-draggable: drag (drag.ts:98-108) so the bar behaves like a
    native title bar — dragging it moves the window, double-clicking it zooms/minimises per System

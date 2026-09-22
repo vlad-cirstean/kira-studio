@@ -2,6 +2,11 @@
 import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
@@ -18,13 +23,8 @@ import { beautifyJson } from '../../beautify';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import MetadataTable from './MetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
@@ -480,7 +480,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* P18 D14/F14: HttpRequestView.vue's own .url-field idiom, verbatim — the wrapper (not the inner
    input) is what actually sizes in the toolbar row. api-ui-consistency.spec.ts selects

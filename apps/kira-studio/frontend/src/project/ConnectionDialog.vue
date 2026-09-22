@@ -13,6 +13,14 @@ import {
 import type { MaskKind, MaskRuleFields } from '@shared/domain/mask';
 import { canRoundTripToFields, formatConnectionUri, parseConnectionUri } from '@shared/domain/uri';
 import { useQuery } from '@tanstack/vue-query';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
+import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, onMounted, ref, watch } from 'vue';
 import { control } from '../bridge/control';
 import { useConfirmDialogStore } from '../state/confirmDialog';
@@ -25,17 +33,9 @@ import {
   upsertMaskRule,
 } from '../state/maskRules';
 import { schemaDialectFor } from '../state/schemas';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import Checkbox from '../theme/primitives/Checkbox.vue';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import SegmentedControl from '../theme/primitives/SegmentedControl.vue';
-import TextField from '../theme/primitives/TextField.vue';
-import { wrapSelectionOnType } from '../theme/wrapSelection';
 
 const confirmDialogStore = useConfirmDialogStore();
 const connectionsStore = useConnectionsStore();

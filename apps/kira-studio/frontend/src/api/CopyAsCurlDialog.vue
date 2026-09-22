@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { computed } from 'vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useCopyAsCurlStore } from './state/curl';
 

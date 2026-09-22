@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '../theme/CodiconIcon.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { openApiRequestTab, openGrpcRequestTab } from './tabs';

@@ -2,14 +2,14 @@
 import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
-import Checkbox from '../../theme/primitives/Checkbox.vue';
 import { type Completion, templateToken, wholeFieldToken } from '../../theme/primitives/completion';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 
 // P22b D2: this table's own value vocabulary — genuinely different from
 // packages/api-core/src/http/headers.ts's headerValueCompletions (gRPC metadata keys are
@@ -278,7 +278,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .metadata-table {
   /* P16 D13: flex:1 rather than height:100% — GrpcRequestView.vue's own filter row, when open, is

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -11,8 +13,6 @@ import {
   useSaveDdlMutation,
   useSchemaDialogStore,
 } from '../state/schemas';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
 // P18 (v1.1) D3: the DDL document a user pastes for one connection, staged until Save — the
 // draft is component-local, cloned at open; Cancel, Escape, the ✕ and the backdrop all discard
@@ -173,7 +173,7 @@ async function onSave(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .schema-dialog-body {
   @apply h-[60vh];

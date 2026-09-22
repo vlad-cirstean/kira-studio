@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { ApiVariable } from '@shared/domain/variables';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { ref, watch } from 'vue';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import Checkbox from '../theme/primitives/Checkbox.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
-import TextField from '../theme/primitives/TextField.vue';
 import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
@@ -202,7 +202,7 @@ function onKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* P22b D9: a grid, not independent flex items — F13's own finding was that adjacent rows' name/
    value/description columns never lined up, since each field carried its own `flex` value and a

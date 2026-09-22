@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelShell from '@theme/primitives/PanelShell.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../shortcuts/commands';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
-import PanelShell from '../theme/primitives/PanelShell.vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import { useCollectionsStore } from './state/collections';
@@ -182,7 +182,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .panel-body {
   @apply flex h-full min-h-0 flex-col;

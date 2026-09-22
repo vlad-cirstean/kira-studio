@@ -5,16 +5,16 @@ import {
   type ResponseHistoryEntry,
 } from '@shared/domain/response-history';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { computed, onMounted, ref } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes, formatRelative } from '../../format';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import Checkbox from '../../theme/primitives/Checkbox.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import { useHttpHistoryStore } from './history';
 
 // P8 D15: the History pane's list — one row per response, capped at HISTORY_PER_SCOPE_LIMIT by
@@ -200,7 +200,7 @@ async function onClear(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .history-pane {
   @apply flex flex-1 min-h-0 flex-col;

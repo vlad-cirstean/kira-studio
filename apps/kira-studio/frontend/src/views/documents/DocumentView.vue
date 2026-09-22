@@ -2,6 +2,12 @@
 import type { SortSpec } from '@shared/domain/queries';
 import type { DocumentTabRecord, PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { connColorVar } from '@theme/connColor';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
@@ -9,16 +15,10 @@ import { registerCommand } from '../../shortcuts/commands';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
-import { connColorVar } from '../../theme/connColor';
-import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
@@ -960,7 +960,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .document-view {
   @apply h-full flex flex-col min-h-0;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, nextTick, ref, watch } from 'vue';
-import { wrapSelectionOnType } from '../theme/wrapSelection';
 import { usePaletteStore } from './state';
 
 const paletteStore = usePaletteStore();
@@ -92,7 +92,7 @@ function onKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .palette-backdrop {
   /* P28 D17(c): the dialog rung — the palette is a modal over the whole workbench, and this was

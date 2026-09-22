@@ -5,15 +5,15 @@ import {
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { computed, onMounted, ref } from 'vue';
 import { formatRelative } from '../../format';
 import { useConfirmDialogStore } from '../../state/confirmDialog';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import { useGrpcCallHistoryStore } from './history';
 
 const confirmDialogStore = useConfirmDialogStore();
@@ -145,7 +145,7 @@ async function onClear(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .history-pane {
   @apply flex flex-1 min-h-0 flex-col;

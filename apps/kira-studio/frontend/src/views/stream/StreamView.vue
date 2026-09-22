@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import type { PageSize, StreamTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { connColorVar } from '@theme/connColor';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { registerCommand } from '../../shortcuts/commands';
@@ -11,18 +19,10 @@ import { useContextMenuStore } from '../../state/contextMenu';
 import { useSettingsStore } from '../../state/settings';
 import { useTabsStore } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
-import { connColorVar } from '../../theme/connColor';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import Checkbox from '../../theme/primitives/Checkbox.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { datasetNumber } from '../shared/eventCoords';
@@ -978,7 +978,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .stream-view {
   @apply h-full flex flex-col min-h-0;
@@ -1114,6 +1114,6 @@ onUnmounted(() => {
 }
 
 .resize-handle {
-  @apply absolute top-0 right-0 w-1 h-full cursor-col-resize z-[1];
+  @apply absolute top-0 right-0 w-1 h-full cursor-col-resize z-1;
 }
 </style>

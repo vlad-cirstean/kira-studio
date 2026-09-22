@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import Checkbox from '../theme/primitives/Checkbox.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import TextField from '../theme/primitives/TextField.vue';
 import {
   type FilterNodeRow,
   kindRows,
@@ -262,7 +262,7 @@ const connectionName = computed(
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .help {
   @apply leading-normal;

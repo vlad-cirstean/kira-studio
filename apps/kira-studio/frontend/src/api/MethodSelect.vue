@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { HTTP_METHODS, type HttpMethod, httpMethodToken } from '@shared/domain/http';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { ref } from 'vue';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 
 // P17 D18/D19, item 1: an app-drawn menu trigger, on the exact P42 D27 precedent
@@ -72,7 +72,7 @@ function select(method: HttpMethod): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .method-anchor {
   @apply relative flex;

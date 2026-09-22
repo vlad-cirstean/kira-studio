@@ -17,6 +17,12 @@ import {
   type SettingsPatch,
 } from '@shared/domain/settings';
 import { useQuery } from '@tanstack/vue-query';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
@@ -30,13 +36,7 @@ import { useDbMcpStore } from '../state/dbmcp';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../state/maskRules';
 import { type Section, sections, useSettingsStore } from '../state/settings';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import Checkbox from '../theme/primitives/Checkbox.vue';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
-import TextField from '../theme/primitives/TextField.vue';
 
 const PAGE_SIZES = [10, 100, 1000, 10000] as const;
 
@@ -1506,7 +1506,7 @@ async function onAddScript(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .dialog-body-inner {
   @apply h-full flex min-h-0;

@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import { connColorVar } from '../theme/connColor';
 import EngineIcon from '../theme/EngineIcon.vue';
 import { columnTypeIcon, nodeIcon } from '../theme/icons';
 import ErrorPopover from './ErrorPopover.vue';
@@ -167,7 +167,7 @@ function onContextMenu(e: MouseEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .tree-row {
   @apply flex items-center relative cursor-default whitespace-nowrap select-none;

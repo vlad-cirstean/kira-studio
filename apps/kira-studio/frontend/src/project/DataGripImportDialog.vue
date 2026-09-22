@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import EngineIcon from '../theme/EngineIcon.vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import Checkbox from '../theme/primitives/Checkbox.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 
 // P25 D10: a real review step. Nothing is written until "Import N connections" is pressed —
@@ -290,7 +290,7 @@ async function onConfirm(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .row-list {
   @apply flex flex-col;

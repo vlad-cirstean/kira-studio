@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed } from 'vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import type { EditBuffer } from './useEditBuffer';
 
 // The one visual form of the three features an edit buffer offers — the `modified` chip, the
@@ -82,7 +82,7 @@ const resetTitle = computed<string>(
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .edit-buffer-actions {
   @apply flex items-center shrink-0 gap-[var(--kira-s-3)];

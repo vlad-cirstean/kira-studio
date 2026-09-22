@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed } from 'vue';
-import IconButton from '../theme/primitives/IconButton.vue';
 import { useCollectionsStore } from './state/collections';
 
 const collectionsStore = useCollectionsStore();
@@ -72,7 +72,7 @@ function plural(n: number, noun: string): string {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .report {
   @apply flex min-w-0 flex-col gap-[var(--kira-s-1)];

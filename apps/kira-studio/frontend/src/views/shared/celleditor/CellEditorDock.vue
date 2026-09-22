@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import { computed } from 'vue';
 import { useCellSelectionStore } from '../../../state/cellSelection';
 import { useLayoutStore } from '../../../state/layout';
-import PanelSplitter from '../../../theme/primitives/PanelSplitter.vue';
 import CellEditorView from './CellEditorView.vue';
 
 const cellSelectionStore = useCellSelectionStore();
@@ -44,7 +44,7 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* The workbench grid gave the splitter its size (a `--kira-gap` row between two gap-separated
    panels, tokens.css:31-36); inside a view there is no gap band to aim at, so the track carries

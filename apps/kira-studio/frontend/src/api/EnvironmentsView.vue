@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { EnvironmentsTabRecord } from '@shared/domain/tabs';
 import type { ApiEnvironment } from '@shared/domain/variables';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, reactive, ref, watch } from 'vue';
 import { useConfirmDialogStore } from '../state/confirmDialog';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import { connColorVar } from '../theme/connColor';
-import AppButton from '../theme/primitives/AppButton.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
-import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
-import TextField from '../theme/primitives/TextField.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import { useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';
@@ -270,7 +270,7 @@ function onKeydown(e: KeyboardEvent, id: string): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .environments-view {
   @apply flex h-full min-h-0 flex-col;

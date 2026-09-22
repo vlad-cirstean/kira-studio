@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, onMounted, ref } from 'vue';
 import { control } from '../bridge/control';
 import { data } from '../bridge/data';
@@ -6,11 +9,8 @@ import MonacoHost from '../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../state/connections';
 import { useFakeDataStore } from '../state/fakeData';
 import { useTabsStore } from '../state/tabs';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import RunState from '../theme/primitives/RunState.vue';
-import TextField from '../theme/primitives/TextField.vue';
 import {
   BATCH_SIZE,
   GenerationError,
@@ -373,7 +373,7 @@ function onSequenceStartChange(index: number, start: number): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .generate-form {
   @apply flex flex-col;

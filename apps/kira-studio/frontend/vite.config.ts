@@ -30,6 +30,10 @@ export default defineConfig(({ command }) => {
         // imports, this is for what `bunx shadcn-vue add` writes.
         '@': fileURLToPath(new URL('./src', import.meta.url)),
         '@shared': fileURLToPath(new URL('../../../packages/shared', import.meta.url)),
+        // P103 (byte-identical tier, folded into this pass): see apps/kira-space/frontend/
+        // vite.config.ts's own note — the same shared theme/shadcn-vue/primitive source, this app
+        // importing rather than owning its own copy.
+        '@theme': fileURLToPath(new URL('../../../packages/theme/src', import.meta.url)),
         '@bindings': fileURLToPath(
           new URL(
             './bindings/github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge',

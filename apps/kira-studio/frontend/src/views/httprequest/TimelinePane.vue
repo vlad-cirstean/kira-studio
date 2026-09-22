@@ -2,8 +2,8 @@
 import type { HttpTimelineHop } from '@shared/domain/http';
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import EmptyState from '@theme/primitives/EmptyState.vue';
 import { computed } from 'vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useHttpHistoryStore } from './history';
 import { useHttpRequestViewStore } from './state';
@@ -311,7 +311,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .timeline-pane {
   @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];

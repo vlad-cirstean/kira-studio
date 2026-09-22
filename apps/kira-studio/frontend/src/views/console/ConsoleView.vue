@@ -5,6 +5,9 @@ import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split'
 import type { ConsoleTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
@@ -12,9 +15,6 @@ import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
 import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import { wheelToHorizontal } from '../../wheelScroll';
@@ -801,7 +801,7 @@ const statusLine = computed(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .console-view {
   @apply h-full flex flex-col min-h-0;

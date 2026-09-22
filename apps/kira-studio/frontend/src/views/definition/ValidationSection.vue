@@ -52,7 +52,7 @@ const showRaw = computed(() => props.documentSchema?.validator != null && fields
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .def-val-desc {
   @apply text-muted;

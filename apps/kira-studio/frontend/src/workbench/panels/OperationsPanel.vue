@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import type { OpRecord } from '@shared/domain/ops';
 import { splitSqlStatements } from '@shared/domain/sql-split';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { copyText } from '../../clipboard';
@@ -10,13 +17,6 @@ import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
 import { useOpsStore } from '../../state/ops';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { connColorVar } from '../../theme/connColor';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
 import { useConsoleViewStore } from '../../views/console/state';
 import { backslashEscapesFor, dollarQuotingFor, sqlDialectFor } from '../../views/shared/sqlIdent';
 
@@ -283,7 +283,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .ops-panel {
   @apply h-full flex flex-col min-h-0;

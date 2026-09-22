@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 
 // Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
@@ -100,7 +100,7 @@ defineSlots<{
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .saved-list-menu-inner {
   @apply max-h-[400px] overflow-y-auto;

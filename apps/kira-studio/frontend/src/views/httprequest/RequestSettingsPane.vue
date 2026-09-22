@@ -6,11 +6,11 @@ import {
   REQUEST_TIMEOUT_MS_RANGE,
 } from '@shared/domain/settings';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
-import Checkbox from '../../theme/primitives/Checkbox.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 
 // P90 §2.6: one row per api settings leaf, in SPEC's own order — a control bound to
 // tab.state.settings.<leaf>, an "Inherit" checkbox (checked === the leaf is null), and helper text
@@ -263,7 +263,7 @@ function onEditGlobalDefaults(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .settings-pane {
   @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-3)] overflow-auto p-[var(--kira-s-3)];

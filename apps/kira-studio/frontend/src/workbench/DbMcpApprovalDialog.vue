@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
 const dbMcpStore = useDbMcpStore();
 
@@ -158,7 +158,7 @@ async function onApprove(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .message {
   @apply whitespace-pre-wrap;

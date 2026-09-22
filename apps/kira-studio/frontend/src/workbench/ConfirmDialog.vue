@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { useConfirmDialogStore } from '../state/confirmDialog';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
 const confirmDialogStore = useConfirmDialogStore();
 

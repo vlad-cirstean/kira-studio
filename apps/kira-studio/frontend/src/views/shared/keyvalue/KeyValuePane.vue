@@ -36,6 +36,14 @@ import {
   OBJECT_BODY_EDIT_BYTES,
   OBJECT_BODY_PREVIEW_BYTES,
 } from '@shared/protocol/page';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { formatBytes } from '../../../format';
 import { registerCommand } from '../../../shortcuts/commands';
@@ -46,18 +54,10 @@ import { useContextMenuStore } from '../../../state/contextMenu';
 import { useObjectStoreStore } from '../../../state/objectStore';
 import { useSettingsStore } from '../../../state/settings';
 import { browseInvalidate } from '../../../state/viewCommands';
-import CodiconIcon from '../../../theme/CodiconIcon.vue';
-import { connColorVar } from '../../../theme/connColor';
-import AppButton from '../../../theme/primitives/AppButton.vue';
-import EmptyState from '../../../theme/primitives/EmptyState.vue';
-import IconButton from '../../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../../theme/primitives/MessageStrip.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ReconnectGate from '../../../theme/primitives/ReconnectGate.vue';
-import SegmentedControl from '../../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../../theme/primitives/TextField.vue';
 import ViewChrome from '../../../theme/primitives/ViewChrome.vue';
-import VirtualList from '../../../theme/primitives/VirtualList.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { datasetNumber } from '../eventCoords';
 import SearchToolbar from '../page/SearchToolbar.vue';
@@ -996,7 +996,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .keyvalue-pane {
   @apply flex-1 min-h-0 flex flex-col;

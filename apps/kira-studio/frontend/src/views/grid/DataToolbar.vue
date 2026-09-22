@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { DataTabRecord, PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import PagerControls from '../shared/page/PagerControls.vue';
 import { pageSizeOptions } from '../shared/page/sizes';
 import ColumnsMenu from './ColumnsMenu.vue';
@@ -335,7 +335,7 @@ function onDeleteRow(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* Sizing/spacing/colour all come from .p-toolbar and the primitives it hosts (p-iconbtn, p-btn,
    p-seg, p-input, p-chip, p-count) — the pager's own layout/page-jump-input styling lives in

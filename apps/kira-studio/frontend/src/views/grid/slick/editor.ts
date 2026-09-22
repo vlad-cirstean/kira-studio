@@ -1,3 +1,4 @@
+import { wrapSelectionOnType } from '@theme/wrapSelection';
 import type {
   Column,
   Editor,
@@ -5,7 +6,6 @@ import type {
   EditorValidationResult,
   GridOption,
 } from 'slickgrid';
-import { wrapSelectionOnType } from '../../../theme/wrapSelection';
 import type { RowHandle } from './dataSource';
 
 // P22 Pass B, C8/§5 D8 — the incumbent's own single overlay `<input>` (`-iter2-pacing` D4:

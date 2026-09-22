@@ -6,6 +6,11 @@ import {
   grpcCodeHint,
 } from '@shared/domain/grpc';
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
@@ -13,12 +18,7 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import { formatBytes } from '../../format';
 import { registerCommand } from '../../shortcuts/commands';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
@@ -395,7 +395,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .response-pane {
   @apply flex h-full min-h-0 flex-col;

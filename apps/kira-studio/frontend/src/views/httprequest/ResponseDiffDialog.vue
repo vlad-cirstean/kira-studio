@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { type BeautifyResult, beautifyJson, beautifyXml } from '../../beautify';
 import { control } from '../../bridge/control';
 import { KIRA_EDITOR_THEME, loadMonaco } from '../../editor/monaco';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { formatBytes, formatRelative } from '../../format';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import DialogFrame from '../../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 
 // P8 D12: two entries, three levels of difference, one dialog. `ids` are the two selections from
@@ -322,7 +322,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .diff-status {
   @apply p-[var(--kira-s-4)];

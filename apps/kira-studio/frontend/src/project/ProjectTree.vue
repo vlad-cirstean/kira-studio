@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TreeHost from '@theme/primitives/TreeHost.vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { shortcutFor } from '../shortcuts/keys';
 import { useConnectionsStore } from '../state/connections';
@@ -8,7 +9,6 @@ import { initSchemaSync } from '../state/schemas';
 import { useSettingsStore } from '../state/settings';
 import { useTabsStore } from '../state/tabs';
 import { reloadTab } from '../state/viewCommands';
-import TreeHost from '../theme/primitives/TreeHost.vue';
 import { emptyBackgroundMenu, menuForRow } from './menus';
 import { type TreeRowVm, useTreeStore } from './state/tree';
 import TreeRow from './TreeRow.vue';
@@ -202,7 +202,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .project-tree {
   @apply h-full flex flex-col min-h-0;
@@ -217,7 +217,7 @@ function onTreeKeydown(e: KeyboardEvent): void {
    correctly without this component needing to know anything about the scrollport (P28 D2). A row
    here is opaque and full-width so it fully occludes whatever real row has scrolled up behind it. */
 .sticky-row {
-  @apply absolute left-0 right-0 z-[1];
+  @apply absolute left-0 right-0 z-1;
   background: var(--kira-bg);
 }
 

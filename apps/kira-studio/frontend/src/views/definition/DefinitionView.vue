@@ -2,6 +2,11 @@
 import { definitionText } from '@shared/domain/definition';
 import type { DefinitionTabRecord } from '@shared/domain/tabs';
 import { decodePath, pathTail } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { copyText } from '../../clipboard';
 import { findRanges } from '../../editor/findRanges';
@@ -9,13 +14,8 @@ import MonacoHost from '../../editor/MonacoHost.vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { useConnectionsStore } from '../../state/connections';
 import { useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import ResponseFindBar, {
   type FindBarHost,
@@ -362,7 +362,7 @@ const breadcrumb = computed(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .definition-view {
   @apply h-full flex flex-col min-h-0;

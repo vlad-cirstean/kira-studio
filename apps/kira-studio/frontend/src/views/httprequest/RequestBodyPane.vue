@@ -9,6 +9,8 @@ import {
 } from '@kira/api-core';
 import type { HttpCodeLanguage } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import IconButton from '@theme/primitives/IconButton.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, ref } from 'vue';
 import {
   type VariableSupport,
@@ -18,9 +20,7 @@ import {
 import { patchHttpRequestTabState } from '../../api/tabs';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import { beautifyFor, canBeautify } from '../shared/celleditor/formats';
 import BinaryBodyPicker from './BinaryBodyPicker.vue';
 import FormDataTable from './FormDataTable.vue';
@@ -232,7 +232,7 @@ const caption = computed(() =>
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .body-pane {
   @apply flex flex-1 min-h-0 flex-col;

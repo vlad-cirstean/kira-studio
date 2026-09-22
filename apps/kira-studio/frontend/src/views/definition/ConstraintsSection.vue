@@ -81,7 +81,7 @@ function onNavigate(c: ConstraintRow): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* Only these two aren't in the shared .def-table td rule (primitives.css) — see
    ColumnsSection.vue's own comment on why. */

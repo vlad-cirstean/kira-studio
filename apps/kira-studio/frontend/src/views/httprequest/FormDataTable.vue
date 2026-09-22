@@ -2,14 +2,14 @@
 import type { HttpFormDataFieldState } from '@shared/domain/http';
 import { contentTypeForFilename } from '@shared/domain/object-store';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { formatBytes } from '../../format';
-import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import FieldRowsTable from './FieldRowsTable.vue';
 import { chooseBodyFile } from './files';
 
@@ -160,7 +160,7 @@ function onClearFile(index: number): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* Vue scoped CSS attributes slotted content with the *passing* component's scope id, not
    FieldRowsTable's — so its own .field-cell rule doesn't reach these slots; repeated here. */

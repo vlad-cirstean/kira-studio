@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/domain/queries';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import { wrapSelectionOnType } from '../../theme/wrapSelection';
 import SavedListMenu from './SavedListMenu.vue';
 
 // Generic across every filter-bearing view (SQL's FilterToolbar.vue, Document's own filter row) —
@@ -219,7 +219,7 @@ async function saveCurrent(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* text-[var(--kira-accent)], not the text-accent utility — shadcn-bridge.css maps --color-accent
    to --kira-hover (grey), same precedent api/CollectionRow.vue's rename-input already documents

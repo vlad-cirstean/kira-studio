@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-core';
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
+import AppButton from '@theme/primitives/AppButton.vue';
 import { computed, ref } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import { useConfirmDialogStore } from '../state/confirmDialog';
-import AppButton from '../theme/primitives/AppButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useVariableSetStore } from './state/variables';
 
@@ -163,7 +163,7 @@ function onCancel(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .bulk-editor {
   @apply flex h-full min-h-0 flex-col gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];

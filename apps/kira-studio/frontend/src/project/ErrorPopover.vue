@@ -1,13 +1,13 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
 // Misc-fixes: a reusable "click for full text" replacement for truncated inline error text +
 // native title tooltip (unreadable for multi-line/long messages, and unreachable on touch).
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
 import { useEventListener } from '@vueuse/core';
 import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import { autoUpdate, computeFloatPosition } from '../theme/floatingPosition';
-import AppButton from '../theme/primitives/AppButton.vue';
 
 const props = defineProps<{ message: string }>();
 
@@ -103,7 +103,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .error-popover-host {
   @apply min-w-0 ml-auto shrink;

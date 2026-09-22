@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { pathTail } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
 import { computed } from 'vue';
 import { formatRelative } from '../../format';
 import { useConnectionDialogStore, useConnectionsStore } from '../../state/connections';
 import { useDatagripImportStore } from '../../state/datagripImport';
 import { type RecentTableEntry, useRecentTablesStore, useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import { connColorVar } from '../../theme/connColor';
 
 // P1 C4: Studio's two empty states, extracted verbatim out of MainView.vue's old dispatch
 // chain (F9) — the mode's own "nothing open" content, mirroring api/ApiStart.vue (C6).
@@ -110,7 +110,7 @@ function openRecent(entry: RecentTableEntry): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .start {
   @apply flex-1 min-h-0 flex items-center justify-center overflow-auto;

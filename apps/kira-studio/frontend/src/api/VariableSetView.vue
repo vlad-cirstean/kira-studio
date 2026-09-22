@@ -2,15 +2,15 @@
 import type { PaletteColor } from '@shared/domain/color';
 import type { VariableSetTabRecord } from '@shared/domain/tabs';
 import type { ApiVariable } from '@shared/domain/variables';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
-import AppButton from '../theme/primitives/AppButton.vue';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
-import TextField from '../theme/primitives/TextField.vue';
 import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useCollectionsStore } from './state/collections';
@@ -519,7 +519,7 @@ function onBulkClose(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .variable-set-view {
   @apply flex h-full min-h-0 flex-col;

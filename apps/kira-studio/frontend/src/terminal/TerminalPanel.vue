@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import type { CustomScript } from '@shared/domain/scripts';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelShell from '@theme/primitives/PanelShell.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref } from 'vue';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -7,13 +14,6 @@ import { useCustomScriptsStore } from '../state/customScripts';
 import { useSettingsStore } from '../state/settings';
 import { useTerminalsStore } from '../state/terminals';
 import { openTerminalTab } from '../state/terminalTabs';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import { connColorVar } from '../theme/connColor';
-import AppButton from '../theme/primitives/AppButton.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
-import PanelShell from '../theme/primitives/PanelShell.vue';
-import TextField from '../theme/primitives/TextField.vue';
 
 const confirmDialogStore = useConfirmDialogStore();
 
@@ -224,7 +224,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .panel-title {
   @apply font-semibold;

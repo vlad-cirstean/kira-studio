@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { formatBytes } from '../format';
@@ -6,7 +7,6 @@ import { useAgentSessionsStore } from '../state/agentSessions';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';
 import { useCacheStatsStore } from '../state/cacheStats';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import { useEngineStore } from './state/engine';
 
 const engineStore = useEngineStore();
@@ -182,7 +182,7 @@ const agentTooltip = computed(() =>
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* Fixed, right-aligned slots (monospace, so `ch` is an exact character width) — as the CPU%/
    memory readouts gain digits (0% -> 100%, 12.0 MB -> 1234.5 MB) they grow into their own

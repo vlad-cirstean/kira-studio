@@ -1,9 +1,9 @@
 <script setup lang="ts" generic="M extends { row: number }">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import CodiconIcon from '../../../theme/CodiconIcon.vue';
-import IconButton from '../../../theme/primitives/IconButton.vue';
-import TextField from '../../../theme/primitives/TextField.vue';
 import type { SearchHandle } from './scan';
 import type { PageSearchApi } from './search';
 import { usePageSearchFilterStore } from './searchFilter';
@@ -386,7 +386,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .search-toolbar {
   @apply bg-elevated;

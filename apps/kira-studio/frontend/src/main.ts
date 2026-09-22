@@ -21,7 +21,7 @@ import { pinia } from './state/pinia';
 import { queryClient } from './state/queryClient';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
-import './theme/base.css';
+import '@theme/base.css';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useSettingsStore } from './state/settings';

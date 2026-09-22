@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed, ref } from 'vue';
-import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import { wheelToHorizontal } from '../../../wheelScroll';
 import { useDocumentRowsStore } from './rows';
 
@@ -76,7 +76,7 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .document-tree {
   /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —

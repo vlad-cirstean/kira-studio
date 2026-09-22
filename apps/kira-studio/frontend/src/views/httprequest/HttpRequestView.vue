@@ -15,6 +15,12 @@ import {
 } from '@kira/api-core';
 import { type HttpMethod, type HttpRequestPane, httpMethodToken } from '@shared/domain/http';
 import type { HttpRequestTabRecord } from '@shared/domain/tabs';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
@@ -30,14 +36,8 @@ import type { RangeHighlight } from '../../editor/ranges';
 import { registerCommand } from '../../shortcuts/commands';
 import { useSettingsStore } from '../../state/settings';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import ResponseFindBar, {
   type FindBarHost,
@@ -689,7 +689,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .overview-anchor {
   @apply relative flex;

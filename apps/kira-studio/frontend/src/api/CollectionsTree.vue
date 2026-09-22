@@ -1,11 +1,11 @@
 <script setup lang="ts">
+import TreeHost from '@theme/primitives/TreeHost.vue';
 import { computed, ref } from 'vue';
 import { copyText } from '../clipboard';
 import { shortcutFor } from '../shortcuts/keys';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '../state/contextMenu';
 import { useSettingsStore } from '../state/settings';
-import TreeHost from '../theme/primitives/TreeHost.vue';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
@@ -177,7 +177,7 @@ const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplica
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .collections-tree {
   @apply h-full;

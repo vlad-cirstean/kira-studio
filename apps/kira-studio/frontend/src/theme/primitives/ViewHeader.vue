@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ConnectionColor, ConnectionKind } from '@shared/domain/connection';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
 import { computed } from 'vue';
-import CodiconIcon from '../CodiconIcon.vue';
-import { connColorVar } from '../connColor';
 import EngineIcon from '../EngineIcon.vue';
 
 // P16 design system: "every view opens with this" 28px identity band — a connection dot, an

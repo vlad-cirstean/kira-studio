@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { HttpCookieWire, HttpResponseWire } from '@shared/domain/http';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../../state/settings';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
 import { useCookiesStore } from './cookies';
 
 // P90 item 2 (§3): one component, two hosts — HttpRequestView.vue's request segment (what the
@@ -180,7 +180,7 @@ const showHopIndex = computed(() => (props.response?.timeline?.hops.length ?? 0)
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .cookies-pane {
   @apply flex flex-1 min-h-0 flex-col overflow-auto;

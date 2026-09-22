@@ -19,6 +19,7 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
       "@shared/*": ["../../packages/shared/*"],
+      "@theme/*": ["../../packages/theme/src/*"],
       "@kira/git-ipc": ["../../packages/git-ipc/src/index.ts"],
       "@kira/git-ipc/codec": ["../../packages/git-ipc/src/codec.ts"]
     }

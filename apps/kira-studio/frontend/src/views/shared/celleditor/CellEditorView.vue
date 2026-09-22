@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
 import { pathTail } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import { findRanges } from '../../../editor/findRanges';
@@ -9,9 +11,7 @@ import { formatBytes } from '../../../format';
 import { cellKey, type SelectedCell, useCellSelectionStore } from '../../../state/cellSelection';
 import { useConnectionsStore } from '../../../state/connections';
 import { type MenuItem, useContextMenuStore } from '../../../state/contextMenu';
-import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import { typeClassColor } from '../../../theme/icons';
-import IconButton from '../../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import ViewHeader from '../../../theme/primitives/ViewHeader.vue';
 import EditBufferActions from '../EditBufferActions.vue';
@@ -649,7 +649,7 @@ const statusLine = computed(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .cell-editor {
   @apply flex flex-col h-full min-h-0;

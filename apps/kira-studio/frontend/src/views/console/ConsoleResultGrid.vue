@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { ColumnDescriptor } from '@shared/protocol/page';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { useSettingsStore } from '../../state/settings';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { type DocumentRowView, useDocumentRowsStore } from '../shared/document/rows';
@@ -397,7 +397,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .console-result-grid {
   /* P19 D6: the copy-error strip is an always-possible sibling above whichever one of

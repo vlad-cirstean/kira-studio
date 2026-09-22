@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 
 // P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
 // case, whole word, regex — which is what the report means by "the standard search toolbar (the
@@ -193,7 +193,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .response-find-bar {
   @apply bg-elevated shrink-0;

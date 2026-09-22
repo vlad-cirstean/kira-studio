@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CodiconIcon from '../CodiconIcon.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 
 // The `.p-strip` message banner (warn/err/note) used above a view's body. `note` (the informational
 // tone — P8's response-history viewing band and storage notices, D10) reuses DefinitionView's own

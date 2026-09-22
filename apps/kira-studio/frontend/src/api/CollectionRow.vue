@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { grpcMethodClass } from '@shared/domain/grpc';
 import { httpMethodToken } from '@shared/domain/http';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed, nextTick, ref, watch } from 'vue';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
 // P4 D13: the same 8 + depth × 14 px indent, roving tabindex and twisty as project/TreeRow.vue,
@@ -163,7 +163,7 @@ function onTwistyClick(e: MouseEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .tree-row {
   @apply relative flex cursor-default items-center gap-[var(--kira-s-2)] whitespace-nowrap select-none pr-[var(--kira-s-4)] text-[length:var(--kira-t-md)] h-[var(--kira-row-height)];

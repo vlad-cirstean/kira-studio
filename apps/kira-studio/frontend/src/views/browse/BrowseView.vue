@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import type { BrowseTabRecord } from '@shared/domain/tabs';
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useContextMenuStore } from '../../state/contextMenu';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { nodeIcon, redisTypeIcon, redisTypeLabel } from '../../theme/icons';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import PanelSplitter from '../../theme/primitives/PanelSplitter.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
-import VirtualList from '../../theme/primitives/VirtualList.vue';
 import {
   type KeyValueHost,
   registerKeyValueHost,
@@ -420,7 +420,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .browse-view {
   @apply h-full flex flex-col min-h-0;

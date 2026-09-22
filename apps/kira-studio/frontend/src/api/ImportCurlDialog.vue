@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { refDebounced } from '@vueuse/core';
 import { computed, ref } from 'vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useImportCurlStore } from './state/curl';
 
@@ -94,7 +94,7 @@ function close(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .curl-textarea {
   @apply min-h-[120px];

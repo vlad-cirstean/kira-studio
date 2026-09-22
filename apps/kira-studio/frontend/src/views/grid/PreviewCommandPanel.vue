@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useQuery } from '@tanstack/vue-query';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { usePendingChangesStore } from './pendingChanges';
@@ -88,7 +88,7 @@ function close(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .preview-panel-inner {
   @apply max-h-[360px] flex flex-col;

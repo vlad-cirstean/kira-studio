@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { connColorVar } from '@theme/connColor';
 import { computed, onMounted, ref } from 'vue';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import { connColorVar } from '../theme/connColor';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useVariablesStore } from './state/variables';
 
@@ -137,7 +137,7 @@ function manage(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .environment-anchor {
   @apply relative flex min-w-0 flex-[0_1_auto];

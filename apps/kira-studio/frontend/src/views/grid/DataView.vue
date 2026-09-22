@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { DataTabRecord } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
+import { connColorVar } from '@theme/connColor';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { registerCommand } from '../../shortcuts/commands';
 import { useConnectionsStore } from '../../state/connections';
 import { useFakeDataStore } from '../../state/fakeData';
-import { connColorVar } from '../../theme/connColor';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
@@ -315,7 +315,7 @@ function onCloseSearch(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .data-view {
   @apply h-full flex flex-col min-h-0;

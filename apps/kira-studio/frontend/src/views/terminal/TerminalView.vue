@@ -159,7 +159,7 @@ async function onDismissHooksPrompt(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-terminal {
   @apply flex flex-col h-full bg-bg p-[var(--kira-s-2)];

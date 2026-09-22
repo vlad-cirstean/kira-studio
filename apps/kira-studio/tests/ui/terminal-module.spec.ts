@@ -8,15 +8,6 @@ import { IPC } from './support/ipcChannels';
 // default (IPC.terminalDefaultCwd) — so an unscoped terminal's title falls out of its basename,
 // 'test' (tabKinds.ts's terminal kind: `s.label || basename(s.cwd) || 'Terminal'`).
 
-const REPO = {
-  id: 'repo-1',
-  name: 'demo-repo',
-  root: '/tmp/demo-repo',
-  repoId: '/tmp/demo-repo',
-  sortOrder: 1,
-  createdAt: '2026-01-01T00:00:00.000Z',
-};
-
 const SCRIPT = {
   id: 'script-1',
   name: 'Dev server',
@@ -51,7 +42,8 @@ async function openTerminalModule(page: import('@playwright/test').Page): Promis
 test('the module exists and opens', async ({ relaunch }) => {
   const { window: page } = await relaunch({ control: [] });
 
-  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(4);
+  // Studio/Api/Terminal — P100 Part 1 dropped Git, the former fourth mode tab.
+  await expect(page.locator('[data-testid="mode-tab"]')).toHaveCount(3);
   await openTerminalModule(page);
 
   await expect(page.locator('[data-testid="terminal-panel"]')).toBeVisible();
@@ -91,70 +83,16 @@ test('an unscoped terminal opens from the tab strip at the resolved home directo
     )
     .toBe(true);
 
-  // Staying in the Terminal module's own workspace the whole time — no side-trip into Git.
+  // Staying in the Terminal module's own workspace the whole time.
   await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
 });
 
-test('a repo-scoped terminal opens at that repo root without leaving the Terminal module', async ({
-  relaunch,
-}) => {
-  const { window: page, control } = await relaunch({
-    control: [TERMINAL_OPEN_OK, { channel: IPC.codeWorkspaceListRepos, response: [REPO] }],
-  });
-
-  await openTerminalModule(page);
-  await page.locator('[data-testid="tab-strip-new"]').click();
-  const menu = page.locator('[data-testid="context-menu"]');
-  await expect(menu).toBeVisible();
-  // Terminal, then a separator, then one entry per known repo — REPO.id is already 'repo-1', so
-  // the rendered testid is `menu-item-repo-repo-1`, not `menu-item-repo-1` (§17.2's own warning).
-  const repoItem = menu.locator(`[data-testid="menu-item-repo-${REPO.id}"]`);
-  await expect(repoItem).toBeVisible();
-  await repoItem.click();
-
-  const terminalTab = tab(page);
-  await expect(terminalTab).toHaveCount(1);
-
-  await expect
-    .poll(() =>
-      control
-        .log()
-        .some(
-          (e) =>
-            e.channel === IPC.terminalOpen &&
-            (e.args as { cwd?: string } | undefined)?.cwd === REPO.root,
-        ),
-    )
-    .toBe(true);
-
-  // §6's own regression to prevent: openRepoTerminalTab's openRepoWorkspace side effect must not
-  // fire here — the active module stays Terminal, not Git/the repo workspace.
-  await expect(modeTab(page, 'terminal')).toHaveClass(/is-active/);
-  await expect(modeTab(page, 'git')).not.toHaveClass(/is-active/);
-});
-
-test('one store, two surfaces: a quick command renders in the Terminal panel and a repo workspace’s own + menu', async ({
-  relaunch,
-}) => {
-  const { window: page } = await relaunch({
-    control: [
-      { channel: IPC.customScriptsList, response: [SCRIPT] },
-      { channel: IPC.codeWorkspaceListRepos, response: [REPO] },
-    ],
-  });
-
-  await openTerminalModule(page);
-  await expect(page.locator(`[data-testid="quick-command-${SCRIPT.id}"]`)).toBeVisible();
-
-  await modeTab(page, 'git').click();
-  await page.locator(`[data-testid="repo-row"][data-repo-id="${REPO.id}"]`).click();
-  await page.locator('[data-testid="tab-strip-new"]').click();
-  const menu = page.locator('[data-testid="context-menu"]');
-  await expect(menu).toBeVisible();
-  // TabStrip.vue's script row id is `script-${script.id}` — SCRIPT.id is already 'script-1', so
-  // the rendered testid is `menu-item-script-script-1`.
-  await expect(menu.locator(`[data-testid="menu-item-script-${SCRIPT.id}"]`)).toBeVisible();
-});
+// P100 Part 1 dropped both the per-repo terminal-menu entries (a repo-scoped terminal's own "+"
+// item) and the git-workspace "+" menu's own script section — TabStrip.vue's "+" menu now lists
+// only the plain Terminal launch (dd3ec62's own commit message). The two tests that used to cover
+// those — "a repo-scoped terminal opens at that repo root..." and "one store, two surfaces:..." —
+// are dropped with them; "running a quick command..." below still covers the one surface that
+// remains (the Terminal panel's own quick-command list).
 
 test('running a quick command opens a terminal titled with its name, at its own working dir', async ({
   relaunch,

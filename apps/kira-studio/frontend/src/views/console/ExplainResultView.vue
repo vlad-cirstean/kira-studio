@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { computed, reactive, ref } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useSettingsStore } from '../../state/settings';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import { getPlan } from './explainResults';
 import type { PlanNode } from './planModel';
 
@@ -170,7 +170,7 @@ const rawLanguage = computed(() =>
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .explain-view {
   @apply h-full overflow-auto flex flex-col text-[length:var(--kira-t-sm)] gap-[var(--kira-s-3)] p-[var(--kira-s-4)];

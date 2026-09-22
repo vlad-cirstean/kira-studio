@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ColumnMeta } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { useContextMenuStore } from '../../state/contextMenu';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { columnTypeColor, columnTypeIcon } from '../../theme/icons';
 import { typeDescription } from '../shared/typeGlossary';
 import { columnsSectionMenu } from './columnsMenu';
@@ -86,7 +86,7 @@ function onContextMenu(ev: MouseEvent, col: ColumnMeta): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* Only these two — the vertical column dividers — aren't in the shared .def-table td rule
    (primitives.css): Validation/Properties are plain key-value tables that don't want them. */

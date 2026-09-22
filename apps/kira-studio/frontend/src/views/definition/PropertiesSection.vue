@@ -32,7 +32,7 @@ defineProps<{
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .def-prop-name {
   @apply whitespace-nowrap text-muted;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { connColorVar } from '@theme/connColor';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { computed, ref } from 'vue';
 import { copyText } from '../clipboard';
-import { connColorVar } from '../theme/connColor';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import PanelSearchBox from '../theme/primitives/PanelSearchBox.vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useCollectionsStore } from './state/collections';
 import { useVariableSetStore, useVariablesStore, type VariableOverviewRow } from './state/variables';
@@ -166,7 +166,7 @@ function editEnvironmentVariables(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .overview-panel {
   @apply flex max-h-[420px] flex-col;

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { Caps } from '@shared/caps';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import Checkbox from '@theme/primitives/Checkbox.vue';
 import { computed, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import Checkbox from '../../theme/primitives/Checkbox.vue';
 import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { nextProjectionFromSelectedColumns } from './menu';
 import { useGridViewStore } from './state';
@@ -154,7 +154,7 @@ function close(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .columns-menu-inner {
   @apply max-h-[320px] flex flex-col;

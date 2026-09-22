@@ -77,7 +77,7 @@ useEventListener(window, 'resize', () => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 /* The top rung of theme/tokens.css's own floating-surface ladder (P28 D17(c)) — every other
    floating surface can host a hinted control, so anything lower would reproduce the "hint

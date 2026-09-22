@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { GrpcRequestTabRecord } from '@shared/domain/tabs';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PanelSearchBox from '../../theme/primitives/PanelSearchBox.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 import { useGrpcRequestViewStore } from './state';
 
 // D13's Schema pane: the source selector (Reflection / .proto file + import paths + Reload) above
@@ -202,7 +202,7 @@ function selectMethod(service: string, method: string): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .schema-browser {
   @apply flex h-full min-h-0 flex-col overflow-auto;

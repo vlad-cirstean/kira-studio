@@ -623,7 +623,7 @@ watch(
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .monaco-host {
   @apply h-full min-h-0 overflow-hidden;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import TextField from '../theme/primitives/TextField.vue';
 import { useCollectionsStore } from './state/collections';
 
 const collectionsStore = useCollectionsStore();

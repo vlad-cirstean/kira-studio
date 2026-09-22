@@ -3,14 +3,14 @@
   lang="ts"
   generic="T extends { name: string; value: string; enabled?: boolean; description?: string }"
 >
+import Checkbox from '@theme/primitives/Checkbox.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
-import Checkbox from '../../theme/primitives/Checkbox.vue';
 import type { Completion } from '../../theme/primitives/completion';
 import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 
 // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —
 // RequestHeadersTable.vue and QueryParamsTable.vue were the same file twice minus a checkbox
@@ -369,7 +369,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .field-rows-table {
   /* P16 D13: flex:1 rather than height:100% — this is no longer always its flex-column parent's

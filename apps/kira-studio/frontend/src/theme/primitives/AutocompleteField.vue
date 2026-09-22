@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { autoClosePairsOnType, wrapSelectionOnType } from '@theme/wrapSelection';
 import { useEventListener, useTimeoutFn } from '@vueuse/core';
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { loadMonaco, type MonacoModule } from '../../editor/monaco';
@@ -7,9 +9,7 @@ import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { SqlDialect } from '../../views/shared/sqlIdent';
-import CodiconIcon from '../CodiconIcon.vue';
 import { computeFloatPosition, pointReference } from '../floatingPosition';
-import { autoClosePairsOnType, wrapSelectionOnType } from '../wrapSelection';
 import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from './completion';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real

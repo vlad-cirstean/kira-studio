@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { ForeignKeyMeta } from '@shared/domain/tree';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
 import { useEventListener } from '@vueuse/core';
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
-import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { computeFloatPosition, pointReference } from '../../theme/floatingPosition';
 import { typeClassColor } from '../../theme/icons';
-import AppButton from '../../theme/primitives/AppButton.vue';
 import { type FkPreviewState, fetchReferencedRow, type PreviewSignal } from './fkPreview';
 import { type FkNavContext, foreignKeyValueFilter, qualifiedNameForPath } from './menu';
 
@@ -191,7 +191,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .fk-preview-backdrop {
   @apply fixed inset-0 z-[var(--kira-z-popover)];

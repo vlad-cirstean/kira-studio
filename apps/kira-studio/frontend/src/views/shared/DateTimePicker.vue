@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
-import TextField from '../../theme/primitives/TextField.vue';
 
 // P24 D18: the app-owned month grid + clock steppers that replace the bare
 // <input type="datetime-local"> — the last piece of OS-drawn UI left in the renderer after P22
@@ -338,7 +338,7 @@ const secondText = computed<string>({
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .dtp {
   @apply flex flex-col gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
