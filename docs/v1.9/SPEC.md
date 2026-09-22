@@ -1081,6 +1081,188 @@ No new `docs/ARCHITECTURE.md` **Known open items** entry from this phase specifi
 carried-forward item (the deferred first-boot pairings/repo-list import) remains Part 1's own,
 recorded in that section above, not duplicated here.
 
+## P100 Part 3 result
+
+Landed per plan (`docs/v1.9/plans/P100-kira-space-extraction.md` §6, §8-§11). 5 commits, `7329c14`
+(directory/package rename) through `a4f4a7c` (the release-workflow pending-changes patch), against
+`8e1402a`: 147 files changed, 1451 insertions(+), 1243 deletions(-).
+
+**Directory and package (`7329c14`).** `git mv apps/kira-studio-vscode apps/kira-space-vscode` (77
+tracked files). `package.json`: `name` → `kira-space-vscode`, `displayName` "Kira Version" → "Kira
+Space", `description` updated. Every path reference fixed per-file, not by a blind rename of the
+string everywhere: root `package.json`'s `workspaces` entry, `knip.json`, `biome.json`,
+`scripts/verify-packaging.sh`, `packages/git-ipc/src/contract.ts`,
+`packages/kira-ui/src/optionTypes.ts`, `packages/git-ui/vite.config.ts` (its `resolve(repoRoot,
+'apps', …)` comma-arg form didn't match a slash-pattern sed and needed a targeted fix),
+`apps/kira-space/frontend/src/repo/git/hostHandlers.ts`,
+`packages/git-core/src/util/nfcPath.test.ts`. Left unchanged, a genuine historical citation:
+`packages/git-core/src/model/reviewRanges.ts`'s "moved here from
+`apps/kira-studio-vscode/src/reviewRanges.ts`, unchanged" comment.
+
+**The full contribution-id and prose sweep (`e689879`, 57 files, 674 insertions(+), 683
+deletions(-))** — combined into one commit rather than the plan's suggested four-way split
+(directory/contribution-ids/URI-scheme/socket-dial), since the underlying sweep is one mechanical
+pass with one correctness property (repo-wide count reaches zero), not four independent pieces of
+work. Verified against §6.2's own table, all counts re-measured against the real file rather than
+trusted from the plan:
+
+- **62** command ids `kiraVersion.<verb>` → `kiraSpace.<verb>` (matches the plan exactly), command
+  category "Kira Version" → "Kira Space".
+- Panel container id `kiraVersion` → `kiraSpace` (title stays "Kira", unchanged); activitybar
+  container `kiraVersionReview` → `kiraSpaceReview`, title "Kira Version" → "Kira Space".
+- 2 view ids (`kiraVersion.graph`/`kiraVersion.review` → `kiraSpace.graph`/`kiraSpace.review`), 2
+  viewsContainers — both counts re-confirmed via the manifest's own JSON structure, not grep alone.
+- **10 colour ids**, not the plan's estimated 14: `kiraSpace.graphLane0`-`7` (8) plus
+  `kiraSpace.reviewedLineBackground`/`reviewedLineOverviewRuler` (2) — the real count in the
+  manifest, named as a deviation rather than silently reported as if it matched.
+- Context keys, comment controller (`kiraVersion.reviewComments` → `kiraSpace.reviewComments`),
+  menu group (`kiraVersion@1` → `kiraSpace@1`), every `when` clause including the virtual-document
+  URI scheme (`resourceScheme == kira-version` → `== kira-space`) — 90 total `kiraSpace` sites in
+  the manifest (`grep -c "kiraSpace"`).
+- `apps/kira-space-vscode/src/connection.ts`'s `socketPath()`: `KIRA_HOME`/`~/.kira-studio` →
+  `KIRA_SPACE_HOME`/`~/.kira-space`; the two user-facing socket-path strings in `extension.ts`
+  (`:247`, `:687`) and one in `README.md` follow.
+  `apps/kira-space-vscode/resources/{icon,review-icon}.svg`'s `<title>` updated.
+- `Kira Studio` → `Kira Space` applied, file by file, only where the string named the backend app
+  (never the DB client): the extension's own `src/{proxyHandlers,extension,html,connection}.ts` and
+  `README.md`; `packages/git-core/src/model/remote.ts` and `settings/schema.ts`;
+  `packages/git-ipc/src/contract.ts`; `packages/git-ui/src/{App.vue,bridge/client.ts,main.ts,
+  graphVisibility.ts}`, `components/review/{ReviewCommitRow,ReviewView}.vue`,
+  `components/dialogs/{RepoSettingsDialog,WorktreeDialog}.vue`, `components/ConnectionBanner.vue`,
+  `state/repoSettings.ts`. Three of those (`App.vue`, `main.ts`, `graphVisibility.ts`) actually
+  said "Kira Studio's own app-wide `appearance.dateFormat`" / "Kira Studio's `RepoGraphView.vue`" —
+  already factually wrong post-Part-1/2 extraction regardless of this phase's renaming, so fixed as
+  a live-behaviour correction, not left stale under a rename-scope technicality.
+- Left unchanged, confirmed by reading full context rather than pattern-matching blind: two DB-client
+  citations in `packages/kira-ui/src/theme/controls.css` and `packages/git-ui/src/theme/
+  kira-structure.css`/`readTokens.ts`; `packages/git-ipc/src/rpc.ts`'s `@kira-version/git` upstream
+  npm package citation (a real external dependency, confirmed against
+  `docs/v1.3/plans/G1-headless-transport-and-extension-migration.md`); test-literal sample paths in
+  `virtualKey.test.ts`/`commands.test.ts`; the immutable `0017_g18_git_repo_settings.sql` migration.
+- `packages/git-core/src/search/matcher.test.ts` and its shared conformance fixture,
+  `packages/git-core/testdata/searchConformance.json` (both TS and Go read the same file, via
+  `apps/kira-space/internal/gitsearch/conformance_test.go`): `fixture@kira-version.test` →
+  `fixture@kira-space.test`, 100+ occurrences, both suites re-run clean after.
+- `NOTICES.md`, `apps/kira-space/internal/storage/model/settings.go`'s comments, and two
+  `SettingsDialog.vue`/`StatusBar.vue` files swept for the same reason.
+
+**Packaging chain retarget (`30d432f`, 9 files, 169 insertions(+), 87 deletions(-))**, all five
+links of §6.3:
+
+1. `apps/kira-studio/build/Taskfile.yml`: `build:vsix` task deleted outright.
+2. `apps/kira-studio/build/darwin/Taskfile.yml`: `common:build:vsix` dependency and the vsix-copy
+   block removed from `create:app:bundle`/`package:`/`package:universal:`/`run`.
+3. `apps/kira-space/build/Taskfile.yml`: new `build:vsix` task; `sources:` names
+   `apps/kira-space-vscode/**` plus `packages/git-{core,ipc,ui}/src/**` — and, a deliberate addition
+   the plan's own list omitted, `packages/kira-ui/src/**`, a real build dependency confirmed by
+   grep; `generates: apps/kira-space/bin/kira-space.vsix`.
+4. `apps/kira-space/build/darwin/Taskfile.yml`: mirrors Kira Studio's original copy-and-fail-loudly
+   block exactly, `kira-space.vsix` naming.
+5. `apps/kira-space/internal/gitvsix/install.go`: `vsixFileName = "kira-space.vsix"`; doc comments
+   and `install_test.go`'s `"Kira Studio.app"` path literals and executable-name literals follow
+   (`"Kira Studio"` → `"Kira Space"`, 2 path sites plus one prose comment).
+
+`scripts/package-vscode.ts`/`scripts/build-vscode.ts` retargeted at `kira-space-vscode` and
+`apps/kira-space/bin/kira-space.vsix`. `scripts/verify-packaging.sh`: S9 retargeted at
+`apps/kira-space-vscode/package.json`/`apps/kira-space/build/config.yml`; Kira Studio's artifact
+block loses its vsix check (A6, moved), keeping A1/A3/A5/N2; a new Kira Space artifact block adds
+A1/A3 (bundle id `com.kirathecat.kira-space`)/A5/A6 (vsix PK-magic and `extension/readme.md`
+sanity)/N2, plus A4/N3 for the `.dmg`. **`scripts/sign-bundle.sh` needed no change** — confirmed
+directly (not assumed from precedent): it already takes `$1`/`$2` as app dir/name from Part 2's own
+generalization, and `package:space` already calls it with `apps/kira-space "Kira Space"`.
+
+**The settings-key rename and contract bump (`0547b90`, BREAKING CHANGE, 25 files, 99
+insertions(+), 86 deletions(-)).** All 11 `kiraVersion.*` wire keys (`graph.pageSize`,
+`graph.scope`, `stash.showInGraph`, `stash.includeUntracked`, `review.baseCandidates`,
+`pull.strategy`, `log.level`, `github.enabled`, `worktree.prepareScript`, `worktree.basePath`,
+`checkout.autoStash`) → `kiraSpace.*`, both `RepoSettingsSnapshot` and `*Patch` json tags. Measured
+site counts against the plan's own table, exact match: `packages/git-core/src/settings/schema.ts`
+26, `schema.test.ts` 54, `packages/git-ui/src/state/repoSettings.ts` 12,
+`components/dialogs/RepoSettingsDialog.vue` 37, `packages/git-ipc/src/contract.ts` 24 (11 keys ×2
+structs, plus comments). 20 Go files under `apps/kira-space/internal` swept for the same string,
+each confirmed to be a comment or test literal citing the same 11 wire keys.
+`CONTRACT_VERSION`/`ContractVersion` 39 → 40 on both sides, with a history-comment block in each
+file's own established style; `gitrpc/stash_test.go`'s `TestContractVersion_Is39` →
+`TestContractVersion_Is40`. `packages/git-ipc/testdata/graphChunkFrame.{bin,json}` regenerated via
+the Go-side fixture regenerator (`KIRA_GIT_FIXTURES=write go test ./apps/kira-space/internal/
+gitsock/... -run TestFixtures_CaptureGraphChunkFrame`), since the old fixture baked in version 39
+and `unwrapVersioned` now rejects it — root-caused to this phase's own change (not pre-existing),
+fixed on the spot per `CLAUDE.md`'s standing rule, then reformatted with `bunx biome check --write`
+to satisfy the pre-commit hook before it would take the commit.
+
+**§6.4's data migration is not needed, contrary to the plan's own text — investigated and
+documented, not assumed either way.** The plan describes `git_repo_settings.key` as holding
+`kiraVersion.*` strings literally and calls for a `0002_p100_rename_setting_keys.sql` rewriting
+them. Reading the real schema (`apps/kira-space/internal/storage/repos/gitreposettings.go`,
+`settings.go`) shows the `key` column already stores short, undotted leaf names —
+`"graphPageSize"`, `"logLevel"`, `"advanced.gitLogLevel"` — fully decoupled from the wire-protocol
+namespace by an earlier P72 redesign; `gitreposettings.go`'s own comment confirms "the sentinel-row
+substitution G18 D14 gave it is deleted along with `instanceWide`'s only user", so §6.4's cited
+`kiraVersion.log.level` sentinel row no longer exists in any form. Confirmed separately that
+`kiraVersion.*` was never a VS Code `settings.json` key either — `apps/kira-space-vscode/
+package.json` has no `"configuration"` section, only ever a wire-protocol JSON field name. A
+migration matching `WHERE key LIKE 'kiraVersion.%'` would be a genuine no-op against every row this
+schema can produce. No migration file was added; this finding and its evidence live in `0547b90`'s
+own commit message, not silently dropped and not implemented as a no-op for form's sake.
+
+**`.github/workflows/release.yml` (`a4f4a7c`)** — this Linux sandbox session cannot push
+`.github/workflows/*` (`docs/DEV_ENVIRONMENT.md`), so the intended diff is staged as
+`docs/pending-changes/.github__workflows__release.yml.patch` (verified with `git apply --check`
+against the real file before writing it, applies cleanly). It drops the "release" job's now-broken
+`apps/kira-studio-vscode/package.json` version-stamp step (that path no longer exists — the
+directory rename in `7329c14` had already made the checked-in workflow stale) and adds a
+`release-space` job: `needs: [test-matrix, db-compat, release]` (so it uploads onto the same draft
+release the "release" job creates rather than racing it to create a second one), its own Wails
+bindings cache path/key, its own version-stamp step (`apps/kira-space/build/config.yml` +
+`apps/kira-space-vscode/package.json`), `bun run package:space`, `verify:packaging`, and a bundle
+assertion asserting `com.kirathecat.kira-space` alongside the "release" job's existing
+`com.kirathecat.kira-studio` assertion. **`pr.yml` needs no change** — checked directly: it never
+references the vscode extension path, never builds a packaged app or dmg, so nothing in it points
+at anything this phase renamed or moved.
+
+**Deliberately out of scope, confirmed against the plan's own §7.3, not an oversight.** `README.md`
+and `docs/ARCHITECTURE.md` still describe `apps/kira-studio-vscode`/"Kira Version" in several live
+places (`README.md:14,215,302,355-361,384,399,450`; `docs/ARCHITECTURE.md:45,52,2886-2943,3491,
+3663-3667`). The plan's own split puts "Documentation" under §7.3, Part 4, not here — confirmed by
+reading the plan's table of contents rather than assuming. Left untouched for Part 4 to pick up as
+its own pass, not silently merged into this phase's scope.
+
+**A stale generated artifact, not a real finding.** `apps/kira-space/frontend/bindings/.../
+storage/model/models.ts` (gitignored, untracked, Wails-generated) still carried a doc-comment line
+reading `kiraVersion.log.level` from before this session's Go edits landed — its real source,
+`apps/kira-space/internal/storage/model/settings.go`, already says `kiraSpace.log.level`. Confirmed
+via grep against the Go source, not assumed; it self-corrects on the next `wails3 task
+common:generate:bindings -clean=true`, the same non-issue Part 2's own result section already
+established for this gitignored directory.
+
+**Verification.** Every command re-run in this session, not trusted from an earlier claim:
+
+- `go build ./...`, `go vet ./...`: clean, no output.
+- `bun run lint:go` (golangci-lint): `0 issues.`
+- `bun run test:go`: 66 packages `ok`, 0 `FAIL`, 32 of them under `apps/kira-space`.
+- `bun run lint` (Biome + `check-tokens.sh`, run automatically by the pre-commit hook on every
+  commit in this phase): clean throughout, `Checked 1340 files … No fixes applied.` on the final
+  commit; every `--kira-*`/`--kv-*`/`--kui-*` reference resolves.
+- `bun run typecheck`: clean across all eight projects.
+- `bun run lint:dead` (knip): exit 0, same 6 duplicate-export warnings and 6 configuration-hint
+  lines as Part 2's own documented baseline — no new finding.
+- `bun run build`: clean, `✓ built in 4.29s` (only the pre-existing >500kB chunk-size advisory).
+- `bun run build:space`: clean, `✓ built in 3.29s`, same advisory.
+- `bun run build:vscode`: clean, `✓ built in 1.12s`, both bundles produced under
+  `apps/kira-space-vscode/dist/` (this is the renamed path — Part 2's own result still shows the
+  pre-rename `kira-studio-vscode` path, correctly, since Part 3 hadn't landed yet).
+- `bun run package:vscode`: writes `apps/kira-space/bin/kira-space.vsix`, 457177 bytes, PK zip
+  magic confirmed directly.
+- `bun run verify:packaging`: `all checks passed` — S1/S2/S5/S9 static checks green for both apps;
+  A1/A3/A5/A6/N2/A4/N3 skipped for both (no built `.app`/`.dmg` in this sandbox, same documented
+  precedent Parts 1-2 used).
+- `bun run test:unit`: 1534 pass, 0 fail, 13649 `expect()` calls, 155 files.
+- `bun run test:webview`: 55 passed, 0 failed — every named-spec file, same count Part 2's own
+  result recorded, none broken by the rename.
+
+No new `docs/ARCHITECTURE.md` **Known open items** entry — nothing this phase touched left a new
+standing limitation; the settings-key finding above is a closed investigation, not an open item.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
