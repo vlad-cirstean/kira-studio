@@ -296,7 +296,7 @@ const breadcrumb = computed(() => {
         <span
           class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
           :class="{
-            'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent': runState.status === 'running',
+            'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
             'border-error': runState.status === 'error',
           }"
         />
