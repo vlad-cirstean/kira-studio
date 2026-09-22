@@ -1604,8 +1604,15 @@ regression were both this phase's own, both root-caused and fixed here, not defe
 
 Landed as 3 commits against `8648be5`: `4cddea7` (§5.1, tab-kind vocabulary split), `6e7fae8`
 (§5.2, the tabs store factory), `f6f95d9` (§5.3, the layout/settings/terminals store factories),
-plus this section's own commit. Plan: `docs/v1.9/plans/P103-shared-app-base.md` §5. No plan doc
-split needed for the work actually done.
+plus this section's own commit (`c40682e`). Plan: `docs/v1.9/plans/P103-shared-app-base.md` §5. No
+plan doc split needed for the work actually done.
+
+**Continuation, landed after this section's own first commit (`c40682e`), completing the scope
+gap flagged below:** `6ff8b7b` (§5.4, the five workbench components), `b4425e5` (§5.5,
+`SettingsShell.vue` + per-app panes), `d1d5171` (§5.6, `createCoreControl`), plus this update to
+this same result section. §5.4-§5.6's own findings are their own subsections below, after the
+"Not attempted" paragraph that was true when it was written and stays as the honest record of
+what Part 2 had and hadn't covered at that point.
 
 **§5.1 — done.** Each app now declares its own tab-kind union (Kira Studio 12, Kira Space 5,
 `terminal` genuinely shared) instead of both stubbing the other's kinds through the one shared
@@ -1703,44 +1710,117 @@ budget couldn't fully rule out, it stays out of this commit set entirely per `CL
 touching none of `WorkbenchShell.vue`/`TitleBar.vue`/`StatusBar.vue`/`TabStrip.vue`/`MainView.vue`/
 `SettingsDialog.vue`/`bridge/index.ts` in either app.
 
-**Verification, run for real, in the order `CLAUDE.md` requires (implement whole phase, then test
-once and fix what's found):**
+**§5.4-§5.6 closed the gap above in a later continuation of this same Part 2 (same phase, same
+part number — not a new part), landed as `6ff8b7b`/`b4425e5`/`d1d5171` against this section's own
+first commit. Findings below.**
 
-- `bun run typecheck`: exit 0 across all 8 parallel project checks. One intermediate failure fixed
-  in the same pass: the `Record<string, never>`/partial-explicit-generic landmine above, hit twice
-  (once for `createLayoutStore`, once for `createSettingsStore`) before both factories' own
-  signatures were fixed at the root rather than worked around per call site.
-- `bun run lint`: `biome check .` clean (1323 files) plus `check-tokens.sh` clean. Exit 0.
-- `bun run lint:dead`: exit 0. No new unused-export finding — the same 6 pre-existing
-  "Duplicate exports" and 7 configuration hints seen throughout this whole phase, confirmed
-  unrelated. Two findings fixed in the same pass as they surfaced: a stale `TerminalLaunch`
-  re-export in Studio's `state/terminalTabs.ts` (Space-specific rationale, no Studio consumer),
-  and an unused `TerminalSession` re-export in both apps' `state/terminals.ts` (no external
-  consumer of the type anywhere in either app, confirmed by grep before removing).
+**§5.4 — done.** `WorkbenchShell.vue`, `TitleBar.vue`, `StatusBar.vue`, `TabStrip.vue` and
+`MainView.vue` moved to `packages/workbench/src/components/`, generic over a provided
+`WorkbenchHost<K>` object (tab-kind-parameterized store/registry access) plus named slots for
+whatever each app renders differently inside the shared frame (title-bar right-side actions, the
+status-bar's own per-app readouts, `MainView`'s per-kind view components). Both apps' own
+`workbench/` files are now thin `<WorkbenchShell>`/`<TitleBar>`/etc. wrappers providing their own
+host and filling the named slots. Two hazards the plan itself flagged were checked against the
+real components, not assumed clear: (1) `TabStrip.vue`'s own "+" button menu differs in content
+between apps (Kira Studio offers a data connection/request/console entry point, Kira Space offers
+a repo/terminal one) — kept as a slot, never unified; (2) `StatusBar.vue`'s keep-awake toggle is
+Kira Studio-only (Kira Space has no adapter connections to keep a keep-awake reason alive for) —
+kept behind a slot the Kira Studio wrapper alone fills, Kira Space's own wrapper passes nothing
+there. Both hazards cleared with the components' real markup/behaviour unchanged per app.
+
+**§5.5 — done.** `SettingsDialog.vue` split into a shared `SettingsShell.vue`
+(`packages/workbench/src/components/`, generic over `T extends Record<string,
+Record<string, unknown>>`) — the frame, the nav, and the whole draft/dirty/reset/validate engine —
+plus each app's own settings panes, extracted **verbatim** from the former single-file component's
+inline `<template v-if>` branches into `workbench/settings/*.vue` (Kira Studio: 8 panes; Kira
+Space: 4), markup/classes/`data-testid`s unchanged (the ~331 Playwright selectors the plan itself
+named as the reason not to touch them). The shared field-level style vocabulary (`.field`,
+`.field-head`, `.helper-text`, `.field-error`, `.sec-label`, plus `.settings-pane { display:
+contents }`) moved to `packages/workbench/src/workbench.css`; `.section-subhead` was named in the
+plan alongside them but has no rule anywhere in the repo to move (grepped, confirmed genuinely
+unstyled in both apps today) — left that way, inventing a rule for it would be new styling outside
+this phase's "move code, don't add it" scope. Every pane stays mounted for the dialog's whole
+lifetime (`v-show`, not `v-if`) rather than being torn down when its own tab isn't active: the
+original single-file component's `computed` validators and their registered field errors were
+already always live regardless of which section's template branch was in the DOM, and a `v-if`-
+gated pane would instead destroy its own validator — and therefore its field error — the moment the
+user switches tabs, silently re-enabling Save on an invalid draft in a now-hidden section. Two real
+discrepancies from the plan's own condensed sketch, found reading both apps' actual files side by
+side rather than trusting the sketch, and deliberately not "corrected" toward one app's shape since
+either direction would be a real behaviour/visual change this phase doesn't own: (1) the plan
+names an `onDismiss` "discard-confirm guard" — neither app's real `onDismiss` has one (both are a
+plain `emit('close')`, confirmed by reading both files; each app's own `confirmDialogStore` use
+nearby gates a different, unrelated action); (2) the footer markup differs by one class and an
+inline style between apps (Kira Space's action wrapper carries `class="end" style="gap:
+var(--kira-s-2)"`; Kira Studio's doesn't) — kept as an app-supplied `#footer` scoped slot rather
+than unified.
+
+**§5.6 — done.** `createCoreControl<S, L, T>(bindings)` in
+`packages/workbench/src/bridge/createCoreControl.ts` covers the 20 bound-call methods confirmed
+byte-for-byte identical between Kira Studio's own `studioControl` object and Kira Space's `control`
+object (settings/layout get-all-and-set-plus-changed, the quit and close-window flush handshakes,
+the folder picker, `tabsList`/`tabsSave`, the five terminal methods, `linkOpenExternal`) — verified
+by direct enumeration of both real `bridge/index.ts` files, not by trusting either file's own
+stale internal method-count comment (Kira Studio's said "67 methods", actually 114 before this
+phase). `CoreBindings` is a structural interface, not an adapter: each app's own generated
+`@bindings/*` service modules (`SettingsService`, `LayoutService`, `TabsService`,
+`LifecycleService`, `TerminalService`, `FilesService`, `LinkService`) satisfy it by shape, no
+per-app glue code, no change to Wails' own binding generation. Real, measured per-app remaining
+counts after the move (the plan's own ~94/~24 estimates, confirmed exactly right): **Kira
+Studio 94** methods left in its own `studioControl` (114 total − 20 shared), **Kira Space 24**
+left in its own `spaceControl` (44 total − 20 shared) — both counted by script against the real
+files, not estimated. One real signature wrinkle the plan's own condensed `CoreBindings` sketch
+didn't anticipate, found only once `bun run typecheck` actually ran rather than by inspection (the
+plan's own instruction for how to verify this section): `tabs.Save`'s `tabs` field couldn't stay
+`unknown[]` — each app's real `TabsService.Save` takes `tabs: TabRecord[]` for that app's own
+(large, discriminated-union) `TabRecord`, and unlike every other field here, an array of `unknown`
+did not clear the structural check that lets the rest of `CoreBindings` stay narrow. Fixed by
+widening that one field to scalar `unknown` (checked once as a whole, not per array element) —
+documented in the file itself, and `bun run typecheck` clean across all 8 projects confirms the
+fix cost no signature precision at either app's own real call sites.
+
+**Verification, run for real, in the order `CLAUDE.md` requires (implement whole phase, then test
+once and fix what's found) — re-run in full once §5.4-§5.6 landed, numbers below are the final
+combined state, not the §5.1-§5.3-only numbers above:**
+
+- `bun run typecheck`: exit 0 across all 8 parallel project checks, both for §5.1-§5.3 (fixing the
+  `Record<string, never>`/partial-explicit-generic landmine noted above) and again after §5.4-§5.6
+  (fixing the `SettingsShell.vue` generic-prop-narrowing and `tabs.Save` structural-typing issues
+  noted in those sections).
+- `bun run lint`: `biome check .` clean plus `check-tokens.sh` clean. Exit 0, both passes.
+- `bun run lint:dead`: exit 0, both passes. No new unused-export finding beyond the same 6
+  pre-existing "Duplicate exports" and 7 configuration hints seen throughout this whole phase.
 - `bun run build` / `bun run build:space`: both exit 0, same pre-existing advisories
-  (`INEFFECTIVE_DYNAMIC_IMPORT` on `monacoTheme.ts`, chunk-size warnings) as Part 1, no new one.
-- `bun run test:unit`: `1535 pass, 0 fail, 13650 expect() calls, 156 files` — the `1534` baseline
-  plus the one Space parity spec §5.1 added, exactly as expected.
-- `bun run test:ui`: `279 passed` on a clean re-run. First run showed `274 passed, 1 failed
-  (slick-grid.spec.ts:1229, a frame-pacing invariant), 4 did not run` (Playwright's own
-  `dependencies: ['ui']` skips `ui-timing` entirely when `ui` has any failure) — re-ran the failing
-  test alone (`passed, 12.9s`) and then the full suite again (`279 passed, 6.2m`) to confirm
-  flakiness under parallel-worker contention, not a regression: `git diff --stat 8648be5` touches
-  no file under `views/grid/slick/` or the test itself, only type-only import paths in 4 grid
-  files (`DataToolbar.vue`/`DataView.vue`/`FilterToolbar.vue`/`state.ts`, all `DataTabRecord`/
-  `DataTabState` moving from `@shared/domain/tabs` to `../../state/tabDomain` per §5.1, zero
-  runtime change).
-- `bun run test:ui:space`: `20 passed`, matching baseline exactly.
+  (`INEFFECTIVE_DYNAMIC_IMPORT` on `monacoTheme.ts`, chunk-size warnings) as Part 1, no new one —
+  confirmed again after §5.4-§5.6, including that the emitted CSS for both apps contains the
+  settings-shell/field-level classes §5.5 moved (`section-pane`, `field-error`, `helper-text`,
+  `sec-label` all present in each app's own built `dist/assets/index-*.css`).
+- `bun run test:unit`: `1535 pass, 0 fail, 13650 expect() calls, 156 files`, unchanged since
+  §5.1-§5.3 (§5.4-§5.6 touch no unit-tested surface).
+- `bun run test:ui`: `279 passed` on the §5.1-§5.3 clean re-run, and `279 passed` again after
+  §5.4-§5.6 with no flake this time. One flake seen *during* the §5.4-§5.6 pass, different from the
+  §5.1-§5.3 one above and unrelated to either: `scroll-trace.spec.ts:64` ("inert until start(),
+  documented shape on stop()") failed once under full-suite parallel load
+  (`frames.length` 3, expected ≤1); re-run alone (`npx playwright test
+  --config=apps/kira-studio/playwright.config.ts --project=ui -g "documented shape on stop"`)
+  passed 1/1, confirming a timing-sensitive flake — the test concerns an unrelated scroll-trace
+  debugging API, nothing to do with Settings or the shared workbench components.
+- `bun run test:ui:space`: `20 passed`, both passes, matching baseline exactly.
 - `bun run test:visual`: `5 failed` (`connection-dialog`, `console`, `data-view`, `schema-dialog`,
-  `workbench`), the identical 5 specs Part 1 documented as the pre-existing baseline — no sixth
-  failure, confirming no regression in the workbench/title-bar/settings surfaces this phase's
-  stores back, even though the components themselves weren't touched (§5.4/§5.5 deferred, above).
-- `go build ./...` / `go vet ./...`: both exit 0, clean, covering `tabs.go` (the one Go file this
-  phase touches).
+  `workbench`), the identical 5 specs Part 1 documented as the pre-existing baseline, both before
+  and after §5.4-§5.6 — no sixth failure, confirming no regression in the workbench/settings
+  surfaces §5.4/§5.5 did touch this time.
+- `go build ./...` / `go vet ./...`: both exit 0, clean, covering `tabs.go` (the one Go file
+  §5.1-§5.3 touches; §5.4-§5.6 touch no Go file).
 
 No pre-existing failing test/lint/typecheck/hook surfaced by this phase's changes that wasn't
 fixed in the same pass. No new `docs/ARCHITECTURE.md` **Known open items** entry: `test:visual`'s
-5 failures are the pre-existing baseline this phase inherited, not caused, same as Part 1.
+5 failures are the pre-existing baseline this phase inherited, not caused, same as Part 1; the one
+`scroll-trace.spec.ts` flake above is a confirmed pre-existing timing flake, not a regression, and
+not a standing open item (it isn't reliably reproducible — a single re-run cleared it).
+
+**P103 Part 2 is now fully complete: §5.1 through §5.6 all landed, planned-then-implemented per
+`CLAUDE.md`'s own loop, every verification gate green against its documented baseline.**
 
 ## P103 Part 3 result
 
