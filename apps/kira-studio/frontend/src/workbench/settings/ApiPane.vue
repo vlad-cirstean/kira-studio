@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import {
   type ApiSettings,
@@ -74,13 +76,23 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     <label class="field">
       <div class="field-head">
         <span>HTTP version</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-api-httpVersion"
-          :disabled="isAtDefault('api', 'httpVersion')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('api', 'httpVersion')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'httpVersion') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-api-httpVersion"
+              :disabled="isAtDefault('api', 'httpVersion')"
+              aria-label="Reset to default"
+              @click="resetLeaf('api', 'httpVersion')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <select
         class="p-select bordered md"
@@ -95,20 +107,30 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     <label class="field">
       <div class="field-head">
         <span>Request timeout (ms)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-api-requestTimeoutMs"
-          :disabled="isAtDefault('api', 'requestTimeoutMs')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('api', 'requestTimeoutMs')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'requestTimeoutMs') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-api-requestTimeoutMs"
+              :disabled="isAtDefault('api', 'requestTimeoutMs')"
+              aria-label="Reset to default"
+              @click="resetLeaf('api', 'requestTimeoutMs')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="REQUEST_TIMEOUT_MS_RANGE.min"
         :max="REQUEST_TIMEOUT_MS_RANGE.max"
-        size="md"
-        :invalid="!!requestTimeoutMsError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!requestTimeoutMsError || undefined"
         data-testid="settings-api-requestTimeoutMs"
         :model-value="String(draft.api.requestTimeoutMs)"
         @input="onRequestTimeoutMsInput"
@@ -126,20 +148,30 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     <label class="field">
       <div class="field-head">
         <span>Max response size (MB)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-api-maxResponseMb"
-          :disabled="isAtDefault('api', 'maxResponseMb')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('api', 'maxResponseMb')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'maxResponseMb') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-api-maxResponseMb"
+              :disabled="isAtDefault('api', 'maxResponseMb')"
+              aria-label="Reset to default"
+              @click="resetLeaf('api', 'maxResponseMb')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="MAX_RESPONSE_MB_RANGE.min"
         :max="MAX_RESPONSE_MB_RANGE.max"
-        size="md"
-        :invalid="!!maxResponseMbError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!maxResponseMbError || undefined"
         data-testid="settings-api-maxResponseMb"
         :model-value="String(draft.api.maxResponseMb)"
         @input="onMaxResponseMbInput"
@@ -157,20 +189,33 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     <div class="field checkbox-row">
       <label class="field checkbox">
         <Checkbox
+          class="size-3.5"
           :model-value="draft.api.sslVerify"
           data-testid="settings-api-sslVerify"
-          @update:model-value="onSslVerifyChange"
-        />
+          @update:model-value="(v) => onSslVerifyChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Verify SSL certificates</span>
       </label>
-      <IconButton
-        icon="discard"
-        class="p-push"
-        data-testid="settings-reset-api-sslVerify"
-        :disabled="isAtDefault('api', 'sslVerify')"
-        v-tooltip="'Reset to default'"
-        @click="resetLeaf('api', 'sslVerify')"
-      />
+      <Tooltip>
+      <TooltipTrigger as-child>
+        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'sslVerify') }">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+          class="p-push"
+            data-testid="settings-reset-api-sslVerify"
+            :disabled="isAtDefault('api', 'sslVerify')"
+            aria-label="Reset to default"
+            @click="resetLeaf('api', 'sslVerify')"
+          >
+            <CodiconIcon name="discard" :size="13" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Reset to default</TooltipContent>
+      </Tooltip>
     </div>
     <p v-if="!draft.api.sslVerify" class="field-error" data-testid="settings-api-sslVerify-warning">
       Turning certificate verification off lets any server present any certificate.
@@ -182,40 +227,63 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     <div class="field checkbox-row">
       <label class="field checkbox">
         <Checkbox
+          class="size-3.5"
           :model-value="draft.api.followRedirects"
           data-testid="settings-api-followRedirects"
-          @update:model-value="onFollowRedirectsChange"
-        />
+          @update:model-value="(v) => onFollowRedirectsChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Follow redirects</span>
       </label>
-      <IconButton
-        icon="discard"
-        class="p-push"
-        data-testid="settings-reset-api-followRedirects"
-        :disabled="isAtDefault('api', 'followRedirects')"
-        v-tooltip="'Reset to default'"
-        @click="resetLeaf('api', 'followRedirects')"
-      />
+      <Tooltip>
+      <TooltipTrigger as-child>
+        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'followRedirects') }">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+          class="p-push"
+            data-testid="settings-reset-api-followRedirects"
+            :disabled="isAtDefault('api', 'followRedirects')"
+            aria-label="Reset to default"
+            @click="resetLeaf('api', 'followRedirects')"
+          >
+            <CodiconIcon name="discard" :size="13" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Reset to default</TooltipContent>
+      </Tooltip>
     </div>
 
     <label class="field">
       <div class="field-head">
         <span>Max redirects</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-api-maxRedirects"
-          :disabled="isAtDefault('api', 'maxRedirects')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('api', 'maxRedirects')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'maxRedirects') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-api-maxRedirects"
+              :disabled="isAtDefault('api', 'maxRedirects')"
+              aria-label="Reset to default"
+              @click="resetLeaf('api', 'maxRedirects')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="MAX_REDIRECTS_RANGE.min"
         :max="MAX_REDIRECTS_RANGE.max"
-        size="md"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
         :disabled="!draft.api.followRedirects"
-        :invalid="!!maxRedirectsError"
+        :aria-invalid="!!maxRedirectsError || undefined"
         data-testid="settings-api-maxRedirects"
         :model-value="String(draft.api.maxRedirects)"
         @input="onMaxRedirectsInput"
@@ -235,24 +303,37 @@ props.registerFieldError('api.maxRedirects', maxRedirectsError);
     <div class="field checkbox-row">
       <label class="field checkbox">
         <Checkbox
+          class="size-3.5"
           :model-value="draft.api.disableCookieJar"
           data-testid="settings-api-disableCookieJar"
-          @update:model-value="onDisableCookieJarChange"
-        />
+          @update:model-value="(v) => onDisableCookieJarChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Disable cookie jar</span>
         <span class="helper-text"
           >Off keeps a session cookie a server sets and replays it on later requests to
           the same host.</span
         >
       </label>
-      <IconButton
-        icon="discard"
-        class="p-push"
-        data-testid="settings-reset-api-disableCookieJar"
-        :disabled="isAtDefault('api', 'disableCookieJar')"
-        v-tooltip="'Reset to default'"
-        @click="resetLeaf('api', 'disableCookieJar')"
-      />
+      <Tooltip>
+      <TooltipTrigger as-child>
+        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'disableCookieJar') }">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+          class="p-push"
+            data-testid="settings-reset-api-disableCookieJar"
+            :disabled="isAtDefault('api', 'disableCookieJar')"
+            aria-label="Reset to default"
+            @click="resetLeaf('api', 'disableCookieJar')"
+          >
+            <CodiconIcon name="discard" :size="13" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Reset to default</TooltipContent>
+      </Tooltip>
     </div>
   </div>
 </template>

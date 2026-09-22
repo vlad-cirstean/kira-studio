@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatBytes } from '@workbench/util/format';
 import { computed } from 'vue';
 import { data } from '../../bridge/data';
@@ -53,20 +54,30 @@ async function onClearCaches(): Promise<void> {
     <label class="field">
       <div class="field-head">
         <span>Result page cache budget (MB)</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-cache-l2BudgetMb"
-          :disabled="isAtDefault('cache', 'l2BudgetMb')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('cache', 'l2BudgetMb')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('cache', 'l2BudgetMb') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-cache-l2BudgetMb"
+              :disabled="isAtDefault('cache', 'l2BudgetMb')"
+              aria-label="Reset to default"
+              @click="resetLeaf('cache', 'l2BudgetMb')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
-      <TextField
+      <Input
         type="number"
         :min="CACHE_L2_BUDGET_MB_RANGE.min"
         :max="CACHE_L2_BUDGET_MB_RANGE.max"
-        size="md"
-        :invalid="!!cacheBudgetError"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :aria-invalid="!!cacheBudgetError || undefined"
         data-testid="settings-cache-budget"
         :model-value="String(draft.cache.l2BudgetMb)"
         @input="onCacheBudgetInput"
@@ -77,19 +88,24 @@ async function onClearCaches(): Promise<void> {
     </label>
     <label class="field">
       <span>Current usage</span>
-      <TextField type="text" size="md" :model-value="cacheSizeLabel" disabled />
+      <Input
+        type="text"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :model-value="cacheSizeLabel"
+        disabled
+      />
     </label>
     <label class="field">
       <span>Hit rate</span>
-      <TextField type="text" size="md" :model-value="hitRateLabel" disabled />
+      <Input
+        type="text"
+        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+        :model-value="hitRateLabel"
+        disabled
+      />
     </label>
-    <AppButton
-      kind="dialog"
-      class="action-button"
-      data-testid="settings-clear-caches"
-      @click="onClearCaches"
-    >
+    <Button variant="dialog" size="kira-lg" class="action-button" data-testid="settings-clear-caches" @click="onClearCaches">
       Clear caches
-    </AppButton>
+    </Button>
   </div>
 </template>

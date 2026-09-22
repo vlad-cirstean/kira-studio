@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import {
   type AppearanceSettings,
@@ -58,21 +60,31 @@ props.registerFieldError('appearance.fontSize', fontSizeError);
     <label class="field">
       <div class="field-head">
         <span>Data font size</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-appearance-fontSize"
-          :disabled="isAtDefault('appearance', 'fontSize')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('appearance', 'fontSize')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'fontSize') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-appearance-fontSize"
+              :disabled="isAtDefault('appearance', 'fontSize')"
+              aria-label="Reset to default"
+              @click="resetLeaf('appearance', 'fontSize')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <div class="size-input">
-        <TextField
+        <Input
           type="number"
           :min="FONT_SIZE_RANGE.min"
           :max="FONT_SIZE_RANGE.max"
-          size="md"
-          :invalid="!!fontSizeError"
+          class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          :aria-invalid="!!fontSizeError || undefined"
           data-testid="settings-font-size"
           :model-value="String(draft.appearance.fontSize)"
           @input="onFontSizeInput"
@@ -89,13 +101,23 @@ props.registerFieldError('appearance.fontSize', fontSizeError);
     <div class="field">
       <div class="field-head">
         <span>Row height</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-appearance-rowDensity"
-          :disabled="isAtDefault('appearance', 'rowDensity')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('appearance', 'rowDensity')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'rowDensity') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-appearance-rowDensity"
+              :disabled="isAtDefault('appearance', 'rowDensity')"
+              aria-label="Reset to default"
+              @click="resetLeaf('appearance', 'rowDensity')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <div class="segmented">
         <button
@@ -119,56 +141,92 @@ props.registerFieldError('appearance.fontSize', fontSizeError);
     <div class="field checkbox-row">
       <label class="field checkbox">
         <Checkbox
+          class="size-3.5"
           :model-value="draft.appearance.wordWrap"
           data-testid="settings-word-wrap"
-          @update:model-value="onWordWrapChange"
-        />
+          @update:model-value="(v) => onWordWrapChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Word wrap</span>
         <span class="helper-text">Long lines wrap instead of scrolling, in the file viewer.</span>
       </label>
-      <IconButton
-        icon="discard"
-        class="p-push"
-        data-testid="settings-reset-appearance-wordWrap"
-        :disabled="isAtDefault('appearance', 'wordWrap')"
-        v-tooltip="'Reset to default'"
-        @click="resetLeaf('appearance', 'wordWrap')"
-      />
+      <Tooltip>
+      <TooltipTrigger as-child>
+        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'wordWrap') }">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+          class="p-push"
+            data-testid="settings-reset-appearance-wordWrap"
+            :disabled="isAtDefault('appearance', 'wordWrap')"
+            aria-label="Reset to default"
+            @click="resetLeaf('appearance', 'wordWrap')"
+          >
+            <CodiconIcon name="discard" :size="13" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Reset to default</TooltipContent>
+      </Tooltip>
     </div>
 
     <div class="field checkbox-row">
       <label class="field checkbox">
         <Checkbox
+          class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
           data-testid="settings-inline-blame"
-          @update:model-value="onInlineBlameChange"
-        />
+          @update:model-value="(v) => onInlineBlameChange(v === true)"
+        >
+          <CodiconIcon name="check" :size="10" />
+        </Checkbox>
         <span>Inline blame</span>
         <span class="helper-text"
           >Show who last changed the current line, at the end of that line, in the
           repository file viewer.</span
         >
       </label>
-      <IconButton
-        icon="discard"
-        class="p-push"
-        data-testid="settings-reset-appearance-inlineBlame"
-        :disabled="isAtDefault('appearance', 'inlineBlame')"
-        v-tooltip="'Reset to default'"
-        @click="resetLeaf('appearance', 'inlineBlame')"
-      />
+      <Tooltip>
+      <TooltipTrigger as-child>
+        <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+          class="p-push"
+            data-testid="settings-reset-appearance-inlineBlame"
+            :disabled="isAtDefault('appearance', 'inlineBlame')"
+            aria-label="Reset to default"
+            @click="resetLeaf('appearance', 'inlineBlame')"
+          >
+            <CodiconIcon name="discard" :size="13" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Reset to default</TooltipContent>
+      </Tooltip>
     </div>
 
     <label class="field">
       <div class="field-head">
         <span>Commit date</span>
-        <IconButton
-          icon="discard"
-          data-testid="settings-reset-appearance-dateFormat"
-          :disabled="isAtDefault('appearance', 'dateFormat')"
-          v-tooltip="'Reset to default'"
-          @click="resetLeaf('appearance', 'dateFormat')"
-        />
+        <Tooltip>
+        <TooltipTrigger as-child>
+          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'dateFormat') }">
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="settings-reset-appearance-dateFormat"
+              :disabled="isAtDefault('appearance', 'dateFormat')"
+              aria-label="Reset to default"
+              @click="resetLeaf('appearance', 'dateFormat')"
+            >
+              <CodiconIcon name="discard" :size="13" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>Reset to default</TooltipContent>
+        </Tooltip>
       </div>
       <select
         class="p-select bordered md"
