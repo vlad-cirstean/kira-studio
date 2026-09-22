@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
 import { openApiRequestTab, openGrpcRequestTab } from '../api/tabs';
-import { useQuickOpenStore } from '../repo/state/quickOpen';
 import { useConnectionDialogStore } from '../state/connections';
 import { useLayoutStore } from '../state/layout';
 import { useModeStore } from '../state/mode';
@@ -17,7 +16,6 @@ interface PaletteCommand {
 
 export const usePaletteStore = defineStore('palette', () => {
   const layoutStore = useLayoutStore();
-  const quickOpenStore = useQuickOpenStore();
   const tabsStore = useTabsStore();
   const settingsStore = useSettingsStore();
 
@@ -74,20 +72,10 @@ export const usePaletteStore = defineStore('palette', () => {
       run: () => layoutStore.toggleOperationsPanel(),
     },
     { id: 'view.find', label: 'Find', run: () => runCommand('view.find') },
-    // C7 S10: registered by GitPanel.vue while mounted — a no-op outside a repo workspace, the
-    // same view-scoped shape every other runCommand entry in this list already has.
-    { id: 'repo.search', label: 'Search in repository', run: () => runCommand('repo.search') },
-    // C9 D6: gated on the active workspace directly (openQuickOpen's own repoIdOfWorkspace check),
-    // not the registerCommand/runCommand shape repo.search above uses — quick open needs no mounted
-    // panel to be meaningful, unlike repo.search's segmented-control switch.
-    { id: 'repo.quickOpen', label: 'Quick Open…', run: () => quickOpenStore.openQuickOpen() },
-    // P74 §7.4 item 1: registered by RepoDiffView.vue only for a revision-backed diff tab — a
-    // no-op elsewhere, the same view-scoped shape every other runCommand entry above has.
-    {
-      id: 'repo.goToFileFromDiff',
-      label: 'Go to file',
-      run: () => runCommand('repo.goToFileFromDiff'),
-    },
+    // P100 Part 2: repo.search (GitPanel.vue), repo.quickOpen (repo/state/quickOpen.ts) and
+    // repo.goToFileFromDiff (RepoDiffView.vue) used to live here — all three registered by, or
+    // gated on, the repo workspace, which moved to apps/kira-space wholesale. Removed rather than
+    // kept as permanently-no-op palette entries with nothing left to register or gate them.
     { id: 'view.refresh', label: 'Refresh', run: () => runCommand('view.refresh') },
     { id: 'view.run', label: 'Run statement', run: () => runCommand('view.run') },
     { id: 'view.run-all', label: 'Run all', run: () => runCommand('view.run-all') },

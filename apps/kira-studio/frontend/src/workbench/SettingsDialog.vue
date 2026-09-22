@@ -6,7 +6,6 @@ import {
   CACHE_L2_BUDGET_MB_RANGE,
   defaultSettings,
   EXPENSIVE_QUERY_ROWS_RANGE,
-  FETCH_AUTO_INTERVAL_MINUTES_RANGE,
   FONT_SIZE_RANGE,
   HTTP_VERSIONS,
   MAX_REDIRECTS_RANGE,
@@ -21,14 +20,13 @@ import { useQuery } from '@tanstack/vue-query';
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { data } from '../bridge/data';
 import { FONT_CHOICES, fontStackAvailable, resolveFontFallback } from '../fonts';
-import { formatBytes, formatRelative } from '../format';
+import { formatBytes } from '../format';
 import { useAgentHooksStore } from '../state/agentHooks';
 import { useCacheStatsStore } from '../state/cacheStats';
 import { useConfirmDialogStore } from '../state/confirmDialog';
 import { useConnectionsStore } from '../state/connections';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useDbMcpStore } from '../state/dbmcp';
-import { useGitClientsStore } from '../state/gitClients';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../state/maskRules';
 import { type Section, sections, useSettingsStore } from '../state/settings';
@@ -49,7 +47,6 @@ const cacheStatsStore = useCacheStatsStore();
 const confirmDialogStore = useConfirmDialogStore();
 const customScriptsStore = useCustomScriptsStore();
 const dbMcpStore = useDbMcpStore();
-const gitClientsStore = useGitClientsStore();
 const keepAwakeStore = useKeepAwakeStore();
 const connectionsStore = useConnectionsStore();
 const settingsStore = useSettingsStore();
@@ -133,51 +130,10 @@ const isDirty = computed(() => Object.keys(pendingPatch.value).length > 0);
 // 'Appearance', G12 D9's own default.
 const activeSection = ref<Section>(settingsStore.settingsSection ?? 'Appearance');
 
-// D16: this section bypasses draft/pendingPatch entirely — a revoke must take effect immediately,
-// not wait for Save, and gitClientsState is a module-level store, not a settings leaf.
-async function onRevokeGitClient(id: string, label: string): Promise<void> {
-  const ok = await confirmDialogStore.confirmDialog(
-    `Revoke access for "${label || id}"? It will need to be re-approved.`,
-    {
-      danger: true,
-    },
-  );
-  if (ok) await gitClientsStore.revokeGitClient(id);
-}
-
-// G10 D12/D14: the same bypass-draft-entirely posture as onRevokeGitClient above — an install is
-// an action, not a setting. installing starts true only while the click is in flight (the button
-// itself has no separate loading affordance elsewhere in this dialog).
-const vsixInstalling = ref(false);
-async function onInstallVsCodeIntegration(): Promise<void> {
-  vsixInstalling.value = true;
-  try {
-    await gitClientsStore.installVsCodeIntegration();
-  } finally {
-    vsixInstalling.value = false;
-  }
-}
-
-// D12's own outcome copy, verbatim where it's a fixed string; installFailed/revealFailed weave in
-// the server's own bounded Detail/vsixPath.
-const vsixOutcomeMessage = computed(() => {
-  const result = gitClientsStore.vsixInstallResult;
-  if (!result) return null;
-  switch (result.outcome) {
-    case 'installed':
-      return 'Installed into VS Code. Reload the window to activate it.';
-    case 'revealed':
-      return "VS Code's code command isn't available. Revealed the file in Finder — drag it onto VS Code, or run Shell Command: Install 'code' command in PATH.";
-    case 'notBundled':
-      return 'The extension ships inside the packaged app. This build has none.';
-    case 'installFailed':
-      return `VS Code refused the install: ${result.detail}. Reveal the file in Finder and drag it onto VS Code instead.`;
-    case 'revealFailed':
-      return `Couldn't reveal the file automatically. Find it at ${result.vsixPath}.`;
-    default:
-      return null;
-  }
-});
+// P100 Part 2: onRevokeGitClient/onInstallVsCodeIntegration/vsixOutcomeMessage (D16/G10 D12/D14 —
+// the 'Connected editors' section's own instant-action, bypass-draft-entirely posture) used to
+// live here. state/gitClients.ts and the whole 'Connected editors' UI section moved to
+// apps/kira-space wholesale — removed along with them.
 
 onBeforeUnmount(() => {
   // §10.1: a later plain open (TitleBar.vue's gear icon, the command palette) must not inherit a
@@ -347,18 +303,6 @@ function onExpensiveQueryRowsInput(e: Event): void {
   draft.advanced.expensiveQueryRows = Number((e.target as HTMLInputElement).value);
 }
 
-function onFetchAutoIntervalInput(e: Event): void {
-  draft.git.fetchAutoIntervalMinutes = Number((e.target as HTMLInputElement).value);
-}
-
-// P92 item 9: an emptied field writes 0 (the "follow appearance.fontSize" sentinel), same rule
-// applyAppearance() reads — not NaN, which onFetchAutoIntervalInput's plain Number(...) would let
-// through unnoticed for a genuinely blank input.
-function onGraphFontSizeInput(e: Event): void {
-  const raw = (e.target as HTMLInputElement).value;
-  draft.git.graphFontSize = raw === '' ? 0 : Number(raw);
-}
-
 // P90 §2.7: the global Api section's own handlers — same shape as every other leaf above.
 function onHttpVersionChange(e: Event): void {
   draft.api.httpVersion = (e.target as HTMLSelectElement).value as Settings['api']['httpVersion'];
@@ -390,23 +334,11 @@ function onGitLogLevelChange(e: Event): void {
     .value as Settings['advanced']['gitLogLevel'];
 }
 
-// G7 D17: `*` matches any run of characters except `/` — the same rule gitpreflight.
-// MatchProtectedBranch enforces server-side; this dialog only edits the pattern list, never
-// evaluates it. A plain ref, not a computed bound straight to draft.git.protectedBranches: parsing
-// on every keystroke and feeding the result back into the textarea's own value would snap away a
-// blank line the instant it's created, fighting the user mid-edit — parsed into the draft by the
-// watcher below instead, one-directionally.
-const protectedBranchesText = ref(draft.git.protectedBranches.join('\n'));
-watch(protectedBranchesText, (v) => {
-  draft.git.protectedBranches = v
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-});
-function resetProtectedBranches(): void {
-  draft.git.protectedBranches = [...defaultSettings.git.protectedBranches];
-  protectedBranchesText.value = draft.git.protectedBranches.join('\n');
-}
+// P100 Part 2: protectedBranchesText (G7 D17 — the Git section's own protected-branch-pattern
+// textarea, one-directionally parsed into draft.git.protectedBranches) and resetProtectedBranches
+// used to live here. The whole 'Git' settings section moved to apps/kira-space along with the repo
+// workspace it configured — removed along with it (draft.git/baseline.git themselves stay, below:
+// Settings is still one shared cross-app type, kira-space's own git.* leaves included).
 
 // P17 D6: the draft accepts whatever is typed (@input, so the field never fights the user
 // mid-keystroke) — validity is derived here, not enforced at write time, and gates Save below.
@@ -446,27 +378,9 @@ const expensiveQueryRowsError = computed<string | null>(() => {
   return null;
 });
 
-const fetchAutoIntervalError = computed<string | null>(() => {
-  const v = draft.git.fetchAutoIntervalMinutes;
-  if (!Number.isFinite(v)) return 'Enter a number.';
-  if (v < FETCH_AUTO_INTERVAL_MINUTES_RANGE.min || v > FETCH_AUTO_INTERVAL_MINUTES_RANGE.max) {
-    return `${FETCH_AUTO_INTERVAL_MINUTES_RANGE.min}–${FETCH_AUTO_INTERVAL_MINUTES_RANGE.max} minutes`;
-  }
-  return null;
-});
-
-// P92 item 9: 0 is the valid "follow appearance.fontSize" sentinel, but 1..8 is below
-// FONT_SIZE_RANGE.min and unreadable — reject that gap here, in the control, since the schema
-// itself accepts the full 0..max range (a stored out-of-range value must still hydrate).
-const graphFontSizeError = computed<string | null>(() => {
-  const v = draft.git.graphFontSize;
-  if (!Number.isFinite(v)) return 'Enter a number.';
-  if (v === 0) return null;
-  if (v < FONT_SIZE_RANGE.min || v > FONT_SIZE_RANGE.max) {
-    return `0, or ${FONT_SIZE_RANGE.min}–${FONT_SIZE_RANGE.max} px`;
-  }
-  return null;
-});
+// P100 Part 2: fetchAutoIntervalError and graphFontSizeError (draft.git.fetchAutoIntervalMinutes/
+// graphFontSize validation, P92 item 9's own 0-sentinel rule) used to live here, guarding the
+// 'Git' settings section removed alongside them.
 
 const requestTimeoutMsError = computed<string | null>(() => {
   const v = draft.api.requestTimeoutMs;
@@ -501,8 +415,6 @@ const isValid = computed(
     !cacheBudgetError.value &&
     !opLogRetentionError.value &&
     !expensiveQueryRowsError.value &&
-    !fetchAutoIntervalError.value &&
-    !graphFontSizeError.value &&
     !requestTimeoutMsError.value &&
     !maxResponseMbError.value &&
     !maxRedirectsError.value,
@@ -1185,196 +1097,11 @@ async function onAddScript(): Promise<void> {
             </div>
           </template>
 
-          <template v-else-if="activeSection === 'Connected editors'">
-            <!-- G10 D14: the Install VS Code Integration entry point — advisory-rendered from
-                 VsixStatus, but the click itself always re-resolves through Install. -->
-            <div class="git-vsix-install">
-              <p v-if="!gitClientsStore.vsix.bundled" class="muted-note" data-testid="git-vsix-not-bundled">
-                The extension ships inside the packaged app. This build has none.
-              </p>
-              <template v-else>
-                <!-- C3 §7.5: the same command-before-button transparency the Database MCP
-                     tab's Claude Code flow uses, applied here too — unrelated feature, same
-                     principle. -->
-                <p class="mono command-text" data-testid="git-vsix-command">
-                  {{ gitClientsStore.vsix.command }}
-                </p>
-                <AppButton
-                  kind="dialog"
-                  class="action-button"
-                  :disabled="vsixInstalling"
-                  data-testid="git-vsix-install-button"
-                  @click="onInstallVsCodeIntegration"
-                >
-                  {{ gitClientsStore.vsix.codeAvailable ? 'Install VS Code Integration' : 'Reveal Extension in Finder' }}
-                </AppButton>
-              </template>
-              <p v-if="vsixOutcomeMessage" class="helper-text" data-testid="git-vsix-outcome">
-                {{ vsixOutcomeMessage }}
-              </p>
-              <p
-                v-if="gitClientsStore.vsix.bundled && !gitClientsStore.vsix.codeAvailable && gitClientsStore.vsix.probed.length > 0"
-                class="muted-note"
-                data-testid="git-vsix-probed"
-              >
-                Looked for VS Code's <span class="mono">code</span> command at:
-                <span class="mono">{{ gitClientsStore.vsix.probed.join(', ') }}</span>
-              </p>
-            </div>
-
-            <p v-if="gitClientsStore.clients.length === 0" class="muted-note" data-testid="git-clients-empty">
-              No editors have been paired yet. A VS Code editor pairs by connecting to
-              <span class="mono">~/.kira-studio/git.sock</span>.
-            </p>
-            <ul v-else class="git-clients-list">
-              <li
-                v-for="client in gitClientsStore.clients"
-                :key="client.id"
-                class="git-client-row"
-                :data-testid="`git-client-row-${client.id}`"
-              >
-                <div class="git-client-info">
-                  <span class="git-client-label">{{ client.label || client.id }}</span>
-                  <span class="helper-text">
-                    <template v-if="client.revokedAt">Revoked</template>
-                    <template v-else>Last seen {{ formatRelative(client.lastSeenAt) }}</template>
-                  </span>
-                </div>
-                <IconButton
-                  v-if="!client.revokedAt"
-                  icon="trash"
-                  tone="danger"
-                  :data-testid="`git-client-revoke-${client.id}`"
-                  v-tooltip="'Revoke'"
-                  @click="onRevokeGitClient(client.id, client.label)"
-                />
-              </li>
-            </ul>
-          </template>
-
-          <template v-else-if="activeSection === 'Git'">
-            <h3 class="section-subhead">Git remote operations</h3>
-            <p class="muted-note">
-              Server-owned: applies to every connected editor immediately, since two windows
-              disagreeing about either is a safety issue, not a preference.
-            </p>
-            <label class="field">
-              <div class="field-head">
-                <span>Protected branch patterns (one per line)</span>
-                <IconButton
-                  icon="discard"
-                  data-testid="settings-reset-git-protectedBranches"
-                  :disabled="isAtDefault('git', 'protectedBranches')"
-                  v-tooltip="'Reset to default'"
-                  @click="resetProtectedBranches"
-                />
-              </div>
-              <textarea
-                v-model="protectedBranchesText"
-                class="p-textarea"
-                rows="4"
-                placeholder="main"
-                data-testid="settings-git-protected-branches"
-              />
-              <span class="helper-text"
-                >Force-pushing or deleting a matching remote branch requires typing its name to
-                confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</span
-              >
-            </label>
-            <label class="field">
-              <div class="field-head">
-                <span>Auto-fetch interval (minutes)</span>
-                <IconButton
-                  icon="discard"
-                  data-testid="settings-reset-git-fetchAutoIntervalMinutes"
-                  :disabled="isAtDefault('git', 'fetchAutoIntervalMinutes')"
-                  v-tooltip="'Reset to default'"
-                  @click="resetLeaf('git', 'fetchAutoIntervalMinutes')"
-                />
-              </div>
-              <TextField
-                type="number"
-                :min="FETCH_AUTO_INTERVAL_MINUTES_RANGE.min"
-                :max="FETCH_AUTO_INTERVAL_MINUTES_RANGE.max"
-                size="md"
-                :invalid="!!fetchAutoIntervalError"
-                data-testid="settings-git-fetch-auto-interval"
-                :model-value="String(draft.git.fetchAutoIntervalMinutes)"
-                @input="onFetchAutoIntervalInput"
-              />
-              <span
-                v-if="fetchAutoIntervalError"
-                class="field-error"
-                data-testid="settings-git-fetch-auto-interval-error"
-              >
-                {{ fetchAutoIntervalError }}
-              </span>
-              <span v-else class="helper-text"
-                >0 disables background fetching. Never prompts for a credential — a remote that
-                needs one simply fails silently and disables the timer until the next explicit
-                fetch.</span
-              >
-            </label>
-            <label class="field">
-              <div class="field-head">
-                <span>Git executable path</span>
-                <IconButton
-                  icon="discard"
-                  data-testid="settings-reset-git-gitPath"
-                  :disabled="isAtDefault('git', 'gitPath')"
-                  v-tooltip="'Reset to default'"
-                  @click="resetLeaf('git', 'gitPath')"
-                />
-              </div>
-              <TextField
-                type="text"
-                size="md"
-                data-testid="settings-git-path"
-                v-model="draft.git.gitPath"
-              />
-              <span class="helper-text"
-                >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
-                time, never cached, so a change here takes effect on the next one.</span
-              >
-            </label>
-            <h3 class="section-subhead">Graph</h3>
-            <label class="field">
-              <div class="field-head">
-                <span>Font size</span>
-                <IconButton
-                  icon="discard"
-                  data-testid="settings-reset-git-graphFontSize"
-                  :disabled="isAtDefault('git', 'graphFontSize')"
-                  v-tooltip="'Reset to default'"
-                  @click="resetLeaf('git', 'graphFontSize')"
-                />
-              </div>
-              <TextField
-                type="number"
-                :min="FONT_SIZE_RANGE.min"
-                :max="FONT_SIZE_RANGE.max"
-                size="md"
-                :invalid="!!graphFontSizeError"
-                data-testid="settings-git-graphFontSize"
-                :model-value="String(draft.git.graphFontSize)"
-                @input="onGraphFontSizeInput"
-              />
-              <span
-                v-if="graphFontSizeError"
-                class="field-error"
-                data-testid="settings-git-graphFontSize-error"
-              >
-                {{ graphFontSizeError }}
-              </span>
-              <span v-else class="helper-text">0 = match the app font size.</span>
-            </label>
-          </template>
-
           <template v-else-if="activeSection === 'Scripts'">
             <p class="helper-text">
               Each script becomes an entry in the tab strip's "+" button and the Terminal module's
               own quick-command panel, opening a new terminal tab running its command. An empty
-              working directory uses the active repository's own worktree root.
+              working directory falls back to the Terminal module's own default directory.
             </p>
 
             <div
@@ -1534,7 +1261,8 @@ async function onAddScript(): Promise<void> {
           </template>
 
           <template v-else-if="activeSection === 'Database MCP'">
-            <!-- M1 §6.2: same instant-action posture as Connected editors above — this leaf
+            <!-- M1 §6.2: the same instant-action posture the 'Connected editors' section's own
+                 revoke/install actions used before it moved to apps/kira-space (P100 Part 2) — this leaf
                  (dbMcp.serverEnabled) both persists and starts/stops the embedded DB MCP server in
                  one call, so it belongs on the action side of the draft/Save line, never mixed with
                  it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
@@ -1924,50 +1652,13 @@ async function onAddScript(): Promise<void> {
   font-size: var(--kira-t-xs);
 }
 
-.section-subhead {
-  @apply font-semibold;
-  margin: var(--kira-s-3) 0 0;
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg);
-}
-
 .action-button {
   @apply self-start;
 }
 
-.git-vsix-install {
-  @apply flex flex-col items-start;
-  gap: var(--kira-s-2);
-  margin-bottom: var(--kira-s-4);
-  padding-bottom: var(--kira-s-4);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
-}
-
-.git-clients-list {
-  @apply flex flex-col m-0 p-0 list-none;
-  gap: var(--kira-s-1);
-}
-
-.git-client-row {
-  @apply flex items-center justify-between rounded-[var(--kira-radius-sm)];
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  border: var(--kira-border-width) solid var(--kira-border);
-}
-
-.git-client-info {
-  @apply flex flex-col min-w-0;
-  gap: var(--kira-s-1);
-}
-
-.git-client-label {
-  @apply overflow-hidden text-ellipsis whitespace-nowrap;
-  color: var(--kira-fg);
-  font-size: var(--kira-t-sm);
-}
-
-/* M2 §7.3: the "Exposed connections" list's own per-row glance — .git-clients-list/.git-client-row's
-   own pattern, with the info column allowed to wrap instead of eliding it. */
+/* M2 §7.3: the "Exposed connections" list's own per-row glance. P100 Part 2: originally patterned
+   after .git-clients-list/.git-client-row (the 'Connected editors' section's own rules) — both
+   moved to apps/kira-space along with that section, so this now stands alone. */
 .db-mcp-connections-list {
   @apply flex flex-col m-0 p-0 list-none;
   gap: var(--kira-s-1);

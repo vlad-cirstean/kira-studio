@@ -5,17 +5,14 @@ import { formatBytes } from '../format';
 import { useAgentSessionsStore } from '../state/agentSessions';
 import { useAppMetricsStore } from '../state/appMetrics';
 import { useAppUpdateStore } from '../state/appUpdate';
-import { useBlameStatusStore } from '../state/blameStatus';
 import { useCacheStatsStore } from '../state/cacheStats';
 import CodiconIcon from '../theme/CodiconIcon.vue';
-import { blameLineText, blameLineTooltip } from '../views/repo/blameLine';
 import { useEngineStore } from './state/engine';
 
 const engineStore = useEngineStore();
 const agentSessionsStore = useAgentSessionsStore();
 const appMetricsStore = useAppMetricsStore();
 const appUpdateStore = useAppUpdateStore();
-const blameStatusStore = useBlameStatusStore();
 const cacheStatsStore = useCacheStatsStore();
 
 // Summed across every process metrics.Sample covers (internal/metrics/ticker.go's Interval, 5s) —
@@ -76,18 +73,11 @@ function onOpenReleasePage(): void {
   void control.updateOpenReleasePage().catch(() => {});
 }
 
-// P76 §5.2: 'none' and 'uncommitted' both render nothing — an always-present "Uncommitted" readout
-// is the extension's own choice; this bar hides items with nothing to say instead (app-metrics,
-// cache-size both do the same), so absent is the consistent answer here.
-const blame = computed(() =>
-  blameStatusStore.status.kind === 'resolved' ? blameStatusStore.status : null,
-);
-const blameText = computed(() => (blame.value ? blameLineText(blame.value) : ''));
-const blameTooltip = computed(() => (blame.value ? blameLineTooltip(blame.value).join(' — ') : ''));
-
-function onRevealBlameCommit(): void {
-  if (blame.value) blameStatusStore.reveal?.(blame.value.sha);
-}
+// P100 Part 2: the blame readout (P76 §5.2 — state/blameStatus.ts, views/repo/blameLine.ts) used
+// to live here, a sibling fact beside the caret-status slot below. Blame is intrinsically a repo/
+// git fact, not duplicated the way the standalone Terminal renderer was (views/terminal/
+// TerminalView.vue's own doc comment) — both its state store and its one caller here moved to
+// apps/kira-space wholesale instead.
 
 // P86 §14.1: an app-wide fact like app-metrics/cache-size beside it, not a caret fact — §11's own
 // count, absent (not a zero reading, StatusBar's own rule above) rather than shown as "0".
@@ -135,18 +125,6 @@ const agentTooltip = computed(() =>
       <span class="p-status" data-testid="caret-status">
         <span class="mono xs muted">no selection</span>
       </span>
-      <!-- P76 §5.2: a sibling fact, not the caret-status slot above — that readout stays unwired. -->
-      <button
-        v-if="blame"
-        class="p-status blame"
-        data-testid="blame-status"
-        :disabled="!blameStatusStore.reveal"
-        v-tooltip="blameTooltip"
-        @click="onRevealBlameCommit"
-      >
-        <CodiconIcon name="git-commit" :size="13" />
-        <span class="blame-text">{{ blameText }}</span>
-      </button>
     </div>
 
     <div class="side">
@@ -233,20 +211,5 @@ const agentTooltip = computed(() =>
 }
 .update:hover {
   color: var(--kira-fg);
-}
-
-/* .blame is a <button> for the same reason .update is (activated -> keyboard focus/Enter/Space
-   come free); its UA chrome reset is that rule's, reused. Unlike .update, no accent color — a
-   blame readout is informational, not something needing attention. */
-.blame {
-  @apply bg-none;
-  font: inherit;
-  color: var(--kira-fg);
-}
-.blame:disabled {
-  @apply cursor-default;
-}
-.blame-text {
-  @apply max-w-[48ch] overflow-hidden text-ellipsis whitespace-nowrap;
 }
 </style>

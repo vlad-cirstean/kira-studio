@@ -1,22 +1,15 @@
 <script setup lang="ts">
 import type { TabRecord } from '@shared/domain/tabs';
-import { isRepoWorkspace, repoIdOfWorkspace } from '@shared/domain/workspace';
 import { computed, nextTick, ref, watch } from 'vue';
 import { copyText } from '../../clipboard';
-import { fileIconStyle } from '../../repo/fileIcon';
 import { useAgentSessionsStore } from '../../state/agentSessions';
-import { useCodeReposStore } from '../../state/coderepos';
 import { type MenuItem, useContextMenuStore } from '../../state/contextMenu';
-import { useCustomScriptsStore } from '../../state/customScripts';
-import { tabsForWorkspace } from '../../state/mode';
-import { openRepoTerminalTab } from '../../state/repoTabs';
-import { useSettingsStore } from '../../state/settings';
+import { tabsForWorkspace, useModeStore } from '../../state/mode';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { TAB_KINDS } from '../../state/tabKinds';
 import { useTabsStore } from '../../state/tabs';
 import { useTerminalsStore } from '../../state/terminals';
-import { openTerminalTab, type TerminalLaunch } from '../../state/terminalTabs';
-import { useWorkspaceStore } from '../../state/workspace';
+import { openTerminalTab } from '../../state/terminalTabs';
 import CodiconIcon from '../../theme/CodiconIcon.vue';
 import { connColorVar } from '../../theme/connColor';
 import { wheelToHorizontal } from '../../wheelScroll';
@@ -24,12 +17,9 @@ import { wheelToHorizontal } from '../../wheelScroll';
 const contextMenuStore = useContextMenuStore();
 
 const agentSessionsStore = useAgentSessionsStore();
-const codeReposStore = useCodeReposStore();
-const customScriptsStore = useCustomScriptsStore();
 const tabIncognitoStore = useTabIncognitoStore();
-const workspaceStore = useWorkspaceStore();
+const modeStore = useModeStore();
 const tabsStore = useTabsStore();
-const settingsStore = useSettingsStore();
 const terminalsStore = useTerminalsStore();
 
 function isPinned(tab: TabRecord): boolean {
@@ -141,10 +131,10 @@ function onContextMenu(e: MouseEvent, tab: TabRecord): void {
   ]);
 }
 
-// C5 §4.3: the active workspace's own tabs (pinned first, §6.1) — studio/api behave exactly as
-// tabsForMode(modeState.active) always did (no pinned kind exists in either), a repo workspace
-// additionally always shows its pinned graph tab first.
-const tabs = computed(() => tabsForWorkspace(workspaceStore.active));
+// C5 §4.3: the active mode's own tabs (pinned first, §6.1) — studio/api/terminal all behave as
+// tabsForMode(modeState.active) always did (no pinned kind exists in any of the three, since
+// P100 Part 2 moved the one kind that was, repo-graph, to apps/kira-space wholesale).
+const tabs = computed(() => tabsForWorkspace(modeStore.active));
 
 // P72 §7: split out of `tabs` so the template can render the pinned tab in a fixed leading slot,
 // outside `.tab-strip`'s own `overflow-x: auto` — previously it scrolled away with everything
@@ -168,7 +158,7 @@ const scrollingTabs = computed(() =>
 // nav, session restore) previously left the strip's own scroll position untouched — the newly
 // active tab could be selected yet scrolled out of view, with nothing on screen indicating a
 // selection had even happened until the user scrolled the strip by hand to go find it.
-const activeTabId = computed(() => tabsStore.activeIdByWorkspace[workspaceStore.active]);
+const activeTabId = computed(() => tabsStore.activeIdByWorkspace[modeStore.active]);
 const stripRef = ref<HTMLElement | null>(null);
 
 watch(
@@ -218,96 +208,28 @@ function onDragEnd(): void {
 // regardless of where inside its 22px box the click landed.
 const newTabBtn = ref<HTMLButtonElement | null>(null);
 
-// P91 §8: the "+" now also shows with zero tabs in the Terminal module — a repo workspace always
-// has its pinned graph tab, so this gap never showed before a module whose normal initial state
-// is zero tabs existed.
-const showNewTab = computed(
-  () => isRepoWorkspace(workspaceStore.active) || workspaceStore.active === 'terminal',
-);
+// P91 §8: the "+" shows with zero tabs in the Terminal module — its own normal initial state.
+// P100 Part 2: this app now has exactly one mode that ever opens a tab through this button — the
+// studio/api project-panel/tree flows are the only way into their own tab kinds, and the repo
+// workspace (the button's other old source of tabs) moved to apps/kira-space wholesale.
+const showNewTab = computed(() => modeStore.active === 'terminal');
 
 function onNewTab(): void {
   const btn = newTabBtn.value;
   if (!btn) return;
   const rect = btn.getBoundingClientRect();
-  const items =
-    workspaceStore.active === 'terminal' ? terminalModuleMenuItems() : newTabMenuItems();
-  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, items);
+  contextMenuStore.openContextMenuAt(rect.left, rect.bottom + 2, terminalModuleMenuItems());
 }
 
-// P85 §6.4: every dropdown entry funnels through this — the active workspace's own repo, or the
-// script's own workingDir override (cwdOverride) when it has one (P85 §7).
-function launchInActiveWorkspace(launch?: TerminalLaunch, cwdOverride?: string): void {
-  const repoId = repoIdOfWorkspace(workspaceStore.active);
-  const repo = repoId ? codeReposStore.codeRepoRecord(repoId) : undefined;
-  if (!repoId || !repo) return;
-  openRepoTerminalTab(repoId, cwdOverride || repo.root, launch);
-}
-
-// P85 §6.1: Terminal and Claude Code (this app's own launch targets) sit together with no rule
-// between them; one item per configured script follows, separated, then "Manage scripts…"
-// (§6.4: settings/customScripts.ts's own reactive list, no separate load here).
-function newTabMenuItems(): MenuItem[] {
-  const items: MenuItem[] = [
-    {
-      type: 'item',
-      id: 'new-terminal',
-      label: 'Terminal',
-      icon: 'terminal-bash',
-      run: () => launchInActiveWorkspace(),
-    },
-    {
-      type: 'item',
-      id: 'new-claude-code',
-      label: 'Claude Code',
-      icon: 'sparkle',
-      run: () =>
-        launchInActiveWorkspace({
-          command: 'claude',
-          label: 'Claude Code',
-          color: 'none',
-          kind: 'claude-code',
-        }),
-    },
-  ];
-  if (customScriptsStore.records.length > 0) {
-    items.push({ type: 'separator' });
-    for (const script of customScriptsStore.records) {
-      items.push({
-        type: 'item',
-        id: `script-${script.id}`,
-        label: script.name,
-        hint: script.command,
-        ...(script.color === 'none' ? { icon: 'play' } : { swatch: script.color }),
-        run: () =>
-          launchInActiveWorkspace(
-            { command: script.command, label: script.name, color: script.color, kind: 'script' },
-            script.workingDir || undefined,
-          ),
-      });
-    }
-  }
-  items.push(
-    { type: 'separator' },
-    {
-      type: 'item',
-      id: 'manage-scripts',
-      label: 'Manage scripts…',
-      icon: 'settings-gear',
-      run: () => settingsStore.openSettingsAt('Scripts'),
-    },
-  );
-  return items;
-}
-
-// P91 §8: the Terminal module's own "+" menu — deliberately not newTabMenuItems above (§8.3): no
-// Claude Code entry (P85/P86's own surface, not asked for here) and no per-script entries (the
-// left panel is the quick-command surface, one click away and always visible while the module is
-// open — two identical launchers side by side is the outcome to avoid). `Terminal` opens an
-// unscoped session at the resolved home directory; one entry per known repository/worktree row
-// (§8.1) opens one scoped at its own root — both stay in the Terminal module's own workspace,
-// never opening a Git workspace as a side effect (§6's whole point).
+// P91 §8: the Terminal module's own "+" menu — one plain, unscoped session at the resolved home
+// directory. P100 Part 2: this used to also list one entry per imported repository/worktree
+// (openRepoTerminalTab's own repo-scoped launch, §8.1) plus a Claude Code/custom-script section
+// (newTabMenuItems, §6.1/§6.4) — both were repo-workspace affordances (state/coderepos.ts,
+// state/customScripts.ts's own workingDir-per-script story existed to target a specific repo
+// root), and this app now has no imported-repos concept left to populate either from. Dropped
+// rather than kept as a dead/empty branch — Kira Space's own repoTabs.ts keeps the full version.
 function terminalModuleMenuItems(): MenuItem[] {
-  const items: MenuItem[] = [
+  return [
     {
       type: 'item',
       id: 'new-terminal',
@@ -319,22 +241,6 @@ function terminalModuleMenuItems(): MenuItem[] {
       },
     },
   ];
-  if (codeReposStore.records.length > 0) {
-    items.push({ type: 'separator' });
-    for (const repo of codeReposStore.records) {
-      items.push({
-        type: 'item',
-        id: `repo-${repo.id}`,
-        label: repo.name,
-        hint: repo.root,
-        icon: 'repo',
-        run: () => {
-          openTerminalTab({ workspaceId: 'terminal', cwd: repo.root, codeRepoId: repo.id });
-        },
-      });
-    }
-  }
-  return items;
 }
 </script>
 
@@ -371,13 +277,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         @click="onClick(tab)"
         @contextmenu.prevent="onContextMenu($event, tab)"
       >
-        <span
-          v-if="typeof icon !== 'string'"
-          class="tab-icon tab-file-icon"
-          :style="fileIconStyle(icon.filePath)"
-          aria-hidden="true"
-        />
-        <CodiconIcon v-else :name="icon" :size="13" class="tab-icon" />
+        <CodiconIcon :name="icon" :size="13" class="tab-icon" />
       </button>
       <span class="tab-strip-separator" aria-hidden="true"></span>
     </div>
@@ -414,13 +314,7 @@ function terminalModuleMenuItems(): MenuItem[] {
         @dragend="onDragEnd"
       >
         <span class="p-tab-rail" />
-        <span
-          v-if="typeof icon !== 'string'"
-          class="tab-icon tab-file-icon"
-          :style="fileIconStyle(icon.filePath)"
-          aria-hidden="true"
-        />
-        <CodiconIcon v-else :name="icon" :size="13" class="tab-icon" />
+        <CodiconIcon :name="icon" :size="13" class="tab-icon" />
         <CodiconIcon
           v-if="tabIncognitoStore.isIncognito(tab.id)"
           name="eye-closed"
@@ -524,15 +418,6 @@ function terminalModuleMenuItems(): MenuItem[] {
 
 .tab-icon {
   @apply shrink-0;
-}
-
-/* P73 §2.3: a seti mask icon (repo-file tabs) rather than a codicon glyph — coloured per language,
-   14px (--kira-control-inline-h) rather than the tree's 16px so it doesn't outweigh the 13px
-   codicon beside it on other tabs. */
-.tab-file-icon {
-  @apply [mask-size:contain] [mask-repeat:no-repeat] [mask-position:center] [-webkit-mask-size:contain] [-webkit-mask-repeat:no-repeat] [-webkit-mask-position:center];
-  width: var(--kira-control-inline-h);
-  height: var(--kira-control-inline-h);
 }
 
 .tab-title {

@@ -18,23 +18,14 @@ export interface ModeDef {
 // P1 D6/C6: mode content comes from a registry, mirroring D4's tab-kind registry. Api's own
 // entries are both EmptyState-based (§0.2) — P1 adds no HTTP functionality, only the seam.
 //
-// P67b §4.1: 'git' joins as a third peer module, not a special case dispatched around (§0's
-// correction — a repository is an instance inside Git, not a fourth top-level tab of its own).
-// §4.6: git's panel/start are lazily imported — GitPanel.vue pulls in RepoFileTree/RepoTreeRow/
-// RepoSearchView/RepoReviewView (and, via RepoTreeRow, seti-icons' 144 KB of JSON data, §6.3),
-// none of which a session that never opens a repository should pay for in its launch chunk
-// (gitUiModule.ts's own C12-3 precedent). `Component` already covers a `defineAsyncComponent`'s
-// return, so ModeDef needs no type change.
+// P100 Part 2: 'git' (P67b §4.1's third peer module — GitPanel.vue/GitStart.vue and everything
+// they pulled in, RepoFileTree/RepoTreeRow/RepoSearchView/RepoReviewView included) moved to
+// apps/kira-space wholesale — this registry is back to the two-plus-terminal shape P91 found it in
+// before P67b, `Component` already covering `defineAsyncComponent`'s return either way.
 export const MODES: Record<AppMode, ModeDef> = {
   studio: { label: 'Studio', icon: 'database', panel: ProjectPanel, start: StudioStart },
   api: { label: 'Api', icon: 'globe', panel: CollectionsPanel, start: ApiStart },
-  git: {
-    label: 'Git',
-    icon: 'source-control',
-    panel: defineAsyncComponent(() => import('../repo/GitPanel.vue')),
-    start: defineAsyncComponent(() => import('../repo/GitStart.vue')),
-  },
-  // P91 §2: a fourth peer module, lazy for the identical reason git's own two are (§1.1) — nothing
+  // P91 §2: a peer module, lazy the same reason git's own two used to be (§1.1, now gone) — nothing
   // in a Studio-only session should pay for the terminal panel's own launch chunk.
   terminal: {
     label: 'Terminal',

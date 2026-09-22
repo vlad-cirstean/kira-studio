@@ -6,8 +6,6 @@ import { openApiRequestTab } from './api/tabs';
 import { control } from './bridge/control';
 import ConnectionDialog from './project/ConnectionDialog.vue';
 import DataGripImportDialog from './project/DataGripImportDialog.vue';
-import QuickOpen from './repo/QuickOpen.vue';
-import { useQuickOpenStore } from './repo/state/quickOpen';
 import CommandPalette from './shortcuts/CommandPalette.vue';
 import { runCommand } from './shortcuts/commands';
 import { usePaletteStore } from './shortcuts/state';
@@ -24,8 +22,6 @@ import ConfirmDialog from './workbench/ConfirmDialog.vue';
 import ContextMenu from './workbench/ContextMenu.vue';
 import DbMcpApprovalDialog from './workbench/DbMcpApprovalDialog.vue';
 import GenerateDataDialog from './workbench/GenerateDataDialog.vue';
-import GitCredentialDialog from './workbench/GitCredentialDialog.vue';
-import GitPairingDialog from './workbench/GitPairingDialog.vue';
 import { useEngineStore } from './workbench/state/engine';
 import { useTooltipStore } from './workbench/state/tooltip';
 import TitleBar from './workbench/TitleBar.vue';
@@ -40,7 +36,6 @@ const datagripImportStore = useDatagripImportStore();
 const fakeDataStore = useFakeDataStore();
 const objectStoreStore = useObjectStoreStore();
 const layoutStore = useLayoutStore();
-const quickOpenStore = useQuickOpenStore();
 const collectionsStore = useCollectionsStore();
 const connectionDialogStore = useConnectionDialogStore();
 const tabsStore = useTabsStore();
@@ -78,7 +73,6 @@ onMounted(() => {
     control.onToggleProjectPanel(layoutStore.toggleProjectPanel),
     control.onToggleOperationsPanel(layoutStore.toggleOperationsPanel),
     control.onCommandPalette(paletteStore.togglePalette),
-    control.onQuickOpen(quickOpenStore.openQuickOpen),
     control.onTabNext(tabsStore.activateNextTab),
     control.onTabPrev(tabsStore.activatePrevTab),
     control.onTabClose(closeActiveTab),
@@ -108,12 +102,9 @@ onUnmounted(() => {
   <ApiDialogs />
   <UploadObjectDialog v-if="objectStoreStore.open" />
   <GenerateDataDialog v-if="fakeDataStore.open" />
-  <GitPairingDialog />
   <DbMcpApprovalDialog />
-  <GitCredentialDialog />
   <ConfirmDialog />
   <ContextMenu />
   <CommandPalette />
-  <QuickOpen />
   <AppTooltip />
 </template>

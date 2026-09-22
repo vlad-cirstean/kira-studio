@@ -12,7 +12,6 @@ import {
   httpRequestTabStateSchema,
 } from '@shared/domain/http';
 import {
-  asRepoFileTab,
   type BrowseTabRecord,
   type BrowseTabState,
   browseTabStateSchema,
@@ -32,10 +31,6 @@ import {
   defaultDefinitionTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
-  defaultRepoDiffTabState,
-  defaultRepoFileTabState,
-  defaultRepoGraphTabState,
-  defaultRepoMultiDiffTabState,
   defaultStreamTabState,
   definitionTabStateSchema,
   documentTabStateSchema,
@@ -46,18 +41,6 @@ import {
   type KeyValueTabRecord,
   type KeyValueTabState,
   keyValueTabStateSchema,
-  type RepoDiffTabRecord,
-  type RepoDiffTabState,
-  type RepoFileTabRecord,
-  type RepoFileTabState,
-  type RepoGraphTabRecord,
-  type RepoGraphTabState,
-  type RepoMultiDiffTabRecord,
-  type RepoMultiDiffTabState,
-  repoDiffTabStateSchema,
-  repoFileTabStateSchema,
-  repoGraphTabStateSchema,
-  repoMultiDiffTabStateSchema,
   type StreamTabRecord,
   type StreamTabState,
   streamTabStateSchema,
@@ -73,15 +56,12 @@ import {
   variableSetTabStateSchema,
 } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
-import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { useTreeStore } from '../project/state/tree';
 import { dropForTab as dropConsoleResultPagesForTab } from '../views/console/resultPages';
 import { drop as dropDocumentPagesForTab } from '../views/documents/page';
 import { drop as dropGridPagesForTab } from '../views/grid/page';
-import { dropRepoDiffTab, dropRepoFileTab, dropRepoMultiDiffTab } from '../views/repo/editors';
 import { drop as dropKeyValuePagesForTab } from '../views/shared/keyvalue/page';
 import { drop as dropStreamPagesForTab } from '../views/stream/page';
-import { useCodeReposStore } from './coderepos';
 import { useConnectionsStore } from './connections';
 import type { MenuItem } from './contextMenu';
 import { useSettingsStore } from './settings';
@@ -94,9 +74,12 @@ import { useTerminalsStore } from './terminals';
 // (F19). Every entry below carries Studio's existing per-kind behaviour verbatim: TabStrip.vue's
 // old iconFor body, tabTitle (F10), connectionRecord(tab.connectionId)?.color, and the "Reveal in
 // project panel" menu item (F11) — nothing here changes what Studio does, only where it lives.
-/** A codicon name, or a file path whose icon comes from the shared seti set
- *  (`repo/fileIcon.ts`) — the same rule the repo file tree and the diff tree already use. */
-type TabIcon = string | { readonly filePath: string };
+// P100 Part 2: this used to also allow `{ readonly filePath: string }` (a seti-set file icon,
+// `repo/fileIcon.ts`) for 'repo-file' tabs — the one kind that ever returned it. That kind is now
+// unreachableTabKind (below), so no TAB_KINDS entry can produce that variant here any more; kept
+// as a plain string alias rather than deleted outright, since TabStrip.vue's own `icon(tab)` call
+// sites still read through this type name.
+type TabIcon = string;
 
 export interface TabKindDef<K extends TabKind = TabKind> {
   mode: (typeof TAB_KIND_MODE)[K];
@@ -181,42 +164,27 @@ function noDrop(): void {
   // definition/browse have no page store of their own (F12) — nothing to free.
 }
 
-// C5 §7: a repo-file tab's `path` is a plain repository-relative path ('src/main.go'), not an
-// encoded NodePath — tabTitle's own pathTail() expects a "kind:name" segment and would return the
-// whole path unparsed, so this kind gets its own basename-only title instead.
-//
-// P74 §7.3: also called for a repo-diff tab's own title (repoDiffTitle below), which has no `rev`
-// field — asRepoFileTab returns null there, so the suffix is added only for an actual repo-file
-// tab at a revision, matching repoDiffTitle's own `(abc1234 ↔ def5678)` suffix shape.
-function repoFileTitle(tab: TabRecord): string {
-  const idx = tab.path.lastIndexOf('/');
-  const base = idx < 0 ? tab.path : tab.path.slice(idx + 1);
-  const rev = asRepoFileTab(tab)?.state.rev;
-  return rev == null ? base : `${base} (${rev.slice(0, 7)})`;
-}
-
-// C6 §8.1: same basename-only reasoning as repoFileTitle, plus a suffix distinguishing a diff tab
-// from a file tab open on the identical path (openTab's own dedupe key lets both coexist).
-// C10 §6.1: a commit diff (revision pair present, openRepoCommitDiffTab) is titled with both
-// short shas instead, so two commits' diffs of the same file read as genuinely different tabs,
-// not two tabs both saying "(Working Tree)".
-function repoDiffTitle(tab: TabRecord): string {
-  const diff = tab as RepoDiffTabRecord; // this kind's own title(), per TabKindDef's own table
-  if (diff.state.left !== null && diff.state.right !== null) {
-    const left = diff.state.leftLabel ?? diff.state.left.slice(0, 7);
-    const right = diff.state.rightLabel ?? diff.state.right.slice(0, 7);
-    return `${repoFileTitle(tab)} (${left} ↔ ${right})`;
-  }
-  return `${repoFileTitle(tab)} (Working Tree)`;
-}
-
-// P92 item 5: no `repoFileTitle`-style basename — `path` doesn't exist on this kind (it covers a
-// whole commit's file set, not one file), so the title is the revision pair plus a file count,
-// mirroring repoDiffTitle's own `leftLabel`/`rightLabel` fallback.
-function repoMultiDiffTitle(tab: TabRecord): string {
-  const diff = tab as RepoMultiDiffTabRecord;
-  const count = diff.state.files.length;
-  return `${diff.state.leftLabel} ↔ ${diff.state.rightLabel} (${count} file${count === 1 ? '' : 's'})`;
+// P100 Part 2: a TabKindDef for a kind this app can never actually construct a tab of — see the
+// repo-* entries' own comment (below) for why this exists instead of narrowing TAB_KINDS's own key
+// type off TabKind. Every member throws if ever actually called (an invariant violation worth
+// failing loudly on) except parseState, which returns null like any other unparseable row —
+// hydrateTabs' own merge-only contract already handles that safely — and dropResources, a no-op
+// like every other kind's own miss case (dropPageStoresForTab blind-calls every registered kind).
+function unreachableTabKind<K extends TabKind>(kind: K): TabKindDef<K> {
+  const unreachable = (): never => {
+    throw new Error(`kira: tab kind "${kind}" belongs to Kira Space, never opened here`);
+  };
+  return {
+    mode: TAB_KIND_MODE[kind],
+    title: unreachable,
+    icon: unreachable,
+    railColor: unreachable,
+    defaultState: unreachable,
+    parseState: () => null,
+    duplicateState: unreachable,
+    dropResources: noDrop,
+    menuExtras: () => [],
+  };
 }
 
 // P3 D3: every parseState below is a one-liner over the schema its own kind already imports —
@@ -430,81 +398,22 @@ export const TAB_KINDS: { [K in TabKind]: TabKindDef<K> } = {
   // C5 §6.2: the pinned graph placeholder — title reads the workspace's own repo name (falling
   // back to a generic label before that repo's row has loaded, mirroring HttpRequestTabState's own
   // pre-load convention).
-  'repo-graph': {
-    mode: TAB_KIND_MODE['repo-graph'],
-    title: (tab) =>
-      useCodeReposStore().codeRepoRecord(repoIdOfWorkspace((tab.workspaceId as WorkspaceKey) ?? ''))
-        ?.name ?? 'Graph',
-    icon: () => 'source-control',
-    railColor: () => undefined,
-    defaultState: (): RepoGraphTabState => defaultRepoGraphTabState(),
-    // Never actually reached (`pinned: true` refuses duplication, state/tabs.ts), but a real
-    // default rather than `{}` keeps this consistent with every other kind's own duplicateState.
-    duplicateState: (_tab: RepoGraphTabRecord): RepoGraphTabState => defaultRepoGraphTabState(),
-    dropResources: noDrop,
-    // No project-panel reveal (this kind has no path to reveal) and no other repo-graph-specific
-    // action exists yet — §6.2's placeholder is a reserved slot, not a half-built feature.
-    menuExtras: () => [],
-    parseState: parseStateWith(repoGraphTabStateSchema),
-    pinned: true,
-  },
-  // C5 §8/§9: one opened repository file, rendered by Monaco (read-only, §11).
-  // P73 §3.1: the same seti icon the file tree already shows for this path — RepoTreeRow.vue's own
-  // fileIconStyle (repo/fileIcon.ts), resolved by TabStrip.vue rather than here (P1 D4).
-  'repo-file': {
-    mode: TAB_KIND_MODE['repo-file'],
-    title: repoFileTitle,
-    icon: (tab) => ({ filePath: tab.path }),
-    railColor: () => undefined,
-    defaultState: (): RepoFileTabState => defaultRepoFileTabState(),
-    duplicateState: (tab: RepoFileTabRecord): RepoFileTabState => ({ ...tab.state }),
-    // §9.3: disposes the live editor widget (if any) and the cached model — RepoFileView.vue's
-    // own unmount (a mere tab switch) never reaches this; only an actual close does.
-    dropResources: (tabId) => dropRepoFileTab(tabId),
-    menuExtras: () => [],
-    parseState: parseStateWith(repoFileTabStateSchema),
-  },
-  // C6 §8.1: a HEAD-vs-worktree diff, opened from "Open changes" — read-only, mirroring
-  // 'repo-file''s shape exactly. No badge, no pinned: a read-only tab, like 'definition''s own
-  // precedent.
-  'repo-diff': {
-    mode: TAB_KIND_MODE['repo-diff'],
-    title: repoDiffTitle,
-    icon: () => 'git-compare',
-    railColor: () => undefined,
-    defaultState: (): RepoDiffTabState => defaultRepoDiffTabState(),
-    // C10: a commit diff's revision pair must survive duplication — resetting to `{}` (pre-C10)
-    // would silently turn a duplicated commit-diff tab into a HEAD-vs-worktree one, the same
-    // "copy the tab's own current state" shape `repo-file`'s own duplicateState already follows.
-    duplicateState: (tab: RepoDiffTabRecord): RepoDiffTabState => ({ ...tab.state }),
-    dropResources: (tabId) => dropRepoDiffTab(tabId),
-    menuExtras: () => [],
-    parseState: parseStateWith(repoDiffTabStateSchema),
-  },
-  // P92 item 5: one commit's whole changed-file set, one tab (VS Code's multi-file diff) —
-  // read-only, mirroring 'repo-diff''s own shape. No badge, no pinned, same reasoning.
-  'repo-multi-diff': {
-    mode: TAB_KIND_MODE['repo-multi-diff'],
-    title: repoMultiDiffTitle,
-    icon: () => 'diff-multiple',
-    railColor: () => undefined,
-    // Never reached through a generic "new tab of this kind" affordance (mirrors 'variable-set'
-    // above) — openRepoMultiDiffTab always supplies a real files/revision pair. This placeholder
-    // only satisfies TabKindDef's own required member.
-    defaultState: (): RepoMultiDiffTabState =>
-      defaultRepoMultiDiffTabState([], { left: '', right: '', leftLabel: '', rightLabel: '' }),
-    // files/review are arrays/objects — copied fresh so editing the duplicate's own state (were
-    // it ever mutated in place) can't reach back into the original's, mirroring http-request's
-    // own array-field reasoning above.
-    duplicateState: (tab: RepoMultiDiffTabRecord): RepoMultiDiffTabState => ({
-      ...tab.state,
-      files: [...tab.state.files],
-      review: tab.state.review ? { ...tab.state.review } : null,
-    }),
-    dropResources: (tabId) => dropRepoMultiDiffTab(tabId),
-    menuExtras: () => [],
-    parseState: parseStateWith(repoMultiDiffTabStateSchema),
-  },
+  // P100 Part 2: the repo workspace (repo-graph/repo-file/repo-diff/repo-multi-diff) moved to
+  // apps/kira-space wholesale — this app never constructs a tab of any of these four kinds again
+  // (GitPanel.vue/RepoFileTree.vue/etc., the only callers that ever did, moved with it). They stay
+  // in this registry, unreachable, rather than narrowing TAB_KINDS's own key type off TabKind: the
+  // registry is deliberately a *total* function over every TabKind (P1 D4's own "no seven-branch
+  // if/else" design), which every TAB_KINDS[tab.kind] call site throughout this app (tabs.ts,
+  // TabStrip.vue, mode.ts, OperationsPanel.vue) leans on — narrowing the key type would mean
+  // auditing and asserting through every one of those, for four kinds that can provably never
+  // appear in this app's own tabsState.tabs (kira-space's own model.TabRecord.Validate requires a
+  // real workspaceId for all five repo/terminal kinds it renders; this app never opens one).
+  // 'terminal' is unaffected — it stays dual-owned (this app's own standalone Terminal module,
+  // views/terminal/TerminalView.vue, this phase's other "duplicate, don't hoist" case).
+  'repo-graph': unreachableTabKind('repo-graph'),
+  'repo-file': unreachableTabKind('repo-file'),
+  'repo-diff': unreachableTabKind('repo-diff'),
+  'repo-multi-diff': unreachableTabKind('repo-multi-diff'),
   // P83 §7.2: an embedded shell at one worktree's directory, rendered with @xterm/xterm. P85
   // §5.2: a launch's own label (a script's name, or 'Claude Code') wins over the cwd's basename.
   terminal: {

@@ -1,42 +1,31 @@
 <script setup lang="ts">
-import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { useModeStore } from '../../state/mode';
-import { useWorkspaceStore } from '../../state/workspace';
 import { MODES } from '../modes';
 import { TAB_VIEWS } from '../tabViews';
 
 const modeStore = useModeStore();
-const workspaceStore = useWorkspaceStore();
 
 // P1 D6/C6: no active tab in the current mode falls back to that mode's own start component
-// (StudioStart for Studio, api/ApiStart for Api, repo/GitStart for Git) instead of a hardcoded
-// <StudioStart />. P67b §4.1: one dispatch expression — a repo workspace falls back to
-// GitStart.vue via moduleOfWorkspace, in practice unreachable (every repo workspace always has at
-// least its pinned graph tab, ensureWorkspaceShell's own guarantee), kept for the same reason
-// MainView keeps a fallback for studio/api at all.
-const modeStart = computed(() => MODES[moduleOfWorkspace(workspaceStore.active)].start);
+// (StudioStart for Studio, api/ApiStart for Api) instead of a hardcoded <StudioStart />.
+// P100 Part 2: the repo-workspace fallback (GitStart.vue, via moduleOfWorkspace) moved to
+// apps/kira-space wholesale along with 'git' itself — mode is directly the lookup key now.
+const modeStart = computed(() => MODES[modeStore.active].start);
 
-// P72 §3: an explicit `include`, not a blanket `KeepAlive` — the graph tab's own layout is what
-// tearing down loses (RepoGraphView.vue's own doc comment: a mere tab switch destroys git-ui's
-// whole nested app, so its computed lane layout is rebuilt from scratch on return). Widening this
-// to every tab kind would silently change the lifetime of every data grid/console/stream tab in
-// the app too — a different phase's decision, not something this row asked for.
-const KEEP_ALIVE_VIEWS = ['RepoGraphView'];
-// One cached instance per open repo workspace is the realistic ceiling (the graph tab is
-// `pinned: true`, at most one per workspace, tabKinds.ts) — bounded here so that stays a
-// guarantee, not an assumption.
-const KEEP_ALIVE_MAX = 20;
+// P72 §3: this used to wrap the switched-in component in a KeepAlive scoped to just the repo-graph
+// tab's own component name — a mere tab switch must not lose its computed lane layout (the doc
+// comment lived on RepoGraphView.vue itself). P100 Part 2: that view moved to apps/kira-space
+// wholesale with the rest of the repo workspace, and no kind left in this app's own TAB_VIEWS
+// needs the same treatment — every one already tears down and rebuilds cheaply on switch — so
+// there is nothing left for a KeepAlive here to preserve.
 </script>
 
 <template>
-  <KeepAlive :include="KEEP_ALIVE_VIEWS" :max="KEEP_ALIVE_MAX">
-    <component
-      :is="TAB_VIEWS[modeStore.activeTab.kind]"
-      v-if="modeStore.activeTab"
-      :key="modeStore.activeTab.id"
-      :tab="modeStore.activeTab"
-    />
-  </KeepAlive>
+  <component
+    :is="TAB_VIEWS[modeStore.activeTab.kind]"
+    v-if="modeStore.activeTab"
+    :key="modeStore.activeTab.id"
+    :tab="modeStore.activeTab"
+  />
   <component :is="modeStart" v-if="!modeStore.activeTab" />
 </template>

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { AppMode } from '@shared/domain/mode';
-import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { control } from '../bridge/control';
 import { useKeepAwakeStore } from '../state/keepAwake';
 import { useLayoutStore } from '../state/layout';
+import { useModeStore } from '../state/mode';
 import { useSettingsStore } from '../state/settings';
-import { useWorkspaceStore } from '../state/workspace';
 import CodiconIcon from '../theme/CodiconIcon.vue';
 import { MODES } from './modes';
 import SettingsDialog from './SettingsDialog.vue';
@@ -14,18 +13,14 @@ import SettingsDialog from './SettingsDialog.vue';
 const keepAwakeStore = useKeepAwakeStore();
 const settingsStore = useSettingsStore();
 const layoutStore = useLayoutStore();
-const workspaceStore = useWorkspaceStore();
+const modeStore = useModeStore();
 
-// P67b §4.3: three peer modules — Studio, Api, Git. A repository is an instance inside Git, not a
-// fourth top-level tab of its own (§0's correction); the repo switcher lives in GitPanel.vue now.
-// P91 OQ-1: Terminal joins last — a cosmetic call, shipped as the plan's own stated default.
-const MODE_ORDER: AppMode[] = ['studio', 'api', 'git', 'terminal'];
+// P100 Part 2: two peer modules again — Studio, Api — Git (P67b §4.3's third) moved to
+// apps/kira-space wholesale. P91 OQ-1: Terminal still joins last, the plan's own stated default.
+const MODE_ORDER: AppMode[] = ['studio', 'api', 'terminal'];
 
-// P67b §4.2: clicking Git returns to whichever repository was last active there
-// (workspaceStore.lastRepoKey), not to a bare generic landing page — the same "return to where you
-// were" behaviour the repo tabs this replaces used to give for free.
 function onClick(mode: AppMode): void {
-  workspaceStore.activateWorkspace(mode === 'git' ? (workspaceStore.lastRepoKey ?? 'git') : mode);
+  modeStore.setMode(mode);
 }
 
 // P92 item 3: no toast channel in the title bar — a rejection (e.g. a `-tags server` build) is
@@ -64,7 +59,7 @@ const keepAwakeTooltip = computed(() => {
         :key="mode"
         type="button"
         class="p-tab mode-tab"
-        :class="{ 'is-active': moduleOfWorkspace(workspaceStore.active) === mode }"
+        :class="{ 'is-active': modeStore.active === mode }"
         data-testid="mode-tab"
         :data-mode="mode"
         @click="onClick(mode)"

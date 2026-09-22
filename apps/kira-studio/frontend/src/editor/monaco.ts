@@ -1,8 +1,11 @@
 // P60a §2.1/D2: the engine-generic half of what `views/repo/monaco.ts` (C5/C6) built —
 // `loadMonaco`/`MonacoModule`/the theme definition — moved here so every editor surface in the app
-// (not only the repo workspace) shares the one memoised bootstrap. `views/repo/monaco.ts` re-exports
-// everything below unchanged, so RepoFileView.vue/RepoDiffView.vue/navigation.ts need no edit.
-export type MonacoModule = typeof import('../views/repo/monacoEntry');
+// (not only the repo workspace) shares the one memoised bootstrap. `views/repo/monaco.ts` used to
+// re-export everything below unchanged, so RepoFileView.vue/RepoDiffView.vue/navigation.ts needed
+// no edit; P100 Part 2 moved the repo workspace itself to apps/kira-space and deleted that shim
+// (plan §5.3) — `monacoEntry.ts` moved here alongside this file instead, since Kira Studio keeps
+// its own non-git Monaco bootstrap.
+export type MonacoModule = typeof import('./monacoEntry');
 
 // D2 (from format.ts's own precedent): memoised so only the first editor surface in a session ever
 // pays the import cost — a session that opens neither an editor nor a repo file never downloads
@@ -116,7 +119,7 @@ export function overflowWidgetsContainer(): HTMLElement {
  *  load — every subsequent call reuses the same resolved module. */
 export function loadMonaco(): Promise<MonacoModule> {
   if (!monacoModule) {
-    monacoModule = import('../views/repo/monacoEntry')
+    monacoModule = import('./monacoEntry')
       .then(async (mod) => {
         wireWorker(mod);
         const { defineKiraTheme } = await import('./monacoTheme');

@@ -11,24 +11,20 @@ import { useAgentSessionsStore } from './state/agentSessions';
 import { useAppMetricsStore } from './state/appMetrics';
 import { useAppUpdateStore } from './state/appUpdate';
 import { useCacheStatsStore } from './state/cacheStats';
-import { useCodeReposStore } from './state/coderepos';
 import { useConnectionsStore } from './state/connections';
 import { useCustomScriptsStore } from './state/customScripts';
 import { useDbMcpStore } from './state/dbmcp';
-import { useGitClientsStore } from './state/gitClients';
 import { useKeepAwakeStore } from './state/keepAwake';
 import { loadMaskRuleCounts } from './state/maskRules';
 import { useOpsStore } from './state/ops';
 import { pinia } from './state/pinia';
 import { queryClient } from './state/queryClient';
-import { ensureWorkspaceShell } from './state/repoTabs';
 import { useTabsStore } from './state/tabs';
 import { useTerminalsStore } from './state/terminals';
 import './theme/base.css';
 import { useLayoutStore } from './state/layout';
 import { useModeStore } from './state/mode';
 import { useSettingsStore } from './state/settings';
-import { useWorkspaceStore } from './state/workspace';
 import { planCount as consolePlanCount } from './views/console/explainResults';
 import {
   pageStoreEntries as consolePageStoreEntries,
@@ -296,14 +292,11 @@ async function bootstrap(): Promise<void> {
   const cacheStatsStore = useCacheStatsStore(pinia);
   const appMetricsStore = useAppMetricsStore(pinia);
   const modeStore = useModeStore(pinia);
-  const codeReposStore = useCodeReposStore(pinia);
   const customScriptsStore = useCustomScriptsStore(pinia);
   const agentHooksStore = useAgentHooksStore(pinia);
   const agentSessionsStore = useAgentSessionsStore(pinia);
-  const gitClientsStore = useGitClientsStore(pinia);
   const dbMcpStore = useDbMcpStore(pinia);
   const keepAwakeStore = useKeepAwakeStore(pinia);
-  const workspaceStore = useWorkspaceStore(pinia);
   const opsStore = useOpsStore(pinia);
   const layoutStore = useLayoutStore(pinia);
   const connectionsStore = useConnectionsStore(pinia);
@@ -326,10 +319,8 @@ async function bootstrap(): Promise<void> {
     // the toolbar's own "does this connection have any masked columns at all" visibility check
     // (deleteRowTooltip's own standing rule: a permanently inert control is worse than no control).
     loadMaskRuleCounts(),
-    codeReposStore.hydrateCodeRepos(),
     customScriptsStore.hydrateCustomScripts(),
     terminalsStore.hydrateTerminalDefaults(),
-    gitClientsStore.hydrateGitClients(),
     dbMcpStore.hydrateDbMcp(),
     dbMcpStore.hydrateDbMcpApprovals(),
     agentHooksStore.hydrateAgentHooks(),
@@ -338,23 +329,11 @@ async function bootstrap(): Promise<void> {
     opsStore.hydrateOps(),
     tabsStore.hydrateTabs(),
   ]);
-  // C5 §4.2: hydrateTabs() already derived workspaceStore.openRepos from the restored tabs
-  // themselves, but it cannot yet tell a live repo from one removed since this window last saved
-  // (state/tabs.ts has no reason to depend on state/coderepos.ts otherwise) — now that
-  // hydrateCodeRepos() has resolved alongside it, drop an orphaned workspace outright and give
-  // every surviving one its pinned graph tab (§6.1), exactly like openRepoWorkspace does for one
-  // opened interactively.
-  const liveRepoIds = new Set(codeReposStore.records.map((r) => r.id));
-  for (const repoId of [...workspaceStore.openRepos]) {
-    if (liveRepoIds.has(repoId)) {
-      ensureWorkspaceShell(repoId);
-      // C6 §8.5: a restored session indexes what it restored — same fire-and-forget posture as
-      // openRepoWorkspace's own call.
-      void control.codeWorkspaceOpenWorkspace(repoId).catch(() => {});
-    } else {
-      workspaceStore.closeRepoWorkspace(repoId);
-    }
-  }
+  // P100 Part 2: this used to also reconcile workspaceStore.openRepos (hydrateTabs' own derived
+  // set, C5 §4.2) against codeReposStore.records once both resolved — dropping an orphaned repo
+  // workspace outright and giving every surviving one its pinned graph tab (ensureWorkspaceShell,
+  // §6.1). The repo workspace, code-repos state, and git-clients state all moved to apps/kira-space
+  // wholesale, so there is nothing left here for this app's own boot sequence to reconcile.
   const app = createApp(App);
   app.use(pinia);
   app.use(VueQueryPlugin, { queryClient });

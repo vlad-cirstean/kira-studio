@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { moduleOfWorkspace } from '@shared/domain/workspace';
 import { computed } from 'vue';
 import { useLayoutStore } from '../state/layout';
-import { useWorkspaceStore } from '../state/workspace';
+import { useModeStore } from '../state/mode';
 import PanelSplitter from '../theme/primitives/PanelSplitter.vue';
 import { MODES } from './modes';
 import MainView from './panels/MainView.vue';
@@ -10,15 +9,15 @@ import OperationsPanel from './panels/OperationsPanel.vue';
 import TabStrip from './panels/TabStrip.vue';
 import StatusBar from './StatusBar.vue';
 
-const workspaceStore = useWorkspaceStore();
+const modeStore = useModeStore();
 const layoutStore = useLayoutStore();
 
 // P1 D6/C6: the left panel mounts whichever mode is active's own self-contained panel component
-// (ProjectPanel for Studio, api/CollectionsPanel for Api, GitPanel for Git) — the shared
-// PanelShell slot Studio used to have all to itself now comes from the registry, not a hardcoded
-// <ProjectPanel />. P67b §4.1: one dispatch expression, no special case for a repo workspace —
-// moduleOfWorkspace folds a repo key onto 'git' before the registry lookup.
-const activeModePanel = computed(() => MODES[moduleOfWorkspace(workspaceStore.active)].panel);
+// (ProjectPanel for Studio, api/CollectionsPanel for Api) — the shared PanelShell slot Studio used
+// to have all to itself now comes from the registry, not a hardcoded <ProjectPanel />. P100 Part
+// 2: Git (P67b §4.1's third peer, GitPanel.vue) moved to apps/kira-space wholesale, so this is
+// back to a direct lookup with no repo-workspace folding step.
+const activeModePanel = computed(() => MODES[modeStore.active].panel);
 
 const projectVisible = computed(() => layoutStore.panel.project.visible);
 const opsVisible = computed(() => layoutStore.panel.operations.visible);

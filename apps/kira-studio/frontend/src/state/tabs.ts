@@ -1,3 +1,4 @@
+import type { AppMode } from '@shared/domain/mode';
 import {
   asBrowseTab,
   asConsoleTab,
@@ -20,19 +21,15 @@ import {
   defaultDefinitionTabState,
   defaultDocumentTabState,
   defaultKeyValueTabState,
-  defaultRepoGraphTabState,
   defaultStreamTabState,
   type KeyValueTabRecord,
   type KeyValueTabState,
-  type RepoFileTabState,
-  type RepoGraphTabState,
   type StreamTabRecord,
   type StreamTabState,
   TAB_KIND_MODE,
   type TabKind,
   type TabRecord,
 } from '@shared/domain/tabs';
-import { isRepoWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
 import { useDebounceFn } from '@vueuse/core';
 import { defineStore } from 'pinia';
 import { reactive, toRefs } from 'vue';
@@ -41,13 +38,12 @@ import { usePendingChangesStore } from '../views/grid/pendingChanges';
 import { useCellSelectionStore } from './cellSelection';
 import { useConnectionsStore } from './connections';
 import { useConsoleDefaultsStore } from './consoleDefaults';
-import { tabsForWorkspace, workspaceKeyOf } from './mode';
+import { tabsForWorkspace, useModeStore, workspaceKeyOf } from './mode';
 import { pinia } from './pinia';
 import { useSettingsStore } from './settings';
 import { useTabIncognitoStore } from './tabIncognito';
 import { TAB_KINDS } from './tabKinds';
 import { cleanupTabRuntime } from './tabRuntime';
-import { useWorkspaceStore } from './workspace';
 
 export interface RecentTableEntry {
   connectionId: string;
@@ -114,18 +110,19 @@ export const useTabsStore = defineStore('tabs', () => {
   }
 
   const tabsState = reactive({
-    tabs: [] as TabRecord[], // ordered, all workspaces interleaved
-    // C5 D2/§4.2: widened from `Record<AppMode, string | null>` to every WorkspaceKey — a tab's own
-    // workspace is workspaceKeyOf(tab), not just TAB_KIND_MODE[tab.kind] any more. 'studio'/'api'
-    // are still always present; a repo key is added the first time a tab of that workspace exists.
-    activeIdByWorkspace: { studio: null, api: null } as Record<WorkspaceKey, string | null>,
+    tabs: [] as TabRecord[], // ordered, all modes interleaved
+    // C5 D2/§4.2: widened from `Record<AppMode, string | null>` (unwidened back by P100 Part 2 —
+    // a tab's own workspace is workspaceKeyOf(tab), still not just TAB_KIND_MODE[tab.kind], but the
+    // key space it ranges over is AppMode again now that the repo workspace's third dimension
+    // (WorkspaceKey, packages/shared/domain/workspace.ts) moved to apps/kira-space wholesale.
+    activeIdByWorkspace: { studio: null, api: null } as Record<AppMode, string | null>,
     /** In-memory only: a restored tab has not loaded and shows "Reconnect & load" (§8.4). */
     hydrated: new Set<string>(),
     // C5 §5.1: one entry per workspace, in memory only (like `hydrated` above) — no schema change,
     // and a restored session comes back with every tab permanent (D3). P74 §5.2: widened from a
     // single `string | null` slot to a set of ids — "Open all changes" needs a whole cohort of
     // preview tabs to replace as a unit, not one slot fought over by every file in the commit.
-    previewIdsByWorkspace: {} as Record<WorkspaceKey, readonly string[]>,
+    previewIdsByWorkspace: {} as Record<AppMode, readonly string[]>,
   });
 
   // D17: the last serialisation actually written — a save whose snapshot is identical to this
@@ -264,10 +261,9 @@ export const useTabsStore = defineStore('tabs', () => {
     });
     tabsState.tabs = tabs;
 
-    // One restored active tab per workspace actually present among the restored tabs — 'studio'/
-    // 'api' are always seeded (even at zero tabs, matching the old per-mode behavior exactly); a
-    // repo workspace's own entry exists only when it has at least one restored tab.
-    const keys = new Set<WorkspaceKey>(['studio', 'api']);
+    // One restored active tab per mode actually present among the restored tabs — 'studio'/'api'
+    // are always seeded (even at zero tabs, matching the old per-mode behavior exactly).
+    const keys = new Set<AppMode>(['studio', 'api']);
     for (const t of tabs) keys.add(workspaceKeyOf(t));
     for (const key of keys) {
       const keyTabs = tabs.filter((t) => workspaceKeyOf(t) === key);
@@ -275,24 +271,10 @@ export const useTabsStore = defineStore('tabs', () => {
       tabsState.activeIdByWorkspace[key] = active?.id ?? null;
     }
 
-    // C5 §4.2: openRepos is every repo workspace with at least one restored tab, in the order its
-    // tabs first appear in the array — nothing new persisted beyond tabs.workspace_id (D2). A repo
-    // whose row was removed since this window last saved is not filtered out here (that would need
-    // this module reaching into state/coderepos.ts, adding a boot-order dependency this file has no
-    // other reason to need) — main.ts's bootstrap calls hydrateCodeRepos() first and then drops an
-    // orphaned repo workspace's tabs itself, once it can name which repo ids are still live.
-    const openRepos: string[] = [];
-    for (const t of tabs) {
-      const key = workspaceKeyOf(t);
-      // P91 §5: was `key === 'studio' || key === 'api'` — a literal comparison against exactly two
-      // non-repo keys, which a third one ('terminal') would fall through and get sliced as if it
-      // were `repo:nal`. Unreachable today (terminal tabs are never persisted, persistableTabs
-      // above), hardened here so this stays true once a fourth non-repo key exists.
-      if (!isRepoWorkspace(key)) continue;
-      const repoId = key.slice('repo:'.length);
-      if (!openRepos.includes(repoId)) openRepos.push(repoId);
-    }
-    useWorkspaceStore().openRepos = openRepos;
+    // P100 Part 2: this used to also derive useWorkspaceStore().openRepos (C5 §4.2) — every repo
+    // workspace with at least one restored tab, by slicing the 'repo:'-prefixed key off each one.
+    // The repo workspace (and useWorkspaceStore itself) moved to apps/kira-space wholesale, so
+    // there is no second dimension left to derive here at all.
     // P22 D12: the boot mode used to be derived here, from whichever tab was active app-wide
     // before mode ever had its own persistence ("there is at most one such tab in a pre-P1
     // session, so this is unambiguous" — its own comment already flagged this as a stand-in,
@@ -303,29 +285,26 @@ export const useTabsStore = defineStore('tabs', () => {
     // connects anything (§8.4).
   }
 
-  // Deactivates every other tab of workspace `key` and marks `id` active, in both the per-tab flag
+  // Deactivates every other tab of mode `key` and marks `id` active, in both the per-tab flag
   // and tabsState.activeIdByWorkspace — the one thing every activation path (open, duplicate,
-  // activateTab) shares. Also brings that workspace forward (D5's "activating a tab from anywhere
-  // brings its mode forward", generalised to every workspace), which is a no-op when the caller is
-  // already there. Goes through activateWorkspace (state/workspace.ts), not a direct modeState write
-  // — so a studio/api tab activated this way is eventually persisted exactly like a mode-tab click
-  // is. P67b §4.2: a repo tab activated this way now ALSO brings the Git module forward
-  // (activateWorkspace persists 'git' via setModule) — the behaviour change that makes clicking a
-  // repo file tab from anywhere (Quick Open, a restored session's own pinned graph tab) switch the
-  // title bar to Git, not just the workspace underneath it.
-  function setActiveTabId(id: string, key: WorkspaceKey): void {
+  // activateTab) shares. Also brings that mode forward (D5's "activating a tab from anywhere
+  // brings its mode forward"), a no-op when the caller is already there. Goes through
+  // useModeStore().setMode, not a direct write — so a tab activated this way is eventually
+  // persisted exactly like a mode-tab click is (P100 Part 2: state/workspace.ts's own
+  // activateWorkspace, git-mode-forwarding included, moved to apps/kira-space along with 'git'
+  // itself — every mode left here is a plain AppMode, so setMode alone is the whole job now).
+  function setActiveTabId(id: string, key: AppMode): void {
     for (const t of tabsState.tabs) {
       if (workspaceKeyOf(t) === key) t.active = t.id === id;
     }
     tabsState.activeIdByWorkspace[key] = id;
-    useWorkspaceStore().activateWorkspace(key);
+    useModeStore().setMode(key);
   }
 
-  // P74 §5.2: removes `id` from workspace `key`'s preview cohort if it is there, a no-op otherwise
-  // — every "one tab leaves the cohort, the rest stay previewed" site (a permanent reopen, close,
-  // drag-start, promoteTab, and repoTabs.ts's own reuse branches) shares this rather than repeating
-  // the same guarded filter. Exported for repoTabs.ts alone — every other site lives in this file.
-  function removeFromPreviewCohort(key: WorkspaceKey, id: string): void {
+  // P74 §5.2: removes `id` from mode `key`'s preview cohort if it is there, a no-op otherwise —
+  // every "one tab leaves the cohort, the rest stay previewed" site (a permanent reopen, close,
+  // drag-start, promoteTab) shares this rather than repeating the same guarded filter.
+  function removeFromPreviewCohort(key: AppMode, id: string): void {
     const cohort = tabsState.previewIdsByWorkspace[key];
     if (!cohort?.includes(id)) return;
     tabsState.previewIdsByWorkspace[key] = cohort.filter((x) => x !== id);
@@ -338,12 +317,12 @@ export const useTabsStore = defineStore('tabs', () => {
   // new preview content survive its own eviction, exactly as openTab's own branch below does for a
   // freshly created one via `previewIdsByWorkspace[key] = [id]`.
   //
-  // P79 review fix (Functional, LOW): exported so state/repoTabs.ts's openRepoCommitDiffTab can call
-  // it from its own existing-tab reuse branch, which short-circuits past openTab entirely and so
-  // never reached this eviction at all — "Open all changes" reusing file 0's own already-open
-  // permanent tab left whatever preview cohort/slot preceded it (an unrelated previewed tab) sitting
-  // there untouched instead of being replaced.
-  function evictPreviewCohort(key: WorkspaceKey, keepId?: string): void {
+  // P79 review fix (Functional, LOW): originally exported so a caller with an existing-tab reuse
+  // branch that short-circuits past openTab entirely could still trigger this eviction (an unrelated
+  // previewed tab must not survive such a reuse untouched). That caller (state/repoTabs.ts's own
+  // openRepoCommitDiffTab) moved to apps/kira-space in P100 Part 2 — kept exported regardless, since
+  // this remains the one correct way for any future such caller in this app to do the same thing.
+  function evictPreviewCohort(key: AppMode, keepId?: string): void {
     const cohort = tabsState.previewIdsByWorkspace[key] ?? [];
     for (const id of cohort) {
       if (id !== keepId) closeTabInternal(id);
@@ -388,7 +367,7 @@ export const useTabsStore = defineStore('tabs', () => {
     connectionId: string | null,
     path: string,
     workspaceId: string | null,
-    workspaceKey: WorkspaceKey,
+    workspaceKey: AppMode,
     opts: OpenTabOpts,
   ): OpenTabResult | null {
     if (!opts.reuse) return null;
@@ -417,11 +396,7 @@ export const useTabsStore = defineStore('tabs', () => {
 
   // Split out of openTab (P99 review: biome's cognitive-complexity ceiling) — the "where does the
   // freshly-created record land" half of §5.2's rules, unchanged in behavior.
-  function insertNewTabRecord(
-    record: TabRecord,
-    workspaceKey: WorkspaceKey,
-    opts: OpenTabOpts,
-  ): void {
+  function insertNewTabRecord(record: TabRecord, workspaceKey: AppMode, opts: OpenTabOpts): void {
     if (opts.preview && opts.previewCohort) {
       // P74 §5.2: a bulk open's own file, after the first — joins the cohort at the end, evicts
       // nothing. The first file of the same bulk open passes `previewCohort` unset, so it already
@@ -472,7 +447,7 @@ export const useTabsStore = defineStore('tabs', () => {
     opts: OpenTabOpts,
   ): OpenTabResult {
     const workspaceId = opts.workspaceId ?? null;
-    const workspaceKey = (workspaceId ?? TAB_KIND_MODE[kind]) as WorkspaceKey;
+    const workspaceKey = (workspaceId ?? TAB_KIND_MODE[kind]) as AppMode;
 
     const reused = reuseExistingTab(kind, connectionId, path, workspaceId, workspaceKey, opts);
     if (reused) return reused;
@@ -610,30 +585,11 @@ export const useTabsStore = defineStore('tabs', () => {
     });
   }
 
-  // C5 §6.1: creates workspace `workspaceId`'s pinned graph tab — a plain push that never activates
-  // it (unlike openTab's own always-active-on-create behavior), so ensureWorkspaceShell
-  // (state/repoTabs.ts) can decide separately whether to activate it (only when the workspace has no
-  // active tab at all) — a restored session's own active tab must never be stolen by shell creation.
-  function createPinnedRepoGraphTab(workspaceId: string): TabRecord {
-    const id = crypto.randomUUID();
-    const record = {
-      id,
-      connectionId: null,
-      // P92 item 8: a repo-graph tab has no file behind it, but `path` is a required column
-      // (model.TabRecord.Validate) and an empty one aborts the whole window's tab save, not just this
-      // row. The workspace key is this tab's real identity — stable, unique per workspace, and
-      // already what `title` resolves the repo name from.
-      path: workspaceId,
-      kind: 'repo-graph',
-      state: defaultRepoGraphTabState(),
-      order: tabsState.tabs.length,
-      active: false,
-      workspaceId,
-    } as unknown as TabRecord;
-    tabsState.tabs.push(record);
-    saveNow();
-    return record;
-  }
+  // P100 Part 2: createPinnedRepoGraphTab (C5 §6.1 — workspaceId's own pinned graph tab, deferred
+  // activation left to ensureWorkspaceShell) used to live here. The repo workspace, its one
+  // 'repo-graph'-kind tab included, moved to apps/kira-space wholesale (state/tabKinds.ts's own
+  // unreachableTabKind entry for it), so this app never constructs one again — removed rather than
+  // kept as dead code no caller anywhere in this app's own tree still reaches.
 
   // Same target, fresh default state — the cheapest possible demonstration of §8.4's identity rule.
   // P1 D4/F12: reads TAB_KINDS[source.kind].duplicateState instead of a seven-branch if/else — each
@@ -712,23 +668,11 @@ export const useTabsStore = defineStore('tabs', () => {
     saveNow();
   }
 
-  // C5 §4.2: closes every tab of workspace `key`, pinned tabs included — the one path that bypasses
-  // closeTab's own pin guard, since discarding the whole workspace (closeRepoWorkspace,
-  // state/workspace.ts) is a different act from closing one of its tabs. Never called for
-  // 'studio'/'api' (those workspaces cannot be closed, only their tabs can).
-  function closeWorkspaceTabs(key: WorkspaceKey): void {
-    const ids = tabsState.tabs.filter((t) => workspaceKeyOf(t) === key).map((t) => t.id);
-    for (const id of ids) {
-      tabsState.hydrated.delete(id);
-      dropAllPagesForTab(id);
-      useCellSelectionStore().clearSelectedCellFor(id);
-      usePendingChangesStore().clearPending(id);
-    }
-    tabsState.tabs = tabsState.tabs.filter((t) => workspaceKeyOf(t) !== key);
-    delete tabsState.activeIdByWorkspace[key];
-    delete tabsState.previewIdsByWorkspace[key];
-    saveNow();
-  }
+  // P100 Part 2: closeWorkspaceTabs (C5 §4.2 — closed every tab of one workspace, pinned included,
+  // the one path that bypassed closeTab's own pin guard) used to exist only for
+  // state/workspace.ts's own closeRepoWorkspace to call when discarding a whole repo workspace.
+  // Both moved to apps/kira-space wholesale, and no mode left in this app can ever be "closed" the
+  // way a repo workspace could (only its tabs, one at a time) — removed rather than kept unreachable.
 
   function closeOthers(id: string): void {
     const keep = tabsState.tabs.find((t) => t.id === id);
@@ -789,7 +733,7 @@ export const useTabsStore = defineStore('tabs', () => {
     // "Close all" always means "in the workspace whose strip this menu opened from" (D5,
     // generalised) — the current workspace, since a tab's context menu can only ever come from a
     // tab actually rendered there. §6.1: a pinned tab survives "Close all".
-    const key = useWorkspaceStore().active;
+    const key = useModeStore().active;
     const closeIds = new Set(
       tabsState.tabs
         .filter((t) => workspaceKeyOf(t) === key && !TAB_KINDS[t.kind].pinned)
@@ -853,7 +797,7 @@ export const useTabsStore = defineStore('tabs', () => {
   // D11: Control+Tab / Control+Shift+Tab — wraps around at either end, matching the tab strip's own
   // left-to-right visual order, scoped to the current workspace's own tabs (D5, generalised).
   function stepTab(delta: 1 | -1): void {
-    const key = useWorkspaceStore().active;
+    const key = useModeStore().active;
     const tabs = tabsForWorkspace(key);
     if (tabs.length === 0) return;
     const idx = tabs.findIndex((t) => t.id === tabsState.activeIdByWorkspace[key]);
@@ -947,18 +891,10 @@ export const useTabsStore = defineStore('tabs', () => {
     patchTabState(id, 'browse', patch, { skipUnchanged: true });
   }
 
-  // C5 §9.3/§12: revealLine is re-patched (debounced) as the user scrolls/navigates — skipUnchanged
-  // since Monaco's own scroll events fire far more often than the line actually changes.
-  function patchRepoFileTabState(id: string, patch: Partial<RepoFileTabState>): void {
-    patchTabState(id, 'repo-file', patch, { skipUnchanged: true });
-  }
-
-  // C10 §8 (S13): TabViewStateStore's own write() — git-ui re-serializes its whole PersistedViewState
-  // on nearly every interaction (scroll, selection, column resize), so this skips a save when the
-  // value is reference-unchanged, the same posture patchRepoFileTabState's own revealLine follows.
-  function patchRepoGraphTabState(id: string, patch: Partial<RepoGraphTabState>): void {
-    patchTabState(id, 'repo-graph', patch, { skipUnchanged: true });
-  }
+  // P100 Part 2: patchRepoFileTabState (C5 §9.3/§12 — revealLine, debounced as Monaco scrolls) and
+  // patchRepoGraphTabState (C10 §8/S13 — git-ui's own TabViewStateStore.write()) both used to live
+  // here. Both kinds' tabs moved to apps/kira-space wholesale — removed along with them rather than
+  // kept as patchers for a kind this app can never construct a tab of.
 
   function markHydrated(id: string): void {
     tabsState.hydrated.add(id);
@@ -1013,10 +949,8 @@ export const useTabsStore = defineStore('tabs', () => {
     openKeyValueTab,
     openStreamTab,
     openBrowseTab,
-    createPinnedRepoGraphTab,
     duplicateTab,
     closeTab,
-    closeWorkspaceTabs,
     closeOthers,
     closeToTheRight,
     closeAll,
@@ -1034,8 +968,6 @@ export const useTabsStore = defineStore('tabs', () => {
     patchKeyValueTabState,
     patchStreamTabState,
     patchBrowseTabState,
-    patchRepoFileTabState,
-    patchRepoGraphTabState,
     markHydrated,
     unmarkHydrated,
     isHydrated,

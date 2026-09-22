@@ -1,8 +1,8 @@
+import { canonicalPath } from '@shared/domain/path';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { control } from '../bridge/control';
-import { canonicalPath } from './coderepos';
 
 // P83 §5: the terminal registry — session state by tab id, plus output routing. Lives in
 // `state/`, not `repo/state/`: biome.json forbids `repo/**` importing `views/**` and `views/**`

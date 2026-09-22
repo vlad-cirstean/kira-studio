@@ -84,7 +84,6 @@ func BuildTemplate(appName string, isDev bool) []Section {
 		{Kind: ItemEmit, Label: "Toggle Project Panel", Accelerator: Shortcuts["view.toggleProjectPanel"].Accelerator(), Channel: bridge.ChannelToggleProjectPanel},
 		{Kind: ItemEmit, Label: "Toggle Operations Panel", Accelerator: Shortcuts["view.toggleOperationsPanel"].Accelerator(), Channel: bridge.ChannelToggleOperationsPanel},
 		{Kind: ItemSeparator},
-		{Kind: ItemEmit, Label: "Quick Open…", Accelerator: Shortcuts["view.quickOpen"].Accelerator(), Channel: bridge.ChannelQuickOpen},
 		{Kind: ItemEmit, Label: "Command Palette…", Accelerator: Shortcuts["view.commandPalette"].Accelerator(), Channel: bridge.ChannelCommandPalette},
 		{Kind: ItemEmit, Label: "Find", Accelerator: Shortcuts["view.find"].Accelerator(), Channel: bridge.ChannelViewFind},
 		{Kind: ItemEmit, Label: "Refresh", Accelerator: Shortcuts["view.refresh"].Accelerator(), Channel: bridge.ChannelViewRefresh},
