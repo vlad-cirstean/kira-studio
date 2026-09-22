@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )

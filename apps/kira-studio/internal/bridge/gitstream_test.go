@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // spyRequest wraps a requestFn, recording every method it was actually called with — the

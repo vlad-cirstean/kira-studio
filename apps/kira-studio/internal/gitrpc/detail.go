@@ -8,7 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // mapDetailError maps gitsession's own closed error vocabulary for this phase's four queries into

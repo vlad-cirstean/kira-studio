@@ -10,7 +10,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitstore"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // ChunkRows is upstream's own CHUNK_ROWS (repoService.ts:711) — how many rows one graph.stream

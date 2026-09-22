@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // TestReentrantSubscribeDoesNotDeadlock guards Emit's snapshot-then-call-with-the-lock-released

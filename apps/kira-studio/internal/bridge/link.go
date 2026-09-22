@@ -3,7 +3,7 @@ package bridge
 import (
 	"net/url"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // LinkService is P79 finding 4's own generic "open this URL in the OS browser" surface —

@@ -9,8 +9,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // Deps is everything a Router needs; nothing more reaches it (D10/D11 from G1, unchanged in shape

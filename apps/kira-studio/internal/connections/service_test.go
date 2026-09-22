@@ -16,7 +16,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"

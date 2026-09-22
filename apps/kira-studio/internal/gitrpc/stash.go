@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // stash.list, stash.show, preflight.stashPop, preflight.stashBranch and G28's own globalStash.list

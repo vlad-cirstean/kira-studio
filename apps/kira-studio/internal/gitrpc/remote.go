@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // remote.pullPreflight/remote.pushPreflight are reads and stay on the request ctx. remote.run

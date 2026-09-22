@@ -26,20 +26,15 @@ func shortPkgName(full string) string {
 // itself, internal/ipcfixture (a test fixture that wires the bound services together — the same
 // composition internal/shell does for the real binary), internal/shell (the app's own composition
 // root), and the bare "internal" package (this file's own directory; it holds no non-test code).
+// rpcstream (SPEC §7's one deliberate module-agnostic-RPC exception) moved out from under
+// internal/bridge to the repo-root internal/rpcstream in P100 Part 1, so it and internal/gitsock
+// (which only needed the exemption for its rpcstream dependency) no longer need entries here —
+// go list -deps no longer reports either as depending on anything under .../internal/bridge.
 var packagesExemptFromBridgeCheck = map[string]bool{
 	"internal":            true,
 	"internal/bridge":     true,
 	"internal/ipcfixture": true,
 	"internal/shell":      true,
-	// internal/bridge/rpcstream is itself part of the transport layer (SPEC §7's one deliberate
-	// exception — module-agnostic RPC infra git and studio/api already share), not a domain
-	// package sitting under it; every package here trivially "depends on" its own path, so a
-	// bridge subpackage would otherwise always fail this check against itself.
-	"internal/bridge/rpcstream": true,
-	// internal/gitsock is the socket-side transport package — the git module's peer of
-	// internal/bridge's Wails-side transport (SPEC §7), not a domain package sitting underneath
-	// it. It needs rpcstream.Conn/Serve, which live under internal/bridge (G1 D4/§3.4).
-	"internal/gitsock": true,
 }
 
 // TestDomainPackagesDoNotImportBridge used to walk a hand-maintained slice of "the domain

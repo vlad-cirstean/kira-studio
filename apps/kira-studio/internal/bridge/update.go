@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // Browser is the OS-browser seam, declared where it is consumed — the same precedent Dialogs

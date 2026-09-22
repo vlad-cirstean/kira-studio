@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // ApprovalTimeout is the app's own existing prompt bound (gitsock's pairingTimeout,

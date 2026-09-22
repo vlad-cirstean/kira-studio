@@ -14,7 +14,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // Conn is the whole of what this protocol needs from one renderer connection. Declared here rather

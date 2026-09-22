@@ -7,7 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // GitHubService is P74 §3.3's one method: opening a pull request in the OS browser, never in

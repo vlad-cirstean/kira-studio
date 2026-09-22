@@ -1,6 +1,6 @@
 package codeworkspace
 
-import "github.com/kirathecat/kira-studio/apps/kira-studio/internal/pathsafe"
+import "github.com/kirathecat/kira-studio/internal/pathsafe"
 
 // ErrPathEscapesRoot aliases pathsafe.ErrPathEscapesRoot (moved there, C8 plan D6) so every
 // existing errors.Is(err, ErrPathEscapesRoot) call site keeps working unchanged.

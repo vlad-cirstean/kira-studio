@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )

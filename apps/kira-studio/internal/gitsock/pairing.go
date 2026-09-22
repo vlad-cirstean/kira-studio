@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // D8's fixed windows: 120s from enqueue (not from being presented), 60s cooldown on an explicit

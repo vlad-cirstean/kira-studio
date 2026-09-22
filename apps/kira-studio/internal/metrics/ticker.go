@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // AnchorNeedles/HelperNeedles are AppProcessSet's own needles, given one home both main.go's

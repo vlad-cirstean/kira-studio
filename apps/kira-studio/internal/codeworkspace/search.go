@@ -12,7 +12,7 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/pathsafe"
+	"github.com/kirathecat/kira-studio/internal/pathsafe"
 )
 
 // C7: Go-native repository-wide text search — stdlib regexp (RE2) for matching, git ls-files

@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/notify"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // Kind values match preconnect.ts's PreconnectStart discriminant.

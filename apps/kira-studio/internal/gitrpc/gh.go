@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // handleCommitResolvePr is commit.resolvePr's own handler (D9 step 2-3) — a thin projection of

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // refs.list, status.get, preflight.checkout and preflight.revert — thin dispatch (D20): decode

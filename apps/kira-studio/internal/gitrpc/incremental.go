@@ -6,7 +6,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // D19: thin dispatch, three handlers — decode, validate (repoId/branch/path non-empty, validRefArg

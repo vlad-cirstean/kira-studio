@@ -8,7 +8,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitpath"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsearch"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // DefaultSearchLimit mirrors upstream's own DEFAULT_SEARCH_LIMIT (gitsearch.DefaultLimit, D11),

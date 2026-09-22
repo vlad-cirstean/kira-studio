@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // preflight.reset and preflight.cherryPick — thin dispatch (D20, matching refs.go's own shape for

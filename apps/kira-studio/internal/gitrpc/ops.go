@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // op.run and undo.run are G5's two write methods — both run RunOp/UndoRun under

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // G26 — stack.list/preflight.restack are reads and stay on the request ctx, matching refs.go/

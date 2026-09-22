@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )

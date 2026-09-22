@@ -6,10 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge/rpcstream"
+	"github.com/kirathecat/kira-studio/internal/rpcstream"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // GitStreamName is the second named stream (docs/v1.5/plans/C10-git-graph-native.md §3.2) —

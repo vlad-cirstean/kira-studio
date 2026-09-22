@@ -15,7 +15,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 

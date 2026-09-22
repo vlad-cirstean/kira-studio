@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // D17: thin dispatch, five handlers — decode, D15's shape validation, entryFor, one RepoEntry

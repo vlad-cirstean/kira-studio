@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // validRefArg is D8's own guard, applied at the one entrance a client-supplied ref name reaches an
