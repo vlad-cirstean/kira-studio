@@ -4,6 +4,7 @@
 // needs the xterm types), but the shape mirrors monacoEntry.ts's own recorded reasoning: everyone
 // this codebase's Terminal instance actually touches lives in this one file.
 import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { useSettingsStore } from '../../state/settings';
@@ -80,6 +81,7 @@ export function getOrCreateTerminal(tabId: string): Attached {
   });
   const fit = new FitAddon();
   term.loadAddon(fit);
+  term.loadAddon(new WebLinksAddon());
   term.open(host);
 
   const off = terminalsStore.onTerminalOutput(tabId, (bytes) => term.write(bytes));
