@@ -58,40 +58,34 @@ defineEmits<{ toggle: []; select: [] }>();
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* P48 F11: the nine rules DocumentView.vue and ConsoleResultGrid.vue each declared for this row
    and its head, one of which had already drifted (`.doc-head`'s own padding, D12 — the document
    view's `--kira-s-4` is the value kept). Everything about the *expanded body* (its own wrapper
    class, its v-if gate, `.doc-preview-match`) stays per-caller in the #body slot (F13) — none of
    it is in this list. */
 .doc-row {
-  display: flex;
-  flex-direction: column;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex flex-col border-b border-border;
 }
 
 .doc-head {
-  height: var(--kira-h-md);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  padding: 0 var(--kira-s-4);
-  cursor: pointer;
+  @apply flex shrink-0 items-center cursor-pointer gap-[var(--kira-s-3)] px-[var(--kira-s-4)] h-[var(--kira-h-md)];
 }
 
 .doc-head:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .doc-row.open > .doc-head {
-  background: var(--kira-bg-elevated);
+  @apply bg-elevated;
 }
 
 /* The row currently published to the cell editor (documents) or selected for the console's own
    copy — a left rail, never a full-row tint, so it stays legible under `.open`'s own background
    and a search match's highlight at the same time. */
 .doc-row.selected > .doc-head {
-  box-shadow: inset 2px 0 0 var(--kira-accent);
+  @apply shadow-[inset_2px_0_0_var(--kira-accent)];
 }
 
 /* P31 D20: the same color-mix tint / solid-current pair KeyValueView.vue uses (and the deleted
@@ -107,25 +101,10 @@ defineEmits<{ toggle: []; select: [] }>();
 }
 
 .expand-toggle {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 0;
+  @apply flex shrink-0 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted;
 }
 
 .doc-id {
-  flex-shrink: 0;
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-md);
-  color: var(--kira-fg);
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply shrink-0 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-fg text-[length:var(--kira-t-md)] font-[family-name:var(--kira-font-data)];
 }
 </style>

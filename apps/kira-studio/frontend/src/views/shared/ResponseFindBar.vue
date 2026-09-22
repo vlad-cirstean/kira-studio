@@ -193,21 +193,21 @@ onMounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .response-find-bar {
-  background: var(--kira-bg-elevated);
-  flex-shrink: 0;
+  @apply bg-elevated shrink-0;
 }
 
 .find-input {
-  width: 200px;
-  flex-shrink: 0;
+  @apply w-[200px] shrink-0;
 }
 
 .find-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .find-count {
-  white-space: nowrap;
+  @apply whitespace-nowrap;
 }
 </style>

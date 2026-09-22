@@ -100,45 +100,35 @@ defineSlots<{
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .saved-list-menu-inner {
-  max-height: 400px;
-  overflow-y: auto;
+  @apply max-h-[400px] overflow-y-auto;
 }
 
 .empty-row {
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply py-[var(--kira-s-2)] px-[var(--kira-s-3)];
 }
 
 .entry-row {
-  cursor: pointer;
+  @apply cursor-pointer;
 }
 
 /* Written by each caller inside the `entry` slot — :slotted() lets this shell still own the
    layout rule for it instead of every caller repeating it. */
 :slotted(.entry-name) {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .pin-button {
-  display: flex;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-subtle);
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
+  @apply flex shrink-0 cursor-pointer border-0 bg-transparent p-0 text-subtle;
 }
 
 .pin-button.pinned {
-  color: var(--kira-warn);
+  @apply text-warn;
 }
 
 .entry-actions {
-  display: flex;
-  gap: var(--kira-s-1);
-  flex-shrink: 0;
+  @apply flex shrink-0 gap-[var(--kira-s-1)];
 }
 </style>

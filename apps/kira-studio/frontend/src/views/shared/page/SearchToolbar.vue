@@ -1,4 +1,5 @@
 <script setup lang="ts" generic="M extends { row: number }">
+import { useDebounceFn } from '@vueuse/core';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import CodiconIcon from '../../../theme/CodiconIcon.vue';
 import IconButton from '../../../theme/primitives/IconButton.vue';
@@ -168,13 +169,12 @@ function startSearch(autoScroll = true): void {
 // toggles (matchCase/wholeWord/regex) stay immediate, since a checkbox click is a single, deliberate
 // action, not a typing stream.
 const QUERY_DEBOUNCE_MS = 150;
-let queryDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+const startSearchDebounced = useDebounceFn(() => startSearch(), QUERY_DEBOUNCE_MS);
 watch(query, () => {
-  clearTimeout(queryDebounceTimer);
-  queryDebounceTimer = setTimeout(() => startSearch(), QUERY_DEBOUNCE_MS);
+  void startSearchDebounced();
 });
 watch([matchCase, wholeWord, regex], () => {
-  clearTimeout(queryDebounceTimer);
+  startSearchDebounced.cancel();
   startSearch();
 });
 
@@ -208,7 +208,7 @@ function goPrev(): void {
 }
 
 function close(): void {
-  clearTimeout(queryDebounceTimer);
+  startSearchDebounced.cancel();
   handle?.cancel();
   handle = null;
   props.api.clearSearchState(props.tabId);
@@ -235,7 +235,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  clearTimeout(queryDebounceTimer);
+  startSearchDebounced.cancel();
   handle?.cancel();
   handle = null;
   props.api.clearSearchState(props.tabId);
@@ -386,8 +386,10 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .search-toolbar {
-  background: var(--kira-bg-elevated);
+  @apply bg-elevated;
 }
 
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
@@ -395,22 +397,18 @@ onUnmounted(() => {
    a class/style on the <TextField> tag itself (DocumentView.vue's own `.filter-field`
    precedent). */
 .search-input {
-  width: 200px;
-  flex-shrink: 0;
+  @apply w-[200px] shrink-0;
 }
 
 .search-input :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .search-count {
-  white-space: nowrap;
+  @apply whitespace-nowrap;
 }
 
 .search-error {
-  color: var(--kira-error);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply whitespace-nowrap overflow-hidden text-ellipsis text-error;
 }
 </style>

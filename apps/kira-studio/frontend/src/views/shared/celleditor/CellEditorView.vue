@@ -649,21 +649,16 @@ const statusLine = computed(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .cell-editor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
+  @apply flex flex-col h-full min-h-0;
 }
 
 /* the format select + beautify/reset trio: this panel's own controls, set off from the
    identity badges with the standard s-4 gutter (mirrors CellEditor.html's inline group) */
 .format-group {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  margin-left: var(--kira-s-4);
-  flex-shrink: 0;
+  @apply flex items-center shrink-0 gap-[var(--kira-s-3)] ml-[var(--kira-s-4)];
 }
 
 /* P42 D27: an app-drawn menu trigger, not a native <select> — border/background/padding/cursor
@@ -671,48 +666,33 @@ const statusLine = computed(() => {
    appearance:base-select/::picker(select)/option rules are select-only and simply don't match a
    <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
 .format-select {
-  max-width: 160px;
-  font-family: var(--kira-font-ui);
+  @apply max-w-[160px] font-[family-name:var(--kira-font-ui)];
 }
 
 .format-select-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .format-select:disabled {
-  color: var(--kira-fg-disabled);
-  cursor: default;
+  @apply cursor-default text-disabled;
 }
 
 /* The message chip (formatProblem) truncates the same way status-badge does — the squiggly
    underline in the editor below and this chip's own tooltip both carry the untruncated text. */
 .invalid-chip {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .generate-anchor {
-  position: relative;
-  flex-shrink: 0;
+  @apply relative shrink-0;
 }
 
 .generate-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: var(--kira-s-2);
+  @apply flex flex-col gap-px p-[var(--kira-s-2)];
 }
 
 .generate-item {
-  width: 100%;
-  border: none;
-  background: transparent;
-  text-align: left;
-  font-family: var(--kira-font-ui);
+  @apply w-full border-0 bg-transparent text-left font-[family-name:var(--kira-font-ui)];
 }
 
 /* the relocated statusLine (bytes / decoded reading — e.g. a base64/hex byte count / truncation
@@ -721,51 +701,33 @@ const statusLine = computed(() => {
    (title carries the full text) rather than growing unbounded and pushing the trailing
    read-only chip around. */
 .status-badge {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply max-w-[220px] overflow-hidden text-ellipsis;
 }
 
 .editor-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex-1 min-h-0 flex flex-col;
 }
 
 .encoded-pane {
-  flex: 1 1 auto;
-  min-height: 0;
+  @apply flex-auto min-h-0;
 }
 
 /* The translate pane (hex/base64's decoded text, or P24's timestamp pane) stacks below the
    encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a side-by-side
    split — this panel is usually too narrow for two columns to read comfortably. */
 .editor-body.has-translate .encoded-pane {
-  flex: 1 1 55%;
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex-[1_1_55%] border-b border-border;
 }
 
 .translate-head {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-1) var(--kira-s-4);
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-xs);
-  background: var(--kira-bg-elevated);
-  border-bottom: var(--kira-border-width) solid var(--kira-border);
+  @apply flex shrink-0 items-center gap-[var(--kira-s-2)] bg-elevated border-b border-border text-subtle text-[length:var(--kira-t-xs)] py-[var(--kira-s-1)] px-[var(--kira-s-4)];
 }
 
 .translate-pane {
-  flex: 1 1 45%;
-  min-height: 0;
+  @apply flex-[1_1_45%] min-h-0;
 }
 
 .translate-pane-empty {
-  flex: 1 1 45%;
-  align-items: center;
-  color: var(--kira-fg-subtle);
+  @apply flex-[1_1_45%] items-center text-subtle;
 }
 </style>

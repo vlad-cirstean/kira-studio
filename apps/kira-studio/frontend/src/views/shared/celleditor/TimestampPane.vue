@@ -138,48 +138,37 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .ts-pane {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
+  @apply flex flex-col h-full min-h-0;
 }
 
 .ts-readings {
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-4);
+  @apply shrink-0 items-center gap-[var(--kira-s-2)] py-[var(--kira-s-2)] px-[var(--kira-s-4)];
 }
 
 .ts-reading {
-  white-space: nowrap;
+  @apply whitespace-nowrap;
 }
 
 .ts-sep {
-  opacity: 0.5;
+  @apply opacity-50;
 }
 
 .ts-edit {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3) var(--kira-s-4);
+  @apply flex-1 min-h-0 flex items-start gap-[var(--kira-s-2)] py-[var(--kira-s-3)] px-[var(--kira-s-4)];
 }
 
 .ts-field {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .ts-field :deep(.p-input) {
-  width: 100%;
+  @apply w-full;
 }
 
 .ts-calendar-anchor {
-  position: relative;
-  flex-shrink: 0;
+  @apply relative shrink-0;
 }
 </style>

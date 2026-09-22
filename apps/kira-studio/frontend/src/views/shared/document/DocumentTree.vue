@@ -76,67 +76,48 @@ const TOKEN_CLASS: Record<'string' | 'number' | 'keyword' | 'bson', string> = {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .document-tree {
-  padding: var(--kira-s-2) 0;
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
   /* P43 iter3 D42: chrome-less horizontal scrolling, TabStrip.vue's/ConsoleView.vue's own idiom —
      the same three declarations, occupying zero vertical space, so rowHeight()'s exact LINE_H
      accounting (rows.ts) is untouched. */
-  overflow-x: auto;
-  overflow-y: hidden;
+  @apply overflow-x-auto overflow-y-hidden text-[length:var(--kira-t-sm)] font-[family-name:var(--kira-font-data)];
   scrollbar-width: none;
+  padding: var(--kira-s-2) 0;
 }
 
 .document-tree::-webkit-scrollbar {
-  display: none;
+  @apply hidden;
 }
 
 .tree-line {
-  height: var(--kira-h-xs);
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  padding-right: var(--kira-s-4);
-  white-space: nowrap;
   /* A line only as wide as its own content grows the scroller's scrollWidth past the panel — a
      plain 100% width would clip at the viewport instead of revealing the rest on scroll. */
-  width: max-content;
-  min-width: 100%;
+  @apply flex items-center whitespace-nowrap w-max min-w-full gap-[var(--kira-s-1)] pr-[var(--kira-s-4)] h-[var(--kira-h-xs)];
 }
 
 .tree-twisty {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  padding: 0;
+  @apply flex shrink-0 w-3.5 h-3.5 items-center justify-center cursor-pointer border-0 bg-transparent p-0 text-muted;
 }
 
 .tree-twisty-spacer {
-  flex-shrink: 0;
-  width: 14px;
+  @apply shrink-0 w-3.5;
 }
 
 .tree-key {
-  flex-shrink: 0;
+  @apply shrink-0;
   color: var(--kira-syntax-property);
 }
 
 .tree-value {
   /* P43 iter3 D42: no longer clipped — .tree-line's own max-content width lets this grow past
      the panel instead, reachable by scrolling .document-tree sideways. */
-  flex-shrink: 0;
+  @apply shrink-0;
 }
 
 .tree-summary {
-  color: var(--kira-fg-muted);
+  @apply text-muted;
 }
 
 .tok-string {

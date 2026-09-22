@@ -82,10 +82,9 @@ const resetTitle = computed<string>(
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .edit-buffer-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-3);
-  flex-shrink: 0;
+  @apply flex items-center shrink-0 gap-[var(--kira-s-3)];
 }
 </style>

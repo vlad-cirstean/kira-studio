@@ -338,92 +338,64 @@ const secondText = computed<string>({
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .dtp {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-3);
+  @apply flex flex-col gap-[var(--kira-s-2)] p-[var(--kira-s-3)];
 }
 
 .dtp-month-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  @apply flex items-center justify-between;
 }
 
 /* P42 D33a: a plain <button> now, so the label itself is the mode-cycling control — reset to
    look like the <span> it replaces rather than a bordered control. */
 .dtp-month-label {
-  border: none;
-  background: none;
-  padding: var(--kira-s-1) var(--kira-s-2);
-  border-radius: var(--kira-radius-sm);
-  font-size: var(--kira-t-sm);
-  font-family: inherit;
-  color: var(--kira-fg);
-  cursor: pointer;
+  @apply border-0 bg-none rounded-kira-sm text-[length:var(--kira-t-sm)] font-[inherit] text-fg cursor-pointer py-[var(--kira-s-1)] px-[var(--kira-s-2)];
 }
 
 .dtp-month-label:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .dtp-weekdays,
 .dtp-days {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  @apply grid grid-cols-7 gap-0.5;
 }
 
 /* The month grid (3x4) and year-block grid (4x4, item 19's "16-year block") share this — same
    .dtp-day chip, just a 4-column grid instead of a 7-column one (D33a). */
 .dtp-grid4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 2px;
+  @apply grid grid-cols-4 gap-0.5;
 }
 
 .dtp-weekday {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--kira-h-xs);
-  color: var(--kira-fg-subtle);
-  font-size: var(--kira-t-xs);
+  @apply flex items-center justify-center text-subtle text-[length:var(--kira-t-xs)] h-[var(--kira-h-xs)];
 }
 
 .dtp-day {
-  height: var(--kira-h-sm);
-  width: 100%;
-  padding: 0;
-  justify-content: center;
-  border: var(--kira-border-width) solid transparent;
-  background: none;
-  font-family: inherit;
+  @apply w-full p-0 justify-center border border-transparent bg-none font-[inherit] h-[var(--kira-h-sm)];
 }
 
 .dtp-day.is-today {
-  border-color: var(--kira-border-strong);
+  @apply border-border-strong;
 }
 
+/* text-[var(--kira-accent)] not text-accent: shadcn-bridge.css maps --color-accent to
+   --kira-hover (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */
 .dtp-day.is-selected {
-  background: var(--kira-accent);
-  color: var(--kira-accent-fg);
+  @apply bg-[var(--kira-accent)] text-[var(--kira-accent-fg)];
 }
 
 .dtp-clock {
-  display: flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  padding-top: var(--kira-s-2);
-  border-top: var(--kira-border-width) solid var(--kira-border);
+  @apply flex items-center border-t border-border gap-[var(--kira-s-1)] pt-[var(--kira-s-2)];
 }
 
 .dtp-clock :deep(.p-input) {
-  width: 52px;
+  @apply w-[52px];
 }
 
 .dtp-clock-sep {
-  color: var(--kira-fg-subtle);
+  @apply text-subtle;
 }
 </style>

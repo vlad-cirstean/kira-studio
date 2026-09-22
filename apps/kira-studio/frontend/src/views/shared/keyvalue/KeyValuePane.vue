@@ -996,61 +996,45 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .keyvalue-pane {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  @apply flex-1 min-h-0 flex flex-col;
 }
 
 .table-panel {
-  flex: 1;
-  min-height: 0;
-  border: none;
-  border-radius: 0;
+  @apply flex-1 min-h-0 border-0 rounded-none;
 }
 
 .tbody {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
   /* P49 D5: VirtualList owns scrolling internally now (its own `.virtual-list { overflow: auto }`,
      height:100% against this flex:1/min-height:0 parent) — EmptyState's two branches above never
      needed to scroll either. */
-  overflow: hidden;
+  @apply flex-1 min-h-0 flex flex-col overflow-hidden;
 }
 
 .kv-col-gutter {
-  width: 40px;
-  flex-shrink: 0;
+  @apply w-10 shrink-0;
 }
 
 .kv-col-field {
-  width: 220px;
-  flex-shrink: 0;
+  @apply w-[220px] shrink-0;
 }
 
 .kv-col-value {
-  flex: 1;
-  min-width: 0;
+  @apply flex-1 min-w-0;
 }
 
 .kv-row {
-  height: var(--kira-row-height);
-  display: flex;
-  cursor: pointer;
+  @apply flex cursor-pointer h-[var(--kira-row-height)];
 }
 
 .kv-row:hover {
-  background: var(--kira-hover);
+  @apply bg-hover;
 }
 
 .truncated-chip {
-  margin-left: var(--kira-s-3);
-  flex-shrink: 0;
-  background: var(--kira-bg-input);
-  color: var(--kira-fg-subtle);
+  @apply shrink-0 bg-input text-subtle ml-[var(--kira-s-3)];
 }
 
 .search-match {
@@ -1059,32 +1043,27 @@ onUnmounted(() => {
 
 .search-match-current {
   background: var(--kira-search-match-current);
-  color: var(--kira-bg);
+  @apply text-bg;
 }
 
 .edit-anchor,
 .add-anchor {
-  position: relative;
+  @apply relative;
 }
 
 .popover-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-3);
+  @apply flex flex-col gap-[var(--kira-s-3)] p-[var(--kira-s-3)];
 }
 
 .popover-title {
-  padding: 0;
+  @apply p-0;
 }
 
 .popover-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kira-s-2);
+  @apply flex justify-end gap-[var(--kira-s-2)];
 }
 
 .popover-error {
-  color: var(--kira-error);
+  @apply text-error;
 }
 </style>

@@ -110,27 +110,25 @@ function onJump(e: Event): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .pager {
-  gap: var(--kira-s-1);
+  @apply gap-[var(--kira-s-1)];
 }
 
 .page-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kira-s-1);
-  white-space: nowrap;
+  @apply inline-flex items-center whitespace-nowrap gap-[var(--kira-s-1)];
 }
 
 /* TextField's root <span class="p-input"> only receives fallthrough attrs on its inner <input>
    (see TextField.vue's inheritAttrs:false), so the fixed width and centred text live on this
    wrapper/its :deep() descendants instead of a class/style on the <TextField> tag itself. */
 .page-input {
-  width: 46px;
+  @apply w-[46px];
 }
 
 .page-input :deep(.p-input) {
-  width: 100%;
-  padding: 0 var(--kira-s-2);
+  @apply w-full px-[var(--kira-s-2)];
 }
 
 /* P22 D2: F3 shows the page-number box is already the same 22px height as the icon buttons
@@ -139,11 +137,10 @@ function onJump(e: Event): void {
    as one weight; :focus-within/:hover restore both, the same "engaged control" idiom .p-select
    (borderless by default, .bordered opt-in) already uses. */
 .page-input :deep(.p-input:not(:focus-within):not(:hover)) {
-  background: none;
-  border-color: transparent;
+  @apply bg-none border-transparent;
 }
 
 .page-input :deep(input) {
-  text-align: center;
+  @apply text-center;
 }
 </style>

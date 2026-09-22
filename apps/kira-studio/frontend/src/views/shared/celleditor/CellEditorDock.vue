@@ -44,20 +44,18 @@ const cell = computed(() => cellSelectionStore.selectedCellFor(props.tabId));
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* The workbench grid gave the splitter its size (a `--kira-gap` row between two gap-separated
    panels, tokens.css:31-36); inside a view there is no gap band to aim at, so the track carries
    its own height. P22 D13: `divider` (above) now draws the visible boundary the comment below
    used to hand off to `.cell-dock`'s own border-top — one mechanism for "a splitter inside a view
    is visible" instead of two that happened to agree, same rendered line in the same place. */
 .cell-splitter {
-  height: var(--kira-s-2);
-  flex-shrink: 0;
+  @apply shrink-0 h-[var(--kira-s-2)];
 }
 
 .cell-dock {
-  flex-shrink: 0;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--kira-bg);
+  @apply shrink-0 min-h-0 overflow-hidden bg-bg;
 }
 </style>
