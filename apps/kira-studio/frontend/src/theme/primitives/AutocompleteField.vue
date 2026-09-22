@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { EditorLanguageId } from '@shared/domain/editor';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+import { useEventListener, useTimeoutFn } from '@vueuse/core';
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { loadMonaco, type MonacoModule } from '../../editor/monaco';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
@@ -14,6 +15,20 @@ import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from './complet
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
 // <input>, not on the wrapping <span class="p-input">.
 defineOptions({ inheritAttrs: false });
+
+// P99 Part 2 (§4.3): declined reka-ui/shadcn's `combobox`. Its Listbox+Popover shape assumes it
+// owns the popup's open state and the trigger's value; this component owns a real <input>/
+// <textarea> directly (this file's own header comment: Playwright's `locator.fill()` needs one,
+// and TextField's $attrs-ordering means no wrapper can intercept `enter` correctly either), plus
+// a paint-only Monaco overlay for syntax colour and a pointer-hit-tested hover panel — neither has
+// a combobox equivalent. Adopting it would mean re-deriving all of that against a library that
+// assumes a plain text value, a bigger behaviour change than a styling pass. Internals: the two
+// window listeners and the hover-open timer moved onto VueUse (§9.3); CSS moved to Tailwind where
+// it is a single, independently-safe rule — the overlay/`.has-overlay`/`is-grow` block (this
+// file's own comments: "the one property this trick actually depends on", "do not add a
+// compensating offset") stays hand CSS since those three rules are pixel-coupled across the real
+// input and its paint-only overlay, and splitting them across utility classes risks exactly the
+// drift those comments warn against.
 
 // P18: identifier/keyword autocomplete for a filter surface's free-text input (SQL's WHERE/ORDER
 // BY, Mongo's filter/sort) — a drop-in TextField look-alike (same .p-input box, same
@@ -340,17 +355,21 @@ const HOVER_DELAY_MS = 400;
 const hoverPanelRef = ref<HTMLElement | null>(null);
 const hoverLines = ref<string[] | null>(null);
 const hoverStyle = ref<{ left: string; top: string } | null>(null);
-let hoverTimer: ReturnType<typeof setTimeout> | null = null;
 // D3(c)'s "a different token than last time" without needing the token's own span — `hoverAt`'s
 // contract (D3) is text-in/lines-out, no offsets — comparing the lines it returns for the pointer's
 // current offset is exactly that: the same token yields the same lines every time.
 let lastHoverKey: string | null = null;
 
+// P99 Part 2: was a hand-rolled `let hoverTimer` + clearTimeout/setTimeout pair — useTimeoutFn's
+// start()/stop() carry the same "cancel and restart" semantics with no bookkeeping of the id.
+const { start: startHoverTimer, stop: stopHoverTimer } = useTimeoutFn(
+  (x: number, top: number, lines: string[]) => void openHoverAt(x, top, lines),
+  HOVER_DELAY_MS,
+  { immediate: false },
+);
+
 function closeHover(): void {
-  if (hoverTimer !== null) {
-    clearTimeout(hoverTimer);
-    hoverTimer = null;
-  }
+  stopHoverTimer();
   hoverLines.value = null;
   lastHoverKey = null;
 }
@@ -395,15 +414,12 @@ function onInputMouseMove(e: MouseEvent): void {
   const key = lines ? JSON.stringify(lines) : null;
   if (key === lastHoverKey) return; // same token (or still no token) as the last move
   lastHoverKey = key;
-  if (hoverTimer !== null) clearTimeout(hoverTimer);
+  stopHoverTimer();
   hoverLines.value = null;
   if (!lines) return;
   const rect = el.getBoundingClientRect();
   const x = e.clientX;
-  hoverTimer = setTimeout(() => {
-    hoverTimer = null;
-    void openHoverAt(x, rect.top, lines);
-  }, HOVER_DELAY_MS);
+  startHoverTimer(x, rect.top, lines);
 }
 
 function onBlur(e: FocusEvent): void {
@@ -427,23 +443,17 @@ function closeOnViewportChange(): void {
   open.value = false;
   forceAll.value = false;
 }
-onMounted(() => {
-  window.addEventListener('resize', closeOnViewportChange);
-  window.addEventListener('scroll', closeOnViewportChange, true);
-});
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', closeOnViewportChange);
-  window.removeEventListener('scroll', closeOnViewportChange, true);
-});
+useEventListener(window, 'resize', closeOnViewportChange);
+useEventListener(window, 'scroll', closeOnViewportChange, true);
 </script>
 
 <template>
   <span
-    class="p-input autocomplete-field"
+    class="p-input autocomplete-field relative"
     :class="{ 'is-invalid': invalid, 'is-grow': grow }"
   >
     <span v-if="prefix" class="ph" :class="{ 'ph-active': prefixActive }">{{ prefix }}</span>
-    <span class="input-wrap" :data-value="modelValue">
+    <span class="input-wrap relative flex min-w-0 flex-1 items-center" :data-value="modelValue">
       <!-- Paint-only: see `language`'s own doc comment above for why this is a second element
            behind the real input rather than the input itself (P60a §5: span-painted text, not a
            mounted editor). `overlayHtml` is built entirely by `paintOverlayHtml` — every character
@@ -512,7 +522,7 @@ onBeforeUnmount(() => {
   <ul
     v-if="open && filtered.length > 0"
     :id="listId"
-    class="autocomplete-suggestions p-completion p-float"
+    class="autocomplete-suggestions p-completion p-float fixed z-[var(--kira-z-autocomplete)] m-0 list-none"
     role="listbox"
     :style="listStyle ?? undefined"
     @mousedown.prevent
@@ -536,28 +546,22 @@ onBeforeUnmount(() => {
   <div
     v-if="hoverLines"
     ref="hoverPanelRef"
-    class="var-hover-panel p-float"
+    class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-[360px] px-[var(--kira-s-3)] py-[var(--kira-s-2)] font-[family-name:var(--kira-font-data)] text-[length:var(--kira-t-sm)] text-fg pointer-events-none"
     role="tooltip"
     data-testid="autocomplete-hover"
     :style="hoverStyle ?? undefined"
   >
-    <div v-for="(line, i) in hoverLines" :key="i" class="hover-line">{{ line }}</div>
+    <div
+      v-for="(line, i) in hoverLines"
+      :key="i"
+      class="hover-line whitespace-pre-wrap [overflow-wrap:anywhere]"
+      :class="{ 'mt-[var(--kira-s-1)] text-muted': i > 0 }"
+      >{{ line }}</div
+    >
   </div>
 </template>
 
 <style scoped>
-.autocomplete-field {
-  position: relative;
-}
-
-.input-wrap {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-}
-
 /* Paint-only and never scrolled by the user directly (see onInputScroll) — sized/positioned to
    sit exactly under the real `<input>` next to it, not the whole `.p-input` box (which may also
    carry a `prefix` span ahead of this wrapper). `kira-font-family` is a monospace stack
@@ -637,37 +641,4 @@ onBeforeUnmount(() => {
   caret-color: var(--kira-fg);
 }
 
-/* P22 D8: this popup's chrome/row/icon/label/detail rules moved to primitives.css's shared
-   `.p-completion*` classes (F13) — this scoped block keeps only what's specific to *this*
-   popup's own positioning, not the completion spec itself: fixed placement (D3's own comment
-   above `positionList()`) and the plain `<ul>` reset. */
-.autocomplete-suggestions {
-  position: fixed;
-  z-index: var(--kira-z-autocomplete);
-  list-style: none;
-  margin: 0;
-}
-
-/* P15b D3(c): positioned by computeFloatPosition (theme/floatingPosition.ts) via hoverStyle — the
-   same `.p-float` chrome (background/border/radius/shadow) every other floating surface uses. */
-.var-hover-panel {
-  position: fixed;
-  z-index: var(--kira-z-autocomplete);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  max-width: 360px;
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg);
-  pointer-events: none;
-}
-
-.hover-line {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.hover-line + .hover-line {
-  color: var(--kira-fg-muted);
-  margin-top: var(--kira-s-1);
-}
 </style>
