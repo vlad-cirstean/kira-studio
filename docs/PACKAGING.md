@@ -33,10 +33,12 @@ It sources `scripts/lib.sh` for shared `ROOT_DIR`, `require_cmd`, `ensure_gopath
   bindings generator's type-checker (`setup.sh:64-71`, `:88-92`);
   it reinstalls only when the pinned version changed, or when the installed binary's own build
   toolchain is older than the directive (`setup.sh:73-80`);
-- delegates bindings regeneration to `wails3 task common:generate:bindings`, gated on an identity
-  stamp at `apps/kira-studio/.task/bindings.stamp` **and** on the bindings directory's own presence
-  (`setup.sh:113-127`) — `apps/kira-studio/frontend/src/bridge/*.ts` imports the generated bindings
-  directly, so `bun run build` fails without them.
+- delegates bindings regeneration to `wails3 task common:generate:bindings`, **for both this app
+  and Kira Space** (`apps/kira-space`, as of v1.9 P100) — a loop over the two app dirs, each gated
+  on its own identity stamp (`apps/<app>/.task/bindings.stamp`) and its own bindings directory's
+  presence (`setup.sh`'s bindings-regeneration block) — `apps/kira-studio/frontend/src/bridge/*.ts`
+  (and Kira Space's own equivalent) import their generated bindings directly, so `bun run build`
+  fails without them.
 
 `setup.sh` does only what is missing on each run. To run just the install step (e.g. to warm up a
 machine before writing code), use `bun run setup`.
@@ -49,9 +51,9 @@ Expected artifacts (nothing lands in `dist/` or `out/` any more):
 - `apps/kira-studio/bin/Kira Studio.app` — the packaged, ad-hoc-signed bundle the image is built
   from. Still produced, and still what you run locally; it is no longer what ships.
 - `apps/kira-studio/bin/Kira Studio` — the bare Go binary the bundle is assembled around.
-- `apps/kira-studio/bin/kira-version.vsix` — the packaged VS Code extension (G10 D7), built by
-  `wails3 task common:build:vsix` (`bun run scripts/package-vscode.ts` under the hood) and copied
-  into the `.app`/`.dmg` below rather than shipped separately.
+
+**As of v1.9 P100, this app's own artifacts carry no `.vsix` at all.** The packaged VS Code
+extension (G10 D7) moved to Kira Space's own bundle in full — see "Kira Space packaging" below.
 
 No `.zip` is produced anywhere any more — the release workflow uploads the `.dmg` (§7).
 
@@ -64,9 +66,6 @@ apps/kira-studio/bin/Kira Studio.app/
                                      CFBundleIdentifier com.kirathecat.kira-studio
     Resources/
       icons.icns                     the only icon the bundle carries; no Assets.car ships (§6)
-      kira-version.vsix              the packaged VS Code extension (G10) — copied here BEFORE
-                                     codesign:adhoc runs, so the ad-hoc signature covers it too;
-                                     located at runtime via os.Executable() + "../Resources"
     MacOS/
       Kira Studio                    the compiled Go binary — the literal filename, space included,
                                      must equal CFBundleExecutable or the bundle neither launches
@@ -77,15 +76,8 @@ There is no `runtime/` subtree any more (P58f M10) — the compiled Go binary is
 `create:app:bundle` used to assert `runtime/{node,engine}` existed and copy that tree in before
 signing; both the guard and the copy step are gone, since there is nothing left to vendor.
 
-**Installing the extension (G10).** Settings → *Connected editors* has an **Install VS Code
-Integration** button (`internal/gitvsix`): it locates the bundled `.vsix` next to the running
-executable, probes for a `code` CLI (`PATH`, then `/usr/local/bin`, then `/opt/homebrew/bin`, then
-the VS Code `.app` bundle's own `bin/code`, then `~/Applications/...` — mirroring
-`gitclient/discovery.go`'s own probe-order shape, since a Finder-launched app's `PATH` never
-includes `/usr/local/bin`), and either runs `code --install-extension <path> --force` or reveals
-the file in Finder as a fallback. `darwin:run`'s `.dev.app` also gets a conditional copy of the
-`.vsix` (when one already exists in `bin/`), so the button is exercisable from a dev build without
-cutting a real `.dmg`.
+**As of P100, installing the extension is Kira Space's own concern — see "Kira Space packaging"
+below.** This app has no *Connected editors* pane, no `internal/gitvsix`, and nothing to install.
 
 **Dev loop:** `bun run dev` (`cd apps/kira-studio && wails3 task dev`) launches a real native window
 with hot reload — the Wails task's own dev-mode config drives the frontend build with a blocking
@@ -264,14 +256,9 @@ human to launch the packaged app and use it.
     volume icon. — **partial**: mount, contents, both icons and `Signature=adhoc` on the image were
     verified from the shell; the drag-onto-Applications gesture and how the window *looks* when
     Finder opens it — background, icon placement — still want a human's eyes.
-12. (G10) Settings → *Connected editors* → **Install VS Code Integration**. With `code` on `PATH`:
-    click it, expect `installed` and VS Code's own "Completed installing extension" under
-    **Kira Version**, publisher `vladcirstean`. Rename `/usr/local/bin/code` aside and relaunch:
-    the button now reads **Reveal Extension in Finder**, clicking it opens Finder with
-    `kira-version.vsix` selected, and the probed-paths line names all five candidates. Restore.
-    With the extension installed from the `.vsix` (not `--extensionDevelopmentPath`), open a git
-    repository and confirm the Git Graph panel renders — the one scenario D6's CJS bundle switch
-    exists to make safe. — *not yet run*
+12. **Moved to Kira Space as of P100** — the *Connected editors* pane, `internal/gitvsix`'s Install
+    VS Code Integration button, and `kira-*.vsix` bundling all now belong to Kira Space's own
+    checklist. See "Kira Space packaging" below.
 
 ## 5. Off-macOS: what this environment could actually check
 
@@ -464,3 +451,52 @@ auth/config tier) is the same shape and made the same move, for the same reason 
 push access without the `workflow` OAuth scope, which GitHub requires for any commit touching
 `.github/workflows/*.yml`. A session with that scope applied them; both staging directories are
 gone.
+
+## 8. Kira Space packaging
+
+**As of v1.9 P100, Kira Space is a separate app with its own bundle, own DMG, and its own copy of
+the whole pipeline above** — `apps/kira-space/build/config.yml`, `apps/kira-space/Taskfile.yml` and
+`apps/kira-space/build/darwin/Taskfile.yml`, generated and packaged exactly the way §1-§2 describe
+for Kira Studio, `CFBundleIdentifier com.kirathecat.kira-space`. `bun run package:space` (`cd
+apps/kira-space && wails3 task darwin:package:dmg`, then `sh scripts/sign-bundle.sh apps/kira-space
+"Kira Space"`) is the entry point — `sign-bundle.sh` takes the app dir and app name as `$1`/`$2` as
+of P100 Part 2, so this one script signs both apps' bundles rather than a near-identical copy per
+app. Expected artifacts: `apps/kira-space/bin/Kira Space.dmg`/`.app`/`Kira Space` (the DMG, the
+bundle, and the bare binary), plus `apps/kira-space/bin/kira-space.vsix` — the one artifact with no
+Kira Studio equivalent.
+
+**The `.vsix` chain — this is where G10's whole packaged-extension story now lives.**
+`scripts/build-vscode.ts` builds the extension's two outputs (the webview UI, from
+`packages/git-ui/vite.config.ts`, and `dist/extension.cjs`, CommonJS per G10 D6) with `Bun.build`;
+`scripts/package-vscode.ts` (`bun run package:vscode`) calls it, then shells `@vscode/vsce package
+--no-dependencies` (mandatory — vsce's own dependency-resolution shells `npm list`, which cannot
+read this workspace's `workspace:*` protocol) to produce `apps/kira-space/bin/kira-space.vsix`, a
+fixed filename with no version baked in (the version lives in the manifest, where `code` reads it).
+`apps/kira-space/build/Taskfile.yml`'s `build:vsix` task wires this into `darwin:package`/
+`darwin:package:universal` (retargeted here from Kira Studio by P100 Part 3); `create:app:bundle`
+copies the built `.vsix` into `Contents/Resources/kira-space.vsix` **before** `codesign:adhoc` runs,
+so the ad-hoc signature covers it too, and fails loudly if the file is missing rather than
+packaging a broken bundle silently. `darwin:run`'s `.dev.app` gets the same conditional copy Kira
+Studio's own dev-app task used to, so **Install VS Code Integration** is exercisable from a dev
+build without cutting a real `.dmg`.
+
+**Installing the extension (G10) — Settings → *Connected editors* → Install VS Code Integration**
+(`apps/kira-space/internal/gitvsix`, retargeted from Kira Studio by P100 Part 3): locates the
+bundled `.vsix` next to the running executable, probes for a `code` CLI (`PATH`, then
+`/usr/local/bin`, then `/opt/homebrew/bin`, then the VS Code `.app` bundle's own `bin/code`, then
+`~/Applications/...`), and either runs `code --install-extension <path> --force` or reveals the
+file in Finder as a fallback.
+
+**Human checklist item, carried over from Kira Studio's own §4 item 12, not yet run against this
+app:** with `code` on `PATH`, click **Install VS Code Integration**, expect `installed` and VS
+Code's own "Completed installing extension" under **Kira Space**, publisher `vladcirstean`. Rename
+`/usr/local/bin/code` aside and relaunch: the button reads **Reveal Extension in Finder**, clicking
+it opens Finder with `kira-space.vsix` selected. Restore. With the extension installed from the
+`.vsix` (not `--extensionDevelopmentPath`), open a git repository and confirm the Git Graph panel
+renders.
+
+**Not yet run in this environment** for the same reason as Kira Studio's own §3/§4: this sandbox is
+Linux, with no macOS, no `codesign`, and no `code` CLI to probe for. What §5's off-macOS limits say
+about Kira Studio's own build applies identically here — `build:native` needs macOS, `codesign`
+does not exist off Darwin — so nothing above has been observed against a real bundle, only read
+from the Taskfiles that produce one.

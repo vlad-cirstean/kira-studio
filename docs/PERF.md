@@ -1484,7 +1484,8 @@ program.
 Upstream's ≤300 ms first-paint budget was measured over in-process `postMessage`. v1.3 replaced
 that with a Unix socket plus FlatBuffers framing, so `docs/v1.3/SPEC.md` carried a standing note
 asking for re-measurement, not re-derivation. G3 built the probe (`TestGraphStreamPerf`) and G8
-extended it to nine (`TestG8PerfBaseline`), both in `apps/kira-studio/internal/gitsock/`. Both are
+extended it to nine (`TestG8PerfBaseline`), both in `internal/gitsock/` (`apps/kira-studio/` at the
+time; moved to `apps/kira-space/` at v1.9 P100, same relative path). Both are
 **opt-in** — `KIRA_GIT_PERF=1`, skipped in `-short`, skipped without `git` on `PATH` — and **assert
 nothing**: each prints one `key=value` line. That's a decision, not an omission: a hard threshold
 in a suite that also runs on real macOS hardware would be flaky in exactly the way

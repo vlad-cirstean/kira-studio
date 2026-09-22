@@ -3959,6 +3959,15 @@ Performance:
   well-formed, tested bound method, just unreachable from any UI — and removing the bind (Go
   service, its `main.go` registration, the frontend wrapper) is left for a future pass rather than
   attempted here, out of this phase's own icon/docs/audit scope.
+- **`.github/workflows/pr.yml` has no Kira Space coverage at all** (found during P100 Part 4's docs
+  sweep). Its `checks` job runs `bun run build` (Kira Studio's frontend only — `build:space` is a
+  separate script it never calls), `go build ./...` (covers Kira Space's Go, since it is one
+  module) and `verify:packaging` (Kira Studio's own bundle only); there is no `build:vscode` or
+  `test:webview` step anywhere in CI. `typecheck`/`lint` already cover Kira Space, since those are
+  whole-repo scripts. Not fixed here: `docs/DEV_ENVIRONMENT.md`'s own section explains this session
+  cannot push a `.github/workflows/*.yml` change directly (an OAuth scope limit) and requires
+  staging one under `docs/pending-changes/` for a session that can; that staging step is real,
+  separate work this phase's own icon/docs/audit scope does not cover.
 - **The dbmcp bearer token reaches `claude mcp add` in plaintext argv** (`internal/mcpinstall/
   install.go`'s `Install`/`Command`, M6 round-1 finding), visible to any other local process or
   user that can list argv (`ps`, `/proc/<pid>/cmdline`) for the short window the `claude mcp add`

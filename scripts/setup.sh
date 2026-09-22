@@ -112,13 +112,21 @@ fi
 # produce different output for identical input — the stale-toolchain bug P20 F5/F6/F7 names. Wiping
 # Task's cache on an identity change forces the unconditional call below to do a real regen instead
 # of trusting a checksum computed under the old binary.
-BINDINGS_DIR="$ROOT_DIR/apps/kira-studio/frontend/bindings"
-STAMP_FILE="$ROOT_DIR/apps/kira-studio/.task/bindings.stamp"
-STAMP="$PINNED_VERSION|$GO_DIRECTIVE|$INSTALLED_TOOLCHAIN"
-if [ ! -d "$BINDINGS_DIR" ] || [ ! -f "$STAMP_FILE" ] || [ "$(cat "$STAMP_FILE")" != "$STAMP" ]; then
-  rm -rf "$ROOT_DIR/apps/kira-studio/.task"
-  mkdir -p "$(dirname "$STAMP_FILE")"
-  printf '%s' "$STAMP" >"$STAMP_FILE"
-fi
-echo "setup: wails3 task common:generate:bindings"
-(cd "$ROOT_DIR/apps/kira-studio" && wails3 task common:generate:bindings)
+#
+# v1.9 P100: looped over both apps, not just Kira Studio — Kira Space's own frontend imports
+# generated bindings the identical way (`apps/kira-space/frontend/src/bridge/*.ts`), and its own
+# `typecheck:space-*` scripts are raw `tsgo`/`vue-tsc` invocations that bypass its Taskfile's own
+# `generate:bindings` dep the same way Kira Studio's `typecheck:*` scripts do — so a fresh clone's
+# first `bun run typecheck` needs both apps' bindings pre-generated here, not only Kira Studio's.
+for APP_DIR in apps/kira-studio apps/kira-space; do
+  BINDINGS_DIR="$ROOT_DIR/$APP_DIR/frontend/bindings"
+  STAMP_FILE="$ROOT_DIR/$APP_DIR/.task/bindings.stamp"
+  STAMP="$PINNED_VERSION|$GO_DIRECTIVE|$INSTALLED_TOOLCHAIN"
+  if [ ! -d "$BINDINGS_DIR" ] || [ ! -f "$STAMP_FILE" ] || [ "$(cat "$STAMP_FILE")" != "$STAMP" ]; then
+    rm -rf "$ROOT_DIR/$APP_DIR/.task"
+    mkdir -p "$(dirname "$STAMP_FILE")"
+    printf '%s' "$STAMP" >"$STAMP_FILE"
+  fi
+  echo "setup: wails3 task common:generate:bindings ($APP_DIR)"
+  (cd "$ROOT_DIR/$APP_DIR" && wails3 task common:generate:bindings)
+done

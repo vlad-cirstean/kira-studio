@@ -143,20 +143,27 @@ See `docs/ARCHITECTURE.md`'s Storage section for the cipher, the key and the env
   accidentally can never weaken it. `apps/kira-studio/tests/ui/secrets.spec.ts`'s "keychain
   available" scenario guards this.
 
-## The git module — running and testing it here (G1-G34, updated P79)
+## The git module — running and testing it here (G1-G34, updated P79; moved to Kira Space, P100)
 
 See `docs/ARCHITECTURE.md`'s Git module section for what it is and why. This section is only about
-running it here.
+running it here. **As of v1.9 P100, the whole module lives under `apps/kira-space`, not
+`apps/kira-studio`** — every path and env var below was retargeted at Part 1/Part 2, not left as
+historical prose.
 
-- **`go test ./apps/kira-studio/internal/git...` needs a real `git` on `PATH` and nothing else** —
+- **`go test ./apps/kira-space/internal/git...` needs a real `git` on `PATH` and nothing else** —
   no Docker, no container, no display, no VS Code. Each test builds its own repository under
   `t.TempDir()`, and cases that need `git` self-skip without it. The app's own floor is **git
   2.38** (`merge-tree --write-tree`), so an older `git` skips more than it runs rather than failing
   informatively.
-- **`KIRA_HOME` scopes the socket, not just the database.** The listener is
-  `${KIRA_HOME}/git.sock` with its flock beside it, so two `KIRA_HOME`s are two fully independent
-  backends and a test never contends with a `bun run dev` session's socket. Anything needing a
-  server builds one over its own temp `KIRA_HOME` — never the fixed path.
+- **`KIRA_SPACE_HOME` scopes the socket, not just the database.** The listener is
+  `${KIRA_SPACE_HOME}/git.sock` with its flock beside it, so two `KIRA_SPACE_HOME`s are two fully
+  independent backends and a test never contends with a `bun run dev:space` session's socket.
+  Anything needing a server builds one over its own temp `KIRA_SPACE_HOME` — never the fixed path.
+  Never `KIRA_HOME` (Kira Studio's own env var) — the two apps' homes are fully separate as of
+  P100, so setting the wrong one silently talks to the wrong app's storage, or none at all.
+- **`bun run dev:space` runs Kira Space's own dev loop** (`cd apps/kira-space && wails3 task dev`)
+  — a separate native window/process from `bun run dev`'s Kira Studio, on its own Vite dev-server
+  port (9246, beside Kira Studio's 9245) so both can run at once without colliding.
 - **The perf probes are opt-in and assert nothing.**
   `KIRA_GIT_PERF=1 go test -run 'TestGraphStreamPerf|TestG8PerfBaseline' ./apps/kira-studio/internal/gitsock/ -v`
   prints one `key=value` line per probe. No threshold assertion, deliberately: this container's
@@ -175,16 +182,17 @@ running it here.
   verification scope" note fixes the list and the reason. The unscoped tree stays worth running
   occasionally as a backstop, not per phase.
 - **A fresh worktree fails `bun run typecheck`/the pre-commit hook on a git-only change**, even
-  after `bun install` — `typecheck:web`/`typecheck:tests`/`typecheck:unit` all resolve
-  `apps/kira-studio/frontend`'s Wails-generated `@bindings/*` modules, which need
-  `scripts/setup.sh`'s full Go+`wails3` install and codegen (below), unrelated to `packages/git-*`.
-  For a change confined to `packages/git-core`/`git-ipc`/`git-ui`, verify with `bun run
-  typecheck:git` (or the three `tsgo`/`vue-tsc` invocations it chains, run separately) plus each
-  touched package's own `bun test` instead of the full `typecheck` — that's the real coverage for
-  those packages, and running full `setup.sh` just to commit a git-only fix is disproportionate.
-  The pre-commit hook itself still runs the unscoped `bun run typecheck`, so it fails regardless;
-  its own header comments a `--no-verify` bypass for exactly this — a change proven correct by the
-  scoped checks above, blocked only by an unrelated, unset-up workspace.
+  after `bun install` — `typecheck:web`/`typecheck:space-web`/`typecheck:tests`/
+  `typecheck:space-tests`/`typecheck:unit`/`typecheck:space-unit` all resolve one of the two apps'
+  frontends' Wails-generated `@bindings/*` modules, which need `scripts/setup.sh`'s full Go+`wails3`
+  install and codegen (below) **for both apps**, unrelated to `packages/git-*`. For a change confined
+  to `packages/git-core`/`git-ipc`/`git-ui`, verify with `bun run typecheck:git` (or the five
+  `tsgo`/`vue-tsc` invocations it chains, run separately) plus each touched package's own `bun test`
+  instead of the full `typecheck` — that's the real coverage for those packages, and running full
+  `setup.sh` for both apps just to commit a git-only fix is disproportionate. The pre-commit hook
+  itself still runs the unscoped `bun run typecheck`, so it fails regardless; its own header
+  comments a `--no-verify` bypass for exactly this — a change proven correct by the scoped checks
+  above, blocked only by an unrelated, unset-up workspace.
 - **A fresh `git worktree` in this container can check out an orphaned "Initial commit" scaffold
   instead of the real branch tip.** Hit by 5 of P79's 6 fix batches. It is a provisioning race, not
   data loss — the affected worktree holds nothing of value, confirmed by `git status` and an
@@ -217,16 +225,17 @@ running it here.
   needs. **Read the installed module source under
   `$(go env GOPATH)/pkg/mod/github.com/wailsapp/wails/v3@<version>/` instead of the docs site** —
   it's the real source for the exact pinned version.
-- **No package under `internal/` needs a C compiler on Linux any more** (v1.9 P97 removed
-  `internal/codeparse`, this repo's one unconditionally-cgo package). Every remaining cgo call this
-  app makes (a handful of darwin-only files in `internal/secrets`, `internal/metrics`,
-  `internal/localauth`, and `internal/gitclient`'s own FSEvents watcher) is behind a `darwin && cgo`
-  build tag with a real, working `!darwin || !cgo` companion, invisible to a Linux build;
-  `modernc.org/sqlite` (the sqlite adapter and the app's own storage) stays cgo-free on every
-  platform. `go test ./apps/kira-studio/internal/...` / `go build ./apps/kira-studio/internal/...`
-  need no C compiler in this container as a result. Only the `apps/kira-studio` `main` package
-  imports Wails and needs the GTK/WebKit headers, so prefer `./apps/kira-studio/internal/...` for a
-  fast loop.
+- **No package under either app's `internal/` needs a C compiler on Linux any more** (v1.9 P97
+  removed `internal/codeparse`, this repo's one unconditionally-cgo package). Every remaining cgo
+  call either app makes (a handful of darwin-only files in Kira Studio's own `internal/secrets`,
+  `internal/metrics`, `internal/localauth`, and Kira Space's own `internal/gitclient`'s FSEvents
+  watcher) is behind a `darwin && cgo` build tag with a real, working `!darwin || !cgo` companion,
+  invisible to a Linux build; `modernc.org/sqlite` (the sqlite adapter and each app's own storage)
+  stays cgo-free on every platform. `go test ./apps/kira-studio/internal/...` /
+  `go build ./apps/kira-studio/internal/...` (and the `apps/kira-space` equivalents) need no C
+  compiler in this container as a result. Only each app's own `main` package imports Wails and
+  needs the GTK/WebKit headers, so prefer `./apps/kira-studio/internal/...` or
+  `./apps/kira-space/internal/...` for a fast loop.
 - **`GOOS=darwin` cross-compiles here only with `CGO_ENABLED=0`.** A pure-Go package builds and
   vets for `darwin/arm64` from this container (`GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build
   ./…`, exit 0); a cgo one cannot be built for darwin here at all (`CGO_ENABLED=1 GOOS=darwin`
