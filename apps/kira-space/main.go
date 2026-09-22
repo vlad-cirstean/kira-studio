@@ -24,6 +24,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/terminal"
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -94,6 +95,7 @@ func main() {
 
 	emitter, attachEmitter := shell.NewDeferredEmitter()
 	deps := appcore.Deps{Repos: repositories, Events: emitter, GitRegistry: gitRegistry}
+	events := bridge.NewEvents(emitter)
 
 	browserOpener, attachBrowser := shell.NewDeferredBrowser()
 
@@ -104,8 +106,25 @@ func main() {
 		Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),
 	}
 	gitHubSvc := &bridge.GitHubService{Deps: deps, Browser: browserOpener}
+	settingsSvc := &bridge.SettingsService{Deps: deps}
+	layoutSvc := &bridge.LayoutService{Deps: deps}
+	tabsSvc := &bridge.TabsService{Deps: deps}
+	// P100 Part 2: internal/terminal is duplicated (not hoisted — Go's internal/ rule) from Kira
+	// Studio's own package, trimmed of its AgentHooks integration (bridge/terminal.go's own doc
+	// comment) — this app has no Claude Code hook-reporting toggle in scope.
+	terminalSvc := &bridge.TerminalService{Emit: emitter, Registry: terminal.NewRegistry()}
 
+	// windows/closeFlush are P100 Part 2's own addition — Part 1 had no per-window flush to
+	// coordinate (no tabs, no layout); the quit-wide handshake below needs windows.Keys, and each
+	// window's own close needs closeFlush's ack routing (shell/closeflush.go).
+	windows := shell.NewWindowRegistry()
+	closeFlush := shell.NewCloseFlushCoordinator()
+
+	beforeFlush := sync.OnceFunc(func() {
+		windows.DetachAll()
+	})
 	teardown := sync.OnceFunc(func() {
+		terminalSvc.Shutdown()
 		if err := gitSock.Close(); err != nil {
 			slog.Warn("close git socket", "scope", "shutdown", "err", err)
 		}
@@ -121,7 +140,7 @@ func main() {
 			slog.Warn("close db", "scope", "shutdown", "err", err)
 		}
 	})
-	quitter := shell.NewQuitter(teardown)
+	quitter := shell.NewQuitter(events, beforeFlush, teardown, 2*time.Second, windows.Keys)
 
 	app := application.New(application.Options{
 		Name:        "Kira Space",
@@ -130,6 +149,11 @@ func main() {
 			application.NewService(gitClientsSvc),
 			application.NewService(codeWorkspaceSvc),
 			application.NewService(gitHubSvc),
+			application.NewService(settingsSvc),
+			application.NewService(layoutSvc),
+			application.NewService(tabsSvc),
+			application.NewService(terminalSvc),
+			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -159,7 +183,11 @@ func main() {
 	opener := &windowOpener{
 		app:          app,
 		windowDeps:   shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt},
-		windows:      shell.NewWindowRegistry(),
+		windows:      windows,
+		events:       events,
+		closeFlush:   closeFlush,
+		quitter:      quitter,
+		terminalSvc:  terminalSvc,
 		repositories: repositories,
 	}
 	shell.AttachReopen(app, opener.reopen)
@@ -251,13 +279,17 @@ func wireGit(repositories *repos.Repos) gitWired {
 	}
 }
 
-// windowOpener is Kira Studio's own windowOpener (main.go), trimmed: no closeFlush handshake, no
-// terminalSvc teardown, no events field — none of the three exist in this app yet (see this
-// file's own top comment).
+// windowOpener is Kira Studio's own windowOpener (main.go), grown in P100 Part 2 to carry
+// events/closeFlush/quitter/terminalSvc — Part 1's own trimmed copy had none of the three yet
+// (no tabs/layout to flush, no terminal registry to tear down).
 type windowOpener struct {
 	app          *application.App
 	windowDeps   shell.WindowDeps
 	windows      *shell.WindowRegistry
+	events       *bridge.Events
+	closeFlush   *shell.CloseFlushCoordinator
+	quitter      *shell.Quitter
+	terminalSvc  *bridge.TerminalService
 	repositories *repos.Repos
 }
 
@@ -273,7 +305,13 @@ func (o *windowOpener) open(rec model.WindowRecord) {
 	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), rec, primaryWorkArea))
 	detach := shell.Attach(win, o.windowDeps, rec.Key)
 	o.windows.Add(rec.Key, win, detach)
+	shell.AttachCloseFlush(win, rec.Key, o.events, o.closeFlush, func() bool { return o.windows.Count() == 1 })
 	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
+		// A window that closes mid-quit-handshake without ever acking through the flush channel is
+		// removed from the pending set here rather than being waited out for the full timeout — a
+		// no-op when no quit is in flight (Quitter.Flushed ignores a key it isn't waiting on).
+		o.quitter.Flushed(rec.Key)
+		o.terminalSvc.Registry.CloseWindow(rec.Key)
 		if o.windows.RemoveAndCount(rec.Key) > 0 {
 			if err := o.repositories.Windows.Delete(rec.Key); err != nil {
 				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
