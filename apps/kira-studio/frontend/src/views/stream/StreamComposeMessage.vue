@@ -5,7 +5,6 @@ import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, ref } from 'vue';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { produceKafkaMessage, sendSqsMessage } from './mutations';
 
 // Item 3/4's "Add message" panel — Kafka gets key/body/headers (kafka/produce.ts's three
@@ -56,88 +55,80 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <PopoverPanel
-    anchor="right"
-    :width="380"
-    test-id="stream-add-message-panel"
-    backdrop-test-id="stream-add-message-backdrop"
-    @close="emit('close')"
-  >
-    <div class="compose-inner">
-      <div class="compose-header p-panel-head">
-        <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
-        <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="toolbar"
-              size="kira-icon"
-              class="p-push"
-              aria-label="Close"
-              @click="emit('close')"
-            >
-              <CodiconIcon name="close" :size="13" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Close</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <div class="compose-body">
-        <label v-if="isKafka" class="field">
-          <span class="p-sm muted">Key (optional)</span>
-          <Input
-            :model-value="key"
-            placeholder="(none)"
-            class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
-            data-testid="stream-add-message-key"
-            @update:model-value="(v) => (key = String(v))"
-          />
-        </label>
-
-        <label class="field">
-          <span class="p-sm muted">Body</span>
-          <textarea
-            v-model="body"
-            class="p-textarea"
-            rows="6"
-            placeholder="Message body"
-            data-testid="stream-add-message-body"
-            @keydown="wrapSelectionOnType"
-          />
-        </label>
-
-        <label class="field">
-          <span class="p-sm muted">Headers (optional JSON object)</span>
-          <textarea
-            v-model="headers"
-            class="p-textarea"
-            rows="3"
-            placeholder='{"source": "manual"}'
-            data-testid="stream-add-message-headers"
-            @keydown="wrapSelectionOnType"
-          />
-        </label>
-
-        <span v-if="error" class="p-sm error-text" data-testid="stream-add-message-error">{{
-          error
-        }}</span>
-      </div>
-
-      <div class="compose-actions">
-        <Button variant="dialog" size="kira-lg" @click="emit('close')">Cancel</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          :disabled="!canSubmit"
-          data-testid="stream-add-message-submit"
-          @click="submit"
-        >
-          {{ isKafka ? 'Produce' : 'Send' }}
-        </Button>
-      </div>
+  <div class="compose-inner">
+    <div class="compose-header p-panel-head">
+      <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+      <span>{{ isKafka ? 'Produce a message' : 'Send a message' }}</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            class="p-push"
+            aria-label="Close"
+            @click="emit('close')"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Close</TooltipContent>
+      </Tooltip>
     </div>
-  </PopoverPanel>
+
+    <div class="compose-body">
+      <label v-if="isKafka" class="field">
+        <span class="p-sm muted">Key (optional)</span>
+        <Input
+          :model-value="key"
+          placeholder="(none)"
+          class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
+          data-testid="stream-add-message-key"
+          @update:model-value="(v) => (key = String(v))"
+        />
+      </label>
+
+      <label class="field">
+        <span class="p-sm muted">Body</span>
+        <textarea
+          v-model="body"
+          class="p-textarea"
+          rows="6"
+          placeholder="Message body"
+          data-testid="stream-add-message-body"
+          @keydown="wrapSelectionOnType"
+        />
+      </label>
+
+      <label class="field">
+        <span class="p-sm muted">Headers (optional JSON object)</span>
+        <textarea
+          v-model="headers"
+          class="p-textarea"
+          rows="3"
+          placeholder='{"source": "manual"}'
+          data-testid="stream-add-message-headers"
+          @keydown="wrapSelectionOnType"
+        />
+      </label>
+
+      <span v-if="error" class="p-sm error-text" data-testid="stream-add-message-error">{{
+        error
+      }}</span>
+    </div>
+
+    <div class="compose-actions">
+      <Button variant="dialog" size="kira-lg" @click="emit('close')">Cancel</Button>
+      <Button
+        variant="dialog-primary"
+        size="kira-lg"
+        :disabled="!canSubmit"
+        data-testid="stream-add-message-submit"
+        @click="submit"
+      >
+        {{ isKafka ? 'Produce' : 'Send' }}
+      </Button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
