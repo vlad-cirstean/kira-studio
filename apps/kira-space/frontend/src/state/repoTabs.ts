@@ -6,12 +6,10 @@ import {
   defaultRepoMultiDiffTabState,
   type ReviewRef,
 } from '@shared/domain/tabs';
-import { repoWorkspaceKey } from '@shared/domain/workspace';
 import { requestReveal } from '../views/repo/reveal';
-import { tabsForWorkspace } from './mode';
-import { type OpenTabResult, useTabsStore } from './tabs';
+import { type OpenTabResult, tabsForWorkspace, useTabsStore } from './tabs';
 import { openTerminalTab, type TerminalLaunch } from './terminalTabs';
-import { useWorkspaceStore } from './workspace';
+import { repoWorkspaceKey, useWorkspaceStore } from './workspace';
 
 // P91 §6: moved to state/terminalTabs.ts, which openTerminalTab below now shares with the
 // Terminal module's own (non-repo-scoped) opener — re-exported so no importer of this module

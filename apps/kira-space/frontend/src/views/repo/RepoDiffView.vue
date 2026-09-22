@@ -13,13 +13,13 @@
 // single-active-view scoped: repoId resolution, the view.find/repo.goToFileFromDiff command
 // registrations, and review-decorations wiring.
 import type { RepoDiffTabRecord } from '@shared/domain/tabs';
-import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { registerCommand } from '../../shortcuts/commands';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
+import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { loadMonaco } from './monaco';
 import { attachReviewDecorations, type ReviewDecorationsHandle } from './reviewDecorations';
 import { useDiffEditor } from './useDiffEditor';
@@ -147,7 +147,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-diff-root {
   @apply h-full flex flex-col;

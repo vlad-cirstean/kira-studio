@@ -107,6 +107,7 @@ func main() {
 		Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{}),
 	}
 	gitHubSvc := &bridge.GitHubService{Deps: deps, Browser: browserOpener}
+	linkSvc := &bridge.LinkService{Browser: browserOpener}
 	settingsSvc := &bridge.SettingsService{Deps: deps}
 	layoutSvc := &bridge.LayoutService{Deps: deps}
 	tabsSvc := &bridge.TabsService{Deps: deps}
@@ -150,6 +151,7 @@ func main() {
 			application.NewService(gitClientsSvc),
 			application.NewService(codeWorkspaceSvc),
 			application.NewService(gitHubSvc),
+			application.NewService(linkSvc),
 			application.NewService(&bridge.FilesService{Dialogs: dialogsSvc}),
 			application.NewService(settingsSvc),
 			application.NewService(layoutSvc),

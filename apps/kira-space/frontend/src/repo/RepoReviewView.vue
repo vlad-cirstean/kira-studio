@@ -69,7 +69,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-review-host {
   @apply h-full w-full;

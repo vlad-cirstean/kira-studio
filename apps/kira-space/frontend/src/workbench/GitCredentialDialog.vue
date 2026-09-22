@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { nextTick, ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useGitCredentialStore } from '../state/gitCredential';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
-import TextField from '../theme/primitives/TextField.vue';
 
 const gitCredentialStore = useGitCredentialStore();
 

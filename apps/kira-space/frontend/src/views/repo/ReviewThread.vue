@@ -8,8 +8,8 @@
 // (review.comment.add/remove, plus the repaint that follows) stay in reviewDecorations.ts — this
 // component only renders and emits.
 import type { ReviewComment } from '@kira/git-ipc';
+import AppButton from '@theme/primitives/AppButton.vue';
 import { computed, ref } from 'vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
 
 const props = defineProps<{
   mode: 'view' | 'compose';
@@ -83,7 +83,7 @@ function submit(): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .review-thread {
   /* §3.1: Monaco's view-lines layer otherwise wins text selection inside this zone too. */

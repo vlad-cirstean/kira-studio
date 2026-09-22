@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import TreeHost from '@theme/primitives/TreeHost.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useContextMenuStore } from '../state/contextMenu';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
-import TreeHost from '../theme/primitives/TreeHost.vue';
 import { menuForRepoRow } from './menus';
 import RepoTreeRow from './RepoTreeRow.vue';
 import { type RepoTreeRowVm, useFileTreeStore } from './state/fileTree';
@@ -95,13 +95,13 @@ function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-tree-body {
   @apply h-full;
 }
 
 .sticky-row {
-  @apply absolute left-0 right-0 bg-bg z-[1];
+  @apply absolute left-0 right-0 bg-bg z-1;
 }
 </style>

@@ -16,7 +16,7 @@ restoreAfterEach(control);
 (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 
 const { asRepoFileTab } = await import('../../../../packages/shared/domain/tabs');
-const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
+const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');
 const { pinia } = await import('../../frontend/src/state/pinia');
 setActivePinia(pinia);
 const { useCodeReposStore } = await import('../../frontend/src/state/coderepos');

@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
 import { ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
 
 const codeReposStore = useCodeReposStore();
 
@@ -37,7 +37,7 @@ async function onImport(): Promise<void> {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .start {
   @apply flex-1 min-h-0 flex items-center justify-center overflow-auto p-[var(--kira-s-6)];

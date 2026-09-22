@@ -2,15 +2,15 @@
 // C5 §12: the real Monaco mount — lands together with monaco.ts's lazy init (S10's own note: no
 // separate stand-in file view ever ships in between).
 import type { RepoFileTabRecord } from '@shared/domain/tabs';
-import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
 import { registerCommand } from '../../shortcuts/commands';
 import { useSettingsStore } from '../../state/settings';
 import { registerTabRuntimeCleanup } from '../../state/tabRuntime';
 import { useTabsStore } from '../../state/tabs';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import SegmentedControl from '../../theme/primitives/SegmentedControl.vue';
+import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { registerEditor, unmountEditor } from './editors';
 import { loadFileContent } from './fileContent';
 import { monacoLanguageFor } from './language';
@@ -19,6 +19,7 @@ import {
   getOrCreateModel,
   KIRA_EDITOR_THEME,
   loadMonaco,
+  overflowWidgetsContainer,
   repoFileUri,
   repoRevisionFileUri,
 } from './monaco';
@@ -175,6 +176,11 @@ async function mount(): Promise<void> {
     scrollBeyondLastLine: false,
     fontFamily: settingsStore.appearance.fontFamily,
     fontSize: settingsStore.appearance.fontSize,
+    // editor/monaco.ts's own overflowWidgetsContainer doc comment: keeps the hover/find-widget a
+    // DOM descendant of the shared overflow container (under document.body) rather than this tab's
+    // own, possibly-clipped panel — the only widgets a read-only viewer still shows.
+    fixedOverflowWidgets: true,
+    overflowWidgetsDomNode: overflowWidgetsContainer(),
   });
   registerEditor(props.tab.id, uri, editor);
   editorInstance = editor;
@@ -299,7 +305,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .monaco-host {
   @apply h-full w-full;

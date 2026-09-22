@@ -1,8 +1,8 @@
 import type { FileStatusCode } from '@shared/domain/repo';
+import type { StickyRowLike } from '@theme/primitives/stickyBand';
 import { defineStore } from 'pinia';
 import { markRaw, reactive } from 'vue';
 import { control } from '../../bridge/control';
-import type { StickyRowLike } from '../../theme/primitives/stickyBand';
 
 // C5 §7.2: the flat path list -> row model fold. No single-child directory compaction (VS Code's
 // `a/b/c` collapsing) — deliberately declined: it complicates the fold, the expand set and reveal,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { computed } from 'vue';
-import CodiconIcon from '../theme/CodiconIcon.vue';
 import { fileIconStyle } from './fileIcon';
 import type { RepoTreeRowVm } from './state/fileTree';
 
@@ -76,7 +76,7 @@ function onContextMenu(e: MouseEvent): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-tree-row {
   @apply flex items-center relative cursor-default whitespace-nowrap select-none h-[var(--kira-row-height)] text-[length:var(--kira-t-md)] gap-[var(--kira-s-2)] pr-[var(--kira-s-4)];

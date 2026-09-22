@@ -16,7 +16,7 @@ setActivePinia(pinia);
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 
-const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
+const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const { useFileTreeStore } = await import('../../frontend/src/repo/state/fileTree');
 const { useRepoSearchStore } = await import('../../frontend/src/repo/state/search');

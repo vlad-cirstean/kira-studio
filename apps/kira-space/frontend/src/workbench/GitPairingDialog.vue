@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import AppButton from '@theme/primitives/AppButton.vue';
+import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { useIntervalFn } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useGitClientsStore } from '../state/gitClients';
-import AppButton from '../theme/primitives/AppButton.vue';
-import DialogFrame from '../theme/primitives/DialogFrame.vue';
 
 const gitClientsStore = useGitClientsStore();
 

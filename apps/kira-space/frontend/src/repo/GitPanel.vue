@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
-import { repoIdOfWorkspace, repoWorkspaceKey } from '@shared/domain/workspace';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
+import PanelShell from '@theme/primitives/PanelShell.vue';
+import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import TextField from '@theme/primitives/TextField.vue';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
 import { registerCommand } from '../shortcuts/commands';
@@ -10,14 +16,7 @@ import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
 import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
 import { useTerminalsStore } from '../state/terminals';
-import { useWorkspaceStore } from '../state/workspace';
-import CodiconIcon from '../theme/CodiconIcon.vue';
-import AppButton from '../theme/primitives/AppButton.vue';
-import EmptyState from '../theme/primitives/EmptyState.vue';
-import IconButton from '../theme/primitives/IconButton.vue';
-import PanelShell from '../theme/primitives/PanelShell.vue';
-import SegmentedControl from '../theme/primitives/SegmentedControl.vue';
-import TextField from '../theme/primitives/TextField.vue';
+import { repoIdOfWorkspace, repoWorkspaceKey, useWorkspaceStore } from '../state/workspace';
 import RepoFileTree from './RepoFileTree.vue';
 import RepoReviewView from './RepoReviewView.vue';
 import RepoSearchView from './RepoSearchView.vue';
@@ -556,7 +555,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .git-panel-body {
   @apply h-full flex flex-col min-h-0;

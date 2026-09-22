@@ -30,14 +30,14 @@
 // transport lease) is untouched, exactly as before.
 import type { MountHandle } from '@kira/git-ui';
 import type { RepoGraphTabRecord } from '@shared/domain/tabs';
-import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
+import EmptyState from '@theme/primitives/EmptyState.vue';
 import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue';
 import { loadGitUi } from '../../repo/git/gitUiModule';
 import { takePendingBlameReveal } from '../../repo/git/hostHandlers';
 import { gitTransportFor } from '../../repo/git/transport';
 import { TabViewStateStore } from '../../repo/git/viewStateStore';
 import { useSettingsStore } from '../../state/settings';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
+import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 
 defineOptions({ name: 'RepoGraphView' });
 
@@ -115,7 +115,7 @@ onActivated(() => handle?.setVisible?.(true));
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-graph-host {
   @apply h-full w-full;

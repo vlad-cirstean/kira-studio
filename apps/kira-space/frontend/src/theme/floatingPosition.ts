@@ -1,5 +1,4 @@
 import {
-  autoUpdate,
   computePosition,
   flip,
   type Middleware,
@@ -71,13 +70,13 @@ export async function computeFloatPosition(
     size({
       padding,
       apply({ availableWidth, availableHeight, elements }) {
-        // Write-only-on-change, and rounded to whole px, because PopoverPanel drives reposition
-        // through `autoUpdate`, whose ResizeObserver watches the *floating* element: an
-        // unconditional write here resizes that element, which fires the observer, which
-        // repositions, which writes again — an unbounded loop that hangs the renderer outright
-        // (it did: definition.spec.ts and tooltips.spec.ts both died with "target page has been
-        // closed" the moment a popover opened). Rounding also absorbs the sub-pixel jitter that
-        // would otherwise keep the comparison unequal forever.
+        // Write-only-on-change, and rounded to whole px, because a consumer using
+        // `@floating-ui/dom`'s own `autoUpdate` drives reposition off a ResizeObserver that
+        // watches the *floating* element: an unconditional write here resizes that element, which
+        // fires the observer, which repositions, which writes again — an unbounded loop that hangs
+        // the renderer outright (it did, in Studio: definition.spec.ts and tooltips.spec.ts both
+        // died with "target page has been closed" the moment a popover opened). Rounding also
+        // absorbs the sub-pixel jitter that would otherwise keep the comparison unequal forever.
         setIfChanged(elements.floating, FLOAT_MAX_WIDTH_VAR, availableWidth);
         setIfChanged(elements.floating, FLOAT_MAX_HEIGHT_VAR, availableHeight);
       },
@@ -111,4 +110,9 @@ export function pointReference(x: number, y: number): ReferenceElement {
 }
 
 export type { ReferenceElement };
-export { autoUpdate };
+
+// P100 Part 2: Studio's own re-export of `@floating-ui/dom`'s `autoUpdate` dropped — its only two
+// Studio callers (theme/primitives/PopoverPanel.vue, project/ErrorPopover.vue) are both Studio-only
+// surfaces kira-space never ported (this app's popovers use the shadcn-vue components/ui/popover
+// set instead). Re-add once a kira-space consumer needs continuous reposition, importing straight
+// from '@floating-ui/dom' or re-exporting here again, whichever that consumer's own module wants.

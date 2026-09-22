@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import IconButton from '@theme/primitives/IconButton.vue';
+import TextField from '@theme/primitives/TextField.vue';
+import VirtualList from '@theme/primitives/VirtualList.vue';
 import { computed, ref } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
-import IconButton from '../theme/primitives/IconButton.vue';
-import TextField from '../theme/primitives/TextField.vue';
-import VirtualList from '../theme/primitives/VirtualList.vue';
 import RepoSearchRow from './RepoSearchRow.vue';
 import { type RepoSearchRowVm, useRepoSearchStore } from './state/search';
 
@@ -161,7 +161,7 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-search-view {
   @apply h-full flex flex-col min-h-0;

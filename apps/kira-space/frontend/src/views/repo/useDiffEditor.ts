@@ -23,6 +23,7 @@ import {
   getOrCreateModel,
   KIRA_EDITOR_THEME,
   loadMonaco,
+  overflowWidgetsContainer,
   repoDiffUris,
   repoRevisionDiffUris,
 } from './monaco';
@@ -241,6 +242,10 @@ export function useDiffEditor(
       scrollBeyondLastLine: false,
       fontFamily: settingsStore.appearance.fontFamily,
       fontSize: settingsStore.appearance.fontSize,
+      // editor/monaco.ts's own overflowWidgetsContainer doc comment — same reasoning as
+      // RepoFileView.vue's own plain editor.
+      fixedOverflowWidgets: true,
+      overflowWidgetsDomNode: overflowWidgetsContainer(),
     });
     created.setModel({ original, modified });
     registerDiffEditor(editorKey, [headUri.toString(), worktreeUri.toString()], created);

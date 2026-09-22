@@ -35,7 +35,12 @@ import { useTerminalsStore } from './terminals';
 // since this app's TabRecord.workspaceId IS the bare repoId (no `repo:` prefix, no
 // repoIdOfWorkspace indirection — state/workspace.ts's own header comment), and railColor uses
 // PaletteColor directly (there is no Connections concept here to own a ConnectionColor alias).
-type SpaceTabKind = 'repo-graph' | 'repo-file' | 'repo-diff' | 'repo-multi-diff' | 'terminal';
+export type SpaceTabKind =
+  | 'repo-graph'
+  | 'repo-file'
+  | 'repo-diff'
+  | 'repo-multi-diff'
+  | 'terminal';
 
 /** A codicon name, or a file path whose icon comes from the shared seti set
  *  (`repo/fileIcon.ts`) — the same rule the repo file tree and the diff tree already use. */

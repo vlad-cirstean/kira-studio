@@ -12,6 +12,7 @@
     "types": ["bun-types"],
     "paths": {
       "@shared/*": ["../../../../packages/shared/*"],
+      "@theme/*": ["../../../../packages/theme/src/*"],
       "@bindings/*": [
         "../../frontend/bindings/github.com/kirathecat/kira-studio/apps/kira-space/internal/bridge/*"
       ],

@@ -14,9 +14,8 @@
  * own type) — this module only stores and retrieves it, never parses it.
  */
 import { asRepoGraphTab } from '@shared/domain/tabs';
-import { repoWorkspaceKey } from '@shared/domain/workspace';
-import { tabsForWorkspace } from '../../state/mode';
-import { useTabsStore } from '../../state/tabs';
+import { tabsForWorkspace, useTabsStore } from '../../state/tabs';
+import { repoWorkspaceKey } from '../../state/workspace';
 
 // P62 §4.5: exported so views/repo/blameAnnotation.ts's own click-through can find the pinned
 // graph tab without a second copy of this lookup — the same tab hostHandlers.ts's own pending-

@@ -16,11 +16,11 @@
 // actually reads — `expanded`, and each section's own copied-out state/error strings — need to be
 // reactive.
 import type { RepoMultiDiffTabRecord } from '@shared/domain/tabs';
-import { repoIdOfWorkspace, type WorkspaceKey } from '@shared/domain/workspace';
+import AppButton from '@theme/primitives/AppButton.vue';
+import EmptyState from '@theme/primitives/EmptyState.vue';
+import IconButton from '@theme/primitives/IconButton.vue';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
-import AppButton from '../../theme/primitives/AppButton.vue';
-import EmptyState from '../../theme/primitives/EmptyState.vue';
-import IconButton from '../../theme/primitives/IconButton.vue';
+import { repoIdOfWorkspace, type WorkspaceKey } from '../../state/workspace';
 import { useDiffEditor } from './useDiffEditor';
 
 const props = defineProps<{ tab: RepoMultiDiffTabRecord }>();
@@ -175,7 +175,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@reference "@/theme/base.css";
+@reference "@theme/base.css";
 
 .repo-multi-diff-root {
   @apply h-full overflow-y-auto flex flex-col;

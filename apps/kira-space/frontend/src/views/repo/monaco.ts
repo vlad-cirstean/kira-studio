@@ -3,11 +3,16 @@
 // `MonacoModule`, the theme definition) into `editor/monaco.ts`, shared by every editor surface in
 // Kira Studio — re-exported here unchanged so this file's own consumers (RepoFileView.vue,
 // RepoDiffView.vue) need no edit. P100 Part 2 moved this file to apps/kira-space alongside its own
-// consumers, re-pointed at this app's own local `../editor/monaco` (a duplicate, not an import —
+// consumers, re-pointed at this app's own local `../../editor/monaco` (a duplicate, not an import —
 // see that file's own doc comment for why).
-export { KIRA_EDITOR_THEME, loadMonaco, type MonacoModule } from '../editor/monaco';
+export {
+  KIRA_EDITOR_THEME,
+  loadMonaco,
+  type MonacoModule,
+  overflowWidgetsContainer,
+} from '../../editor/monaco';
 
-import type { MonacoModule } from '../editor/monaco';
+import type { MonacoModule } from '../../editor/monaco';
 
 // §9.3/C6 D6: one model per open file tab, keyed by a stable `kira-repo://<repoId>/<path>` URI —
 // disposed through the tab kind's existing dropResources hook (closeTab already blind-calls it for

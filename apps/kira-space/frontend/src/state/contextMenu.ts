@@ -54,25 +54,8 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
   return { ...toRefs(state), openContextMenuAt, openContextMenu, closeContextMenu };
 });
 
-// P21 D5: a new local keybinding dispatches through the same menu-builder function a right-click
-// would call, rather than a parallel handler — the printed shortcut and the executed action are
-// then the same object, and `disabled` gating (canEdit, a missing record, …) is honoured for
-// free instead of being restated at the keydown site. Walks one level into submenus (e.g.
-// `copy-rows-tsv` lives inside `rowMenu`'s "Copy row(s)" submenu).
-export function runMenuShortcut(items: MenuItem[], id: ShortcutId): boolean {
-  for (const item of items) {
-    if (item.type === 'item' && item.shortcut === id && !item.disabled) {
-      void item.run();
-      return true;
-    }
-    if (item.type === 'submenu') {
-      for (const sub of item.items) {
-        if (sub.type === 'item' && sub.shortcut === id && !sub.disabled) {
-          void sub.run();
-          return true;
-        }
-      }
-    }
-  }
-  return false;
-}
+// P100 Part 2: Studio's own runMenuShortcut (keydown-triggered menu dispatch, e.g. F2/Delete on a
+// tree row) dropped — kira-space ported no tree/grid whose own keydown handler calls it, and no
+// MenuItem built here sets `.shortcut` yet (ContextMenu.vue's own display of it stays ready for
+// when one does). `MenuItem.shortcut` itself stays in the type/renderer, not dead: re-add this
+// dispatcher alongside the first real caller instead of carrying it unused.

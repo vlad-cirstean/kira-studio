@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    // P100 Part 2: mirrors Kira Studio's own tsconfig.tests.json exactly — graphStreamFixture.ts
+    // (copied verbatim, support/graphStreamFixture.ts's own doc comment) imports the real
+    // `@kira/git-ipc` codec, the same CLAUDE.md library-over-hand-roll reasoning that tsconfig
+    // documents.
+    "allowImportingTsExtensions": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "paths": {
+      "@shared/*": ["../../packages/shared/*"],
+      "@theme/*": ["../../packages/theme/src/*"],
+      "@kira/git-ipc": ["../../packages/git-ipc/src/index.ts"],
+      "@kira/git-ipc/codec": ["../../packages/git-ipc/src/codec.ts"]
+    }
+  },
+  "include": ["../../packages/shared/**/*.ts", "playwright.config.ts", "tests/ui/**/*.ts"]
+}

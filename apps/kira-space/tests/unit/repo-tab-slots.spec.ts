@@ -16,8 +16,8 @@ restoreAfterEach(control);
 (control as unknown as { tabsSave: typeof control.tabsSave }).tabsSave = () => Promise.resolve();
 
 const { defaultRepoFileTabState } = await import('../../../../packages/shared/domain/tabs');
-const { repoWorkspaceKey } = await import('../../../../packages/shared/domain/workspace');
-const { tabsForWorkspace } = await import('../../frontend/src/state/mode');
+const { repoWorkspaceKey } = await import('../../frontend/src/state/workspace');
+const { tabsForWorkspace } = await import('../../frontend/src/state/tabs');
 const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { openRepoCommitDiffTab, openRepoFileTab } = await import(
@@ -273,7 +273,7 @@ describe('C5 §6.1: the pinned tab', () => {
     expect(tabsStore.tabs.some((t) => t.id === graph.id)).toBe(true);
     expect(tabsStore.tabs.some((t) => t.id === file2.id)).toBe(false);
 
-    tabsStore.closeAll();
+    tabsStore.closeAll(ws);
     expect(tabsStore.tabs.some((t) => t.id === graph.id)).toBe(true);
     expect(tabsForWorkspace(ws).filter((t) => t.id !== graph.id).length).toBe(0);
   });
