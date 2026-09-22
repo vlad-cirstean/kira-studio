@@ -1986,6 +1986,151 @@ the same pass — the `quit_test.go` race is fixed above; the `gitsock` flake is
 pre-existing and outside this phase's diff, and left as `CLAUDE.md`'s own exception for work
 "genuinely outside the phase's own scope" allows.
 
+## P103 Part 4 result
+
+Landed as 5 commits against `e5625b9`: `c281c66` (`internal/appsettings`), `c916b2f` (recompose
+`model.Settings`), `57665b1` (recompose the settings repos), `bfb228e` (the TypeScript settings
+schema split), `bf26be0` (§10 closing-audit remediation), plus this section's own commit. Plan:
+`docs/v1.9/plans/P103-shared-app-base.md` §7/§10. Implemented as written, §7.1-§7.4 and the closing
+audit all run; one genuine deviation from the plan's own §4 file list, disclosed below.
+
+**§7.1 `internal/appsettings`:** repo-root package holding `Appearance`/`Git`/`AdvancedCore` (plus
+`*Patch` variants), `DefaultAppearance`/`DefaultGit`, `ValidateAppearance`/`ValidateGit`,
+`ValidRowDensity`/`ValidDateFormat`/`ValidLogLevel`/`InRange`, the generic `Leaf[T]`/`LeafValid[T]`
+SQL-shaped helpers, and `UpsertAppearance`/`UpsertGit`/`UpsertLeaf`/`ReadAppearance`/`ReadGit` — the
+exact surface §7.1 specifies. Both apps' `storage/model/settings.go` and `storage/repos/settings.go`
+recomposed on it; `apps/kira-space/internal/storage/repos/helpers.go`'s own `alwaysValid` dropped as
+dead once `appsettings.AlwaysValid` replaced its one caller.
+
+**§7.2 `Advanced.GitLogLevel` — embed, decided by the plan's own procedure, not a guess:** saved
+each app's `frontend/bindings/**/models.ts` before the change, embedded
+`appsettings.AdvancedCore`/`AdvancedCorePatch` into both apps' `AdvancedSettings`/`AdvancedPatch`,
+regenerated bindings cleanly (`wails3 task common:generate:bindings -f` — the Taskfile's own
+`generate:bindings` target already passes `-clean=true` to the underlying `wails3 generate
+bindings`; `-clean` is not a valid flag at the `wails3 task` level itself, the one place this
+session's command differs from the plan's literal text), diffed against the saved baseline for both
+apps: unchanged — `gitLogLevel` stays a flat `string`/`string | null` field in the generated TS,
+`encoding/json`'s embedded-field promotion and Wails3's binding generator agree. **Decision: kept
+the embedding**, no revert. `Appearance`/`Git` moving to a repo-root package produced the expected
+generated-model path change only; the frontend never imports the generated models directly
+(`bridge/index.ts` reads `Settings`/`SettingsPatch` from each app's own `state/settingsDomain.ts`
+now, narrowed with `trust<T>`), confirmed invisible by `bun run typecheck`/`build` for both apps.
+
+**§7.3 splitting `settingsSchema`:** `packages/shared/domain/settings.ts` trimmed to the genuinely
+shared pieces — `rowDensitySchema`/`RowDensity`, `FONT_SIZE_RANGE`,
+`FETCH_AUTO_INTERVAL_MINUTES_RANGE`, `appearanceSettingsSchema`/`AppearanceSettings`,
+`gitLogLevelSchema`/`GitLogLevel`, `gitSettingsSchema`/`GitSettings`. One addition the plan's own
+text didn't anticipate: `HTTP_VERSIONS`/`httpVersionSchema`/`HttpVersion` stayed here too, rather
+than moving into Kira Studio's app-local `settingsDomain.ts` with the rest of `apiSettingsSchema` —
+`packages/shared/domain/http.ts` (itself shared-tier) depends on them, and a shared package may not
+import `apps/*/frontend/src/state/*` (this session's own extension of `CLAUDE.md`'s "a shared
+package never imports `apps/*/internal/...`" to cover `apps/*/frontend/src/state` the same way).
+Each app now owns `frontend/src/state/settingsDomain.ts` composing its own
+`settingsSchema`/`settingsPatchSchema`/`defaultSettings`: Kira Studio 8 sections (appearance, data,
+cache, advanced, git, api, dbMcp, claudeCode), Kira Space 3 (appearance, advanced, git) — confirmed
+by reading `defaultSettings`' own object literal in both files, matching the plan's §7.3 "8 keys to
+3" claim exactly. `grep` for `settings\.(data|cache|api|dbMcp|claudeCode)` under
+`apps/kira-space/frontend/src` returns zero, both before this split (verified first, matching the
+plan's own precondition) and after (the §10 audit row below re-confirms).
+
+**§7.3 deviation, found and fixed within this same pass:** moving these schemas out of
+`packages/shared` (knip's always-exempt entry tier — `knip.json`'s `"entry": ["**/*.ts"]` for that
+workspace) into each app's own usage-traced `settingsDomain.ts` exposed real `bun run lint:dead`
+findings: several raw zod schema objects (`dataSettingsSchema`, `cacheSettingsSchema`,
+`advancedSettingsSchema`, `dbMcpSettingsSchema`, `claudeCodeSettingsSchema`, `settingsSchema`,
+`settingsPatchSchema` in both files) and per-section inferred types (`DataSettings`,
+`CacheSettings`, `AdvancedSettings` in both apps, `DbMcpSettings`, `ClaudeCodeSettings`,
+`GitSettings` in Kira Space) had zero real external consumers even before the split — confirmed by
+grep, not assumed. Fixed per `CLAUDE.md`'s "a failing lint finding gets fixed on the spot" rule:
+dropped `export` from those schema consts (deleting the dead type aliases outright), keeping
+exported exactly the genuine public surface — `Settings`/`SettingsPatch`/`defaultSettings`,
+`ApiSettings` (Kira Studio's `ApiPane.vue`), `AppearanceSettings`/`GitLogLevel`/`RowDensity` (both
+apps' panes), `FONT_SIZE_RANGE`/`HTTP_VERSIONS` (Kira Studio), `FONT_SIZE_RANGE`/
+`FETCH_AUTO_INTERVAL_MINUTES_RANGE` (Kira Space). `bun run lint:dead` returned to the exact
+pre-existing baseline (6 duplicate-export pairs, 7 configuration hints, zero unused-export
+findings) after the fix.
+
+**§10 closing audit, run over the whole repo, re-verifying Parts 1-3's own claims too — found two
+real gaps beyond this phase's own §7 scope, both fixed in the same pass (`bf26be0`):**
+
+| Check | Command | Result |
+|---|---|---|
+| No byte-identical file left | whole-tree `md5sum` over every `.ts`/`.vue`/`.go`/`.css`/`.sql` in both apps, grouped by hash | Found `state/pinia.ts` + `state/queryClient.ts` still duplicated (named in the plan's own §4 file list, never actually moved in Parts 1-3). `queryClient.ts` hoisted to `packages/workbench`; `pinia.ts` **declined, reason named** (below) — zero unexplained hits remain |
+| No code-identical file left | comment-stripped diff over every common-path file under `frontend/src`/`internal` in both apps | 6 pairs found; all 6 already named — `pinia.ts` (this session's own decline), `state/terminals.ts` (§5.3's own by-design host-function shim, comment says so), `internal/bridge/{lifecycle,link}.go` + `internal/buildinfo/buildinfo.go` (§2.3's decline table), `internal/config/env.go` (Part 3's own one-line-wrapper comment) |
+| No tab-kind stub survives | `grep -rn "unreachableTabKind\|NeverRenderedTabView\|as SpaceTabKind" apps/` | Zero (2 hits are comments *about* their own removal) |
+| Go/TS vocabularies agree | `bun test` the two parity specs | Both pass |
+| No cross-app `internal/` import | `grep -rn "apps/kira-studio/internal" apps/kira-space/` and the reverse | Zero real imports (5 hits, all doc-comment mentions of the sibling path, not imports) |
+| No shared package imports an app | `grep -rn "apps/kira-" internal/ packages/workbench/src` | Zero real imports (11 hits, all doc-comment mentions) |
+| `layering_test` still bites | `go test ./apps/kira-studio/internal/ ./apps/kira-space/internal/ -run TestDomainPackagesDoNotImportBridge -v` | Both `PASS`; Kira Studio 27 subtests, Kira Space 27 subtests, neither exemption set grown |
+| Workbench imports nothing app-local | `grep -rn "\.\./\.\./\.\./apps\|@/" packages/workbench/src`, plus a `biome.json` `noRestrictedImports` block | Zero hits; block added in `bf26be0` (`packages/workbench/**` may not import `**/apps/**` or `@/*`) |
+| Exactly one `<script>` per component | `grep -c "<script"` across both frontends + `packages/workbench`/`theme`/`git-ui`/`kira-ui` | Exactly 1 each (2 false-positive greps were comment text mentioning `<script setup>`, confirmed by reading) |
+| Store ids unchanged | `grep -rn "defineStore(" apps packages` | `'tabs'`, `'settings'`, `'layout'`, `'contextMenu'`, `'terminals'`, `'confirmDialog'`, `'tooltip'` all present, unchanged |
+| Kira Space carries no dead settings section | `grep -rn "settings\.(data\|cache\|api\|dbMcp\|claudeCode)" apps/kira-space` | Zero |
+| No new hand-rolled primitive | `git diff --stat dd3ec62` over `packages/workbench/src/components` | All 9 files are Part 1/2 moves (none pre-existed at phase start); `ContextMenu.vue`/`AppTooltip.vue`/`ConfirmDialog.vue` diffed against their pre-move content — import paths only, internals unchanged |
+| Line count fell | `git diff --shortstat dd3ec62 HEAD` over both apps' `frontend/src` + `internal/` | 634 files changed, 6,076 insertions(+), 25,328 deletions(-) — net **-19,252** lines, well past the ~3,800 target |
+
+**The `state/pinia.ts` decline, found by actually attempting the merge, not by inspection alone:**
+first hoisted it to `packages/workbench/src/state/pinia.ts` like `queryClient.ts`, matching the
+plan's own §4 list. `bun run test:unit` immediately caught a real bug: it runs both apps' spec
+files in one Bun process, and a single shared `createPinia()` instance gives both apps' same-named
+stores (`'tabs'`, `'settings'`, ... — `CLAUDE.md`'s own store-id-stability rule) the same Pinia
+registry — Kira Space's `useTabsStore()` resolved to Kira Studio's already-registered `'tabs'`
+store, missing Kira Space-only methods (`createPinnedRepoGraphTab`, `patchRepoFileTabState`). 9
+tests failed, deterministically, across repeat runs. Neither app's real runtime hits this (each is
+a separate Vite/Wails bundle with its own module graph), but the shared *test* process does, and
+`bun run test:unit` is a phase gate. Reverted to per-app `pinia.ts`, each with a comment naming this
+exact reason — the one place this session declines a merge the plan's own file list called for, and
+names why, matching the standard `CLAUDE.md`/§2.3 already set for a declined move elsewhere in this
+phase.
+
+**Two timing-sensitive findings investigated, neither a regression from this phase's own diff:**
+
+- `bun run test:ui`'s `ui-timing` project (Kira Studio) intermittently misses two tripwires under
+  this sandbox's load — `perf.spec.ts`'s p95 scroll-frame gate (`<80`, one run measured exactly
+  `80`) and `slick-grid.spec.ts`'s 150ms select-all gate (one run measured `188`). Neither spec
+  touches settings, Monaco, Pinia or anything else this phase's diff changed
+  (`git diff --stat e5625b9 HEAD -- '**/perf.spec.ts' '**/slick-grid.spec.ts'` — empty); both
+  specs' own source comments already frame their thresholds as sandbox-cadence-tolerant, not exact
+  ("loose enough to not chase this sandbox's own baseline cadence"). Every non-timing `ui`-project
+  spec passed clean across every run this phase performed (277-279 of 279, only these two
+  `ui-timing` tripwires ever failed, never the same one twice with the same margin). Named here per
+  `CLAUDE.md`'s own rule, not silently dropped; not re-chased further given zero relation to this
+  phase's diff and the tests' own documented tolerance for exactly this sandbox condition.
+- `go test ./...` surfaced one failure, `apps/kira-space/internal/gitsock.TestRevoke_DoesNotDisturbAnotherClient`
+  — a **different** test in the **same package** Part 3's own result section already named as a
+  known fsnotify-timing flake under load (`TestMatrix_M3_FullIndependence`, confirmed 5/5 clean in
+  isolation there). `git diff --stat e5625b9 HEAD -- apps/kira-space/internal/gitsock` is empty —
+  this phase touches nothing in that package. Passed clean in isolation (<1s). A second
+  whole-package `-count=1` rerun timed out at Go's own 10-minute default with a goroutine dump
+  showing an unrelated test hung on a channel receive — consistent with the same load-sensitivity
+  Part 3 already documented for this package, not chased further past that isolation confirmation
+  given the cost (10+ minutes per attempt) and zero connection to this phase's diff.
+
+**Every hook run clean, no `--no-verify` on any commit.** Pre-commit (`bun run lint` + `bun run
+typecheck`) and pre-push (`go build ./...` + `golangci-lint run` + `bun run lint:dead`) both passed
+on all 5 commits.
+
+**Verification, run fresh against `HEAD` (`bf26be0`) after all 5 commits:**
+
+- `go build ./...` / `go vet ./...`: exit 0, no output, both.
+- `golangci-lint run`: `0 issues.`
+- `gofmt -l` scoped to every `.go` file this phase touched: empty.
+- `go test ./apps/kira-studio/internal/ ./apps/kira-space/internal/ -run TestDomainPackagesDoNotImportBridge`: both `ok`.
+- `bun run typecheck`: clean across all 8 projects.
+- `bun run lint`: clean (biome + `check-tokens.sh`, including the new `packages/workbench/**` `noRestrictedImports` block).
+- `bun run lint:dead`: exit 0, exact pre-existing baseline (6 duplicate exports, 7 configuration hints, zero unused-export findings).
+- `bun run build` / `bun run build:space`: both clean (only the pre-existing >500 kB chunk + ineffective-dynamic-import advisories).
+- `bun run test:unit`: **1535 pass, 0 fail**, 13,650 `expect()` calls, 156 files.
+- `bun run test:ui` (Kira Studio): 277-279 of 279 across repeated runs, the only misses being the two named `ui-timing` tripwires above; every `ui`-project (non-timing) spec passed every run.
+- `bun run test:ui:space` (Kira Space): 20/20, clean, no flakes across repeated runs.
+- `bun run test:visual`: 5 failed of 5, each ~1% pixel ratio — exactly the documented pre-existing baseline, no sixth failure.
+- `go test ./...`: every package `ok` except the named pre-existing `gitsock` flake above, isolated and confirmed unrelated to this phase's diff.
+
+All four parts of P103 are now complete. Every §11 risk was avoided: the Wails binding-generation
+risk was resolved by §7.2's own procedure (embedding kept); no new hand-rolled primitive was added;
+no cross-app `internal/` import or shared-package-imports-app crept in; `test:visual`'s 5 known
+failures stayed at 5, no sixth.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
