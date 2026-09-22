@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { isDynamicName, isFakeName, isGrpcDirty, toSavedGrpcRequest } from '@kira/api-core';
 import { grpcRequestTitle } from '@shared/domain/grpc';
-import AppButton from '@theme/primitives/AppButton.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { connColorVar } from '@theme/connColor';
 import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -21,11 +23,12 @@ import { patchGrpcRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
 import MonacoHost from '../../editor/MonacoHost.vue';
+import { useConnectionsStore } from '../../state/connections';
+import { useRunState } from '../../state/runState';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import { templateToken } from '../../theme/primitives/completion';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import MetadataTable from './MetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import SchemaBrowser from './SchemaBrowser.vue';
@@ -39,10 +42,30 @@ const collectionsStore = useCollectionsStore();
 const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
 const grpcRequestViewStore = useGrpcRequestViewStore();
+const connectionsStore = useConnectionsStore();
 
 const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
+
+// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
+const envColor = computed(() => variablesStore.environmentColorForTab(props.tab.id));
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
+const railColor = computed(() =>
+  envColor.value !== undefined
+    ? envColor.value
+    : connRecord.value
+      ? (connRecord.value.color ?? null)
+      : undefined,
+);
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 // P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
 // environment id it reads through while incognito.
@@ -260,222 +283,284 @@ onUnmounted(() => {
 
 <template>
   <div class="grpc-request-view" data-testid="grpc-request-view">
-    <ViewChrome
-      :tab="tab"
-      icon="symbol-interface"
-      :name="title"
-      target-testid="grpc-request-target"
-      refresh-testid="grpc-request-refresh"
-      stop-testid="grpc-request-stop"
-      :can-stop="running"
-      :env-color="variablesStore.environmentColorForTab(tab.id)"
-      @refresh="onCall"
-      @stop="onStop"
-    >
-      <template #badges>
-        <span v-if="tab.state.service && tab.state.method" class="p-chip info" data-testid="grpc-method-chip">
-          {{ tab.state.service }}/{{ tab.state.method }}
-        </span>
-        <span v-if="dirty" class="dirty-mark" data-testid="grpc-dirty" v-tooltip="'Unsaved changes'">•</span>
-        <span
-          v-if="unresolvedRefs.length > 0"
-          class="p-chip warn"
-          data-testid="grpc-unresolved-chip"
-          v-tooltip="unresolvedTooltip"
-        >
-          {{ unresolvedRefs.length }} unresolved
-        </span>
-        <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
-        <span
-          v-if="incognito"
-          class="p-chip"
-          data-testid="grpc-incognito-chip"
-          v-tooltip="'Nothing from this tab is saved'"
-        >
-          Incognito
-        </span>
-      </template>
-
-      <!-- P22b D3 (HttpRequestView.vue's own sibling): Save moves to the slot ViewHeader already
-           reserves for exactly this — #badges renders before the push and shifts position
-           whenever the dirty mark or unresolved chip changes width. Same testid/disabled/tooltip,
-           only the slot moved. -->
-      <template #head-trailing>
-        <AppButton
-          icon="save"
-          data-testid="grpc-save"
-          :disabled="incognito || (canSave && !dirty)"
-          v-tooltip="incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection')"
-          @click="onSave"
-        >
-          Save
-        </AppButton>
-      </template>
-
-      <template #toolbar>
-        <!-- P18 D14 (P15 D4's gRPC sibling): style="flex: 1" directly on AutocompleteField was a
-             no-op (F14) -- TextField/AutocompleteField set inheritAttrs: false, so a call-site
-             style lands on the inner <input> (already flex: 1) and never on the wrapping .p-input
-             box that actually sizes it. The app's existing wrapper + :deep(.p-input) idiom (used
-             at ten other call sites, HttpRequestView.vue's own .url-field among them) fixes it
-             here too — the target field now actually grows with the window. -->
-        <div class="grpc-target-field">
-          <AutocompleteField
-            :model-value="tab.state.target"
-            placeholder="api.example.com:443"
-            data-testid="grpc-target"
-            :candidates="variables.candidates"
-            :token-at="templateToken"
-            :range-highlights="variables.rangeHighlights"
-            :hover-at="variables.hoverAt"
-            @update:model-value="onTargetInput"
-            @enter="onCall"
-          />
-        </div>
-        <SegmentedControl
-          :model-value="tab.state.tlsMode"
-          :options="TLS_OPTIONS"
-          data-testid="grpc-tls-toggle"
-          @update:model-value="setTlsMode"
-        />
-        <!-- P22b D10: the same wrapper + :deep(.p-select) idiom .grpc-target-field uses above, for
-             the identical reason — a bare <select> has no width rule of its own, so it shrinks to
-             its widest <option> label. Both fields are flex: 1 in this one toolbar row, so they
-             share the free space evenly and stay responsive at either extreme of window size. -->
-        <div class="grpc-method-field">
-          <select
-            class="p-select bordered"
-            data-testid="grpc-method-select"
-            :value="selectedMethodValue"
-            :disabled="methodOptions.length === 0"
-            @change="onMethodSelect"
-          >
-            <option value="" disabled>Choose a method…</option>
-            <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-        </div>
-        <AppButton
-          icon="play"
-          variant="primary"
-          data-testid="grpc-call"
-          :disabled="running || !tab.state.service || !tab.state.method"
-          v-tooltip="'Call'"
-          @click="onCall"
-        >
-          Call
-        </AppButton>
-      </template>
-
-      <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
-           icon-only action group, so this is its own #toolbar-end. -->
-      <template #toolbar-end>
-        <IconButton
-          icon="eye-closed"
-          :active="incognito"
-          aria-label="Incognito"
-          v-tooltip="incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on'"
-          data-testid="grpc-incognito-toggle"
-          @click="toggleIncognito"
-        />
-      </template>
-
-      <template #toolbar-2>
-        <SegmentedControl
-          :model-value="tab.state.requestPane"
-          :options="REQUEST_PANE_OPTIONS"
-          data-testid="grpc-request-pane-toggle"
-          @update:model-value="setRequestPane"
-        />
-        <IconButton
-          v-if="tab.state.requestPane === 'message'"
-          icon="expand-all"
-          v-tooltip="'Beautify'"
-          data-testid="grpc-beautify"
-          @click="onBeautify"
-        />
-        <IconButton
-          v-if="tab.state.requestPane === 'metadata'"
-          icon="search"
-          :active="fieldFilterOpen"
-          v-tooltip="'Filter'"
-          data-testid="grpc-field-filter-toggle"
-          @click="toggleFieldFilter"
-        />
-        <IconButton
-          v-if="tab.state.requestPane === 'metadata'"
-          icon="note"
-          :active="tab.state.fieldDescriptions"
-          v-tooltip="tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions'"
-          data-testid="grpc-field-descriptions-toggle"
-          @click="toggleFieldDescriptions"
-        />
-        <div class="overview-anchor">
-          <IconButton
-            icon="variable-group"
-            :active="overviewOpen"
-            aria-label="Variables"
-            v-tooltip="'Variables'"
-            data-testid="grpc-variables-overview-toggle"
-            @click="overviewOpen = !overviewOpen"
-          />
-          <VariablesOverviewPanel
-            v-if="overviewOpen"
-            :collection-id="collectionId"
-            :environment-id="envId"
-            :can-edit="!incognito"
-            @close="overviewOpen = false"
-          />
-        </div>
-        <EnvironmentSelect :tab-id="tab.id" />
-      </template>
-
-      <div class="request-response-split">
-        <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="grpc-request-pane">
-          <MonacoHost
-            v-if="tab.state.requestPane === 'message'"
-            :doc="tab.state.message"
-            language="json"
-            :read-only="false"
-            :range-highlights="variables.rangeHighlights"
-            :hover-source="variableHoverSource(variables.hoverInfo)"
-            autocomplete
-            :completion-sources="[variableCompletionSource(variables.candidates)]"
-            auto-close-brackets
-            data-testid="grpc-message-editor"
-            @update:doc="onMessageInput"
-          />
-          <template v-else-if="tab.state.requestPane === 'metadata'">
-            <PanelSearchBox
-              v-if="fieldFilterOpen"
-              v-model="fieldFilterQuery"
-              placeholder="Filter"
-              testid="grpc-field-filter"
-            />
-            <MetadataTable
-              :tab="tab"
-              :filter-query="fieldFilterQuery"
-              :variables="variables"
-              :show-descriptions="tab.state.fieldDescriptions"
-            />
-          </template>
-          <SchemaBrowser v-else :tab="tab" />
-        </div>
-
-        <PanelSplitter
-          class="request-splitter"
-          orientation="row"
-          :size="requestPaneHeight"
-          :min="120"
-          :max="800"
-          divider
-          @resize="onResizeRequestPane"
-        />
-
-        <div class="response-pane-slot" data-testid="grpc-response-pane-slot">
-          <ResponsePane :tab="tab" />
-        </div>
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
+      />
+      <span class="icon-box"><CodiconIcon name="symbol-interface" :size="13" /></span>
+      <span class="p-view-target" data-testid="grpc-request-target">{{ title }}</span>
+      <span v-if="tab.state.service && tab.state.method" class="p-chip info" data-testid="grpc-method-chip">
+        {{ tab.state.service }}/{{ tab.state.method }}
+      </span>
+      <Tooltip v-if="dirty">
+        <TooltipTrigger as-child>
+          <span class="dirty-mark" data-testid="grpc-dirty" aria-label="Unsaved changes">•</span>
+        </TooltipTrigger>
+        <TooltipContent>Unsaved changes</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="unresolvedRefs.length > 0">
+        <TooltipTrigger as-child>
+          <span class="p-chip warn" data-testid="grpc-unresolved-chip">{{ unresolvedRefs.length }} unresolved</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ unresolvedTooltip }}</TooltipContent>
+      </Tooltip>
+      <!-- P71 §5.1: HttpRequestView.vue's own view-head chip. -->
+      <Tooltip v-if="incognito">
+        <TooltipTrigger as-child>
+          <span class="p-chip" data-testid="grpc-incognito-chip">Incognito</span>
+        </TooltipTrigger>
+        <TooltipContent>Nothing from this tab is saved</TooltipContent>
+      </Tooltip>
+      <span class="p-push flex items-center gap-1">
+        <!-- P22b D3 (HttpRequestView.vue's own sibling): Save stays ahead of the push, same as the
+             #badges group above, so it shifts position with the dirty mark/unresolved chip. -->
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira"
+              data-testid="grpc-save"
+              :disabled="incognito || (canSave && !dirty)"
+              @click="onSave"
+            >
+              <CodiconIcon name="save" :size="13" />
+              Save
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
+        </Tooltip>
+      </span>
+    </div>
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="p-toolbar">
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" aria-label="Refresh" data-testid="grpc-request-refresh" @click="onCall">
+              <CodiconIcon name="refresh" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="grpc-request-stop" @click="onStop">
+              <CodiconIcon name="debug-stop" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
+        </Tooltip>
       </div>
-    </ViewChrome>
+      <!-- P18 D14 (P15 D4's gRPC sibling): style="flex: 1" directly on AutocompleteField was a
+           no-op (F14) -- TextField/AutocompleteField set inheritAttrs: false, so a call-site
+           style lands on the inner <input> (already flex: 1) and never on the wrapping .p-input
+           box that actually sizes it. The app's existing wrapper + :deep(.p-input) idiom (used
+           at ten other call sites, HttpRequestView.vue's own .url-field among them) fixes it
+           here too — the target field now actually grows with the window. -->
+      <div class="grpc-target-field">
+        <AutocompleteField
+          :model-value="tab.state.target"
+          placeholder="api.example.com:443"
+          data-testid="grpc-target"
+          :candidates="variables.candidates"
+          :token-at="templateToken"
+          :range-highlights="variables.rangeHighlights"
+          :hover-at="variables.hoverAt"
+          @update:model-value="onTargetInput"
+          @enter="onCall"
+        />
+      </div>
+      <ToggleGroup type="single" :model-value="tab.state.tlsMode" data-testid="grpc-tls-toggle" @update:model-value="(v) => v && setTlsMode(v as 'plaintext' | 'tls')">
+        <ToggleGroupItem v-for="opt in TLS_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
+      </ToggleGroup>
+      <!-- P22b D10: the same wrapper + :deep(.p-select) idiom .grpc-target-field uses above, for
+           the identical reason — a bare <select> has no width rule of its own, so it shrinks to
+           its widest <option> label. Both fields are flex: 1 in this one toolbar row, so they
+           share the free space evenly and stay responsive at either extreme of window size. -->
+      <div class="grpc-method-field">
+        <select
+          class="p-select bordered"
+          data-testid="grpc-method-select"
+          :value="selectedMethodValue"
+          :disabled="methodOptions.length === 0"
+          @change="onMethodSelect"
+        >
+          <option value="" disabled>Choose a method…</option>
+          <option v-for="opt in methodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+        </select>
+      </div>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar-primary"
+            size="kira"
+            data-testid="grpc-call"
+            :disabled="running || !tab.state.service || !tab.state.method"
+            @click="onCall"
+          >
+            <CodiconIcon name="play" :size="13" />
+            Call
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Call</TooltipContent>
+      </Tooltip>
+      <span class="p-push" />
+      <span
+        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+      >
+        <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+        <span
+          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          :class="{
+            'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent': runState.status === 'running',
+            'border-error': runState.status === 'error',
+          }"
+        />
+      </span>
+      <!-- P71 §5.2: HttpRequestView.vue's own toolbar toggle — gRPC's #toolbar row has no other
+           icon-only action group, so this is its own toolbar-end group. -->
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': incognito }"
+              aria-label="Incognito"
+              data-testid="grpc-incognito-toggle"
+              @click="toggleIncognito"
+            >
+              <CodiconIcon name="eye-closed" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ incognito ? 'Incognito — turn off to resume saving this tab' : 'Incognito — nothing from this tab is saved from here on' }}</TooltipContent>
+        </Tooltip>
+      </div>
+    </div>
+
+    <div class="p-toolbar last">
+      <ToggleGroup type="single" :model-value="tab.state.requestPane" data-testid="grpc-request-pane-toggle" @update:model-value="(v) => v && setRequestPane(v as 'message' | 'metadata' | 'schema')">
+        <ToggleGroupItem v-for="opt in REQUEST_PANE_OPTIONS" :key="opt.value" :value="opt.value" :data-testid="opt.testid">{{ opt.label }}</ToggleGroupItem>
+      </ToggleGroup>
+      <Tooltip v-if="tab.state.requestPane === 'message'">
+        <TooltipTrigger as-child>
+          <Button variant="toolbar" size="kira-icon" aria-label="Beautify" data-testid="grpc-beautify" @click="onBeautify">
+            <CodiconIcon name="expand-all" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Beautify</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="tab.state.requestPane === 'metadata'">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': fieldFilterOpen }"
+            aria-label="Filter"
+            data-testid="grpc-field-filter-toggle"
+            @click="toggleFieldFilter"
+          >
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Filter</TooltipContent>
+      </Tooltip>
+      <Tooltip v-if="tab.state.requestPane === 'metadata'">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': tab.state.fieldDescriptions }"
+            aria-label="Descriptions"
+            data-testid="grpc-field-descriptions-toggle"
+            @click="toggleFieldDescriptions"
+          >
+            <CodiconIcon name="note" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ tab.state.fieldDescriptions ? 'Hide descriptions' : 'Show descriptions' }}</TooltipContent>
+      </Tooltip>
+      <div class="overview-anchor">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': overviewOpen }"
+              aria-label="Variables"
+              data-testid="grpc-variables-overview-toggle"
+              @click="overviewOpen = !overviewOpen"
+            >
+              <CodiconIcon name="variable-group" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Variables</TooltipContent>
+        </Tooltip>
+        <VariablesOverviewPanel
+          v-if="overviewOpen"
+          :collection-id="collectionId"
+          :environment-id="envId"
+          :can-edit="!incognito"
+          @close="overviewOpen = false"
+        />
+      </div>
+      <EnvironmentSelect :tab-id="tab.id" />
+    </div>
+
+    <div class="request-response-split">
+      <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="grpc-request-pane">
+        <MonacoHost
+          v-if="tab.state.requestPane === 'message'"
+          :doc="tab.state.message"
+          language="json"
+          :read-only="false"
+          :range-highlights="variables.rangeHighlights"
+          :hover-source="variableHoverSource(variables.hoverInfo)"
+          autocomplete
+          :completion-sources="[variableCompletionSource(variables.candidates)]"
+          auto-close-brackets
+          data-testid="grpc-message-editor"
+          @update:doc="onMessageInput"
+        />
+        <template v-else-if="tab.state.requestPane === 'metadata'">
+          <InputGroup v-if="fieldFilterOpen" data-testid="grpc-field-filter">
+            <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+            <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" />
+            <InputGroupAddon v-if="fieldFilterQuery" align="inline-end">
+              <InputGroupButton aria-label="Clear filter" @click="fieldFilterQuery = ''">
+                <CodiconIcon name="close" :size="13" />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <MetadataTable
+            :tab="tab"
+            :filter-query="fieldFilterQuery"
+            :variables="variables"
+            :show-descriptions="tab.state.fieldDescriptions"
+          />
+        </template>
+        <SchemaBrowser v-else :tab="tab" />
+      </div>
+
+      <PanelSplitter
+        class="request-splitter"
+        orientation="row"
+        :size="requestPaneHeight"
+        :min="120"
+        :max="800"
+        divider
+        @resize="onResizeRequestPane"
+      />
+
+      <div class="response-pane-slot" data-testid="grpc-response-pane-slot">
+        <ResponsePane :tab="tab" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -523,11 +608,11 @@ onUnmounted(() => {
    crossed it — `divider` (above) draws the line HttpRequestView.vue's own twin comment names.
    grpc-request.spec.ts polls `.request-splitter`'s box-shadow — kept as a marker class. */
 .request-splitter {
-  @apply shrink-0 h-[var(--kira-s-2)];
+  @apply shrink-0 h-1;
 }
 
 .dirty-mark {
-  @apply text-warn leading-none text-[length:var(--kira-t-lg)];
+  @apply text-warn leading-none text-kira-lg;
 }
 
 .response-pane-slot {

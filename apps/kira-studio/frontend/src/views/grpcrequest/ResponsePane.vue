@@ -5,10 +5,11 @@ import {
   grpcCodeClass,
   grpcCodeHint,
 } from '@shared/domain/grpc';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { formatBytes } from '@workbench/util/format';
@@ -18,7 +19,6 @@ import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor
 import MonacoHost from '../../editor/MonacoHost.vue';
 import type { RangeHighlight } from '../../editor/ranges';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
@@ -243,21 +243,28 @@ onUnmounted(() => {
 
 <template>
   <div class="response-pane" data-testid="grpc-response-pane">
-    <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="grpc-call-error">
-      {{ rt.error.message }}
-    </MessageStrip>
+    <Alert
+      v-if="rt?.status === 'error' && rt.error"
+      variant="destructive"
+      data-testid="grpc-call-error"
+    >
+      <AlertDescription>{{ rt.error.message }}</AlertDescription>
+    </Alert>
 
     <!-- P18 D14 (P15 D1's gRPC sibling): the status row, the pane switcher and every strip render
          from tab-open — only the response-dependent *contents* below stay conditional. A freshly-
          opened tab used to show no Messages/Metadata/History switcher at all. -->
     <div class="response-status-row p-toolbar">
       <template v-if="hasCode">
-        <span
-          class="p-chip"
-          :class="grpcCodeClass(code)"
-          data-testid="grpc-status-chip"
-          v-tooltip="codeHint"
-        >
+        <Tooltip v-if="codeHint">
+          <TooltipTrigger as-child>
+            <span class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
+              {{ codeName }} ({{ code }})
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ codeHint }}</TooltipContent>
+        </Tooltip>
+        <span v-else class="p-chip" :class="grpcCodeClass(code)" data-testid="grpc-status-chip">
           {{ codeName }} ({{ code }})
         </span>
         <span class="p-push" />
@@ -269,60 +276,82 @@ onUnmounted(() => {
       <span v-else class="p-push" />
       <!-- P22b D14: HTTP's own ResponsePane.vue idiom — only the Messages pane has a document to
            search (Metadata is a plain key-value list, History is a row list). -->
-      <IconButton
-        v-if="tab.state.responsePane === 'messages'"
-        icon="search"
-        :active="findOpen"
-        v-tooltip="'Find in message'"
-        data-testid="grpc-find-toggle"
-        @click="toggleFind"
-      />
-      <SegmentedControl
+      <Tooltip v-if="tab.state.responsePane === 'messages'">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': findOpen }"
+            aria-label="Find in message"
+            data-testid="grpc-find-toggle"
+            @click="toggleFind"
+          >
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Find in message</TooltipContent>
+      </Tooltip>
+      <ToggleGroup
+        type="single"
         :model-value="tab.state.responsePane"
-        :options="RESPONSE_PANE_OPTIONS"
         data-testid="grpc-response-pane-toggle"
-        @update:model-value="setResponsePane"
-      />
+        @update:model-value="(v) => v && setResponsePane(v as GrpcResponsePane)"
+      >
+        <ToggleGroupItem
+          v-for="opt in RESPONSE_PANE_OPTIONS"
+          :key="opt.value"
+          :value="opt.value"
+          :data-testid="opt.testid"
+        >
+          {{ opt.label }}
+        </ToggleGroupItem>
+      </ToggleGroup>
     </div>
 
     <!-- P18 D13's other half, kept: the server's own statusMessage is a message, not a
          restatement of the code, so it stays on its own line free to wrap. -->
     <div v-if="statusMessage" class="p-xs dim status-message" data-testid="grpc-status-message">{{ statusMessage }}</div>
 
-    <MessageStrip v-if="viewing" tone="note" data-testid="grpc-history-band">
-      Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
-      <AppButton class="strip-action" data-testid="grpc-history-back" @click="onBackToLatest">
-        {{ rt?.result ? 'Back to latest' : 'Close' }}
-      </AppButton>
-    </MessageStrip>
+    <Alert v-if="viewing" class="strip-note" data-testid="grpc-history-band">
+      <AlertDescription class="strip-note-text flex items-center gap-3">
+        Viewing the call from {{ viewingTime }} · {{ viewing?.snapshot.method }}
+        <Button
+          variant="toolbar"
+          size="kira"
+          class="strip-action"
+          data-testid="grpc-history-back"
+          @click="onBackToLatest"
+        >
+          {{ rt?.result ? 'Back to latest' : 'Close' }}
+        </Button>
+      </AlertDescription>
+    </Alert>
 
     <!-- D11: a streaming call's history entry stores only the first maxGrpcStoredMessages
          (finding 8) — this is the one place that ever becomes visible now that ServerStream
          actually fills Messages/MessageCount in. -->
-    <MessageStrip
+    <Alert
       v-if="viewing?.snapshot.messagesElided"
-      tone="note"
+      class="strip-note"
       data-testid="grpc-history-messages-elided"
     >
-      Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
-    </MessageStrip>
+      <AlertDescription class="strip-note-text">
+        Showing the first {{ messages.length }} of {{ viewing.snapshot.entry.messageCount }} messages.
+      </AlertDescription>
+    </Alert>
 
-    <MessageStrip
-      v-if="rt?.status === 'cancelled'"
-      tone="warn"
-      data-testid="grpc-stopped-strip"
-    >
-      Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
-    </MessageStrip>
+    <Alert v-if="rt?.status === 'cancelled'" class="strip-warn" data-testid="grpc-stopped-strip">
+      <AlertDescription class="strip-warn-text">
+        Stopped after {{ messages.length }} message{{ messages.length === 1 ? '' : 's' }}.
+      </AlertDescription>
+    </Alert>
 
     <!-- D15/D17: the live view's own ceiling (state.ts's MAX_LIVE_MESSAGES) — finding 11. -->
-    <MessageStrip
-      v-if="liveMessagesElided"
-      tone="note"
-      data-testid="grpc-live-messages-elided"
-    >
-      Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
-    </MessageStrip>
+    <Alert v-if="liveMessagesElided" class="strip-note" data-testid="grpc-live-messages-elided">
+      <AlertDescription class="strip-note-text">
+        Showing the most recent {{ messages.length }} of {{ rt?.trueMessageCount }} messages.
+      </AlertDescription>
+    </Alert>
 
     <CallHistoryList v-if="tab.state.responsePane === 'history'" :tab="tab" />
     <div v-else-if="tab.state.responsePane === 'metadata'" class="metadata-groups" data-testid="grpc-response-metadata">
@@ -371,7 +400,9 @@ onUnmounted(() => {
           </div>
         </template>
       </VirtualList>
-      <EmptyState v-if="messages.length === 0" icon="arrow-right" label="Call this method to see its response">
+      <Alert v-if="messages.length === 0" class="empty-state" variant="default">
+        <CodiconIcon name="arrow-right" :size="24" class="empty-state-icon" />
+        <AlertTitle class="empty-state-title">Call this method to see its response</AlertTitle>
         <button
           v-if="hasHistory"
           type="button"
@@ -381,7 +412,7 @@ onUnmounted(() => {
         >
           {{ historyCount }} past call{{ historyCount === 1 ? '' : 's' }} · View history
         </button>
-      </EmptyState>
+      </Alert>
     </div>
 
     <!-- D14: docked below the pane it searches (LAW 03), mirroring HTTP's own ResponsePane.vue. -->
@@ -402,11 +433,11 @@ onUnmounted(() => {
 }
 
 .response-status-row {
-  @apply gap-[var(--kira-s-2)];
+  @apply gap-1;
 }
 
 .status-message {
-  @apply px-[var(--kira-s-3)] pt-0 pb-[var(--kira-s-2)];
+  @apply px-1.5 pt-0 pb-1;
 }
 
 .message-list {
@@ -425,7 +456,7 @@ onUnmounted(() => {
    (22px, the script's own numeric constant, kept equal to --kira-h-sm here) — VirtualList
    positions every row assuming that exact height, border included via box-sizing. */
 .message-header {
-  @apply box-border flex w-full items-center gap-[var(--kira-s-2)] border-0 border-b border-border bg-none px-[var(--kira-s-3)] font-[inherit] text-fg h-[var(--kira-h-sm)] cursor-pointer;
+  @apply box-border flex w-full items-center gap-1 border-0 border-b border-border bg-none px-1.5 font-[inherit] text-fg h-5.5 cursor-pointer;
 }
 
 .message-header:hover {
@@ -440,14 +471,39 @@ onUnmounted(() => {
 }
 
 .metadata-groups {
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-4)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-2 overflow-auto p-1.5;
 }
 
 .metadata-group-title {
-  @apply mb-[var(--kira-s-1)];
+  @apply mb-0.5;
 }
 
 .history-hint-link {
-  @apply mt-[var(--kira-s-2)] cursor-pointer border-0 bg-none p-0 text-[length:var(--kira-t-sm)] text-[var(--kira-accent)];
+  @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
+}
+
+/* Alert tone classes replacing MessageStrip's own tone colors (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
+}
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+.empty-state-icon {
+  @apply text-subtle;
+}
+.empty-state-title {
+  @apply text-kira-md text-muted font-normal;
 }
 </style>

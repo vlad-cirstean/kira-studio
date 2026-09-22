@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { WELL_KNOWN_REQUEST_METADATA } from '@kira/api-core';
 import type { GrpcMetadataState } from '@shared/domain/grpc';
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
@@ -222,7 +224,9 @@ function onContainerKeydown(e: KeyboardEvent): void {
         :disabled="entry.index >= tab.state.metadata.length"
         data-testid="grpc-metadata-enabled"
         @update:model-value="toggleEnabled(entry.index)"
-      />
+      >
+        <CodiconIcon name="check" :size="10" />
+      </Checkbox>
       <div class="metadata-cell">
         <AutocompleteField
           grow
@@ -247,32 +251,43 @@ function onContainerKeydown(e: KeyboardEvent): void {
           :hover-at="variables.hoverAt"
           @update:model-value="updateField(entry.index, 'value', $event)"
         />
-        <TextField
-          v-else
-          grow
-          :model-value="entry.row.value"
-          placeholder="value"
-          data-testid="grpc-metadata-value"
-          @update:model-value="updateField(entry.index, 'value', $event)"
-        />
+        <InputGroup v-else>
+          <InputGroupTextarea
+            rows="1"
+            :model-value="entry.row.value"
+            placeholder="value"
+            data-testid="grpc-metadata-value"
+            @update:model-value="updateField(entry.index, 'value', String($event))"
+          />
+        </InputGroup>
       </div>
       <!-- P22b D6: FieldRowsTable.vue's own description cell, mirrored here (F18). -->
       <div v-if="showDescriptions" class="metadata-cell">
-        <TextField
-          grow
-          :model-value="entry.row.description ?? ''"
-          placeholder="description"
-          data-testid="grpc-metadata-description"
-          @update:model-value="updateField(entry.index, 'description', $event)"
-        />
+        <InputGroup>
+          <InputGroupTextarea
+            rows="1"
+            :model-value="entry.row.description ?? ''"
+            placeholder="description"
+            data-testid="grpc-metadata-description"
+            @update:model-value="updateField(entry.index, 'description', String($event))"
+          />
+        </InputGroup>
       </div>
-      <IconButton
-        icon="close"
-        :disabled="entry.index >= tab.state.metadata.length"
-        v-tooltip="'Remove'"
-        data-testid="grpc-metadata-remove"
-        @click="removeRow(entry.index)"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :disabled="entry.index >= tab.state.metadata.length"
+            aria-label="Remove"
+            data-testid="grpc-metadata-remove"
+            @click="removeRow(entry.index)"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Remove</TooltipContent>
+      </Tooltip>
     </div>
   </div>
 </template>
@@ -283,7 +298,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
 .metadata-table {
   /* P16 D13: flex:1 rather than height:100% — GrpcRequestView.vue's own filter row, when open, is
      a sibling above this in the same flex-column parent. */
-  @apply flex flex-1 min-h-0 flex-col gap-[var(--kira-s-2)] overflow-auto p-[var(--kira-s-3)];
+  @apply flex flex-1 min-h-0 flex-col gap-1 overflow-auto p-1.5;
 }
 
 /* P22b D9 (FieldRowsTable.vue's own sibling — F18's literal copy): a grid, not independent flex
@@ -291,7 +306,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
    grid-template-columns itself is set inline (above) since it depends on showDescriptions, which
    — like showEnabled in FieldRowsTable.vue — is fixed per table instance, never per row. */
 .metadata-row {
-  @apply grid items-center gap-[var(--kira-s-2)];
+  @apply grid items-center gap-1;
 }
 
 .metadata-cell {

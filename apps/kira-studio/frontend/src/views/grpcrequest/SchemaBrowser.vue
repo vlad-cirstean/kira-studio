@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useGrpcRequestViewStore } from './state';
 
 // D13's Schema pane: the source selector (Reflection / .proto file + import paths + Reload) above
@@ -99,68 +104,111 @@ function selectMethod(service: string, method: string): void {
 <template>
   <div class="schema-browser" data-testid="grpc-schema-browser">
     <div class="source-row p-toolbar">
-      <SegmentedControl
+      <ToggleGroup
+        type="single"
         :model-value="tab.state.descriptorMode"
-        :options="SOURCE_OPTIONS"
         data-testid="grpc-source-toggle"
-        @update:model-value="setDescriptorMode"
-      />
+        @update:model-value="(v) => v && setDescriptorMode(v as 'reflection' | 'proto')"
+      >
+        <ToggleGroupItem
+          v-for="opt in SOURCE_OPTIONS"
+          :key="opt.value"
+          :value="opt.value"
+          :data-testid="opt.testid"
+        >
+          {{ opt.label }}
+        </ToggleGroupItem>
+      </ToggleGroup>
       <template v-if="tab.state.descriptorMode === 'reflection'">
-        <TextField
+        <Input
           :model-value="tab.state.target"
           placeholder="api.example.com:443"
-          style="flex: 1"
+          class="flex-1"
           data-testid="grpc-schema-target"
-          @update:model-value="onTargetInput"
+          @update:model-value="onTargetInput($event.toString())"
         />
       </template>
       <template v-else>
-        <TextField
+        <Input
           :model-value="tab.state.protoPath"
           placeholder="No .proto file chosen"
           readonly
-          style="flex: 1"
+          class="flex-1"
           data-testid="grpc-proto-path"
         />
-        <AppButton data-testid="grpc-choose-proto" @click="chooseProtoFile">Choose…</AppButton>
+        <Button variant="toolbar" size="kira" data-testid="grpc-choose-proto" @click="chooseProtoFile">
+          Choose…
+        </Button>
       </template>
-      <AppButton icon="refresh" data-testid="grpc-schema-reload" :disabled="rt?.status === 'loading'" @click="onReload">
+      <Button
+        variant="toolbar"
+        size="kira"
+        data-testid="grpc-schema-reload"
+        :disabled="rt?.status === 'loading'"
+        @click="onReload"
+      >
+        <CodiconIcon name="refresh" :size="13" />
         Reload
-      </AppButton>
+      </Button>
     </div>
 
     <div v-if="tab.state.descriptorMode === 'proto'" class="import-paths" data-testid="grpc-import-paths">
       <span class="def-section-title">Import paths</span>
       <div class="import-path-list">
         <div v-for="(p, i) in tab.state.importPaths" :key="i" class="p-row">
-          <span class="p-xs mono import-path-text" v-tooltip="p">{{ p }}</span>
-          <IconButton icon="close" class="p-push" v-tooltip="'Remove'" @click="removeImportPath(i)" />
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="p-xs mono import-path-text">{{ p }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ p }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                class="p-push"
+                aria-label="Remove"
+                @click="removeImportPath(i)"
+              >
+                <CodiconIcon name="close" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Remove</TooltipContent>
+          </Tooltip>
         </div>
         <div v-if="tab.state.importPaths.length === 0" class="p-xs dim">
           No import paths — the .proto file's own directory is used
         </div>
       </div>
       <div class="add-row">
-        <TextField
+        <Input
           v-model="newImportPath"
           placeholder="Add an import path…"
           data-testid="grpc-new-import-path"
-          @enter="addImportPath"
+          @keydown.enter="addImportPath"
         />
-        <AppButton data-testid="grpc-add-import-path" @click="addImportPath">Add</AppButton>
+        <Button variant="toolbar" size="kira" data-testid="grpc-add-import-path" @click="addImportPath">
+          Add
+        </Button>
       </div>
     </div>
 
-    <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="grpc-schema-error">
-      {{ rt.error }}
-    </MessageStrip>
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="grpc-schema-error">
+      <AlertDescription>{{ rt.error }}</AlertDescription>
+    </Alert>
 
-    <PanelSearchBox
-      v-if="rt?.schema && rt.schema.services.length > 0"
-      v-model="filterQuery"
-      placeholder="Filter services and methods"
-      testid="grpc-schema-filter"
-    />
+    <InputGroup v-if="rt?.schema && rt.schema.services.length > 0" data-testid="grpc-schema-filter">
+      <InputGroupAddon>
+        <CodiconIcon name="search" :size="13" />
+      </InputGroupAddon>
+      <InputGroupInput v-model="filterQuery" placeholder="Filter services and methods" />
+      <InputGroupAddon v-if="filterQuery" align="inline-end">
+        <InputGroupButton @click="filterQuery = ''">
+          <CodiconIcon name="close" :size="13" />
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
     <div class="service-list" data-testid="grpc-service-list">
       <template v-if="rt?.schema && filteredServices.length > 0">
         <div v-for="svc in filteredServices" :key="svc.name" class="service-group">
@@ -186,17 +234,20 @@ function selectMethod(service: string, method: string): void {
           </button>
         </div>
       </template>
-      <EmptyState
+      <Alert
         v-else-if="isFiltered && rt?.schema && rt.schema.services.length > 0"
-        icon="search"
-        label="No matches"
+        class="empty-state"
         data-testid="grpc-schema-filter-empty"
-      />
-      <EmptyState
-        v-else-if="rt?.status !== 'loading'"
-        icon="symbol-interface"
-        label="Choose a source above to browse this server's services"
-      />
+      >
+        <CodiconIcon name="search" :size="24" class="empty-state-icon" />
+        <AlertTitle class="empty-state-title">No matches</AlertTitle>
+      </Alert>
+      <Alert v-else-if="rt?.status !== 'loading'" class="empty-state">
+        <CodiconIcon name="symbol-interface" :size="24" class="empty-state-icon" />
+        <AlertTitle class="empty-state-title">
+          Choose a source above to browse this server's services
+        </AlertTitle>
+      </Alert>
     </div>
   </div>
 </template>
@@ -209,11 +260,11 @@ function selectMethod(service: string, method: string): void {
 }
 
 .source-row {
-  @apply gap-[var(--kira-s-2)];
+  @apply gap-1;
 }
 
 .import-paths {
-  @apply flex flex-col gap-[var(--kira-s-1)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex flex-col gap-0.5 border-b border-border px-1.5 py-1;
 }
 
 /* D14: a real cap + scroll, so a large .proto tree's import list can never push the source row
@@ -227,19 +278,19 @@ function selectMethod(service: string, method: string): void {
 }
 
 .add-row {
-  @apply flex items-center gap-[var(--kira-s-2)];
+  @apply flex items-center gap-1;
 }
 
 .service-list {
-  @apply flex-1 min-h-0 overflow-auto px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex-1 min-h-0 overflow-auto px-1.5 py-1;
 }
 
 .service-group {
-  @apply mb-[var(--kira-s-3)];
+  @apply mb-1.5;
 }
 
 .service-name {
-  @apply py-[var(--kira-s-1)];
+  @apply py-0.5;
 }
 
 /* p-row supplies height/display/align-items/gap/padding/border-radius/color/font-size/cursor
@@ -249,6 +300,16 @@ function selectMethod(service: string, method: string): void {
 }
 
 .method-name {
-  @apply text-[length:var(--kira-t-sm)];
+  @apply text-kira-sm;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+.empty-state-icon {
+  @apply text-subtle;
+}
+.empty-state-title {
+  @apply text-kira-md text-muted font-normal;
 }
 </style>

@@ -4,16 +4,21 @@ import {
   GRPC_HISTORY_PER_SCOPE_LIMIT,
   type GrpcCallHistoryEntry,
 } from '@shared/domain/grpc-history';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
 import { computed, onMounted, ref } from 'vue';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import { useGrpcCallHistoryStore } from './history';
 
 const confirmDialogStore = useConfirmDialogStore();
@@ -79,35 +84,48 @@ async function onClear(): Promise<void> {
     <div class="history-toolbar p-toolbar">
       <span class="p-xs dim">{{ entries.length }} {{ entries.length === 1 ? 'call' : 'calls' }}</span>
       <span class="p-push" />
-      <AppButton
-        icon="trash"
+      <Button
+        variant="toolbar"
+        size="kira"
         :disabled="entries.length === 0"
         data-testid="grpc-history-clear"
         @click="onClear"
       >
+        <CodiconIcon name="trash" :size="13" />
         Clear history
-      </AppButton>
+      </Button>
     </div>
 
-    <MessageStrip v-if="rt?.error" tone="err">{{ rt.error }}</MessageStrip>
-    <EmptyState
-      v-else-if="entries.length === 0"
-      icon="history"
-      :label="incognito ? 'Calls are not recorded in an incognito tab.' : 'No past calls yet'"
-    />
+    <Alert v-if="rt?.error" variant="destructive">
+      <AlertDescription>{{ rt.error }}</AlertDescription>
+    </Alert>
+    <Alert v-else-if="entries.length === 0" class="empty-state">
+      <CodiconIcon name="history" :size="24" class="empty-state-icon" />
+      <AlertTitle class="empty-state-title">
+        {{ incognito ? 'Calls are not recorded in an incognito tab.' : 'No past calls yet' }}
+      </AlertTitle>
+    </Alert>
 
     <template v-else>
-      <PanelSearchBox
-        v-model="filterQuery"
-        placeholder="Filter history"
-        testid="grpc-history-filter"
-      />
-      <EmptyState
+      <InputGroup data-testid="grpc-history-filter">
+        <InputGroupAddon>
+          <CodiconIcon name="search" :size="13" />
+        </InputGroupAddon>
+        <InputGroupInput v-model="filterQuery" placeholder="Filter history" />
+        <InputGroupAddon v-if="filterQuery" align="inline-end">
+          <InputGroupButton @click="filterQuery = ''">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <Alert
         v-if="isFiltered && filteredEntries.length === 0"
-        icon="search"
-        label="No matches"
+        class="empty-state"
         data-testid="grpc-history-filter-empty"
-      />
+      >
+        <CodiconIcon name="search" :size="24" class="empty-state-icon" />
+        <AlertTitle class="empty-state-title">No matches</AlertTitle>
+      </Alert>
     </template>
 
     <div v-if="entries.length > 0 && filteredEntries.length > 0" class="history-rows">
@@ -119,21 +137,34 @@ async function onClear(): Promise<void> {
         data-testid="grpc-history-row"
         @click="onRowClick(entry.id)"
       >
-        <span
-          class="p-chip"
-          :class="grpcCodeClass(entry.code)"
-          v-tooltip="grpcCodeHint(entry.code)"
-          >{{ entry.codeName }}</span
-        >
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="p-chip" :class="grpcCodeClass(entry.code)">{{ entry.codeName }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ grpcCodeHint(entry.code) }}</TooltipContent>
+        </Tooltip>
         <span class="p-xs mono">{{ entry.method }}</span>
-        <span v-tooltip="entry.calledAt" class="p-xs dim">{{ formatRelative(entry.calledAt) }}</span>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="p-xs dim">{{ formatRelative(entry.calledAt) }}</span>
+          </TooltipTrigger>
+          <TooltipContent>{{ entry.calledAt }}</TooltipContent>
+        </Tooltip>
         <span class="p-push" />
-        <IconButton
-          icon="trash"
-          v-tooltip="'Delete'"
-          data-testid="grpc-history-delete"
-          @click.stop="onDelete(entry.id)"
-        />
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Delete"
+              data-testid="grpc-history-delete"
+              @click.stop="onDelete(entry.id)"
+            >
+              <CodiconIcon name="trash" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Delete</TooltipContent>
+        </Tooltip>
       </div>
     </div>
 
@@ -152,7 +183,7 @@ async function onClear(): Promise<void> {
 }
 
 .history-toolbar {
-  @apply gap-[var(--kira-s-2)];
+  @apply gap-1;
 }
 
 .history-rows {
@@ -160,7 +191,7 @@ async function onClear(): Promise<void> {
 }
 
 .history-row {
-  @apply flex cursor-pointer items-center gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex cursor-pointer items-center gap-1 border-b border-border px-1.5 py-1;
 }
 
 .history-row:hover,
@@ -169,6 +200,16 @@ async function onClear(): Promise<void> {
 }
 
 .history-cap-note {
-  @apply shrink-0 border-t border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply shrink-0 border-t border-border px-1.5 py-1;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+.empty-state-icon {
+  @apply text-subtle;
+}
+.empty-state-title {
+  @apply text-kira-md text-muted font-normal;
 }
 </style>
