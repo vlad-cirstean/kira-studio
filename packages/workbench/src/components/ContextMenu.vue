@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuSub,
@@ -55,48 +56,50 @@ async function onItemClick(item: MenuItem): Promise<void> {
             </span>
             <span class="flex-1 overflow-hidden text-ellipsis">{{ item.label }}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent data-testid="context-submenu">
-            <template
-              v-for="(sub, subIdx) in item.items"
-              :key="sub.type === 'separator' ? `sep-${subIdx}` : sub.id"
-            >
-              <DropdownMenuSeparator v-if="sub.type === 'separator'" />
-              <DropdownMenuItem
-                v-else
-                :disabled="sub.type === 'item' && !!sub.disabled"
-                :variant="sub.type === 'item' && sub.danger ? 'destructive' : 'default'"
-                :data-testid="`menu-item-${sub.id}`"
-                @select="sub.type === 'item' && onItemClick(sub)"
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent data-testid="context-submenu">
+              <template
+                v-for="(sub, subIdx) in item.items"
+                :key="sub.type === 'separator' ? `sep-${subIdx}` : sub.id"
               >
-                <span class="flex items-center justify-center shrink-0 size-4">
+                <DropdownMenuSeparator v-if="sub.type === 'separator'" />
+                <DropdownMenuItem
+                  v-else
+                  :disabled="sub.type === 'item' && !!sub.disabled"
+                  :variant="sub.type === 'item' && sub.danger ? 'destructive' : 'default'"
+                  :data-testid="`menu-item-${sub.id}`"
+                  @select="sub.type === 'item' && onItemClick(sub)"
+                >
+                  <span class="flex items-center justify-center shrink-0 size-4">
+                    <span
+                      v-if="sub.type === 'item' && sub.swatch"
+                      class="w-2.5 h-2.5 rounded-full shrink-0"
+                      :class="{ 'border-[1.5px] border-disabled': sub.swatch === 'none' }"
+                      :style="sub.swatch === 'none' ? undefined : { background: connColorVar(sub.swatch) }"
+                    />
+                    <CodiconIcon
+                      v-else-if="sub.icon"
+                      :name="sub.icon"
+                      :size="13"
+                      class="text-muted-foreground"
+                    />
+                  </span>
+                  <span class="flex-1 overflow-hidden text-ellipsis">{{ sub.label }}</span>
+                  <DropdownMenuShortcut
+                    v-if="sub.type === 'item' && sub.shortcut"
+                    :data-testid="`menu-item-${sub.id}-shortcut`"
+                    >{{ formatShortcut(sub.shortcut) }}</DropdownMenuShortcut
+                  >
                   <span
-                    v-if="sub.type === 'item' && sub.swatch"
-                    class="w-2.5 h-2.5 rounded-full shrink-0"
-                    :class="{ 'border-[1.5px] border-disabled': sub.swatch === 'none' }"
-                    :style="sub.swatch === 'none' ? undefined : { background: connColorVar(sub.swatch) }"
-                  />
-                  <CodiconIcon
-                    v-else-if="sub.icon"
-                    :name="sub.icon"
-                    :size="13"
-                    class="text-muted-foreground"
-                  />
-                </span>
-                <span class="flex-1 overflow-hidden text-ellipsis">{{ sub.label }}</span>
-                <DropdownMenuShortcut
-                  v-if="sub.type === 'item' && sub.shortcut"
-                  :data-testid="`menu-item-${sub.id}-shortcut`"
-                  >{{ formatShortcut(sub.shortcut) }}</DropdownMenuShortcut
-                >
-                <span
-                  v-if="sub.type === 'item' && sub.checked"
-                  class="flex items-center justify-center shrink-0 size-4"
-                >
-                  <CodiconIcon name="check" :size="13" />
-                </span>
-              </DropdownMenuItem>
-            </template>
-          </DropdownMenuSubContent>
+                    v-if="sub.type === 'item' && sub.checked"
+                    class="flex items-center justify-center shrink-0 size-4"
+                  >
+                    <CodiconIcon name="check" :size="13" />
+                  </span>
+                </DropdownMenuItem>
+              </template>
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
         </DropdownMenuSub>
 
         <Tooltip v-else :disabled="!item.hint">
