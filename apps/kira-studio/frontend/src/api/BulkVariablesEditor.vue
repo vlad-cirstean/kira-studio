@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { type EnvRow, parseEnv, reconcileEnv, serializeEnv } from '@kira/api-core';
 import type { ApiVariable, ApiVariableBulkEntry, VariableScope } from '@shared/domain/variables';
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, ref } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useVariableSetStore } from './state/variables';
 
 const confirmDialogStore = useConfirmDialogStore();
@@ -112,12 +112,14 @@ function onCancel(): void {
 
 <template>
   <div class="bulk-editor" data-testid="variables-bulk-editor">
-    <MessageStrip tone="note" data-testid="variables-bulk-hint">
-      Bulk edit cannot create or remove the secret flag on a row — a new <code>KEY=value</code>
-      line always creates a non-secret variable, and a secret's own line stays
-      <code>KEY=</code> with its value left unchanged unless you type one. Use the row's own
-      toggle to change a variable's secret flag.
-    </MessageStrip>
+    <Alert class="strip-note" data-testid="variables-bulk-hint">
+      <AlertDescription class="strip-note-text">
+        Bulk edit cannot create or remove the secret flag on a row — a new <code>KEY=value</code>
+        line always creates a non-secret variable, and a secret's own line stays
+        <code>KEY=</code> with its value left unchanged unless you type one. Use the row's own
+        toggle to change a variable's secret flag.
+      </AlertDescription>
+    </Alert>
 
     <div class="bulk-body">
       <MonacoHost
@@ -129,35 +131,34 @@ function onCancel(): void {
       />
     </div>
 
-    <MessageStrip v-if="parseError" tone="err" data-testid="variables-bulk-error">
-      {{ parseError.message }}
-    </MessageStrip>
+    <Alert v-if="parseError" variant="destructive" data-testid="variables-bulk-error">
+      <AlertDescription>{{ parseError.message }}</AlertDescription>
+    </Alert>
     <template v-else-if="diff">
       <div class="bulk-summary" data-testid="variables-bulk-summary">{{ summary }}</div>
-      <MessageStrip
-        v-if="diff.hasRenameRisk"
-        tone="warn"
-        data-testid="variables-bulk-rename-warning"
-      >
-        Renaming a key here removes the old one and its value history. Rename in the table to keep
-        it.
-      </MessageStrip>
+      <Alert v-if="diff.hasRenameRisk" class="strip-warn" data-testid="variables-bulk-rename-warning">
+        <AlertDescription class="strip-warn-text">
+          Renaming a key here removes the old one and its value history. Rename in the table to
+          keep it.
+        </AlertDescription>
+      </Alert>
     </template>
 
-    <MessageStrip v-if="applyError" tone="err" data-testid="variables-bulk-apply-error">
-      {{ applyError }}
-    </MessageStrip>
+    <Alert v-if="applyError" variant="destructive" data-testid="variables-bulk-apply-error">
+      <AlertDescription>{{ applyError }}</AlertDescription>
+    </Alert>
 
     <div class="bulk-actions">
-      <AppButton data-testid="variables-bulk-cancel" @click="onCancel">Cancel</AppButton>
-      <AppButton
-        variant="primary"
+      <Button variant="toolbar" size="kira" data-testid="variables-bulk-cancel" @click="onCancel">Cancel</Button>
+      <Button
+        variant="toolbar-primary"
+        size="kira"
         data-testid="variables-bulk-apply"
         :disabled="parseError !== null || applying"
         @click="onApply"
       >
         Apply
-      </AppButton>
+      </Button>
     </div>
   </div>
 </template>
@@ -166,7 +167,7 @@ function onCancel(): void {
 @reference "@theme/base.css";
 
 .bulk-editor {
-  @apply flex h-full min-h-0 flex-col gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex h-full min-h-0 flex-col gap-1 px-1.5 py-1;
 }
 
 .bulk-body {
@@ -174,10 +175,25 @@ function onCancel(): void {
 }
 
 .bulk-summary {
-  @apply text-subtle text-[length:var(--kira-t-sm)];
+  @apply text-subtle text-kira-sm;
 }
 
 .bulk-actions {
-  @apply flex justify-end gap-[var(--kira-s-2)];
+  @apply flex justify-end gap-1;
+}
+
+/* Alert tone classes replacing MessageStrip's note/warn markers (P104 §9 rule 5: literal hex, not
+   a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
+}
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

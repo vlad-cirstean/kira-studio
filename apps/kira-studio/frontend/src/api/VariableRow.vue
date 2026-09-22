@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { ApiVariable } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { ref, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
@@ -122,82 +123,114 @@ function onKeydown(e: KeyboardEvent): void {
     @dragover.prevent="emit('dragover', index)"
     @dragend="emit('dragend')"
   >
-    <span
-      class="drag-handle"
-      :class="{ 'is-disabled': trailing }"
-      aria-hidden="true"
-      data-testid="variable-grip"
-      v-tooltip="filtered && !trailing ? 'Clear the filter to reorder' : undefined"
-    >
+    <Tooltip v-if="filtered && !trailing">
+      <TooltipTrigger as-child>
+        <span class="drag-handle" aria-hidden="true" data-testid="variable-grip">
+          <CodiconIcon name="gripper" :size="13" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Clear the filter to reorder</TooltipContent>
+    </Tooltip>
+    <span v-else class="drag-handle" :class="{ 'is-disabled': trailing }" aria-hidden="true" data-testid="variable-grip">
       <CodiconIcon name="gripper" :size="13" />
     </span>
     <div class="cell name-cell">
-      <TextField
+      <Input
         :model-value="row.name"
         placeholder="name"
         data-testid="variable-name"
-        @update:model-value="onNameInput"
+        @update:model-value="onNameInput(String($event))"
         @blur="emit('blur')"
       />
       <span v-if="duplicate" class="p-chip warn" data-testid="variable-duplicate">duplicate</span>
     </div>
     <div class="cell value-cell">
       <span v-if="notYetRevealed()" class="masked-value" data-testid="variable-value-masked">••••••••</span>
-      <TextField
+      <Input
         v-else
         :type="row.isSecret && !visible ? 'password' : 'text'"
         :model-value="row.value"
         placeholder="value"
         data-testid="variable-value"
-        @update:model-value="onValueInput"
+        @update:model-value="onValueInput(String($event))"
         @blur="emit('blur')"
       />
-      <IconButton
-        v-if="row.isSecret"
-        icon="eye"
-        :active="visible"
-        v-tooltip="notYetRevealed() ? 'Reveal' : 'Toggle visibility'"
-        data-testid="variable-reveal"
-        @click="onEyeClick"
-      />
+      <Tooltip v-if="row.isSecret">
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :class="{ 'bg-input text-fg': visible }"
+            aria-label="Reveal"
+            data-testid="variable-reveal"
+            @click="onEyeClick"
+          >
+            <CodiconIcon name="eye" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ notYetRevealed() ? 'Reveal' : 'Toggle visibility' }}</TooltipContent>
+      </Tooltip>
     </div>
     <div class="cell description-cell">
-      <TextField
+      <Input
         :model-value="row.description"
         placeholder="description"
         data-testid="variable-description"
-        @update:model-value="onDescriptionInput"
+        @update:model-value="onDescriptionInput(String($event))"
         @blur="emit('blur')"
       />
     </div>
-    <label class="secret-toggle" v-tooltip="secretsUnavailable ? 'Secret storage is unavailable' : 'Secret'">
-      <Checkbox
-        :model-value="row.isSecret"
-        :disabled="secretsUnavailable && !row.isSecret"
-        data-testid="variable-secret"
-        @update:model-value="onSecretChange"
-      />
-    </label>
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <label class="secret-toggle">
+          <Checkbox
+            :model-value="row.isSecret"
+            :disabled="secretsUnavailable && !row.isSecret"
+            data-testid="variable-secret"
+            @update:model-value="(v) => onSecretChange(v === true)"
+          >
+            <CodiconIcon name="check" :size="10" />
+          </Checkbox>
+        </label>
+      </TooltipTrigger>
+      <TooltipContent>{{ secretsUnavailable ? 'Secret storage is unavailable' : 'Secret' }}</TooltipContent>
+    </Tooltip>
     <div class="history-anchor">
-      <IconButton
-        icon="history"
-        :disabled="trailing"
-        v-tooltip="'History'"
-        data-testid="variable-history"
-        @click="onHistoryClick"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            :disabled="trailing"
+            aria-label="History"
+            data-testid="variable-history"
+            @click="onHistoryClick"
+          >
+            <CodiconIcon name="history" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>History</TooltipContent>
+      </Tooltip>
       <VariableHistoryMenu
         v-if="showHistory && variableSetStore.variableId === row.id"
         @close="onHistoryClose"
       />
     </div>
-    <IconButton
-      icon="trash"
-      :disabled="props.trailing"
-      v-tooltip="'Remove'"
-      data-testid="variable-remove"
-      @click="emit('remove')"
-    />
+    <Tooltip>
+      <TooltipTrigger as-child>
+        <Button
+          variant="toolbar"
+          size="kira-icon"
+          :disabled="props.trailing"
+          aria-label="Remove"
+          data-testid="variable-remove"
+          @click="emit('remove')"
+        >
+          <CodiconIcon name="trash" :size="13" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Remove</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -210,7 +243,7 @@ function onKeydown(e: KeyboardEvent): void {
    columns: handle, name, value, description, secret toggle, history, remove. */
 .variable-row {
   grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
-  @apply grid items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply grid items-center gap-1 px-1.5 py-1;
 }
 
 .variable-row.is-dragging {
@@ -226,10 +259,7 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .cell {
-  @apply flex min-w-0 items-center gap-[var(--kira-s-2)];
-}
-.cell :deep(.p-input) {
-  @apply w-full;
+  @apply flex min-w-0 items-center gap-1;
 }
 
 .masked-value {

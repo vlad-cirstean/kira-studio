@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Button } from '@theme/components/ui/button';
 import { useCollectionsStore } from './state/collections';
 import { useImportCurlStore } from './state/curl';
 import { openApiRequestTab, openGrpcRequestTab } from './tabs';
@@ -27,34 +28,34 @@ function onImportCurl(): void {
 
 <template>
   <div
-    class="flex flex-1 min-h-0 items-center justify-center overflow-auto p-[var(--kira-s-6)]"
+    class="flex flex-1 min-h-0 items-center justify-center overflow-auto p-4"
     data-testid="api-start"
   >
-    <div class="flex w-[420px] max-w-full flex-col items-center gap-[var(--kira-s-4)] text-center">
+    <div class="flex w-[420px] max-w-full flex-col items-center gap-2 text-center">
       <span class="dim"><CodiconIcon name="globe" :size="32" /></span>
-      <div class="tracking-[-0.01em] text-fg text-[length:var(--kira-t-xl)]">No request open</div>
-      <div class="muted leading-normal text-[length:var(--kira-t-md)]">
+      <div class="tracking-[-0.01em] text-fg text-kira-xl">No request open</div>
+      <div class="muted leading-normal text-kira-md">
         Send a request and see its response here.
       </div>
-      <div class="flex flex-wrap items-center justify-center gap-[var(--kira-s-2)]">
-        <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openApiRequestTab">
-          <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
+      <div class="flex flex-wrap items-center justify-center gap-1">
+        <Button variant="dialog-primary" size="kira-lg" data-testid="new-request-start" @click="openApiRequestTab">
+          <CodiconIcon name="add" :size="13" />
           New request
-        </button>
+        </Button>
       </div>
-      <div class="flex flex-wrap items-center justify-center gap-[var(--kira-s-2)]">
-        <button type="button" class="p-dlgbtn" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
-          <span class="icon-box"><CodiconIcon name="symbol-interface" :size="13" /></span>
+      <div class="flex flex-wrap items-center justify-center gap-1">
+        <Button variant="dialog" size="kira-lg" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
+          <CodiconIcon name="symbol-interface" :size="13" />
           New gRPC request
-        </button>
-        <button type="button" class="p-dlgbtn" data-testid="import-collection-start" @click="onImport">
-          <span class="icon-box"><CodiconIcon name="cloud-download" :size="13" /></span>
+        </Button>
+        <Button variant="dialog" size="kira-lg" data-testid="import-collection-start" @click="onImport">
+          <CodiconIcon name="cloud-download" :size="13" />
           Import collection…
-        </button>
-        <button type="button" class="p-dlgbtn" data-testid="import-curl-start" @click="onImportCurl">
-          <span class="icon-box"><CodiconIcon name="terminal" :size="13" /></span>
+        </Button>
+        <Button variant="dialog" size="kira-lg" data-testid="import-curl-start" @click="onImportCurl">
+          <CodiconIcon name="terminal" :size="13" />
           Import from curl…
-        </button>
+        </Button>
       </div>
     </div>
   </div>

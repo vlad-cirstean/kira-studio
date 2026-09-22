@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { computed } from 'vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useCopyAsCurlStore } from './state/curl';
 
 const copyAsCurlStore = useCopyAsCurlStore();
@@ -10,8 +10,9 @@ const copyAsCurlStore = useCopyAsCurlStore();
 // P7 D10: the generated command, masked by default. Secrets are still {{token}} until Show secret
 // values is pressed — the gate is `revealSecretValues`'s own `revealVariable` calls
 // (http/state/variables.ts's existing four-outcome flow), not anything here. Built on DialogFrame
-// + the existing `.p-strip note`/`.p-strip warn` shape (ImportReportStrip.vue's own technique) —
-// no new theme/primitives/ component (§0.2).
+// + the `.strip-note`/`.strip-warn` tone classes (ImportReportStrip.vue's own technique) — P104
+// §3 leaves DialogFrame's own call sites unchanged (its P99 Part 2 comment declines shadcn's
+// dialog vocabulary for this design system's pixel-exact chrome).
 const command = computed(() => copyAsCurlStore.currentCurlCommand());
 
 const maskedNames = computed(() =>
@@ -81,45 +82,70 @@ function close(): void {
         data-testid="copy-as-curl-command"
       />
 
-      <MessageStrip
+      <Alert
         v-if="copyAsCurlStore.deferredNames.length > 0"
-        :tone="stripTone"
+        :class="stripTone === 'warn' ? 'strip-warn' : 'strip-note'"
         data-testid="copy-as-curl-strip"
       >
-        {{ stripText }}
-        <AppButton
-          v-if="maskedNames.length > 0"
-          class="strip-action"
-          kind="dialog"
-          :disabled="copyAsCurlStore.revealing"
-          data-testid="copy-as-curl-reveal"
-          @click="onReveal"
+        <AlertDescription
+          :class="stripTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'"
+          class="flex items-start gap-1.5"
         >
-          Show secret values
-        </AppButton>
-      </MessageStrip>
+          <span>{{ stripText }}</span>
+          <Button
+            v-if="maskedNames.length > 0"
+            variant="dialog"
+            size="kira"
+            class="ml-auto shrink-0"
+            :disabled="copyAsCurlStore.revealing"
+            data-testid="copy-as-curl-reveal"
+            @click="onReveal"
+          >
+            Show secret values
+          </Button>
+        </AlertDescription>
+      </Alert>
 
       <div v-if="hasDynamicValue" class="p-sm muted" data-testid="copy-as-curl-dynamic-note">
         {{ dynamicNote }}
       </div>
 
-      <MessageStrip v-if="copyAsCurlStore.error" tone="err" data-testid="copy-as-curl-error">
-        {{ copyAsCurlStore.error }}
-      </MessageStrip>
+      <Alert v-if="copyAsCurlStore.error" variant="destructive" data-testid="copy-as-curl-error">
+        <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>
+      </Alert>
     </div>
 
     <template #footer>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" data-testid="copy-as-curl-close" @click="close">Close</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
+        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
           data-testid="copy-as-curl-copy"
           @click="onCopy"
         >
           Copy
-        </AppButton>
+        </Button>
       </span>
     </template>
   </DialogFrame>
 </template>
+
+<style scoped>
+@reference "@theme/base.css";
+
+/* Alert tone classes replacing MessageStrip's note/warn markers (P104 §9 rule 5: literal hex,
+   not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
+}
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+</style>

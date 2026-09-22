@@ -1,30 +1,37 @@
 <script setup lang="ts">
 import type { PaletteColor } from '@shared/domain/color';
 import type { ApiVariable } from '@shared/domain/variables';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { connColorVar } from '@theme/connColor';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
+import { useRunState } from '../state/runState';
 import type { VariableSetTabRecord } from '../state/tabDomain';
 import ColorPicker from '../theme/primitives/ColorPicker.vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import BulkVariablesEditor from './BulkVariablesEditor.vue';
 import { useCollectionsStore } from './state/collections';
 import { useVariableSetStore, useVariablesStore } from './state/variables';
 import VariableRow from './VariableRow.vue';
 
 // P17 D16: VariablesDialog.vue's own replacement — the exact same per-row draft/blur/reorder
-// mechanics, re-hosted in a tab (ViewChrome) instead of a dialog (DialogFrame), keyed by `tab.id`
-// (MainView.vue keys this component by it, so one instance <-> one tab, same discipline every
-// other tab view already follows). `data-testid="variables-dialog"`/`"variables-filter"`/
-// `"variables-error"` are kept byte-identical to the dialog's own — the row-level testids never
-// changed at all (VariableRow.vue is untouched apart from D14's description cell) — so the
-// existing http-variables.spec.ts/api-secret-reveal-isolation.spec.ts regression net passes with
-// no edit.
+// mechanics, re-hosted in a tab instead of a dialog (DialogFrame), keyed by `tab.id` (MainView.vue
+// keys this component by it, so one instance <-> one tab, same discipline every other tab view
+// already follows). `data-testid="variables-dialog"`/`"variables-filter"`/`"variables-error"` are
+// kept byte-identical to the dialog's own — the row-level testids never changed at all
+// (VariableRow.vue is untouched apart from D14's description cell) — so the existing
+// http-variables.spec.ts/api-secret-reveal-isolation.spec.ts regression net passes with no edit.
+//
+// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
 const props = defineProps<{ tab: VariableSetTabRecord }>();
 
 const collectionsStore = useCollectionsStore();
@@ -53,6 +60,20 @@ const owningEnvironment = computed(() =>
 const ownerExists = computed(() =>
   scope.value === 'collection' ? !!owningCollection.value : !!owningEnvironment.value,
 );
+
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
+const railColor = computed<PaletteColor | null | undefined>(() => {
+  if (scope.value === 'environment') return owningEnvironment.value?.color ?? 'none';
+  return connRecord.value ? (connRecord.value.color ?? null) : undefined;
+});
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 onMounted(() => {
   collectionsStore.initCollections();
@@ -386,135 +407,159 @@ function onBulkClose(): void {
 
 <template>
   <div class="variable-set-view" data-testid="variables-dialog" :data-scope="scope">
-    <ViewChrome
-      :tab="tab"
-      :icon="scope === 'environment' ? 'server-environment' : 'symbol-variable'"
-      :name="tab.state.name || 'Variables'"
-      :show-run-controls="false"
-      target-testid="variable-set-target"
-      :env-color="scope === 'environment' ? (owningEnvironment?.color ?? 'none') : undefined"
-    >
-      <!-- P22b D9 (remainder): ViewChrome's own standard bands, rather than the hand-spaced single
-           #toolbar-2 row this view used to build both controls into on its own — the search box
-           in #toolbar (the band every other view's own filter/search control lives in), the
-           .env-text toggle in #toolbar-end (every other view's own trailing action group). -->
-      <template #toolbar>
-        <PanelSearchBox
-          v-if="!bulkMode"
-          v-model="filterQuery"
-          placeholder="Filter by name"
-          testid="variables-filter"
-        />
-      </template>
-      <template #toolbar-end>
-        <IconButton
-          v-if="ownerExists"
-          icon="code"
-          :active="bulkMode"
-          aria-label="Edit as .env text"
-          v-tooltip="'Edit as .env text'"
-          data-testid="variables-bulk-toggle"
-          @click="bulkMode = !bulkMode"
-        />
-      </template>
-
-      <EmptyState
-        v-if="ownersLoaded && !ownerExists"
-        icon="warning"
-        label="This variable set no longer exists"
-        data-testid="variable-set-orphan"
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
       />
-      <BulkVariablesEditor
-        v-else-if="bulkMode"
-        :tab-id="tab.id"
-        :scope="scope"
-        :owner-id="ownerId"
-        :rows="rows"
-        @close="onBulkClose"
-      />
-      <div v-else ref="listRef" class="p-dialog-body list">
-        <MessageStrip v-if="error" tone="err" data-testid="variables-error">
-          {{ error }}
-        </MessageStrip>
-        <MessageStrip
-          v-else-if="connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
-          tone="warn"
-          data-testid="variables-secrets-unavailable"
-        >
-          {{ connectionsStore.secretStorage.reason }}
-        </MessageStrip>
-
-        <div v-if="scope === 'environment' && owningEnvironment" class="env-fields">
-          <!-- P22b D9 (remainder): GrpcRequestView.vue's own inheritAttrs:false idiom — a bare
-               TextField sizes to its own content, not the flex row's available space, without this
-               wrapper + :deep(.p-input) width:100% pair. -->
-          <!-- P28 D16(b): real labels. Both fields carried a placeholder and nothing else, so a
-               populated environment showed two unlabelled text boxes — the placeholder is gone the
-               moment either has a value, which is most of the time. Same .cell label convention
-               the variable table's own header row below uses. -->
-          <label class="env-field">
-            <span class="env-field-label p-xs dim">Name</span>
-            <TextField
-              v-model="envNameDraft"
-              placeholder="name"
-              data-testid="environment-name"
-              @blur="onEnvFieldBlur"
-            />
-          </label>
-          <label class="env-field">
-            <span class="env-field-label p-xs dim">Description</span>
-            <TextField
-              v-model="envDescriptionDraft"
-              placeholder="description"
-              data-testid="environment-description"
-              @blur="onEnvFieldBlur"
-            />
-          </label>
-          <ColorPicker
-            :model-value="owningEnvironment.color"
-            label="Environment color"
-            data-testid="environment-color-picker"
-            @update:model-value="onEnvColorChange"
-          />
-          <AppButton data-testid="environment-duplicate" @click="onDuplicateEnvironment">
-            Duplicate
-          </AppButton>
-        </div>
-
-        <div class="header-row">
-          <span class="cell"></span>
-          <span class="cell">Name</span>
-          <span class="cell">Value</span>
-          <span class="cell">Description</span>
-          <span class="cell"></span>
-          <span class="cell"></span>
-          <span class="cell"></span>
-        </div>
-        <VariableRow
-          v-for="(row, i) in displayRows"
-          :key="row.id || 'trailing'"
-          :row="row"
-          :index="i"
-          :dragging="dragIndex === i"
-          :duplicate="duplicateFor(row)"
-          :trailing="row.id === ''"
-          :filtered="isFiltered"
-          :secrets-unavailable="!!connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
-          @update:name="onUpdateName(row.id, $event)"
-          @update:value="onUpdateValue(row.id, $event)"
-          @update:is-secret="onUpdateSecret(row.id, $event)"
-          @update:description="onUpdateDescription(row.id, $event)"
-          @blur="onBlur(row.id)"
-          @remove="onRemove(row.id)"
-          @reveal="onReveal(row.id)"
-          @history="onHistoryClickFor(row)"
-          @dragstart="onDragStart"
-          @dragover="onDragOver"
-          @dragend="onDragEnd"
-          @move="onMove(row.id, $event)"
+      <span class="icon-box">
+        <CodiconIcon :name="scope === 'environment' ? 'server-environment' : 'symbol-variable'" :size="13" />
+      </span>
+      <span class="p-view-target" data-testid="variable-set-target">{{ tab.state.name || 'Variables' }}</span>
+      <span class="p-push flex items-center gap-1" />
+    </div>
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <!-- P22b D9 (remainder): the standard toolbar bands, rather than the hand-spaced single
+         #toolbar-2 row this view used to build both controls into on its own — the search box
+         (the band every other view's own filter/search control lives in), the .env-text toggle in
+         the trailing group (every other view's own trailing action group). -->
+    <div class="p-toolbar last">
+      <InputGroup v-if="!bulkMode" data-testid="variables-filter">
+        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" />
+        <InputGroupAddon v-if="filterQuery" align="inline-end">
+          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <span class="p-push" />
+      <span
+        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+      >
+        <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+        <span
+          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          :class="{
+            'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
+            'border-error': runState.status === 'error',
+          }"
         />
+      </span>
+      <div class="group">
+        <Tooltip v-if="ownerExists">
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': bulkMode }"
+              aria-label="Edit as .env text"
+              data-testid="variables-bulk-toggle"
+              @click="bulkMode = !bulkMode"
+            >
+              <CodiconIcon name="code" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Edit as .env text</TooltipContent>
+        </Tooltip>
       </div>
-    </ViewChrome>
+    </div>
+
+    <Alert v-if="ownersLoaded && !ownerExists" class="empty-state" data-testid="variable-set-orphan">
+      <CodiconIcon name="warning" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md text-muted font-normal">This variable set no longer exists</AlertTitle>
+    </Alert>
+    <BulkVariablesEditor
+      v-else-if="bulkMode"
+      :tab-id="tab.id"
+      :scope="scope"
+      :owner-id="ownerId"
+      :rows="rows"
+      @close="onBulkClose"
+    />
+    <div v-else ref="listRef" class="p-dialog-body list">
+      <Alert v-if="error" variant="destructive" data-testid="variables-error">
+        <AlertDescription>{{ error }}</AlertDescription>
+      </Alert>
+      <Alert
+        v-else-if="connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
+        class="strip-warn"
+        data-testid="variables-secrets-unavailable"
+      >
+        <AlertDescription class="strip-warn-text">{{ connectionsStore.secretStorage.reason }}</AlertDescription>
+      </Alert>
+
+      <div v-if="scope === 'environment' && owningEnvironment" class="env-fields">
+        <!-- P28 D16(b): real labels. Both fields carried a placeholder and nothing else, so a
+             populated environment showed two unlabelled text boxes — the placeholder is gone the
+             moment either has a value, which is most of the time. Same .cell label convention
+             the variable table's own header row below uses. -->
+        <label class="env-field">
+          <span class="env-field-label p-xs dim">Name</span>
+          <Input
+            v-model="envNameDraft"
+            placeholder="name"
+            data-testid="environment-name"
+            @blur="onEnvFieldBlur"
+          />
+        </label>
+        <label class="env-field">
+          <span class="env-field-label p-xs dim">Description</span>
+          <Input
+            v-model="envDescriptionDraft"
+            placeholder="description"
+            data-testid="environment-description"
+            @blur="onEnvFieldBlur"
+          />
+        </label>
+        <ColorPicker
+          :model-value="owningEnvironment.color"
+          label="Environment color"
+          data-testid="environment-color-picker"
+          @update:model-value="onEnvColorChange"
+        />
+        <Button variant="toolbar" size="kira" data-testid="environment-duplicate" @click="onDuplicateEnvironment">
+          Duplicate
+        </Button>
+      </div>
+
+      <div class="header-row">
+        <span class="cell"></span>
+        <span class="cell">Name</span>
+        <span class="cell">Value</span>
+        <span class="cell">Description</span>
+        <span class="cell"></span>
+        <span class="cell"></span>
+        <span class="cell"></span>
+      </div>
+      <VariableRow
+        v-for="(row, i) in displayRows"
+        :key="row.id || 'trailing'"
+        :row="row"
+        :index="i"
+        :dragging="dragIndex === i"
+        :duplicate="duplicateFor(row)"
+        :trailing="row.id === ''"
+        :filtered="isFiltered"
+        :secrets-unavailable="!!connectionsStore.secretStorage && !connectionsStore.secretStorage.available"
+        @update:name="onUpdateName(row.id, $event)"
+        @update:value="onUpdateValue(row.id, $event)"
+        @update:is-secret="onUpdateSecret(row.id, $event)"
+        @update:description="onUpdateDescription(row.id, $event)"
+        @blur="onBlur(row.id)"
+        @remove="onRemove(row.id)"
+        @reveal="onReveal(row.id)"
+        @history="onHistoryClickFor(row)"
+        @dragstart="onDragStart"
+        @dragover="onDragOver"
+        @dragend="onDragEnd"
+        @move="onMove(row.id, $event)"
+      />
+    </div>
   </div>
 </template>
 
@@ -532,18 +577,15 @@ function onBulkClose(): void {
 .env-fields {
   /* P28 D16(b): flex-end, not center — each labelled field is now a two-row column, and centering
      would misalign the inputs against the colour picker and Duplicate button beside them. */
-  @apply flex items-end gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex items-end gap-1 border-b border-border px-1.5 py-1;
 }
 
 .env-field {
-  @apply flex min-w-0 flex-1 flex-col gap-[var(--kira-s-1)];
+  @apply flex min-w-0 flex-1 flex-col gap-0.5;
 }
 
 .env-field-label {
-  @apply pl-[var(--kira-s-1)];
-}
-.env-field :deep(.p-input) {
-  @apply w-full;
+  @apply pl-0.5;
 }
 
 /* P22b D9: mirrors VariableRow.vue's own grid template exactly (handle, name, value,
@@ -551,6 +593,19 @@ function onBulkClose(): void {
    non-labelled cells are blank placeholders for the columns that carry no header text. */
 .header-row {
   grid-template-columns: auto 1.2fr 2fr 1.5fr auto auto auto;
-  @apply grid gap-[var(--kira-s-2)] border-b border-border px-[var(--kira-s-3)] py-[var(--kira-s-2)] text-subtle text-[length:var(--kira-t-sm)];
+  @apply grid gap-1 border-b border-border px-1.5 py-1 text-subtle text-kira-sm;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
+}
+
+/* Alert tone class replacing MessageStrip's warn marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

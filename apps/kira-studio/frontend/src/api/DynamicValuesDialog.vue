@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { FAKE_NAMES, loadDynamicGenerator } from '@kira/api-core';
-import AppButton from '@theme/primitives/AppButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useDynamicValuesStore } from './state/dynamicValues';
@@ -71,37 +73,49 @@ function close(): void {
     @close="close"
   >
     <div class="p-dialog-body list dynamic-values-body">
-      <PanelSearchBox v-model="filterQuery" placeholder="Filter" testid="dynamic-values-filter" />
-      <EmptyState
+      <InputGroup data-testid="dynamic-values-filter">
+        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+        <InputGroupInput v-model="filterQuery" placeholder="Filter" />
+        <InputGroupAddon v-if="filterQuery" align="inline-end">
+          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <Alert
         v-if="isFiltered && filteredEntries.length === 0"
-        icon="search"
-        label="No matches"
+        class="empty-state"
         data-testid="dynamic-values-filter-empty"
-      />
-      <div
-        v-for="entry in filteredEntries"
-        :key="entry.name"
-        class="p-row dynamic-values-row"
-        data-testid="dynamic-values-fake-row"
-        :data-name="entry.name"
-        role="button"
-        tabindex="0"
-        v-tooltip="'Copy'"
-        @click="onCopy(entry.name)"
-        @keydown.enter="onCopy(entry.name)"
       >
-        <code class="reference" data-testid="dynamic-values-reference">{{
-          reference(entry.name)
-        }}</code>
-        <span class="p-chip info sample" data-testid="dynamic-values-sample">{{
-          samples[entry.name] ?? ''
-        }}</span>
-      </div>
+        <CodiconIcon name="search" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+      </Alert>
+      <Tooltip v-for="entry in filteredEntries" :key="entry.name">
+        <TooltipTrigger as-child>
+          <div
+            class="p-row dynamic-values-row"
+            data-testid="dynamic-values-fake-row"
+            :data-name="entry.name"
+            role="button"
+            tabindex="0"
+            @click="onCopy(entry.name)"
+            @keydown.enter="onCopy(entry.name)"
+          >
+            <code class="reference" data-testid="dynamic-values-reference">{{
+              reference(entry.name)
+            }}</code>
+            <span class="p-chip info sample" data-testid="dynamic-values-sample">{{
+              samples[entry.name] ?? ''
+            }}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>Copy</TooltipContent>
+      </Tooltip>
     </div>
 
     <template #footer>
       <span class="p-dialog-actions end">
-        <AppButton kind="dialog" data-testid="dynamic-values-close" @click="close">Close</AppButton>
+        <Button variant="dialog" size="kira-lg" data-testid="dynamic-values-close" @click="close">Close</Button>
       </span>
     </template>
   </DialogFrame>
@@ -117,7 +131,7 @@ function close(): void {
 }
 
 .dynamic-values-row {
-  @apply h-auto justify-between px-[var(--kira-s-3)] py-[var(--kira-s-2)] min-h-[var(--kira-h-md)];
+  @apply h-auto justify-between px-1.5 py-1 min-h-6.5;
 }
 
 .reference {
@@ -126,5 +140,9 @@ function close(): void {
 
 .sample {
   @apply min-w-0 overflow-hidden text-ellipsis;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 </style>

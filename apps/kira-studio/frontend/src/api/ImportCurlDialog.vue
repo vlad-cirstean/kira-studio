@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { refDebounced } from '@vueuse/core';
 import { computed, ref } from 'vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useImportCurlStore } from './state/curl';
 
 const importCurlStore = useImportCurlStore();
@@ -55,39 +55,37 @@ function close(): void {
         autofocus
       />
 
-      <MessageStrip v-if="preview.error" tone="err" data-testid="import-curl-error">
-        {{ preview.error }}
-      </MessageStrip>
+      <Alert v-if="preview.error" variant="destructive" data-testid="import-curl-error">
+        <AlertDescription>{{ preview.error }}</AlertDescription>
+      </Alert>
       <template v-else-if="text.trim() !== ''">
         <div class="p-sm muted" data-testid="import-curl-summary">{{ preview.summary }}</div>
-        <!-- D12: the same `.p-strip warn` + `<li :data-kind>` shape ImportReportStrip.vue
+        <!-- D12: the same `.strip-warn` + `<li :data-kind>` shape ImportReportStrip.vue
              established — shown live, before Import is pressed, rather than as a post-hoc report. -->
-        <MessageStrip
-          v-if="preview.warnings.length > 0"
-          tone="warn"
-          data-testid="import-curl-warnings"
-        >
-          <ul class="warnings">
-            <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
-              {{ warning.detail }}
-            </li>
-          </ul>
-        </MessageStrip>
+        <Alert v-if="preview.warnings.length > 0" class="strip-warn" data-testid="import-curl-warnings">
+          <AlertDescription class="strip-warn-text">
+            <ul class="warnings">
+              <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
+                {{ warning.detail }}
+              </li>
+            </ul>
+          </AlertDescription>
+        </Alert>
       </template>
     </div>
 
     <template #footer>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" data-testid="import-curl-cancel" @click="close">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
+        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
           data-testid="import-curl-submit"
           :disabled="text.trim() === '' || preview.error !== null"
           @click="onImport"
         >
           Import
-        </AppButton>
+        </Button>
       </span>
     </template>
   </DialogFrame>
@@ -101,6 +99,15 @@ function close(): void {
 }
 
 .warnings {
-  @apply m-0 flex flex-col gap-[var(--kira-s-1)] pl-[var(--kira-s-4)];
+  @apply m-0 flex flex-col gap-0.5 pl-2;
+}
+
+/* Alert tone class replacing MessageStrip's warn marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

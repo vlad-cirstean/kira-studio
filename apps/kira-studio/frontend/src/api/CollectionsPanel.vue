@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelShell from '@theme/primitives/PanelShell.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import { useCollectionsStore } from './state/collections';
@@ -18,9 +19,9 @@ const collectionsStore = useCollectionsStore();
 const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
 
-// P4 C5: the placeholder is gone — this is a real tree now, mounted through the same PanelShell
-// shell Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
-// collections yet", which is also what gates PanelShell's own search box (F14).
+// P4 C5: the placeholder is gone — this is a real tree now, mounted through the same panel-shell
+// geometry Studio's ProjectPanel.vue uses. `empty` is no longer hardcoded: it is "this app has no
+// collections yet", which is also what gates the search box below (F14).
 //
 // The header's own `new-request` testid is the one front door left (P1's own affordance) — P13
 // D6 removed the empty state's duplicate `new-request-empty`/`new-collection-empty`/
@@ -48,6 +49,40 @@ onMounted(variablesStore.initVariables);
 const collectionsExpanded = ref(true);
 function onSearch(value: string): void {
   collectionsStore.search = value;
+}
+
+// P104 §3: PanelShell inlined at this call site (no library counterpart) — its search
+// reveal/toggle and type-ahead redirect, moved in verbatim.
+const showSearch = ref(false);
+function revealSearch(): void {
+  if (showSearch.value) return;
+  showSearch.value = true;
+}
+function toggleSearch(): void {
+  showSearch.value = !showSearch.value;
+  if (!showSearch.value) onSearch('');
+}
+// VS Code's own file-explorer "type to search" pattern: a tree row holds real DOM focus once
+// selected, so a printable keystroke lands here via bubbling — this redirects it into the panel's
+// own search box rather than making the user click into Search first.
+function onPanelKeydown(e: KeyboardEvent): void {
+  if (e.defaultPrevented || e.isComposing) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1 || e.key === ' ') return;
+  const target = e.target as HTMLElement | null;
+  if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+  const container = e.currentTarget as HTMLElement;
+  e.preventDefault();
+  onSearch(collectionsStore.search + e.key);
+  const wasHidden = !showSearch.value;
+  revealSearch();
+  if (wasHidden) {
+    void nextTick(() => {
+      container.querySelector<HTMLInputElement>('[data-testid="tree-search"]')?.focus();
+    });
+  } else {
+    container.querySelector<HTMLInputElement>('[data-testid="tree-search"]')?.focus();
+  }
 }
 
 function onNewCollection(): void {
@@ -115,70 +150,123 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PanelShell :empty="empty" :search="collectionsStore.search" @update:search="onSearch">
-    <template #title>
+  <!-- P104 §3: PanelShell inlined (no library counterpart). -->
+  <div class="flex h-full flex-col" @keydown="onPanelKeydown">
+    <div class="p-panel-head h-[34px]">
       <span>Collections</span>
-    </template>
-    <template #actions>
-      <IconButton
-        icon="add"
-        aria-label="New request"
-        v-tooltip="'New request'"
-        data-testid="new-request"
-        @click="openApiRequestTab"
-      />
-      <IconButton
-        icon="new-folder"
-        aria-label="New collection"
-        v-tooltip="'New collection'"
-        data-testid="new-collection"
-        @click="onNewCollection"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            class="p-push"
+            :class="{ 'bg-input text-fg': showSearch }"
+            aria-label="Search"
+            data-testid="toggle-search"
+            @click="toggleSearch"
+          >
+            <CodiconIcon name="search" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{{ showSearch ? 'Hide search' : 'Search' }}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="New request"
+            data-testid="new-request"
+            @click="openApiRequestTab"
+          >
+            <CodiconIcon name="add" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>New request</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="New collection"
+            data-testid="new-collection"
+            @click="onNewCollection"
+          >
+            <CodiconIcon name="new-folder" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>New collection</TooltipContent>
+      </Tooltip>
       <!-- P28 D18: the Postman import moved to the menu bar (App → Import Postman Collection…)
            and to the command palette entry it already had. D11's spinner-on-the-action reasoning
            went with the button; collectionsState.busy still gates re-entry inside
            importCollection() itself, so a second import cannot start while one is running. -->
       <!-- P5 D3/D11: the environments dialog's own entry point — environments exist
            independently of collections, so this lives in the panel's header, not the tree. -->
-      <IconButton
-        icon="server-environment"
-        aria-label="Environments"
-        v-tooltip="'Environments…'"
-        data-testid="api-environments"
-        @click="onEnvironments"
-      />
-    </template>
-    <template #body>
-      <div class="panel-body">
-        <ImportReportStrip />
-        <div class="panel-category" :class="{ collapsed: !collectionsExpanded }">
-          <button
-            type="button"
-            class="panel-category-head"
-            data-testid="collections-category-toggle"
-            @click="collectionsExpanded = !collectionsExpanded"
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button
+            variant="toolbar"
+            size="kira-icon"
+            aria-label="Environments"
+            data-testid="api-environments"
+            @click="onEnvironments"
           >
-            <CodiconIcon :name="collectionsExpanded ? 'chevron-down' : 'chevron-right'" :size="13" />
-            <span>Collections</span>
-          </button>
-          <CollectionsTree v-if="collectionsExpanded" class="tree-body" />
+            <CodiconIcon name="server-environment" :size="13" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Environments…</TooltipContent>
+      </Tooltip>
+    </div>
+    <template v-if="!empty">
+      <InputGroup v-if="showSearch" data-testid="collections-search-group">
+        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+        <InputGroupInput
+          :model-value="collectionsStore.search"
+          data-testid="tree-search"
+          @update:model-value="onSearch(String($event))"
+        />
+        <InputGroupAddon v-if="collectionsStore.search" align="inline-end">
+          <InputGroupButton aria-label="Clear search" @click="onSearch('')">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <div class="min-h-0 flex-1">
+        <div class="panel-body">
+          <ImportReportStrip />
+          <div class="panel-category" :class="{ collapsed: !collectionsExpanded }">
+            <button
+              type="button"
+              class="panel-category-head"
+              data-testid="collections-category-toggle"
+              @click="collectionsExpanded = !collectionsExpanded"
+            >
+              <CodiconIcon :name="collectionsExpanded ? 'chevron-down' : 'chevron-right'" :size="13" />
+              <span>Collections</span>
+            </button>
+            <CollectionsTree v-if="collectionsExpanded" class="tree-body" />
+          </div>
+          <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request
+               ("remove the environment list from alongside the collections list entirely"). The
+               environments themselves did not go anywhere: the header's own action opens the
+               environments tab, which lists and manages them, and each row there still opens the
+               same openVariableSetTab('environment', …) this category used to. -->
         </div>
-        <!-- P28 D16(d) removes P22b D8's environments category from this panel by user request
-             ("remove the environment list from alongside the collections list entirely"). The
-             environments themselves did not go anywhere: the header's own action opens the
-             environments tab, which lists and manages them, and each row there still opens the
-             same openVariableSetTab('environment', …) this category used to. -->
       </div>
     </template>
-    <template #empty>
+    <div v-else class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-2 p-4 text-center">
       <ImportReportStrip />
-      <EmptyState icon="folder-library" label="No collections yet">
+      <Alert class="empty-state" data-testid="collections-empty">
+        <CodiconIcon name="folder-library" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">No collections yet</AlertTitle>
         <span class="p-xs dim side-empty-text"
           >Create one from the <b>+</b> above, or import a Postman collection.</span
         >
-      </EmptyState>
-    </template>
-  </PanelShell>
+      </Alert>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -200,7 +288,7 @@ onUnmounted(() => {
    category shape (P18's own "promote when a second consumer appears" rule). */
 .panel-category-head {
   all: unset;
-  @apply flex shrink-0 cursor-pointer items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] text-muted uppercase tracking-[0.05em] h-[var(--kira-control-h)] text-[length:var(--kira-t-sm)];
+  @apply flex shrink-0 cursor-pointer items-center gap-1 px-1.5 text-muted uppercase tracking-[0.05em] h-control text-kira-sm;
 }
 .panel-category-head:hover {
   @apply text-fg;
@@ -212,5 +300,9 @@ onUnmounted(() => {
 
 .side-empty-text {
   @apply leading-normal;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 </style>

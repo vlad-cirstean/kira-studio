@@ -2,6 +2,7 @@
 import { grpcMethodClass } from '@shared/domain/grpc';
 import { httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type CollectionRowVm, useCollectionsStore } from './state/collections';
 
@@ -153,12 +154,17 @@ function onTwistyClick(e: MouseEvent): void {
       @keydown.esc.prevent="cancelRename"
       @blur="commitRename"
     />
-    <span v-else class="label" v-tooltip="row.url || row.name">
-      <template v-for="(part, i) in parts" :key="i">
-        <mark v-if="part.hit">{{ part.text }}</mark>
-        <template v-else>{{ part.text }}</template>
-      </template>
-    </span>
+    <Tooltip v-else>
+      <TooltipTrigger as-child>
+        <span class="label">
+          <template v-for="(part, i) in parts" :key="i">
+            <mark v-if="part.hit">{{ part.text }}</mark>
+            <template v-else>{{ part.text }}</template>
+          </template>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{{ row.url || row.name }}</TooltipContent>
+    </Tooltip>
   </div>
 </template>
 
@@ -166,7 +172,7 @@ function onTwistyClick(e: MouseEvent): void {
 @reference "@theme/base.css";
 
 .tree-row {
-  @apply relative flex cursor-default items-center gap-[var(--kira-s-2)] whitespace-nowrap select-none pr-[var(--kira-s-4)] text-[length:var(--kira-t-md)] h-[var(--kira-row-height)];
+  @apply relative flex cursor-default items-center gap-1 whitespace-nowrap select-none pr-2 text-kira-md h-row;
 }
 
 .tree-row:hover {
@@ -194,7 +200,7 @@ function onTwistyClick(e: MouseEvent): void {
 /* A fixed width so every row's name starts at the same x — an unaligned ragged edge is exactly
    what makes a long request list hard to scan, which is the reason the chip exists at all. */
 .method {
-  @apply w-[52px] shrink-0 overflow-hidden text-center text-ellipsis tracking-[0.02em] text-[length:var(--kira-t-xs)];
+  @apply w-[52px] shrink-0 overflow-hidden text-center text-ellipsis tracking-[0.02em] text-kira-xs;
 }
 
 .label {
@@ -203,10 +209,10 @@ function onTwistyClick(e: MouseEvent): void {
 
 .label mark {
   /* The same yellow search-match tint every other search-capable view in the app uses. */
-  @apply rounded-kira-sm text-inherit bg-[var(--kira-search-match)];
+  @apply rounded-kira-sm text-inherit bg-warn/25;
 }
 
 .rename-input {
-  @apply min-w-0 flex-1 rounded-kira-sm border px-[var(--kira-s-1)] py-0 font-[inherit] text-fg bg-input outline-none border-[var(--kira-accent)];
+  @apply min-w-0 flex-1 rounded-kira-sm border px-0.5 py-0 font-[inherit] text-fg bg-input outline-none border-primary;
 }
 </style>

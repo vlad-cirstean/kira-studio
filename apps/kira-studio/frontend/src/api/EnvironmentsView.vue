@@ -1,34 +1,54 @@
 <script setup lang="ts">
 import type { ApiEnvironment } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import AppButton from '@theme/primitives/AppButton.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, reactive, ref, watch } from 'vue';
+import { useConnectionsStore } from '../state/connections';
+import { useRunState } from '../state/runState';
 import type { EnvironmentsTabRecord } from '../state/tabDomain';
-import ViewChrome from '../theme/primitives/ViewChrome.vue';
 import { useVariablesStore } from './state/variables';
 import { openVariableSetTab } from './tabs';
 
 const confirmDialogStore = useConfirmDialogStore();
 const variablesStore = useVariablesStore();
+const connectionsStore = useConnectionsStore();
 
 // P28 D16(c): the environment list, re-hosted in a tab. Every behaviour below is
 // EnvironmentsDialog.vue's, ported unchanged — name/description inline editing committed together
 // on blur (P17 D14), *Edit variables…*, delete behind a confirm, an *Active* radio, drag/keyboard
 // reordering refused while filtered (D14), Duplicate (P17 D17) and *New environment*. What changed
-// is the chrome: ViewChrome instead of DialogFrame, the filter in the toolbar band every other view
-// puts its filter in, *New environment* in the trailing action group, and no Close button — a tab
-// is closed the way every other tab is.
+// is the chrome: this view's own head/toolbar bands instead of DialogFrame, the filter in the
+// toolbar band every other view puts its filter in, *New environment* in the trailing action
+// group, and no Close button — a tab is closed the way every other tab is.
 //
-// `showRunControls: false` for the same reason VariableSetView passes it (D16a): there is no
-// operation here to refresh or stop, and two permanently-disabled buttons say something different
-// from "not right now".
-defineProps<{ tab: EnvironmentsTabRecord }>();
+// `showRunControls: false`'s own reasoning (D16a) still holds — there is no operation here to
+// refresh or stop, and two permanently-disabled buttons say something different from "not right
+// now" — so the refresh/stop group below is omitted outright rather than rendered disabled.
+//
+// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
+const props = defineProps<{ tab: EnvironmentsTabRecord }>();
+
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
+const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 const nameDrafts = reactive<Record<string, string>>({});
 const descriptionDrafts = reactive<Record<string, string>>({});
@@ -157,28 +177,51 @@ function onKeydown(e: KeyboardEvent, id: string): void {
 
 <template>
   <div class="environments-view" data-testid="environments-dialog">
-    <ViewChrome
-      :tab="tab"
-      icon="server-environment"
-      name="Environments"
-      :show-run-controls="false"
-      target-testid="environments-target"
-    >
-      <template #toolbar>
-        <PanelSearchBox
-          v-if="variablesStore.environments.length > 0"
-          v-model="filterQuery"
-          placeholder="Filter by name"
-          testid="environments-filter"
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined (no library counterpart). -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
+      />
+      <span class="icon-box"><CodiconIcon name="server-environment" :size="13" /></span>
+      <span class="p-view-target" data-testid="environments-target">Environments</span>
+      <span class="p-push flex items-center gap-1" />
+    </div>
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="p-toolbar last">
+      <InputGroup v-if="variablesStore.environments.length > 0" data-testid="environments-filter">
+        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" />
+        <InputGroupAddon v-if="filterQuery" align="inline-end">
+          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+      <span class="p-push" />
+      <span
+        class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+        :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+      >
+        <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
+        <span
+          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          :class="{
+            'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
+            'border-error': runState.status === 'error',
+          }"
         />
-      </template>
-      <template #toolbar-end>
-        <AppButton variant="primary" data-testid="new-environment" @click="onNewEnvironment">
+      </span>
+      <div class="group">
+        <Button variant="toolbar-primary" size="kira" data-testid="new-environment" @click="onNewEnvironment">
           New environment
-        </AppButton>
-      </template>
+        </Button>
+      </div>
+    </div>
 
-      <div class="p-dialog-body list">
+    <div class="p-dialog-body list">
         <div
           v-for="(env, i) in displayEnvironments"
           :key="env.id"
@@ -198,74 +241,94 @@ function onKeydown(e: KeyboardEvent, id: string): void {
             :style="{ '--kira-rail': connColorVar(env.color) }"
             data-testid="environment-color-dot"
           />
-          <span
-            class="drag-handle"
-            aria-hidden="true"
-            data-testid="environment-grip"
-            v-tooltip="isFiltered ? 'Clear the filter to reorder' : undefined"
-          >
+          <Tooltip v-if="isFiltered">
+            <TooltipTrigger as-child>
+              <span class="drag-handle" aria-hidden="true" data-testid="environment-grip">
+                <CodiconIcon name="gripper" :size="13" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>Clear the filter to reorder</TooltipContent>
+          </Tooltip>
+          <span v-else class="drag-handle" aria-hidden="true" data-testid="environment-grip">
             <CodiconIcon name="gripper" :size="13" />
           </span>
-          <input
-            type="radio"
-            name="active-environment"
-            :checked="env.isActive"
-            v-tooltip="'Active'"
-            data-testid="environment-active"
-            @change="onSetActive(env.id)"
-          />
-          <!-- P22b D9 (remainder): a bare TextField with a `flex:1` class of its own sizes to its
-               content, not the row's available space — `class` falls through onto TextField's
-               inner <input> (inheritAttrs:false), never onto the outer .p-input box that actually
-               participates in this row's flex layout. -->
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <input
+                type="radio"
+                name="active-environment"
+                :checked="env.isActive"
+                data-testid="environment-active"
+                @change="onSetActive(env.id)"
+              />
+            </TooltipTrigger>
+            <TooltipContent>Active</TooltipContent>
+          </Tooltip>
           <div class="name-field">
-            <TextField
+            <Input
               v-model="nameDrafts[env.id]"
               data-testid="environment-name"
               @blur="onFieldBlur(env.id)"
             />
           </div>
           <div class="description-field">
-            <TextField
+            <Input
               v-model="descriptionDrafts[env.id]"
               placeholder="description"
               data-testid="environment-description"
               @blur="onFieldBlur(env.id)"
             />
           </div>
-          <AppButton
+          <Button
+            variant="toolbar"
+            size="kira"
             data-testid="environment-edit-variables"
             @click="onEditVariables(env.id, env.name)"
           >
             Edit variables…
-          </AppButton>
-          <IconButton
-            icon="copy"
-            v-tooltip="'Duplicate'"
-            data-testid="environment-duplicate"
-            @click="onDuplicate(env.id)"
-          />
-          <IconButton
-            icon="trash"
-            v-tooltip="'Delete'"
-            data-testid="environment-remove"
-            @click="onDelete(env.id, env.name)"
-          />
+          </Button>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Duplicate"
+                data-testid="environment-duplicate"
+                @click="onDuplicate(env.id)"
+              >
+                <CodiconIcon name="copy" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Duplicate</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                aria-label="Delete"
+                data-testid="environment-remove"
+                @click="onDelete(env.id, env.name)"
+              >
+                <CodiconIcon name="trash" :size="13" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete</TooltipContent>
+          </Tooltip>
         </div>
-        <EmptyState
-          v-if="variablesStore.environments.length === 0"
-          icon="server-environment"
-          label="No environments yet"
-          data-testid="environments-empty"
-        />
-        <EmptyState
+        <Alert v-if="variablesStore.environments.length === 0" class="empty-state" data-testid="environments-empty">
+          <CodiconIcon name="server-environment" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md text-muted font-normal">No environments yet</AlertTitle>
+        </Alert>
+        <Alert
           v-else-if="isFiltered && displayEnvironments.length === 0"
-          icon="search"
-          label="No matches"
+          class="empty-state"
           data-testid="environments-filter-empty"
-        />
-      </div>
-    </ViewChrome>
+        >
+          <CodiconIcon name="search" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+        </Alert>
+    </div>
   </div>
 </template>
 
@@ -281,7 +344,7 @@ function onKeydown(e: KeyboardEvent, id: string): void {
 }
 
 .environment-row {
-  @apply flex items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex items-center gap-1 px-1.5 py-1;
 }
 
 .environment-row.is-dragging {
@@ -296,8 +359,8 @@ function onKeydown(e: KeyboardEvent, id: string): void {
 .description-field {
   @apply min-w-0 flex-1;
 }
-.name-field :deep(.p-input),
-.description-field :deep(.p-input) {
-  @apply w-full;
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 </style>

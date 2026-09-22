@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Input } from '@theme/components/ui/input';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import TextField from '@theme/primitives/TextField.vue';
 import { computed, ref, watch } from 'vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useCollectionsStore } from './state/collections';
 
 const collectionsStore = useCollectionsStore();
@@ -75,10 +75,10 @@ function splitTarget(value: string): [string, string | null] {
     @close="collectionsStore.closeSaveDialog"
   >
     <div class="p-dialog-body">
-      <label class="p-sm muted mt-[var(--kira-s-2)]">Name</label>
-      <TextField v-model="name" data-testid="save-request-name" @enter="onSave" />
+      <label class="p-sm muted mt-1">Name</label>
+      <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
 
-      <label class="p-sm muted mt-[var(--kira-s-2)]">Save to</label>
+      <label class="p-sm muted mt-1">Save to</label>
       <select v-model="target" class="p-select bordered" data-testid="save-request-target">
         <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
           <option :value="`${c.id}:`">(collection root)</option>
@@ -86,29 +86,42 @@ function splitTarget(value: string): [string, string | null] {
         </optgroup>
       </select>
 
-      <MessageStrip
-        v-if="collectionTargets.length === 0"
-        tone="warn"
-        data-testid="save-request-no-target"
-      >
-        Create a collection first — a request needs somewhere to live.
-      </MessageStrip>
-      <MessageStrip v-if="error" tone="err" data-testid="save-request-error">{{ error }}</MessageStrip>
+      <Alert v-if="collectionTargets.length === 0" class="strip-warn" data-testid="save-request-no-target">
+        <AlertDescription class="strip-warn-text">
+          Create a collection first — a request needs somewhere to live.
+        </AlertDescription>
+      </Alert>
+      <Alert v-if="error" variant="destructive" data-testid="save-request-error">
+        <AlertDescription>{{ error }}</AlertDescription>
+      </Alert>
     </div>
 
     <template #footer>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" data-testid="save-request-cancel" @click="collectionsStore.closeSaveDialog">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
+        <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="collectionsStore.closeSaveDialog">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
           data-testid="save-request-submit"
           :disabled="!name.trim() || !target || saving"
           @click="onSave"
         >
           Save
-        </AppButton>
+        </Button>
       </span>
     </template>
   </DialogFrame>
 </template>
+
+<style scoped>
+@reference "@theme/base.css";
+
+/* Alert tone class replacing MessageStrip's warn marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+</style>

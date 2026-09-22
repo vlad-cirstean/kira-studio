@@ -86,7 +86,7 @@ function select(method: HttpMethod): void {
 }
 
 .method-menu {
-  @apply flex flex-col p-[var(--kira-s-1)];
+  @apply flex flex-col p-0.5;
 }
 
 .method-menu-item {

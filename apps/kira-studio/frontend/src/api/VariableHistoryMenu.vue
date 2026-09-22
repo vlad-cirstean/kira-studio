@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import IconButton from '@theme/primitives/IconButton.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatRelative } from '@workbench/util/format';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useVariableSetStore } from './state/variables';
@@ -44,12 +46,14 @@ function close(): void {
     @close="close"
   >
     <div class="history-menu">
-      <EmptyState
+      <Alert
         v-if="variableSetStore.entries.length === 0"
-        icon="history"
-        label="No previous values"
+        class="empty-state"
         data-testid="variable-history-empty"
-      />
+      >
+        <CodiconIcon name="history" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md text-muted font-normal">No previous values</AlertTitle>
+      </Alert>
       <div
         v-for="entry in variableSetStore.entries"
         :key="entry.id"
@@ -65,19 +69,34 @@ function close(): void {
             displayValue(entry)
           }}</span>
         </div>
-        <IconButton
-          v-if="notYetRevealed(entry)"
-          icon="eye"
-          v-tooltip="'Reveal'"
-          data-testid="variable-history-reveal"
-          @click="onReveal(entry.id)"
-        />
-        <IconButton
-          icon="reply"
-          v-tooltip="'Restore'"
-          data-testid="variable-history-restore"
-          @click="onRestore(entry)"
-        />
+        <Tooltip v-if="notYetRevealed(entry)">
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Reveal"
+              data-testid="variable-history-reveal"
+              @click="onReveal(entry.id)"
+            >
+              <CodiconIcon name="eye" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Reveal</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Restore"
+              data-testid="variable-history-restore"
+              @click="onRestore(entry)"
+            >
+              <CodiconIcon name="reply" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Restore</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   </PopoverPanel>
@@ -87,19 +106,19 @@ function close(): void {
 @reference "@theme/base.css";
 
 .history-menu {
-  @apply flex max-h-[320px] flex-col overflow-auto p-[var(--kira-s-2)];
+  @apply flex max-h-[320px] flex-col overflow-auto p-1;
 }
 
 .history-entry {
-  @apply flex items-center gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
+  @apply flex items-center gap-1 px-1.5 py-1;
 }
 
 .entry-main {
-  @apply flex min-w-0 flex-1 flex-col gap-[var(--kira-s-1)];
+  @apply flex min-w-0 flex-1 flex-col gap-0.5;
 }
 
 .entry-time {
-  @apply text-subtle text-[length:var(--kira-t-sm)];
+  @apply text-subtle text-kira-sm;
 }
 
 .entry-value {
@@ -108,5 +127,9 @@ function close(): void {
 
 .entry-value.masked {
   @apply text-subtle tracking-[2px];
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 </style>

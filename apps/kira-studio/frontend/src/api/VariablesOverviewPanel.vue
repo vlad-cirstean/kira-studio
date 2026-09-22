@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import PanelSearchBox from '@theme/primitives/PanelSearchBox.vue';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
 import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
@@ -83,21 +85,33 @@ function editEnvironmentVariables(): void {
 <template>
   <PopoverPanel :width="360" anchor="left" test-id="variables-overview" backdrop-test-id="variables-overview-backdrop" @close="close">
     <div class="overview-panel">
-      <PanelSearchBox v-model="filterQuery" placeholder="Filter by name" testid="variables-overview-filter" />
+      <InputGroup data-testid="variables-overview-filter">
+        <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
+        <InputGroupInput v-model="filterQuery" placeholder="Filter by name" />
+        <InputGroupAddon v-if="filterQuery" align="inline-end">
+          <InputGroupButton aria-label="Clear filter" @click="filterQuery = ''">
+            <CodiconIcon name="close" :size="13" />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
 
       <div class="overview-list">
-        <EmptyState
+        <Alert
           v-if="isFiltered && filteredRows.length === 0"
-          icon="search"
-          label="No matches"
+          class="empty-state"
           data-testid="variables-overview-empty"
-        />
-        <EmptyState
+        >
+          <CodiconIcon name="search" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md text-muted font-normal">No matches</AlertTitle>
+        </Alert>
+        <Alert
           v-else-if="rows.length === 0"
-          icon="symbol-variable"
-          label="No variables in scope"
+          class="empty-state"
           data-testid="variables-overview-empty"
-        />
+        >
+          <CodiconIcon name="symbol-variable" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md text-muted font-normal">No variables in scope</AlertTitle>
+        </Alert>
         <div
           v-for="row in filteredRows"
           :key="`${row.scope}:${row.id}`"
@@ -107,22 +121,37 @@ function editEnvironmentVariables(): void {
           :data-scope="row.scope"
           :data-shadowed="row.shadowed"
         >
-          <code
-            class="reference"
-            role="button"
-            tabindex="0"
-            v-tooltip="'Copy'"
-            data-testid="variables-overview-name"
-            @click="onCopy(row.name)"
-            @keydown.enter="onCopy(row.name)"
-            >{{ reference(row.name) }}</code
-          >
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <code
+                class="reference"
+                role="button"
+                tabindex="0"
+                data-testid="variables-overview-name"
+                @click="onCopy(row.name)"
+                @keydown.enter="onCopy(row.name)"
+                >{{ reference(row.name) }}</code
+              >
+            </TooltipTrigger>
+            <TooltipContent>Copy</TooltipContent>
+          </Tooltip>
           <span v-if="row.isSecret" class="p-chip warn" data-testid="variables-overview-secret">secret</span>
           <span v-else class="overview-value" data-testid="variables-overview-value">{{ row.value }}</span>
+          <Tooltip v-if="row.shadowed">
+            <TooltipTrigger as-child>
+              <span
+                class="p-chip scope-chip"
+                :class="row.scope"
+                data-testid="variables-overview-scope"
+                >{{ row.scope }}</span
+              >
+            </TooltipTrigger>
+            <TooltipContent>Shadowed by an environment variable of the same name</TooltipContent>
+          </Tooltip>
           <span
+            v-else
             class="p-chip scope-chip"
             :class="row.scope"
-            v-tooltip="row.shadowed ? `Shadowed by an environment variable of the same name` : undefined"
             data-testid="variables-overview-scope"
             >{{ row.scope }}</span
           >
@@ -173,7 +202,11 @@ function editEnvironmentVariables(): void {
 }
 
 .overview-list {
-  @apply flex flex-col gap-[var(--kira-s-1)] overflow-y-auto p-[var(--kira-s-2)];
+  @apply flex flex-col gap-0.5 overflow-y-auto p-1;
+}
+
+.empty-state {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 
 /* P22b D9: VariableRow.vue's own grid template, minus the columns a read-only popover has no use
@@ -183,7 +216,7 @@ function editEnvironmentVariables(): void {
    empty rather than shifting `scope` into its place, which an *earlier* optional column would. */
 .overview-row {
   grid-template-columns: 1.2fr 2fr auto 1.5fr;
-  @apply grid min-w-0 items-center gap-[var(--kira-s-2)] rounded-kira-sm px-[var(--kira-s-2)] py-[var(--kira-s-1)];
+  @apply grid min-w-0 items-center gap-1 rounded-kira-sm px-1 py-0.5;
 }
 
 .overview-row.shadowed {
@@ -199,7 +232,7 @@ function editEnvironmentVariables(): void {
 }
 
 .overview-description {
-  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-[length:var(--kira-t-xs)];
+  @apply min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-subtle text-kira-xs;
 }
 
 .scope-chip {
@@ -211,12 +244,12 @@ function editEnvironmentVariables(): void {
 }
 
 .overview-footer {
-  @apply flex flex-col gap-[var(--kira-s-1)] border-t border-border p-[var(--kira-s-2)];
+  @apply flex flex-col gap-0.5 border-t border-border p-1;
 }
 
 .overview-link {
   all: unset;
-  @apply inline-flex cursor-pointer items-center gap-[var(--kira-s-2)] text-info text-[length:var(--kira-t-sm)];
+  @apply inline-flex cursor-pointer items-center gap-1 text-info text-kira-sm;
 }
 .overview-link:disabled {
   @apply cursor-default text-subtle opacity-60;

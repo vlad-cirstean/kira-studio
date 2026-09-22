@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import AppButton from '@theme/primitives/AppButton.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 import { useEditRawStore } from './state/raw';
 
 const editRawStore = useEditRawStore();
@@ -87,45 +87,41 @@ function close(): void {
         />
       </div>
 
-      <MessageStrip v-if="preview.error" tone="err" data-testid="edit-raw-error">
-        {{ preview.error }}
-      </MessageStrip>
+      <Alert v-if="preview.error" variant="destructive" data-testid="edit-raw-error">
+        <AlertDescription>{{ preview.error }}</AlertDescription>
+      </Alert>
       <template v-else>
-        <MessageStrip
-          v-if="preview.modeChanged"
-          tone="warn"
-          data-testid="edit-raw-mode-changed"
-        >
-          The body mode changes from <strong>{{ preview.modeChanged.from }}</strong> to
-          <strong>{{ preview.modeChanged.to }}</strong> — the bytes and headers this sends are
-          unchanged, only the editor for the body is.
-        </MessageStrip>
-        <MessageStrip
-          v-if="preview.warnings.length > 0"
-          tone="warn"
-          data-testid="edit-raw-warnings"
-        >
-          <ul class="warnings">
-            <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
-              {{ warning.detail }}
-            </li>
-          </ul>
-        </MessageStrip>
+        <Alert v-if="preview.modeChanged" class="strip-warn" data-testid="edit-raw-mode-changed">
+          <AlertDescription class="strip-warn-text">
+            The body mode changes from <strong>{{ preview.modeChanged.from }}</strong> to
+            <strong>{{ preview.modeChanged.to }}</strong> — the bytes and headers this sends are
+            unchanged, only the editor for the body is.
+          </AlertDescription>
+        </Alert>
+        <Alert v-if="preview.warnings.length > 0" class="strip-warn" data-testid="edit-raw-warnings">
+          <AlertDescription class="strip-warn-text">
+            <ul class="warnings">
+              <li v-for="(warning, i) in preview.warnings" :key="i" :data-kind="warning.kind">
+                {{ warning.detail }}
+              </li>
+            </ul>
+          </AlertDescription>
+        </Alert>
       </template>
     </div>
 
     <template #footer>
       <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" data-testid="edit-raw-cancel" @click="close">Cancel</AppButton>
-        <AppButton
-          kind="dialog"
-          variant="primary"
+        <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
+        <Button
+          variant="dialog-primary"
+          size="kira-lg"
           data-testid="edit-raw-apply"
           :disabled="preview.error !== null"
           @click="onApply"
         >
           Apply
-        </AppButton>
+        </Button>
       </span>
     </template>
   </DialogFrame>
@@ -139,6 +135,15 @@ function close(): void {
 }
 
 .warnings {
-  @apply m-0 flex flex-col gap-[var(--kira-s-1)] pl-[var(--kira-s-4)];
+  @apply m-0 flex flex-col gap-0.5 pl-2;
+}
+
+/* Alert tone class replacing MessageStrip's warn marker (P104 §9 rule 5: literal hex, not a
+   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

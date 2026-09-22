@@ -152,11 +152,11 @@ function manage(): void {
 }
 
 .environment-menu {
-  @apply flex flex-col p-[var(--kira-s-1)];
+  @apply flex flex-col p-0.5;
 }
 
 .environment-menu-item {
-  @apply w-full gap-[var(--kira-s-2)] rounded-kira-sm;
+  @apply w-full gap-1 rounded-kira-sm;
 }
 
 .environment-menu-item .label {
@@ -164,6 +164,6 @@ function manage(): void {
 }
 
 .environment-menu-separator {
-  @apply my-[var(--kira-s-1)] bg-border h-[var(--kira-border-width)];
+  @apply my-0.5 border-t border-border;
 }
 </style>
