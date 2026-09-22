@@ -74,7 +74,7 @@ function close(): void {
   >
     <div class="p-dialog-body">
       <textarea
-        class="p-textarea mono command-text"
+        class="p-textarea mono min-h-[180px]"
         :value="command"
         readonly
         rows="10"
@@ -123,9 +123,3 @@ function close(): void {
     </template>
   </DialogFrame>
 </template>
-
-<style scoped>
-.command-text {
-  min-height: 180px;
-}
-</style>

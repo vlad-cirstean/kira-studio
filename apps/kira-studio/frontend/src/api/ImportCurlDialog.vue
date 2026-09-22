@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { refDebounced } from '@vueuse/core';
+import { computed, ref } from 'vue';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
 import MessageStrip from '../theme/primitives/MessageStrip.vue';
@@ -19,16 +20,10 @@ const text = ref('');
 // every single keystroke just to update a one-line summary has no business running that often —
 // the textarea itself (`text`) stays bound immediately so typing never stutters; the preview below
 // reads a debounced copy instead. 400ms mirrors this app's own precedent for the identical
-// shape (project/SchemaDialog.vue's own parse-summary debounce).
-const debouncedText = ref('');
-let previewTimer: ReturnType<typeof setTimeout> | undefined;
-onBeforeUnmount(() => clearTimeout(previewTimer));
-watch(text, (value) => {
-  clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => {
-    debouncedText.value = value;
-  }, 400);
-});
+// shape (project/SchemaDialog.vue's own parse-summary debounce). Unlike EditRawRequestDialog.vue's
+// own copy, this one has no external-open reset to preserve, so refDebounced (P99 Part 3) is a
+// direct fit — no manual watch/setTimeout needed.
+const debouncedText = refDebounced(text, 400);
 
 const preview = computed(() => importCurlStore.previewCurl(debouncedText.value));
 
@@ -99,16 +94,13 @@ function close(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .curl-textarea {
-  min-height: 120px;
+  @apply min-h-[120px];
 }
 
 .warnings {
-  margin: 0;
-  padding-left: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply m-0 flex flex-col gap-[var(--kira-s-1)] pl-[var(--kira-s-4)];
 }
-
 </style>

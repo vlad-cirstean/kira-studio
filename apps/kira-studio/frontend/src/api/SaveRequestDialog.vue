@@ -75,10 +75,10 @@ function splitTarget(value: string): [string, string | null] {
     @close="collectionsStore.closeSaveDialog"
   >
     <div class="p-dialog-body">
-      <label class="field-label p-sm muted">Name</label>
+      <label class="p-sm muted mt-[var(--kira-s-2)]">Name</label>
       <TextField v-model="name" data-testid="save-request-name" @enter="onSave" />
 
-      <label class="field-label p-sm muted">Save to</label>
+      <label class="p-sm muted mt-[var(--kira-s-2)]">Save to</label>
       <select v-model="target" class="p-select bordered" data-testid="save-request-target">
         <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
           <option :value="`${c.id}:`">(collection root)</option>
@@ -112,9 +112,3 @@ function splitTarget(value: string): [string, string | null] {
     </template>
   </DialogFrame>
 </template>
-
-<style scoped>
-.field-label {
-  margin-top: var(--kira-s-2);
-}
-</style>

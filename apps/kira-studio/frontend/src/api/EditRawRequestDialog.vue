@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
 import AppButton from '../theme/primitives/AppButton.vue';
@@ -20,26 +21,27 @@ const text = ref('');
 // typically hand-pasted small): re-parsing the whole buffer on every single keystroke just to
 // update a preview has no business running that often — the editor itself (`text`) stays bound
 // immediately so typing never stutters; the preview below reads a debounced copy instead. 400ms
-// mirrors ImportCurlDialog.vue's own precedent for the identical shape.
+// mirrors ImportCurlDialog.vue's own precedent for the identical shape. P99 Part 3: useDebounceFn
+// over refDebounced(text, 400) — an external open must write debouncedText immediately (below), not
+// 400ms later, matching project/SchemaDialog.vue's own identical-shape precedent (P99 Part 2).
 const debouncedText = ref('');
-let previewTimer: ReturnType<typeof setTimeout> | undefined;
-onBeforeUnmount(() => clearTimeout(previewTimer));
+const setDebouncedText = useDebounceFn((value: string) => {
+  debouncedText.value = value;
+}, 400);
+onBeforeUnmount(() => setDebouncedText.cancel());
 
 watch(
   () => editRawStore.open,
   (open) => {
     if (!open) return;
     text.value = editRawStore.initialText;
-    clearTimeout(previewTimer);
+    setDebouncedText.cancel();
     debouncedText.value = editRawStore.initialText;
   },
   { immediate: true },
 );
 watch(text, (value) => {
-  clearTimeout(previewTimer);
-  previewTimer = setTimeout(() => {
-    debouncedText.value = value;
-  }, 400);
+  void setDebouncedText(value);
 });
 
 const preview = computed(() => editRawStore.previewRaw(debouncedText.value));
@@ -130,19 +132,13 @@ function close(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .raw-editor {
-  height: 320px;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  overflow: hidden;
+  @apply h-[320px] overflow-hidden rounded-kira border border-border;
 }
 
 .warnings {
-  margin: 0;
-  padding-left: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply m-0 flex flex-col gap-[var(--kira-s-1)] pl-[var(--kira-s-4)];
 }
-
 </style>

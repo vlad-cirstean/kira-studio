@@ -26,18 +26,23 @@ function onImportCurl(): void {
 </script>
 
 <template>
-  <div class="start" data-testid="api-start">
-    <div class="start-inner">
-      <span class="start-mark dim"><CodiconIcon name="globe" :size="32" /></span>
-      <div class="start-title">No request open</div>
-      <div class="start-sub muted">Send a request and see its response here.</div>
-      <div class="start-actions">
+  <div
+    class="flex flex-1 min-h-0 items-center justify-center overflow-auto p-[var(--kira-s-6)]"
+    data-testid="api-start"
+  >
+    <div class="flex w-[420px] max-w-full flex-col items-center gap-[var(--kira-s-4)] text-center">
+      <span class="dim"><CodiconIcon name="globe" :size="32" /></span>
+      <div class="tracking-[-0.01em] text-fg text-[length:var(--kira-t-xl)]">No request open</div>
+      <div class="muted leading-normal text-[length:var(--kira-t-md)]">
+        Send a request and see its response here.
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-[var(--kira-s-2)]">
         <button type="button" class="p-dlgbtn primary" data-testid="new-request-start" @click="openApiRequestTab">
           <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
           New request
         </button>
       </div>
-      <div class="start-actions">
+      <div class="flex flex-wrap items-center justify-center gap-[var(--kira-s-2)]">
         <button type="button" class="p-dlgbtn" data-testid="new-grpc-request-start" @click="openGrpcRequestTab">
           <span class="icon-box"><CodiconIcon name="symbol-interface" :size="13" /></span>
           New gRPC request
@@ -54,44 +59,3 @@ function onImportCurl(): void {
     </div>
   </div>
 </template>
-
-<style scoped>
-.start {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--kira-s-6);
-  overflow: auto;
-}
-
-.start-inner {
-  width: 420px;
-  max-width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: var(--kira-s-4);
-}
-
-.start-title {
-  font-size: var(--kira-t-xl);
-  color: var(--kira-fg);
-  letter-spacing: -0.01em;
-}
-
-.start-sub {
-  font-size: var(--kira-t-md);
-  line-height: 1.5;
-}
-
-.start-actions {
-  display: flex;
-  gap: var(--kira-s-2);
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-</style>

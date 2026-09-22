@@ -163,31 +163,21 @@ function onCancel(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .bulk-editor {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-2);
-  padding: var(--kira-s-2) var(--kira-s-3);
-  height: 100%;
-  min-height: 0;
+  @apply flex h-full min-h-0 flex-col gap-[var(--kira-s-2)] px-[var(--kira-s-3)] py-[var(--kira-s-2)];
 }
 
 .bulk-body {
-  flex: 1;
-  min-height: 200px;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  overflow: hidden;
+  @apply flex-1 min-h-[200px] overflow-hidden rounded-kira border border-border;
 }
 
 .bulk-summary {
-  font-size: var(--kira-t-sm);
-  color: var(--kira-fg-subtle);
+  @apply text-subtle text-[length:var(--kira-t-sm)];
 }
 
 .bulk-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--kira-s-2);
+  @apply flex justify-end gap-[var(--kira-s-2)];
 }
 </style>

@@ -108,28 +108,23 @@ function close(): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 /* p-dialog-body.list supplies display/flex-direction/padding/gap; this body also needs to scroll
    within the dialog's own fixed max-height. */
 .dynamic-values-body {
-  overflow-y: auto;
+  @apply overflow-y-auto;
 }
 
 .dynamic-values-row {
-  justify-content: space-between;
-  height: auto;
-  min-height: var(--kira-h-md);
-  padding: var(--kira-s-2) var(--kira-s-3);
+  @apply h-auto justify-between px-[var(--kira-s-3)] py-[var(--kira-s-2)] min-h-[var(--kira-h-md)];
 }
 
 .reference {
-  font-family: var(--kira-font-data);
-  color: var(--kira-fg);
-  flex-shrink: 0;
+  @apply shrink-0 text-fg font-[family-name:var(--kira-font-data)];
 }
 
 .sample {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply min-w-0 overflow-hidden text-ellipsis;
 }
 </style>

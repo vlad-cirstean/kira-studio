@@ -72,18 +72,13 @@ function plural(n: number, noun: string): string {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .report {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
-  min-width: 0;
+  @apply flex min-w-0 flex-col gap-[var(--kira-s-1)];
 }
 
 .warnings {
-  margin: 0;
-  padding-left: var(--kira-s-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-1);
+  @apply m-0 flex flex-col gap-[var(--kira-s-1)] pl-[var(--kira-s-4)];
 }
 </style>
