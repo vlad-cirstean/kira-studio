@@ -2,10 +2,11 @@
 import type { NodeKind } from '@shared/domain/tree';
 import { EMPTY_VISIBILITY, type TreeVisibility } from '@shared/domain/tree-filter';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
-import TextField from '@theme/primitives/TextField.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Input } from '@theme/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import {
@@ -138,20 +139,33 @@ const connectionName = computed(
 </script>
 
 <template>
-  <DialogFrame
-    v-if="filtersDialogStore.open"
-    title="Tree filters"
-    :width="560"
-    max-height="80vh"
-    test-id="filters-dialog"
-    close-test-id="filters-dialog-close"
-    @close="filtersDialogStore.closeFiltersDialog"
-  >
-    <template #header>
-      <span class="icon-box muted"><CodiconIcon name="filter" :size="13" /></span>
-      <span>Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></span>
-    </template>
+  <Dialog v-if="filtersDialogStore.open" :open="true" @update:open="(v) => !v && filtersDialogStore.closeFiltersDialog()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="filters-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 560px; max-width: 560px; max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <span class="icon-box muted"><CodiconIcon name="filter" :size="13" /></span>
+        <DialogTitle class="text-kira-lg font-normal"
+          >Tree filters<template v-if="connectionName"> — {{ connectionName }}</template></DialogTitle
+        >
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="filters-dialog-close"
+            @click="filtersDialogStore.closeFiltersDialog"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
+      <div class="overflow-auto">
     <div class="p-dialog-body">
       <span class="help">
         Ticked types and objects are shown; unticking one hides it and everything under it.
@@ -176,8 +190,11 @@ const connectionName = computed(
           >
             <Checkbox
               :model-value="!row.hidden"
+              class="size-3.5"
               @update:model-value="onToggleKind(row.kind)"
-            />
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
             <span class="kind-label">{{ row.label }}</span>
             <span class="kind-count">{{ row.count }}</span>
           </label>
@@ -194,9 +211,9 @@ const connectionName = computed(
           </span>
         </div>
         <div class="name-filter-wrap">
-          <TextField
+          <Input
             v-model="nameFilter"
-            class="name-filter"
+            class="name-filter h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
             placeholder="Filter objects by name"
             data-testid="filter-name-input"
           />
@@ -221,15 +238,24 @@ const connectionName = computed(
               <CodiconIcon :name="expandedPaths.has(row.path) ? 'chevron-down' : 'chevron-right'" :size="12" />
             </button>
             <span v-else class="twisty-spacer" />
-            <label class="object-checkbox-label" v-tooltip="row.disabledReason ?? undefined">
-              <Checkbox
-                :model-value="row.state !== 'off'"
-                :indeterminate="row.state === 'partial'"
-                :disabled="row.disabled"
-                @update:model-value="onToggleNode(row)"
-              />
-              <span class="object-name">{{ row.name }}</span>
-            </label>
+            <Tooltip :disabled="!row.disabledReason">
+              <TooltipTrigger as-child>
+                <label class="object-checkbox-label">
+                  <Checkbox
+                    :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
+                    :disabled="row.disabled"
+                    class="size-3.5"
+                    @update:model-value="onToggleNode(row)"
+                  >
+                    <template #default="{ state }">
+                      <CodiconIcon :name="state === 'indeterminate' ? 'dash' : 'check'" :size="10" />
+                    </template>
+                  </Checkbox>
+                  <span class="object-name">{{ row.name }}</span>
+                </label>
+              </TooltipTrigger>
+              <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
+            </Tooltip>
             <span v-if="row.hasChildren" class="object-count">{{ row.childCount }}</span>
           </div>
           <span v-if="objects.rows.length === 0" class="empty-note">Nothing cached yet.</span>
@@ -250,15 +276,17 @@ const connectionName = computed(
         Only cached nodes are listed here — expand more of the tree to include them.
       </span>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
-      <span class="p-dialog-actions p-push">
-        <AppButton kind="dialog" @click="filtersDialogStore.closeFiltersDialog">Cancel</AppButton>
-        <AppButton kind="dialog" variant="primary" @click="onSave">Save filters</AppButton>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="help">Applies to <span class="mono">{{ connectionName }}</span> only</span>
+        <span class="flex items-center gap-1 ml-auto">
+          <Button variant="dialog" size="kira-lg" @click="filtersDialogStore.closeFiltersDialog">Cancel</Button>
+          <Button variant="dialog-primary" size="kira-lg" @click="onSave">Save filters</Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -306,7 +334,7 @@ const connectionName = computed(
 
 .kind-list,
 .object-list {
-  @apply flex flex-col gap-px max-h-[220px] overflow-y-auto rounded-[var(--kira-radius-sm)];
+  @apply flex flex-col gap-px max-h-[220px] overflow-y-auto rounded-kira-sm;
   border: var(--kira-border-width) solid var(--kira-border);
   padding: var(--kira-s-2);
 }
@@ -358,14 +386,10 @@ const connectionName = computed(
   @apply w-full;
 }
 
-.name-filter-wrap :deep(.p-input) {
-  @apply w-full;
-}
-
 /* the live-consequence strip is boxed rather than full-bleed, since it sits inside the
    dialog body rather than spanning a whole view */
 .preview-strip {
-  @apply self-stretch rounded-[var(--kira-radius-sm)];
+  @apply self-stretch rounded-kira-sm;
   border: var(--kira-border-width) solid var(--kira-border);
 }
 

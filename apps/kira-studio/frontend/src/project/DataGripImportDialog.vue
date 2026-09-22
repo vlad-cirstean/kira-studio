@@ -2,9 +2,10 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import AppButton from '@theme/primitives/AppButton.vue';
-import Checkbox from '@theme/primitives/Checkbox.vue';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { Button } from '@theme/components/ui/button';
+import { Checkbox } from '@theme/components/ui/checkbox';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
@@ -135,20 +136,31 @@ async function onConfirm(): Promise<void> {
 </script>
 
 <template>
-  <DialogFrame
-    v-if="datagripImportStore.open"
-    title="Import from DataGrip"
-    :width="720"
-    :height="560"
-    test-id="datagrip-import-dialog"
-    close-test-id="datagrip-import-dialog-close"
-    @close="datagripImportStore.closeDataGripImportDialog"
-  >
-    <template #header>
-      <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
-      <span>{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</span>
-    </template>
+  <Dialog v-if="datagripImportStore.open" :open="true" @update:open="(v) => !v && datagripImportStore.closeDataGripImportDialog()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="datagrip-import-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 720px; max-width: 720px; height: 560px"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <span class="icon-box muted"><CodiconIcon name="database" :size="13" /></span>
+        <DialogTitle class="text-kira-lg font-normal">{{ report ? 'Import from DataGrip — results' : 'Import from DataGrip' }}</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="datagrip-import-dialog-close"
+            @click="datagripImportStore.closeDataGripImportDialog"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
 
+      <div class="flex-1 min-h-0 overflow-auto">
     <div v-if="!report" class="p-dialog-body">
       <MessageStrip
         v-if="secretStatus && !secretStatus.available"
@@ -174,8 +186,11 @@ async function onConfirm(): Promise<void> {
             <Checkbox
               v-if="row.importable"
               :model-value="datagripImportStore.selected.has(row.uuid)"
+              class="size-3.5"
               @update:model-value="datagripImportStore.toggleDataGripRow(row.uuid)"
-            />
+            >
+              <CodiconIcon name="check" :size="10" />
+            </Checkbox>
           </span>
           <span v-if="row.importable" class="engine-mark" :style="{ color: `var(--kira-conn-${KIND_ACCENT[row.kind as ConnectionKind]})` }">
             <EngineIcon :kind="row.kind as ConnectionKind" :size="15" />
@@ -189,14 +204,14 @@ async function onConfirm(): Promise<void> {
               {{ row.host ? `${row.host}:${row.port}` : '' }}<span v-if="row.database">/{{ row.database }}</span>
             </span>
             <span v-if="row.username" class="ds-username dim">{{ row.username }}</span>
-            <span
-              v-if="looksAlreadyImported(row)"
-              class="p-chip warn"
-              data-testid="datagrip-row-duplicate"
-              v-tooltip="'A connection with this name, host, port and database already exists.'"
-            >
-              looks like it's already imported
-            </span>
+            <Tooltip v-if="looksAlreadyImported(row)">
+              <TooltipTrigger as-child>
+                <span class="p-chip warn" data-testid="datagrip-row-duplicate">
+                  looks like it's already imported
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>A connection with this name, host, port and database already exists.</TooltipContent>
+            </Tooltip>
             <span
               v-if="row.passwordOutlook"
               class="p-chip p-push"
@@ -211,14 +226,14 @@ async function onConfirm(): Promise<void> {
           </template>
 
           <span v-if="row.warnings.length > 0" class="ds-warnings">
-            <span
-              v-for="w in row.warnings"
-              :key="w"
-              class="icon-box dim"
-              v-tooltip="warningLabel(w)"
-            >
-              <CodiconIcon name="warning" :size="12" />
-            </span>
+            <Tooltip v-for="w in row.warnings" :key="w">
+              <TooltipTrigger as-child>
+                <span class="icon-box dim">
+                  <CodiconIcon name="warning" :size="12" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{{ warningLabel(w) }}</TooltipContent>
+            </Tooltip>
           </span>
         </div>
         <span v-if="rows.length === 0" class="empty-note">No data sources found in this project.</span>
@@ -254,39 +269,41 @@ async function onConfirm(): Promise<void> {
         </div>
       </div>
     </div>
+      </div>
 
-    <template #footer>
-      <template v-if="!report">
-        <span class="help">{{ datagripImportStore.projectPath }}</span>
-        <span class="p-dialog-actions p-push">
-          <AppButton kind="dialog" data-testid="datagrip-import-cancel" @click="datagripImportStore.closeDataGripImportDialog">
-            Cancel
-          </AppButton>
-          <AppButton
-            kind="dialog"
-            variant="primary"
-            data-testid="datagrip-import-confirm"
-            :disabled="checkedCount === 0 || datagripImportStore.busy"
-            @click="onConfirm"
-          >
-            Import {{ checkedCount }} connection{{ checkedCount === 1 ? '' : 's' }}
-          </AppButton>
-        </span>
-      </template>
-      <template v-else>
-        <span class="p-dialog-actions p-push">
-          <AppButton
-            kind="dialog"
-            variant="primary"
-            data-testid="datagrip-import-report-close"
-            @click="datagripImportStore.closeDataGripImportDialog"
-          >
-            Close
-          </AppButton>
-        </span>
-      </template>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <template v-if="!report">
+          <span class="help">{{ datagripImportStore.projectPath }}</span>
+          <span class="flex items-center gap-1 ml-auto">
+            <Button variant="dialog" size="kira-lg" data-testid="datagrip-import-cancel" @click="datagripImportStore.closeDataGripImportDialog">
+              Cancel
+            </Button>
+            <Button
+              variant="dialog-primary"
+              size="kira-lg"
+              data-testid="datagrip-import-confirm"
+              :disabled="checkedCount === 0 || datagripImportStore.busy"
+              @click="onConfirm"
+            >
+              Import {{ checkedCount }} connection{{ checkedCount === 1 ? '' : 's' }}
+            </Button>
+          </span>
+        </template>
+        <template v-else>
+          <span class="flex items-center gap-1 ml-auto">
+            <Button
+              variant="dialog-primary"
+              size="kira-lg"
+              data-testid="datagrip-import-report-close"
+              @click="datagripImportStore.closeDataGripImportDialog"
+            >
+              Close
+            </Button>
+          </span>
+        </template>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
