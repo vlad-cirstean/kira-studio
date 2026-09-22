@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
 // logLevelSettingKey names the one leaf that used to carry G18 D14's sentinel-row special case —
@@ -49,7 +50,7 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	leaf(stored, "githubEnabled", &result.GithubEnabled)
 	leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
 	leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
-	leafValid(stored, logLevelSettingKey, &result.LogLevel, model.ValidLogLevel)
+	leafValid(stored, logLevelSettingKey, &result.LogLevel, appsettings.ValidLogLevel)
 
 	return result, nil
 }

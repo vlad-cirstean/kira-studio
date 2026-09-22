@@ -6,12 +6,13 @@ import (
 	"fmt"
 )
 
-// leaf, leafValid, alwaysValid, rowScanner and requireOneRow are Kira Studio's own repos-package
-// helpers, extracted here into one file since every one of this trimmed package's own files needs
-// at least one of them: Kira Studio keeps leaf/leafValid/alwaysValid inline in its own settings.go
-// and rowScanner/requireOneRow inline in connections.go/collections.go — files this app has no
+// leaf, leafValid, rowScanner and requireOneRow are Kira Studio's own repos-package helpers,
+// extracted here into one file since every one of this trimmed package's own files needs at least
+// one of them: Kira Studio keeps leaf/leafValid inline in its own settings.go and
+// rowScanner/requireOneRow inline in connections.go/collections.go — files this app has no
 // equivalent of (no connections/collections tables), so their helpers move here instead of staying
-// buried in a file that would otherwise never exist in this package.
+// buried in a file that would otherwise never exist in this package. alwaysValid moved to
+// appsettings.AlwaysValid (P103 Part 4).
 
 // rowScanner is *sql.Row and *sql.Rows' shared Scan surface — the same shape Kira Studio's own
 // connections.go declares it, so a single scan function works against either a QueryRow result or
@@ -67,5 +68,3 @@ func leafValid[T any](stored map[string]json.RawMessage, key string, dst *T, val
 	}
 	*dst = v
 }
-
-func alwaysValid[T any](T) bool { return true }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appsettings"
 )
 
 // SettingsRepo reads and writes the `settings` table, one JSON-valued row per leaf
@@ -51,76 +52,25 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	}
 
 	result := model.DefaultSettings()
-	leaf(stored, "appearance.fontFamily", &result.Appearance.FontFamily)
-	leafValid(stored, "appearance.fontSize", &result.Appearance.FontSize, alwaysValid[int])
-	leafValid(stored, "appearance.rowDensity", &result.Appearance.RowDensity, model.ValidRowDensity)
-	leaf(stored, "appearance.wordWrap", &result.Appearance.WordWrap)
-	leaf(stored, "appearance.rowColoring", &result.Appearance.RowColoring)
-	leaf(stored, "appearance.inlineBlame", &result.Appearance.InlineBlame)
-	leafValid(stored, "appearance.dateFormat", &result.Appearance.DateFormat, model.ValidDateFormat)
+	result.Appearance = appsettings.ReadAppearance(stored)
+	result.Git = appsettings.ReadGit(stored)
 	leafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
-	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, model.InRange(8, 1024))
-	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, model.InRange(1, 365))
-	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, model.InRange(1_000, 1_000_000_000))
-	leafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, model.ValidLogLevel)
-	leaf(stored, "git.protectedBranches", &result.Git.ProtectedBranches)
-	leafValid(stored, "git.fetchAutoIntervalMinutes", &result.Git.FetchAutoIntervalMinutes, model.InRange(0, 1440))
-	leaf(stored, "git.path", &result.Git.GitPath)
-	leafValid(stored, "git.graphFontSize", &result.Git.GraphFontSize, model.InRange(0, 24))
+	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, appsettings.InRange(8, 1024))
+	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, appsettings.InRange(1, 365))
+	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, appsettings.InRange(1_000, 1_000_000_000))
+	leafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
 	leafValid(stored, "api.httpVersion", &result.Api.HTTPVersion, model.ValidHTTPVersion)
-	leafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, model.InRange(0, 3_600_000))
-	leafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, model.InRange(0, 2048))
+	leafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, appsettings.InRange(0, 3_600_000))
+	leafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, appsettings.InRange(0, 2048))
 	leaf(stored, "api.sslVerify", &result.Api.SSLVerify)
 	leaf(stored, "api.followRedirects", &result.Api.FollowRedirects)
-	leafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, model.InRange(0, 100))
+	leafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, appsettings.InRange(0, 100))
 	leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
 	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
 	leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
 	leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
 	leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	return result, nil
-}
-
-func upsertAppearanceSection(tx *sql.Tx, a *model.AppearancePatch) error {
-	if a == nil {
-		return nil
-	}
-	if a.FontFamily != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.fontFamily", *a.FontFamily); err != nil {
-			return err
-		}
-	}
-	if a.FontSize != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.fontSize", *a.FontSize); err != nil {
-			return err
-		}
-	}
-	if a.RowDensity != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.rowDensity", *a.RowDensity); err != nil {
-			return err
-		}
-	}
-	if a.WordWrap != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.wordWrap", *a.WordWrap); err != nil {
-			return err
-		}
-	}
-	if a.RowColoring != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.rowColoring", *a.RowColoring); err != nil {
-			return err
-		}
-	}
-	if a.InlineBlame != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.inlineBlame", *a.InlineBlame); err != nil {
-			return err
-		}
-	}
-	if a.DateFormat != nil {
-		if err := upsertSettingsLeaf(tx, "appearance.dateFormat", *a.DateFormat); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func upsertDataSection(tx *sql.Tx, d *model.DataPatch) error {
@@ -153,33 +103,6 @@ func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
 	}
 	if a.GitLogLevel != nil {
 		if err := upsertSettingsLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func upsertGitSection(tx *sql.Tx, g *model.GitPatch) error {
-	if g == nil {
-		return nil
-	}
-	if g.ProtectedBranches != nil {
-		if err := upsertSettingsLeaf(tx, "git.protectedBranches", *g.ProtectedBranches); err != nil {
-			return err
-		}
-	}
-	if g.FetchAutoIntervalMinutes != nil {
-		if err := upsertSettingsLeaf(tx, "git.fetchAutoIntervalMinutes", *g.FetchAutoIntervalMinutes); err != nil {
-			return err
-		}
-	}
-	if g.GitPath != nil {
-		if err := upsertSettingsLeaf(tx, "git.path", *g.GitPath); err != nil {
-			return err
-		}
-	}
-	if g.GraphFontSize != nil {
-		if err := upsertSettingsLeaf(tx, "git.graphFontSize", *g.GraphFontSize); err != nil {
 			return err
 		}
 	}
@@ -270,7 +193,7 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	if err := upsertAppearanceSection(tx, patch.Appearance); err != nil {
+	if err := appsettings.UpsertAppearance(tx, patch.Appearance); err != nil {
 		return model.Settings{}, err
 	}
 	if err := upsertDataSection(tx, patch.Data); err != nil {
@@ -282,7 +205,7 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 	if err := upsertAdvancedSection(tx, patch.Advanced); err != nil {
 		return model.Settings{}, err
 	}
-	if err := upsertGitSection(tx, patch.Git); err != nil {
+	if err := appsettings.UpsertGit(tx, patch.Git); err != nil {
 		return model.Settings{}, err
 	}
 	if err := upsertApiSection(tx, patch.Api); err != nil {
@@ -348,5 +271,3 @@ func leafValid[T any](stored map[string]json.RawMessage, key string, dst *T, val
 	}
 	*dst = v
 }
-
-func alwaysValid[T any](T) bool { return true }
