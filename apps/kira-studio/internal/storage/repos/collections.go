@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -210,7 +211,7 @@ func (r *CollectionsRepo) CreateCollection(name string) (model.Collection, error
 	}
 	c := model.Collection{
 		ID: uuid.NewString(), Name: name, SortOrder: order,
-		CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
+		CreatedAt: kiratime.NowISO(), UpdatedAt: kiratime.NowISO(),
 	}
 	if _, err := r.DB.Exec(
 		`INSERT INTO api_collections (id, name, sort_order, origin_json, created_at, updated_at)
@@ -237,7 +238,7 @@ func (r *CollectionsRepo) CreateItem(collectionID string, parentID *string, kind
 
 	item := model.CollectionItem{
 		ID: uuid.NewString(), CollectionID: collectionID, ParentID: parentID, Kind: kind, Name: name,
-		Protocol: model.ItemProtocolHTTP, CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
+		Protocol: model.ItemProtocolHTTP, CreatedAt: kiratime.NowISO(), UpdatedAt: kiratime.NowISO(),
 	}
 	requestJSON := ""
 	if kind == model.CollectionItemRequest {
@@ -305,7 +306,7 @@ func (r *CollectionsRepo) CreateGrpcItem(collectionID string, parentID *string, 
 	item := model.CollectionItem{
 		ID: uuid.NewString(), CollectionID: collectionID, ParentID: parentID, Kind: model.CollectionItemRequest,
 		Name: name, Protocol: model.ItemProtocolGrpc, Method: req.Service + "/" + req.Method, URL: req.Target,
-		CreatedAt: model.NowISO(), UpdatedAt: model.NowISO(),
+		CreatedAt: kiratime.NowISO(), UpdatedAt: kiratime.NowISO(),
 	}
 
 	tx, err := r.DB.Begin()
@@ -399,7 +400,7 @@ func (r *CollectionsRepo) SaveRequest(itemID, name string, request model.SavedRe
 	if err != nil {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: encode request: %w", err)
 	}
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	if _, err := r.DB.Exec(
 		`UPDATE api_items
 		    SET name = ?, method = ?, url = ?, request_json = ?, origin_json = ?, updated_at = ?
@@ -443,7 +444,7 @@ func (r *CollectionsRepo) SaveGrpcRequest(itemID, name string, request model.Sav
 	if err != nil {
 		return model.CollectionItem{}, fmt.Errorf("repos/collections: encode grpc request: %w", err)
 	}
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	method := request.Service + "/" + request.Method
 	if _, err := r.DB.Exec(
 		`UPDATE api_items SET name = ?, method = ?, url = ?, request_json = ?, updated_at = ? WHERE id = ?`,
@@ -488,7 +489,7 @@ func (r *CollectionsRepo) Rename(id, target, name string) error {
 	if id == "" || name == "" {
 		return fmt.Errorf("repos/collections: id and name are required")
 	}
-	res, err := r.DB.Exec(`UPDATE `+table+` SET name = ?, updated_at = ? WHERE id = ?`, name, model.NowISO(), id)
+	res, err := r.DB.Exec(`UPDATE `+table+` SET name = ?, updated_at = ? WHERE id = ?`, name, kiratime.NowISO(), id)
 	if err != nil {
 		return fmt.Errorf("repos/collections: rename %s %s: %w", target, id, err)
 	}
@@ -627,7 +628,7 @@ func (r *CollectionsRepo) ImportTree(tree *postman.Tree) (model.Collection, erro
 	if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_collections`).Scan(&order); err != nil {
 		return model.Collection{}, fmt.Errorf("repos/collections: next collection order: %w", err)
 	}
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	collection := model.Collection{
 		ID: uuid.NewString(), Name: tree.Name, SortOrder: order, CreatedAt: now, UpdatedAt: now,
 	}

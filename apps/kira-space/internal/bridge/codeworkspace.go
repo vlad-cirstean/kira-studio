@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -12,8 +13,8 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -296,7 +297,7 @@ func (s *CodeWorkspaceService) ImportRepo(ctx context.Context, args CodeWorkspac
 		Name:      filepath.Base(summary.Root),
 		Root:      summary.Root,
 		RepoID:    summary.RepoID,
-		CreatedAt: model.NowISO(),
+		CreatedAt: kiratime.NowISO(),
 	}
 	created, err := s.Deps.Repos.CodeRepos.Create(rec)
 	if err != nil {

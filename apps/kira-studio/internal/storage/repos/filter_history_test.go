@@ -2,6 +2,7 @@ package repos_test
 
 import (
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"strings"
 	"testing"
 	"time"
@@ -84,7 +85,7 @@ func TestFilterHistoryPerConnectionCapEvictsLeastRecentlyUsedPath(t *testing.T) 
 	for i := 0; i < total; i++ {
 		id := fmt.Sprintf("fh-%05d", i)
 		path := fmt.Sprintf("p%05d", i) // one row per path: the per-path cap (20) never fires here.
-		usedAt := model.FormatISO(base.Add(time.Duration(i) * time.Millisecond))
+		usedAt := kiratime.FormatISO(base.Add(time.Duration(i) * time.Millisecond))
 		if _, err := stmt.Exec(id, path, usedAt); err != nil {
 			t.Fatalf("seed row %d: %v", i, err)
 		}

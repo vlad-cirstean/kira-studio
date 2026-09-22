@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -146,7 +147,7 @@ func (r *GrpcHistoryRepo) Record(rec model.GrpcCallHistoryRecord) error {
 	if rec.ItemID != "" {
 		itemID = &rec.ItemID
 	}
-	calledAt := model.NowISO()
+	calledAt := kiratime.NowISO()
 	storedBytes := len(snapshotJSON)
 
 	if _, err := tx.Exec(

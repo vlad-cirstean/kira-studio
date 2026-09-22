@@ -7,6 +7,7 @@ package maskrules
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"strings"
 	"sync"
 
@@ -58,7 +59,7 @@ func (s *Service) Upsert(connectionID string, f model.MaskRuleFields) (model.Mas
 	if f.Kind == model.MaskKindNumber {
 		f.Correlate = false
 	}
-	rec, err := s.rules.Upsert(uuid.NewString(), connectionID, f, model.NowISO())
+	rec, err := s.rules.Upsert(uuid.NewString(), connectionID, f, kiratime.NowISO())
 	if err != nil {
 		return model.MaskRule{}, err
 	}

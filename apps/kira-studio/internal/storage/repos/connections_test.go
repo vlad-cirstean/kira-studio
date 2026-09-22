@@ -1,6 +1,7 @@
 package repos_test
 
 import (
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -17,7 +18,7 @@ func TestThrottlePerSecRoundTrips(t *testing.T) {
 		Name: "throttled", Kind: "postgres", Color: "blue", Mode: "fields",
 		Options: map[string]any{}, ThrottlePerSec: 2.5,
 	}
-	created, err := connRepo.Insert("conn-throttle", fields, model.NowISO())
+	created, err := connRepo.Insert("conn-throttle", fields, kiratime.NowISO())
 	if err != nil {
 		t.Fatalf("Insert: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestThrottlePerSecRoundTrips(t *testing.T) {
 	}
 
 	fields.ThrottlePerSec = 0
-	updated, err := connRepo.Update("conn-throttle", fields, model.NowISO())
+	updated, err := connRepo.Update("conn-throttle", fields, kiratime.NowISO())
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -48,7 +49,7 @@ func TestThrottlePerSecRoundTrips(t *testing.T) {
 	// equivalent.
 	defaulted, err := connRepo.Insert("conn-throttle-default", model.ConnectionFields{
 		Name: "unthrottled", Kind: "postgres", Color: "blue", Mode: "fields", Options: map[string]any{},
-	}, model.NowISO())
+	}, kiratime.NowISO())
 	if err != nil {
 		t.Fatalf("Insert (default): %v", err)
 	}

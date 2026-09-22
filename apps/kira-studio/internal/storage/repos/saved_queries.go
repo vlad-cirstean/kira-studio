@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"strings"
 
@@ -110,7 +111,7 @@ func (r *SavedQueriesRepo) insert(connectionID, path, name, kind string, body []
 		return model.SavedQuery{}, fmt.Errorf("repos/saved_queries: %w", err)
 	}
 	newID := uuid.NewString()
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	if _, err := r.DB.Exec(
 		`INSERT INTO saved_queries (id, connection_id, path, name, kind, body, pinned, created_at, used_at)
 		 VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
@@ -203,7 +204,7 @@ func (r *SavedQueriesRepo) Delete(queryID string) error {
 }
 
 func (r *SavedQueriesRepo) Touch(queryID string) error {
-	if _, err := r.DB.Exec(`UPDATE saved_queries SET used_at = ? WHERE id = ?`, model.NowISO(), queryID); err != nil {
+	if _, err := r.DB.Exec(`UPDATE saved_queries SET used_at = ? WHERE id = ?`, kiratime.NowISO(), queryID); err != nil {
 		return fmt.Errorf("repos/saved_queries: touch %s: %w", queryID, err)
 	}
 	return nil

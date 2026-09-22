@@ -2,6 +2,7 @@ package ipcfixture
 
 import (
 	"context"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
@@ -111,7 +112,7 @@ func NewApp(t *testing.T) *App {
 // password through the real secrets repo.
 func (a *App) SeedConnection(t *testing.T, id string, fields model.ConnectionFields, password *string) model.ConnectionSummary {
 	t.Helper()
-	created, err := a.Repos.Connections.Insert(id, fields, model.NowISO())
+	created, err := a.Repos.Connections.Insert(id, fields, kiratime.NowISO())
 	if err != nil {
 		t.Fatalf("ipcfixture: seed connection %s: %v", id, err)
 	}

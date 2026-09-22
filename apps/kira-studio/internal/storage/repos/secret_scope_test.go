@@ -5,6 +5,7 @@ package repos_test
 // a genuine round trip under KIRA_INSECURE_SECRETS=1 and a real secrets.New().
 
 import (
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
 
 	"github.com/google/uuid"
@@ -100,7 +101,7 @@ func TestACiphertextMovedBetweenColumnsIsRefused(t *testing.T) {
 		if _, err := db.Exec(
 			`INSERT INTO api_variable_history (id, variable_id, value, is_secret, secret_value, recorded_at)
 			 VALUES (?, ?, '', 1, ?, ?)`,
-			historyID, v.ID, liveCiphertext, model.NowISO(),
+			historyID, v.ID, liveCiphertext, kiratime.NowISO(),
 		); err != nil {
 			t.Fatalf("seed history row with planted live ciphertext: %v", err)
 		}

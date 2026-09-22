@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
 
 	"github.com/google/uuid"
@@ -29,7 +30,7 @@ func TestMaskRulesUniqueIndexIsCaseInsensitive(t *testing.T) {
 	r, db := newMaskRulesRepo(t)
 	connID := uuid.NewString()
 	seedConnection(t, db, connID)
-	now := model.NowISO()
+	now := kiratime.NowISO()
 
 	first, err := r.Upsert(uuid.NewString(), connID, model.MaskRuleFields{
 		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail, KeepHint: true, Correlate: true,
@@ -40,7 +41,7 @@ func TestMaskRulesUniqueIndexIsCaseInsensitive(t *testing.T) {
 
 	second, err := r.Upsert(uuid.NewString(), connID, model.MaskRuleFields{
 		TableName: "Customers", ColumnName: "Email", Kind: model.MaskKindRedact, KeepHint: false, Correlate: false,
-	}, model.NowISO())
+	}, kiratime.NowISO())
 	if err != nil {
 		t.Fatalf("Upsert(Email, different case): %v", err)
 	}
@@ -71,7 +72,7 @@ func TestMaskRulesCascadeOnConnectionDelete(t *testing.T) {
 
 	if _, err := r.Upsert(uuid.NewString(), connID, model.MaskRuleFields{
 		TableName: "*", ColumnName: "ssn", Kind: model.MaskKindRedact, Correlate: false,
-	}, model.NowISO()); err != nil {
+	}, kiratime.NowISO()); err != nil {
 		t.Fatalf("Upsert: %v", err)
 	}
 
@@ -101,7 +102,7 @@ func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 
 	fromID := uuid.NewString()
 	fields := model.ConnectionFields{Name: "src", Kind: "postgres", Color: "blue", Mode: "fields"}
-	if _, err := conns.InsertWithSecret(fromID, fields, model.NowISO(), nil); err != nil {
+	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)
 	}
 
@@ -114,7 +115,7 @@ func TestInsertDuplicateWithSecretDoesNotCopyMaskCorrelationKey(t *testing.T) {
 	}
 
 	toID := uuid.NewString()
-	if _, err := conns.InsertDuplicateWithSecret(fromID, toID, fields, model.NowISO()); err != nil {
+	if _, err := conns.InsertDuplicateWithSecret(fromID, toID, fields, kiratime.NowISO()); err != nil {
 		t.Fatalf("InsertDuplicateWithSecret: %v", err)
 	}
 
@@ -152,12 +153,12 @@ func TestInsertDuplicateWithSecretAlwaysStartsMcpDisabled(t *testing.T) {
 		Name: "src", Kind: "postgres", Color: "blue", Mode: "fields",
 		McpEnabled: true, McpReadMode: "allow", McpWriteMode: "deny", McpDdlMode: "deny",
 	}
-	if _, err := conns.InsertWithSecret(fromID, fields, model.NowISO(), nil); err != nil {
+	if _, err := conns.InsertWithSecret(fromID, fields, kiratime.NowISO(), nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)
 	}
 
 	toID := uuid.NewString()
-	created, err := conns.InsertDuplicateWithSecret(fromID, toID, fields, model.NowISO())
+	created, err := conns.InsertDuplicateWithSecret(fromID, toID, fields, kiratime.NowISO())
 	if err != nil {
 		t.Fatalf("InsertDuplicateWithSecret: %v", err)
 	}
@@ -188,11 +189,11 @@ func TestSetMcpEnabledFlipsFlagAndRejectsMissingID(t *testing.T) {
 
 	connID := uuid.NewString()
 	fields := model.ConnectionFields{Name: "conn", Kind: "postgres", Color: "blue", Mode: "fields"}
-	if _, err := conns.InsertWithSecret(connID, fields, model.NowISO(), nil); err != nil {
+	if _, err := conns.InsertWithSecret(connID, fields, kiratime.NowISO(), nil); err != nil {
 		t.Fatalf("InsertWithSecret: %v", err)
 	}
 
-	if err := conns.SetMcpEnabled(connID, true, model.NowISO()); err != nil {
+	if err := conns.SetMcpEnabled(connID, true, kiratime.NowISO()); err != nil {
 		t.Fatalf("SetMcpEnabled(true): %v", err)
 	}
 	got, err := conns.Get(connID)
@@ -206,7 +207,7 @@ func TestSetMcpEnabledFlipsFlagAndRejectsMissingID(t *testing.T) {
 		t.Fatalf("Name = %q, want unchanged %q — SetMcpEnabled must touch mcp_enabled alone", got.Name, "conn")
 	}
 
-	if err := conns.SetMcpEnabled(uuid.NewString(), true, model.NowISO()); !errors.Is(err, sql.ErrNoRows) {
+	if err := conns.SetMcpEnabled(uuid.NewString(), true, kiratime.NowISO()); !errors.Is(err, sql.ErrNoRows) {
 		t.Fatalf("SetMcpEnabled(missing id) = %v, want a wrapped sql.ErrNoRows", err)
 	}
 }

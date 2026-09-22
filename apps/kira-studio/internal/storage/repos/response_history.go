@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
@@ -139,7 +140,7 @@ func (r *ResponseHistoryRepo) Record(rec model.ResponseHistoryRecord) error {
 	if itemID != nil {
 		scopeKey = *itemID
 	}
-	sentAt := model.NowISO()
+	sentAt := kiratime.NowISO()
 	storedBytes := len(snapshotJSON)
 
 	if _, err := tx.Exec(

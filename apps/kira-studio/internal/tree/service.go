@@ -8,12 +8,13 @@ package tree
 import (
 	"context"
 	"encoding/json"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // Connected is the one thing tree needs from the connections service. A one-method interface
@@ -108,14 +109,14 @@ func (s *Service) freshnessFloor(connectionID string) (string, bool) {
 	if st.Status != "connected" {
 		return "", false
 	}
-	return model.FormatISO(time.UnixMilli(st.Since)), true
+	return kiratime.FormatISO(time.UnixMilli(st.Since)), true
 }
 
 // getCached is the whole cache-aside read path's choke point, and P24's staleness rule lives here
 // (D4): a payload written before the current connection's Since is stale and BYPASSED, never
 // dropped — D5 needs it left on disk for a disconnected read, and a failed re-fetch must not lose
 // what is already cached (that half is still the caller's job, same as before this phase).
-// fetchedAt compares against the floor as a plain string — both are model.FormatISO's fixed-width,
+// fetchedAt compares against the floor as a plain string — both are kiratime.FormatISO's fixed-width,
 // UTC, three-fractional-digit format, which sorts lexicographically the same as chronologically
 // (F12). A payload with no recorded fetchedAt (a pre-P24 row) compares as "", less than every real
 // timestamp, so it reads as stale under any floor and is otherwise unaffected — exactly D2's

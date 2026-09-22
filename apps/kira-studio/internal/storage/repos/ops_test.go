@@ -2,6 +2,7 @@ package repos_test
 
 import (
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"strings"
 	"testing"
 	"time"
@@ -70,7 +71,7 @@ func TestOpsFinishTruncatesOversizedCommand(t *testing.T) {
 	ops := newOpsRepo(t)
 	oversized := strings.Repeat("x", 70_000) // > maxOpCommandBytes (64 KiB)
 
-	appendAndFinish(t, ops, "op-1", model.NowISO(), model.OpFinish{
+	appendAndFinish(t, ops, "op-1", kiratime.NowISO(), model.OpFinish{
 		Status: "ok", DurationMs: 5, Command: &oversized,
 	})
 
@@ -99,7 +100,7 @@ func TestOpsFinishStoresShortCommandVerbatim(t *testing.T) {
 	ops := newOpsRepo(t)
 	short := "select 1"
 
-	appendAndFinish(t, ops, "op-2", model.NowISO(), model.OpFinish{
+	appendAndFinish(t, ops, "op-2", kiratime.NowISO(), model.OpFinish{
 		Status: "ok", DurationMs: 1, Command: &short,
 	})
 
@@ -121,7 +122,7 @@ func TestOpsFinishTruncatesOversizedErrorWithNoFlag(t *testing.T) {
 	ops := newOpsRepo(t)
 	oversizedErr := strings.Repeat("e", 10_000) // > maxOpErrorBytes (8 KiB)
 
-	appendAndFinish(t, ops, "op-3", model.NowISO(), model.OpFinish{
+	appendAndFinish(t, ops, "op-3", kiratime.NowISO(), model.OpFinish{
 		Status: "error", DurationMs: 1, Error: &oversizedErr,
 	})
 
@@ -143,7 +144,7 @@ func TestOpsFinishTruncatesOversizedErrorWithNoFlag(t *testing.T) {
 func TestOpsPruneByteBudgetEvictsOldestAcrossTable(t *testing.T) {
 	ops := newOpsRepo(t)
 	base := time.Now()
-	at := func(hoursAgo int) string { return model.FormatISO(base.Add(-time.Duration(hoursAgo) * time.Hour)) }
+	at := func(hoursAgo int) string { return kiratime.FormatISO(base.Add(-time.Duration(hoursAgo) * time.Hour)) }
 
 	// old-1/old-2 are deliberately padded so they are unmistakably the two biggest rows in the
 	// table; mid-1/mid-2 are ordinary small commands. Oldest-to-newest by started_at.
@@ -196,8 +197,8 @@ func strPtr(s string) *string { return &s }
 
 func TestOpsPruneRetentionCutStillWorks(t *testing.T) {
 	ops := newOpsRepo(t)
-	staleAt := model.FormatISO(time.Now().Add(-48 * time.Hour))
-	freshAt := model.NowISO()
+	staleAt := kiratime.FormatISO(time.Now().Add(-48 * time.Hour))
+	freshAt := kiratime.NowISO()
 	seedRawOp(t, ops, "stale", staleAt)
 	seedRawOp(t, ops, "fresh", freshAt)
 
@@ -235,7 +236,7 @@ func TestOpsPruneHardCapRowsStillWorks(t *testing.T) {
 	const total = 20_001
 	for i := 0; i < total; i++ {
 		id := fmt.Sprintf("op-%05d", i)
-		startedAt := model.FormatISO(base.Add(time.Duration(i) * time.Millisecond))
+		startedAt := kiratime.FormatISO(base.Add(time.Duration(i) * time.Millisecond))
 		if _, err := stmt.Exec(id, startedAt); err != nil {
 			t.Fatalf("seed row %d: %v", i, err)
 		}
@@ -280,15 +281,15 @@ func TestReconcileInterruptedFlipsRunningRowsToError(t *testing.T) {
 	ops := newOpsRepo(t)
 
 	// A genuinely still-'running' row — Append is the real path that leaves one in that state.
-	if err := ops.Append(model.OpAppend{ID: "op-running", Kind: "read", StartedAt: model.NowISO()}); err != nil {
+	if err := ops.Append(model.OpAppend{ID: "op-running", Kind: "read", StartedAt: kiratime.NowISO()}); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 	// A second one, to confirm the UPDATE is not somehow limited to a single row.
-	if err := ops.Append(model.OpAppend{ID: "op-running-2", Kind: "read", StartedAt: model.NowISO()}); err != nil {
+	if err := ops.Append(model.OpAppend{ID: "op-running-2", Kind: "read", StartedAt: kiratime.NowISO()}); err != nil {
 		t.Fatalf("Append: %v", err)
 	}
 	// An already-finished row must be left alone.
-	appendAndFinish(t, ops, "op-already-done", model.NowISO(), model.OpFinish{Status: "ok", DurationMs: 5})
+	appendAndFinish(t, ops, "op-already-done", kiratime.NowISO(), model.OpFinish{Status: "ok", DurationMs: 5})
 
 	n, err := ops.ReconcileInterrupted()
 	if err != nil {

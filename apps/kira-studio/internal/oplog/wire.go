@@ -6,12 +6,13 @@ package oplog
 
 import (
 	"encoding/json"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"time"
 
-	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // Event is the op-log's own event shape. EventSource is a consumer-declared interface (A11's
@@ -246,7 +247,7 @@ func (w *Wiring) handleOpEnd(payload json.RawMessage, inFlight map[string]inFlig
 	if ok {
 		record.ConnectionID, record.TabID, record.StartedAt, record.Kind = started.connectionID, started.tabID, started.startedAt, started.kind
 	} else {
-		record.StartedAt, record.Kind = model.NowISO(), "test"
+		record.StartedAt, record.Kind = kiratime.NowISO(), "test"
 	}
 	w.updates.Emit(record)
 
@@ -277,7 +278,7 @@ func (w *Wiring) finishInFlight(inFlight map[string]inFlightOp, message string) 
 
 		durationMs := 0 // a startedAt that will not parse yields 0 — JS gives NaN there, which
 		// is not a number SQLite should store, and 0 is the honest value for "we cannot tell".
-		if started, err := model.ParseISO(rec.startedAt); err == nil {
+		if started, err := kiratime.ParseISO(rec.startedAt); err == nil {
 			if d := int(now.Sub(started).Milliseconds()); d > 0 {
 				durationMs = d
 			}

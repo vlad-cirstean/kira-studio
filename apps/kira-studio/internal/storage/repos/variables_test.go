@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
@@ -271,7 +272,7 @@ func TestPromoteImportedIsOneShotAndIdempotent(t *testing.T) {
 
 	// A pre-P5 collection row: created directly, carrying a top-level variable[] inside
 	// origin_json exactly as a P4-era import would have left it.
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	collectionID := "collection-pre-p5"
 	if _, err := db.Exec(
 		`INSERT INTO api_collections (id, name, sort_order, origin_json, created_at, updated_at)

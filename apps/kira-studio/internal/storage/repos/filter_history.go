@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 
 	"github.com/google/uuid"
@@ -84,7 +85,7 @@ func (r *FilterHistoryRepo) Record(connectionID, path string, where *string, ord
 	if _, err := tx.Exec(
 		`INSERT INTO filter_history (id, connection_id, path, where_text, order_by_json, used_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
-		uuid.NewString(), connectionID, path, where, orderByJSON, model.NowISO(),
+		uuid.NewString(), connectionID, path, where, orderByJSON, kiratime.NowISO(),
 	); err != nil {
 		return fmt.Errorf("repos/filter_history: insert: %w", err)
 	}

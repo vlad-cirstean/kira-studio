@@ -3,9 +3,8 @@ package repos_test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // TestMetadataCacheDifferentKindsShareOneRow pins Put's merge semantics: the unique index is
@@ -166,7 +165,7 @@ func TestMetadataCacheLegacyRowFetchedAtIsEmpty(t *testing.T) {
 	if _, err := r.DB.Exec(
 		`INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
 		 VALUES ('c1', 'db:legacy', 'children', '{"children":["a"]}', ?, NULL)`,
-		model.NowISO(),
+		kiratime.NowISO(),
 	); err != nil {
 		t.Fatalf("seed legacy row: %v", err)
 	}

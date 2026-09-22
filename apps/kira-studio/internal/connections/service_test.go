@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"math"
 	"os"
 	"strings"
@@ -16,13 +17,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 func strPtr(s string) *string { return &s }
@@ -1005,12 +1006,12 @@ func TestDuplicateCopiesMaskRules(t *testing.T) {
 
 	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
 		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail, KeepHint: true, Correlate: true,
-	}, model.NowISO()); err != nil {
+	}, kiratime.NowISO()); err != nil {
 		t.Fatalf("MaskRules.Upsert: %v", err)
 	}
 	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
 		TableName: "customers", ColumnName: "ssn", Kind: model.MaskKindRedact,
-	}, model.NowISO()); err != nil {
+	}, kiratime.NowISO()); err != nil {
 		t.Fatalf("MaskRules.Upsert: %v", err)
 	}
 
@@ -1077,7 +1078,7 @@ func TestDuplicateEnablesMcpOnlyAfterMaskRulesCopySucceeds(t *testing.T) {
 
 	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
 		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail,
-	}, model.NowISO()); err != nil {
+	}, kiratime.NowISO()); err != nil {
 		t.Fatalf("MaskRules.Upsert: %v", err)
 	}
 
@@ -1121,7 +1122,7 @@ func TestDuplicateLeavesMcpDisabledWhenMaskRuleCopyFails(t *testing.T) {
 
 	if _, err := h.repos.MaskRules.Upsert(uuid.NewString(), created.ID, model.MaskRuleFields{
 		TableName: "customers", ColumnName: "email", Kind: model.MaskKindEmail,
-	}, model.NowISO()); err != nil {
+	}, kiratime.NowISO()); err != nil {
 		t.Fatalf("MaskRules.Upsert: %v", err)
 	}
 

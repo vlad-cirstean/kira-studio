@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // maxMetadataPayloadBytes and maxMetadataRowsPerConnection mirror metadata-cache.ts's
@@ -89,7 +88,7 @@ func (r *MetadataCacheRepo) Put(connectionID, path, kind string, payload json.Ra
 	}
 	merged[kind] = payload
 
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	fetchedAt := map[string]string{}
 	if raw, ok := existing[fetchedAtKey]; ok {
 		_ = json.Unmarshal(raw, &fetchedAt) // best-effort; a corrupt map just resets to {kind: now}

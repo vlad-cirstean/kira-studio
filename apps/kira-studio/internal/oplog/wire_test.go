@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"sync"
 	"testing"
 	"time"
@@ -159,7 +160,7 @@ func (c *updateCollector) count() int {
 // phantom still-running op.
 func TestStartReconcilesInterruptedRunningRows(t *testing.T) {
 	h := newHarness(t, 30)
-	seedRawOp(t, h.ops, "left-running-by-a-crash", model.NowISO())
+	seedRawOp(t, h.ops, "left-running-by-a-crash", kiratime.NowISO())
 
 	h.wiring.Start()
 	t.Cleanup(h.wiring.Stop)
@@ -173,7 +174,7 @@ func TestStartReconcilesInterruptedRunningRows(t *testing.T) {
 
 func TestPruneRunsAtStartAndEvery500(t *testing.T) {
 	h := newHarness(t, 1)
-	staleAt := model.FormatISO(time.Now().Add(-48 * time.Hour))
+	staleAt := kiratime.FormatISO(time.Now().Add(-48 * time.Hour))
 	seedRawOp(t, h.ops, "stale-at-start", staleAt)
 
 	h.wiring.Start()
@@ -210,7 +211,7 @@ func TestShutdownReconcilesInFlight(t *testing.T) {
 	h.wiring.OnUpdate(updates.handle)
 	h.wiring.Start()
 
-	startedAt := model.NowISO()
+	startedAt := kiratime.NowISO()
 	for _, id := range []string{"op1", "op2", "op3"} {
 		h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayload(id, nil, nil, "read", startedAt)}
 	}
@@ -258,7 +259,7 @@ func TestIncognitoOpSkipsPersistence(t *testing.T) {
 	h.wiring.Start()
 	t.Cleanup(h.wiring.Stop)
 
-	startedAt := model.NowISO()
+	startedAt := kiratime.NowISO()
 	h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayloadIncognito("op-incog", startedAt)}
 	waitUntil(t, time.Second, func() bool { return updates.count() == 1 })
 	if rowExists(t, h.ops, "op-incog") {
@@ -285,7 +286,7 @@ func TestStopWaitsForConsumerBeforeReturning(t *testing.T) {
 	h := newHarness(t, 30)
 	h.wiring.Start()
 
-	startedAt := model.NowISO()
+	startedAt := kiratime.NowISO()
 	for _, id := range []string{"op1", "op2", "op3"} {
 		h.src.ch <- oplog.Event{Topic: oplog.EventOpStart, Payload: opStartPayload(id, nil, nil, "read", startedAt)}
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -119,7 +120,7 @@ func newHarness(t *testing.T) *harness {
 // a real name to read.
 func (h *harness) seedConnection(t *testing.T, id, name string) {
 	t.Helper()
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	if _, err := h.repos.Connections.DB.Exec(
 		`INSERT INTO connections (id, name, kind, color, mode, read_only, created_at, updated_at, sort_order)
 		 VALUES (?, ?, ?, 'blue', 'fields', 0, ?, ?, 0)`,
@@ -581,7 +582,7 @@ func TestPreP24RowIsStaleWhenConnectedAndServedWhenNot(t *testing.T) {
 	if _, err := h.repos.Metadata.DB.Exec(
 		`INSERT INTO metadata_cache (connection_id, path, kind, payload_json, fetched_at, etag)
 		 VALUES (?, ?, 'children', ?, ?, NULL)`,
-		"c1", path, `{"children":`+legacyChildren+`}`, model.NowISO(),
+		"c1", path, `{"children":`+legacyChildren+`}`, kiratime.NowISO(),
 	); err != nil {
 		t.Fatalf("seed legacy row: %v", err)
 	}

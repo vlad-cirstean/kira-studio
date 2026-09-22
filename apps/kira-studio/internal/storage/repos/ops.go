@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"time"
 
@@ -198,7 +199,7 @@ func (r *OpsRepo) Recent(limit int) ([]model.OpRecord, error) {
 // the next pass has to consider. P52 §5.4's rewrite — every pass is a single DELETE with a
 // subquery, never per-call-shape SQL.
 func (r *OpsRepo) Prune(retentionDays int) error {
-	cutoff := model.FormatISO(time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour))
+	cutoff := kiratime.FormatISO(time.Now().Add(-time.Duration(retentionDays) * 24 * time.Hour))
 	if _, err := r.DB.Exec(`DELETE FROM op_log WHERE started_at < ?`, cutoff); err != nil {
 		return fmt.Errorf("repos/ops: prune retention cut: %w", err)
 	}

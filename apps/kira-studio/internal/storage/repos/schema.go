@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -30,7 +31,7 @@ func (r *SchemaRepo) Get(connectionID string) (model.ConnectionDDL, error) {
 }
 
 func (r *SchemaRepo) Set(connectionID, ddl string) (model.ConnectionDDL, error) {
-	out := model.ConnectionDDL{ConnectionID: connectionID, DDL: ddl, UpdatedAt: model.NowISO()}
+	out := model.ConnectionDDL{ConnectionID: connectionID, DDL: ddl, UpdatedAt: kiratime.NowISO()}
 	if _, err := r.DB.Exec(
 		`INSERT INTO connection_ddl (connection_id, ddl, updated_at) VALUES (?, ?, ?)
 		   ON CONFLICT(connection_id) DO UPDATE SET ddl = excluded.ddl, updated_at = excluded.updated_at`,

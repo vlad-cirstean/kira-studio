@@ -3,6 +3,7 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -73,7 +74,7 @@ func (r *CustomScriptsRepo) Create(fields model.CustomScriptFields) (model.Custo
 	if err := r.DB.QueryRow(`SELECT MAX(sort_order) FROM custom_scripts`).Scan(&maxOrder); err != nil {
 		return model.CustomScript{}, fmt.Errorf("repos/customscripts: max sort_order: %w", err)
 	}
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	rec := model.CustomScript{
 		ID:         uuid.NewString(),
 		Name:       fields.Name,
@@ -101,7 +102,7 @@ func (r *CustomScriptsRepo) Update(id string, fields model.CustomScriptFields) (
 	if err := fields.Validate(); err != nil {
 		return model.CustomScript{}, fmt.Errorf("repos/customscripts: %w", err)
 	}
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	res, err := r.DB.Exec(
 		`UPDATE custom_scripts SET name = ?, command = ?, working_dir = ?, color = ?, updated_at = ? WHERE id = ?`,
 		fields.Name, fields.Command, fields.WorkingDir, fields.Color, now, id,

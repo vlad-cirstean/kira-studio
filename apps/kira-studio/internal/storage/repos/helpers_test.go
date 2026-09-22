@@ -2,10 +2,10 @@ package repos_test
 
 import (
 	"database/sql"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
 )
 
@@ -39,7 +39,7 @@ func newOpsRepo(t *testing.T) *repos.OpsRepo {
 // with a foreign key into connections(id) — foreign_keys=ON (P52 §4.3) enforces this for real.
 func seedConnection(t *testing.T, db *sql.DB, connID string) {
 	t.Helper()
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	if _, err := db.Exec(
 		`INSERT INTO connections (id, name, kind, color, mode, read_only, created_at, updated_at, sort_order)
 		 VALUES (?, ?, 'postgres', 'blue', 'fields', 0, ?, ?, 0)`,

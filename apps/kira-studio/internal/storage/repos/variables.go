@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"strconv"
 
@@ -88,7 +89,7 @@ func (r *VariablesRepo) CreateEnvironment(name, description, color string) (mode
 	if err := r.db.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_environments`).Scan(&order); err != nil {
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	e := model.Environment{ID: uuid.NewString(), Name: name, SortOrder: order, Description: description, Color: color}
 	if _, err := r.db.Exec(
 		`INSERT INTO api_environments (id, name, sort_order, is_active, description, color, created_at, updated_at)
@@ -109,7 +110,7 @@ func (r *VariablesRepo) UpdateEnvironment(id, name, description, color string) e
 	}
 	res, err := r.db.Exec(
 		`UPDATE api_environments SET name = ?, description = ?, color = ?, updated_at = ? WHERE id = ?`,
-		name, description, color, model.NowISO(), id,
+		name, description, color, kiratime.NowISO(), id,
 	)
 	if err != nil {
 		return fmt.Errorf("repos/variables: update environment %s: %w", id, err)
@@ -158,7 +159,7 @@ func (r *VariablesRepo) DuplicateEnvironment(id string) (model.Environment, erro
 		return model.Environment{}, fmt.Errorf("repos/variables: next environment order: %w", err)
 	}
 
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	newEnv := model.Environment{
 		ID: uuid.NewString(), Name: srcName + " copy", SortOrder: order, IsActive: false,
 		Description: srcDescription, Color: srcColor,
@@ -257,7 +258,7 @@ func (r *VariablesRepo) SetActiveEnvironment(id string) error {
 		return fmt.Errorf("repos/variables: clear active environment: %w", err)
 	}
 	if id != "" {
-		res, err := tx.Exec(`UPDATE api_environments SET is_active = 1, updated_at = ? WHERE id = ?`, model.NowISO(), id)
+		res, err := tx.Exec(`UPDATE api_environments SET is_active = 1, updated_at = ? WHERE id = ?`, kiratime.NowISO(), id)
 		if err != nil {
 			return fmt.Errorf("repos/variables: set active environment %s: %w", id, err)
 		}
@@ -400,7 +401,7 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	if id == "" {
 		return r.insertVariable(tx, scope, ownerID, name, value, isSecret, description, storedValue, storedSecret, now)
 	}
@@ -727,7 +728,7 @@ func (r *VariablesRepo) ApplyBulk(scope model.VariableScope, ownerID string, ent
 	nextIndex := map[string]int{}
 	matched := map[string]bool{}
 
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	var result model.VariableBulkResult
 	finalOrder := make([]string, 0, len(entries))
 
@@ -1186,7 +1187,7 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 		if err := tx.QueryRow(`SELECT COALESCE(MAX(sort_order) + 1, 0) FROM api_variables WHERE collection_id = ?`, collectionID).Scan(&order); err != nil {
 			return fmt.Errorf("repos/variables: next variable order: %w", err)
 		}
-		now := model.NowISO()
+		now := kiratime.NowISO()
 		for _, entry := range entries {
 			if entry.Key == "" {
 				continue
@@ -1214,7 +1215,7 @@ func (r *VariablesRepo) promoteIfNeeded(collectionID string) error {
 	}
 	if _, err := tx.Exec(
 		`UPDATE api_collections SET origin_json = ?, variables_promoted = 1, updated_at = ? WHERE id = ?`,
-		string(encodedOrigin), model.NowISO(), collectionID,
+		string(encodedOrigin), kiratime.NowISO(), collectionID,
 	); err != nil {
 		return fmt.Errorf("repos/variables: stamp promoted: %w", err)
 	}
@@ -1248,7 +1249,7 @@ func (r *VariablesRepo) ImportVariables(collectionID string, vars []postman.Vari
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	now := model.NowISO()
+	now := kiratime.NowISO()
 	order := 0
 	for _, v := range vars {
 		if v.Name == "" {

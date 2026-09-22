@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -15,9 +16,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/oplog"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // OpSpec is the Go analogue of scheduler/ops.ts's runOp spec parameter. ConnectionID is nil for a
@@ -185,7 +185,7 @@ func (h *Host) RunOp(ctx context.Context, spec OpSpec, fn func(context.Context, 
 		}
 	}
 
-	startedAt := model.NowISO()
+	startedAt := kiratime.NowISO()
 	h.emitJSON(oplog.EventOpStart, opStartPayload{
 		OpID: opID, ConnectionID: spec.ConnectionID, TabID: spec.TabID, Kind: spec.Kind, StartedAt: startedAt,
 		Incognito: spec.Incognito,

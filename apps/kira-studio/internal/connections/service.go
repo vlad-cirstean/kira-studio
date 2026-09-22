@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"reflect"
 	"sort"
@@ -14,13 +15,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
-	"github.com/kirathecat/kira-studio/internal/notify"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/preconnect"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/secrets"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/repos"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/notify"
 )
 
 // Backend is the slice of adapter lifecycle operations this service calls through instead of
@@ -271,7 +272,7 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 	fields := in.ConnectionFields
 	fields.URI = uri
 	id := uuid.NewString()
-	created, err := s.deps.Conns.InsertWithSecret(id, fields, model.NowISO(), storedSecret)
+	created, err := s.deps.Conns.InsertWithSecret(id, fields, kiratime.NowISO(), storedSecret)
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
@@ -338,7 +339,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 
 	fields := in.ConnectionFields
 	fields.URI = uri
-	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, model.NowISO(), hasSecret, storedSecret)
+	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, kiratime.NowISO(), hasSecret, storedSecret)
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
@@ -393,7 +394,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// separate writes — a crash between them can no longer leave a passwordless duplicate behind.
 	// mcp_enabled is always inserted off (that method's own doc comment) — flipped on below, once
 	// mask rules are copied.
-	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, model.NowISO())
+	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, kiratime.NowISO())
 	if err != nil {
 		return model.ConnectionSummary{}, wrapErr(err)
 	}
@@ -415,7 +416,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// crash between this write and the one above leaves the duplicate merely not-yet-MCP-enabled
 	// (safe), never exposed-without-rules (unsafe).
 	if fields.McpEnabled {
-		if err := s.deps.Conns.SetMcpEnabled(newID, true, model.NowISO()); err != nil {
+		if err := s.deps.Conns.SetMcpEnabled(newID, true, kiratime.NowISO()); err != nil {
 			return model.ConnectionSummary{}, wrapErr(err)
 		}
 		created.McpEnabled = true
@@ -439,7 +440,7 @@ func (s *Service) copyMaskRules(fromID, toID string) error {
 	for i := range existing {
 		ids[i] = uuid.NewString()
 	}
-	return s.deps.MaskRules.CopyForConnection(fromID, toID, ids, model.NowISO())
+	return s.deps.MaskRules.CopyForConnection(fromID, toID, ids, kiratime.NowISO())
 }
 
 func (s *Service) Remove(id string) error {
