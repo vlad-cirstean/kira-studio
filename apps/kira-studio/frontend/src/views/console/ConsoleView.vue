@@ -644,7 +644,7 @@ const statusLine = computed(() => {
             <Button
               variant="toolbar"
               size="kira-icon"
-              :class="{ 'bg-input text-fg': !tab.state.newResultSet }"
+              :class="{ 'bg-input text-fg is-active': !tab.state.newResultSet }"
               aria-label="New result set toggle"
               data-testid="console-new-result-toggle"
               @click="setNewResultSet(tab.id, !tab.state.newResultSet)"

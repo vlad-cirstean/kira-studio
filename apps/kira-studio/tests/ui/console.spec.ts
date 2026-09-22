@@ -692,12 +692,13 @@ test('Query console — result-tab right-click: close, close others, close to th
 
   // --- disabled, never hidden, when it would be a no-op — the sole surviving chip's own menu -
   await resultTabs.first().click({ button: 'right' });
-  await expect(page.locator('[data-testid="menu-item-close-other-results"]')).toHaveClass(
-    /is-disabled/,
+  await expect(page.locator('[data-testid="menu-item-close-other-results"]')).toHaveAttribute(
+    'data-disabled',
+    '',
   );
-  await expect(page.locator('[data-testid="menu-item-close-results-to-the-right"]')).toHaveClass(
-    /is-disabled/,
-  );
+  await expect(
+    page.locator('[data-testid="menu-item-close-results-to-the-right"]'),
+  ).toHaveAttribute('data-disabled', '');
 
   // --- plain close: the panel goes empty once the only result set closes --------------------
   await page.click('[data-testid="menu-item-close"]');

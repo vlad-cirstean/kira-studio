@@ -52,7 +52,10 @@ const CONTROL: ControlSnapshot[] = [
   ...FIXTURE.control,
 ];
 
-const tooltip = (page: Page): Locator => page.locator('[data-testid="app-tooltip"]');
+// reka generates the content id itself (no fixed "app-tooltip" id any more, tooltips.spec.ts's
+// own §6.5 migration note) — `[data-slot="tooltip-content"]` is ui/tooltip's own TooltipContent.vue
+// marker, not tied to any one call site's DOM.
+const tooltip = (page: Page): Locator => page.locator('[data-slot="tooltip-content"]');
 
 async function assertTooltipShows(
   page: Page,
@@ -61,7 +64,9 @@ async function assertTooltipShows(
 ): Promise<void> {
   await trigger.hover();
   await expect(tooltip(page)).toBeVisible({ timeout: 1_000 });
-  await expect(tooltip(page)).toHaveText(text);
+  // toContainText, not toHaveText: reka's TooltipContent renders a visually-hidden a11y mirror
+  // span alongside the visible text, so a bare .textContent read sees the text doubled.
+  await expect(tooltip(page)).toContainText(text);
 }
 
 test('a read-only MongoDB connection disables Add/Edit/Delete on the document view', async ({
@@ -113,12 +118,14 @@ test('a read-only MongoDB connection disables Add/Edit/Delete on the document vi
 
   const addButton = page.locator('[data-testid="document-add"]');
   await expect(addButton).toBeDisabled();
-  await assertTooltipShows(page, addButton, 'Connection is read-only');
+  // The disabled <button> itself receives no pointer events in Blink, so the never-disabled
+  // wrapper <span> is the real trigger and hit target (tooltips.spec.ts's own pattern).
+  await assertTooltipShows(page, addButton.locator('xpath=..'), 'Connection is read-only');
 
   const deleteButton = page.locator('[data-testid="document-delete"]').first();
   await expect(deleteButton).toBeDisabled();
 
   const editButton = page.locator('[data-testid="document-edit"]').first();
   await expect(editButton).toBeDisabled();
-  await assertTooltipShows(page, editButton, 'Connection is read-only');
+  await assertTooltipShows(page, editButton.locator('xpath=..'), 'Connection is read-only');
 });

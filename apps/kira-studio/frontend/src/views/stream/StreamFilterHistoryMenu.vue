@@ -84,7 +84,9 @@ function remove(entry: StreamFilterHistoryEntry): void {
            own note (the 320px popover is structurally too narrow for a long summary). -->
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="entry-name mono">{{ summarize(entry) }}</span>
+          <span class="entry-name mono flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            summarize(entry)
+          }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ summarize(entry) }}</TooltipContent>
       </Tooltip>

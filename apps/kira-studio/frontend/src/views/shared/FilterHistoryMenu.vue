@@ -162,7 +162,9 @@ async function saveCurrent(): Promise<void> {
            already max-width: 320px; white-space: pre-wrap, so a long clause wraps instead. -->
       <Tooltip v-if="isSaved(entry)">
         <TooltipTrigger as-child>
-          <span class="entry-name">{{ entry.name }}</span>
+          <span class="entry-name flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            entry.name
+          }}</span>
         </TooltipTrigger>
         <TooltipContent class="whitespace-pre-wrap"
           >{{ entry.name }}&#10;{{ summarize(entry.body.where, entry.body.orderBy) }}</TooltipContent
@@ -170,7 +172,9 @@ async function saveCurrent(): Promise<void> {
       </Tooltip>
       <Tooltip v-else>
         <TooltipTrigger as-child>
-          <span class="entry-name mono">{{ summarize(entry.where, entry.orderBy) }}</span>
+          <span class="entry-name mono flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            summarize(entry.where, entry.orderBy)
+          }}</span>
         </TooltipTrigger>
         <TooltipContent>{{ summarize(entry.where, entry.orderBy) }}</TooltipContent>
       </Tooltip>

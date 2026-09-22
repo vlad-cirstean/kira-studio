@@ -115,7 +115,9 @@ async function saveCurrent(): Promise<void> {
            own note (the 320px popover is structurally too narrow for a saved query's full text). -->
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="entry-name">{{ entry.name }}</span>
+          <span class="entry-name flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{{
+            entry.name
+          }}</span>
         </TooltipTrigger>
         <TooltipContent class="whitespace-pre-wrap">{{ `${entry.name}\n${entry.body.text}` }}</TooltipContent>
       </Tooltip>

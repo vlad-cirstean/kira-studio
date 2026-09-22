@@ -107,7 +107,7 @@ function onJump(e: Event): void {
           v-model="pageInputValue"
           type="number"
           min="1"
-          class="w-full text-center"
+          class="h-control w-full text-center"
           :data-testid="`${testidPrefix}pager-page-input`"
           @change="onJump"
         />

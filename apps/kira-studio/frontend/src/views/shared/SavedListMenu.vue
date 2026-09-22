@@ -126,11 +126,14 @@ defineSlots<{
   @apply cursor-pointer;
 }
 
-/* Written by each caller inside the `entry` slot — :slotted() lets this shell still own the
-   layout rule for it instead of every caller repeating it. */
-:slotted(.entry-name) {
-  @apply flex-1 overflow-hidden text-ellipsis whitespace-nowrap;
-}
+/* flex-1/overflow-hidden/text-ellipsis/whitespace-nowrap used to live here as a single
+   :slotted(.entry-name) rule, but reka-ui's TooltipTrigger `as-child` clones the slotted vnode
+   (every caller wraps its entry-name span in a Tooltip, for the full-text-on-hover P31 D27/F27
+   behavior) without carrying Vue's slotted-content scope-id marker, so the rule silently never
+   matched — the row's flex children packed left instead of stretching, and its geometric center
+   (what a real click/tap lands on) fell on the trailing action buttons instead of the row's own
+   content (console.spec.ts's saved-query-apply scenario caught it). Each caller now applies these
+   Tailwind classes directly on its own entry-name span instead. */
 
 .pin-button {
   @apply flex shrink-0 cursor-pointer border-0 bg-transparent p-0 text-subtle;
