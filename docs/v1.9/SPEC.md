@@ -1866,7 +1866,13 @@ documented exception for a fresh worktree: `bun install` confirmed clean (`bun.l
 untouched), `bun run lint` (`biome check .` + `check-tokens.sh`) passes standalone every time, and
 the hook's own `bun run typecheck` fails only on missing Wails-generated `@bindings/*` modules
 (needing full `scripts/setup.sh` codegen for both apps) — unrelated to a Go-only change, exactly
-the scenario that doc names. No hook was bypassed with a real check left red.
+the scenario that doc names. **The final push also needed `--no-verify`**: `.githooks/pre-push`
+runs `go build ./...` (passed) and `bun run lint:go` (passed) before `bun run lint:dead`, which
+failed on the same missing-`@bindings/*` root cause (unresolved `@bindings/*` imports in
+`bridge/index.ts`) plus a handful of pre-existing duplicate-export findings, all in files this
+phase never touched (`git diff --name-only c40682e HEAD` against each flagged path — empty).
+`.githooks/pre-push`'s own header comments the same `--no-verify` bypass for exactly this case. No
+hook was bypassed with a real, in-scope check left red.
 
 **Verification, run fresh against `HEAD` (`f94c5e0`) after all 4 commits, in the order `CLAUDE.md`
 requires — implement whole phase, then test once:**
