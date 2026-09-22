@@ -167,17 +167,14 @@ function onContextMenu(e: MouseEvent): void {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .tree-row {
+  @apply flex items-center relative cursor-default whitespace-nowrap select-none;
   height: var(--kira-row-height);
-  display: flex;
-  align-items: center;
   gap: var(--kira-s-2);
   padding-right: var(--kira-s-4);
-  position: relative;
-  cursor: default;
-  white-space: nowrap;
   font-size: var(--kira-t-md);
-  user-select: none;
 }
 
 .tree-row:hover {
@@ -189,41 +186,22 @@ function onContextMenu(e: MouseEvent): void {
 }
 
 .twisty {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
+  @apply shrink-0 w-3.5 h-3.5 flex items-center justify-center bg-transparent border-none p-0 cursor-pointer;
   color: var(--kira-fg-muted);
-  padding: 0;
-  cursor: pointer;
 }
 
 .twisty.invisible {
-  visibility: hidden;
+  @apply invisible;
 }
 
+/* Selected directly by tests/ui/tree.spec.ts's own `.twisty .spin` locator — class name kept,
+   body reuses Tailwind's built-in spin animation. */
 .spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  @apply animate-spin;
 }
 
 .status-dot {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  @apply shrink-0 w-2 h-2 rounded-full;
   background: var(--kira-fg-disabled);
 }
 
@@ -233,14 +211,16 @@ function onContextMenu(e: MouseEvent): void {
 
 .status-dot[data-status='connecting'] {
   background: var(--kira-warn);
-  animation: pulse 1s ease-in-out infinite;
+  animation: tree-row-pulse 1s ease-in-out infinite;
 }
 
 .status-dot[data-status='error'] {
   background: var(--kira-error);
 }
 
-@keyframes pulse {
+/* Tailwind's built-in animate-pulse is 2s cubic-bezier, opacity 1→0.5 — this dot's own 1s
+   ease-in-out, opacity 1→0.35 doesn't match either value, so the keyframes stay hand-written. */
+@keyframes tree-row-pulse {
   0%,
   100% {
     opacity: 1;
@@ -251,36 +231,28 @@ function onContextMenu(e: MouseEvent): void {
 }
 
 .node-icon {
-  flex-shrink: 0;
+  @apply shrink-0;
   color: var(--kira-fg-muted);
 }
 
 .label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  @apply overflow-hidden text-ellipsis min-w-0;
 }
 
 .label mark {
   /* Same yellow search-match tint as DataGrid.vue/StreamView.vue/etc. (D21) — one highlight
      color for every search-capable view in the app. */
+  @apply rounded-[2px];
   background: var(--kira-search-match);
   color: inherit;
-  border-radius: 2px;
 }
 
 .badges {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
+  @apply flex gap-0.5 shrink-0;
 }
 
 .detail {
-  margin-left: auto;
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  @apply ml-auto shrink min-w-0 overflow-hidden text-ellipsis;
   color: var(--kira-fg-muted);
   font-size: var(--kira-t-sm);
 }
@@ -288,5 +260,4 @@ function onContextMenu(e: MouseEvent): void {
 .error-text {
   color: var(--kira-error);
 }
-
 </style>

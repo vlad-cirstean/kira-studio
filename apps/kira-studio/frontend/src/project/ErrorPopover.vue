@@ -2,6 +2,7 @@
 // Misc-fixes: a reusable "click for full text" replacement for truncated inline error text +
 // native title tooltip (unreadable for multi-line/long messages, and unreachable on touch).
 // Mirrors ContextMenu.vue's Teleport/fixed-position/outside-click-closes pattern.
+import { useEventListener } from '@vueuse/core';
 import { nextTick, onUnmounted, ref, watch } from 'vue';
 import { copyText } from '../clipboard';
 import CodiconIcon from '../theme/CodiconIcon.vue';
@@ -59,11 +60,12 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape' && open.value) close();
 }
 
-document.addEventListener('mousedown', onDocMouseDown, true);
-document.addEventListener('keydown', onKeydown);
+// useEventListener attaches immediately (like the addEventListener calls this replaces, run at
+// setup time rather than deferred to onMounted) and auto-detaches on this component's unmount —
+// same lifetime as the manual pair it replaces.
+useEventListener(document, 'mousedown', onDocMouseDown, true);
+useEventListener(document, 'keydown', onKeydown);
 onUnmounted(() => {
-  document.removeEventListener('mousedown', onDocMouseDown, true);
-  document.removeEventListener('keydown', onKeydown);
   stopAutoUpdate?.();
 });
 </script>
@@ -101,51 +103,36 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .error-popover-host {
-  min-width: 0;
-  margin-left: auto;
-  flex-shrink: 1;
+  @apply min-w-0 ml-auto shrink;
 }
 
 .error-trigger {
-  display: flex;
-  align-items: center;
+  @apply flex items-center min-w-0 max-w-full bg-transparent border-none p-0 cursor-pointer;
   gap: var(--kira-s-2);
-  min-width: 0;
-  max-width: 100%;
-  background: transparent;
-  border: none;
-  padding: 0;
   color: var(--kira-error);
   font-size: var(--kira-t-sm);
-  cursor: pointer;
 }
 
 .error-trigger-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .error-popover {
-  position: fixed;
   /* P28 D17(c): the menu rung. This was a bare 200 — above the dialog scrim (then 100) and below
      the tooltip (then 300). Both relationships are preserved by the ladder: 300 sits above
      --kira-z-dialog and below --kira-z-tooltip. */
+  @apply fixed w-[340px] max-h-[240px] flex flex-col;
   z-index: var(--kira-z-menu);
-  width: 340px;
   max-width: calc(100vw - 8px);
-  max-height: 240px;
-  display: flex;
-  flex-direction: column;
   font-size: var(--kira-t-md);
 }
 
 .error-popover-body {
+  @apply overflow-auto whitespace-pre-wrap break-words;
   padding: var(--kira-s-4);
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
   color: var(--kira-error);
   font-family: var(--kira-font-data);
 }
@@ -154,7 +141,7 @@ onUnmounted(() => {
    floating surface, with the border moved to the top since this one closes
    the popover instead of opening it. */
 .error-popover-actions {
+  @apply shrink-0;
   border-top: var(--kira-border-width) solid var(--kira-border);
-  flex-shrink: 0;
 }
 </style>
