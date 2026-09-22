@@ -203,15 +203,15 @@ func TestGuardRepoSettingsSet_AllowedFieldsReachInnerHandler(t *testing.T) {
 	}{
 		{
 			name:   "graph paging/scope",
-			params: `{"repoId":"r1","patch":{"kiraVersion.graph.pageSize":50,"kiraVersion.graph.scope":"local"}}`,
+			params: `{"repoId":"r1","patch":{"kiraSpace.graph.pageSize":50,"kiraSpace.graph.scope":"local"}}`,
 		},
 		{
 			name:   "PullStrategy",
-			params: `{"repoId":"r1","patch":{"kiraVersion.pull.strategy":"rebase"}}`,
+			params: `{"repoId":"r1","patch":{"kiraSpace.pull.strategy":"rebase"}}`,
 		},
 		{
 			name:   "CheckoutAutoStash",
-			params: `{"repoId":"r1","patch":{"kiraVersion.checkout.autoStash":false}}`,
+			params: `{"repoId":"r1","patch":{"kiraSpace.checkout.autoStash":false}}`,
 		},
 	}
 	for _, tc := range cases {
@@ -244,11 +244,11 @@ func TestGuardRepoSettingsSet_RestrictedFieldsAreRefused(t *testing.T) {
 	}{
 		{
 			name:   "WorktreePrepareScript alongside an allowed field",
-			params: `{"repoId":"r1","patch":{"kiraVersion.graph.pageSize":50,"kiraVersion.worktree.prepareScript":"rm -rf /"}}`,
+			params: `{"repoId":"r1","patch":{"kiraSpace.graph.pageSize":50,"kiraSpace.worktree.prepareScript":"rm -rf /"}}`,
 		},
 		{
 			name:   "WorktreeBasePath",
-			params: `{"repoId":"r1","patch":{"kiraVersion.worktree.basePath":"/tmp/worktrees"}}`,
+			params: `{"repoId":"r1","patch":{"kiraSpace.worktree.basePath":"/tmp/worktrees"}}`,
 		},
 	}
 	for _, tc := range cases {

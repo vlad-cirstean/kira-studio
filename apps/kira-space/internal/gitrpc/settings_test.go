@@ -79,7 +79,7 @@ func TestRepoSettings_GetSetRoundTrip(t *testing.T) {
 
 	got, err := router.handleRepoSettingsSet(context.Background(), conn, []byte(`{
 		"repoId": "/repos/a",
-		"patch": {"kiraVersion.pull.strategy": "rebase"}
+		"patch": {"kiraSpace.pull.strategy": "rebase"}
 	}`))
 	if err != nil {
 		t.Fatalf("repoSettings.set: %v", err)
@@ -109,7 +109,7 @@ func TestRepoSettings_GetSetRoundTrip(t *testing.T) {
 // guard, at the RPC layer (storage/repos/gitreposettings_test.go's own
 // TestGitRepoSettingsRepo_LogLevelIsScopedPerRepo covers the storage layer directly): replaces
 // G18 §3.18's collapse guard for D14 now that the sentinel substitution is deleted —
-// repoSettings.set for kiraVersion.log.level on repo A must NOT be visible via repoSettings.get on
+// repoSettings.set for kiraSpace.log.level on repo A must NOT be visible via repoSettings.get on
 // repo B.
 func TestRepoSettings_LogLevelIsScopedAcrossRepos(t *testing.T) {
 	router, _ := newTestRouter()
@@ -118,7 +118,7 @@ func TestRepoSettings_LogLevelIsScopedAcrossRepos(t *testing.T) {
 
 	if _, err := router.handleRepoSettingsSet(context.Background(), conn, []byte(`{
 		"repoId": "/repos/a",
-		"patch": {"kiraVersion.log.level": "debug"}
+		"patch": {"kiraSpace.log.level": "debug"}
 	}`)); err != nil {
 		t.Fatalf("repoSettings.set(a): %v", err)
 	}
@@ -194,7 +194,7 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	// repoId, for any key.
 	if _, err := handlersA.Request(context.Background(), "repoSettings.set", []byte(`{
 		"repoId": "/repos/a",
-		"patch": {"kiraVersion.log.level": "warn"}
+		"patch": {"kiraSpace.log.level": "warn"}
 	}`)); err != nil {
 		t.Fatalf("repoSettings.set via connA: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestRepoSettings_ChangedEventReachesEveryConnection(t *testing.T) {
 	gotB.reset()
 	if _, err := handlersB.Request(context.Background(), "repoSettings.set", []byte(`{
 		"repoId": "/repos/c",
-		"patch": {"kiraVersion.log.level": "debug"}
+		"patch": {"kiraSpace.log.level": "debug"}
 	}`)); err != nil {
 		t.Fatalf("repoSettings.set via connB: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestRepoSettings_WedgedConnectionDoesNotBlockOthers(t *testing.T) {
 	go func() {
 		_, err := handlersOther.Request(context.Background(), "repoSettings.set", []byte(`{
 			"repoId": "/repos/a",
-			"patch": {"kiraVersion.log.level": "warn"}
+			"patch": {"kiraSpace.log.level": "warn"}
 		}`))
 		done <- err
 	}()

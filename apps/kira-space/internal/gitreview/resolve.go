@@ -57,7 +57,7 @@ type Input struct {
 	// OriginHead is `git symbolic-ref --short refs/remotes/origin/HEAD`'s answer, or "" when unset
 	// (probe P1: an absent or dangling origin/HEAD is "not set", never an error).
 	OriginHead string
-	// Candidates is kiraVersion.review.baseCandidates, in configured order.
+	// Candidates is kiraSpace.review.baseCandidates, in configured order.
 	Candidates []string
 }
 
@@ -70,7 +70,7 @@ type Core struct {
 	Candidates []Candidate
 }
 
-// DefaultBaseCandidates mirrors SETTINGS' own kiraVersion.review.baseCandidates default — the
+// DefaultBaseCandidates mirrors SETTINGS' own kiraSpace.review.baseCandidates default — the
 // server's own fallback for a raw socket client with no settings snapshot to inject from (D1).
 var DefaultBaseCandidates = []string{"main", "master"}
 

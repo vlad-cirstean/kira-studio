@@ -302,7 +302,7 @@ func (e *RepoEntry) githubRepo(ctx context.Context) (ghclient.Repo, bool) {
 	return repo, ok
 }
 
-// githubEnabled reads kiraVersion.github.enabled off this entry's own repo settings (D16) — plain
+// githubEnabled reads kiraSpace.github.enabled off this entry's own repo settings (D16) — plain
 // field read, no caching of its own (RepoSettings() is already cheap, and a live toggle must take
 // effect on the very next resolve, not after some TTL).
 func (e *RepoEntry) githubEnabled() bool {

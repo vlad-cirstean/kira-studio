@@ -78,7 +78,7 @@ func (w *Walk) matchesSpec(spec porcelain.WalkSpec) bool {
 	if w.spec.Scope != spec.Scope || w.spec.IncludeStash != spec.IncludeStash {
 		return false
 	}
-	// G28 D15: ExcludeStash joins the comparison so flipping kiraVersion.stash.showInGraph
+	// G28 D15: ExcludeStash joins the comparison so flipping kiraSpace.stash.showInGraph
 	// re-opens the walk on the next graph.stream rather than silently reusing a walk built under
 	// the OLD setting.
 	if w.spec.ExcludeStash != spec.ExcludeStash {

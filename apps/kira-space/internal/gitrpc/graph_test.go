@@ -26,7 +26,7 @@ func graphSpecGit(t *testing.T, dir string, args ...string) {
 }
 
 // openGraphSpecEntry opens a fresh one-commit repo on a Conn whose registry answers
-// kiraVersion.stash.showInGraph = showInGraph — the one setting excludeStashFor/walkSpecFrom reads.
+// kiraSpace.stash.showInGraph = showInGraph — the one setting excludeStashFor/walkSpecFrom reads.
 func openGraphSpecEntry(t *testing.T, showInGraph bool) *gitsession.RepoEntry {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {

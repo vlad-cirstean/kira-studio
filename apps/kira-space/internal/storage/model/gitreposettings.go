@@ -22,18 +22,18 @@ type GitRepoSettings struct {
 	// badge, no search PR arm, no reaper re-resolve — both commit.resolvePr/branch.resolvePr answer
 	// {kind:'disabled'} outright. Genuinely per-repo, default true.
 	GithubEnabled bool `json:"githubEnabled"`
-	// WorktreePrepareScript is G25 D10's own ninth leaf (kiraVersion.worktree.prepareScript): one
+	// WorktreePrepareScript is G25 D10's own ninth leaf (kiraSpace.worktree.prepareScript): one
 	// command-line string, never a path, never an argv array. "" means the feature is off — no
 	// spawn, no shell, ever — the only value this leaf is EVER read from is this table; it must
 	// never be sourced from `.git/config`, a tracked file, or any repo-carried convention (D10 —
 	// the single highest-value safety property in the whole feature). Deliberately NOT validated
 	// beyond being a string: it is shell text the user wrote, not a value this app parses.
 	WorktreePrepareScript string `json:"worktreePrepareScript"`
-	// WorktreeBasePath is G25 D10's own tenth leaf (kiraVersion.worktree.basePath) — pure UX, never
+	// WorktreeBasePath is G25 D10's own tenth leaf (kiraSpace.worktree.basePath) — pure UX, never
 	// a security boundary: it only pre-fills WorktreeDialog's own path field. "" means no
 	// suggestion beyond the dialog's own basename default.
 	WorktreeBasePath string `json:"worktreeBasePath"`
-	// CheckoutAutoStash is G28 D16's own eleventh leaf (kiraVersion.checkout.autoStash) — read
+	// CheckoutAutoStash is G28 D16's own eleventh leaf (kiraSpace.checkout.autoStash) — read
 	// CLIENT-SIDE ONLY (the server never consults it, D16's own fail-safe-direction doc comment):
 	// true means a blocked checkout is re-issued with autoStash:true instead of opening the old
 	// CheckoutDialog. Default true.
@@ -77,10 +77,10 @@ type GitRepoSettingsPatch struct {
 	CheckoutAutoStash *bool `json:"checkoutAutoStash,omitempty"`
 }
 
-// ValidGraphScope mirrors schema.ts's kiraVersion.graph.scope enum.
+// ValidGraphScope mirrors schema.ts's kiraSpace.graph.scope enum.
 func ValidGraphScope(v string) bool { return v == "all" || v == "head" }
 
-// ValidPullStrategy mirrors schema.ts's kiraVersion.pull.strategy enum.
+// ValidPullStrategy mirrors schema.ts's kiraSpace.pull.strategy enum.
 func ValidPullStrategy(v string) bool {
 	switch v {
 	case "auto", "ff-only", "merge", "rebase":
@@ -90,7 +90,7 @@ func ValidPullStrategy(v string) bool {
 	}
 }
 
-// ValidLogLevel mirrors schema.ts's kiraVersion.log.level enum.
+// ValidLogLevel mirrors schema.ts's kiraSpace.log.level enum.
 func ValidLogLevel(v string) bool {
 	switch v {
 	case "off", "error", "warn", "info", "debug":
@@ -100,7 +100,7 @@ func ValidLogLevel(v string) bool {
 	}
 }
 
-// validGraphPageSize mirrors schema.ts's kiraVersion.graph.pageSize bounds (100-50000).
+// validGraphPageSize mirrors schema.ts's kiraSpace.graph.pageSize bounds (100-50000).
 var validGraphPageSize = InRange(100, 50000)
 
 // Validate checks every leaf the caller actually patched against schema.ts's own bounds, naming

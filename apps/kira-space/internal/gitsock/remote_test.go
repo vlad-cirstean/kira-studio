@@ -968,7 +968,7 @@ func TestIntegration_SecondRemoteOpIsRefusedAndCancelIsHonest(t *testing.T) {
 
 // TestIntegration_PullPreflightHonorsRepoStoredStrategy is G18 D6/F14's own regression guard:
 // remote.pullPreflight sent with NO strategySetting (the raw-client shape every proxyHandlers.ts
-// call now uses, D6's own upgrade) must resolve the repo's own stored kiraVersion.pull.strategy
+// call now uses, D6's own upgrade) must resolve the repo's own stored kiraSpace.pull.strategy
 // rather than falling straight to gitpreflight.ResolvePullStrategy's "auto" ladder — proven end to
 // end over the real socket, not just at the storage or handler-unit layer.
 func TestIntegration_PullPreflightHonorsRepoStoredStrategy(t *testing.T) {
@@ -993,6 +993,6 @@ func TestIntegration_PullPreflightHonorsRepoStoredStrategy(t *testing.T) {
 		t.Fatalf("unmarshal remote.pullPreflight result: %v", err)
 	}
 	if preflight.Strategy != gitpreflight.PullRebase || preflight.Source != gitpreflight.SourceSetting {
-		t.Fatalf("preflight = %+v, want strategy=rebase source=setting (this repo's own stored kiraVersion.pull.strategy)", preflight)
+		t.Fatalf("preflight = %+v, want strategy=rebase source=setting (this repo's own stored kiraSpace.pull.strategy)", preflight)
 	}
 }

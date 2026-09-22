@@ -347,7 +347,7 @@ func TestIntegration_ResolveBaseHonoursRequestBaseCandidates(t *testing.T) {
 // TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates is G18 D6's own regression guard:
 // review.resolveBase sent with NO baseCandidates field (the raw-client shape proxyHandlers.ts now
 // sends, D6's own forward() simplification) must resolve this repo's own stored
-// kiraVersion.review.baseCandidates rather than falling straight to
+// kiraSpace.review.baseCandidates rather than falling straight to
 // gitreview.DefaultBaseCandidates.
 func TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates(t *testing.T) {
 	t.Parallel()
@@ -363,7 +363,7 @@ func TestIntegration_ResolveBaseHonoursRepoStoredBaseCandidates(t *testing.T) {
 
 	withStoredCandidates := resolveBaseOK(t, client, repoID, "master", nil, nil)
 	if withStoredCandidates.Base == nil || *withStoredCandidates.Base != "release" {
-		t.Fatalf("master resolution with no request-borne candidates = %+v, want base release (this repo's own stored kiraVersion.review.baseCandidates)", withStoredCandidates)
+		t.Fatalf("master resolution with no request-borne candidates = %+v, want base release (this repo's own stored kiraSpace.review.baseCandidates)", withStoredCandidates)
 	}
 }
 

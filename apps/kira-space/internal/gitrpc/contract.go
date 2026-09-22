@@ -32,7 +32,7 @@ package gitrpc
 // first did (G10 D9): it is the sole compatibility authority, even though the Go server neither
 // emits nor parses either addition — both are extension<->webview only.
 // G18 D5: 21 -> 22, for three new requests (repoSettings.get/set, settings.setGitPath) and one
-// new event (repoSettings.changed) — seven kiraVersion.* settings move out of
+// new event (repoSettings.changed) — seven kiraSpace.* settings move out of
 // contributes.configuration into their own per-repo store (D1/D3/D4); SettingsSnapshot narrows to
 // its one remaining member (workbench.tree.indent) and a new RepoSettingsSnapshot carries the
 // seven moved keys.
@@ -62,7 +62,7 @@ package gitrpc
 // only the wire shape for an extension-answered method.
 // G24 D14 (2026-09-09): 26 -> 27, for two new Go-served requests (commit.resolvePr,
 // branch.resolvePr), four new wire types (GhStatus, PrRecord, PrLookupResult, and the state string
-// union it carries) and one new RepoSettingsSnapshot member (kiraVersion.github.enabled). Every
+// union it carries) and one new RepoSettingsSnapshot member (kiraSpace.github.enabled). Every
 // addition is additive; SearchMatchField/CommitSearchHit/internal/gitsearch are untouched (F9 —
 // the wire's own search-field union is commits-only, the PR fields live entirely in git-core's
 // client-side SearchField instead).
@@ -70,8 +70,8 @@ package gitrpc
 // preflight.worktreeRemove, worktree.prepare, worktree.cancelPrepare, worktree.openWindow), one new
 // event (worktree.progress), two new OpRequest kinds (worktreeAdd, worktreeRemove), one new
 // OpErrorKind (WorktreeLocked), two new host capabilities (openWorktreeWindow, runPrepareScript),
-// one new UiActionKind, and two new RepoSettingsSnapshot members (kiraVersion.worktree.
-// prepareScript, kiraVersion.worktree.basePath). worktree.openWindow is answered entirely inside
+// one new UiActionKind, and two new RepoSettingsSnapshot members (kiraSpace.worktree.
+// prepareScript, kiraSpace.worktree.basePath). worktree.openWindow is answered entirely inside
 // the extension (D6) — the same "editor.*-shaped" precedent editor.openDiff/editor.openRangeDiff
 // already set (this constant still moves, for the same reason ui.action first did at G10 D9: it is
 // the sole compatibility authority, even for an addition the Go server neither emits nor parses).
@@ -95,11 +95,11 @@ package gitrpc
 // CheckoutPreflight routes (autoStash, detachHere, D2) and one new WorktreeAddPreflight route
 // (detachHere, D7) — both additive to an existing string-array field, no new wire type; one new
 // OpErrorKind (NothingToStash); one new UiActionKind (saveGlobalStash); one new
-// RepoSettingsSnapshot leaf (kiraVersion.checkout.autoStash, boolean, default true, read
+// RepoSettingsSnapshot leaf (kiraSpace.checkout.autoStash, boolean, default true, read
 // client-side only, D16). StashEntry itself widens by two fields (scope, ref; index's own doc
 // comment gains the -1 sentinel for a global entry) rather than forking a parallel
 // GlobalStashEntry type (D17's own closing argument) -- so, notably, ZERO new wire interfaces.
-// No SQL migration (kiraVersion.checkout.autoStash lives in the existing key-value
+// No SQL migration (kiraSpace.checkout.autoStash lives in the existing key-value
 // git_repo_settings table); no watcher change (refs/kira/** already falls under
 // commonDir/refs/**'s existing first classify rule); no new ClassifyOpError stderr row (every
 // failure this phase can produce is either already classified or refused host-side before git can
@@ -153,7 +153,13 @@ package gitrpc
 // additions always have (G10 D9): it is the sole compatibility authority, even for a method this
 // server neither emits nor parses. No new event, no new capability (openExternal already gates
 // this the same way it gates pr.openExternal), no SQL migration.
-const ContractVersion = 39
+// P100 Part 3: 39 -> 40, no shape change at all -- the eleven RepoSettingsSnapshot keys are
+// renamed kiraVersion.* -> kiraSpace.* as the extension itself is renamed to Kira Space. A
+// wire-compatible extension built before this rename would otherwise silently write and read
+// settings under the old key names against a server that has migrated its stored rows to the new
+// ones -- deliberately rejected by the version gate instead, the same reasoning every
+// version-only bump in this history has already established (G10 D9).
+const ContractVersion = 40
 
 // Protocol is the handshake envelope's own version (SPEC §3.3's "protocol":1), distinct from
 // ContractVersion — it never changes unless the hello/ready exchange itself is redesigned.

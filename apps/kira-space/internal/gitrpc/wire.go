@@ -117,7 +117,7 @@ type GraphLoadMoreParams struct {
 	Pages  *int               `json:"pages,omitempty"`
 	Range  *CommitRangeParams `json:"range,omitempty"`
 	// Scope/PageSize (D6): optional, injected by the extension from the window's own
-	// kiraVersion.graph.* settings. Absent for every raw socket client (every Go integration
+	// kiraSpace.graph.* settings. Absent for every raw socket client (every Go integration
 	// test included) — the server defaults them (walkSpecFrom, graph.go).
 	Scope    string `json:"scope,omitempty"`
 	PageSize *int   `json:"pageSize,omitempty"`
@@ -365,7 +365,7 @@ type ReviewResolveBaseParams struct {
 	RepoID string  `json:"repoId"`
 	Branch string  `json:"branch"`
 	Base   *string `json:"base,omitempty"`
-	// BaseCandidates (D1): optional, injected by the extension from kiraVersion.review.
+	// BaseCandidates (D1): optional, injected by the extension from kiraSpace.review.
 	// baseCandidates. Absent for every raw socket client — the server defaults it
 	// (gitreview.DefaultBaseCandidates).
 	BaseCandidates []string `json:"baseCandidates,omitempty"`
@@ -383,7 +383,7 @@ type ReviewResolveBaseParams struct {
 type RemotePullPreflightParams struct {
 	RepoID string `json:"repoId"`
 	Branch string `json:"branch"`
-	// StrategySetting (D2): optional, injected by the extension from kiraVersion.pull.strategy,
+	// StrategySetting (D2): optional, injected by the extension from kiraSpace.pull.strategy,
 	// exactly as review.resolveBase injects baseCandidates. Absent (or "auto") for every raw
 	// socket client — gitpreflight.ResolvePullStrategy already treats "" as "auto".
 	StrategySetting string `json:"strategySetting,omitempty"`
@@ -537,35 +537,35 @@ type ReviewCommentExportResult struct {
 }
 
 // ---------------------------------------------------------------------------------------
-// G18 — repoSettings.get/set/changed (D3/D4). Wire-tagged with their literal kiraVersion.* dotted
+// G18 — repoSettings.get/set/changed (D3/D4). Wire-tagged with their literal kiraSpace.* dotted
 // keys so RepoSettingsSnapshot is a direct structural copy of @kira/git-ipc's own
 // RepoSettingsSnapshot, needing no translation layer on either side — the same discipline
 // gitclient.GitStatus's own JSON tags already follow for GitStatus.
 // ---------------------------------------------------------------------------------------
 
 // RepoSettingsSnapshot is repoSettings.get/set's own result — the settings D1 moved into their
-// own per-repo table. P72 §9.2: kiraVersion.log.level used to be the one exception, its value
+// own per-repo table. P72 §9.2: kiraSpace.log.level used to be the one exception, its value
 // shared across every repo this installation opens (D14) — that collapse is now deleted (Kira
 // Studio gets its own independent, genuinely app-wide advanced.gitLogLevel control instead), so
 // every leaf here, log.level included, is genuinely scoped by repoId.
 type RepoSettingsSnapshot struct {
-	GraphPageSize         int      `json:"kiraVersion.graph.pageSize"`
-	GraphScope            string   `json:"kiraVersion.graph.scope"`
-	StashShowInGraph      bool     `json:"kiraVersion.stash.showInGraph"`
-	StashIncludeUntracked bool     `json:"kiraVersion.stash.includeUntracked"`
-	ReviewBaseCandidates  []string `json:"kiraVersion.review.baseCandidates"`
-	PullStrategy          string   `json:"kiraVersion.pull.strategy"`
-	LogLevel              string   `json:"kiraVersion.log.level"`
+	GraphPageSize         int      `json:"kiraSpace.graph.pageSize"`
+	GraphScope            string   `json:"kiraSpace.graph.scope"`
+	StashShowInGraph      bool     `json:"kiraSpace.stash.showInGraph"`
+	StashIncludeUntracked bool     `json:"kiraSpace.stash.includeUntracked"`
+	ReviewBaseCandidates  []string `json:"kiraSpace.review.baseCandidates"`
+	PullStrategy          string   `json:"kiraSpace.pull.strategy"`
+	LogLevel              string   `json:"kiraSpace.log.level"`
 	// GithubEnabled is G24 D16's own eighth leaf — genuinely per-repo, default true.
-	GithubEnabled bool `json:"kiraVersion.github.enabled"`
+	GithubEnabled bool `json:"kiraSpace.github.enabled"`
 	// WorktreePrepareScript/WorktreeBasePath are G25 D10/D16's own ninth and tenth leaves.
-	WorktreePrepareScript string `json:"kiraVersion.worktree.prepareScript"`
-	WorktreeBasePath      string `json:"kiraVersion.worktree.basePath"`
+	WorktreePrepareScript string `json:"kiraSpace.worktree.prepareScript"`
+	WorktreeBasePath      string `json:"kiraSpace.worktree.basePath"`
 	// CheckoutAutoStash is G28 D16/D17's own eleventh leaf: read CLIENT-SIDE ONLY (the server never
 	// consults it — the fail-safe direction, D16's own doc comment) to decide whether a blocked
 	// checkout is re-issued with autoStash:true or falls through to the old CheckoutDialog. Default
 	// true.
-	CheckoutAutoStash bool `json:"kiraVersion.checkout.autoStash"`
+	CheckoutAutoStash bool `json:"kiraSpace.checkout.autoStash"`
 }
 
 // RepoSettingsGetParams is repoSettings.get's own request.
@@ -577,17 +577,17 @@ type RepoSettingsGetParams struct {
 // optional, present only when the caller means to change it (SettingsPatch/GitRepoSettingsPatch's
 // own discipline, restated at the wire).
 type RepoSettingsPatchWire struct {
-	GraphPageSize         *int      `json:"kiraVersion.graph.pageSize,omitempty"`
-	GraphScope            *string   `json:"kiraVersion.graph.scope,omitempty"`
-	StashShowInGraph      *bool     `json:"kiraVersion.stash.showInGraph,omitempty"`
-	StashIncludeUntracked *bool     `json:"kiraVersion.stash.includeUntracked,omitempty"`
-	ReviewBaseCandidates  *[]string `json:"kiraVersion.review.baseCandidates,omitempty"`
-	PullStrategy          *string   `json:"kiraVersion.pull.strategy,omitempty"`
-	LogLevel              *string   `json:"kiraVersion.log.level,omitempty"`
-	GithubEnabled         *bool     `json:"kiraVersion.github.enabled,omitempty"`
-	WorktreePrepareScript *string   `json:"kiraVersion.worktree.prepareScript,omitempty"`
-	WorktreeBasePath      *string   `json:"kiraVersion.worktree.basePath,omitempty"`
-	CheckoutAutoStash     *bool     `json:"kiraVersion.checkout.autoStash,omitempty"`
+	GraphPageSize         *int      `json:"kiraSpace.graph.pageSize,omitempty"`
+	GraphScope            *string   `json:"kiraSpace.graph.scope,omitempty"`
+	StashShowInGraph      *bool     `json:"kiraSpace.stash.showInGraph,omitempty"`
+	StashIncludeUntracked *bool     `json:"kiraSpace.stash.includeUntracked,omitempty"`
+	ReviewBaseCandidates  *[]string `json:"kiraSpace.review.baseCandidates,omitempty"`
+	PullStrategy          *string   `json:"kiraSpace.pull.strategy,omitempty"`
+	LogLevel              *string   `json:"kiraSpace.log.level,omitempty"`
+	GithubEnabled         *bool     `json:"kiraSpace.github.enabled,omitempty"`
+	WorktreePrepareScript *string   `json:"kiraSpace.worktree.prepareScript,omitempty"`
+	WorktreeBasePath      *string   `json:"kiraSpace.worktree.basePath,omitempty"`
+	CheckoutAutoStash     *bool     `json:"kiraSpace.checkout.autoStash,omitempty"`
 }
 
 // RepoSettingsSetParams is repoSettings.set's own request.

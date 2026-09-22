@@ -23,7 +23,7 @@ type Deps struct {
 	// Askpass is G7's credential broker — nil when it failed to start (main.go's own D8 posture:
 	// every remote op then runs with no askpass interposition at all, never a fatal boot error).
 	Askpass *gitaskpass.Broker
-	// SetGitPath is G18 D11's own migration leg for kiraVersion.git.path: a plain func, not an
+	// SetGitPath is G18 D11's own migration leg for kiraSpace.git.path: a plain func, not an
 	// interface (the same seam gitsession.Registry.Settings already is), writing straight through
 	// to storage/repos.SettingsRepo.Set — never repoSettings.set, since git.path never lived in
 	// the per-repo store (D15). Extension-only; nil-safe (see settings.go's handleSettingsSetGitPath).

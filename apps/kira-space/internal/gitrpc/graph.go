@@ -19,7 +19,7 @@ const ChunkRows = 500
 
 // walkSpecFrom resolves D6's optional scope/pageSize into a porcelain.WalkSpec and a concrete
 // page size. G18 D6 upgrades what "the server's own default" means: entry's own stored
-// kiraVersion.graph.* settings (RepoEntry.RepoSettings, itself falling back to the schema's own
+// kiraSpace.graph.* settings (RepoEntry.RepoSettings, itself falling back to the schema's own
 // "all"/5000 defaults when entry is nil or storage has nothing stored) — reached by every raw
 // socket client that omits scope/pageSize, with zero change to either param's own wire shape.
 func walkSpecFrom(entry *gitsession.RepoEntry, scope string, pageSize *int) (porcelain.WalkSpec, int) {
@@ -30,7 +30,7 @@ func walkSpecFrom(entry *gitsession.RepoEntry, scope string, pageSize *int) (por
 }
 
 // excludeStashFor is G28 D15's own settings-side wiring for the decidable "off" half of
-// kiraVersion.stash.showInGraph (F13: inert since G18) — a server-side read from the repo's own
+// kiraSpace.stash.showInGraph (F13: inert since G18) — a server-side read from the repo's own
 // stored settings, so no wire change at all. nil entry (no repo.open has happened yet) reads as
 // false, the setting's own default ("on", today's de-facto behaviour).
 func excludeStashFor(entry *gitsession.RepoEntry) bool {

@@ -148,7 +148,14 @@ import type { EventKey, RequestKey, StreamKey } from './contract.ts';
 // message itself), not something the Go side can compose, so each host still refuses anything but
 // a well-formed http(s) URL before its own OS-open call. No new event, no new capability
 // ('openExternal' already gates this the same way it gates 'pr.openExternal'), no SQL migration.
-export const CONTRACT_VERSION = 39;
+// P100 Part 3: 39 -> 40, no shape change at all -- the eleven 'RepoSettingsSnapshot' keys
+// (§ below) are renamed 'kiraVersion.*' -> 'kiraSpace.*' as the extension itself is renamed to
+// Kira Space. A wire-compatible extension built before this rename would otherwise silently
+// write and read settings under the old key names against a server that has migrated its stored
+// rows to the new ones -- deliberately rejected by the version gate instead, the same reasoning
+// every version-only bump in this history has already established (G10 D9): the mismatch must be
+// a loud, blocking panel, not a settings value that quietly stops round-tripping.
+export const CONTRACT_VERSION = 40;
 
 export class ContractVersionMismatchError extends Error {
   readonly received: number;

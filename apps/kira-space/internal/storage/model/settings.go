@@ -24,7 +24,7 @@ type AppearanceSettings struct {
 
 type AdvancedSettings struct {
 	// GitLogLevel is P72 §9.2's genuinely app-wide replacement for the per-repo
-	// kiraVersion.log.level — internal/logging.SetLevel is its actual mechanism.
+	// kiraSpace.log.level — internal/logging.SetLevel is its actual mechanism.
 	GitLogLevel string `json:"gitLogLevel"`
 }
 

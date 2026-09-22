@@ -738,7 +738,7 @@ func TestGraphStreamPerf(t *testing.T) {
 // TestIntegration_GraphLoadMoreHonorsRepoStoredPageSize is G18 D6's own regression guard: a
 // graph.loadMore sent with NO pageSize field (the raw-client shape proxyHandlers.ts now sends,
 // D6's own forward() simplification) must resolve this repo's own stored
-// kiraVersion.graph.pageSize rather than falling straight to logsession.DefaultPageSize — proven
+// kiraSpace.graph.pageSize rather than falling straight to logsession.DefaultPageSize — proven
 // end to end over the real socket.
 func TestIntegration_GraphLoadMoreHonorsRepoStoredPageSize(t *testing.T) {
 	t.Parallel()

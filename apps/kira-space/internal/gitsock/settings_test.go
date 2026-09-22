@@ -32,7 +32,7 @@ func recvRepoSettingsChanged(c *testClient) gitrpc.RepoSettingsChangedPayload {
 
 // TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos is P72 §9.2's own end-to-end proof,
 // over the real socket and the real per-test SQLite database (not a fake), replacing G18 §3.5/
-// §3.18's collapse test: repoSettings.set for kiraVersion.log.level on repo A is NOT visible via
+// §3.18's collapse test: repoSettings.set for kiraSpace.log.level on repo A is NOT visible via
 // repoSettings.get on repo B — D14's cross-repo sentinel collapse is deleted, so log.level is an
 // ordinary per-repo leaf now. repoSettings.changed still reaches a connection that only ever
 // opened the OTHER repo (D7's fan-out is unconditional on which key changed, unaffected by this).
@@ -58,7 +58,7 @@ func TestIntegration_RepoSettingsLogLevelIsScopedAcrossRealRepos(t *testing.T) {
 	// remote.progress.
 	setResp := requestIgnoringEvents(t, clientA, "repoSettings.set", map[string]any{
 		"repoId": repoIDA,
-		"patch":  map[string]any{"kiraVersion.log.level": "debug"},
+		"patch":  map[string]any{"kiraSpace.log.level": "debug"},
 	})
 	var setResult gitrpc.RepoSettingsSnapshot
 	if err := json.Unmarshal(setResp.Result, &setResult); err != nil {

@@ -46,7 +46,7 @@ func RangeToken(r RangeSpec) string {
 // namespace included, so the `--all` arm always excludes it first — `--exclude` must PRECEDE the
 // `--all` it modifies (probe P11), and is a harmless no-op when nothing under that prefix exists
 // yet. `--exclude=refs/stash` is added ADDITIONALLY when spec.ExcludeStash is set (the decidable
-// "off" half of kiraVersion.stash.showInGraph, D15) — never for the `head` scope or a ranged walk,
+// "off" half of kiraSpace.stash.showInGraph, D15) — never for the `head` scope or a ranged walk,
 // where RevSetArgs does not sweep `--all` at all and an exclusion would be meaningless.
 func RevSetArgs(spec WalkSpec) []string {
 	var args []string
