@@ -3,7 +3,6 @@ package bridge
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/metrics"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -47,10 +46,10 @@ const (
 	// (the RunOp closure calling grpcclient.ServerStream), not a startup-wired long-lived source,
 	// so it needs no Sources entry and no Attach subscription.
 	ChannelGrpcCall = "kira:grpc:call"
-	// ChannelGitPairing and ChannelGitClientsChanged are G1's own two push channels (SPEC §3.3,
-	// D19) — the pairing prompt's live queue snapshot, and the Connected editors pane's list.
-	ChannelGitPairing        = "kira:git:pairing"
-	ChannelGitClientsChanged = "kira:git:clients"
+	// ChannelGitPairing and ChannelGitClientsChanged (G1's own two push channels, SPEC §3.3, D19 —
+	// the pairing prompt's live queue snapshot, and the Connected editors pane's list) moved with
+	// the rest of the git module's bridge wiring to apps/kira-space in P100 Part 1; this app emits
+	// neither any more.
 	// ChannelCodeSearch is C7 D7's own push channel — a repository-wide search's coalesced file
 	// groups, delivered with EmitTo (one window only) exactly the shape ChannelGrpcCall (P11 D8)
 	// established: flush on 60ms/256 matches/the terminal event, one producer (StartSearch's own
@@ -104,10 +103,6 @@ type Sources struct {
 	Metrics interface {
 		OnSample(func(metrics.Sample)) func()
 	}
-	Git interface {
-		OnPairingChanged(func(gitsock.PairingSnapshot)) func()
-		OnClientsChanged(func([]model.GitClient)) func()
-	}
 	DbMcp interface {
 		OnApprovalChange(func(dbmcp.ApprovalSnapshot)) func()
 	}
@@ -142,12 +137,6 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 	unsubMetrics := s.Metrics.OnSample(func(sample metrics.Sample) {
 		ev.emit.Emit(ChannelAppMetrics, sample)
 	})
-	unsubGitPairing := s.Git.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
-		ev.emit.Emit(ChannelGitPairing, toWireSnapshot(snap))
-	})
-	unsubGitClients := s.Git.OnClientsChanged(func(clients []model.GitClient) {
-		ev.emit.Emit(ChannelGitClientsChanged, clients)
-	})
 	unsubDbMcpApproval := s.DbMcp.OnApprovalChange(func(snap dbmcp.ApprovalSnapshot) {
 		ev.emit.Emit(ChannelDbMcpApproval, toWireApprovalSnapshot(snap))
 	})
@@ -158,8 +147,6 @@ func (ev *Events) Attach(s Sources) (detach func()) {
 		unsubList()
 		unsubOplog()
 		unsubMetrics()
-		unsubGitPairing()
-		unsubGitClients()
 		unsubDbMcpApproval()
 	}
 }

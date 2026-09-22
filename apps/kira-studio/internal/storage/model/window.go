@@ -24,11 +24,13 @@ type WindowRecord struct {
 }
 
 // validWindowModes are the only values AppMode (packages/shared/domain/mode.ts) can be.
-// P67b §4.2: 'git' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint,
-// no migration needed), so an older binary reading a 'git' row still degrades cleanly through
-// NormalizeMode below. P91 §3: 'terminal' joins the same way — without an entry here, a window
-// closed in the Terminal module would silently reopen in Studio.
-var validWindowModes = map[string]bool{"studio": true, "api": true, "git": true, "terminal": true}
+// P91 §3: 'terminal' joined studio/api — windows.mode is unconstrained TEXT (no CHECK constraint,
+// no migration needed), so an older binary reading an unrecognised mode still degrades cleanly
+// through NormalizeMode below; without an entry here, a window closed in the Terminal module
+// would silently reopen in Studio. P100 Part 1: 'git' (P67b §4.2) dropped with the rest of the
+// git module — a stored 'git' row now degrades to DefaultWindowMode the same way, no migration
+// needed for the same reason.
+var validWindowModes = map[string]bool{"studio": true, "api": true, "terminal": true}
 
 // DefaultWindowMode is the app's own default mode — the migration's column DEFAULT and this
 // constant deliberately agree, so there is exactly one place the default lives on each side.

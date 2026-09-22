@@ -26,9 +26,6 @@ type Repos struct {
 	Variables       *VariablesRepo
 	ResponseHistory *ResponseHistoryRepo
 	GrpcHistory     *GrpcHistoryRepo
-	GitClients      *GitClientsRepo
-	GitRepoSettings *GitRepoSettingsRepo
-	CodeRepos       *CodeReposRepo
 	// MaskRules is M5's rule store (connection_mask_rules) — needs no cipher, unlike MaskKeys just
 	// below, so it belongs in this aggregate the same as every other cipher-free repo.
 	MaskRules *MaskRulesRepo
@@ -77,9 +74,6 @@ func New(db *sql.DB) (*Repos, error) {
 		Collections:     &CollectionsRepo{DB: db},
 		ResponseHistory: &ResponseHistoryRepo{DB: db},
 		GrpcHistory:     &GrpcHistoryRepo{DB: db},
-		GitClients:      &GitClientsRepo{DB: db},
-		GitRepoSettings: &GitRepoSettingsRepo{DB: db},
-		CodeRepos:       &CodeReposRepo{DB: db},
 		MaskRules:       &MaskRulesRepo{DB: db},
 		CustomScripts:   &CustomScriptsRepo{DB: db},
 		stmts:           []*sql.Stmt{settingsSelectAll, layoutSelectAll, tabsSelectAll, opsInsert, opsUpdate},

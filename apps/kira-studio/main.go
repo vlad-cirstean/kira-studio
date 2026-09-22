@@ -2,10 +2,7 @@ package main
 
 import (
 	"embed"
-	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -27,17 +24,10 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appupdate"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/buildinfo"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/connections"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/dbmcp"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/enginecache"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitaskpass"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitclient"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitrpc"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsession"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitsock"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/gitvsix"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/keepawake"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/maskrules"
@@ -55,7 +45,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/logging"
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 	// Aliased: main.go's own `events` local var (bridge.NewEvents) would otherwise shadow this
 	// package for the rest of the function, exactly where openWindow's WindowClosing listener
 	// needs it.
@@ -77,13 +66,6 @@ var assets embed.FS
 // Quitter to the now-real App -> menu -> engine stream -> reopen handler -> the main window ->
 // app.Run() (P56 §4.11). There is no Node engine child to start any more (P58f M10 Phase 4).
 func main() {
-	// G7 D8: the askpass helper's whole entry point — four lines, unambiguous (a real GUI launch
-	// has no argv), and returns before anything Wails-related runs, so it can never accidentally
-	// start a window. The shim `main.go`'s own broker below writes execs this exact binary this way.
-	if len(os.Args) > 1 && os.Args[1] == "askpass" {
-		os.Exit(gitaskpass.RunHelper(os.Args[2:], os.Environ(), os.Stdout))
-	}
-
 	// P100 Part 1: startupfail moved to repo-root internal/ and can no longer read
 	// internal/config/internal/buildinfo itself (Go's internal/ rule — a repo-root package cannot
 	// import anything under apps/kira-studio/internal), so this app constructs its own Reporter,
@@ -105,21 +87,16 @@ func main() {
 	db, cipher, authorizer := core.db, core.cipher, core.authorizer
 	repositories, secretsRepo, maskRulesSvc := core.repositories, core.secretsRepo, core.maskRulesSvc
 
-	git := wireGit(repositories)
-	gitRunner, gitDiscovery, gitRegistry := git.runner, git.discovery, git.registry
-	askpassBroker, gitRouter, gitSock := git.askpassBroker, git.router, git.sock
-
 	// P5 D8: the SAME authorizer instance connections.New below is given — that is what makes the
 	// reveal grace genuinely shared between a connection-password reveal and a variable reveal.
 	apiVarsSvc := apivars.New(repositories.Variables, cipher, authorizer)
 
 	deps := appcore.Deps{
-		DB:          db.DB,
-		StartedAt:   startedAt.UnixMilli(),
-		Repos:       repositories,
-		ApiVars:     apiVarsSvc,
-		GitRegistry: gitRegistry,
-		MaskRules:   maskRulesSvc,
+		DB:        db.DB,
+		StartedAt: startedAt.UnixMilli(),
+		Repos:     repositories,
+		ApiVars:   apiVarsSvc,
+		MaskRules: maskRulesSvc,
 	}
 
 	// Read from the just-migrated (possibly still-default) settings row, same as production would
@@ -149,28 +126,15 @@ func main() {
 	// nothing is added to the quit teardown below.
 	updateChecker := appupdate.NewChecker(buildinfo.Version)
 
-	embedded := wireEmbeddedServices(deps, gitDiscovery, gitRunner, gitSock, connectionsSvc, oplogWiring, metricsTicker)
+	embedded := wireEmbeddedServices(deps, connectionsSvc, oplogWiring, metricsTicker)
 	dbMcpSvc := embedded.dbMcpSvc
 	agentHooksSvc, keepAwakeSvc := embedded.agentHooksSvc, embedded.keepAwakeSvc
 	windowsSvc, terminalSvc := embedded.windowsSvc, embedded.terminalSvc
-	codeWorkspaceSvc := embedded.codeWorkspaceSvc
 	events, eventsDetach := embedded.events, embedded.eventsDetach
 
 	lifecycle := wireLifecycle(events, eventsDetach, metricsTicker, oplogWiring, connectionsSvc,
-		dbMcpSvc, agentHooksSvc, keepAwakeSvc, codeWorkspaceSvc, terminalSvc,
-		gitSock, askpassBroker, repositories, db)
+		dbMcpSvc, agentHooksSvc, keepAwakeSvc, terminalSvc, repositories, db)
 	windows, closeFlush, quitter := lifecycle.windows, lifecycle.closeFlush, lifecycle.quitter
-
-	// G12 D8: the pairing-request fallback when no Kira Studio window exists to focus. NOT
-	// registered as a Wails service (application.NewService) — a service's ServiceStartup error
-	// is fatal to the whole app (application.go's startup() returns it straight through Run()),
-	// and this one's Startup fails by design outside a packaged, signed .app (checkBundleIdentifier,
-	// notifications_darwin.go) as well as on any Linux desktop with no D-Bus session bus reachable
-	// (confirmed here: registering it made the server binary exit 1 before ever starting). D8's
-	// own text already expects RequestNotificationAuthorization/SendNotification to fail softly
-	// outside a packaged app; the service's *registration* must never be what takes the app down
-	// first. Calling its methods directly, with no Wails service lifecycle, sidesteps that.
-	notifier := notifications.New()
 
 	app := application.New(application.Options{
 		Name: "Kira Studio",
@@ -201,19 +165,12 @@ func main() {
 			application.NewService(&bridge.ResponseHistoryService{Deps: deps}),
 			application.NewService(&bridge.GrpcHistoryService{Deps: deps}),
 			application.NewService(&bridge.DataGripService{Deps: deps}),
-			application.NewService(&bridge.GitClientsService{Deps: deps, Sock: gitSock, Broker: gitSock.Broker(), Vsix: gitvsix.New(gitvsix.Deps{})}),
 			application.NewService(dbMcpSvc),
 			application.NewService(agentHooksSvc),
 			application.NewService(keepAwakeSvc),
-			// C5 §3.3/C6 §7: the native code-viewing workspace's own bound service — Discovery/
-			// Runner mirror gitrpc's own seam rather than reusing gitRegistry (this workspace
-			// needs one read-only runner and the resolved git.path, never gitsession's refcounted
-			// lifecycle).
-			application.NewService(codeWorkspaceSvc),
 			application.NewService(terminalSvc),
 			application.NewService(&bridge.CustomScriptsService{Deps: deps}),
 			application.NewService(&bridge.UpdateService{Checker: updateChecker, Browser: browserOpener}),
-			application.NewService(&bridge.GitHubService{Deps: deps, Browser: browserOpener}),
 			application.NewService(&bridge.LinkService{Browser: browserOpener}),
 			application.NewService(&bridge.LifecycleService{Flusher: quitter, WindowFlusher: closeFlush}),
 		},
@@ -255,11 +212,11 @@ func main() {
 	quitter.Attach(app)
 
 	wireWindowsAndMenu(postAppDeps{
-		app: app, router: router, gitRouter: gitRouter, gitSock: gitSock, repositories: repositories,
+		app: app, router: router, repositories: repositories,
 		startedAt: startedAt, events: events, windows: windows, closeFlush: closeFlush, quitter: quitter,
-		terminalSvc: terminalSvc, windowsSvc: windowsSvc, keepAwakeSvc: keepAwakeSvc, notifier: notifier,
-		attachDialogs: attachDialogs, setUnsubscribePairing: lifecycle.setUnsubscribePairing,
-		reporter: reporter,
+		terminalSvc: terminalSvc, windowsSvc: windowsSvc, keepAwakeSvc: keepAwakeSvc,
+		attachDialogs: attachDialogs,
+		reporter:      reporter,
 	})
 
 	if err := app.Run(); err != nil {
@@ -316,85 +273,6 @@ func openCore(reporter *startupfail.Reporter) coreOpened {
 	return coreOpened{
 		db: db, cipher: cipher, authorizer: authorizer,
 		repositories: repositories, secretsRepo: secretsRepo, maskRulesSvc: maskRulesSvc,
-	}
-}
-
-// gitWired is wireGit's own result: runner, discovery, registry, settings closure (wired directly
-// onto registry, not returned separately), askpass broker, router, socket.
-type gitWired struct {
-	runner        gitclient.Runner
-	discovery     *gitclient.Discovery
-	registry      *gitsession.Registry
-	askpassBroker *gitaskpass.Broker
-	router        *gitrpc.Router
-	sock          *gitsock.Server
-}
-
-// wireGit runs main's own git-wiring block: runner -> discovery -> registry (with its own
-// Settings/RepoSettingsGet/RepoSettingsSet closures wired on) -> askpass broker -> gitRouter
-// (hoisted so the native git stream, wired later in main, shares the exact same Router the socket
-// below uses) -> gitSock, started. A start failure on either the askpass broker or the socket is
-// logged, never fatal (D5/D8) — the app must still boot.
-func wireGit(repositories *repos.Repos) gitWired {
-	// G2 D18/D19: repository lifecycle moves to a refcounted gitsession.Registry, shared across
-	// every connection, with gitrpc rebuilt as a per-connection Router over it.
-	gitRunner := gitclient.NewExecRunner()
-	gitDiscovery := gitclient.NewDiscovery(gitclient.NewPlatformLocator(), gitRunner, gitclient.NewRealClock())
-	gitRegistry := gitsession.NewRegistry(gitRunner)
-	// G7 D16: the server-owned settings a remote op reads fresh on every push pre-flight/run and
-	// every auto-fetch tick — never cached, since a stale protected-branch list is a safety bug.
-	// G18 D15: gitPath joins the same closure — the third leaf of the same table, read the same
-	// way, threaded into every internal/gitrpc Discovery.Status call site (Registry.Settings).
-	gitRegistry.Settings = func() (protectedBranches []string, autoFetchMinutes int, gitPath string) {
-		s, err := repositories.Settings.GetAll()
-		if err != nil {
-			slog.Warn("read git settings", "scope", "git", "err", err)
-			return nil, 0, ""
-		}
-		return s.Git.ProtectedBranches, s.Git.FetchAutoIntervalMinutes, s.Git.GitPath
-	}
-	// G18 D8: the seven per-repo display settings (D3), backed by GitRepoSettingsRepo — D14's
-	// log.level sentinel substitution happens entirely inside that repo, invisibly here.
-	gitRegistry.RepoSettingsGet = repositories.GitRepoSettings.Get
-	gitRegistry.RepoSettingsSet = repositories.GitRepoSettings.Set
-	// G7 D8: a broker that fails to start is logged and left nil — every remote op then runs with
-	// no askpass interposition at all, D10's own already-supported "user's own askpass wins" path,
-	// not a new failure mode. It must never be fatal to boot (same posture as the socket below).
-	askpassBroker, err := gitaskpass.New(gitaskpass.Options{})
-	if err != nil {
-		slog.Warn("start askpass broker", "scope", "startup", "err", err)
-		askpassBroker = nil
-	}
-	// C10 §3.3/§10 S5: hoisted out of gitsock.Deps.Router literal so the native git stream
-	// (shell.RegisterGitStream, below) can share the exact same Router — one handler table served
-	// over two transports (the socket, for external clients; the in-process Wails stream, for this
-	// app's own renderer), never two independently constructed ones.
-	gitRouter := gitrpc.New(gitrpc.Deps{
-		Discovery: gitDiscovery, Runner: gitRunner, Registry: gitRegistry, ServerVersion: buildinfo.Version,
-		Askpass: askpassBroker,
-		// G18 D11: the settings.setGitPath migration leg's own write path — the exact
-		// SettingsRepo.Set(SettingsPatch{Git: &GitPatch{GitPath: ...}}) shape D11 names,
-		// reused rather than reinvented.
-		SetGitPath: func(gitPath string) error {
-			_, err := repositories.Settings.Set(model.SettingsPatch{Git: &model.GitPatch{GitPath: &gitPath}})
-			return err
-		},
-	})
-	gitSock := gitsock.New(gitsock.Deps{
-		SocketPath:    filepath.Join(config.KiraHome(), "git.sock"),
-		LockPath:      filepath.Join(config.KiraHome(), "git.sock.lock"),
-		Clients:       repositories.GitClients,
-		Registry:      gitRegistry,
-		Router:        gitRouter,
-		ServerVersion: buildinfo.Version,
-		Now:           time.Now,
-	})
-	if err := gitSock.Start(); err != nil {
-		slog.Warn("git socket listener", "scope", "startup", "err", err)
-	}
-	return gitWired{
-		runner: gitRunner, discovery: gitDiscovery, registry: gitRegistry,
-		askpassBroker: askpassBroker, router: gitRouter, sock: gitSock,
 	}
 }
 
@@ -483,14 +361,13 @@ func wireAdapters(deps *appcore.Deps, settings model.Settings, repositories *rep
 // blocks (the Services list, teardown, the window-closing terminal cleanup) still reach past this
 // function's own return.
 type embeddedWired struct {
-	dbMcpSvc         *bridge.DbMcpService
-	agentHooksSvc    *bridge.AgentHooksService
-	keepAwakeSvc     *bridge.KeepAwakeService
-	windowsSvc       *bridge.WindowsService
-	terminalSvc      *bridge.TerminalService
-	codeWorkspaceSvc *bridge.CodeWorkspaceService
-	events           *bridge.Events
-	eventsDetach     func()
+	dbMcpSvc      *bridge.DbMcpService
+	agentHooksSvc *bridge.AgentHooksService
+	keepAwakeSvc  *bridge.KeepAwakeService
+	windowsSvc    *bridge.WindowsService
+	terminalSvc   *bridge.TerminalService
+	events        *bridge.Events
+	eventsDetach  func()
 }
 
 // wireEmbeddedServices runs main's own embedded-service block: DB MCP (with its own approval
@@ -501,22 +378,15 @@ type embeddedWired struct {
 // the point main's own deps.Events assignment (the emitter) has already run — each
 // bridge.XxxService{Deps: deps} literal below is exactly the same value copy the original
 // sequential code made in place.
-func wireEmbeddedServices(deps appcore.Deps, gitDiscovery *gitclient.Discovery, gitRunner gitclient.Runner, gitSock *gitsock.Server, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker) embeddedWired {
-	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle, same
-	// posture as gitSock just above. StartIfEnabled's own failure (a bind conflict) is logged,
-	// never fatal, mirroring gitSock.Start().
+func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service, oplogWiring *oplog.Wiring, metricsTicker *metrics.Ticker) embeddedWired {
+	// M1 §3.3: the DB MCP server's embedded instance — owned by this app's own lifecycle.
+	// StartIfEnabled's own failure (a bind conflict) is logged, never fatal.
 	// M2 §5.1/§5.3: the approval broker outlives the server's own start/stop (constructed here, not
 	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
 	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
-
-	// C5 §3.3: the native code workspace's own bound service — Discovery/Runner mirror gitrpc's
-	// own seam rather than reusing gitRegistry.
-	codeWorkspaceSvc := &bridge.CodeWorkspaceService{
-		Deps: deps, Discovery: gitDiscovery, Runner: gitRunner, Registry: codeworkspace.NewRegistry(),
-	}
 
 	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
 	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
@@ -550,34 +420,29 @@ func wireEmbeddedServices(deps appcore.Deps, gitDiscovery *gitclient.Discovery, 
 	}
 
 	events := bridge.NewEvents(deps.Events)
-	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, Git: gitSock, DbMcp: dbMcpApprovals})
+	eventsDetach := events.Attach(bridge.Sources{Connections: connectionsSvc, Oplog: oplogWiring, Metrics: metricsTicker, DbMcp: dbMcpApprovals})
 
 	return embeddedWired{
 		dbMcpSvc: dbMcpSvc, agentHooksSvc: agentHooksSvc, keepAwakeSvc: keepAwakeSvc,
-		windowsSvc: windowsSvc, terminalSvc: terminalSvc, codeWorkspaceSvc: codeWorkspaceSvc,
+		windowsSvc: windowsSvc, terminalSvc: terminalSvc,
 		events: events, eventsDetach: eventsDetach,
 	}
 }
 
 // lifecycleWired is wireLifecycle's own result: the window registry, the close-flush coordinator
 // and the quitter main's later blocks (openWindow, BuildMenu, app's own ShouldQuit/OnShutdown)
-// still reach past this function's own return, plus setUnsubscribePairing — the pairing-broker
-// unsubscribe main wires in once `app` exists further down still needs to land inside the same
-// teardown closure this function owns.
+// still reach past this function's own return.
 type lifecycleWired struct {
-	windows               *shell.WindowRegistry
-	closeFlush            *shell.CloseFlushCoordinator
-	quitter               *shell.Quitter
-	setUnsubscribePairing func(func())
+	windows    *shell.WindowRegistry
+	closeFlush *shell.CloseFlushCoordinator
+	quitter    *shell.Quitter
 }
 
 // wireLifecycle runs main's own pre-app window-lifecycle block: the window registry -> the
 // close-flush coordinator -> beforeFlush/teardown (today's OnShutdown, minus the ticker Stop,
 // which moves to beforeFlush, run before the flush wait rather than after it — P56 D3/index.ts:156)
-// -> the quitter built over both. unsubscribePairing is declared here (nil until main wires the
-// pairing broker once `app` exists) so teardown, itself built here, can still close over the real
-// value by reference — setUnsubscribePairing is how main assigns it later.
-func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, codeWorkspaceSvc *bridge.CodeWorkspaceService, terminalSvc *bridge.TerminalService, gitSock *gitsock.Server, askpassBroker *gitaskpass.Broker, repositories *repos.Repos, db *storage.DB) lifecycleWired {
+// -> the quitter built over both.
+func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *metrics.Ticker, oplogWiring *oplog.Wiring, connectionsSvc *connections.Service, dbMcpSvc *bridge.DbMcpService, agentHooksSvc *bridge.AgentHooksService, keepAwakeSvc *bridge.KeepAwakeService, terminalSvc *bridge.TerminalService, repositories *repos.Repos, db *storage.DB) lifecycleWired {
 	// windows holds every currently open window's shell.Attach cleanup, keyed by that window's own
 	// identity (P8 C2, replacing the single detachWindow/mainWindow pair that only ever worked
 	// because at most one window could exist at a time — F4). beforeFlush detaches every one of
@@ -589,10 +454,6 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 	// the quit one below: at most one window is ever waiting at a time.
 	closeFlush := shell.NewCloseFlushCoordinator()
 
-	// G12 D8: assigned below, once `app` exists — declared here (nil until then) so `teardown`
-	// (which is defined before `app` is) can still close over the real value by reference.
-	var unsubscribePairing func()
-
 	// teardown is today's OnShutdown, minus the ticker Stop (which moves to beforeFlush, run
 	// before the flush wait rather than after it — P56 D3/index.ts:156).
 	beforeFlush := sync.OnceFunc(func() {
@@ -601,9 +462,6 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 	})
 	teardown := sync.OnceFunc(func() {
 		eventsDetach()
-		if unsubscribePairing != nil {
-			unsubscribePairing()
-		}
 		oplogWiring.Stop()
 		connectionsSvc.Shutdown()
 		bridge.StopDbMcp(dbMcpSvc)
@@ -612,16 +470,7 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 		// "caffeinate is dead" as short as possible — order otherwise isn't load-bearing here, the
 		// controller's release is independent of the PTY registry terminalSvc.Shutdown() stops.
 		bridge.StopKeepAwake(keepAwakeSvc)
-		codeWorkspaceSvc.Shutdown()
 		terminalSvc.Shutdown()
-		if err := gitSock.Close(); err != nil {
-			slog.Warn("close git socket", "scope", "shutdown", "err", err)
-		}
-		if askpassBroker != nil {
-			if err := askpassBroker.Close(); err != nil {
-				slog.Warn("close askpass broker", "scope", "shutdown", "err", err)
-			}
-		}
 		if err := repositories.Close(); err != nil {
 			slog.Warn("close repos", "scope", "shutdown", "err", err)
 		}
@@ -633,19 +482,16 @@ func wireLifecycle(events *bridge.Events, eventsDetach func(), metricsTicker *me
 
 	return lifecycleWired{
 		windows: windows, closeFlush: closeFlush, quitter: quitter,
-		setUnsubscribePairing: func(f func()) { unsubscribePairing = f },
 	}
 }
 
 // postAppDeps is wireWindowsAndMenu's own argument bundle — every piece main built before `app`
 // existed that this block still needs, gathered into one struct since the block itself (dialog
-// attach, pairing wiring, notification-response routing, the three window closures, the menu, the
-// startup window list) is one continuous unit that only makes sense once `app` is real.
+// attach, the three window closures, the menu, the startup window list) is one continuous unit
+// that only makes sense once `app` is real.
 type postAppDeps struct {
 	app          *application.App
 	router       *adapterhost.Router
-	gitRouter    *gitrpc.Router
-	gitSock      *gitsock.Server
 	repositories *repos.Repos
 	startedAt    time.Time
 	events       *bridge.Events
@@ -655,19 +501,15 @@ type postAppDeps struct {
 	terminalSvc  *bridge.TerminalService
 	windowsSvc   *bridge.WindowsService
 	keepAwakeSvc *bridge.KeepAwakeService
-	notifier     *notifications.NotificationService
 
-	attachDialogs         func(app *application.App, window func() application.Window)
-	setUnsubscribePairing func(func())
-	reporter              *startupfail.Reporter
+	attachDialogs func(app *application.App, window func() application.Window)
+	reporter      *startupfail.Reporter
 }
 
-// wireWindowsAndMenu runs main's own post-`app` block: the dialog attach point -> the git-pairing
-// notification wiring (front the app and post a system notification when a pairing request
-// arrives, withdraw it once resolved) -> the notification-tap router -> the two Wails streams ->
-// the three window closures (open/openNew/reopen) -> the reopen/system-wake handlers -> the menu
-// -> the startup window list, opened. Nothing here is needed past main's own app.Run() call, so
-// this returns nothing.
+// wireWindowsAndMenu runs main's own post-`app` block: the dialog attach point -> the engine
+// stream -> the three window closures (open/openNew/reopen) -> the reopen/system-wake handlers ->
+// the menu -> the startup window list, opened. Nothing here is needed past main's own app.Run()
+// call, so this returns nothing.
 func wireWindowsAndMenu(d postAppDeps) {
 	app := d.app
 
@@ -677,8 +519,6 @@ func wireWindowsAndMenu(d postAppDeps) {
 	// build, mid-startup before any window is focused) so a dialog call still has some live
 	// window to attach to rather than none (F4's second half — the single `mainWindow` var this
 	// replaces always attached to whichever window was created most recently, not the caller).
-	// G12 D8 reuses this same "which window" resolution for the pairing activator below — the
-	// only other place in the tree that legitimately answers the same question.
 	windowToActOn := func() application.Window {
 		if w := app.Window.Current(); w != nil {
 			return w
@@ -687,10 +527,7 @@ func wireWindowsAndMenu(d postAppDeps) {
 	}
 	d.attachDialogs(app, windowToActOn)
 
-	wirePairingNotifications(d, windowToActOn)
-
 	shell.RegisterEngineStream(app, d.router)
-	shell.RegisterGitStream(app, d.gitRouter)
 
 	opener := &windowOpener{
 		app: app, windowDeps: shell.WindowDeps{Windows: d.repositories.Windows, StartedAt: d.startedAt},
@@ -724,81 +561,6 @@ func wireWindowsAndMenu(d postAppDeps) {
 	for _, rec := range records {
 		opener.open(rec)
 	}
-}
-
-// wirePairingNotifications runs wireWindowsAndMenu's own pairing-notification block: the
-// pairing-changed subscription (front the app and post a system notification when a request
-// arrives, withdraw it once resolved — G12 D8/F4, revised by G14 D4) and the notification-tap
-// router (G14 D4). Lives here, not in internal/gitsock, because main.go is the only place in the
-// tree that legitimately imports both gitsock and application (the layering test's own rule).
-func wirePairingNotifications(d postAppDeps, windowToActOn func() application.Window) {
-	var lastPresentedPairingID string
-	d.setUnsubscribePairing(d.gitSock.OnPairingChanged(func(snap gitsock.PairingSnapshot) {
-		if snap.Pending == nil {
-			// The request that was presented resolved (approved/denied/timed out) without a fresh
-			// one taking its place — withdraw its notification so Notification Centre never keeps
-			// a live Approve/Deny button for something already decided.
-			if lastPresentedPairingID != "" {
-				withdrawPairingNotification(d.notifier, lastPresentedPairingID)
-			}
-			lastPresentedPairingID = "" // the edge latch: a future request is a fresh "just arrived".
-			return
-		}
-		// Only the head of the queue *newly arriving* is worth presenting again; a snapshot
-		// emitted because the count behind it changed re-presents the same RequestID and is not.
-		if snap.Pending.RequestID == lastPresentedPairingID {
-			return
-		}
-		if lastPresentedPairingID != "" {
-			withdrawPairingNotification(d.notifier, lastPresentedPairingID)
-		}
-		lastPresentedPairingID = snap.Pending.RequestID
-		req := snap.Pending
-		// Notify first, always — the user who is not looking at Kira Studio needs this to be
-		// what tells them. Then, if a window exists, bring it forward too: a user who *is*
-		// looking at Kira Studio still gets the in-app dialog in front of them.
-		notifyPairingPending(d.notifier, req)
-		if w := windowToActOn(); w != nil {
-			// Runs on the broker's own goroutine — never block it on the UI thread.
-			application.InvokeAsync(func() {
-				w.Show()
-				w.Restore()
-				w.Focus()
-			})
-		}
-	}))
-
-	// G14 D4: routes a tapped notification action straight onto the broker — the single authority
-	// over a pairing decision (SPEC §3.3) — without any state of our own. A stale action (already
-	// approved/denied/timed out in the window) is a lookup miss the broker itself already answers
-	// with a non-Resolved PairingActionResult; that is not surfaced as an error here, since nothing
-	// about the trust model changes and the broker already logged it. Tapping the notification's
-	// body (not a button) is never an implicit approve — it only brings the window forward, same
-	// as the fallback above, so the in-app dialog can answer it.
-	d.notifier.OnNotificationResponse(func(result notifications.NotificationResult) {
-		if result.Error != nil {
-			slog.Debug("git pairing: notification response error", "scope", "gitsock", "err", result.Error)
-			return
-		}
-		requestID, _ := result.Response.UserInfo["requestId"].(string)
-		if requestID == "" {
-			return
-		}
-		switch result.Response.ActionIdentifier {
-		case pairingApproveActionID:
-			d.gitSock.Broker().Approve(requestID)
-		case pairingDenyActionID:
-			d.gitSock.Broker().Deny(requestID)
-		case notifications.DefaultActionIdentifier:
-			if w := windowToActOn(); w != nil {
-				application.InvokeAsync(func() {
-					w.Show()
-					w.Restore()
-					w.Focus()
-				})
-			}
-		}
-	})
 }
 
 // windowOpener groups the three window closures (open/openNew/reopen) main used to build as
@@ -918,108 +680,3 @@ func (o *windowOpener) reopen() {
 // internal/startupfail's own per-Reporter alertOnce bound -- both exist because this handler could,
 // in principle, be reached more than once before the process actually exits.
 var platformErrorOnce sync.Once
-
-// G14 D4: the category ID and the two action identifiers OnNotificationResponse switches on above.
-const (
-	pairingCategoryID      = "kira.git.pairing"
-	pairingApproveActionID = "approve"
-	pairingDenyActionID    = "deny"
-)
-
-// pairingNotificationID is the one ID both notifyPairingPending and withdrawPairingNotification
-// address a request's notification by.
-func pairingNotificationID(requestID string) string {
-	return "kira-git-pairing-" + requestID
-}
-
-// notifyPairingPending is D4's system notification for a pairing request — SPEC §3.3 deliberately
-// holds the request rather than spawning one, and this is now the *first* way the user learns
-// about it (F6), not a fallback for "no window". It carries Approve/Deny actions, routed back onto
-// the broker by OnNotificationResponse above. Two real limits, not bugs: it only works in a
-// packaged, signed .app (notifications.New's darwin impl refuses without a bundle identifier —
-// logged at Debug and otherwise ignored, since a developer running from source has a terminal and
-// a window); and authorization is requested lazily here, on first actual use, never at startup —
-// asking before the app has any reason to notify is exactly what a good macOS app avoids. A denial
-// is terminal for this process and is logged once, via notificationsDenied.
-var notificationsDenied bool
-
-// pairingCategoryRegistered: the category is registered once, lazily, the first time a request
-// needs it — never at startup, same rule as authorization above.
-var pairingCategoryRegistered bool
-
-// notifierCallGuard: everywhere else in this file, an unavailable notifications backend degrades
-// softly because the pinned module reports it as an `error` (checked and logged at Debug above and
-// below). Linux is the one exception, confirmed against the pinned module's own source rather than
-// assumed: `RequestNotificationAuthorization` is a plain stub that always returns `(true, nil)`,
-// with no check that a D-Bus session bus is actually reachable, so an unregistered notifier (G12
-// D8's own deliberate choice, restated by D4 above) can panic on a nil D-Bus connection the moment
-// a real send is attempted — not an error this file's own `if err != nil` handling ever sees. That
-// is a real crash observed in this container (no session bus) — a platform this app does not
-// target, but one its own dev loop and CI still run on, and a git pairing request must never be
-// able to take the whole process down. recover() is what makes every notifier call below degrade
-// exactly as softly as its documented-error siblings already do.
-func notifierCallGuard(fn func() error) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("notifications backend panicked: %v", r)
-		}
-	}()
-	return fn()
-}
-
-func notifyPairingPending(notifier *notifications.NotificationService, req *gitsock.PairingRequest) {
-	if notificationsDenied {
-		return
-	}
-	granted, err := notifier.RequestNotificationAuthorization()
-	if err != nil {
-		slog.Debug("git pairing: notification authorization unavailable", "scope", "gitsock", "err", err)
-		return
-	}
-	if !granted {
-		notificationsDenied = true
-		slog.Info("git pairing: notification authorization denied; pairing requests will not surface a notification for the rest of this session")
-		return
-	}
-	if !pairingCategoryRegistered {
-		pairingCategoryRegistered = true
-		if err := notifierCallGuard(func() error {
-			return notifier.RegisterNotificationCategory(notifications.NotificationCategory{
-				ID: pairingCategoryID,
-				Actions: []notifications.NotificationAction{
-					{ID: pairingApproveActionID, Title: "Approve"},
-					{ID: pairingDenyActionID, Title: "Deny", Destructive: true},
-				},
-			})
-		}); err != nil {
-			slog.Debug("git pairing: register notification category", "scope", "gitsock", "err", err)
-		}
-	}
-	if err := notifierCallGuard(func() error {
-		return notifier.SendNotificationWithActions(notifications.NotificationOptions{
-			ID:         pairingNotificationID(req.RequestID),
-			Title:      "Kira Studio",
-			Subtitle:   req.Label,
-			Body:       "wants to connect to your git backend.",
-			CategoryID: pairingCategoryID,
-			Data:       map[string]any{"requestId": req.RequestID},
-			// TimeSensitive, not Critical: this is what breaks through a Focus mode. Critical
-			// additionally overrides Do Not Disturb *and mute*, needs a special Apple
-			// entitlement, and is for alarms — a pairing prompt is not one.
-			InterruptionLevel: notifications.InterruptionLevelTimeSensitive,
-		})
-	}); err != nil {
-		slog.Debug("git pairing: send notification", "scope", "gitsock", "err", err)
-	}
-}
-
-// withdrawPairingNotification removes a request's delivered notification once it has resolved
-// elsewhere (approved/denied in-window, timed out, or superseded by a new head) — so Notification
-// Centre never keeps a live Approve/Deny button for something already decided.
-func withdrawPairingNotification(notifier *notifications.NotificationService, requestID string) {
-	if err := notifierCallGuard(func() error {
-		return notifier.RemoveDeliveredNotification(pairingNotificationID(requestID))
-	}); err != nil {
-		slog.Debug("git pairing: remove delivered notification", "scope", "gitsock", "err", err)
-	}
-}

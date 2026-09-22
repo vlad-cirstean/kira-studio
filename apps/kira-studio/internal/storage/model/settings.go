@@ -236,6 +236,18 @@ func ValidPageSize(v int) bool {
 	}
 }
 
+// ValidLogLevel mirrors schema.ts's kiraVersion.log.level enum. P100 Part 1: kept here rather than
+// deleted with the rest of internal/storage/model/gitreposettings.go — advanced.gitLogLevel (the
+// only remaining caller) stays on model.Settings, see this app's own bridge/settings.go comment.
+func ValidLogLevel(v string) bool {
+	switch v {
+	case "off", "error", "warn", "info", "debug":
+		return true
+	default:
+		return false
+	}
+}
+
 // InRange returns a predicate matching settings.ts's z.number().int().min(lo).max(hi).
 func InRange(lo, hi int) func(int) bool {
 	return func(v int) bool { return v >= lo && v <= hi }

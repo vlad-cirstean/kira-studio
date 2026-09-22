@@ -2,6 +2,19 @@ package bridge
 
 import "testing"
 
+// fakeBrowser is bridge.Browser's own test double. P100 Part 1: used to live in github_test.go,
+// deleted with the rest of the git module's bridge files — this test is its only remaining caller.
+type fakeBrowser struct {
+	opened string
+	calls  int
+}
+
+func (b *fakeBrowser) OpenURL(url string) error {
+	b.opened = url
+	b.calls++
+	return nil
+}
+
 func TestLinkService_OpenExternal(t *testing.T) {
 	tests := []struct {
 		name    string

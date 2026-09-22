@@ -36,16 +36,13 @@ func (s *SettingsService) Set(args SettingsSetArgs) (model.Settings, error) {
 	if args.Patch.Cache != nil && args.Patch.Cache.L2BudgetMb != nil {
 		s.Deps.Router.PushCacheConfig(merged)
 	}
-	// G31 round-2 functional-correctness review, finding #8: EnsureAutoFetch's only other caller
-	// is Conn.Open (gitsession's own off→on path) — a repository already open when the user turns
-	// fetch.autoInterval back on from 0 had no way to ever restart auto-fetch without a fresh
-	// repo.open, since pauseAutoFetch (armed the moment the interval reads 0) leaves nothing
-	// scheduled to notice a later settings change on its own. This is the actual write path for
-	// that setting (git.path's own sibling in the same instance-wide GitPatch); repoSettings.set
-	// is a different, per-repo settings surface that never carries it.
-	if args.Patch.Git != nil && args.Patch.Git.FetchAutoIntervalMinutes != nil && s.Deps.GitRegistry != nil {
-		s.Deps.GitRegistry.ReconcileAutoFetch()
-	}
+	// P100 Part 1: the git.fetchAutoIntervalMinutes -> GitRegistry.ReconcileAutoFetch side effect
+	// that used to live here moved with the git module to apps/kira-space (its own bridge/
+	// settings.go has no equivalent yet — Kira Space has no SettingsService of its own in Part 1).
+	// The git.* leaves themselves (GitSettings: ProtectedBranches/FetchAutoIntervalMinutes/
+	// GitPath/GraphFontSize) stay on model.Settings unchanged: removing them cleanly needs a
+	// matching frontend/packages/shared schema change, out of this phase's Go-only scope — see
+	// this phase's own result section.
 	// P72 §9.2: advanced.gitLogLevel's own actual mechanism — apply the new verbosity immediately
 	// rather than only on next launch.
 	if args.Patch.Advanced != nil && args.Patch.Advanced.GitLogLevel != nil {
