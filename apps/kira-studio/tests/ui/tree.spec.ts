@@ -657,14 +657,16 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   function filterKindRow(kind: string) {
     return page.locator(`[data-testid="filter-kind-row-${kind}"]`);
   }
+  // P104: reka's CheckboxRoot renders `<button role="checkbox">`, not a native
+  // `<input type="checkbox">` -- matched by its own data-slot instead.
   function filterKindCheckbox(kind: string) {
-    return filterKindRow(kind).locator('input[type="checkbox"]');
+    return filterKindRow(kind).locator('[data-slot="checkbox"]');
   }
   function filterObjectRow(path: string) {
     return page.locator(`[data-testid="filter-object-row"][data-path="${path}"]`);
   }
   function filterObjectCheckbox(path: string) {
-    return filterObjectRow(path).locator('input[type="checkbox"]');
+    return filterObjectRow(path).locator('[data-slot="checkbox"]');
   }
   async function openFilters(path: string): Promise<void> {
     await openRowMenu(page, path);
@@ -672,11 +674,11 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
     await expect(filtersDialog).toBeVisible();
   }
   async function saveFilters(): Promise<void> {
-    await page.locator('.dialog-footer button', { hasText: 'Save' }).click();
+    await page.locator('[data-slot="dialog-footer"] button', { hasText: 'Save' }).click();
     await expect(filtersDialog).toHaveCount(0);
   }
   async function cancelFilters(): Promise<void> {
-    await page.locator('.dialog-footer button', { hasText: 'Cancel' }).click();
+    await page.locator('[data-slot="dialog-footer"] button', { hasText: 'Cancel' }).click();
     await expect(filtersDialog).toHaveCount(0);
   }
 
@@ -728,10 +730,12 @@ test('project tree — expansion, caching, disconnect/reconnect, search, filters
   await filterObjectRow(APP_PATH).locator('.twisty-btn').click();
   await expect(filterObjectCheckbox(SEQUENCE_PATH)).toBeDisabled();
   await expect(filterObjectRow(SEQUENCE_PATH)).toHaveAttribute('data-state', 'off');
-  await expect(filterObjectRow(SEQUENCE_PATH).locator('.object-checkbox-label')).toHaveAttribute(
-    'data-kira-tip',
-    /.+/,
-  );
+  // P104 §6.2: the disabled-row reason moved off data-kira-tip onto the real Tooltip system
+  // (FiltersDialog.vue's `Tooltip :disabled="!row.disabledReason"`) -- hover to read it instead.
+  await filterObjectRow(SEQUENCE_PATH).locator('.object-checkbox-label').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).not.toHaveCount(0);
+  await expect(page.locator('[data-slot="tooltip-content"]')).not.toHaveText('');
+  await page.mouse.move(0, 0);
   const previewBefore = await page.locator('[data-testid="filters-preview"]').innerText();
   const [shownBefore, totalBefore] = [...previewBefore.matchAll(/\d+/g)].map((m) => Number(m[0]));
   await saveFilters();

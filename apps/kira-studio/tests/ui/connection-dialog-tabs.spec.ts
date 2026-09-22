@@ -238,15 +238,18 @@ test('a save that fails validation on a Pre-connect-tab field switches to that t
 // P19 D1/D2: one width (620) and one height (520) for the whole dialog, both steps and every
 // tab/sub-tab/engine family included — see docs/v1.2/plans/P19-connection-dialog-mongo-console-sql-tooling.md.
 
+// P104: the shadcn Dialog swap put data-testid="connection-dialog" directly on DialogContent --
+// the dialog box itself, not a `.dialog` descendant of some outer wrapper -- and the scrollable
+// body region now carries its own explicit testid rather than a `.dialog-body` class.
 async function dialogBox(page: import('@playwright/test').Page) {
-  const box = await page.locator('[data-testid="connection-dialog"] .dialog').boundingBox();
+  const box = await page.locator('[data-testid="connection-dialog"]').boundingBox();
   if (!box) throw new Error('connection dialog box not found');
   return box;
 }
 
 async function dialogBodyFits(page: import('@playwright/test').Page): Promise<boolean> {
   const { scrollHeight, clientHeight } = await page
-    .locator('[data-testid="connection-dialog"] .dialog-body')
+    .locator('[data-testid="connection-dialog-body"]')
     .evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
   return scrollHeight <= clientHeight;
 }

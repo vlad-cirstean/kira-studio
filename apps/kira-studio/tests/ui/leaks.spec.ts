@@ -384,11 +384,15 @@ test('leak sweep — tab/store symmetry, connection delete purges the tree', asy
   expect(await retention(page)).toEqual(retentionBaseline2);
 
   // A freshly re-opened tab starts from a default runtime: no stale count, nothing counted yet.
+  // P104 §6.2: the count button's tooltip moved off data-kira-tip onto the real Tooltip system
+  // (DataToolbar.vue, Stream B's own file) -- hover to read its now-hover-revealed content instead.
   await (await findRow(page, ORDER_ITEMS_PATH)).dblclick();
   await waitForGrid(page);
   const freshCountButton = page.locator('[data-testid="toolbar-count"]');
   await expect(freshCountButton).not.toHaveClass(/stale/);
-  expect(await freshCountButton.getAttribute('data-kira-tip')).toBe('Count all rows');
+  await freshCountButton.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('Count all rows');
+  await page.mouse.move(0, 0);
   await closeAllTabs(page);
 
   // --- scenario 3: deleting a connection closes its tabs and purges the tree (F6/D6) -----------
