@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { useIntervalFn } from '@vueuse/core';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useDbMcpStore } from '../state/dbmcp';
 import AppButton from '../theme/primitives/AppButton.vue';
 import DialogFrame from '../theme/primitives/DialogFrame.vue';
@@ -12,15 +13,22 @@ const dbMcpStore = useDbMcpStore();
 // than a dock or a notification queue. Renders nothing while dbMcpStore.approval.pending is null.
 
 const denyButton = ref<{ $el: HTMLElement } | null>(null);
-let ticking = 0;
 const now = ref(Date.now());
 
 // Perf (finding #19, M6): this component is always-mounted at App.vue's own root (never
 // unmounted per approval), so a plain onMounted only ever fires once, at app boot — a 1s
-// setInterval started there ticked for the app's entire lifetime even though the dialog itself
-// renders nothing while dbMcpStore.approval.pending is null (DialogFrame's own v-if below). Start
-// and stop the interval instead as pending flips non-null/null.
-//
+// interval started there would tick for the app's entire lifetime even though the dialog itself
+// renders nothing while dbMcpStore.approval.pending is null (DialogFrame's own v-if below).
+// useIntervalFn's own pause()/resume() (immediate: false) is started/stopped instead as pending
+// flips non-null/null.
+const { pause: pauseTick, resume: resumeTick } = useIntervalFn(
+  () => {
+    now.value = Date.now();
+  },
+  1000,
+  { immediate: false },
+);
+
 // This also fixes denyButton's own focus call: run from onMounted, it only ever executed once, at
 // that same app-boot mount — with DialogFrame's v-if false and nothing in the DOM yet, so
 // denyButton.value was always null there and Deny was never actually focused. nextTick here runs
@@ -30,20 +38,16 @@ watch(
   (isPending) => {
     if (isPending) {
       now.value = Date.now();
-      ticking = window.setInterval(() => {
-        now.value = Date.now();
-      }, 1000);
+      resumeTick();
       // Deny is the default focus, an approval dialog whose Enter key runs a write or DDL
       // statement is the wrong default.
       void nextTick(() => denyButton.value?.$el?.focus());
-    } else if (ticking) {
-      window.clearInterval(ticking);
-      ticking = 0;
+    } else {
+      pauseTick();
     }
   },
   { immediate: true },
 );
-onUnmounted(() => window.clearInterval(ticking));
 
 const remainingSeconds = computed(() => {
   const expires = dbMcpStore.approval.pending?.expiresAtMs;
@@ -136,7 +140,7 @@ async function onApprove(): Promise<void> {
     </p>
 
     <template #footer>
-      <span class="p-dialog-actions end footer-actions p-push">
+      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
         <AppButton ref="denyButton" kind="dialog" data-testid="db-mcp-approval-deny" @click="onDeny">
           Deny
         </AppButton>
@@ -154,26 +158,24 @@ async function onApprove(): Promise<void> {
 </template>
 
 <style scoped>
+@reference "@/theme/base.css";
+
 .message {
+  @apply whitespace-pre-wrap;
   margin: 0 0 var(--kira-s-2);
   padding: var(--kira-s-4) var(--kira-s-5) 0;
-  white-space: pre-wrap;
 }
 
 .statement {
+  @apply max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[var(--kira-radius-sm)];
   margin: 0 var(--kira-s-5) var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
-  max-height: 220px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
   background: var(--kira-bg-input);
   border: 1px solid var(--kira-border);
-  border-radius: var(--kira-radius-sm);
 }
 
 .detail {
-  margin: 0;
+  @apply m-0;
   padding: 0 var(--kira-s-5) var(--kira-s-4);
   color: var(--kira-fg-subtle);
 }
@@ -183,10 +185,6 @@ async function onApprove(): Promise<void> {
 }
 
 .plan-issue {
-  padding-top: 0;
-}
-
-.footer-actions {
-  gap: var(--kira-s-2);
+  @apply pt-0;
 }
 </style>

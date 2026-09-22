@@ -103,19 +103,19 @@ watch(
     close-test-id="upload-close"
     @close="onClose"
   >
-    <div class="upload-form">
+    <div class="flex flex-col" style="gap: var(--kira-s-3); padding: var(--kira-s-4) var(--kira-s-5)">
       <AppButton kind="dialog" data-testid="upload-choose-file" @click="chooseFile">
         Choose file…
       </AppButton>
-      <div v-if="chosenFile" class="chosen-file p-sm muted" data-testid="upload-chosen-file">
+      <div v-if="chosenFile" class="p-sm muted p-0" data-testid="upload-chosen-file">
         {{ chosenFile.name }} ({{ formatBytes(chosenFile.size) }})
       </div>
 
       <template v-if="chosenFile">
-        <label class="field-label p-sm muted">Key</label>
+        <label class="p-sm muted p-0">Key</label>
         <TextField v-model="key" data-testid="upload-key" />
 
-        <label class="field-label p-sm muted">Content type</label>
+        <label class="p-sm muted p-0">Content type</label>
         <TextField v-model="contentType" data-testid="upload-content-type" />
       </template>
 
@@ -123,7 +123,9 @@ watch(
     </div>
 
     <template #footer>
-      <span class="p-dialog-actions end footer-actions p-push">
+      <!-- p-dialog-actions.end supplies display/align-items/justify-content/width; this dialog
+           keeps its own tighter s-2 gap rather than the shared s-3. -->
+      <span class="p-dialog-actions end p-push" style="gap: var(--kira-s-2)">
         <AppButton kind="dialog" data-testid="upload-cancel" @click="onClose">Cancel</AppButton>
         <AppButton
           kind="dialog"
@@ -138,26 +140,3 @@ watch(
     </template>
   </DialogFrame>
 </template>
-
-<style scoped>
-.upload-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kira-s-3);
-  padding: var(--kira-s-4) var(--kira-s-5);
-}
-
-.chosen-file {
-  padding: 0;
-}
-
-.field-label {
-  padding: 0;
-}
-
-/* p-dialog-actions.end supplies display/align-items/justify-content/width; this dialog keeps its
-   own tighter s-2 gap rather than the shared s-3. */
-.footer-actions {
-  gap: var(--kira-s-2);
-}
-</style>
