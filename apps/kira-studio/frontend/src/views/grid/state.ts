@@ -14,14 +14,10 @@ import {
   registerTabReload,
   reloadTabsForTarget,
 } from '../../state/viewCommands';
+import { runPagedLoad } from '../shared/page/load';
+import { createPageNavigation } from '../shared/page/navigation';
 import type { Selection } from '../shared/slick/selection';
-import {
-  applyLoadFailure,
-  beginOp,
-  createRuntimeStore,
-  runPagedCount,
-  stopOp,
-} from '../shared/viewOp';
+import { beginOp, createRuntimeStore, runPagedCount } from '../shared/viewOp';
 import { clearCellFocus } from './focusRequest';
 import { setPage } from './page';
 import { usePendingChangesStore } from './pendingChanges';
@@ -151,60 +147,58 @@ export const useGridViewStore = defineStore('gridView', () => {
     };
     const opId = beginOp(rt);
 
-    try {
-      const response = await data.read({
-        opId,
-        tabId,
-        connectionId: tab.connectionId,
-        path: tab.path,
-        projection: tab.state.projection,
-        filter: tab.state.filter,
-        sort: tab.state.sort,
-        pageSize: tab.state.pageSize,
-        cursor: effectiveCursor,
-      });
-      // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
-      // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
-      // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
-      if (!runtime[tabId]) return;
-      if (rt.opId !== opId) return; // superseded by a newer load
-
-      // A 'data' tab only ever exists against a tabular-shaped adapter (Postgres/MariaDB) — Mongo
-      // opens a 'document' tab instead (P8) — so this narrows rather than widening setPage/getPage.
-      if (response.page.kind !== 'tabular') {
-        throw new Error(`unexpected page kind for a data tab: ${response.page.kind}`);
-      }
-      setPage(tabId, response.page);
-      rt.status = 'idle';
-      rt.opId = null;
-      rt.hasMore = response.page.position.hasMore;
-      rt.nextToken = response.page.position.nextToken;
-      rt.prevToken = response.page.position.prevToken;
-      // 'cursor'/'offsetWindow'/'batch' are keyvalue/stream-page concepts (P9/P10) — a tabular
-      // page's own keyset/offset readers never produce them.
-      const strategy = response.page.position.strategy;
-      if (strategy !== 'keyset' && strategy !== 'offset') {
-        throw new Error(`unexpected ${strategy} pagination for a tabular page`);
-      }
-      rt.lastStrategy = strategy;
-      if (!rt.meta) void loadMeta(tabId);
-    } catch (err) {
-      // A stop button that blanks the grid is worse than the query the user stopped — the
-      // previously rendered page stays exactly as it was. Disconnected: same entry point as a
-      // restored tab, one component, two ways in.
-      const superseded = rt.opId !== opId;
-      applyLoadFailure(rt, opId, err, tabId);
-      // A newer load has already taken over pageIndex (and this one's own optimistic patch is
-      // ancient history by comparison) — reverting here would stomp on state this failure has
-      // nothing to do with.
-      if (!superseded && revertPageIndexOnFailure !== undefined) {
-        useTabsStore().patchDataTabState(tabId, { pageIndex: revertPageIndexOnFailure });
-      }
-      // P67 §5.2: a load that produced no page can never satisfy a pending focus request — leaving
-      // it pending would let a *later*, unrelated load consume it and jump somewhere nobody asked
-      // for.
-      clearCellFocus(tabId);
-    }
+    // A 'data' tab only ever exists against a tabular-shaped adapter (Postgres/MariaDB) — Mongo
+    // opens a 'document' tab instead (P8) — so expectKind narrows rather than widening
+    // setPage/getPage. A stop button that blanks the grid is worse than the query the user
+    // stopped — a failure here (below) leaves the previously rendered page exactly as it was.
+    await runPagedLoad({
+      rt,
+      opId,
+      stillMounted: () => Boolean(runtime[tabId]),
+      read: () =>
+        data.read({
+          opId,
+          tabId,
+          connectionId: tab.connectionId as string,
+          path: tab.path,
+          projection: tab.state.projection,
+          filter: tab.state.filter,
+          sort: tab.state.sort,
+          pageSize: tab.state.pageSize,
+          cursor: effectiveCursor,
+        }),
+      expectKind: 'tabular',
+      id: tabId,
+      tabNoun: 'data tab',
+      apply: (page) => {
+        setPage(tabId, page);
+        rt.status = 'idle';
+        rt.opId = null;
+        rt.hasMore = page.position.hasMore;
+        rt.nextToken = page.position.nextToken;
+        rt.prevToken = page.position.prevToken;
+        // 'cursor'/'offsetWindow'/'batch' are keyvalue/stream-page concepts (P9/P10) — a tabular
+        // page's own keyset/offset readers never produce them.
+        const strategy = page.position.strategy;
+        if (strategy !== 'keyset' && strategy !== 'offset') {
+          throw new Error(`unexpected ${strategy} pagination for a tabular page`);
+        }
+        rt.lastStrategy = strategy;
+        if (!rt.meta) void loadMeta(tabId);
+      },
+      onFailure: (superseded) => {
+        // A newer load has already taken over pageIndex (and this one's own optimistic patch is
+        // ancient history by comparison) — reverting here would stomp on state this failure has
+        // nothing to do with.
+        if (!superseded && revertPageIndexOnFailure !== undefined) {
+          useTabsStore().patchDataTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+        }
+        // P67 §5.2: a load that produced no page can never satisfy a pending focus request —
+        // leaving it pending would let a *later*, unrelated load consume it and jump somewhere
+        // nobody asked for.
+        clearCellFocus(tabId);
+      },
+    });
   }
 
   // The explicit ↻ Refresh affordance — hard-drops both pages and the count (default `scope: 'all'`).
@@ -245,73 +239,18 @@ export const useGridViewStore = defineStore('gridView', () => {
     );
   }
 
-  function stop(tabId: string): void {
-    stopOp(runtime[tabId]);
-  }
-
-  async function goFirst(tabId: string): Promise<void> {
-    const prevIndex = useTabsStore().findDataTab(tabId)?.state.pageIndex;
-    useTabsStore().patchDataTabState(tabId, { pageIndex: 0 });
-    await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
-  }
-
-  // D7's cursor choice: prefer the token when one is available, falling back to offset — the
-  // pager position (`pageIndex`) always advances by one regardless of which strategy served it.
-  async function goNext(tabId: string): Promise<void> {
-    const tab = useTabsStore().findDataTab(tabId);
-    if (!tab) return;
-    const rt = ensureRuntime(tabId);
-    const prevIndex = tab.state.pageIndex;
-    const nextIndex = prevIndex + 1;
-    const cursor: PageCursor = rt.nextToken
-      ? { mode: 'after', token: rt.nextToken }
-      : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
-    useTabsStore().patchDataTabState(tabId, { pageIndex: nextIndex });
-    await load(tabId, cursor, prevIndex);
-  }
-
-  async function goPrev(tabId: string): Promise<void> {
-    const tab = useTabsStore().findDataTab(tabId);
-    if (!tab) return;
-    const rt = ensureRuntime(tabId);
-    const prevIndex = tab.state.pageIndex;
-    const targetIndex = Math.max(0, prevIndex - 1);
-    const cursor: PageCursor = rt.prevToken
-      ? { mode: 'before', token: rt.prevToken }
-      : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
-    useTabsStore().patchDataTabState(tabId, { pageIndex: targetIndex });
-    await load(tabId, cursor, prevIndex);
-  }
-
-  // Requires a count and is offset (pageCount-1)*pageSize (§8c) — the toolbar disables ⏭ until
-  // Σ has run.
-  async function goLast(tabId: string): Promise<void> {
-    const tab = useTabsStore().findDataTab(tabId);
-    const rt = runtime[tabId];
-    if (!tab || !rt?.count) return;
-    const prevIndex = tab.state.pageIndex;
-    const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
-    const lastIndex = pageCount - 1;
-    useTabsStore().patchDataTabState(tabId, { pageIndex: lastIndex });
-    await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize }, prevIndex);
-  }
-
-  async function goToPage(tabId: string, n: number): Promise<void> {
-    const tab = useTabsStore().findDataTab(tabId);
-    if (!tab) return;
-    const prevIndex = tab.state.pageIndex;
-    const index = Math.max(0, n);
-    useTabsStore().patchDataTabState(tabId, { pageIndex: index });
-    await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize }, prevIndex);
-  }
-
-  // Every state-changing control resets paging to page 0 (§8.5) — page 40 at 100 rows is not
-  // page 40 at 10 000, and a changed filter/sort/projection invalidates whatever tokens were held.
-  function resetTokens(tabId: string): void {
-    const rt = ensureRuntime(tabId);
-    rt.nextToken = null;
-    rt.prevToken = null;
-  }
+  // I2-14: stop/goFirst/goNext/goPrev/goLast/goToPage/resetTokens — mirrors views/documents/
+  // state.ts's own set exactly, modulo the tab accessor pair below. Every state-changing control
+  // resets paging to page 0 (§8.5) — page 40 at 100 rows is not page 40 at 10 000, and a changed
+  // filter/sort/projection invalidates whatever tokens were held; goLast requires a count — the
+  // toolbar disables ⏭ until Σ has run.
+  const { stop, goNext, goPrev, goFirst, goLast, goToPage, resetTokens } = createPageNavigation({
+    tab: (tabId) => useTabsStore().findDataTab(tabId)?.state,
+    patch: (tabId, p) => useTabsStore().patchDataTabState(tabId, p),
+    runtime: (tabId) => runtime[tabId],
+    ensureRuntime,
+    load,
+  });
 
   async function setPageSize(tabId: string, pageSize: DataTabState['pageSize']): Promise<void> {
     const prevIndex = useTabsStore().findDataTab(tabId)?.state.pageIndex;
