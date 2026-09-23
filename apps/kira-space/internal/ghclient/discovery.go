@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // Locator resolves a candidate `gh` binary path, without running it — D3's own narrowed probe
@@ -18,14 +20,6 @@ type Locator interface {
 	// Locate returns the first usable candidate, and the full list of paths considered (in probe
 	// order) either way.
 	Locate() (path string, probed []string, found bool)
-}
-
-func isExecutable(stat func(string) (os.FileInfo, error), path string) bool {
-	info, err := stat(path)
-	if err != nil || info.IsDir() {
-		return false
-	}
-	return info.Mode()&0o111 != 0
 }
 
 type platformLocator struct {
@@ -54,7 +48,7 @@ func (l *platformLocator) Locate() (string, []string, bool) {
 	for _, dir := range []string{"/opt/homebrew/bin", "/usr/local/bin"} {
 		candidate := filepath.Join(dir, "gh")
 		probed = append(probed, candidate)
-		if isExecutable(l.stat, candidate) {
+		if toolexec.IsExecutable(l.stat, candidate) {
 			return candidate, probed, true
 		}
 	}
