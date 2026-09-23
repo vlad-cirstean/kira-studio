@@ -1,3 +1,4 @@
+import { assertTooltipShows } from '../ui/support/tooltip';
 import { expect, test } from './fixtures';
 import { installPassthrough } from './support/passthrough';
 import {
@@ -73,11 +74,11 @@ test('real backend through a plain browser tab: connect, tree, rows', async ({
   await expect(page.locator('[data-testid="context-menu"]')).toBeVisible();
   await page.click('[data-testid="menu-item-connect"]');
 
-  // The real adapter's own version string, not a canned one — assert().toStartWith would be
-  // nicer, but toHaveAttribute's regex form does the same job.
+  // The real adapter's own version string, not a canned one.
+  // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
   const statusDot = connRow.locator('.status-dot');
   await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 15_000 });
-  await expect(statusDot).toHaveAttribute('data-kira-tip', /^SQLite 3\./);
+  await assertTooltipShows(page, statusDot, /^SQLite 3\./);
 
   await connRow.locator('.twisty').click();
   const dbRow = page.locator('[data-testid="tree-row"][data-path="database:main"]');

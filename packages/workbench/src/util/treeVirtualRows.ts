@@ -1,13 +1,8 @@
-import {
-  STICKY_MAX_ROWS,
-  type StickyRowLike,
-  stickyBand,
-  stickyInsetFor,
-} from '@theme/primitives/stickyBand';
+import { STICKY_MAX_ROWS, type StickyRowLike, stickyBand, stickyInsetFor } from '@theme/stickyBand';
 import { computed, type Ref } from 'vue';
 import { useVirtualRows } from './virtualRows';
 
-// P104 §3.4: theme/primitives/TreeHost.vue's own recipe (virtualization + the pinned ancestor
+// P104 §3.4: the old hand-rolled tree host's own recipe (virtualization + the pinned ancestor
 // band + reveal-scroll) rebuilt on useVirtualRows -- stickyBand.ts itself is a logic file, not a
 // component primitive, and stays untouched (§1.7's own distinction).
 export function useTreeVirtualRows<T extends StickyRowLike & { key: string }>(opts: {

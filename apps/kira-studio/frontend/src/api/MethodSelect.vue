@@ -45,7 +45,7 @@ function select(method: HttpMethod): void {
         </button>
       </PopoverTrigger>
     </div>
-    <PopoverContent align="start" class="w-[140px] gap-0 p-0" data-testid="method-menu">
+    <PopoverContent align="start" class="w-36 gap-0 p-0" data-testid="method-menu">
       <div class="method-menu">
         <button
           v-for="m in HTTP_METHODS"

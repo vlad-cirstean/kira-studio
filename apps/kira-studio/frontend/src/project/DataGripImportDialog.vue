@@ -343,7 +343,7 @@ async function onConfirm(): Promise<void> {
 }
 
 .ds-name {
-  @apply min-w-0 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap;
+  @apply min-w-0 max-w-56 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .ds-target,

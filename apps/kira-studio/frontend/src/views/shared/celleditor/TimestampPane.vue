@@ -169,7 +169,7 @@ watch(calendarOpen, (open) => {
           </Tooltip>
           <PopoverAnchor :reference="calendarAnchorRef ?? undefined" />
         </span>
-        <PopoverContent align="start" class="w-[228px] gap-0 p-0" data-testid="cell-editor-timestamp-calendar-popover">
+        <PopoverContent align="start" class="w-56 gap-0 p-0" data-testid="cell-editor-timestamp-calendar-popover">
           <DateTimePicker :model-value="pickerDate" :zone="zone" @update:model-value="onPick" />
         </PopoverContent>
       </Popover>

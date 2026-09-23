@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { assertTooltipShows } from '../ui/support/tooltip';
 import { expect, test } from './fixtures';
 import { type KafkaFixture, startKafka } from './support/kafka';
 import {
@@ -80,9 +81,10 @@ test('C1b: real MariaDB (native), end to end, keyset paging over big_rows', asyn
   await page.click('[data-testid="menu-item-connect"]');
 
   // Step 6: the real Go-native adapter's own server-version handshake, not a canned one.
+  // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
   const mariaStatusDot = mariaRow.locator('.status-dot');
   await expect(mariaStatusDot).toHaveAttribute('data-status', 'connected', { timeout: 15_000 });
-  await expect(mariaStatusDot).toHaveAttribute('data-kira-tip', /^MariaDB \d+\./);
+  await assertTooltipShows(page, mariaStatusDot, /^MariaDB \d+\./);
 
   // Step 7: tree expands straight to relations — MariaDB has no schema level, unlike Postgres's
   // database -> schema -> relation depth.

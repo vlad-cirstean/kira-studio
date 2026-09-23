@@ -259,6 +259,6 @@ const rawLanguage = computed(() =>
 }
 
 .raw-body {
-  @apply h-[260px] border border-border rounded-kira-sm overflow-hidden;
+  @apply h-64 border border-border rounded-kira-sm overflow-hidden;
 }
 </style>

@@ -773,7 +773,7 @@ const statusLine = computed(() => {
           >
             <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
             ><span
-              class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+              class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
               :class="{
                 'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
                   runState.status === 'running',
@@ -1014,14 +1014,14 @@ const statusLine = computed(() => {
 }
 
 .editor-body {
-  @apply flex-[1_1_40%] min-h-0 border-b border-border;
+  @apply flex-1 basis-2/5 min-h-0 border-b border-border;
 }
 
 /* P40 D7: flex:1 (not a fixed height) so the active result's grid always reaches the panel's
    bottom edge — DataView.vue's own .grid-area rule (F1: the fixed-height .result-panel this used
    to be left an empty band below the last row whenever a result had fewer rows than that height). */
 .results-body {
-  @apply flex-[1_1_60%] min-h-0 flex flex-col;
+  @apply flex-1 basis-3/5 min-h-0 flex flex-col;
 }
 
 /* One .p-tab chip per result set (P40 D3) — the same "chip with a nested close span" markup
@@ -1057,7 +1057,7 @@ const statusLine = computed(() => {
 }
 
 .result-tab {
-  @apply max-w-[140px] h-5.5 text-kira-xs;
+  @apply max-w-36 h-5.5 text-kira-xs;
 }
 
 .result-tab:hover:not(.is-active) {

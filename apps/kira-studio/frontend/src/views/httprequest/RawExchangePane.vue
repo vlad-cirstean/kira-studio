@@ -311,7 +311,7 @@ defineExpose({
 }
 
 .raw-section {
-  @apply flex min-h-[200px] flex-col gap-0.5;
+  @apply flex min-h-52 flex-col gap-0.5;
 }
 
 .raw-section-header {
@@ -323,7 +323,7 @@ defineExpose({
 }
 
 .raw-editor {
-  @apply flex-1 min-h-[200px] overflow-hidden rounded-kira border border-border;
+  @apply flex-1 min-h-52 overflow-hidden rounded-kira border border-border;
 }
 
 .empty-state {

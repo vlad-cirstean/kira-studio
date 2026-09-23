@@ -149,7 +149,7 @@ function close(): void {
 @reference "@theme/base.css";
 
 .raw-editor {
-  @apply h-[320px] overflow-hidden rounded-kira border border-border;
+  @apply h-80 overflow-hidden rounded-kira border border-border;
 }
 
 .warnings {

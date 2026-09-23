@@ -380,7 +380,7 @@ onUnmounted(() => {
 }
 
 .diff-headers {
-  @apply max-h-[160px] shrink-0 overflow-auto border-b border-border px-2 py-1;
+  @apply max-h-40 shrink-0 overflow-auto border-b border-border px-2 py-1;
 }
 
 .diff-header-row {
@@ -389,7 +389,7 @@ onUnmounted(() => {
 }
 
 .diff-header-head {
-  @apply text-subtle uppercase tracking-[0.05em];
+  @apply text-subtle uppercase tracking-wider;
 }
 
 .diff-header-row.added .diff-header-status {

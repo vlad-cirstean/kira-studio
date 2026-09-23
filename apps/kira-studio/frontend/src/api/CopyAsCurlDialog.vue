@@ -90,7 +90,7 @@ function close(): void {
       <div class="overflow-auto">
     <div class="p-dialog-body">
       <Textarea
-        class="font-data min-h-[180px]"
+        class="font-data min-h-44"
         :model-value="command"
         readonly
         rows="10"

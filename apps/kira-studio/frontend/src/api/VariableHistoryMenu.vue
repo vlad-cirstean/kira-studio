@@ -33,7 +33,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
 </script>
 
 <template>
-  <PopoverContent align="start" class="w-[280px] gap-0 p-0" data-testid="variable-history">
+  <PopoverContent align="start" class="w-72 gap-0 p-0" data-testid="variable-history">
     <div class="history-menu">
       <Alert
         v-if="variableSetStore.entries.length === 0"
@@ -95,7 +95,7 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
 @reference "@theme/base.css";
 
 .history-menu {
-  @apply flex max-h-[320px] flex-col overflow-auto p-1;
+  @apply flex max-h-80 flex-col overflow-auto p-1;
 }
 
 .history-entry {

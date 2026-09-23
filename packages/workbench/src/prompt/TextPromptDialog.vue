@@ -62,7 +62,7 @@ onMounted(() => {
 }
 
 .text-prompt-box {
-  @apply w-[280px] flex flex-col gap-1.5 p-2;
+  @apply w-72 flex flex-col gap-1.5 p-2;
 }
 
 .text-prompt-actions {

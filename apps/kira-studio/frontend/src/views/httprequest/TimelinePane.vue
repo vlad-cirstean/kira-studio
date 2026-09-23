@@ -11,7 +11,7 @@ import { useHttpRequestViewStore } from './state';
 
 // P10 D11/D12/D13/F18: the waterfall and the per-hop detail — a fifth response-pane segment,
 // mounted here (not http/) for the same reason RawExchangePane.vue is (P9 F16): it needs
-// theme/primitives/ and views/**'s own import rights, which http/** does not have (biome.json).
+// theme/ and views/**'s own import rights, which http/** does not have (biome.json).
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const httpRequestViewStore = useHttpRequestViewStore();
 const httpHistoryStore = useHttpHistoryStore();
@@ -352,11 +352,11 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .hop-track {
-  @apply relative h-[10px] overflow-hidden rounded-kira-sm bg-input;
+  @apply relative h-3 overflow-hidden rounded-kira-sm bg-input;
 }
 
 .hop-bar {
-  @apply absolute inset-y-0 flex min-w-[2px];
+  @apply absolute inset-y-0 flex min-w-0.5;
 }
 
 .hop-segment {
@@ -393,7 +393,7 @@ function hopNotes(hop: HttpTimelineHop): HopNote[] {
 }
 
 .legend-swatch {
-  @apply inline-block h-[8px] w-[8px] rounded-kira-sm;
+  @apply inline-block h-2 w-2 rounded-kira-sm;
 }
 
 .empty-state {

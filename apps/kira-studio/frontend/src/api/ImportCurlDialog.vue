@@ -114,7 +114,7 @@ function close(): void {
 @reference "@theme/base.css";
 
 .curl-textarea {
-  @apply min-h-[120px];
+  @apply min-h-32;
 }
 
 .warnings {

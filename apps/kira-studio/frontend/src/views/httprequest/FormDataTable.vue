@@ -10,7 +10,7 @@ import { formatBytes } from '@workbench/util/format';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import { templateToken } from '../../theme/primitives/completion';
+import { templateToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 import { chooseBodyFile } from './files';

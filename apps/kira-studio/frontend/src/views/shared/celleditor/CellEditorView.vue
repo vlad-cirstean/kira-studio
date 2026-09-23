@@ -552,7 +552,7 @@ const statusLine = computed(() => {
               </Tooltip>
               <PopoverAnchor :reference="generateAnchorRef ?? undefined" />
             </span>
-            <PopoverContent align="start" class="w-[200px] gap-0 p-0" data-testid="cell-editor-generate-popover">
+            <PopoverContent align="start" class="w-52 gap-0 p-0" data-testid="cell-editor-generate-popover">
               <div class="generate-menu">
                 <Tooltip v-for="gen in GENERATORS" :key="gen.id">
                   <TooltipTrigger as-child>
@@ -709,7 +709,7 @@ const statusLine = computed(() => {
    appearance:base-select/::picker(select)/option rules are select-only and simply don't match a
    <button>, which is why the chevron below is drawn explicitly instead of relying on one. */
 .format-select {
-  @apply max-w-[160px] font-[family-name:var(--kira-font-ui)];
+  @apply max-w-40 font-[family-name:var(--kira-font-ui)];
 }
 
 .format-select-label {
@@ -723,7 +723,7 @@ const statusLine = computed(() => {
 /* The message chip (formatProblem) truncates the same way status-badge does — the squiggly
    underline in the editor below and this chip's own tooltip both carry the untruncated text. */
 .invalid-chip {
-  @apply max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap;
+  @apply max-w-56 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
 .generate-anchor {
@@ -744,7 +744,7 @@ const statusLine = computed(() => {
    (title carries the full text) rather than growing unbounded and pushing the trailing
    read-only chip around. */
 .status-badge {
-  @apply max-w-[220px] overflow-hidden text-ellipsis;
+  @apply max-w-56 overflow-hidden text-ellipsis;
 }
 
 .editor-body {
@@ -759,7 +759,7 @@ const statusLine = computed(() => {
    encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a side-by-side
    split — this panel is usually too narrow for two columns to read comfortably. */
 .editor-body.has-translate .encoded-pane {
-  @apply flex-[1_1_55%] border-b border-border;
+  @apply flex-1 basis-7/12 border-b border-border;
 }
 
 .translate-head {
@@ -767,10 +767,10 @@ const statusLine = computed(() => {
 }
 
 .translate-pane {
-  @apply flex-[1_1_45%] min-h-0;
+  @apply flex-1 basis-5/12 min-h-0;
 }
 
 .translate-pane-empty {
-  @apply flex-[1_1_45%] items-center text-subtle;
+  @apply flex-1 basis-5/12 items-center text-subtle;
 }
 </style>

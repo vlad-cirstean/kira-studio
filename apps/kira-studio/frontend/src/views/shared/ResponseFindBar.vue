@@ -231,7 +231,7 @@ onMounted(() => {
 }
 
 .find-input {
-  @apply w-[200px] shrink-0;
+  @apply w-52 shrink-0;
 }
 
 .find-count {

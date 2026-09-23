@@ -180,7 +180,7 @@ async function onApprove(): Promise<void> {
 }
 
 .statement {
-  @apply max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-kira-sm;
+  @apply max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-kira-sm;
   margin: 0 var(--kira-s-5) var(--kira-s-2);
   padding: var(--kira-s-2) var(--kira-s-3);
   background: var(--kira-bg-input);

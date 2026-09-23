@@ -171,7 +171,7 @@ function onCancel(): void {
 }
 
 .bulk-body {
-  @apply flex-1 min-h-[200px] overflow-hidden rounded-kira border border-border;
+  @apply flex-1 min-h-52 overflow-hidden rounded-kira border border-border;
 }
 
 .bulk-summary {

@@ -83,7 +83,7 @@ function editEnvironmentVariables(): void {
 </script>
 
 <template>
-  <PopoverContent align="start" class="w-[360px] gap-0 p-0" data-testid="variables-overview">
+  <PopoverContent align="start" class="w-96 gap-0 p-0" data-testid="variables-overview">
     <div class="overview-panel">
       <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>

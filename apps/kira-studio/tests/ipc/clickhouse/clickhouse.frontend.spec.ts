@@ -1,5 +1,6 @@
 import { expect, test } from '../../ui/fixtures';
 import { gridCell } from '../../ui/support/grid';
+import { assertTooltipShows } from '../../ui/support/tooltip';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './clickhouse.fixture';
@@ -43,7 +44,8 @@ test('clickhouse (frontend, mocked IPC) — tree, filter-by-value quoting, delet
   await page.click('[data-testid="menu-item-connect"]');
   const statusDot = connRow.locator('.status-dot');
   await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
-  await expect(statusDot).toHaveAttribute('data-kira-tip', /^ClickHouse 2\d\./);
+  // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
+  await assertTooltipShows(page, statusDot, /^ClickHouse 2\d\./);
 
   // --- tree: tables ungrouped, Views/Materialized views folders, no INFORMATION_SCHEMA row ------
   await expandRow(page, '');
@@ -99,7 +101,13 @@ test('clickhouse (frontend, mocked IPC) — tree, filter-by-value quoting, delet
   await expect(addRowButton).toBeEnabled();
   const deleteRowButton = page.locator('[data-testid="toolbar-delete-row"]');
   await expect(deleteRowButton).toBeDisabled();
-  await expect(deleteRowButton).toHaveAttribute('data-kira-tip', /does not support deleting rows/);
+  // P104 §6.3: a disabled <button> receives no pointer events in Blink, so the never-disabled
+  // wrapper <span> is the real trigger and hit target.
+  await assertTooltipShows(
+    page,
+    deleteRowButton.locator('xpath=..'),
+    /does not support deleting rows/,
+  );
 
   await idCell.dblclick();
   await expect(page.locator('[data-testid="grid-cell-input"]')).toHaveCount(0);

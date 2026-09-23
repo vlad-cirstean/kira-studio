@@ -131,14 +131,16 @@ test('datagrip import — the preview lists every row, greys the unsupported one
   // The unsupported-engine row is greyed, has no checkbox, and names the driver.
   const oracleRow = page.locator('[data-testid="datagrip-row-uuid-oracle"]');
   await expect(oracleRow).toHaveAttribute('data-importable', 'false');
-  await expect(oracleRow.locator('input[type="checkbox"]')).toHaveCount(0);
+  // P104: reka's CheckboxRoot renders `<button role="checkbox">`, not a native
+  // `<input type="checkbox">` -- matched by its own data-slot instead (tree.spec.ts precedent).
+  await expect(oracleRow.locator('[data-slot="checkbox"]')).toHaveCount(0);
   await expect(oracleRow.locator('[data-testid="datagrip-row-skip-reason"]')).toContainText(
     'oracle',
   );
 
   // The password-not-saved row is still importable and checked by default, with its outlook shown.
   const notSavedRow = page.locator('[data-testid="datagrip-row-uuid-not-saved"]');
-  await expect(notSavedRow.locator('input[type="checkbox"]')).toBeChecked();
+  await expect(notSavedRow.locator('[data-slot="checkbox"]')).toBeChecked();
   await expect(notSavedRow.locator('[data-testid="datagrip-row-outlook"]')).toContainText(
     'did not save',
   );
@@ -146,7 +148,7 @@ test('datagrip import — the preview lists every row, greys the unsupported one
   // The row matching an existing connection is badged and starts unchecked (D10).
   const dupRow = page.locator('[data-testid="datagrip-row-uuid-dup"]');
   await expect(dupRow.locator('[data-testid="datagrip-row-duplicate"]')).toBeVisible();
-  await expect(dupRow.locator('input[type="checkbox"]')).not.toBeChecked();
+  await expect(dupRow.locator('[data-slot="checkbox"]')).not.toBeChecked();
 
   // Confirm's label counts only checked rows: pg-main + ci-db, not the dup or the oracle row.
   await expect(page.locator('[data-testid="datagrip-import-confirm"]')).toHaveText(

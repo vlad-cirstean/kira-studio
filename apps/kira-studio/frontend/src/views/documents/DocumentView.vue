@@ -771,7 +771,7 @@ onUnmounted(() => {
                 <CodiconIcon name="list-selection" :size="13" />
                 <span
                   v-if="tab.state.projection !== null"
-                  class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-state-on"
+                  class="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-state-on"
                 />
               </Button>
             </TooltipTrigger>
@@ -784,7 +784,7 @@ onUnmounted(() => {
                (hidden) never matters for positioning. -->
           <Popover :open="projectionOpen" @update:open="(v) => (projectionOpen = v)">
             <PopoverAnchor :reference="(projectionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
-            <PopoverContent align="end" class="w-[200px] p-0" data-testid="document-projection-menu">
+            <PopoverContent align="end" class="w-52 p-0" data-testid="document-projection-menu">
               <ProjectionMenu :tab-id="tab.id" :caps="caps" />
             </PopoverContent>
           </Popover>
@@ -864,7 +864,7 @@ onUnmounted(() => {
           >
             <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
             ><span
-              class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+              class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
               :class="{
                 'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
                   runState.status === 'running',
@@ -1201,7 +1201,7 @@ onUnmounted(() => {
    SQL-style box's 230px — a Mongo sort document (`{ createdAt: -1, name: 1 }`) runs a bit longer
    than the old `field ASC, field2 DESC` text it replaced. */
 .sort-field {
-  @apply w-[280px] shrink-0;
+  @apply w-72 shrink-0;
 }
 
 .sort-field :deep(.p-input) {

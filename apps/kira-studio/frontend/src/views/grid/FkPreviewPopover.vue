@@ -196,7 +196,7 @@ onUnmounted(() => {
 }
 
 .fk-preview {
-  @apply fixed w-[320px] flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)];
+  @apply fixed w-80 flex flex-col max-h-[var(--kira-float-max-h,none)] max-w-[var(--kira-float-max-w,none)];
 }
 
 .fk-preview-header {

@@ -30,7 +30,7 @@ const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
 
 <template>
   <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, treeStore.search)">
-    <div class="p-panel-head h-[34px]">
+    <div class="p-panel-head h-bar">
       <span>Connections</span>
       <Tooltip>
         <TooltipTrigger as-child>

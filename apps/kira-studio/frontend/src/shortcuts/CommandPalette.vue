@@ -36,7 +36,7 @@ function onKeydown(e: KeyboardEvent): void {
     <div class="palette p-float" data-testid="command-palette" @click.stop>
       <Command class="rounded-none! p-0!" @keydown="onKeydown">
         <CommandInput data-testid="command-palette-input" placeholder="Type a command…" />
-        <CommandList class="max-h-[300px]">
+        <CommandList class="max-h-72">
           <CommandEmpty class="dim" data-testid="command-palette-empty">No matching commands</CommandEmpty>
           <CommandItem
             v-for="command in paletteStore.paletteCommands"
@@ -61,7 +61,7 @@ function onKeydown(e: KeyboardEvent): void {
 .palette-backdrop {
   /* P28 D17(c): the dialog rung — the palette is a modal over the whole workbench, and this was
      a bare 100, the literal DialogFrame used to carry. Same relationship, named. */
-  @apply fixed inset-0 flex items-start justify-center pt-[120px] bg-black/30;
+  @apply fixed inset-0 flex items-start justify-center pt-30 bg-black/30;
   z-index: var(--kira-z-dialog);
 }
 

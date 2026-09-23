@@ -52,7 +52,7 @@ defineSlots<{
 </script>
 
 <template>
-  <PopoverContent align="start" class="w-[320px] gap-0 p-0" :data-testid="panelTestId">
+  <PopoverContent align="start" class="w-80 gap-0 p-0" :data-testid="panelTestId">
     <div class="saved-list-menu-inner">
       <div class="p-menu-label">{{ title }}</div>
       <div v-if="saved.length === 0" class="empty-row p-sm dim">{{ emptySavedText }}</div>

@@ -335,7 +335,7 @@ const connectionName = computed(
 
 .kind-list,
 .object-list {
-  @apply flex flex-col gap-px max-h-[220px] overflow-y-auto rounded-kira-sm;
+  @apply flex flex-col gap-px max-h-56 overflow-y-auto rounded-kira-sm;
   border: var(--kira-border-width) solid var(--kira-border);
   padding: var(--kira-s-2);
 }

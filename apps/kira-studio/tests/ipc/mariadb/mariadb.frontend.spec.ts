@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../../ui/fixtures';
+import { assertTooltipShows } from '../../ui/support/tooltip';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import { controlSnapshots, portSnapshots } from './mariadb.fixture';
 
@@ -53,11 +54,8 @@ test('mariadb (frontend, mocked IPC) — connect, tree, data tab, count, filter,
   await expect.poll(() => firstGutterNumber(page), { timeout: 15_000 }).toBe('1');
 
   await page.click('[data-testid="toolbar-count"]');
-  await expect(page.locator('[data-testid="toolbar-count"]')).toHaveAttribute(
-    'data-kira-tip',
-    /3/,
-    { timeout: 15_000 },
-  );
+  // P104 §6: the count tooltip moved off `data-kira-tip` onto the real Tooltip system.
+  await assertTooltipShows(page, page.locator('[data-testid="toolbar-count"]'), /3/, 15_000);
 
   // --- filter (row 6) ------------------------------------------------------------------------
   await page.fill('[data-testid="filter-where-input"]', 'quantity > 1');

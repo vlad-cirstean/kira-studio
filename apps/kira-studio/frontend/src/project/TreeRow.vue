@@ -252,7 +252,7 @@ function onContextMenu(e: MouseEvent): void {
 .label mark {
   /* Same yellow search-match tint as DataGrid.vue/StreamView.vue/etc. (D21) — one highlight
      color for every search-capable view in the app. */
-  @apply rounded-[2px];
+  @apply rounded-sm;
   background: var(--kira-search-match);
   color: inherit;
 }

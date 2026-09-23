@@ -1,5 +1,5 @@
 import type { FileStatusCode } from '@shared/domain/repo';
-import type { StickyRowLike } from '@theme/primitives/stickyBand';
+import type { StickyRowLike } from '@theme/stickyBand';
 import { defineStore } from 'pinia';
 import { markRaw } from 'vue';
 import { control } from '../../bridge/control';

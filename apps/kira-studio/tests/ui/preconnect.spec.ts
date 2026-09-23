@@ -220,6 +220,10 @@ test('preconnect — dialog field, and failure before connect', async ({ relaunc
   await expect(failRow.locator('.status-dot')).toHaveAttribute('data-status', 'error', {
     timeout: 10_000,
   });
-  await expect(failRow.locator('.status-dot')).toHaveAttribute('data-kira-tip', /exit 3/);
-  await expect(failRow.locator('.status-dot')).toHaveAttribute('data-kira-tip', /nope/);
+  // P104 moved TreeRow.vue's status-dot hint off data-kira-tip onto a real Tooltip/TooltipContent
+  // (statusTitle), so the dot must actually be hovered to render it.
+  await failRow.locator('.status-dot').hover();
+  const statusTooltip = page.locator('[data-slot="tooltip-content"]').first();
+  await expect(statusTooltip).toContainText(/exit 3/);
+  await expect(statusTooltip).toContainText(/nope/);
 });

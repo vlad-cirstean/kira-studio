@@ -2,7 +2,7 @@ import { useVirtualizer } from '@tanstack/vue-virtual';
 import { useResizeObserver } from '@vueuse/core';
 import { computed, onMounted, type Ref, ref } from 'vue';
 
-// P104 §3.4: theme/primitives/VirtualList.vue's own recipe, rebuilt on @tanstack/vue-virtual
+// P104 §3.4: the old hand-rolled virtual list's own recipe, rebuilt on @tanstack/vue-virtual
 // directly at each call site rather than kept as a wrapper component (§9 rule 4) -- this is the
 // shared *behaviour* (windowing, scrollstate, scrollToIndex), never a re-rendered wrapper; the
 // scroll container and row markup still live in each caller's own template.

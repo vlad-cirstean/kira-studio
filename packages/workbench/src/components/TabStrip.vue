@@ -338,7 +338,7 @@ function onDragEnd(): void {
 /* RepoTreeRow.vue's own .node-icon, ported for the identical `{ filePath }` marker — a repo-file
    tab's own seti icon, not a codicon glyph. */
 .tab-file-icon {
-  @apply w-[13px] h-[13px] text-muted;
+  @apply w-3.5 h-3.5 text-muted;
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;

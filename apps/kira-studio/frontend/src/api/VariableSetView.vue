@@ -426,7 +426,7 @@ function onBulkClose(): void {
       >
         <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
         <span
-          class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+          class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
           :class="{
             'animate-[spin_0.7s_linear_infinite] border-t-primary border-r-transparent border-b-primary border-l-primary': runState.status === 'running',
             'border-error': runState.status === 'error',
@@ -500,7 +500,7 @@ function onBulkClose(): void {
           />
         </Label>
         <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
-             call site rather than kept as a shared primitive (theme/primitives/ColorPicker.vue). -->
+             call site rather than kept as a shared primitive component. -->
         <div
           class="color-picker flex h-6.5 flex-wrap items-center gap-1"
           role="radiogroup"
@@ -572,7 +572,7 @@ function onBulkClose(): void {
   @apply flex h-full min-h-0 flex-col;
 }
 
-/* Inlined from theme/primitives/ColorPicker.vue (P104 §3): the "no colour" swatch's diagonal
+/* Inlined from the old hand-rolled color picker (P104 §3): the "no colour" swatch's diagonal
    slash, never a 13th hue standing in for "nothing chosen". */
 .swatch.none {
   border: 1.5px solid var(--kira-fg-muted);

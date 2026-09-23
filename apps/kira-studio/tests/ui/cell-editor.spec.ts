@@ -592,17 +592,23 @@ test('cell editor — autodetect, beautify, override, NULL/empty/truncated, read
   );
 
   // Every row in the picker explains itself on hover (D28), reading from the same FORMAT_HELP
-  // the trigger's own tooltip uses — updateTip() writes data-kira-tip on mount, so the row need
-  // not actually be hovered to assert its content.
+  // the trigger's own tooltip uses. P104 moved ContextMenu.vue's own hint off the old
+  // data-kira-tip DOM-scan onto a real Tooltip/TooltipContent per item, so the row must now
+  // actually be hovered to render its content — same pattern as fake-data.spec.ts/http-raw.spec.ts's
+  // own disabled-control tooltip assertions.
   await page.click('[data-testid="cell-editor-format"]');
-  await expect(page.locator('[data-testid="menu-item-format-iso8601"]')).toHaveAttribute(
-    'data-kira-tip',
+  await page.locator('[data-testid="menu-item-format-iso8601"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     'A calendar date and time, spelled as an ISO-8601 timestamp.',
   );
-  await expect(page.locator('[data-testid="menu-item-format-json"]')).toHaveAttribute(
-    'data-kira-tip',
+  await page.locator('[data-testid="menu-item-format-json"]').hover();
+  await expect(page.locator('[data-slot="tooltip-content"]').first()).toContainText(
     'A JSON document — objects and arrays get syntax highlighting and Beautify.',
   );
+  // The open tooltip's own popper content can still overlap the next menu item and intercept its
+  // click — move off both trigger and content and let it close before clicking Auto.
+  await page.mouse.move(0, 0);
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveCount(0);
   await page.click('[data-testid="menu-item-format-auto"]');
   await expect(panel).toHaveAttribute('data-format', 'text');
   await expect(invalidChip).toHaveCount(0);

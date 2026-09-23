@@ -10,7 +10,7 @@ import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
 import type { RangeHighlight } from '../../editor/ranges';
-import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../../theme/primitives/completion';
+import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../../theme/completion';
 import type { SqlDialect } from './sqlIdent';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
@@ -29,10 +29,10 @@ defineOptions({ inheritAttrs: false });
 // whole contract, that the real <input>/<textarea> keeps DOM focus throughout, with
 // `activeIndex` alone driving which suggestion looks current.
 
-// P104 §3.2: the reka `AutocompleteRoot`/`Combobox*` swap for theme/primitives/AutocompleteField.vue
-// — a Stream B-owned sibling rather than an edit to that file, since one of its 7 call sites
-// (DocumentView.vue) is Stream A territory. Keeps every behaviour theme/primitives/
-// AutocompleteField.vue's own header comment named as having no combobox equivalent (a real
+// P104 §3.2: the reka `AutocompleteRoot`/`Combobox*` swap for the old hand-rolled autocomplete
+// field — a Stream B-owned sibling rather than an edit to that file, since one of its 7 call
+// sites (DocumentView.vue) is Stream A territory. Keeps every behaviour the old file's own
+// header comment named as having no combobox equivalent (a real
 // <input>/<textarea> for Playwright's `locator.fill()` and keydown-time enter interception, the
 // Monaco paint overlay, the pointer-hit-tested hover panel) entirely unchanged — this file still
 // owns the real element and its own keyboard model. reka supplies only what it actually has an
@@ -574,7 +574,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
     <div
       v-if="hoverLines"
       ref="hoverPanelRef"
-      class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-[360px] px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
+      class="var-hover-panel p-float fixed z-[var(--kira-z-autocomplete)] max-w-96 px-1.5 py-1 font-data text-kira-sm text-fg pointer-events-none"
       role="tooltip"
       data-testid="autocomplete-hover"
       :style="hoverStyle ?? undefined"

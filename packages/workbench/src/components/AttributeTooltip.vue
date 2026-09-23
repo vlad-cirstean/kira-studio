@@ -19,11 +19,14 @@ const TIP_ATTR = 'data-kira-tip';
 const PARTS_ATTR = 'data-kira-tip-parts';
 
 const props = defineProps<{
-  /** The grid's own header row element. Scoping the listener to it (instead of `document`) keeps
-   *  this mountable twice (SlickGridHost.vue and ConsoleSlickGrid.vue each own a grid) with no
-   *  cross-talk, and matches how little of `document`-level hit-testing state/tooltip.ts's D3
-   *  comment needed in the first place -- SlickGrid's header row is the only DOM this ever hits. */
-  container: HTMLElement | null;
+  /** The grid's own header row element(s). Scoping the listener to them (instead of `document`)
+   *  keeps this mountable twice (SlickGridHost.vue and ConsoleSlickGrid.vue each own a grid) with
+   *  no cross-talk, and matches how little of `document`-level hit-testing state/tooltip.ts's D3
+   *  comment needed in the first place -- SlickGrid's header row is the only DOM this ever hits.
+   *  An array, not a single element: SlickGrid always splits the header row into two sibling DOM
+   *  panes (frozen columns + the rest), with no narrower common ancestor than the whole grid --
+   *  `useEventListener` takes `Arrayable<HTMLElement>` natively, so the caller just passes both. */
+  container: HTMLElement[] | HTMLElement | null;
 }>();
 
 const bridge = ref<InstanceType<typeof TooltipAnchorBridge> | null>(null);

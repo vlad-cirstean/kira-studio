@@ -4,7 +4,7 @@
 // action) got no schema-aware completion at all, even when the tree already had everything it
 // needed cached. Neither function had any test coverage before this file (the census this phase's
 // own research pass ran found zero — tests/unit/autocomplete-tokenizers.spec.ts, despite its name,
-// covers only theme/primitives/completion.ts's plain-field tokenizers).
+// covers only theme/completion.ts's plain-field tokenizers).
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';

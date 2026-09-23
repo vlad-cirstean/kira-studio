@@ -339,7 +339,7 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, panelSearch)">
-    <div class="p-panel-head h-[34px]">
+    <div class="p-panel-head h-bar">
       <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
       <ToggleGroup
@@ -684,7 +684,7 @@ onUnmounted(() => {
    below, so a collapsed row's branch and its expanded children's read as the same class of
    information. */
 .repo-head {
-  @apply flex-none min-w-0 max-w-[45%] overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle;
+  @apply flex-none min-w-0 max-w-5/12 overflow-hidden text-ellipsis whitespace-nowrap text-kira-sm text-subtle;
 }
 
 .repo-twisty { /* RepoTreeRow.vue's .twisty, ported */

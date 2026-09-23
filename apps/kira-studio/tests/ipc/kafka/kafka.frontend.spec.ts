@@ -1,4 +1,5 @@
 import { expect, test } from '../../ui/fixtures';
+import { assertTooltipShows } from '../../ui/support/tooltip';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './kafka.fixture';
@@ -39,7 +40,8 @@ test('kafka (frontend, mocked IPC) — tree, partition filter, stream tab (offse
   await page.click('[data-testid="menu-item-connect"]');
   const statusDot = connRow.locator('.status-dot');
   await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
-  await expect(statusDot).toHaveAttribute('data-kira-tip', 'Kafka');
+  // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
+  await assertTooltipShows(page, statusDot, 'Kafka');
 
   // --- tree: topics ungrouped at root; "Consumer groups" is a frontend-only folder over the
   // real consumerGroup-kind node (D15/mysql's "Routines" precedent) --------------------------

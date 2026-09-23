@@ -250,14 +250,16 @@ test('fake data generator — gate, defaults, preview, generate, failure', async
   await page.selectOption('[data-testid="generate-data-recipe-name"]', 'constant');
   await page.fill('[data-testid="generate-data-constant-name"]', 'generated row');
 
-  // P16 D6: the recipe <select> now matches the h-sm TextField beside it in the same
+  // P16 D6: the recipe <select> now matches the h-control ui/input beside it in the same
   // .recipe-row — the reported mismatch (26px vs 22px), fixed by the height flip's default
   // rather than a local override, since this call site gets no `.p-select.md` opt-in.
+  // P104: `Input` (`ui/input`) renders the `<input>` directly, no `.p-input` wrapper div — the
+  // testid'd element itself is now the one whose box height is compared.
   const recipeSelectHeight = await page
     .locator('[data-testid="generate-data-recipe-name"]')
     .evaluate((el) => (el as HTMLElement).offsetHeight);
   const constantFieldHeight = await page
-    .locator('.p-input:has([data-testid="generate-data-constant-name"])')
+    .locator('[data-testid="generate-data-constant-name"]')
     .evaluate((el) => (el as HTMLElement).offsetHeight);
   expect(recipeSelectHeight).toBe(constantFieldHeight);
 

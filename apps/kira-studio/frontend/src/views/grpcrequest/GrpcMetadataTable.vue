@@ -4,7 +4,7 @@ import type { GrpcMetadataState } from '@shared/domain/grpc';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
-import type { Completion } from '../../theme/primitives/completion';
+import type { Completion } from '../../theme/completion';
 import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 
 // P107 T2-18: a thin wrapper over FieldRowsTable, same D15/C6 shape RequestHeadersTable.vue uses —

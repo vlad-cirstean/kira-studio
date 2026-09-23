@@ -1,5 +1,6 @@
 import { expect, test } from '../../ui/fixtures';
 import { gridCell } from '../../ui/support/grid';
+import { assertTooltipShows } from '../../ui/support/tooltip';
 import { connectionRow, expandRow, findRow, openRowMenu } from '../../ui/support/tree';
 import type { ControlSnapshot } from '../support/types';
 import { controlSnapshots, portSnapshots } from './mysql.fixture';
@@ -42,7 +43,8 @@ test('mysql (frontend, mocked IPC) — connect, tree, filter-by-value quoting, c
   await page.click('[data-testid="menu-item-connect"]');
   const statusDot = connRow.locator('.status-dot');
   await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 10_000 });
-  await expect(statusDot).toHaveAttribute('data-kira-tip', /^MySQL 8\.4\./);
+  // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
+  await assertTooltipShows(page, statusDot, /^MySQL 8\.4\./);
 
   await expandRow(page, '');
   const dbRow = await expandRow(page, DB_PATH);

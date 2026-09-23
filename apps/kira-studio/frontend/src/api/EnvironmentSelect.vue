@@ -86,7 +86,7 @@ function manage(): void {
     </div>
     <PopoverContent
       align="end"
-      class="w-[200px] gap-0 p-0"
+      class="w-52 gap-0 p-0"
       data-testid="api-environment-menu"
     >
       <div class="environment-menu">
@@ -140,7 +140,7 @@ function manage(): void {
 @reference "@theme/base.css";
 
 .environment-anchor {
-  @apply relative flex min-w-0 flex-[0_1_auto];
+  @apply relative flex min-w-0 flex-initial;
 }
 
 .environment-select {

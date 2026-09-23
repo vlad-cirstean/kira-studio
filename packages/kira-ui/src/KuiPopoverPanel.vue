@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// G20 D5: shared chrome for a trigger-anchored dropdown — a fresh reimplementation of
-// `apps/kira-studio/frontend/src/theme/primitives/PopoverPanel.vue`'s own shape: a full-viewport,
+// G20 D5: shared chrome for a trigger-anchored dropdown — a fresh reimplementation of the old
+// hand-rolled `PopoverPanel.vue`'s own shape: a full-viewport,
 // `position: fixed`, transparent backdrop (click-outside-closes), an `Escape` handler, and
 // positioning via `floatingPosition.ts` against the trigger's own wrapper element (this
 // component's own DOM parent) — so no consumer needs to pass an anchor element in explicitly.
