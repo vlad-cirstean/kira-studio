@@ -3,6 +3,7 @@ import type { FilterHistoryEntry, SavedFilterQuery, SortSpec } from '@shared/dom
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, nextTick, onMounted, ref } from 'vue';
@@ -193,7 +194,7 @@ async function saveCurrent(): Promise<void> {
       </Tooltip>
     </template>
     <template #footer>
-      <div class="p-sep" />
+      <Separator class="my-1" />
       <button type="button" class="save-current p-row" data-testid="save-current-filter" @click="saveCurrent">
         <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         Save current filter…

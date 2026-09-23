@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { PopoverContent } from '@theme/components/ui/popover';
+import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
@@ -156,7 +157,7 @@ onBeforeUnmount(() => {
           {{ name }}
         </label>
       </div>
-      <div class="p-sep" />
+      <Separator class="my-1" />
       <div class="columns-menu-footer p-xs dim" data-testid="columns-menu-footer">
         {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }}
       </div>

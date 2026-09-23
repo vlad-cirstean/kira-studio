@@ -21,6 +21,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
@@ -1020,9 +1021,9 @@ const preconnectText = computed({
           <div v-else-if="activeTab === 'Pre-connect'" class="tab-pane" role="tabpanel">
           <div class="field">
             <label>Pre-connect command <span class="dim">— optional</span></label>
-            <textarea
+            <Textarea
               v-model="preconnectText"
-              class="p-textarea mono"
+              class="font-data"
               rows="4"
               maxlength="2000"
               data-testid="connection-preconnect"
@@ -1079,9 +1080,9 @@ const preconnectText = computed({
               >Description
               <span class="dim">— what this database is for, read verbatim by an AI client</span></label
             >
-            <textarea
+            <Textarea
               v-model="draft.mcpDescription"
-              class="p-textarea mono"
+              class="font-data"
               rows="2"
               maxlength="1000"
               :disabled="!draft.mcpEnabled"

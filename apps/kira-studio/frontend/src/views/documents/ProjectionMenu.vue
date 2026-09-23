@@ -3,6 +3,7 @@ import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { Separator } from '@theme/components/ui/separator';
 import { onUnmounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { fieldNamesOnPage } from './page';
@@ -75,7 +76,7 @@ onUnmounted(() => {
         {{ name }}
       </label>
     </div>
-    <div class="p-sep" />
+    <Separator class="my-1" />
     <div class="columns-menu-footer p-xs dim" data-testid="document-projection-menu-footer">
       {{ caps?.projection ? 'Applied server-side' : 'Applied after fetch' }} — fields seen on the
       loaded page; `_id` is always returned.

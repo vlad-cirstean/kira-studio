@@ -3,6 +3,7 @@ import type { SavedConsoleQuery } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { nextTick, onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
@@ -136,7 +137,7 @@ async function saveCurrent(): Promise<void> {
       </Tooltip>
     </template>
     <template #footer>
-      <div class="p-sep" />
+      <Separator class="my-1" />
       <button type="button" class="save-current p-row" data-testid="console-save-current" @click="saveCurrent">
         <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         Save current query…

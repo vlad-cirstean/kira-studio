@@ -280,25 +280,6 @@
   background: var(--kira-select);
 }
 
-/* ---------- P28 textarea ---------- */
-/* Promoted from StreamComposeMessage.vue's scoped .p-input-styled — the design-system's plain
-   multiline text control, for content with no CodeMirror language (a shell pre-connect command,
-   a free-text message body): a real <textarea>, not a hand-rolled editor. */
-.p-textarea {
-  width: 100%;
-  border: var(--kira-border-width) solid var(--kira-border);
-  border-radius: var(--kira-radius);
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-  font-family: var(--kira-font-data);
-  font-size: var(--kira-t-sm);
-  /* P16 D7: 4px vertical, 8px horizontal — matches .p-input's own gutter (its multiline sibling
-     was tighter still, by another 2px). */
-  padding: var(--kira-s-2) var(--kira-s-4);
-  resize: vertical;
-  box-sizing: border-box;
-}
-
 /* ---------- P13 dialog body ---------- */
 /* The column wrapper every DialogFrame consumer puts inside .dialog-body (which is the scroll
    container and deliberately has no padding of its own). Promoted from the identical
@@ -605,12 +586,6 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.p-sep {
-  height: var(--kira-border-width);
-  background: var(--kira-border-strong);
-  margin: var(--kira-s-2) 0;
-}
-
 /* ---------- P22 D8: completion popup — one specification, expressed twice. AutocompleteField.vue
    (plain fields) consumes these classes directly; CodeMirror draws its own <ul>/<li> for the
    console/DDL/cell editors with no seam to hand it a Vue component (F14), so editor/theme.ts

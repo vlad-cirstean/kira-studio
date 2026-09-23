@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref, watch } from 'vue';
@@ -107,9 +108,9 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
       </div>
-      <textarea
+      <Textarea
         v-model="protectedBranchesText"
-        class="p-textarea"
+        class="font-data"
         rows="4"
         placeholder="main"
         data-testid="settings-git-protected-branches"

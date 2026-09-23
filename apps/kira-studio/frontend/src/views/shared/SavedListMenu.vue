@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { PopoverContent } from '@theme/components/ui/popover';
+import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 
 // Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
@@ -90,7 +91,7 @@ defineSlots<{
       </div>
 
       <template v-if="recent">
-        <div class="p-sep" />
+        <Separator class="my-1" />
         <div class="p-menu-label">Recent</div>
         <div v-if="recent.length === 0" class="empty-row p-sm dim">{{ emptyRecentText }}</div>
         <div

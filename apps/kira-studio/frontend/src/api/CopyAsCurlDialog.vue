@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Textarea } from '@theme/components/ui/textarea';
 import { computed } from 'vue';
 import { useCopyAsCurlStore } from './state/curl';
 
@@ -88,9 +89,9 @@ function close(): void {
       </DialogHeader>
       <div class="overflow-auto">
     <div class="p-dialog-body">
-      <textarea
-        class="p-textarea mono min-h-[180px]"
-        :value="command"
+      <Textarea
+        class="font-data min-h-[180px]"
+        :model-value="command"
         readonly
         rows="10"
         data-testid="copy-as-curl-command"

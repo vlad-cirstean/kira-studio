@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
+import { Textarea } from '@theme/components/ui/textarea';
 import { refDebounced } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { useImportCurlStore } from './state/curl';
@@ -62,9 +63,9 @@ function close(): void {
       </DialogHeader>
       <div class="overflow-auto">
     <div class="p-dialog-body">
-      <textarea
+      <Textarea
         v-model="text"
-        class="p-textarea curl-textarea"
+        class="font-data curl-textarea"
         rows="6"
         placeholder="curl -X POST https://api.example.com/orders -H 'Content-Type: application/json' -d '{&quot;id&quot;: 1}'"
         data-testid="import-curl-textarea"

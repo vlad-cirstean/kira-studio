@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
 import { computed, ref } from 'vue';
@@ -89,9 +90,9 @@ async function submit(): Promise<void> {
 
       <label class="field">
         <span class="p-sm muted">Body</span>
-        <textarea
+        <Textarea
           v-model="body"
-          class="p-textarea"
+          class="font-data"
           rows="6"
           placeholder="Message body"
           data-testid="stream-add-message-body"
@@ -101,9 +102,9 @@ async function submit(): Promise<void> {
 
       <label class="field">
         <span class="p-sm muted">Headers (optional JSON object)</span>
-        <textarea
+        <Textarea
           v-model="headers"
-          class="p-textarea"
+          class="font-data"
           rows="3"
           placeholder='{"source": "manual"}'
           data-testid="stream-add-message-headers"
