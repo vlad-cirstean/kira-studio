@@ -6,7 +6,7 @@ import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
 import {
@@ -74,7 +74,20 @@ function onPick(date: Date): void {
 
 const calendarOpen = ref(false);
 const calendarAnchorRef = ref<HTMLElement | null>(null);
+const calendarTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 const pickerDate = computed(() => parsed.value?.date ?? new Date());
+
+// P104: the day cell that stages a pick lives inside PopoverContent, which reka teleports to
+// document.body — outside `.editor-body`'s own DOM subtree. Its own onEditorBlur only stages when
+// focus crosses that subtree's boundary (`container.contains(next)`), so once the day cell (never
+// itself inside `.editor-body`) is removed from the DOM on close, the browser drops focus with no
+// element inside `.editor-body` to blur *from* — the next explicit focus (format/status/etc.)
+// fires no focusout at all, and the pick is silently lost (cell-editor.spec.ts's day-pick-then-
+// blur scenario caught it). Returning focus to this trigger on close (the old, non-teleported
+// PopoverPanel's own implicit behavior) restores a real element inside `.editor-body` to blur from.
+watch(calendarOpen, (open) => {
+  if (!open) void nextTick(() => calendarTriggerEl.value?.$el.focus());
+});
 </script>
 
 <template>
@@ -140,6 +153,7 @@ const pickerDate = computed(() => parsed.value?.date ?? new Date());
             <TooltipTrigger as-child>
               <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
                 <Button
+                  ref="calendarTriggerEl"
                   variant="toolbar"
                   size="kira-icon"
                   aria-label="Pick a date and time"

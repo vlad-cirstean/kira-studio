@@ -1260,8 +1260,12 @@ test("cell editor — owned by the view, never shows another tab's cell", async 
   await page.locator(`[data-testid="tab"][data-tab-id="${consoleTabId}"]`).click();
   await expect(panel).toHaveAttribute('data-cell-key', new RegExp(`^${consoleTabId}:`));
   // D5: the panel's height is a persisted global, not per-tab — it must not visually reset.
+  // P104: reka's SplitterPanel (size-unit="px") converts the shared layoutStore px value to a
+  // percentage of each view's own SplitterGroup pixel height (reka-ui/Splitter/utils/units.ts),
+  // so a sub-pixel rounding gap between two views with slightly different total heights is
+  // expected, not a reset — a real reset would jump back to a whole different height, not <1px.
   const consoleDockHeight = await dock.evaluate((el) => el.getBoundingClientRect().height);
-  expect(consoleDockHeight).toBe(dockHeight);
+  expect(Math.abs(consoleDockHeight - dockHeight)).toBeLessThan(1);
 
   // (6) A definition tab mounts no dock at all — the minimal reproduction of the user's report
   // (switch from a cell-bearing tab straight into one that never had the panel in the first
