@@ -61,7 +61,11 @@ function onRevealBlameCommit(): void {
 .blame:disabled {
   @apply cursor-default;
 }
+/* v1.9 tailwind-declines deep dive: this truncates with an ellipsis rather than reserving exact
+   character width, unlike a monospace digit field -- a fixed cap serves the same purpose. 48ch in
+   the body's system-ui font at the 12px default is roughly 48 * 6.6px =~ 317px; max-w-80 (320px)
+   is the nearest default step. */
 .blame-text {
-  @apply max-w-[48ch] overflow-hidden text-ellipsis whitespace-nowrap;
+  @apply max-w-80 overflow-hidden text-ellipsis whitespace-nowrap;
 }
 </style>

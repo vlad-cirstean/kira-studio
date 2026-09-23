@@ -353,8 +353,10 @@ onUnmounted(() => {
 .md-reading {
   @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4;
 }
+/* v1.9 tailwind-declines deep dive: Tailwind ships a real `max-w-prose` utility (65ch) for
+   exactly this — readable line length — narrower than the original 72ch but the same intent. */
 .md-reading > :deep(*) {
-  @apply max-w-[72ch];
+  @apply max-w-prose;
 }
 .md-reading :deep(h1),
 .md-reading :deep(h2),

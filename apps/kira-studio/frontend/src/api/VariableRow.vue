@@ -274,8 +274,11 @@ function onKeydown(e: KeyboardEvent): void {
   @apply flex min-w-0 items-center gap-1;
 }
 
+/* v1.9 tailwind-declines deep dive: tracking-widest (0.1em) is the widest step Tailwind's default
+   scale has; at this row's inherited body font-size (--kira-font-size, 12px default) that is
+   1.2px, not the original flat 2px, but nothing further out exists on the scale. */
 .masked-value {
-  @apply flex-1 text-subtle tracking-[2px];
+  @apply flex-1 text-subtle tracking-widest;
 }
 
 .secret-toggle {

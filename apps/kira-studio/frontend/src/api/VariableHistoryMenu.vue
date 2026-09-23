@@ -114,8 +114,11 @@ function onRestore(entry: ApiVariableHistoryEntry): void {
   @apply overflow-hidden text-ellipsis whitespace-nowrap;
 }
 
+/* v1.9 tailwind-declines deep dive: tracking-widest (0.1em) is the widest step Tailwind's default
+   scale has; at this span's inherited font-size (PopoverContent's own text-sm, 14px) that is
+   1.4px, not the original flat 2px, but nothing further out exists on the scale. */
 .entry-value.masked {
-  @apply text-subtle tracking-[2px];
+  @apply text-subtle tracking-widest;
 }
 
 .empty-state {
