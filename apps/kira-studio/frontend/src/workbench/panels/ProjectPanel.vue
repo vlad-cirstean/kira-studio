@@ -4,7 +4,7 @@ import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import FiltersDialog from '../../project/FiltersDialog.vue';
 import ProjectTree from '../../project/ProjectTree.vue';
 import SchemaDialog from '../../project/SchemaDialog.vue';
@@ -20,8 +20,10 @@ const treeStore = useTreeStore();
 const empty = computed(() => connectionsStore.records.length === 0);
 // P104 §3: PanelShell's own header/search-reveal/type-ahead-redirect logic, inlined via the
 // shared usePanelHeaderSearch composable rather than kept as a wrapper component.
-const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   searchable: () => true,
+  getSearch: () => treeStore.search,
   setSearch: (v) => {
     treeStore.search = v;
   },
@@ -29,7 +31,7 @@ const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
 </script>
 
 <template>
-  <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, treeStore.search)">
+  <div ref="rootEl" class="flex h-full flex-col">
     <div class="p-panel-head h-bar">
       <span>Connections</span>
       <Tooltip>

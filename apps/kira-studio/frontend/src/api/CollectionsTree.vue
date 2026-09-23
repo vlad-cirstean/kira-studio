@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
 import { backgroundMenu, type CollectionMenuActions, menuForRow } from './menus';
@@ -108,6 +109,7 @@ function onContextMenu(row: CollectionRowVm, event: MouseEvent): void {
 }
 
 function onBackgroundContextMenu(event: MouseEvent): void {
+  event.preventDefault();
   contextMenuStore.openContextMenu(event, backgroundMenu(actions));
 }
 
@@ -150,17 +152,22 @@ function onTreeKeydown(e: KeyboardEvent): void {
 }
 
 const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplicate'] as const;
+
+// P105 §5.1: the tree background has no interactive role of its own -- both listeners bind here
+// via VueUse rather than as raw template attributes on a non-interactive div.
+const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
+useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
+useEventListener(scrollEl, 'keydown', onTreeKeydown);
 </script>
 
 <template>
   <div class="collections-tree">
-    <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
+    <div ref="treeBodyEl" class="tree-body" data-testid="tree-background">
       <div
         ref="scrollEl"
         class="virtual-list h-full overflow-auto"
         data-testid="virtual-list"
         @scroll="onScroll"
-        @keydown="onTreeKeydown"
       >
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
           <template v-for="slot in band" :key="slot.row.key">

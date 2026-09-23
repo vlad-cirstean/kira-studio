@@ -11,7 +11,7 @@
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
 import { KuiButton, KuiPopoverPanel, KuiSearchInput, useModalFocus } from '@kira/kira-ui';
-import { onClickOutside } from '@vueuse/core';
+import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
@@ -71,6 +71,13 @@ onClickOutside(rootEl, () => {
   if (isOpen.value) close();
 });
 
+// P105 §5.1: the wrapping div is not interactive -- both keydown listeners bind here via VueUse
+// instead of raw template attributes.
+useEventListener(rootEl, 'keydown', (e) => {
+  onModalKeydown(e);
+  if (e.key === 'Escape') close();
+});
+
 const sections = computed(() =>
   buildRefListSections(
     {
@@ -101,7 +108,7 @@ function pick(ref: string): void {
 </script>
 
 <template>
-  <div ref="rootEl" class="kv-base-selector" @keydown="onModalKeydown" @keydown.escape="close">
+  <div ref="rootEl" class="kv-base-selector">
     <KuiButton
       class="kv-base-trigger"
       aria-haspopup="true"

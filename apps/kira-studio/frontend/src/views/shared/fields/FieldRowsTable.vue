@@ -13,6 +13,7 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../../api/state/variableCompletion';
 import type { Completion } from '../../../theme/completion';
@@ -263,6 +264,9 @@ function onContainerKeydown(e: KeyboardEvent): void {
     target.setSelectionRange(target.value.length, target.value.length);
   }
 }
+
+// P105 §5.1: the table container is not interactive -- binds via VueUse instead of a raw @keydown.
+useEventListener(containerRef, 'keydown', onContainerKeydown);
 </script>
 
 <template>
@@ -270,7 +274,6 @@ function onContainerKeydown(e: KeyboardEvent): void {
     ref="containerRef"
     class="field-rows-table"
     :data-testid="containerTestid"
-    @keydown="onContainerKeydown"
   >
     <div
       v-for="entry in displayRows"

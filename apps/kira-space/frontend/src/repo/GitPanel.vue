@@ -13,7 +13,7 @@ import { registerCommand } from '@workbench/shortcuts/commands';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
-import { computed, onMounted, onUnmounted, reactive, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, useTemplateRef, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
@@ -309,8 +309,10 @@ const panelSearch = computed<string>({
 });
 const panelEmpty = computed(() => codeReposStore.records.length === 0);
 const panelSearchable = computed(() => tab.value !== 'review');
-const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   searchable: () => panelSearchable.value,
+  getSearch: () => panelSearch.value,
   setSearch: (v) => {
     panelSearch.value = v;
   },
@@ -338,7 +340,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, panelSearch)">
+  <div ref="rootEl" class="flex h-full flex-col">
     <div class="p-panel-head h-bar">
       <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->

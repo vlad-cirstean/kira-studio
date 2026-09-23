@@ -10,7 +10,7 @@ import { connColorVar } from '@theme/connColor';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
-import { computed, ref } from 'vue';
+import { computed, ref, useTemplateRef } from 'vue';
 import { useCustomScriptsStore } from '../state/customScripts';
 import { useSettingsStore } from '../state/settings';
 import { useTerminalsStore } from '../state/terminals';
@@ -52,8 +52,10 @@ const empty = computed(() => customScriptsStore.records.length === 0 && !adding.
 // P104 §3: PanelShell's own header/search-reveal/type-ahead-redirect logic, inlined via the
 // shared usePanelHeaderSearch composable -- this panel is always searchable (PanelShell's own
 // `:searchable="true"`).
-const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+const { showSearch, toggleSearch } = usePanelHeaderSearch(rootEl, {
   searchable: () => true,
+  getSearch: () => search.value,
   setSearch: (v) => {
     search.value = v;
   },
@@ -136,7 +138,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
 
 <template>
   <div data-testid="terminal-panel" class="terminal-panel">
-    <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, search)">
+    <div ref="rootEl" class="flex h-full flex-col">
       <div class="p-panel-head h-bar">
         <span class="panel-title">Quick commands</span>
         <Tooltip>

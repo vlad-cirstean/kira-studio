@@ -11,7 +11,8 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
-import { ref, watch } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { ref, useTemplateRef, watch } from 'vue';
 import { useVariableSetStore } from './state/variables';
 import VariableHistoryMenu from './VariableHistoryMenu.vue';
 
@@ -120,19 +121,27 @@ function onKeydown(e: KeyboardEvent): void {
     emit('move', 'down');
   }
 }
+
+// P105 §5.1: the row root has no interactive role of its own -- all four listeners bind here via
+// VueUse instead of as raw template attributes.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useEventListener(rootEl, 'keydown', onKeydown);
+useEventListener(rootEl, 'dragstart', () => emit('dragstart', props.index));
+useEventListener(rootEl, 'dragover', (e) => {
+  e.preventDefault();
+  emit('dragover', props.index);
+});
+useEventListener(rootEl, 'dragend', () => emit('dragend'));
 </script>
 
 <template>
   <div
+    ref="rootEl"
     class="variable-row"
     :class="{ 'is-dragging': dragging }"
     data-testid="variable-row"
     :data-id="row.id"
     :draggable="!trailing && !filtered"
-    @keydown="onKeydown"
-    @dragstart="emit('dragstart', index)"
-    @dragover.prevent="emit('dragover', index)"
-    @dragend="emit('dragend')"
   >
     <Tooltip v-if="filtered && !trailing">
       <TooltipTrigger as-child>

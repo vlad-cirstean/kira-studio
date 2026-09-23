@@ -3,7 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { type FindOptions, findQueryIsInvalid, findRanges } from '../../editor/findRanges';
 
 // P28 D11: the three option toggles the data views' own SearchToolbar has always had — match
@@ -125,11 +126,15 @@ function onKeydown(e: KeyboardEvent): void {
 onMounted(() => {
   void nextTick(() => findInput.value?.$el.focus());
 });
+
+// P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useEventListener(rootEl, 'keydown', onKeydown);
 </script>
 
 <template>
   <!-- LAW 03: docks below the pane it searches, never floating over it. -->
-  <div class="response-find-bar p-toolbar" data-testid="http-find-bar" @keydown="onKeydown">
+  <div ref="rootEl" class="response-find-bar p-toolbar" data-testid="http-find-bar">
     <span class="icon-box muted">
       <CodiconIcon name="search" :size="13" />
     </span>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { useEventListener } from '@vueuse/core';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useSchemaColumnsStore } from '../state/schemaColumns';
 import { initSchemaSync } from '../state/schemas';
@@ -139,6 +140,7 @@ async function onContextMenu(row: TreeRowVm, event: MouseEvent): Promise<void> {
 function onBackgroundContextMenu(event: MouseEvent): void {
   // TreeRow.vue stops propagation on its own contextmenu handler, so only a right-click on
   // the empty area below/around the rows (the virtual list's spacer divs) ever reaches here.
+  event.preventDefault();
   contextMenuStore.openContextMenu(event, emptyBackgroundMenu());
 }
 
@@ -172,17 +174,22 @@ function onTreeKeydown(e: KeyboardEvent): void {
   }
   if (runMenuShortcut(menuForRow(row), id)) e.preventDefault();
 }
+
+// P105 §5.1: the tree background has no interactive role of its own -- both listeners bind here
+// via VueUse rather than as raw template attributes on a non-interactive div.
+const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
+useEventListener(treeBodyEl, 'contextmenu', onBackgroundContextMenu);
+useEventListener(scrollEl, 'keydown', onTreeKeydown);
 </script>
 
 <template>
   <div class="project-tree">
-    <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
+    <div ref="treeBodyEl" class="tree-body" data-testid="tree-background">
       <div
         ref="scrollEl"
         class="virtual-list h-full overflow-auto"
         data-testid="virtual-list"
         @scroll="onScroll"
-        @keydown="onTreeKeydown"
       >
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
           <template v-for="slot in band" :key="slot.row.key">

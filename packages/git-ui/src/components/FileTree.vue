@@ -485,10 +485,11 @@ function reviewToggleTitle(path: string): string {
     </div>
 
     <div
+      v-if="listMode === 'tree'"
       ref="treeEl"
       class="kv-file-tree-rows"
-      :aria-label="listMode === 'tree' ? 'File tree' : 'File list'"
-      :role="listMode === 'tree' ? 'tree' : 'listbox'"
+      aria-label="File tree"
+      role="tree"
       @keydown="onKeydown"
     >
       <div
@@ -497,15 +498,134 @@ function reviewToggleTitle(path: string): string {
         :key="rowKey(row)"
         class="kui-row kv-file-tree-row"
         :class="{ 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile }"
-        :role="listMode === 'tree' ? 'treeitem' : 'option'"
-        :aria-level="listMode === 'tree' ? row.depth + 1 : undefined"
-        :aria-expanded="listMode === 'tree' && row.kind === 'directory' ? row.expanded : undefined"
+        role="treeitem"
+        :aria-level="row.depth + 1"
+        :aria-expanded="row.kind === 'directory' ? row.expanded : undefined"
         :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
         :tabindex="index === focusedRow ? 0 : -1"
         :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
         @click="onRowClick(index)"
         @dblclick="onRowDblClick(index)"
         @contextmenu="onRowContextMenu($event, row)"
+        @keydown.space.prevent="onRowClick(index)"
+      >
+        <template v-if="row.kind === 'directory'">
+          <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
+               rows' checkbox column aligned underneath it. -->
+          <span v-if="reviewStates" class="kv-file-tree-review-slot" aria-hidden="true"></span>
+          <span
+            class="codicon kv-file-tree-chevron"
+            :class="row.expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
+            aria-hidden="true"
+          ></span>
+          <span class="kv-file-tree-dir-name">{{ row.node.name }}</span>
+          <span class="kv-file-tree-dir-stats">
+            {{ row.node.fileCount }} {{ row.node.fileCount === 1 ? "file" : "files" }}
+            <span class="kv-diff-added-fg" v-kui-tooltip="`${exactCount(row.node.additions)} additions`"
+              >+{{ formatChangeCount(row.node.additions) }}</span
+            >
+            <span class="kv-diff-deleted-fg" v-kui-tooltip="`${exactCount(row.node.deletions)} deletions`"
+              >-{{ formatChangeCount(row.node.deletions) }}</span
+            >
+          </span>
+        </template>
+        <template v-else>
+          <!-- P75 §4: leading edge, not trailing — a trailing position shifted row to row with the
+               +N/-N counts' own width and crowded the pane's scrollbar. A real checkbox (not a
+               toggle button) so the partial state gets a correct native `aria-checked="mixed"` for
+               free, and `.prevent` because the server's answer is this control's only state
+               (`ReviewFilesState.mark` applies `result.review`, not an optimistic local toggle). -->
+          <input
+            v-if="reviewStates"
+            type="checkbox"
+            class="kv-file-tree-review-toggle"
+            :checked="reviewStatusFor(row.node.change.path)?.kind === 'full'"
+            :indeterminate="reviewStatusFor(row.node.change.path)?.kind === 'partial'"
+            v-kui-tooltip="reviewToggleTitle(row.node.change.path)"
+            :aria-label="reviewToggleTitle(row.node.change.path)"
+            @click.prevent.stop="emit('toggleReviewed', row.node.change.path)"
+          />
+          <span
+            class="kv-file-tree-icon"
+            :style="fileIconStyle(row.node.path)"
+            aria-hidden="true"
+          ></span>
+          <span class="kv-file-tree-name" v-kui-tooltip="fileTitle(row.node.change)">
+            <template v-if="renameDisplay(row.node.change)">
+              {{ renameDisplay(row.node.change)?.from }}
+              <span class="codicon codicon-arrow-small-right" aria-hidden="true"></span>
+              {{ renameDisplay(row.node.change)?.to }}
+            </template>
+            <template v-else>{{ row.node.name }}</template>
+          </span>
+          <!-- P105: the flat-mode-only directory hint never applies in tree mode (a real
+               directory row already carries this path via its own ancestor rows). -->
+          <span class="kv-file-tree-trailing">
+            <span v-if="!row.node.change.isBinary" class="kv-file-tree-counts">
+              <span
+                class="kv-diff-added-fg"
+                v-kui-tooltip="`${exactCount(row.node.change.additions ?? 0)} additions`"
+                >+{{ formatChangeCount(row.node.change.additions ?? 0) }}</span
+              >
+              <span
+                class="kv-diff-deleted-fg"
+                v-kui-tooltip="`${exactCount(row.node.change.deletions ?? 0)} deletions`"
+                >-{{ formatChangeCount(row.node.change.deletions ?? 0) }}</span
+              >
+            </span>
+            <span
+              class="kv-file-tree-status"
+              :class="statusClass(row.node.change)"
+              v-kui-tooltip="fileTitle(row.node.change)"
+              >{{ statusLetter(row.node.change) }}</span
+            >
+          </span>
+          <span
+            v-if="reviewStates && reviewStatusFor(row.node.change.path)?.changedSinceReview"
+            class="kv-file-tree-changed-badge"
+            v-kui-tooltip="'Changed since you reviewed it'"
+            aria-hidden="true"
+            >●</span
+          >
+        </template>
+      </div>
+
+      <KuiButton v-if="capped.hiddenCount > 0" class="kv-file-tree-show-all" @click="capLifted = true">
+        Show all {{ rows.length }} files
+      </KuiButton>
+
+      <KuiContextMenu
+        v-if="fileMenuState"
+        :sections="fileMenuSections"
+        :x="fileMenuState.x"
+        :y="fileMenuState.y"
+        label="File actions"
+        @select="onFileMenuSelect"
+        @close="fileMenuState = undefined"
+      />
+    </div>
+    <div
+      v-else
+      ref="treeEl"
+      class="kv-file-tree-rows"
+      aria-label="File list"
+      role="listbox"
+      @keydown="onKeydown"
+    >
+      <div
+        v-for="(row, index) in capped.visible"
+        :id="rowId(index)"
+        :key="rowKey(row)"
+        class="kui-row kv-file-tree-row"
+        :class="{ 'kv-row-focused': index === focusedRow, 'kv-row-selected': row.kind === 'file' && row.node.fileIndex === selectedFile }"
+        role="option"
+        :aria-selected="row.kind === 'file' ? row.node.fileIndex === selectedFile : undefined"
+        :tabindex="index === focusedRow ? 0 : -1"
+        :style="{ paddingLeft: `calc(var(--kv-tree-indent) * ${row.depth})` }"
+        @click="onRowClick(index)"
+        @dblclick="onRowDblClick(index)"
+        @contextmenu="onRowContextMenu($event, row)"
+        @keydown.space.prevent="onRowClick(index)"
       >
         <template v-if="row.kind === 'directory'">
           <!-- P75 §4.3: no mark on a directory row, but a same-width empty slot keeps the file
@@ -557,7 +677,7 @@ function reviewToggleTitle(path: string): string {
             <template v-else>{{ row.node.name }}</template>
           </span>
           <span
-            v-if="listMode === 'flat' && dirOf(row.node.path)"
+            v-if="dirOf(row.node.path)"
             class="kv-file-tree-file-dir"
             >{{ dirOf(row.node.path) }}</span
           >

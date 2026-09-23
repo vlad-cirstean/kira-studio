@@ -3,7 +3,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { computed, nextTick, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { usePageSearchFilterStore } from '../shared/page/searchFilter';
 import { getPage, pageVersion } from './page';
 import { useStreamSearchStore } from './search';
@@ -81,6 +82,10 @@ function onKeydown(e: KeyboardEvent): void {
   }
 }
 
+// P105 §5.1: the toolbar div is not interactive -- binds via VueUse instead of a raw @keydown.
+const rootEl = useTemplateRef<HTMLElement>('rootEl');
+useEventListener(rootEl, 'keydown', onKeydown);
+
 onMounted(() => {
   void nextTick(() => searchInput.value?.$el.focus());
 });
@@ -95,7 +100,7 @@ onUnmounted(() => {
 
 <template>
   <!-- Docks below the toolbar it searches, same placement law as views/shared/page/SearchToolbar.vue. -->
-  <div class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar" @keydown="onKeydown">
+  <div ref="rootEl" class="stream-search-toolbar p-toolbar" data-testid="stream-search-toolbar">
     <span class="icon-box muted"><CodiconIcon name="search" :size="13" /></span>
     <div class="search-input">
       <Input

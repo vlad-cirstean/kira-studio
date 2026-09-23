@@ -10,9 +10,10 @@ import {
   TooltipDisabledTrigger,
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
+import { useEventListener } from '@vueuse/core';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, useTemplateRef, watch } from 'vue';
 import type { ConsoleDiagnostic } from '../../../editor/diagnostics';
 import { findRanges } from '../../../editor/findRanges';
 import MonacoHost from '../../../editor/MonacoHost.vue';
@@ -313,6 +314,12 @@ function onEditorKeydown(e: KeyboardEvent): void {
     buffer.reset();
   }
 }
+
+// P105 §5.1: the wrapping div is not interactive -- both listeners bind via VueUse instead of raw
+// template attributes. `e.currentTarget` inside onEditorBlur is still this same element.
+const editorBodyEl = useTemplateRef<HTMLElement>('editorBodyEl');
+useEventListener(editorBodyEl, 'keydown', onEditorKeydown);
+useEventListener(editorBodyEl, 'focusout', onEditorBlur);
 
 function closePanel(): void {
   cellSelectionStore.clearSelectedCellFor(selectedCell.value.tabId);
@@ -626,10 +633,9 @@ const statusLine = computed(() => {
          lives inside here (not in its own strip, as the native picker used to) precisely so it
          inherits this same staging rule instead of needing its own (P24 D14/D15). -->
     <div
+      ref="editorBodyEl"
       class="editor-body"
       :class="{ 'has-translate': showTranslatePane }"
-      @keydown="onEditorKeydown"
-      @focusout="onEditorBlur"
     >
       <div class="encoded-pane" data-testid="cell-editor-encoded">
         <MonacoHost

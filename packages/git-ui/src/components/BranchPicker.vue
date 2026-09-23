@@ -32,7 +32,7 @@ import {
   KuiTextInput,
   type MenuItem,
 } from '@kira/kira-ui';
-import { onClickOutside } from '@vueuse/core';
+import { onClickOutside, useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
@@ -254,6 +254,7 @@ function onFilterKeydown(event: KeyboardEvent): void {
  *  action where it has one (`.kv-branch-row-main` is a `<button>` for branch/tag/stash rows and a
  *  plain, unclickable `<div>` for worktree/stack rows — one selector does both without a per-kind
  *  branch). `Tab` is left alone: it already reaches the row's own trailing buttons. */
+const rowsScrollEl = ref<HTMLElement | null>(null);
 function onRowsKeydown(event: KeyboardEvent): void {
   const rowEl = (event.target as HTMLElement).closest<HTMLElement>('.kv-branch-row[data-row-id]');
   if (rowEl === null) return;
@@ -292,6 +293,10 @@ function onRowsKeydown(event: KeyboardEvent): void {
       return;
   }
 }
+
+// P105 §5.1: the row-scroll div carries no interactive role of its own -- binds via VueUse
+// instead of a raw @keydown on it.
+useEventListener(rowsScrollEl, 'keydown', onRowsKeydown);
 
 const tabOptions = computed<readonly KuiSegmentedOption[]>(() => [
   {
@@ -333,6 +338,12 @@ function close(): void {
   filter.value = '';
   capSteps.value = {};
 }
+
+// P105 §5.1: the wrapping div carries no interactive role of its own -- binds via VueUse instead
+// of a raw @keydown.escape on it.
+useEventListener(rootEl, 'keydown', (e) => {
+  if (e.key === 'Escape') close();
+});
 
 // P77 §7.2 fix: was `isOpen.value = !isOpen.value`, which opened the panel without ever calling
 // `open()` — the filter-focus fix below only ran for the palette's own `runUiAction` route
@@ -603,9 +614,9 @@ watch(visibleBranchNames, (names) => {
       />
 
       <div
+        ref="rowsScrollEl"
         class="kv-branch-panel-scroll"
         :aria-label="TAB_LABELS[activeTab]"
-        @keydown="onRowsKeydown"
       >
         <template v-if="activeTab === 'branches'">
         <div class="kv-branch-section" aria-label="Branches">

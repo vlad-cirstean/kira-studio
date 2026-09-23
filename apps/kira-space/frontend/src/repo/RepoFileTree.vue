@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useDebounceFn } from '@vueuse/core';
+import { useDebounceFn, useEventListener } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { openRepoFileTab } from '../state/repoTabs';
 import { useSettingsStore } from '../state/settings';
 import { menuForRepoRow } from './menus';
@@ -81,10 +81,15 @@ function onOpen(row: RepoTreeRowVm, preview: boolean): void {
 function onContextMenu(row: RepoTreeRowVm, event: MouseEvent): void {
   contextMenuStore.openContextMenu(event, menuForRepoRow(props.repoId, row));
 }
+
+// P105 §5.1: suppresses the browser context menu over the empty tree background (rows stop
+// propagation on their own contextmenu handler) -- the tree background has no interactive role.
+const treeBodyEl = useTemplateRef<HTMLElement>('treeBodyEl');
+useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
 </script>
 
 <template>
-  <div class="repo-tree-body" data-testid="tree-background" @contextmenu.prevent>
+  <div ref="treeBodyEl" class="repo-tree-body" data-testid="tree-background">
     <div
       ref="scrollEl"
       class="virtual-list h-full overflow-auto"
