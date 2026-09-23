@@ -31,7 +31,7 @@ function nonce(): string {
   return randomBytes(16).toString('hex');
 }
 
-export type WebviewKind = 'graph' | 'review';
+type WebviewKind = 'graph' | 'review';
 
 export interface StartWebviewServerOptions {
   /** Builds the bootstrap island payload for a `/graph` or `/review` request, given the server's

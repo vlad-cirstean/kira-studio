@@ -16,11 +16,9 @@ import type { EventPayload, UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import { toWireConnectionState } from './connection.ts';
 import { renderHtml } from './html.ts';
-import { WebviewProviderBase, type WebviewProviderBaseDeps } from './webviewProviderBase.ts';
+import { WebviewProviderBase } from './webviewProviderBase.ts';
 
 const GRAPH_FOCUS_COMMAND = 'kiraSpace.graph.focus';
-
-export type KiraGraphViewProviderDeps = WebviewProviderBaseDeps;
 
 export class KiraGraphViewProvider extends WebviewProviderBase {
   /** G10 D19: a palette command that fired while this view was cold — consumed (and cleared) by
