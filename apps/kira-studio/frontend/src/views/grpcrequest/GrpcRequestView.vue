@@ -30,7 +30,7 @@ import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { templateToken } from '../../theme/primitives/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
-import MetadataTable from './MetadataTable.vue';
+import GrpcMetadataTable from './GrpcMetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import SchemaBrowser from './SchemaBrowser.vue';
 import { findMethod, resolveGrpcTabState, useGrpcRequestViewStore } from './state';
@@ -557,7 +557,7 @@ onUnmounted(() => {
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <MetadataTable
+          <GrpcMetadataTable
             :tab="tab"
             :filter-query="fieldFilterQuery"
             :variables="variables"

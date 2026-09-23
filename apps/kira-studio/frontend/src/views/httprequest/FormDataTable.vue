@@ -12,7 +12,7 @@ import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
 import { templateToken } from '../../theme/primitives/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
-import FieldRowsTable from './FieldRowsTable.vue';
+import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 import { chooseBodyFile } from './files';
 
 // P3 C8/D4/D15: form-data over C6's shared table, with real file fields. D4's whole point: a
