@@ -2885,6 +2885,138 @@ files.
   or fail to compile, against the pre-fix code before landing, isolated via `git stash push --
   <file>` on the single changed file.
 
+## P108 Part 15 result
+
+Reviewed per `plans/P108-part15-space-git-ops.md` (Opus reviewer, no fixing); one Sonnet fixer
+landed all 9 findings (F1-F9) against `8e25fbd`, none dismissed or deferred, as 8 commits (F2+F3
+grouped — both touch `operation.go`/`conflict.go` and share the `operation.ts` twin commit — every
+other finding its own commit).
+
+- **F1 (HIGH) `e785f1d`** — `RunRemote`'s protected-branch gate and `PushPreflight`'s
+  `ClassifyPushInput.Branch` both matched/confirmed against `params.Branch`, the LOCAL branch
+  name — but a force-push actually lands on `resolveUpstreamRemoteBranch`'s result, which can
+  differ (a local `feat` tracking `origin/main`). A force-push of a stacked/renamed branch onto a
+  protected upstream slipped past the typed-confirmation gate entirely, since
+  `MatchProtectedBranch` never saw the real destination name. Resolved the upstream remote branch
+  name *before* both checks and matched/compared against it instead; `deleteRemoteBranch` is
+  unaffected (its `params.Branch` already names the remote branch directly).
+- **F2/F3 (MEDIUM) `ff3d164`** — F2: a paused multi-commit revert/cherry-pick whose current commit
+  was finished with a plain `git commit` (instead of `--continue`) cleared `REVERT_HEAD`/
+  `CHERRY_PICK_HEAD` but left `sequencer/` (and its `todo`) behind; `ClassifyInProgress` fell
+  through to "nothing in progress," so the app offered no banner and refused Continue/Abort,
+  silently never applying the remaining commits. Added `SequencerTodoKind`, read from
+  `sequencer/todo`'s first pending command (mirroring git's own `wt-status.c`), re-deriving
+  revert/cherryPick when every `*_HEAD` file is already gone. F3: a plain `git am` shares
+  `rebase-apply/` with an apply-backend `git rebase`, distinguished only by the `applying` marker
+  file; both were classified as an ordinary rebase, so `rebase --continue/--abort/--skip` all
+  failed against a real `git am`. Took the conservative fix per the plan's own instruction: no new
+  `am` `InProgressKind` (a `git-ipc` wire-contract change, Part 17's own boundary) — report-only
+  instead, every `Can*` flag false, with `head-name`/`onto` now also read from `rebase-apply/` (not
+  only `rebase-merge/`) so `HeadName`/`OtherSha` are populated there too. Both ported to the TS twin
+  `packages/git-core/src/model/operation.ts` in the same commit, with its own test coverage.
+- **F4 (MEDIUM) `57af9a4`** — `classifyOpErrorRules` is an ordered table of plain, whole-blob
+  `strings.Contains` checks; a commit subject (`could not apply <sha>... <subject>`) or a
+  conflicting file path (`Auto-merging <path>`, `CONFLICT (...): Merge conflict in <path>`) is
+  user-controlled text in that same blob — a commit titled "Handle connection refused" was
+  classified `NetworkFailed` instead of `Conflict`; other subjects/paths could trip
+  `AlreadyExists`/`NonFastForward`/`RemoteNotFound`/`NotFullyMerged`. Added a line-anchored
+  `Conflict` check first, ahead of every other row — matches only a line that literally starts with
+  `error: could not apply `/`error: could not revert `/`conflict (`, which no subject/path text can
+  ever sit at the very start of.
+- **F5 (MEDIUM) `8ac2087`** — `PullConfigArgs` spliced the raw branch name into a `--get-regexp`
+  pattern unescaped, unlike its sibling `BranchConfigRegexpArgs`, which already applies
+  `regexp.QuoteMeta`. A branch named `feat+x` silently matched the wrong key (ERE's `|` has the
+  lowest binding precedence); a branch named `a(b` (a legal git refname) made `git config` exit 6,
+  failing the whole `PullPreflight`. Applied `regexp.QuoteMeta(branch)`, the same precedent
+  `BranchConfigRegexpArgs` already established.
+- **F6 (MEDIUM) `a311454`** — `mapRebaseValue` only recognized the four exact strings
+  `true`/`false`/`interactive`/`merges`, not git's own case-insensitive boolean synonyms
+  (`yes`/`on`/`1`, `no`/`off`/`0`) or the short forms `i`/`m` — e.g. `pull.rebase=yes` silently fell
+  through to the ff-only default. Exported as `MapRebaseValue`, widened to accept every synonym git
+  itself does. Separately, `merges` mapped to a plain rebase with no `--rebase-merges`, silently
+  linearizing merge commits away; threaded a `rebaseMerges` bool through `gitops.RebaseArgs` and
+  added `gitpreflight.WantsRebaseMerges`, which the executor asks by re-reading the same config
+  spawn `PullPreflight` already made — avoiding a `PullStrategy` wire-union widening (a `git-ipc`
+  contract change, Part 17's own boundary). No TS twin exists to update: `packages/git-core/src/
+  preflight/` holds only `reset.ts`/`tag.ts`; no `pull.ts` file exists anywhere in the repo
+  (confirmed by search) for this logic to mirror into.
+- **F7 (MEDIUM-LOW) `4fc7c04`** — if a prepare script exited 0 but a background process it spawned
+  still held stdout/stderr open, `cmd.Wait` returned a wrapped `exec.ErrWaitDelay` once
+  `WaitDelay`'s deadline stopped waiting on that redirection — neither an `*exec.ExitError`, a
+  timeout, nor a cancellation — and `Run` treated it as a genuine spawn failure, discarding the
+  whole transcript. Now handled as a normal result: exit code taken from `cmd.ProcessState` when no
+  `*exec.ExitError` already supplied one, and a new `Result.Incomplete` field marks the transcript
+  as possibly incomplete instead.
+- **F8 (LOW) `b3a07d1`** — on timeout/cancel, once the shell (SIGTERM's own direct target) exited
+  and `Wait` returned, `escalate.Stop()` cancelled the pending delayed SIGKILL regardless of
+  whether any OTHER process-group member (a descendant that traps SIGTERM away) was still running —
+  nothing else was left to kill it, letting it outlive the documented 15-minute hard timeout. Now
+  sends SIGKILL to the whole group immediately and unconditionally right after `Wait` returns
+  (ESRCH tolerated), which does not reintroduce the pid-reuse race the original `Stop()` guards
+  against: that race is about a *delayed* kill long after `Wait` returned; Linux does not free a
+  PGID for reuse while any member is still alive, and this fires the instant `Wait` proves
+  `cmd.Process` — a member of exactly this group — has just been reaped. Updated the G31 round-2
+  #11 regression test for this intentional behavior change (now expects exactly one prompt SIGKILL,
+  not zero — the delayed escalation timer itself must still never separately fire, which the test
+  still checks).
+- **F9 (LOW) `3b279fb`** — `resolveStackBase` checked `!exists(parent)` only in the "parent is NOT
+  itself stacked" branch; a parent with its own `kirastack` config (`parentIsStacked=true`) but no
+  ref left at all (removed via `git update-ref -d`, which leaves the config behind) was walked into
+  as though it still resolved — the branch on top of it then resolved to whatever base that
+  dangling parent's own chain would have reached, and `flattenStack` (which only walks a base
+  through its own member branches, never the refless parent itself) silently dropped it from both
+  `Stacks` and `Orphans`, breaking `BuildStacks`' documented "never drops a branch" contract. Now
+  checked in the `parentIsStacked` branch too, same as its sibling — the branch becomes a visible
+  orphan instead.
+
+**Cross-chunk touches into `gitsession/*` (Part 16's files), flagged for that chunk's reviewer, all
+minimal and at the exact boundary each finding named — never a broader review of those files:**
+F1 → `gitsession/remote.go` (`RunRemote`'s gate resolves the upstream branch name before checking
+it; `PushPreflight` passes the resolved name to `ClassifyPush`). F6 → `gitsession/remote.go` (new
+`wantsRebaseMerges` helper, one call-site change in `runPullOp`) — **known, explicitly unresolved
+limitation:** an EXPLICIT strategy override is indistinguishable, from this re-read, from one the
+config ladder itself produced; fully closing that gap needs a `git-ipc` contract change this fix
+deliberately avoids. F7 needed no `gitsession` change — verified by reading `gitsession/
+worktree.go`'s own caller: it already just forwards `ExitCode`/`Output`/`Truncated` and only
+special-cases a non-nil `err`, which this fix means no longer happens for this case;
+`Result.Incomplete` is a new, additive field it does not yet read.
+
+**Working-tree note.** A concurrent Part 4 fixer session was committing in
+`apps/kira-studio/internal/adapters/**` in this same shared checkout throughout this phase (no
+scope overlap by design). Two of this phase's own commits (F2/F3, then F4) briefly, accidentally
+absorbed that session's own uncommitted, staged changes — a race between this session's `git add`
+of its own files and the concurrent session's own `git add` of its unrelated ones, both landing in
+the same shared index. Caught immediately by checking `git show --stat HEAD` against the intended
+file list right after each commit; both were corrected on the spot via `git reset --soft HEAD~1`
+plus `git restore --staged` on the swept-in files (restoring them to the OTHER session's own
+uncommitted working tree, exactly as it left them — no data lost) and re-committing this phase's
+own files alone, add-then-commit collapsed into one shell invocation to close the race window.
+Verified after each correction that the other session's own next commit (`f16d9db`, `ee10f4d`,
+`ca47bac`) landed cleanly on top with its own files intact.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `bun run lint:go` (`golangci-lint run`): 0 issues.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration
+  hints) — this chunk touches nothing knip already flags.
+- `bun run typecheck`: exit 0 across every project (including `packages/git-core`'s own, for the
+  F2/F3 TS twin change).
+- `go test ./...`: full suite, run once near the end per `CLAUDE.md`. First run hit one failure —
+  `gitsock.TestBroker_QueueBoundedAgainstUnlimitedEnqueue` timed out at 600s while a concurrent
+  Part 4 fixer session's own `-race` adapter test run was sharing this same sandbox. `gitsock` is
+  Part 17's own package (`gitrpc`/`gitsock`/`gitvsix`) with zero import of anything this chunk
+  touches (confirmed by grep) — re-ran the single test, then the whole `gitsock` package, then the
+  full suite again, all in isolation with no concurrent load: every one passed clean. Confirmed
+  transient resource-contention flake, not a regression from this phase's own changes; the clean
+  re-run is what's recorded as this phase's own verification.
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never
+  used.
+- Every regression test added (F1, F2, F3, F5, F6, F7, F8, F9 each got one or more — F4 reused and
+  extended the existing `TestClassifyOpError_Conflict` coverage with two new adversarial cases) was
+  confirmed to fail, or fail to compile, against the pre-fix code before landing, isolated via
+  `git stash push -- <file>` on the changed production file(s) only.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
