@@ -141,12 +141,11 @@ func (r *Router) Children(ctx context.Context, connectionID string, path model.N
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
-	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "children"},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	children, err := runOp(ctx, r.host, connectionID, "children", "", nil, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (adapters.TreeChildren, error) {
 			result, err := adapter.Children(ctx, path, op)
 			if err != nil {
-				return nil, err
+				return adapters.TreeChildren{}, err
 			}
 			op.SetRows(len(result.Nodes))
 			return result, nil
@@ -154,7 +153,6 @@ func (r *Router) Children(ctx context.Context, connectionID string, path model.N
 	if err != nil {
 		return adapters.TreeChildren{}, err
 	}
-	children := value.(adapters.TreeChildren)
 	// Same nil-slice-over-the-wire hazard Describe/Definition already guard against (P58b's own
 	// closeout finding): a native adapter's `var nodes []model.TreeNode` left empty marshals as
 	// `null`, not `[]`, and Adapter rule 5 requires Children() to answer a leaf with an empty
@@ -171,12 +169,11 @@ func (r *Router) Describe(ctx context.Context, connectionID string, path model.N
 	if err != nil {
 		return model.ObjectMeta{}, err
 	}
-	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "describe", TabID: tabID},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	return runOp(ctx, r.host, connectionID, "describe", "", tabID, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (model.ObjectMeta, error) {
 			meta, err := adapter.Describe(ctx, path, op)
 			if err != nil {
-				return nil, err
+				return model.ObjectMeta{}, err
 			}
 			// Native adapters build their list fields (e.g. ReferencedBy) as `var x []T` and leave
 			// them nil when empty, which json.Marshal renders as `null` — a cached result gets this
@@ -186,10 +183,6 @@ func (r *Router) Describe(ctx context.Context, connectionID string, path model.N
 			op.SetRows(len(meta.Columns))
 			return meta, nil
 		})
-	if err != nil {
-		return model.ObjectMeta{}, err
-	}
-	return value.(model.ObjectMeta), nil
 }
 
 func (r *Router) Definition(ctx context.Context, connectionID string, path model.NodePath, tabID *string) (model.ObjectDefinition, error) {
@@ -197,12 +190,11 @@ func (r *Router) Definition(ctx context.Context, connectionID string, path model
 	if err != nil {
 		return model.ObjectDefinition{}, err
 	}
-	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "definition", TabID: tabID},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	return runOp(ctx, r.host, connectionID, "definition", "", tabID, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) (model.ObjectDefinition, error) {
 			def, err := adapter.Definition(ctx, path, op)
 			if err != nil {
-				return nil, err
+				return model.ObjectDefinition{}, err
 			}
 			// Same nil-slice-over-the-wire hazard as Describe above, for Notes/Constraints/
 			// Sections.
@@ -210,10 +202,6 @@ func (r *Router) Definition(ctx context.Context, connectionID string, path model
 			op.SetRows(len(def.Statements))
 			return def, nil
 		})
-	if err != nil {
-		return model.ObjectDefinition{}, err
-	}
-	return value.(model.ObjectDefinition), nil
 }
 
 // SchemaColumns is P22c D1/D2's schema-wide sibling of Describe.
@@ -222,9 +210,8 @@ func (r *Router) SchemaColumns(ctx context.Context, connectionID string, path mo
 	if err != nil {
 		return nil, err
 	}
-	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "schemaColumns"},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	relations, err := runOp(ctx, r.host, connectionID, "schemaColumns", "", nil, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) ([]model.RelationColumns, error) {
 			relations, err := adapter.SchemaColumns(ctx, path, op)
 			if err != nil {
 				return nil, err
@@ -243,7 +230,6 @@ func (r *Router) SchemaColumns(ctx context.Context, connectionID string, path mo
 	if err != nil {
 		return nil, err
 	}
-	relations := value.([]model.RelationColumns)
 	if relations == nil {
 		relations = []model.RelationColumns{}
 	}
@@ -257,9 +243,8 @@ func (r *Router) KeyTypes(ctx context.Context, connectionID string, paths []mode
 	if err != nil {
 		return nil, err
 	}
-	id := connectionID
-	_, value, err := r.host.RunOp(ctx, OpSpec{ConnectionID: &id, Kind: "keyTypes"},
-		func(ctx context.Context, op *adapters.OpCtx) (any, error) {
+	types, err := runOp(ctx, r.host, connectionID, "keyTypes", "", nil, adapter,
+		func(ctx context.Context, adapter adapters.Adapter, op *adapters.OpCtx) ([]string, error) {
 			types, err := adapter.KeyTypes(ctx, paths, op)
 			if err != nil {
 				return nil, err
@@ -270,7 +255,6 @@ func (r *Router) KeyTypes(ctx context.Context, connectionID string, paths []mode
 	if err != nil {
 		return nil, err
 	}
-	types := value.([]string)
 	if types == nil {
 		types = []string{}
 	}
