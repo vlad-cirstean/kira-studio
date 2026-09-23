@@ -1,3 +1,4 @@
+import { buildPackedChunk } from '@kira/git-core/testing/packedChunk';
 import type { PackedCommitChunk } from '@kira/git-ipc';
 import { encodeStreamPayload } from '@kira/git-ipc/codec';
 
@@ -16,40 +17,20 @@ import { encodeStreamPayload } from '@kira/git-ipc/codec';
 
 const WIDEST_SAMPLE_TIMESTAMP = Date.UTC(2024, 11, 30, 22, 48) / 1000;
 
-/** A single-commit, zero-parent `PackedCommitChunk` at row 0 — `fakeGraphHost.ts`'s own
- *  `buildPackedChunkAt` (the VS Code interaction suite's analogous fixture), ported here since
- *  that file lives in a different workspace package this app's tests cannot import from. */
+/** A single-commit, zero-parent `PackedCommitChunk` at row 0 — `fakeGraphHost.ts`'s own analogous
+ *  fixture (the VS Code interaction suite) builds the same shape via the shared
+ *  `@kira/git-core/testing/packedChunk` (P107 I2-27). */
 export function buildOneCommitChunk(sha: string, subject: string): PackedCommitChunk {
-  const shaBytes = Buffer.from(sha, 'hex');
-  const subjectBytes = Buffer.from(subject, 'utf8');
-  return {
-    from: 0,
-    to: 1,
-    shaWidthBytes: 20,
-    shas: shaBytes.buffer.slice(shaBytes.byteOffset, shaBytes.byteOffset + shaBytes.byteLength),
-    parentOffsets: Uint32Array.from([0, 0]).buffer,
-    parentShas: new ArrayBuffer(0),
-    identityIds: Uint32Array.from([0, 1, 0, 1]).buffer,
-    times: Uint32Array.from([WIDEST_SAMPLE_TIMESTAMP, WIDEST_SAMPLE_TIMESTAMP]).buffer,
-    subjectBytes: subjectBytes.buffer.slice(
-      subjectBytes.byteOffset,
-      subjectBytes.byteOffset + subjectBytes.byteLength,
-    ),
-    subjectOffsets: Uint32Array.from([0, subjectBytes.byteLength]).buffer,
-    dictionaryBase: 0,
-    dictionary: ['Fake Author', 'fake@example.com'],
-    decorations: [],
-  };
+  return buildPackedChunk([{ sha, subject }]);
 }
 
-// P93 §8.4: a multi-branch fixture ported from `fakeGraphHost.ts`'s own `buildBranchOrderChunk`
-// (the VS Code interaction suite's analogous fixture — that file lives in a different workspace
-// package this app's tests cannot import from, so the table and the packing logic are duplicated
-// here rather than shared). Same shape: `main` (HEAD, 3 commits) plus two feature branches forked
-// off it at different depths, one long enough to collapse (n > MIN_COLLAPSIBLE = 3), one not.
-// Store rows arrive in topo order (a parent's row index is always strictly greater than its
-// child's), not display order — see `fakeGraphHost.ts`'s own doc comment for the full row/parent
-// table this mirrors.
+// P93 §8.4: a multi-branch fixture — `fakeGraphHost.ts`'s own `buildBranchOrderChunk` (the VS
+// Code interaction suite's analogous fixture) builds the same table via the shared
+// `@kira/git-core/testing/packedChunk` builder. Same shape: `main` (HEAD, 3 commits) plus two
+// feature branches forked off it at different depths, one long enough to collapse (n >
+// MIN_COLLAPSIBLE = 3), one not. Store rows arrive in topo order (a parent's row index is always
+// strictly greater than its child's), not display order — see `fakeGraphHost.ts`'s own doc
+// comment for the full row/parent table this mirrors.
 function multiBranchSha(row: number): string {
   return (row + 1).toString(16).padStart(2, '0').repeat(20);
 }
@@ -94,65 +75,18 @@ const MULTI_BRANCH_PARENT_ROW: readonly (number | undefined)[] = [
   undefined,
 ];
 
-function toArrayBuffer(buffer: Buffer): ArrayBuffer {
-  return buffer.buffer.slice(
-    buffer.byteOffset,
-    buffer.byteOffset + buffer.byteLength,
-  ) as ArrayBuffer;
-}
-
 /** The whole multi-branch fixture as one `PackedCommitChunk` — every parent link resolves within
  *  this single chunk, so one `graph.stream` chunk (`buildGraphStreamChunk` below) is enough. */
 export function buildMultiBranchChunk(): PackedCommitChunk {
-  const rowCount = MULTI_BRANCH_SUBJECTS.length;
-
-  const shaBytes = Buffer.concat(
-    Array.from({ length: rowCount }, (_, row) => Buffer.from(multiBranchSha(row), 'hex')),
-  );
-
-  const parentOffsets: number[] = [0];
-  const parentShaBuffers: Buffer[] = [];
-  for (let row = 0; row < rowCount; row++) {
+  const rows = MULTI_BRANCH_SUBJECTS.map((subject, row) => {
     const parentRow = MULTI_BRANCH_PARENT_ROW[row];
-    if (parentRow !== undefined) {
-      parentShaBuffers.push(Buffer.from(multiBranchSha(parentRow), 'hex'));
-    }
-    parentOffsets.push(parentShaBuffers.length);
-  }
-  const parentShaBytes = Buffer.concat(parentShaBuffers);
-
-  const identityIds = new Uint32Array(rowCount * 4);
-  const times = new Uint32Array(rowCount * 2);
-  for (let row = 0; row < rowCount; row++) {
-    identityIds.set([0, 1, 0, 1], row * 4);
-    times.set([WIDEST_SAMPLE_TIMESTAMP, WIDEST_SAMPLE_TIMESTAMP], row * 2);
-  }
-
-  const subjectBuffers = MULTI_BRANCH_SUBJECTS.map((s) => Buffer.from(s, 'utf8'));
-  const subjectBytes = Buffer.concat(subjectBuffers);
-  const subjectOffsets = new Uint32Array(rowCount + 1);
-  let cursor = 0;
-  for (let row = 0; row < rowCount; row++) {
-    subjectOffsets[row] = cursor;
-    cursor += subjectBuffers[row].byteLength;
-  }
-  subjectOffsets[rowCount] = cursor;
-
-  return {
-    from: 0,
-    to: rowCount,
-    shaWidthBytes: 20,
-    shas: toArrayBuffer(shaBytes),
-    parentOffsets: Uint32Array.from(parentOffsets).buffer,
-    parentShas: toArrayBuffer(parentShaBytes),
-    identityIds: identityIds.buffer,
-    times: times.buffer,
-    subjectBytes: toArrayBuffer(subjectBytes),
-    subjectOffsets: subjectOffsets.buffer,
-    dictionaryBase: 0,
-    dictionary: ['Fake Author', 'fake@example.com'],
-    decorations: [],
-  };
+    return {
+      sha: multiBranchSha(row),
+      subject,
+      parents: parentRow !== undefined ? [multiBranchSha(parentRow)] : [],
+    };
+  });
+  return buildPackedChunk(rows);
 }
 
 const MULTI_BRANCH_COMMITTER_DATE_NEWER = WIDEST_SAMPLE_TIMESTAMP + 2000;
