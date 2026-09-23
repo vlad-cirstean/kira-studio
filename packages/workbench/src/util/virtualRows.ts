@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import { useResizeObserver } from '@vueuse/core';
-import { computed, onMounted, type Ref, ref } from 'vue';
+import { computed, onMounted, type Ref, ref, watch } from 'vue';
 
 // P104 §3.4: the old hand-rolled virtual list's own recipe, rebuilt on @tanstack/vue-virtual
 // directly at each call site rather than kept as a wrapper component (§9 rule 4) -- this is the
@@ -26,6 +26,12 @@ export function useVirtualRows(opts: UseVirtualRowsOptions) {
     estimateSize: (index: number) => opts.rowHeights?.()?.[index] ?? opts.rowHeight(),
     overscan: opts.overscan ?? 8,
   });
+
+  // `estimateSize` isn't one of virtual-core's own memo deps (only `count` and the handful listed
+  // in `Virtualizer#maybeNotify` are) -- a row-height change with the same item count (a document
+  // row expanding, the row-density toggle) never re-triggers a measure on its own, so rows overlap
+  // or mis-lay-out until the count next changes. Force it explicitly on either input changing.
+  watch([() => opts.rowHeight(), () => opts.rowHeights?.()], () => virtualizer.value.measure());
 
   const virtualItems = computed(() => virtualizer.value.getVirtualItems());
   const totalSize = computed(() => virtualizer.value.getTotalSize());

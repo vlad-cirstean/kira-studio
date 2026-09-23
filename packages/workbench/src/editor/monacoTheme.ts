@@ -26,37 +26,43 @@ export const KIRA_EDITOR_THEME = 'kira-editor';
 // nothing here even logs past the one console error). Chromium does not canonicalise either way,
 // which is why both forms went unnoticed until a real WebKit run.
 //
-// A canvas 2D context's own `fillStyle` setter/getter accepts the full CSS `<color>` grammar (any
-// keyword, any hex length, `rgb()`/`hsl()`/...) and is spec-required to serialize an opaque colour
-// back out as `#rrggbb` on read — a general normalizer that subsumes the narrower hex-shorthand-only
-// fix this replaces, rather than special-casing named colours as a second regex.
+// A canvas 2D context's own `fillStyle` setter accepts the full CSS `<color>` grammar (any
+// keyword, any hex length, `rgb()`/`hsl()`/`color-mix()`/`color()`/...). Reading the *string* back
+// out of `fillStyle` (the earlier approach here) only serializes as far as each engine's own
+// `<color>` stringifier goes -- both Chromium and WebKit hand back a `color()` function string for
+// a `color-mix()` token (`--kira-search-match`'s own `color(srgb 0.8 0.654902 0 / 0.25)`), which
+// the old rgba-only regex below never matched, so the raw string reached Monaco's own
+// `Color.fromHex` and silently resolved to `Color.red` (browser-verified, both engines). Reading
+// the *rendered pixel* instead is engine-agnostic by construction: whatever the color computes to,
+// `getImageData` hands back its actual RGBA bytes, no string grammar to keep up with.
 let normalizeCanvasCtx: CanvasRenderingContext2D | null | undefined;
 
 // D6 (P67c §3.2) — the alpha trap: a translucent token (`--kira-scrollbar: #79797966`, or a
-// `color-mix(… transparent)` token like `--kira-search-match`) comes back from the canvas
-// normalizer above as `rgba(r, g, b, a)`, never `#rrggbb`. `editor.defineTheme`'s `colors` values
-// go through `Color.fromHex` (`StandaloneTheme.getColors()`, standaloneThemeService.js), which
-// accepts only `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` and returns *red* — not an error — on anything
-// else. Re-encoding as 8-digit hex here, once, is what lets `defineKiraTheme` map a translucent
-// `--kira-*` token at all without silently painting a widget bright red.
-const RGBA_PATTERN = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/;
-function rgbaToHex8(rgba: string): string | undefined {
-  const match = RGBA_PATTERN.exec(rgba);
-  if (!match) return undefined;
-  const [, r, g, b, a] = match;
-  const byte = (n: number): string => Math.round(n).toString(16).padStart(2, '0');
-  return `#${byte(Number(r))}${byte(Number(g))}${byte(Number(b))}${byte(Number(a) * 255)}`;
-}
-
+// `color-mix(… transparent)` token like `--kira-search-match`) is not opaque, so `editor.defineTheme`'s
+// `colors` values -- which go through `Color.fromHex` (`StandaloneTheme.getColors()`,
+// standaloneThemeService.js), accepting only `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA` -- need the alpha
+// byte carried through, not dropped. Always emitting `#rrggbbaa` (never bare `#rrggbb`) is what lets
+// `defineKiraTheme` map a translucent `--kira-*` token at all without silently painting a widget red;
+// `ColorMap.getId`'s own regex (`tokenization.js`) accepts the trailing alpha pair for token `rules`
+// foregrounds too, so one format serves both call sites below.
 function normalizeColor(color: string): string {
   if (normalizeCanvasCtx === undefined) {
-    normalizeCanvasCtx = document.createElement('canvas').getContext('2d');
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    normalizeCanvasCtx = canvas.getContext('2d');
+    // 'copy' replaces the destination pixel outright instead of alpha-compositing the new fill
+    // over whatever the previous call left behind -- required for a translucent `color` to read
+    // back as itself rather than blended with the prior draw.
+    if (normalizeCanvasCtx) normalizeCanvasCtx.globalCompositeOperation = 'copy';
   }
   if (!normalizeCanvasCtx) return color; // no canvas 2D support — pass through rather than throw
   normalizeCanvasCtx.fillStyle = '#000000'; // known-good reset, so an invalid `color` leaves this
   normalizeCanvasCtx.fillStyle = color;
-  const normalized = normalizeCanvasCtx.fillStyle;
-  return rgbaToHex8(normalized) ?? normalized;
+  normalizeCanvasCtx.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = normalizeCanvasCtx.getImageData(0, 0, 1, 1).data;
+  const byte = (n: number): string => n.toString(16).padStart(2, '0');
+  return `#${byte(r)}${byte(g)}${byte(b)}${byte(a)}`;
 }
 
 export function cssVar(name: string, fallback: string): string {
