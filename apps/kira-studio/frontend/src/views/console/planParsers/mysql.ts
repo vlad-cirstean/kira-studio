@@ -1,4 +1,10 @@
-import { isOverThreshold, maxEstimatedRows, pushWideScanIssue, rollupIssues } from '../planIssues';
+import {
+  isOverThreshold,
+  maxEstimatedRows,
+  pushWideScanIssue,
+  rollupIssues,
+  tableLabel,
+} from '../planIssues';
 import type { PlanNode, QueryPlan, ScanEstimate } from '../planModel';
 
 // P18 (v1.1) D13/D15/D16: MySQL 8.4's `EXPLAIN FORMAT=JSON` — F12. One row, one column, a
@@ -63,13 +69,6 @@ function tableMetrics(table: RawTable): Array<{ label: string; value: string }> 
     out.push({ label: key, value: Array.isArray(value) ? value.join(', ') : String(value) });
   }
   return out;
-}
-
-function tableLabel(table: RawTable): string {
-  const name = table.table_name ?? '?';
-  if (table.access_type === 'ALL') return `Full scan on ${name}`;
-  if (table.access_type) return `${table.access_type} access on ${name}`;
-  return name;
 }
 
 function tableNode(table: RawTable, thresholdRows: number, scans: ScanEstimate[]): PlanNode {

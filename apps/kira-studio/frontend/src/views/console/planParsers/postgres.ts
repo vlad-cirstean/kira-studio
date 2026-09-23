@@ -1,4 +1,10 @@
-import { isOverThreshold, maxEstimatedRows, pushWideScanIssue, rollupIssues } from '../planIssues';
+import {
+  isOverThreshold,
+  maxEstimatedRows,
+  pushWideScanIssue,
+  rawFieldMetrics,
+  rollupIssues,
+} from '../planIssues';
 import type { PlanNode, QueryPlan, ScanEstimate } from '../planModel';
 
 // P18 (v1.1) D13/D15/D16: Postgres 18's `EXPLAIN (FORMAT JSON, COSTS TRUE, ...)` returns one row,
@@ -53,15 +59,6 @@ const TYPED_KEYS = new Set([
   'Plans',
 ]);
 
-function metricsFrom(raw: RawNode): Array<{ label: string; value: string }> {
-  const out: Array<{ label: string; value: string }> = [];
-  for (const [key, value] of Object.entries(raw)) {
-    if (TYPED_KEYS.has(key) || value === undefined) continue;
-    out.push({ label: key, value: Array.isArray(value) ? value.join(', ') : String(value) });
-  }
-  return out;
-}
-
 function buildNode(raw: RawNode, thresholdRows: number, scans: ScanEstimate[]): PlanNode {
   const nodeType = raw['Node Type'] ?? 'Node';
   const relation = raw['Relation Name'];
@@ -78,7 +75,7 @@ function buildNode(raw: RawNode, thresholdRows: number, scans: ScanEstimate[]): 
       raw['Total Cost'] !== undefined
         ? { total: raw['Total Cost'], startup: raw['Startup Cost'] }
         : undefined,
-    metrics: metricsFrom(raw),
+    metrics: rawFieldMetrics(raw, TYPED_KEYS),
     issues: [],
     children: (raw.Plans ?? []).map((child) => buildNode(child, thresholdRows, scans)),
   };
