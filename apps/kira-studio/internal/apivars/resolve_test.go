@@ -84,6 +84,10 @@ func TestResolveAgainstTheSharedCorpus(t *testing.T) {
 	}
 }
 
+// strPtr is repos_test's own helper (storage/repos/ops_test.go), restated here — F2's three-state
+// VariablesRepo.Upsert (P108 Part 3) needs it for every secret seeded below.
+func strPtr(s string) *string { return &s }
+
 // newResolveService opens a real (tmpfile-backed) SQLite database through the real migrations —
 // mirrors repos_test's own newVariablesRepo (variables_test.go); duplicated rather than imported
 // since that helper lives in an internal _test.go file of a different package. Auth is nil: none of
@@ -126,7 +130,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 	}
 
 	t.Run("substitutes and reports exactly what it used", func(t *testing.T) {
-		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", "sekret-value", true, ""); err != nil {
+		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", strPtr("sekret-value"), true, ""); err != nil {
 			t.Fatalf("Upsert: %v", err)
 		}
 
@@ -220,7 +224,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 	// proof that the resolver itself hands out the right text; bridge/http_test.go proves the
 	// masking replacer built from it.
 	t.Run("a piped secret's Rendered is the transformed form, not the plaintext", func(t *testing.T) {
-		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "piped", "hunter2", true, ""); err != nil {
+		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "piped", strPtr("hunter2"), true, ""); err != nil {
 			t.Fatalf("Upsert: %v", err)
 		}
 
@@ -248,7 +252,7 @@ func TestResolveRequestReturnsExactlyTheSecretsItSubstituted(t *testing.T) {
 	// D9(d): a secret used both plainly and piped in one request produces two entries, one per
 	// distinct (Name, Placeholder) — the case a name-keyed model could not represent at all.
 	t.Run("a secret used both plainly and piped records two distinct entries", func(t *testing.T) {
-		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "dual", "s3cr3t", true, ""); err != nil {
+		if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "dual", strPtr("s3cr3t"), true, ""); err != nil {
 			t.Fatalf("Upsert: %v", err)
 		}
 

@@ -125,15 +125,30 @@ async function onDuplicateEnvironment(): Promise<void> {
 
 // ---- the row table (VariablesDialog.vue's own mechanics, verbatim but tab-scoped) ----
 
+// F2 (P108 Part 3): valueTouched is the three-state signal commitDraft sends to Upsert's own
+// nil-means-unchanged `value` parameter. A secret row's seeded `value` is always "" (D4/D5's list
+// projection), so without this flag every blur — even one that only renamed or re-described the
+// row — would send that blank seed as a real replacement value and silently wipe the stored
+// secret. Only onUpdateValue (a real edit) and onUpdateSecret's own commit (which always fills
+// draft.value with a genuine plaintext first, revealed or already-plain) ever set it true; a mere
+// reveal-icon peek (the revealMirroredValue watcher below) never does — it is a read-only mirror,
+// not an edit. Reset to false on every syncDrafts, since a freshly loaded row has no pending edit.
 interface Draft {
   name: string;
   value: string;
+  valueTouched: boolean;
   isSecret: boolean;
   description: string;
 }
 
 const drafts = reactive<Record<string, Draft>>({});
-const trailingDraft = reactive<Draft>({ name: '', value: '', isSecret: false, description: '' });
+const trailingDraft = reactive<Draft>({
+  name: '',
+  value: '',
+  valueTouched: false,
+  isSecret: false,
+  description: '',
+});
 const order = ref<string[]>([]);
 
 function syncDrafts(): void {
@@ -142,12 +157,14 @@ function syncDrafts(): void {
     drafts[row.id] = {
       name: row.name,
       value: row.value,
+      valueTouched: false,
       isSecret: row.isSecret,
       description: row.description,
     };
   }
   trailingDraft.name = '';
   trailingDraft.value = '';
+  trailingDraft.valueTouched = false;
   trailingDraft.isSecret = false;
   trailingDraft.description = '';
   order.value = rows.value.map((row) => row.id);
@@ -229,7 +246,8 @@ function duplicateFor(row: ApiVariable): boolean {
 
 function draftFor(id: string): Draft {
   if (id === '') return trailingDraft;
-  if (!drafts[id]) drafts[id] = { name: '', value: '', isSecret: false, description: '' };
+  if (!drafts[id])
+    drafts[id] = { name: '', value: '', valueTouched: false, isSecret: false, description: '' };
   return drafts[id];
 }
 
@@ -237,7 +255,9 @@ function onUpdateName(id: string, value: string): void {
   draftFor(id).name = value;
 }
 function onUpdateValue(id: string, value: string): void {
-  draftFor(id).value = value;
+  const draft = draftFor(id);
+  draft.value = value;
+  draft.valueTouched = true;
 }
 function onUpdateDescription(id: string, value: string): void {
   draftFor(id).description = value;
@@ -251,11 +271,14 @@ async function commitDraft(id: string): Promise<void> {
     const name = draft.name.trim();
     trailingDraft.name = '';
     trailingDraft.value = '';
+    trailingDraft.valueTouched = false;
     trailingDraft.isSecret = false;
     trailingDraft.description = '';
     await variableSetStore.upsertVariable(props.tab.id, scope.value, ownerId.value, {
       id: '',
       name,
+      // Create always carries a real value (never null) — Upsert requires one for id === '' (a
+      // fresh row has no prior stored value nil could ever mean "leave untouched" against).
       value,
       isSecret,
       description,
@@ -271,7 +294,8 @@ async function commitDraft(id: string): Promise<void> {
   await variableSetStore.upsertVariable(props.tab.id, scope.value, ownerId.value, {
     id,
     name: draft.name.trim(),
-    value: draft.value,
+    // F2: null unless this draft's value was actually touched — see Draft's own comment above.
+    value: draft.valueTouched ? draft.value : null,
     isSecret: draft.isSecret,
     description: draft.description,
   });
@@ -289,9 +313,12 @@ async function onBlur(id: string): Promise<void> {
     draft.name = row.name;
     return;
   }
+  // F2: a secret row's own row.value is always "" (D4/D5), so comparing draft.value to it
+  // directly is meaningless for a secret — valueTouched is the real "did the value change"
+  // signal; draft.value === row.value still short-circuits a touched-then-reverted plain edit.
   if (
     draft.name === row.name &&
-    draft.value === row.value &&
+    (!draft.valueTouched || draft.value === row.value) &&
     draft.isSecret === row.isSecret &&
     draft.description === row.description
   )
@@ -307,6 +334,9 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
   const draft = draftFor(id);
   if (checked) {
     draft.isSecret = true;
+    // draft.value already holds the row's real plaintext here (a plain row's own List value is
+    // never blanked) — a genuine value, safe (and necessary) to send.
+    draft.valueTouched = true;
     await commitDraft(id);
     return;
   }
@@ -316,6 +346,7 @@ async function onUpdateSecret(id: string, checked: boolean): Promise<void> {
     draft.value = value;
   }
   draft.isSecret = false;
+  draft.valueTouched = true;
   await commitDraft(id);
 }
 

@@ -359,21 +359,24 @@ func (r *VariablesRepo) List(scope model.VariableScope, ownerID string) ([]model
 	return out, nil
 }
 
-// Upsert creates (id == "") or updates one variable. value is always the plaintext — a secret's
-// plaintext crosses the bridge here deliberately, in the one direction D5 never restricts: the
-// user just typed it into a revealed, editable field, the same as ConnectionDialog's password
-// field. D13: an update that actually changes the stored value records the value it replaced,
-// inside the same transaction, before trimming to variableHistoryLimit.
-func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, value string, isSecret bool, description string) (model.Variable, error) {
+// Upsert creates (id == "") or updates one variable. value is a three-state pointer — nil = leave
+// the stored value untouched, matching connections.Input.Password's own "nil = unchanged" contract
+// (connections/input.go). F2 (P108 Part 3): a secret's list projection is always "" (D4/D5), so a
+// caller that reads a row, edits only its name or description, and writes it back without ever
+// revealing the secret has no real plaintext to send — a plain string parameter forced every such
+// edit to send "" and Upsert unconditionally re-encrypted it, silently wiping the secret. nil closes
+// that: only a genuine edit (the frontend's own "value touched" flag) sends a non-nil value, and
+// "" is still a real, explicit clear when a caller does send it. Required for a create (id == "").
+// When non-nil, it is always the plaintext — a secret's plaintext crosses the bridge here
+// deliberately, in the one direction D5 never restricts: the user just typed it into a revealed,
+// editable field, the same as ConnectionDialog's password field. D13: an update that actually
+// changes the stored value records the value it replaced, inside the same transaction, before
+// trimming to variableHistoryLimit.
+func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name string, value *string, isSecret bool, description string) (model.Variable, error) {
 	if _, err := scopeColumn(scope); err != nil {
 		return model.Variable{}, err
 	}
 	if err := (model.Variable{Name: name}).Validate(); err != nil {
-		return model.Variable{}, err
-	}
-
-	storedValue, storedSecret, err := r.encryptFor(value, isSecret)
-	if err != nil {
 		return model.Variable{}, err
 	}
 
@@ -385,29 +388,95 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 
 	now := kiratime.NowISO()
 	if id == "" {
-		return r.insertVariable(tx, scope, ownerID, name, value, isSecret, description, storedValue, storedSecret, now)
+		if value == nil {
+			return model.Variable{}, fmt.Errorf("repos/variables: value is required to create a variable")
+		}
+		storedValue, storedSecret, err := r.encryptFor(*value, isSecret)
+		if err != nil {
+			return model.Variable{}, err
+		}
+		return r.insertVariable(tx, scope, ownerID, name, *value, isSecret, description, storedValue, storedSecret, now)
 	}
 
+	existing, err := r.readVariableForUpdate(tx, id)
+	if err != nil {
+		return model.Variable{}, err
+	}
+
+	if value == nil {
+		return r.updateVariableUntouched(tx, id, name, description, now, existing)
+	}
+	return r.updateVariableValue(tx, id, name, *value, isSecret, description, now, existing)
+}
+
+// existingVariableRow is Upsert's own pre-image of the row an update reads before writing —
+// shared by both of its own branches below (F2, P108 Part 3's own split to stay under gocognit's
+// cap).
+type existingVariableRow struct {
+	scope          model.VariableScope
+	ownerID        string
+	oldValue       string
+	oldSecret      bool
+	oldSecretValue sql.NullString
+	sortOrder      int
+}
+
+func (r *VariablesRepo) readVariableForUpdate(tx *sql.Tx, id string) (existingVariableRow, error) {
 	var (
 		collectionID, environmentID sql.NullString
-		oldValue                    string
+		row                         existingVariableRow
 		oldSecretInt                int
-		oldSecretValue              sql.NullString
-		oldSortOrder                int
 	)
-	err = tx.QueryRow(
+	err := tx.QueryRow(
 		`SELECT collection_id, environment_id, value, is_secret, secret_value, sort_order FROM api_variables WHERE id = ?`, id,
-	).Scan(&collectionID, &environmentID, &oldValue, &oldSecretInt, &oldSecretValue, &oldSortOrder)
+	).Scan(&collectionID, &environmentID, &row.oldValue, &oldSecretInt, &row.oldSecretValue, &row.sortOrder)
 	if errors.Is(err, sql.ErrNoRows) {
-		return model.Variable{}, fmt.Errorf("repos/variables: no variable %s", id)
+		return existingVariableRow{}, fmt.Errorf("repos/variables: no variable %s", id)
 	}
 	if err != nil {
-		return model.Variable{}, fmt.Errorf("repos/variables: read variable %s: %w", id, err)
+		return existingVariableRow{}, fmt.Errorf("repos/variables: read variable %s: %w", id, err)
 	}
-	oldSecret := oldSecretInt != 0
+	row.oldSecret = oldSecretInt != 0
+	if collectionID.Valid {
+		row.scope, row.ownerID = model.VariableScopeCollection, collectionID.String
+	} else {
+		row.scope, row.ownerID = model.VariableScopeEnvironment, environmentID.String
+	}
+	return row, nil
+}
 
-	if changed, oldPlain, oldPlainOK := r.valueChanged(oldValue, oldSecret, oldSecretValue, value); changed && oldPlainOK {
-		if err := r.recordHistory(tx, id, oldPlain, oldSecret, now); err != nil {
+// updateVariableUntouched is Upsert's value == nil branch — F2 (P108 Part 3): nothing about the
+// value transitioned, so value/secret_value/is_secret stay exactly as stored (an isSecret flip
+// with no real value to move into/out of secret_value has no meaning here; the frontend never
+// sends one) and no history is recorded, only name/description.
+func (r *VariablesRepo) updateVariableUntouched(tx *sql.Tx, id, name, description, now string, existing existingVariableRow) (model.Variable, error) {
+	if _, err := tx.Exec(
+		`UPDATE api_variables SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
+		name, description, now, id,
+	); err != nil {
+		return model.Variable{}, fmt.Errorf("repos/variables: update variable %s: %w", id, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return model.Variable{}, fmt.Errorf("repos/variables: commit: %w", err)
+	}
+	out := model.Variable{ID: id, Scope: existing.scope, OwnerID: existing.ownerID, Name: name, Value: existing.oldValue, IsSecret: existing.oldSecret, SortOrder: existing.sortOrder, Description: description}
+	if out.IsSecret {
+		out.Value = ""
+	}
+	return out, nil
+}
+
+// updateVariableValue is Upsert's value != nil branch — the ordinary path: encrypt if secret,
+// record history for a real change, write the row, purge pre-secret history on a plain-to-secret
+// flip (Finding 1, P21 round 3).
+func (r *VariablesRepo) updateVariableValue(tx *sql.Tx, id, name, value string, isSecret bool, description, now string, existing existingVariableRow) (model.Variable, error) {
+	storedValue, storedSecret, err := r.encryptFor(value, isSecret)
+	if err != nil {
+		return model.Variable{}, err
+	}
+
+	if changed, oldPlain, oldPlainOK := r.valueChanged(existing.oldValue, existing.oldSecret, existing.oldSecretValue, value); changed && oldPlainOK {
+		if err := r.recordHistory(tx, id, oldPlain, existing.oldSecret, now); err != nil {
 			return model.Variable{}, err
 		}
 	}
@@ -421,24 +490,17 @@ func (r *VariablesRepo) Upsert(scope model.VariableScope, ownerID, id, name, val
 
 	// A plain-to-secret transition purges pre-secret history — see purgePlaintextHistory's own
 	// comment (Finding 1, P21 round 3) for why.
-	if isSecret && !oldSecret {
+	if isSecret && !existing.oldSecret {
 		if err := purgePlaintextHistory(tx, id); err != nil {
 			return model.Variable{}, err
 		}
-	}
-
-	resolvedScope, resolvedOwner := model.VariableScopeCollection, ""
-	if collectionID.Valid {
-		resolvedOwner = collectionID.String
-	} else {
-		resolvedScope, resolvedOwner = model.VariableScopeEnvironment, environmentID.String
 	}
 
 	if err := tx.Commit(); err != nil {
 		return model.Variable{}, fmt.Errorf("repos/variables: commit: %w", err)
 	}
 
-	out := model.Variable{ID: id, Scope: resolvedScope, OwnerID: resolvedOwner, Name: name, Value: value, IsSecret: isSecret, SortOrder: oldSortOrder, Description: description}
+	out := model.Variable{ID: id, Scope: existing.scope, OwnerID: existing.ownerID, Name: name, Value: value, IsSecret: isSecret, SortOrder: existing.sortOrder, Description: description}
 	if out.IsSecret {
 		out.Value = ""
 	}

@@ -134,6 +134,10 @@ func TestGrpcHasAnyReference(t *testing.T) {
 	}
 }
 
+// strPtr is repos_test's own helper (storage/repos/ops_test.go), restated here — F2's three-state
+// VariablesRepo.Upsert (P108 Part 3) needs it for every secret seeded below.
+func strPtr(s string) *string { return &s }
+
 // newGrpcServiceForTest opens a real (tmpfile-backed) SQLite database through the real migrations
 // and wires a *GrpcService against it — mirrors apivars/resolve_test.go's own newResolveService
 // and bridge/http_test.go's own newRepos-backed setup.
@@ -176,7 +180,7 @@ func TestRecordGrpcHistory_NeverPersistsResolvedSecrets(t *testing.T) {
 		t.Fatalf("CreateCollection: %v", err)
 	}
 	const secretToken = "sk_live_super_secret_token"
-	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true, ""); err != nil {
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", strPtr(secretToken), true, ""); err != nil {
 		t.Fatalf("Upsert secret: %v", err)
 	}
 
@@ -247,10 +251,10 @@ func TestResolveGrpcCallSource_ResolvesTargetAndMetadataInProtoDescriptorMode(t 
 	}
 	const secretHost = "internal-secret-host.example.com"
 	const secretToken = "sk_live_super_secret_token"
-	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "host", secretHost, true, ""); err != nil {
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "host", strPtr(secretHost), true, ""); err != nil {
 		t.Fatalf("Upsert host secret: %v", err)
 	}
-	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", secretToken, true, ""); err != nil {
+	if _, err := variablesRepo.Upsert(model.VariableScopeCollection, c.ID, "", "token", strPtr(secretToken), true, ""); err != nil {
 		t.Fatalf("Upsert token secret: %v", err)
 	}
 

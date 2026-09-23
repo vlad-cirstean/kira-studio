@@ -50,12 +50,12 @@ func TestVariablesSortOrderIsDenseAndScopeIndependent(t *testing.T) {
 
 	var collectionIDs, envIDs []string
 	for _, name := range []string{"a", "b", "c"} {
-		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", name, name, false, "")
+		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", name, strPtr(name), false, "")
 		if err != nil {
 			t.Fatalf("Upsert(collection, %s): %v", name, err)
 		}
 		collectionIDs = append(collectionIDs, v.ID)
-		w, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", name, name, false, "")
+		w, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", name, strPtr(name), false, "")
 		if err != nil {
 			t.Fatalf("Upsert(environment, %s): %v", name, err)
 		}
@@ -116,13 +116,13 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "baseUrl", "v1", false, "")
+	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "baseUrl", strPtr("v1"), false, "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
 	// Writing the same value twice records nothing: no prior value was actually replaced.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "v1", false, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", strPtr("v1"), false, ""); err != nil {
 		t.Fatalf("no-op upsert: %v", err)
 	}
 	hist, err := r.History(v.ID)
@@ -134,7 +134,7 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 	}
 
 	// A real change records the value it replaced.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "v2", false, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", strPtr("v2"), false, ""); err != nil {
 		t.Fatalf("upsert v2: %v", err)
 	}
 	hist, err = r.History(v.ID)
@@ -147,7 +147,7 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 
 	// Restoring writes through the ordinary path, so it is itself recorded — the value being
 	// replaced (v2) becomes the newest history entry.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", hist[0].Value, false, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", strPtr(hist[0].Value), false, ""); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
 	hist, err = r.History(v.ID)
@@ -160,7 +160,7 @@ func TestVariableHistoryRecordsOnChangeDedupedAndTrimmed(t *testing.T) {
 
 	// Trimmed at 20, oldest dropped first.
 	for i := 0; i < 25; i++ {
-		if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", "gen"+string(rune('a'+i)), false, ""); err != nil {
+		if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "baseUrl", strPtr("gen"+string(rune('a'+i))), false, ""); err != nil {
 			t.Fatalf("upsert gen%d: %v", i, err)
 		}
 	}
@@ -189,12 +189,12 @@ func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "sk-live-old", false, "")
+	v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", strPtr("sk-live-old"), false, "")
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	// A plain edit records "sk-live-old" in history.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", "sk-live-mid", false, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", strPtr("sk-live-mid"), false, ""); err != nil {
 		t.Fatalf("plain edit: %v", err)
 	}
 	hist, err := r.History(v.ID)
@@ -208,7 +208,7 @@ func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
 	// Flip to secret in the same edit that also changes the value: recordHistory would otherwise
 	// stamp *this* transition's row is_secret=0 too (the flag is read from the old row), leaving the
 	// value it replaced ("sk-live-mid") in cleartext right alongside the earlier one.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", "sk-live-new", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", strPtr("sk-live-new"), true, ""); err != nil {
 		t.Fatalf("flip to secret: %v", err)
 	}
 
@@ -222,7 +222,7 @@ func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
 
 	// A subsequent secret-to-secret edit records history the normal, encrypted way and is
 	// unaffected by the purge.
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", "sk-live-newer", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, v.ID, "token", strPtr("sk-live-newer"), true, ""); err != nil {
 		t.Fatalf("secret edit: %v", err)
 	}
 	hist, err = r.History(v.ID)
@@ -234,13 +234,70 @@ func TestUpsertToSecretPurgesPlaintextHistory(t *testing.T) {
 	}
 }
 
+// TestUpsertWithNilValueLeavesASecretUntouched is F2 (P108 Part 3): List's own list projection
+// always returns "" for a secret (D4/D5), so the frontend seeds an unrevealed secret's draft from
+// that blank value — a nil value pointer must be Upsert's own "leave the stored value untouched"
+// signal for exactly this case, or renaming/describing a secret without ever revealing it silently
+// wipes it (the old value survives only in history; the next request sends an empty credential).
+func TestUpsertWithNilValueLeavesASecretUntouched(t *testing.T) {
+	r, db := newVariablesRepo(t)
+	collectionID := newCollectionFor(t, db)
+
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", strPtr("s3cr3t"), true, "old desc")
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	// Rename and re-describe without ever revealing — exactly what an onBlur commit sends for an
+	// unrevealed secret draft once the frontend only sends a real value when one was actually typed.
+	updated, err := r.Upsert(model.VariableScopeCollection, collectionID, created.ID, "apiKeyRenamed", nil, true, "new desc")
+	if err != nil {
+		t.Fatalf("update with nil value: %v", err)
+	}
+	if updated.Value != "" {
+		t.Fatalf("returned Value = %q, want '' for a secret", updated.Value)
+	}
+	if updated.Name != "apiKeyRenamed" || updated.Description != "new desc" {
+		t.Fatalf("updated = %+v, want the name/description to have actually changed", updated)
+	}
+
+	plain, err := r.RevealValue(created.ID)
+	if err != nil {
+		t.Fatalf("RevealValue: %v", err)
+	}
+	if plain != "s3cr3t" {
+		t.Fatalf("RevealValue after a nil-value update = %q, want the original s3cr3t (unwiped)", plain)
+	}
+
+	// No history recorded — nothing about the value changed.
+	hist, err := r.History(created.ID)
+	if err != nil {
+		t.Fatalf("History: %v", err)
+	}
+	if len(hist) != 0 {
+		t.Fatalf("History = %+v, want none (a nil-value update touches no value)", hist)
+	}
+
+	// An explicit, real edit afterward still works normally.
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, created.ID, "apiKeyRenamed", strPtr("s3cr3t-2"), true, "new desc"); err != nil {
+		t.Fatalf("real edit after a nil-value update: %v", err)
+	}
+	plain, err = r.RevealValue(created.ID)
+	if err != nil {
+		t.Fatalf("RevealValue after real edit: %v", err)
+	}
+	if plain != "s3cr3t-2" {
+		t.Fatalf("RevealValue after real edit = %q, want s3cr3t-2", plain)
+	}
+}
+
 // ---- 3. List never returns a secret's plaintext or ciphertext ----
 
 func TestVariablesListNeverReturnsASecret(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "s3cr3t", true, "")
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", strPtr("s3cr3t"), true, "")
 	if err != nil {
 		t.Fatalf("Upsert(secret): %v", err)
 	}
@@ -415,10 +472,10 @@ func TestSecretsForDuplicateNameResolvesFirstWinsBySortOrder(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "first-value", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", strPtr("first-value"), true, ""); err != nil {
 		t.Fatalf("Upsert(first): %v", err)
 	}
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "second-value", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", strPtr("second-value"), true, ""); err != nil {
 		t.Fatalf("Upsert(second): %v", err)
 	}
 
@@ -443,10 +500,10 @@ func TestSecretsForEnvironmentStillOverridesCollectionDespiteFirstWins(t *testin
 		t.Fatalf("CreateEnvironment: %v", err)
 	}
 
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", "collection-value", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "token", strPtr("collection-value"), true, ""); err != nil {
 		t.Fatalf("Upsert(collection): %v", err)
 	}
-	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "token", "env-value", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "token", strPtr("env-value"), true, ""); err != nil {
 		t.Fatalf("Upsert(environment): %v", err)
 	}
 
@@ -471,13 +528,13 @@ func TestDuplicateEnvironmentCopiesCiphertextVerbatimNoHistoryNeverActive(t *tes
 	if err := r.SetActiveEnvironment(env.ID); err != nil {
 		t.Fatalf("SetActiveEnvironment: %v", err)
 	}
-	plain, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "apiKey", "s3cr3t-value", true, "")
+	plain, err := r.Upsert(model.VariableScopeEnvironment, env.ID, "", "apiKey", strPtr("s3cr3t-value"), true, "")
 	if err != nil {
 		t.Fatalf("Upsert(secret): %v", err)
 	}
 	// A second, real edit so the source variable actually has history — proving the clone
 	// carries none of it is meaningless against a variable that never had any.
-	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, plain.ID, "apiKey", "s3cr3t-value-2", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeEnvironment, env.ID, plain.ID, "apiKey", strPtr("s3cr3t-value-2"), true, ""); err != nil {
 		t.Fatalf("Upsert(secret, changed): %v", err)
 	}
 	srcHistory, err := r.History(plain.ID)
@@ -572,7 +629,7 @@ func TestApplyBulkLeavesAnUntouchedSecretByteIdentical(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "s3cr3t", true, "d")
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", strPtr("s3cr3t"), true, "d")
 	if err != nil {
 		t.Fatalf("Upsert(secret): %v", err)
 	}
@@ -615,7 +672,7 @@ func TestApplyBulkNewSecretValueRecordsExactlyOneHistoryRow(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "old-secret", true, "")
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", strPtr("old-secret"), true, "")
 	if err != nil {
 		t.Fatalf("Upsert(secret): %v", err)
 	}
@@ -653,15 +710,15 @@ func TestApplyBulkFullReconcile(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	kept, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "kept", "old-value", false, "")
+	kept, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "kept", strPtr("old-value"), false, "")
 	if err != nil {
 		t.Fatalf("Upsert(kept): %v", err)
 	}
-	gone, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "gone", "x", false, "")
+	gone, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "gone", strPtr("x"), false, "")
 	if err != nil {
 		t.Fatalf("Upsert(gone): %v", err)
 	}
-	secret, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "secretVar", "s3cr3t", true, "old desc")
+	secret, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "secretVar", strPtr("s3cr3t"), true, "old desc")
 	if err != nil {
 		t.Fatalf("Upsert(secretVar): %v", err)
 	}

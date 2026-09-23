@@ -255,13 +255,15 @@ export const apiControl = {
     unwrap(VariablesService.List({ scope: scopeArg(scope), ownerId })).then((r) =>
       trust<ApiVariable[]>(r ?? []),
     ),
-  // id: '' creates a new row (D19).
+  // id: '' creates a new row (D19). value is three-state (F2, P108 Part 3) — null leaves the
+  // stored value untouched; VariablesUpsertArgs.Value mirrors ConnectionsUpdateArgs.Password's own
+  // nil-means-unchanged contract on the Go side.
   variablesUpsert: (args: {
     scope: VariableScope;
     ownerId: string;
     id: string;
     name: string;
-    value: string;
+    value: string | null;
     isSecret: boolean;
     description?: string;
   }): Promise<ApiVariable> =>

@@ -316,8 +316,11 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     return listCache[cacheKey(scope, ownerId)] ?? [];
   }
 
-  /** id: '' creates a new row (D19). Re-lists afterward — the same "one call, always correct"
-   *  discipline http/state/collections.ts's own mutations use. */
+  /** id: '' creates a new row (D19). value is three-state (F2, P108 Part 3): null means "leave the
+   *  stored value untouched" — VariableSetView.vue's own valueTouched flag is what decides which
+   *  one it sends; every other caller here (restoreHistoryEntry) always has a real value in hand.
+   *  Re-lists afterward — the same "one call, always correct" discipline http/state/collections.ts's
+   *  own mutations use. */
   async function upsertVariable(
     tabId: string,
     scope: VariableScope,
@@ -325,7 +328,7 @@ export const useVariableSetStore = defineStore('variableSet', () => {
     args: {
       id: string;
       name: string;
-      value: string;
+      value: string | null;
       isSecret: boolean;
       description?: string;
     },

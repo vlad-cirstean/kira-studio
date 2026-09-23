@@ -22,11 +22,11 @@ func TestAHistorySecretRoundTripsUnderItsOwnScope(t *testing.T) {
 	r, db := newVariablesRepo(t)
 	collectionID := newCollectionFor(t, db)
 
-	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", "old-secret", true, "")
+	created, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "apiKey", strPtr("old-secret"), true, "")
 	if err != nil {
 		t.Fatalf("Upsert(create): %v", err)
 	}
-	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, created.ID, "apiKey", "new-secret", true, ""); err != nil {
+	if _, err := r.Upsert(model.VariableScopeCollection, collectionID, created.ID, "apiKey", strPtr("new-secret"), true, ""); err != nil {
 		t.Fatalf("Upsert(change): %v", err)
 	}
 
@@ -70,7 +70,7 @@ func TestACiphertextMovedBetweenColumnsIsRefused(t *testing.T) {
 			t.Fatalf("read connection ciphertext: %v", err)
 		}
 
-		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "stolen", "placeholder", true, "")
+		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "stolen", strPtr("placeholder"), true, "")
 		if err != nil {
 			t.Fatalf("Upsert(placeholder secret): %v", err)
 		}
@@ -84,7 +84,7 @@ func TestACiphertextMovedBetweenColumnsIsRefused(t *testing.T) {
 	})
 
 	t.Run("live variable secret into a history row", func(t *testing.T) {
-		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "liveSecret", "current-value", true, "")
+		v, err := r.Upsert(model.VariableScopeCollection, collectionID, "", "liveSecret", strPtr("current-value"), true, "")
 		if err != nil {
 			t.Fatalf("Upsert(live secret): %v", err)
 		}

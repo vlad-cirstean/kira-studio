@@ -143,14 +143,18 @@ func (s *VariablesService) List(args VariablesScopeArgs) ([]model.Variable, erro
 	return list, nil
 }
 
-// VariablesUpsertArgs's ID is "" for a create (D19). Value is always the plaintext — the one
-// direction D5 never restricts: the user just typed it into a revealed, editable field.
+// VariablesUpsertArgs's ID is "" for a create (D19). Value is a three-state pointer — nil = leave
+// the stored value untouched (F2, P108 Part 3), mirroring bridge.ConnectionsUpdateArgs.Password's
+// own "nil = unchanged" contract. When non-nil it is always the plaintext — the one direction D5
+// never restricts: the user just typed it into a revealed, editable field. The frontend sends nil
+// whenever a draft's value was never actually touched (its seeded value is always "" for a secret,
+// D4/D5's list projection) — see VariableSetView.vue's own valueTouched flag.
 type VariablesUpsertArgs struct {
 	Scope       model.VariableScope `json:"scope"`
 	OwnerID     string              `json:"ownerId"`
 	ID          string              `json:"id"`
 	Name        string              `json:"name"`
-	Value       string              `json:"value"`
+	Value       *string             `json:"value"`
 	IsSecret    bool                `json:"isSecret"`
 	Description string              `json:"description"`
 }
@@ -161,6 +165,9 @@ func (s *VariablesService) Upsert(args VariablesUpsertArgs) (model.Variable, err
 	}
 	if args.Name == "" {
 		return model.Variable{}, ipcerr.BadRequest("name is required")
+	}
+	if args.ID == "" && args.Value == nil {
+		return model.Variable{}, ipcerr.BadRequest("value is required")
 	}
 	v, err := s.Deps.Repos.Variables.Upsert(args.Scope, args.OwnerID, args.ID, args.Name, args.Value, args.IsSecret, args.Description)
 	if err != nil {
