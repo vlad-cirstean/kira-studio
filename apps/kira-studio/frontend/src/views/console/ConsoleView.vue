@@ -773,9 +773,9 @@ const statusLine = computed(() => {
           >
             <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
             ><span
-              class="ring h-3 w-3 shrink-0 rounded-full border-[1.5px] border-border-strong"
+              class="ring h-3 w-3 shrink-0 rounded-full border-2 border-border-strong"
               :class="{
-                'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
+                'animate-kira-spin border-t-accent border-r-transparent border-b-accent border-l-accent':
                   runState.status === 'running',
                 'border-error': runState.status === 'error',
               }"
@@ -990,19 +990,19 @@ const statusLine = computed(() => {
   @apply relative;
 }
 
-/* Alert tone classes replacing MessageStrip's own warn/note-tone colors (P104 §9 rule 5: literal
-   hex, not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+/* Alert tone classes replacing MessageStrip's own warn/note-tone colors (now --kira-warn-
+   text/--kira-note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
 .strip-warn {
   @apply bg-warn/10 border-warn/20;
 }
 .strip-warn-text {
-  @apply text-[#d9c47a];
+  @apply text-warn-text;
 }
 .strip-note {
   @apply bg-info/8 border-info/20;
 }
 .strip-note-text {
-  @apply text-[#a8c8ee];
+  @apply text-note-text;
 }
 
 .auto-explain-message {

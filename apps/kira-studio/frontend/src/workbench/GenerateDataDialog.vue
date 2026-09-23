@@ -501,7 +501,7 @@ function onSequenceStartChange(index: number, start: number): void {
               <span class="inline-flex items-center gap-1 font-data text-kira-xs text-info">
                 <span class="min-w-[7ch] text-right">—</span>
                 <span
-                  class="h-3 w-3 shrink-0 rounded-full border-[1.5px] border-t-accent border-r-transparent border-b-accent border-l-accent animate-[spin_0.7s_linear_infinite]"
+                  class="h-3 w-3 shrink-0 rounded-full border-2 border-t-accent border-r-transparent border-b-accent border-l-accent animate-kira-spin"
                 />
               </span>
             </TooltipTrigger>
@@ -586,12 +586,12 @@ function onSequenceStartChange(index: number, start: number): void {
   margin-top: var(--kira-s-2);
 }
 
-/* Alert tone classes replacing MessageStrip's own warn-tone colors (P104 §9 rule 5: literal hex,
-   not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+/* Alert tone classes replacing MessageStrip's own warn-tone colors (now --kira-warn-text/--kira-
+   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
 .strip-warn {
   @apply bg-warn/10 border-warn/20;
 }
 .strip-warn-text {
-  @apply text-[#d9c47a];
+  @apply text-warn-text;
 }
 </style>

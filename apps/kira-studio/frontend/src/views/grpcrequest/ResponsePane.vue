@@ -493,7 +493,7 @@ onUnmounted(() => {
    equal to the script's own MESSAGE_DETAIL_HEIGHT (200px); a JSON document taller than this
    scrolls inside MonacoHost's own scroller instead of growing the row. */
 .message-detail {
-  @apply box-border h-[200px] overflow-auto border-b border-border;
+  @apply box-border h-50 overflow-auto border-b border-border;
 }
 
 .metadata-groups {
@@ -508,19 +508,19 @@ onUnmounted(() => {
   @apply mt-1 cursor-pointer border-0 bg-none p-0 text-kira-sm text-primary;
 }
 
-/* Alert tone classes replacing MessageStrip's own tone colors (P104 §9 rule 5: literal hex, not a
-   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+/* Alert tone classes replacing MessageStrip's own tone colors (now --kira-warn-text/--kira-note-
+   text in tokens.css, promoted off this rule's literal-hex carve-out). */
 .strip-note {
   @apply bg-info/8 border-info/20;
 }
 .strip-note-text {
-  @apply text-[#a8c8ee];
+  @apply text-note-text;
 }
 .strip-warn {
   @apply bg-warn/10 border-warn/20;
 }
 .strip-warn-text {
-  @apply text-[#d9c47a];
+  @apply text-warn-text;
 }
 
 .empty-state {

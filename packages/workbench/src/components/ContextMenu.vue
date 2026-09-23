@@ -74,7 +74,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                     <span
                       v-if="sub.type === 'item' && sub.swatch"
                       class="w-2.5 h-2.5 rounded-full shrink-0"
-                      :class="{ 'border-[1.5px] border-disabled': sub.swatch === 'none' }"
+                      :class="{ 'border border-disabled': sub.swatch === 'none' }"
                       :style="sub.swatch === 'none' ? undefined : { background: connColorVar(sub.swatch) }"
                     />
                     <CodiconIcon
@@ -114,7 +114,7 @@ async function onItemClick(item: MenuItem): Promise<void> {
                 <span
                   v-if="item.swatch"
                   class="w-2.5 h-2.5 rounded-full shrink-0"
-                  :class="{ 'border-[1.5px] border-disabled': item.swatch === 'none' }"
+                  :class="{ 'border border-disabled': item.swatch === 'none' }"
                   :style="item.swatch === 'none' ? undefined : { background: connColorVar(item.swatch) }"
                 />
                 <CodiconIcon v-else-if="item.icon" :name="item.icon" :size="13" class="text-muted-foreground" />
