@@ -4,6 +4,7 @@ import type { ObjectMeta } from '@shared/domain/tree';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import {
   cellNavButton,
   cellText,
@@ -20,12 +21,11 @@ import {
   COMPOSITE_PK_COLUMNS,
   COMPOSITE_PK_PATH,
   compositePkConnectAndOpen,
-  DB_PATH,
   ORDER_ITEMS_PATH,
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { connectionRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/interaction.spec.ts (P57 D16), against real captures of the
 // regions -> customers -> orders -> order_items <- products FK graph and app.composite_pk's own
@@ -304,27 +304,6 @@ const EMPLOYEES_META: ObjectMeta = {
   rowEstimate: null,
   comment: null,
 };
-
-function connectionCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
 
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
@@ -1069,30 +1048,6 @@ async function installClipboardShim(page: Page): Promise<void> {
   await page.addInitScript(CLIPBOARD_SHIM);
   await page.reload();
   await page.waitForSelector('[data-testid="status-bar"]');
-}
-
-async function connectAndExpand(page: Page, name: string, color: string): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-postgres"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '5432');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'postgres');
-  await page.click(`[data-testid="color-${color}"]`);
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  await expandRow(page, '');
-  await expandRow(page, DB_PATH);
-  await expandRow(page, APP_PATH);
 }
 
 async function menuItemIds(page: Page): Promise<string[]> {

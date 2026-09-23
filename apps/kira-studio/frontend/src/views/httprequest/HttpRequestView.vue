@@ -40,22 +40,20 @@ import { useCollectionsStore } from '../../api/state/collections';
 import { applyCurlToTab, useCopyAsCurlStore } from '../../api/state/curl';
 import { useEditRawStore } from '../../api/state/raw';
 import { variableSupport } from '../../api/state/variableCompletion';
-import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
+import { useVariableSetStore } from '../../api/state/variables';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { DEFAULT_FIND_OPTIONS, type FindOptions, findRanges } from '../../editor/findRanges';
 import type { RangeHighlight } from '../../editor/ranges';
-import { useConnectionsStore } from '../../state/connections';
-import { useRunState } from '../../state/runState';
 import { useSettingsStore } from '../../state/settings';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { templateToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 import ResponseFindBar, {
   type FindBarHost,
   type FindBarTarget,
 } from '../shared/ResponseFindBar.vue';
+import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import CookiesPane from './CookiesPane.vue';
 import { useCookiesStore } from './cookies';
@@ -69,49 +67,25 @@ import { onSendCompleted, resolveForExport, resolveTabState, useHttpRequestViewS
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 
-const tabIncognitoStore = useTabIncognitoStore();
 const editRawStore = useEditRawStore();
 const collectionsStore = useCollectionsStore();
 const copyAsCurlStore = useCopyAsCurlStore();
-const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
 const cookiesStore = useCookiesStore();
 const settingsStore = useSettingsStore();
 const httpRequestViewStore = useHttpRequestViewStore();
-const connectionsStore = useConnectionsStore();
 
 const rt = computed(() => httpRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 
 const title = computed(() => httpRequestTitle(props.tab.state));
 
-// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
-const envColor = computed(() => variablesStore.environmentColorForTab(props.tab.id));
-const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
-const railColor = computed(() =>
-  envColor.value !== undefined
-    ? envColor.value
-    : connRecord.value
-      ? (connRecord.value.color ?? null)
-      : undefined,
-);
-const runState = useRunState(() => props.tab.id);
-const runStateLabel = computed(() => {
-  if (runState.value.status === 'error') return 'failed';
-  if (runState.value.elapsedMs === null) return '—';
-  return runState.value.elapsedMs < 1000
-    ? `${Math.round(runState.value.elapsedMs)} ms`
-    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-});
-
 // P71 §5/§3.1: the tab's own incognito state, and the per-tab environment id it reads through
 // while incognito (api/state/variables.ts's own override) — every other caller of
 // collectionId/environmentId in this file goes through envId, never activeEnvironmentId directly.
-const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
-function toggleIncognito(): void {
-  tabIncognitoStore.setIncognito(props.tab.id, !incognito.value);
-}
-const envId = computed(() => variablesStore.environmentIdForTab(props.tab.id));
+const { railColor, runState, runStateLabel, incognito, toggleIncognito, envId } = useRequestChrome(
+  () => props.tab,
+);
 
 // D12/P17 D19: a method chip coloured per-method (not per-family any more — httpMethodToken
 // replaces httpMethodClass outright, F13/D19), over .p-method's new tinted-background rule. P4

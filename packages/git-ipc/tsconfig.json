@@ -9,7 +9,12 @@
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "lib": ["ESNext"],
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    // P107 I2-27: rpc.test.ts's own testing-only import of @workbench/testing/unit/async
+    // (deferred/sleep) — the same alias every frontend app's own tsconfig already gives it.
+    "paths": {
+      "@workbench/*": ["../workbench/src/*"]
+    }
   },
   "include": ["src/**/*.ts"]
 }

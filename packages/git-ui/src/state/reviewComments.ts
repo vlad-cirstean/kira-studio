@@ -1,8 +1,8 @@
-import type { ReviewComment } from '@kira/git-ipc';
-import { TransportError } from '@kira/git-ipc';
+import type { ResultOf, ReviewComment } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
 import { copyToClipboard } from './clipboardActions.ts';
+import { createLatestRequest, runLatest } from './latestRequest.ts';
 
 /** The `(repoId, branch)` pair `review.comment.*` is keyed on (G13 D14) — no `base`, since the
  *  session key has none: a comment is a fact about a branch's own review, not about a comparison. */
@@ -32,7 +32,7 @@ export class ReviewCommentsState {
   readonly #bridge: BridgeClient;
   readonly #unsubscribeChanged: () => void;
   #target: ReviewCommentsTarget | undefined;
-  #loadController: AbortController | undefined;
+  readonly #loadRequest = createLatestRequest<ResultOf<'review.comment.list'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -48,7 +48,7 @@ export class ReviewCommentsState {
   /** Called whenever the review session's own target changes — resets everything and, when a
    *  target is given, loads the list. */
   setTarget(target: ReviewCommentsTarget | undefined): void {
-    this.#loadController?.abort();
+    this.#loadRequest.abort();
     this.#target = target;
     this.comments.value = [];
     this.loadError.value = undefined;
@@ -65,27 +65,24 @@ export class ReviewCommentsState {
   async #load(): Promise<void> {
     const target = this.#target;
     if (!target) return;
-    this.#loadController?.abort();
-    const controller = new AbortController();
-    this.#loadController = controller;
-    this.loading.value = true;
-    const stillCurrent = (): boolean => this.#target === target;
-    try {
-      const result = await this.#bridge.request(
-        'review.comment.list',
-        { repoId: target.repoId, branch: target.branch },
-        controller.signal,
-      );
-      if (!stillCurrent()) return;
-      this.comments.value = result.comments;
-    } catch (error) {
-      if (error instanceof TransportError && error.code === 'cancelled') return;
-      if (!stillCurrent()) return;
-      this.loadError.value = error instanceof Error ? error.message : String(error);
-    } finally {
-      if (stillCurrent()) this.loading.value = false;
-      if (this.#loadController === controller) this.#loadController = undefined;
-    }
+    await runLatest(this.#loadRequest, {
+      request: (signal) =>
+        this.#bridge.request(
+          'review.comment.list',
+          { repoId: target.repoId, branch: target.branch },
+          signal,
+        ),
+      stillCurrent: () => this.#target === target,
+      onResult: (result) => {
+        this.comments.value = result.comments;
+      },
+      onError: (message) => {
+        this.loadError.value = message;
+      },
+      setLoading: (loading) => {
+        this.loading.value = loading;
+      },
+    });
   }
 
   /** Removes one comment — applies the server's own scoped, idempotent delete (G13 D11) and drops
@@ -164,7 +161,7 @@ export class ReviewCommentsState {
   }
 
   dispose(): void {
-    this.#loadController?.abort();
+    this.#loadRequest.abort();
     this.#unsubscribeChanged();
   }
 }

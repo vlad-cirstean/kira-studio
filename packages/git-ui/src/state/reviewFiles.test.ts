@@ -1,63 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  EventKey,
-  EventPayload,
-  FileChange,
-  ParamsOf,
-  RequestKey,
-  ResultOf,
-  StreamChunkOf,
-  StreamKey,
-  StreamParamsOf,
-  Transport,
-} from '@kira/git-ipc';
+import type { FileChange } from '@kira/git-ipc';
+import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
+import { FakeTransport } from '../testing/fakeTransport.ts';
 import { ReviewFilesState } from './reviewFiles.ts';
-
-/** Same fake `Transport` shape `pr.test.ts`/`repoSettings.test.ts` already established. */
-class FakeTransport implements Transport {
-  onRequest: (method: RequestKey, params: unknown) => unknown = () => {
-    throw new Error('unscripted request');
-  };
-  readonly calls: Array<{ method: RequestKey; params: unknown }> = [];
-  #handlers = new Map<EventKey, Set<(payload: unknown) => void>>();
-
-  request<K extends RequestKey>(method: K, params: ParamsOf<K>): Promise<ResultOf<K>> {
-    this.calls.push({ method, params });
-    return Promise.resolve(this.onRequest(method, params) as ResultOf<K>);
-  }
-
-  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
-    let set = this.#handlers.get(method);
-    if (!set) {
-      set = new Set();
-      this.#handlers.set(method, set);
-    }
-    const wrapped = handler as (payload: unknown) => void;
-    set.add(wrapped);
-    return () => set?.delete(wrapped);
-  }
-
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
-    for (const handler of this.#handlers.get(method) ?? []) {
-      handler(payload);
-    }
-  }
-
-  stream<K extends StreamKey>(
-    _method: K,
-    _params: StreamParamsOf<K>,
-    _onChunk: (chunk: StreamChunkOf<K>) => void,
-  ): Promise<void> {
-    return Promise.reject(new Error('not used by these tests'));
-  }
-
-  dispose(): void {}
-}
-
-function tick(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
 
 function fileChange(path: string): FileChange {
   return {
@@ -135,14 +81,14 @@ describe('ReviewFilesState — sinceReview mode opens each file against its own 
     };
 
     state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
-    await tick();
+    await sleep();
     expect(state.diffMode.value).toBe('sinceReview');
 
     state.selectFile('a.ts');
-    await tick();
+    await sleep();
 
     state.selectFile('b.ts');
-    await tick();
+    await sleep();
 
     expect(openRangeDiffCalls).toEqual([
       { path: 'a.ts', leftRev: 'a-reviewed-sha', leftLabel: 'your last review' },
@@ -177,16 +123,16 @@ describe('ReviewFilesState — pending never latches across a setTarget while a 
     };
 
     state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
-    await tick();
+    await sleep();
 
     void state.mark('a.ts', true);
-    await tick();
+    await sleep();
     expect(state.pending.value).toBe(true);
 
     // A base-resolution change (or Refresh review, or the stale-review banner) lands a fresh
     // target while the mark() above is still hanging — resolveMark is deliberately never called.
     state.setTarget({ repoId: REPO, branch: BRANCH, base: 'a-different-base' });
-    await tick();
+    await sleep();
 
     expect(state.pending.value).toBe(false);
 
@@ -195,7 +141,7 @@ describe('ReviewFilesState — pending never latches across a setTarget while a 
     // already in flight.
     const markCallsBefore = transport.calls.filter((c) => c.method === 'review.mark').length;
     void state.mark('b.ts', true);
-    await tick();
+    await sleep();
     expect(transport.calls.filter((c) => c.method === 'review.mark').length).toBe(
       markCallsBefore + 1,
     );
@@ -228,7 +174,7 @@ describe('ReviewFilesState — a failed mark() surfaces on markError instead of 
     };
 
     state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
-    await tick();
+    await sleep();
     expect(state.markError.value).toBeUndefined();
 
     // mark() is awaited directly here (not `void`-discarded, as every real caller does) — proves
@@ -260,7 +206,7 @@ describe('ReviewFilesState — a failed mark() surfaces on markError instead of 
     };
 
     state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
-    await tick();
+    await sleep();
 
     await state.mark('a.ts', true);
     expect(state.markError.value).toBe('disk full');
@@ -286,12 +232,12 @@ describe('ReviewFilesState — a failed mark() surfaces on markError instead of 
     };
 
     state.setTarget({ repoId: REPO, branch: BRANCH, base: BASE });
-    await tick();
+    await sleep();
     await state.mark('a.ts', true);
     expect(state.markError.value).toBe('disk full');
 
     state.setTarget({ repoId: REPO, branch: BRANCH, base: 'a-different-base' });
-    await tick();
+    await sleep();
     expect(state.markError.value).toBeUndefined();
   });
 });

@@ -95,46 +95,57 @@ export function openRepoDiffTab(repoId: string, path: string): OpenTabResult {
   });
 }
 
-// C10 §6.1 (S15): a *commit* diff — two revisions of one path, neither of which is the worktree.
-// openTab's own dedupe key is (workspaceId, kind, connectionId, path) alone (openRepoDiffTab
-// above relies on exactly that), which would collide two different commits' diffs of the same
-// file into one tab. This wrapper does its own lookup over the revision pair as well, then
-// delegates with reuse:false so openTab's own key stays exactly what C5 defined — a second commit
-// diff of the same file is a second tab, never a silent replacement of the first.
+// P107 I2-20: openRepoCommitDiffTab/openRepoReviewDiffTab share this reuse-or-open frame — find an
+// existing tab over the same (path, left, right, review-or-not) key, replay the P79 preview-cohort
+// fix on a hit, else delegate to openTab with reuse:false so C5's own dedupe key (workspaceId,
+// kind, connectionId, path) never collides two different revision pairs of the same file.
+// `review: null` selects openRepoCommitDiffTab's own commit-diff match/build; non-null selects
+// openRepoReviewDiffTab's review-diff ones — the two are otherwise identical.
 //
-// C11 §7.5: the lookup also requires `review === null` — without it, a single-commit branch whose
-// merge base equals the commit's own parent would have the identical (left, right) pair as its
-// review diff and this function would silently reuse that tab, rendering no review layer at all.
-export function openRepoCommitDiffTab(
-  repoId: string,
-  path: string,
-  left: string,
-  right: string,
-  labels: { left: string; right: string },
-  pinned: boolean,
+// The audit that named this dedup (P107) also checked review's own reuse branch against P79's fix
+// (a preview-type reuse skipping openTab's own preview-cohort eviction, since the reuse path never
+// reaches openTab at all): review's branch had no `evictPreviewCohort` call for the
+// `!pinned && !previewCohort` case, only `removeFromPreviewCohort` for `pinned`. No caller anywhere
+// passes `previewCohort` to either function today (`hostHandlers.ts`'s `editor.openDiff`/
+// `editor.openRangeDiff` both omit it), so `!previewCohort` is always true at every live call site —
+// this was a live gap for review diffs, not a deliberate difference; review's own doc comment
+// already claims "same shape" as commit's. Fixed here, not preserved: both reuse branches now
+// evict/remove-from-cohort before activateTab (P79's own ordering — its save must land before
+// activateTab's).
+function reuseOrOpenRepoDiffTab(opts: {
+  repoId: string;
+  path: string;
+  left: string;
+  right: string;
+  labels: { left: string; right: string };
+  review: ReviewRef | null;
+  pinned: boolean;
   // P74 §5.2: set only by a bulk caller ("Open all changes") — every file after the first in that
   // same loop, so the cohort it started is joined rather than each file evicting the last.
-  previewCohort?: boolean,
-): OpenTabResult {
+  previewCohort?: boolean;
+}): OpenTabResult {
   const tabsStore = useTabsStore();
-  const workspaceId = repoWorkspaceKey(repoId);
+  const workspaceId = repoWorkspaceKey(opts.repoId);
   const existing = tabsStore.tabs.find((t) => {
-    if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
+    if ((t.workspaceId ?? null) !== workspaceId || t.path !== opts.path) return false;
     const diff = asRepoDiffTab(t);
-    return (
-      diff !== null &&
-      diff.state.review === null &&
-      diff.state.left === left &&
-      diff.state.right === right
-    );
+    if (diff === null || diff.state.left !== opts.left || diff.state.right !== opts.right) {
+      return false;
+    }
+    // C11 §7.5: without matching on review too, a single-commit branch whose merge base equals
+    // the commit's own parent would have the identical (left, right) pair as its review diff and
+    // reuse that tab, rendering no review layer at all.
+    return opts.review === null
+      ? diff.state.review === null
+      : diff.state.review !== null && diff.state.review.branch === opts.review.branch;
   });
   if (existing) {
-    if (pinned) {
+    if (opts.pinned) {
       // §5.2 rule 1's own "a permanent open promotes the workspace's current preview tab" —
       // openTab's own reuse branch does this; this wrapper's own reuse path needs the identical
       // rule since it never reaches openTab's.
       tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
-    } else if (!previewCohort) {
+    } else if (!opts.previewCohort) {
       // P79 review fix (Functional, LOW): this reuse path short-circuits past openTab entirely,
       // so a preview-type open (not a cohort-joining one) never reached openTab's own §5.2 rule 3
       // eviction — "Open all changes" reusing file 0's own already-open (permanent) tab left
@@ -152,16 +163,41 @@ export function openRepoCommitDiffTab(
   return tabsStore.openTab(
     'repo-diff',
     null,
-    path,
+    opts.path,
     () =>
-      defaultRepoDiffTabState({
-        left,
-        right,
-        leftLabel: labels.left,
-        rightLabel: labels.right,
-      }),
-    { reuse: false, workspaceId, preview: !pinned, previewCohort },
+      defaultRepoDiffTabState(
+        {
+          left: opts.left,
+          right: opts.right,
+          leftLabel: opts.labels.left,
+          rightLabel: opts.labels.right,
+        },
+        opts.review ?? undefined,
+      ),
+    { reuse: false, workspaceId, preview: !opts.pinned, previewCohort: opts.previewCohort },
   );
+}
+
+// C10 §6.1 (S15): a *commit* diff — two revisions of one path, neither of which is the worktree.
+export function openRepoCommitDiffTab(
+  repoId: string,
+  path: string,
+  left: string,
+  right: string,
+  labels: { left: string; right: string },
+  pinned: boolean,
+  previewCohort?: boolean,
+): OpenTabResult {
+  return reuseOrOpenRepoDiffTab({
+    repoId,
+    path,
+    left,
+    right,
+    labels,
+    review: null,
+    pinned,
+    previewCohort,
+  });
 }
 
 // P92 item 5 (§7.2): one commit's whole changed-file set in one tab — `editor.openAllChanges`'s
@@ -192,51 +228,31 @@ export function openRepoMultiDiffTab(
   );
 }
 
-// C11 §7.5/§7.4 (S8): the review-diff counterpart to openRepoCommitDiffTab above — same shape, one
-// correction to the dedupe predicate (`review !== null`, this function's own mirror of that
-// function's added `review === null`) so the two tab kinds can never collide into one. `review`
-// turns on `reviewDecorations.ts`'s comment/mark layer (§7.4) over the same left/right pair; `left`
-// is the merge base or `reviewedAtSha` (§7.2's two diff modes), `right` is always `review.branchTip`.
+// C11 §7.5/§7.4 (S8): the review-diff counterpart to openRepoCommitDiffTab above — same shape.
+// `review` turns on `reviewDecorations.ts`'s comment/mark layer (§7.4) over the same left/right
+// pair; `left` is the merge base or `reviewedAtSha` (§7.2's two diff modes), `right` is always
+// `review.branchTip`.
 export function openRepoReviewDiffTab(
   repoId: string,
   path: string,
   left: string,
   right: string,
   labels: { left: string; right: string },
-  review: { branch: string; branchTip: string; leftLabel: string },
+  review: ReviewRef,
   pinned: boolean,
   // P74 §5.2: mirrors openRepoCommitDiffTab's own trailing param — see its doc comment.
   previewCohort?: boolean,
 ): OpenTabResult {
-  const tabsStore = useTabsStore();
-  const workspaceId = repoWorkspaceKey(repoId);
-  const existing = tabsStore.tabs.find((t) => {
-    if ((t.workspaceId ?? null) !== workspaceId || t.path !== path) return false;
-    const diff = asRepoDiffTab(t);
-    return (
-      diff !== null &&
-      diff.state.review !== null &&
-      diff.state.review.branch === review.branch &&
-      diff.state.left === left &&
-      diff.state.right === right
-    );
-  });
-  if (existing) {
-    tabsStore.activateTab(existing.id);
-    if (pinned) tabsStore.removeFromPreviewCohort(workspaceId, existing.id);
-    return { id: existing.id, reused: true };
-  }
-  return tabsStore.openTab(
-    'repo-diff',
-    null,
+  return reuseOrOpenRepoDiffTab({
+    repoId,
     path,
-    () =>
-      defaultRepoDiffTabState(
-        { left, right, leftLabel: labels.left, rightLabel: labels.right },
-        review,
-      ),
-    { reuse: false, workspaceId, preview: !pinned, previewCohort },
-  );
+    left,
+    right,
+    labels,
+    review,
+    pinned,
+    previewCohort,
+  });
 }
 
 // P83 §10.3: opens a terminal tab in codeRepoId's own workspace, rooted at `cwd` — the tab-strip

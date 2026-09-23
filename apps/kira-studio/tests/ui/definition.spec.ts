@@ -1,15 +1,15 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
-  DB_PATH,
   ORDER_ITEMS_PATH,
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/definition.spec.ts (P57 D16), against real captured
 // treeDefinition responses (scripts/capture-postgres-tree.ts). Scenario 10 ("session restore")
@@ -103,27 +103,6 @@ const WIDE_TABLE_DEFINITION = {
   generatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-function connectionCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
-
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
@@ -166,35 +145,11 @@ async function switchToStructure(view: import('@playwright/test').Locator) {
   await view.locator('[data-testid="definition-pane-structure"]').click();
 }
 
-async function connectAndExpand(page: import('@playwright/test').Page, name: string) {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-postgres"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '5432');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'postgres');
-  await page.click(`[data-testid="color-${name === 'Definition DB' ? 'blue' : 'green'}"]`);
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  await expandRow(page, '');
-  await expandRow(page, DB_PATH);
-  await expandRow(page, APP_PATH);
-}
-
 test('Definition tab — Structure/Source, columns menu, notes, read-only, cache and refresh', async ({
   relaunch,
 }) => {
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
-  await connectAndExpand(page, 'Definition DB');
+  await connectAndExpand(page, 'Definition DB', 'blue');
 
   // --- scenario 1: open from the menu, Structure is the default pane ----------------------
   await openRowMenu(page, ORDER_ITEMS_PATH);
@@ -381,7 +336,7 @@ test('Definition tab — tree grouping: folders collapsed by default, zero-IPC e
     ],
     stream: RO_FIXTURE.port,
   });
-  await connectAndExpand(page, 'Grouping DB');
+  await connectAndExpand(page, 'Grouping DB', 'green');
 
   // Tables render first, ungrouped, ahead of any folder.
   const wideTableRow = await findRow(page, WIDE_TABLE_PATH);

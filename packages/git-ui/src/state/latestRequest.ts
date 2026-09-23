@@ -47,3 +47,33 @@ export function createLatestRequest<T>(): {
     },
   };
 }
+
+export type LatestRequest<T> = ReturnType<typeof createLatestRequest<T>>;
+
+/**
+ * P107 I2-22: `reviewFiles.ts`'s `#loadFiles`/`#loadDiff` and `reviewComments.ts`'s `#load` each
+ * repeated the same frame around their own ad-hoc `AbortController` field — abort previous, new
+ * controller, `loading = true`, request, apply-or-set-error, `finally` reset — instead of using
+ * `latest` here. `setLoading` mirrors the original `finally` exactly: only the run that is still
+ * current when it settles gets to flip loading back off, so a superseded run's late `finally`
+ * never clobbers the loading flag a newer run already set.
+ */
+export async function runLatest<T>(
+  latest: LatestRequest<T>,
+  opts: {
+    request: (signal: AbortSignal) => Promise<T>;
+    stillCurrent: () => boolean;
+    onResult: (value: T) => void;
+    onError: (message: string) => void;
+    setLoading?: (loading: boolean) => void;
+  },
+): Promise<void> {
+  opts.setLoading?.(true);
+  try {
+    const outcome = await latest.run(opts.request, opts.stillCurrent);
+    if (outcome.status === 'ok') opts.onResult(outcome.value);
+    else if (outcome.status === 'error') opts.onError(outcome.message);
+  } finally {
+    if (opts.stillCurrent()) opts.setLoading?.(false);
+  }
+}

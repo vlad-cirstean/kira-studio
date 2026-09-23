@@ -792,6 +792,42 @@ function onCreateWorktree(seed?: WorktreeCreateSeed): void {
   worktreeCreateRequest.value = seed ?? {};
 }
 
+// P107 I2-39: the unborn-HEAD and normal branches below bound <AppToolbar> identically — one
+// bindings object instead of two copies of the same 16 props/12 listeners. Read only from inside
+// the template's own `v-else-if="repoState"` guard, so `repoState.value` is always defined there.
+const toolbarBindings = computed(() => ({
+  graphView,
+  repoState: repoState.value as RepoState,
+  refsState,
+  opsState,
+  stashState,
+  worktreeState,
+  stackState,
+  openWorktreeWindowCapability: actions.value?.capabilities.openWorktreeWindow ?? false,
+  actions: actions.value,
+  prState,
+  searchOpen: searchOpen.value,
+  collapseBranches: collapseBranches.value,
+  onStashChanges: () => {
+    stashCreateOpen.value = true;
+  },
+  onBranchFromStash: handleBranchFromStash,
+  onSaveGlobalStash: () => {
+    globalStashSaveOpen.value = true;
+  },
+  onSaveEntryToGlobalStash: handleSaveEntryToGlobalStash,
+  onSwitchWorktree: handleSwitchWorktree,
+  onOpenWorktreeWindow: handleOpenWorktreeWindow,
+  onCreateWorktree,
+  onOpenRestackDialog: handleOpenRestackDialog,
+  onOpenSetStackParentDialog: handleOpenSetStackParentDialog,
+  onOpenRepoSettings: () => {
+    repoSettingsDialogOpen.value = true;
+  },
+  onToggleSearch: toggleSearchRow,
+  onToggleCollapseBranches: () => setCollapseBranches(!collapseBranches.value),
+}));
+
 // ---------------------------------------------------------------------------------------
 // `docs/plans/P7.md` W14: the ref-badge context menu — a right-click that lands on a
 // `refBadges.ts` badge (`CommitGrid.vue`'s own hit-test) instead of bare row space opens this,
@@ -1614,33 +1650,7 @@ onBeforeUnmount(() => {
       />
 
       <template v-else-if="repoState.activeRepo.value.head.kind === 'unborn'">
-        <AppToolbar
-          ref="toolbarRef"
-          :graph-view="graphView"
-          :repo-state="repoState"
-          :refs-state="refsState"
-          :ops-state="opsState"
-          :stash-state="stashState"
-          :worktree-state="worktreeState"
-          :stack-state="stackState"
-          :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
-          :actions="actions"
-          :pr-state="prState"
-          :search-open="searchOpen"
-          :collapse-branches="collapseBranches"
-          @stash-changes="stashCreateOpen = true"
-          @branch-from-stash="handleBranchFromStash"
-          @save-global-stash="globalStashSaveOpen = true"
-          @save-entry-to-global-stash="handleSaveEntryToGlobalStash"
-          @switch-worktree="handleSwitchWorktree"
-          @open-worktree-window="handleOpenWorktreeWindow"
-          @create-worktree="onCreateWorktree"
-          @open-restack-dialog="handleOpenRestackDialog"
-          @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
-          @open-repo-settings="repoSettingsDialogOpen = true"
-          @toggle-search="toggleSearchRow"
-          @toggle-collapse-branches="setCollapseBranches(!collapseBranches)"
-        />
+        <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
         <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
           <SearchBox
             ref="searchBoxRef"
@@ -1654,33 +1664,7 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-else>
-        <AppToolbar
-          ref="toolbarRef"
-          :graph-view="graphView"
-          :repo-state="repoState"
-          :refs-state="refsState"
-          :ops-state="opsState"
-          :stash-state="stashState"
-          :worktree-state="worktreeState"
-          :stack-state="stackState"
-          :open-worktree-window-capability="actions?.capabilities.openWorktreeWindow ?? false"
-          :actions="actions"
-          :pr-state="prState"
-          :search-open="searchOpen"
-          :collapse-branches="collapseBranches"
-          @stash-changes="stashCreateOpen = true"
-          @branch-from-stash="handleBranchFromStash"
-          @save-global-stash="globalStashSaveOpen = true"
-          @save-entry-to-global-stash="handleSaveEntryToGlobalStash"
-          @switch-worktree="handleSwitchWorktree"
-          @open-worktree-window="handleOpenWorktreeWindow"
-          @create-worktree="onCreateWorktree"
-          @open-restack-dialog="handleOpenRestackDialog"
-          @open-set-stack-parent-dialog="handleOpenSetStackParentDialog"
-          @open-repo-settings="repoSettingsDialogOpen = true"
-          @toggle-search="toggleSearchRow"
-          @toggle-collapse-branches="setCollapseBranches(!collapseBranches)"
-        />
+        <AppToolbar ref="toolbarRef" v-bind="toolbarBindings" />
         <div v-if="searchOpen" ref="searchRowEl" class="kv-search-row">
           <SearchBox
             ref="searchBoxRef"

@@ -10,7 +10,12 @@
     "skipLibCheck": true,
     "jsx": "preserve",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "bun-types"]
+    "types": ["vite/client", "bun-types"],
+    // P107 I2-27: *.test.ts's own testing-only import of @workbench/testing/unit/async
+    // (deferred/sleep) — the same alias every frontend app's own tsconfig already gives it.
+    "paths": {
+      "@workbench/*": ["../workbench/src/*"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.vue"]
 }

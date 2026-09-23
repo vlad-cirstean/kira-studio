@@ -1,5 +1,4 @@
 import { CONNECTION_COLOR_CHOICES } from '@shared/domain/connection';
-import { decodePath } from '@shared/domain/tree';
 import { formatConnectionUri } from '@shared/domain/uri';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
@@ -10,8 +9,16 @@ import { useConsoleDefaultsStore } from '../state/consoleDefaults';
 import { useObjectStoreStore } from '../state/objectStore';
 import { schemaDialectFor, useSchemaDialogStore } from '../state/schemas';
 import { useTabsStore } from '../state/tabs';
-import { countTab, dataQueryCommands } from '../state/viewCommands';
+import { dataQueryCommands } from '../state/viewCommands';
 import { nodeIcon } from '../theme/icons';
+import {
+  copyNameItems,
+  countItem,
+  definitionItem,
+  openItems,
+  qualifiedNameFor,
+  refreshItem,
+} from './menuItems';
 import {
   groupParentPath,
   rowKey,
@@ -19,25 +26,6 @@ import {
   useFiltersDialogStore,
   useTreeStore,
 } from './state/tree';
-
-const QUALIFIED_KINDS = new Set([
-  'schema',
-  'table',
-  'view',
-  'matview',
-  'sequence',
-  'function',
-  'collection',
-]);
-
-// Produced locally from the path — never round-trips to the engine for a string join (§9b).
-function qualifiedNameFor(row: TreeRowVm): string {
-  const decoded = decodePath(row.connectionId, row.path);
-  return decoded.segments
-    .filter((s) => QUALIFIED_KINDS.has(s.kind))
-    .map((s) => s.name)
-    .join('.');
-}
 
 export function menuForRow(row: TreeRowVm): MenuItem[] {
   switch (row.kind) {
@@ -314,76 +302,22 @@ function bucketMenu(row: TreeRowVm): MenuItem[] {
 // §8.10's own ordering: Open data / Open data in new tab come first, before Refresh.
 function relationMenu(row: TreeRowVm): MenuItem[] {
   return [
-    {
-      type: 'item',
-      id: 'open-data',
+    ...openItems(row, {
+      idBase: 'open-data',
       label: 'Open data',
       icon: 'table',
-      // Display-only (P21 D5): Enter fires ProjectTree.vue's onOpen(row) directly (the same
-      // action double-click performs), not this run() via runMenuShortcut.
-      shortcut: 'tree.open',
-      run: () => {
-        useTabsStore().openDataTab(row.connectionId, row.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-data-new-tab',
-      label: 'Open data in new tab',
-      icon: 'table',
-      run: () => {
-        useTabsStore().openDataTab(row.connectionId, row.path, { newTab: true });
-      },
-    },
-    // D5: offered only when the connection's caps say so — never a permanently disabled row.
-    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
-      ? [
-          {
-            type: 'item' as const,
-            id: 'open-definition',
-            label: 'Open definition',
-            icon: 'file-code',
-            run: () => {
-              useTabsStore().openDefinitionTab(row.connectionId, row.path);
-            },
-          },
-        ]
-      : []),
+      openTab: (connectionId, path, opts) => useTabsStore().openDataTab(connectionId, path, opts),
+    }),
+    ...definitionItem(row),
     ...consoleMenuItem(row),
-    {
-      type: 'item',
-      id: 'refresh',
-      label: 'Refresh',
-      icon: 'refresh',
-      run: () => useTreeStore().refreshObject(row.connectionId, row.path),
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-    {
-      type: 'item',
-      id: 'copy-qualified-name',
-      label: 'Copy qualified name',
-      icon: 'copy',
-      run: () => copyText(qualifiedNameFor(row)),
-    },
-    {
-      type: 'item',
+    refreshItem(row),
+    ...copyNameItems(row, true),
+    countItem(row, {
       id: 'count-rows',
       label: 'Count rows',
-      icon: 'symbol-numeric',
-      // Opens (or reuses) the table's data tab and runs Σ on it — never a bare count with
-      // nowhere to show the answer.
-      run: () => {
-        const { id: tabId } = useTabsStore().openDataTab(row.connectionId, row.path);
-        countTab('data', tabId);
-      },
-    },
+      kind: 'data',
+      openTab: (connectionId, path) => useTabsStore().openDataTab(connectionId, path),
+    }),
     {
       type: 'submenu',
       id: 'saved-filters',
@@ -400,72 +334,23 @@ function relationMenu(row: TreeRowVm): MenuItem[] {
 // a SQL WHERE/ORDER BY shape that has no Mongo-filter analog yet).
 function collectionMenu(row: TreeRowVm): MenuItem[] {
   return [
-    {
-      type: 'item',
-      id: 'open-document',
+    ...openItems(row, {
+      idBase: 'open-document',
       label: 'Open',
       icon: 'json',
-      shortcut: 'tree.open',
-      run: () => {
-        useTabsStore().openDocumentTab(row.connectionId, row.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-document-new-tab',
-      label: 'Open in new tab',
-      icon: 'json',
-      run: () => {
-        useTabsStore().openDocumentTab(row.connectionId, row.path, { newTab: true });
-      },
-    },
-    // D5: offered only when the connection's caps say so — never a permanently disabled row.
-    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
-      ? [
-          {
-            type: 'item' as const,
-            id: 'open-definition',
-            label: 'Open definition',
-            icon: 'file-code',
-            run: () => {
-              useTabsStore().openDefinitionTab(row.connectionId, row.path);
-            },
-          },
-        ]
-      : []),
+      openTab: (connectionId, path, opts) =>
+        useTabsStore().openDocumentTab(connectionId, path, opts),
+    }),
+    ...definitionItem(row),
     ...consoleMenuItem(row),
-    {
-      type: 'item',
-      id: 'refresh',
-      label: 'Refresh',
-      icon: 'refresh',
-      run: () => useTreeStore().refreshObject(row.connectionId, row.path),
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-    {
-      type: 'item',
-      id: 'copy-qualified-name',
-      label: 'Copy qualified name',
-      icon: 'copy',
-      run: () => copyText(qualifiedNameFor(row)),
-    },
-    {
-      type: 'item',
+    refreshItem(row),
+    ...copyNameItems(row, true),
+    countItem(row, {
       id: 'count-documents',
       label: 'Count documents',
-      icon: 'symbol-numeric',
-      run: () => {
-        const { id: tabId } = useTabsStore().openDocumentTab(row.connectionId, row.path);
-        countTab('document', tabId);
-      },
-    },
+      kind: 'document',
+      openTab: (connectionId, path) => useTabsStore().openDocumentTab(connectionId, path),
+    }),
   ];
 }
 
@@ -505,46 +390,14 @@ function groupMenu(row: TreeRowVm): MenuItem[] {
 // and config, a queue's attributes, live there now that the tree no longer expands either.
 function streamNodeMenu(row: TreeRowVm): MenuItem[] {
   return [
-    {
-      type: 'item',
-      id: 'open-stream',
+    ...openItems(row, {
+      idBase: 'open-stream',
       label: 'Open',
       icon: nodeIcon(row.kind),
-      shortcut: 'tree.open',
-      run: () => {
-        useTabsStore().openStreamTab(row.connectionId, row.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-stream-new-tab',
-      label: 'Open in new tab',
-      icon: nodeIcon(row.kind),
-      run: () => {
-        useTabsStore().openStreamTab(row.connectionId, row.path, { newTab: true });
-      },
-    },
-    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
-      ? [
-          {
-            type: 'item' as const,
-            id: 'open-definition',
-            label: 'Open definition',
-            icon: 'file-code',
-            run: () => {
-              useTabsStore().openDefinitionTab(row.connectionId, row.path);
-            },
-          },
-        ]
-      : []),
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
+      openTab: (connectionId, path, opts) => useTabsStore().openStreamTab(connectionId, path, opts),
+    }),
+    ...definitionItem(row),
+    ...copyNameItems(row),
   ];
 }
 
@@ -553,36 +406,7 @@ function streamNodeMenu(row: TreeRowVm): MenuItem[] {
 // throws E_UNSUPPORTED for those paths (P19 §5); gating on caps there would offer a row that always
 // errors. A consumer group had no definition at all before this phase (F10).
 function consumerGroupMenu(row: TreeRowVm): MenuItem[] {
-  return [
-    ...(useConnectionsStore().states[row.connectionId]?.caps?.definition === true
-      ? [
-          {
-            type: 'item' as const,
-            id: 'open-definition',
-            label: 'Open definition',
-            icon: 'file-code',
-            run: () => {
-              useTabsStore().openDefinitionTab(row.connectionId, row.path);
-            },
-          },
-        ]
-      : []),
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(row.name),
-    },
-    {
-      type: 'item',
-      id: 'copy-qualified-name',
-      label: 'Copy qualified name',
-      icon: 'copy',
-      run: () => copyText(qualifiedNameFor(row)),
-    },
-  ];
+  return [...definitionItem(row), ...copyNameItems(row, true)];
 }
 
 // Reads from the on-demand cache state/tree.ts populates just before the menu opens

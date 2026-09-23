@@ -7,39 +7,13 @@
 
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionManager } from './connection.ts';
-import { createProxyHandlers } from './proxyHandlers.ts';
+import { buildStubProxyHandlers } from './testing/stubHost.ts';
 
 function buildHandlers(url: string | null, opened: string[]) {
-  const notImplemented = (): never => {
-    throw new Error('not implemented in this test');
-  };
   const connection = {
     request: async () => ({ url }),
   } as unknown as ConnectionManager;
-  return createProxyHandlers({
-    connection,
-    settings: notImplemented,
-    // biome-ignore lint/suspicious/noExplicitAny: unused by pr.openExternal, stubbed minimally.
-    roots: {} as any,
-    // biome-ignore lint/suspicious/noExplicitAny: unused by pr.openExternal, stubbed minimally.
-    clipboard: {} as any,
-    // biome-ignore lint/suspicious/noExplicitAny: unused by pr.openExternal, stubbed minimally.
-    editor: {} as any,
-    // biome-ignore lint/suspicious/noExplicitAny: unused by pr.openExternal, stubbed minimally.
-    logger: {} as any,
-    // biome-ignore lint/suspicious/noExplicitAny: unused by pr.openExternal, stubbed minimally.
-    windows: {} as any,
-    browser: { openExternal: async (u: string) => void opened.push(u) },
-    isWorkspaceTrusted: () => true,
-    revealReview: () => {},
-    revealCommitInGraph: () => {},
-    renderReviewComments: () => {},
-    notifyCommentsMutated: () => {},
-    refreshReviewMarking: () => {},
-    notifyReviewMarked: () => {},
-    // biome-ignore lint/suspicious/noExplicitAny: unused by pr.openExternal, stubbed minimally.
-    reviewSessionStore: {} as any,
-  });
+  return buildStubProxyHandlers(connection, opened);
 }
 
 describe('pr.openExternal', () => {

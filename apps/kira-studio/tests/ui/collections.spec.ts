@@ -2,16 +2,13 @@ import type { Locator, Page } from '@playwright/test';
 import { CHANNEL } from '@shared/protocol/events';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 import { emitWailsEvent } from './support/mockRuntime';
 
 // P4 §6.3: four tests, one snapshot per channel (mockRuntime.ts: a channel with exactly one
 // snapshot answers args-blind, which is what lets a test assert on a call's args afterwards
 // without having to make them matchable up front).
-
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
 
 // Located by row id rather than by label: a `hasText` filter would make "Orders" match the
 // "Orders API" collection row too, and the id is what the row model actually keys on.

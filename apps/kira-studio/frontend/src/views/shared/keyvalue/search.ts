@@ -1,12 +1,5 @@
-import {
-  emptyScan,
-  keyValueRowScanner,
-  runChunkedScan,
-  type SearchHandle,
-  type SearchQuery,
-} from '../page/scan';
+import { keyValueRowScanner, runPageScan, type SearchHandle, type SearchQuery } from '../page/scan';
 import { createPageSearch } from '../page/search';
-import { visibleRowsOf } from '../page/visibleRows';
 import { getPage, pageVersion } from './page';
 
 // Mirrors views/grid/search.ts exactly, narrowed to KeyValuePage's two fixed semantic columns
@@ -33,22 +26,20 @@ function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  if (!page || q.text === '') return emptyScan();
-
-  return runChunkedScan<Match>(
-    page.rowCount,
-    keyValueRowScanner(page, ['field', 'value'], (row, col, start, end) => ({
-      row,
-      col,
-      start,
-      end,
-    })),
+  // P42 D39/P49 D5: KeyValueView.vue reports its own visible window (VirtualList's visible-range
+  // emit) — runPageScan scans that window first instead of always starting cold at row 0.
+  return runPageScan(
+    page,
+    tabId,
+    (p) =>
+      keyValueRowScanner(p, ['field', 'value'], (row, col, start, end) => ({
+        row,
+        col,
+        start,
+        end,
+      })),
     q,
     onProgress,
-    // P42 D39/P49 D5: KeyValueView.vue now reports its own visible window (VirtualList's
-    // visible-range emit), so this scans on-screen rows first instead of always starting cold at
-    // row 0 — closing the gap this comment used to record.
-    { priority: visibleRowsOf(tabId) ?? undefined },
   );
 }
 

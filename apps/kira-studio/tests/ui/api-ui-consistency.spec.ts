@@ -1,6 +1,6 @@
-import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { grpcTab, modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { acceptConfirm } from './support/dialogs';
 import { editorText, stableBoundingBox } from './support/editorText';
 import { IPC } from './support/ipcChannels';
@@ -9,10 +9,6 @@ import { IPC } from './support/ipcChannels';
 // both is not") guarding three things a restyle can genuinely regress, not the restyles
 // themselves: a de-duplicated affordance staying de-duplicated, an HTML-validity fix staying
 // fixed, and one new control's enabled state actually tracking real data.
-
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
 
 test('collections empty state has no duplicate action buttons (D6)', async ({ relaunch }) => {
   // No control mock needed — mockRuntime.ts's own WILDCARD_DEFAULTS answers collectionsList with
@@ -32,36 +28,6 @@ test('collections empty state has no duplicate action buttons (D6)', async ({ re
   // D6/F3: no bordered dialog button anywhere in the panel's own empty-state slot.
   await expect(page.locator('.side-empty .p-dlgbtn')).toHaveCount(0);
 });
-
-function grpcTab(state: Record<string, unknown>): Record<string, unknown> {
-  return {
-    id: 'tab-grpc-1',
-    connectionId: null,
-    path: 'request',
-    kind: 'grpc-request',
-    order: 0,
-    active: true,
-    state: {
-      target: '',
-      tlsMode: 'tls',
-      caFile: '',
-      serverName: '',
-      descriptorMode: 'reflection',
-      protoPath: '',
-      importPaths: [],
-      service: '',
-      method: '',
-      message: '',
-      metadata: [],
-      itemId: null,
-      name: '',
-      requestPane: 'message',
-      responsePane: 'history',
-      requestPaneHeight: 0,
-      ...state,
-    },
-  };
-}
 
 const GRPC_HISTORY_ENTRY = {
   id: 'call-1',
@@ -168,12 +134,6 @@ test('a disabled Call button dims via opacity, not an unreadable label on a full
 // P15 §4: four cases guarding this phase's own end-to-end behaviour, not the restyles themselves —
 // the response pane's chrome present from tab-open (D1), JSON as a top-level body segment (D6),
 // and the tab-strip badge (D8).
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
 
 test('a freshly opened request tab shows the response pane switcher before any send (D1)', async ({
   relaunch,

@@ -5,6 +5,7 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -17,17 +18,6 @@ const { useTabsStore } = await import('../../frontend/src/state/tabs');
 const tabsStore = useTabsStore();
 const { useBrowseViewStore } = await import('../../frontend/src/views/browse/state');
 const browseViewStore = useBrowseViewStore();
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (v: T) => void;
-} {
-  let resolve!: (v: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
 
 // Generous over the couple of microtask hops loadKeyTypes' own await chain needs (stub -> await
 // control.treeKeyTypes -> the writes after it) — cheap, and avoids this file being sensitive to

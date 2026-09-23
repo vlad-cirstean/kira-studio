@@ -1,18 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { SETTINGS } from '@kira/git-core';
-import type {
-  EventKey,
-  EventPayload,
-  ParamsOf,
-  RepoSettingsSnapshot,
-  RequestKey,
-  ResultOf,
-  StreamChunkOf,
-  StreamKey,
-  StreamParamsOf,
-  Transport,
-} from '@kira/git-ipc';
+import type { RepoSettingsSnapshot } from '@kira/git-ipc';
+import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
+import { FakeTransport } from '../testing/fakeTransport.ts';
 import { RepoSettingsState } from './repoSettings.ts';
 
 function defaultSnapshot(): RepoSettingsSnapshot {
@@ -29,55 +20,6 @@ function defaultSnapshot(): RepoSettingsSnapshot {
     'kiraSpace.worktree.basePath': SETTINGS['kiraSpace.worktree.basePath'].default,
     'kiraSpace.checkout.autoStash': SETTINGS['kiraSpace.checkout.autoStash'].default,
   };
-}
-
-/** A minimal, in-memory Transport fake — request() is scripted per call via `onRequest`; on()
- *  records handlers so a test can fire an event synchronously with `emit`. Mirrors the shape
- *  every other `state/` module's own tests would need, had any existed before this phase (G18
- *  is git-ui's first test file at all — G16's own declared non-goal is a component-rendering
- *  tier, not unit tests for plain state classes). */
-class FakeTransport implements Transport {
-  onRequest: (method: RequestKey, params: unknown) => unknown = () => {
-    throw new Error('unscripted request');
-  };
-  readonly calls: Array<{ method: RequestKey; params: unknown }> = [];
-  #handlers = new Map<EventKey, Set<(payload: unknown) => void>>();
-
-  request<K extends RequestKey>(method: K, params: ParamsOf<K>): Promise<ResultOf<K>> {
-    this.calls.push({ method, params });
-    return Promise.resolve(this.onRequest(method, params) as ResultOf<K>);
-  }
-
-  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
-    let set = this.#handlers.get(method);
-    if (!set) {
-      set = new Set();
-      this.#handlers.set(method, set);
-    }
-    const wrapped = handler as (payload: unknown) => void;
-    set.add(wrapped);
-    return () => set?.delete(wrapped);
-  }
-
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
-    for (const handler of this.#handlers.get(method) ?? []) {
-      handler(payload);
-    }
-  }
-
-  stream<K extends StreamKey>(
-    _method: K,
-    _params: StreamParamsOf<K>,
-    _onChunk: (chunk: StreamChunkOf<K>) => void,
-  ): Promise<void> {
-    return Promise.reject(new Error('not used by these tests'));
-  }
-
-  dispose(): void {}
-}
-
-function tick(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('RepoSettingsState', () => {
@@ -100,7 +42,7 @@ describe('RepoSettingsState', () => {
       return { ...defaultSnapshot(), 'kiraSpace.pull.strategy': 'rebase' };
     };
     state.setRepoId('/repos/a');
-    await tick();
+    await sleep();
 
     expect(state.settings.value['kiraSpace.pull.strategy']).toBe('rebase');
     state.dispose();
@@ -112,7 +54,7 @@ describe('RepoSettingsState', () => {
     const state = new RepoSettingsState(bridge);
     transport.onRequest = () => ({ ...defaultSnapshot(), 'kiraSpace.pull.strategy': 'merge' });
     state.setRepoId('/repos/a');
-    await tick();
+    await sleep();
     expect(state.settings.value['kiraSpace.pull.strategy']).toBe('merge');
 
     state.setRepoId(undefined);
@@ -126,7 +68,7 @@ describe('RepoSettingsState', () => {
     const state = new RepoSettingsState(bridge);
     transport.onRequest = () => defaultSnapshot();
     state.setRepoId('/repos/a');
-    await tick();
+    await sleep();
 
     transport.onRequest = (method, params) => {
       expect(method).toBe('repoSettings.set');
@@ -152,7 +94,7 @@ describe('RepoSettingsState', () => {
 
     transport.onRequest = () => defaultSnapshot();
     state.setRepoId('/repos/a');
-    await tick();
+    await sleep();
     expect(state.settings.value['kiraSpace.github.enabled']).toBe(true);
 
     transport.onRequest = (method, params) => {
@@ -180,7 +122,7 @@ describe('RepoSettingsState', () => {
       'kiraSpace.pull.strategy': 'rebase',
     });
     state.setRepoId('/repos/a');
-    await tick();
+    await sleep();
     expect(state.settings.value['kiraSpace.pull.strategy']).toBe('rebase');
 
     transport.emit('repoSettings.changed', {
@@ -206,7 +148,7 @@ describe('RepoSettingsState', () => {
     const state = new RepoSettingsState(bridge);
     transport.onRequest = () => defaultSnapshot();
     state.setRepoId('/repos/a');
-    await tick();
+    await sleep();
 
     transport.emit('repoSettings.changed', {
       repoId: '/repos/a',

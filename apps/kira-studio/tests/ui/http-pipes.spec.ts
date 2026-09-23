@@ -1,6 +1,6 @@
-import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { httpResponse, openHttpModeAndNewRequest } from './support/apiMode';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
@@ -19,33 +19,6 @@ import { IPC } from './support/ipcChannels';
 // the transformed (piped) plaintext ever appearing — the properties R3's own Go tests
 // (bridge/http_test.go's TestMaskSecrets_MasksPipedSecretsBase64Form et al.) prove are what Go
 // actually computes; this file proves the UI never adds a leak of its own on top.
-
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
-
-function httpResponse(overrides: Record<string, unknown>): Record<string, unknown> {
-  return {
-    status: 200,
-    statusText: 'OK',
-    proto: 'HTTP/1.1',
-    headers: [],
-    body: '',
-    bodyEncoding: 'utf8',
-    bodyBytes: 0,
-    bodyTruncated: false,
-    elapsedMs: 5,
-    finalUrl: 'https://api.example.com/v1',
-    redirects: [],
-    ...overrides,
-  };
-}
 
 // ---- 1. Stage 1 never resolves a piped secret — the literal reference is what leaves the renderer ----
 

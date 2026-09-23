@@ -132,6 +132,32 @@ async function onRemoveRepo(id: string): Promise<void> {
   await codeReposStore.removeCodeRepo(id);
 }
 
+// P107 I2-20: the Rename…/Close/Remove triple onRepoContextMenu and onWorktreeContextMenu below
+// both build — same three items, same handlers, only "which record" differs. Close only renders
+// while `id` isOpen (both callers'); Rename/Remove always render (both callers already gate
+// whether to offer this triple at all before calling — onWorktreeContextMenu only for a worktree
+// that has its own code_repos record).
+function recordMenuItems(
+  record: { id: string; name: string },
+  handlers: { rename: () => void; close: () => void; remove: () => void },
+): MenuItem[] {
+  const items: MenuItem[] = [
+    { type: 'item' as const, id: 'rename', label: 'Rename…', icon: 'edit', run: handlers.rename },
+  ];
+  if (isOpen(record.id)) {
+    items.push({ type: 'item' as const, id: 'close', label: 'Close', icon: 'close', run: handlers.close });
+  }
+  items.push({
+    type: 'item' as const,
+    id: 'remove',
+    label: 'Remove',
+    icon: 'trash',
+    danger: true,
+    run: handlers.remove,
+  });
+  return items;
+}
+
 function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
   const items: MenuItem[] = [
     {
@@ -140,13 +166,6 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       label: 'Open',
       icon: 'folder-opened',
       run: () => onRowClick(repo.id),
-    },
-    {
-      type: 'item' as const,
-      id: 'rename',
-      label: 'Rename…',
-      icon: 'edit',
-      run: () => onRenameRepo(repo.id, repo.name),
     },
     {
       type: 'item' as const,
@@ -163,30 +182,18 @@ function onRepoContextMenu(e: MouseEvent, repo: RepoSummary): void {
       run: () => void openRepoTerminalTab(repo.id, repo.root),
     },
     { type: 'separator' as const },
-  ];
-  if (isOpen(repo.id)) {
-    items.push({
-      type: 'item' as const,
-      id: 'close',
-      label: 'Close',
-      icon: 'close',
+    ...recordMenuItems(repo, {
+      rename: () => onRenameRepo(repo.id, repo.name),
       // P82 §8.3: collapse first, so the lease release is synchronous with the close instead of a
       // watch flush later — the same reason quickOpen.ts:178 exposes dropQuickOpen alongside its
       // own watch. The §6.6 watch would collapse it anyway.
-      run: () => {
+      close: () => {
         worktreesStore.collapseRepoWorktrees(repo.id);
         workspaceStore.closeRepoWorkspace(repo.id);
       },
-    });
-  }
-  items.push({
-    type: 'item' as const,
-    id: 'remove',
-    label: 'Remove',
-    icon: 'trash',
-    danger: true,
-    run: () => onRemoveRepo(repo.id),
-  });
+      remove: () => onRemoveRepo(repo.id),
+    }),
+  ];
   contextMenuStore.openContextMenu(e, items);
 }
 
@@ -225,35 +232,18 @@ function onWorktreeContextMenu(e: MouseEvent, repo: RepoSummary, wt: WorktreeEnt
   const record = codeReposStore.codeRepoRecordForPath(wt.path);
   if (record) {
     items.push({ type: 'separator' as const });
-    items.push({
-      type: 'item' as const,
-      id: 'rename',
-      label: 'Rename…',
-      icon: 'edit',
-      run: () => onRenameRepo(record.id, record.name),
-    });
-    if (isOpen(record.id)) {
-      items.push({
-        type: 'item' as const,
-        id: 'close',
-        label: 'Close',
-        icon: 'close',
-        run: () => {
+    items.push(
+      ...recordMenuItems(record, {
+        rename: () => onRenameRepo(record.id, record.name),
+        close: () => {
           worktreesStore.collapseRepoWorktrees(record.id);
           workspaceStore.closeRepoWorkspace(record.id);
         },
-      });
-    }
-    items.push({
-      type: 'item' as const,
-      id: 'remove',
-      label: 'Remove',
-      icon: 'trash',
-      danger: true,
-      // Removes the code_repos record, never the worktree on disk — the nested row survives it,
-      // since it comes from `git worktree list`, not from codeReposState.
-      run: () => onRemoveRepo(record.id),
-    });
+        // Removes the code_repos record, never the worktree on disk — the nested row survives it,
+        // since it comes from `git worktree list`, not from codeReposState.
+        remove: () => onRemoveRepo(record.id),
+      }),
+    );
   }
   contextMenuStore.openContextMenu(e, items);
 }

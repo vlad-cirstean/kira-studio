@@ -1,12 +1,5 @@
-import {
-  eachMatch,
-  emptyScan,
-  runChunkedScan,
-  type SearchHandle,
-  type SearchQuery,
-} from '../shared/page/scan';
+import { eachMatch, runPageScan, type SearchHandle, type SearchQuery } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
-import { visibleRowsOf } from '../shared/page/visibleRows';
 import { documentRow, getPage, pageVersion } from './page';
 
 export interface Match {
@@ -40,11 +33,12 @@ function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  if (!page || q.text === '') return emptyScan();
-
-  return runChunkedScan<Match>(
-    page.rowCount,
-    (row, pattern, out) => {
+  // P42 D39: runPageScan scans the rows DocumentView.vue's VirtualList currently has on screen
+  // (D37) first.
+  return runPageScan(
+    page,
+    tabId,
+    () => (row, pattern, out) => {
       const doc = documentRow(tabId, row);
       if (!doc) return;
       const text = previewLineFor(doc.body);
@@ -52,8 +46,6 @@ function runSearch(
     },
     q,
     onProgress,
-    // P42 D39: the rows DocumentView.vue's VirtualList currently has on screen (D37).
-    { priority: visibleRowsOf(tabId) ?? undefined },
   );
 }
 

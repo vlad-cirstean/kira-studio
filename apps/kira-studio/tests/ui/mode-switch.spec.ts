@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab } from './support/apiMode';
 import { installFakeTimers } from './support/clock';
 import { IPC } from './support/ipcChannels';
 import {
@@ -70,10 +71,6 @@ async function createAndConnect(page: import('@playwright/test').Page): Promise<
   await expandRow(page, '');
   await expandRow(page, 'database:kira_test');
   await expandRow(page, 'database:kira_test/schema:app');
-}
-
-function modeTab(page: import('@playwright/test').Page, mode: 'studio' | 'api' | 'terminal') {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
 }
 
 test('mode switch — three mode tabs, an empty Http mode, and Studio state that survives the round trip', async ({

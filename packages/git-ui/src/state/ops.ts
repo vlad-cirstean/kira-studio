@@ -47,6 +47,7 @@ import {
   composeUndoAnnouncement,
   type StashPredictionMismatch,
 } from './liveAnnouncements.ts';
+import { createPendingSlot, type PendingSlot } from './pendingSlot.ts';
 import type { RefsState } from './refs.ts';
 import type { RepoSettingsState } from './repoSettings.ts';
 import type { StackState } from './stack.ts';
@@ -190,19 +191,27 @@ export class OpsState {
    *  the same way it already does for `DetailState.announcement` (P5 W11). */
   readonly announcement: ShallowRef<string> = shallowRef('');
 
-  readonly pendingCheckout: ShallowRef<CheckoutPreflight | undefined> = shallowRef(undefined);
-  readonly pendingRevert: ShallowRef<RevertPreflight | undefined> = shallowRef(undefined);
+  // P107 I2-23: each slot below backs one of the six confirm-dialog quadruples this class used to
+  // hand-roll separately (`pendingSlot.ts`'s own doc comment) — `pendingX` stays the public ref a
+  // dialog component watches, now `#xSlot.pending` rather than its own `shallowRef`.
+  readonly #checkoutSlot = createPendingSlot<CheckoutPreflight, CheckoutRoute | null>();
+  readonly pendingCheckout = this.#checkoutSlot.pending;
+  readonly #revertSlot = createPendingSlot<RevertPreflight, RevertRoute | null>();
+  readonly pendingRevert = this.#revertSlot.pending;
   /** `docs/plans/P10.md` W10: `ResetDialog.vue`'s own pending state — unlike `pendingRevert`,
    *  opened for EVERY reset, not only a hazardous one (judgment call 18's single entry point IS
    *  the mode picker, so there is no "clean, skip the dialog" fast path to mirror here). */
-  readonly pendingReset: ShallowRef<ResetPreflight | undefined> = shallowRef(undefined);
+  readonly #resetSlot = createPendingSlot<ResetPreflight, ResetRoute | null>();
+  readonly pendingReset = this.#resetSlot.pending;
   /** `CherryPickDialog.vue`'s own pending state — a near-sibling of `pendingRevert`: opened only
    *  when the pre-flight found something worth a dialog (a blocker, a mainline choice, or the
    *  non-blocking `alreadyApplied` advisory — `runCherryPick`'s own trigger condition). */
-  readonly pendingCherryPick: ShallowRef<CherryPickPreflight | undefined> = shallowRef(undefined);
+  readonly #cherryPickSlot = createPendingSlot<CherryPickPreflight, CherryPickRoute | null>();
+  readonly pendingCherryPick = this.#cherryPickSlot.pending;
   /** P9 W13: the shared apply/pop confirmation's own pending state — see `PendingStashPop`'s own
    *  doc comment on why one field, not two, covers both verbs (OQ7). */
-  readonly pendingStashPop: ShallowRef<PendingStashPop | undefined> = shallowRef(undefined);
+  readonly #stashPopSlot = createPendingSlot<PendingStashPop, boolean>();
+  readonly pendingStashPop = this.#stashPopSlot.pending;
 
   // -------------------------------------------------------------------------------------
   // P8 W17: remote ops. Deliberately a sibling to the four steps above, not folded into
@@ -221,7 +230,8 @@ export class OpsState {
    *  the first chunk arrives (a trivially small fetch/push may emit none at all; the toolbar must
    *  not read that as a stall, matching probe 6). Cleared when the op finishes. */
   readonly remoteProgress: ShallowRef<RemoteProgress | undefined> = shallowRef(undefined);
-  readonly pendingForcePush: ShallowRef<PendingForcePush | undefined> = shallowRef(undefined);
+  readonly #forcePushSlot = createPendingSlot<PendingForcePush, ForcePushRoute | null>();
+  readonly pendingForcePush = this.#forcePushSlot.pending;
   /** Set the moment a strategy is known (preflight response, or an explicit override) and left
    *  in place after the pull finishes — see `PullStrategyInfo`'s own doc comment. */
   readonly pullStrategy: ShallowRef<PullStrategyInfo | undefined> = shallowRef(undefined);
@@ -270,12 +280,6 @@ export class OpsState {
    *  value can only ever produce the OLD dialog, never an unexpected write, D16). */
   readonly #repoSettings: RepoSettingsState | undefined;
   #repoId: string | undefined;
-  #resolveCheckout: ((route: CheckoutRoute | null) => void) | undefined;
-  #resolveRevert: ((route: RevertRoute | null) => void) | undefined;
-  #resolveReset: ((route: ResetRoute | null) => void) | undefined;
-  #resolveCherryPick: ((route: CherryPickRoute | null) => void) | undefined;
-  #resolveForcePush: ((route: ForcePushRoute | null) => void) | undefined;
-  #resolveStashPop: ((proceed: boolean) => void) | undefined;
   #resolvePull: ((proceed: boolean) => void) | undefined;
   #resolvePostCheckoutPull: ((proceed: boolean) => void) | undefined;
   readonly #unsubscribe: () => void;
@@ -463,7 +467,7 @@ export class OpsState {
 
       let discardLocalChanges = false;
       if (preflight.verdict === 'blocked') {
-        const route = await this.#confirmCheckout(preflight);
+        const route = await this.#checkoutSlot.ask(preflight);
         // G32 round-3 functional-correctness review, finding #7: the active repo can change
         // while this dialog is open (e.g. "Open in graph" calls repo.open directly, independent
         // of this method's own busy hold) — proceeding on a route the user chose for a DIFFERENT
@@ -571,25 +575,57 @@ export class OpsState {
     resolve?.(proceed);
   }
 
-  #confirmCheckout(preflight: CheckoutPreflight): Promise<CheckoutRoute | null> {
-    this.pendingCheckout.value = preflight;
-    return new Promise((resolve) => {
-      this.#resolveCheckout = resolve;
-    });
-  }
-
   /** `CheckoutDialog.vue`'s own Discard/Cancel buttons call this — `null` for Cancel, matching
    *  `RevertDialog`'s own convention below. */
   resolveCheckoutDialog(route: CheckoutRoute | null): void {
-    this.pendingCheckout.value = undefined;
-    const resolve = this.#resolveCheckout;
-    this.#resolveCheckout = undefined;
-    resolve?.(route);
+    this.#checkoutSlot.resolve(route);
   }
 
   // -------------------------------------------------------------------------------------
   // revert
   // -------------------------------------------------------------------------------------
+
+  /**
+   * P107 I2-23: `runRevert`/`runCherryPick` share this exact flow — preflight already in hand,
+   * an optional dialog for `mainline`/`noCommit` (skipped when nothing needs deciding), the
+   * G32 round-3 finding #7 repo-changed guard, a `null` route cancelling with `cancelText`, then
+   * `op.run` + `#applyResult` + an announce step. Push/force-push keep their own `#runRemote` (no
+   * `mainline`/`noCommit`, a differently-shaped route) and use their slot directly, per the doc.
+   */
+  async #runPreflighted<
+    TPreflight,
+    TRoute extends { mainline: number | undefined; noCommit: boolean },
+  >(opts: {
+    repoId: string;
+    preflight: TPreflight;
+    needsDialog: (preflight: TPreflight) => boolean;
+    slot: PendingSlot<TPreflight, TRoute | null>;
+    cancelText: string;
+    buildOp: (mainline: number | undefined, noCommit: boolean) => OpRequest;
+    announce: (result: OpResult, noCommit: boolean) => string;
+  }): Promise<void> {
+    const { repoId } = opts;
+    let mainline: number | undefined;
+    let noCommit = false;
+    if (opts.needsDialog(opts.preflight)) {
+      const route = await opts.slot.ask(opts.preflight);
+      // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
+      // #checkoutSlot.ask above — the active repo can change while this dialog is open.
+      if (this.#repoId !== repoId) return;
+      if (route === null) {
+        this.announcement.value = opts.cancelText;
+        return;
+      }
+      mainline = route.mainline;
+      noCommit = route.noCommit;
+    }
+    const result = await this.#bridge.request('op.run', {
+      repoId,
+      op: opts.buildOp(mainline, noCommit),
+    });
+    this.#applyResult(repoId, result);
+    this.announcement.value = opts.announce(result, noCommit);
+  }
 
   async runRevert(shas: readonly string[]): Promise<void> {
     const repoId = this.#repoId;
@@ -597,38 +633,21 @@ export class OpsState {
     this.busy.value = true;
     try {
       const preflight = await this.#bridge.request('preflight.revert', { repoId, shas });
-      let mainline: number | undefined;
-      let noCommit = false;
-      if (preflight.verdict !== 'clean' || preflight.mainlineRequired.length > 0) {
-        const route = await this.#confirmRevert(preflight);
-        // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
-        // #confirmCheckout above — the active repo can change while this dialog is open.
-        if (this.#repoId !== repoId) return;
-        if (route === null) {
-          this.announcement.value = 'Revert cancelled.';
-          return;
-        }
-        mainline = route.mainline;
-        noCommit = route.noCommit;
-      }
-      const result = await this.#bridge.request('op.run', {
+      await this.#runPreflighted({
         repoId,
-        op: { kind: 'revert', shas, mainline, noCommit },
+        preflight,
+        needsDialog: (p) => p.verdict !== 'clean' || p.mainlineRequired.length > 0,
+        slot: this.#revertSlot,
+        cancelText: 'Revert cancelled.',
+        buildOp: (mainline, noCommit) => ({ kind: 'revert', shas, mainline, noCommit }),
+        announce: (result, noCommit) =>
+          result.ok
+            ? composeRevertAnnouncement(shas, noCommit)
+            : composeOpFailureAnnouncement('Revert', result.error),
       });
-      this.#applyResult(repoId, result);
-      this.announcement.value = result.ok
-        ? composeRevertAnnouncement(shas, noCommit)
-        : composeOpFailureAnnouncement('Revert', result.error);
     } finally {
       this.busy.value = false;
     }
-  }
-
-  #confirmRevert(preflight: RevertPreflight): Promise<RevertRoute | null> {
-    this.pendingRevert.value = preflight;
-    return new Promise((resolve) => {
-      this.#resolveRevert = resolve;
-    });
   }
 
   /** `RevertDialog.vue` calls this once a mainline is picked (`mainlineRequired.length > 0`) so
@@ -644,10 +663,7 @@ export class OpsState {
   }
 
   resolveRevertDialog(route: RevertRoute | null): void {
-    this.pendingRevert.value = undefined;
-    const resolve = this.#resolveRevert;
-    this.#resolveRevert = undefined;
-    resolve?.(route);
+    this.#revertSlot.resolve(route);
   }
 
   // -------------------------------------------------------------------------------------
@@ -675,9 +691,9 @@ export class OpsState {
           : `Reset failed — ${target} does not resolve to a commit.`;
         return;
       }
-      const route = await this.#confirmReset(preflight);
+      const route = await this.#resetSlot.ask(preflight);
       // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
-      // #confirmCheckout above — the active repo can change while this dialog is open.
+      // #checkoutSlot.ask above — the active repo can change while this dialog is open.
       if (this.#repoId !== repoId) return;
       if (route === null) {
         this.announcement.value = 'Reset cancelled.';
@@ -720,13 +736,6 @@ export class OpsState {
     }
   }
 
-  #confirmReset(preflight: ResetPreflight): Promise<ResetRoute | null> {
-    this.pendingReset.value = preflight;
-    return new Promise((resolve) => {
-      this.#resolveReset = resolve;
-    });
-  }
-
   /** `ResetDialog.vue`'s own mode-radio recompute (OQ11): `destroys`/`requiresTypedConfirmation`/
    *  `routes`/`verdict` all depend only on `mode` and the ONE pre-flight's own `dirty` breakdown,
    *  already in hand — no round trip. Re-derived via `core`'s own `classifyReset`, never a hand-
@@ -757,10 +766,7 @@ export class OpsState {
   /** `ResetDialog.vue`'s Reset/Stash first/Cancel buttons call this — `null` for Cancel, matching
    *  `resolveCheckoutDialog`/`resolveRevertDialog`'s own convention. */
   resolveResetDialog(route: ResetRoute | null): void {
-    this.pendingReset.value = undefined;
-    const resolve = this.#resolveReset;
-    this.#resolveReset = undefined;
-    resolve?.(route);
+    this.#resetSlot.resolve(route);
   }
 
   // -------------------------------------------------------------------------------------
@@ -778,45 +784,26 @@ export class OpsState {
     this.busy.value = true;
     try {
       const preflight = await this.#bridge.request('preflight.cherryPick', { repoId, sha });
-      let mainline: number | undefined;
-      let noCommit = false;
-      if (
-        preflight.verdict !== 'clean' ||
-        preflight.mainlineRequired.length > 0 ||
-        preflight.alreadyApplied
-      ) {
-        const route = await this.#confirmCherryPick(preflight);
-        // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
-        // #confirmCheckout above — the active repo can change while this dialog is open.
-        if (this.#repoId !== repoId) return;
-        if (route === null) {
-          this.announcement.value = 'Cherry-pick cancelled.';
-          return;
-        }
-        mainline = route.mainline;
-        noCommit = route.noCommit;
-      }
-      const result = await this.#bridge.request('op.run', {
+      await this.#runPreflighted({
         repoId,
-        op: { kind: 'cherryPick', sha, mainline, noCommit },
+        preflight,
+        needsDialog: (p) =>
+          p.verdict !== 'clean' || p.mainlineRequired.length > 0 || p.alreadyApplied,
+        slot: this.#cherryPickSlot,
+        cancelText: 'Cherry-pick cancelled.',
+        buildOp: (mainline, noCommit) => ({ kind: 'cherryPick', sha, mainline, noCommit }),
+        announce: (result, noCommit) => {
+          const mismatch = this.#reconcileCherryPick(preflight.prediction, result);
+          return mismatch
+            ? composeCherryPickMismatchAnnouncement(mismatch)
+            : result.ok
+              ? composeCherryPickAnnouncement(sha, noCommit)
+              : composeOpFailureAnnouncement('Cherry-pick', result.error);
+        },
       });
-      this.#applyResult(repoId, result);
-      const mismatch = this.#reconcileCherryPick(preflight.prediction, result);
-      this.announcement.value = mismatch
-        ? composeCherryPickMismatchAnnouncement(mismatch)
-        : result.ok
-          ? composeCherryPickAnnouncement(sha, noCommit)
-          : composeOpFailureAnnouncement('Cherry-pick', result.error);
     } finally {
       this.busy.value = false;
     }
-  }
-
-  #confirmCherryPick(preflight: CherryPickPreflight): Promise<CherryPickRoute | null> {
-    this.pendingCherryPick.value = preflight;
-    return new Promise((resolve) => {
-      this.#resolveCherryPick = resolve;
-    });
   }
 
   /** `CherryPickDialog.vue` calls this once a mainline is picked, same shape as
@@ -836,10 +823,7 @@ export class OpsState {
   }
 
   resolveCherryPickDialog(route: CherryPickRoute | null): void {
-    this.pendingCherryPick.value = undefined;
-    const resolve = this.#resolveCherryPick;
-    this.#resolveCherryPick = undefined;
-    resolve?.(route);
+    this.#cherryPickSlot.resolve(route);
   }
 
   /** Hard part 7/D57: `CherryPickPreflight.prediction` is exact about the merge alone, reconciled
@@ -938,9 +922,9 @@ export class OpsState {
         scope: entry.scope,
       });
       if (preflight.verdict !== 'clean') {
-        const proceed = await this.#confirmStashPop(verb, preflight);
+        const proceed = await this.#stashPopSlot.ask({ verb, preflight });
         // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
-        // #confirmCheckout above — the active repo can change while this dialog is open.
+        // #checkoutSlot.ask above — the active repo can change while this dialog is open.
         if (this.#repoId !== repoId) return undefined;
         if (!proceed) {
           this.announcement.value = `Stash ${verb} cancelled.`;
@@ -967,22 +951,12 @@ export class OpsState {
     }
   }
 
-  #confirmStashPop(verb: 'apply' | 'pop', preflight: StashPopPreflight): Promise<boolean> {
-    this.pendingStashPop.value = { verb, preflight };
-    return new Promise((resolve) => {
-      this.#resolveStashPop = resolve;
-    });
-  }
-
   /** `StashDialog.vue`'s shared apply/pop confirmation calls this — `false` for Cancel, matching
    *  `resolveCheckoutDialog`/`resolveRevertDialog`'s own `null`-for-cancel convention as closely
    *  as a boolean route can (there is no route data to withhold on cancel here, per
    *  `PendingStashPop`'s own doc comment). */
   resolveStashPopDialog(proceed: boolean): void {
-    this.pendingStashPop.value = undefined;
-    const resolve = this.#resolveStashPop;
-    this.#resolveStashPop = undefined;
-    resolve?.(proceed);
+    this.#stashPopSlot.resolve(proceed);
   }
 
   /** §7.6's concrete answer to hard part 1 (D... `docs/plans/P9.md`'s own worked example): only
@@ -1517,7 +1491,7 @@ export class OpsState {
     if (preflight.blockers.length > 0) {
       const proceed = await this.#confirmPull(preflight);
       // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
-      // #confirmCheckout above — the active repo can change while this dialog is open.
+      // #checkoutSlot.ask above — the active repo can change while this dialog is open.
       if (this.#repoId !== repoId) return;
       if (!proceed) {
         this.announcement.value = 'Pull cancelled.';
@@ -1616,7 +1590,7 @@ export class OpsState {
   /**
    * `ForcePushDialog.vue`'s own entry point: a preflight round trip (so the dialog can show the
    * remote tip it is about to overwrite and the matched protected pattern, if any), then the
-   * dialog's own confirm/cancel promise, mirroring `#confirmCheckout`/`#confirmRevert` above.
+   * dialog's own confirm/cancel promise, mirroring `#checkoutSlot.ask`/`#revertSlot.ask` above.
    * `expectedRemoteTip` is the preflight's `remoteTip` — re-read and compared host-side
    * immediately before spawning (D48's residual-hazard mitigation), so a change between here and
    * the actual spawn fails with `LeaseViolation` rather than silently overwriting more than the
@@ -1631,9 +1605,9 @@ export class OpsState {
       remote,
     });
     if (this.#repoId !== repoId) return;
-    const route = await this.#confirmForcePush({ remote, branch, preflight });
+    const route = await this.#forcePushSlot.ask({ remote, branch, preflight });
     // G32 round-3 functional-correctness review, finding #7: same guard as runCheckout's own
-    // #confirmCheckout above — the active repo can change while this dialog is open.
+    // #checkoutSlot.ask above — the active repo can change while this dialog is open.
     if (this.#repoId !== repoId) return;
     if (route === null) {
       this.announcement.value = 'Force push cancelled.';
@@ -1657,20 +1631,10 @@ export class OpsState {
     );
   }
 
-  #confirmForcePush(pending: PendingForcePush): Promise<ForcePushRoute | null> {
-    this.pendingForcePush.value = pending;
-    return new Promise((resolve) => {
-      this.#resolveForcePush = resolve;
-    });
-  }
-
   /** `ForcePushDialog.vue`'s Cancel/confirm buttons call this — `null` for Cancel, matching
    *  `resolveCheckoutDialog`/`resolveRevertDialog`'s own convention. */
   resolveForcePushDialog(route: ForcePushRoute | null): void {
-    this.pendingForcePush.value = undefined;
-    const resolve = this.#resolveForcePush;
-    this.#resolveForcePush = undefined;
-    resolve?.(route);
+    this.#forcePushSlot.resolve(route);
   }
 
   /** `remote.cancel` — always safe to call: `false` (never an error) when there was nothing to

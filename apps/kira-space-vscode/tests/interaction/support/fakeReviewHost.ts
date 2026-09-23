@@ -14,6 +14,7 @@
  * and never talks to a real extension host or Go server — the whole point of this tier (§4.2).
  */
 
+import { buildPackedChunk } from '@kira/git-core/testing/packedChunk';
 import type { PackedCommitChunk } from '@kira/git-ipc';
 import { CONTRACT_VERSION } from '@kira/git-ipc';
 import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
@@ -45,30 +46,8 @@ function wrap(body: unknown): unknown {
   return encode({ version: CONTRACT_VERSION, body }, 'base64').payload;
 }
 
-function buildPackedChunk(): PackedCommitChunk {
-  const shaBytes = Buffer.from(FAKE_SHA, 'hex');
-  const subjectBytes = Buffer.from(FAKE_SUBJECT, 'utf8');
-  const timestamp = 1_700_000_000;
-  return {
-    from: 0,
-    to: 1,
-    shaWidthBytes: 20,
-    shas: shaBytes.buffer.slice(shaBytes.byteOffset, shaBytes.byteOffset + shaBytes.byteLength),
-    parentOffsets: Uint32Array.from([0, 0]).buffer,
-    parentShas: new ArrayBuffer(0),
-    // author name/email, committer name/email — the same identity reused for both (ids 0/1).
-    identityIds: Uint32Array.from([0, 1, 0, 1]).buffer,
-    // author time, committer time.
-    times: Uint32Array.from([timestamp, timestamp]).buffer,
-    subjectBytes: subjectBytes.buffer.slice(
-      subjectBytes.byteOffset,
-      subjectBytes.byteOffset + subjectBytes.byteLength,
-    ),
-    subjectOffsets: Uint32Array.from([0, subjectBytes.byteLength]).buffer,
-    dictionaryBase: 0,
-    dictionary: ['Fake Author', 'fake@example.com'],
-    decorations: [],
-  };
+function reviewPackedChunk(): PackedCommitChunk {
+  return buildPackedChunk([{ sha: FAKE_SHA, subject: FAKE_SUBJECT }], { timestamp: 1_700_000_000 });
 }
 
 /** The scripted responses, each a ready-to-dispatch wire envelope (`{version, body}`) — built
@@ -124,7 +103,7 @@ function buildResponses(): {
         source: 'git',
         remaining: 0,
         exhausted: true,
-        commits: buildPackedChunk(),
+        commits: reviewPackedChunk(),
       });
       return [wrap({ t: 'chunk', id, chunk }), wrap({ t: 'end', id })] as const;
     },

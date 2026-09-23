@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { deferred, sleep } from '@workbench/testing/unit/async';
 import type { BufferEncoding } from './codec.ts';
 import { encodeStreamPayload } from './codec.ts';
 import type { PackedCommitChunk, StreamChunkOf } from './contract.ts';
@@ -10,21 +11,10 @@ import {
 } from './rpc.ts';
 import { CONTRACT_VERSION, wrapVersioned } from './validate.ts';
 
+/** N sequential macrotask ticks — some race/ordering assertions below need to wait out more than
+ *  one round of pending timers before an assertion holds, not just one (`sleep(0)`'s own case). */
 function tick(times = 1): Promise<void> {
-  return times <= 1
-    ? new Promise((resolve) => setTimeout(resolve, 0))
-    : tick(1).then(() => tick(times - 1));
-}
-
-function deferred<T = void>(): {
-  readonly promise: Promise<T>;
-  readonly resolve: (value: T) => void;
-} {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
+  return times <= 1 ? sleep(0) : tick(times - 1).then(() => sleep(0));
 }
 
 /** A real in-memory pipe: posting on one end synchronously invokes the other end's handler,

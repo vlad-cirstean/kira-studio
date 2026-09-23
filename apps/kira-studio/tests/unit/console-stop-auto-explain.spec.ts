@@ -10,40 +10,12 @@ import '@workbench/testing/unit/window';
 import { describe, expect, test } from 'bun:test';
 import type { ConnectionSummary } from '@shared/domain/connection';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
-import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
-import { setActivePinia } from 'pinia';
-import { pinia } from '../../frontend/src/state/pinia';
+import { deferred, sleep } from '@workbench/testing/unit/async';
+import { bootstrapConsole } from './support/consoleHarness.ts';
 
-setActivePinia(pinia);
-
-const { control } = await import('../../frontend/src/bridge/control');
-restoreAfterEach(control);
-const { data } = await import('../../frontend/src/bridge/data');
-restoreAfterEach(data);
-const { useConnectionsStore } = await import('../../frontend/src/state/connections');
-const connectionsStore = useConnectionsStore();
-const { useTabsStore } = await import('../../frontend/src/state/tabs');
-const tabsStore = useTabsStore();
-const { useConsoleViewStore } = await import('../../frontend/src/views/console/state');
-const consoleViewStore = useConsoleViewStore();
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (v: T) => void;
-  reject: (e: unknown) => void;
-} {
-  let resolve!: (v: T) => void;
-  let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const { data, control, connectionsStore, tabsStore, consoleViewStore } = await bootstrapConsole({
+  control: true,
+});
 
 describe('console Stop during the auto-explain pre-run batch (P12 round 1 F5)', () => {
   test('cancels the EXPLAIN batch and never issues the real run', async () => {

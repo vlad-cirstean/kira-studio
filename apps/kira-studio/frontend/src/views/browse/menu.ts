@@ -2,6 +2,7 @@ import type { TreeNode } from '@shared/domain/tree';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
+import { copyNameItems, openItems } from '../../project/menuItems';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
 import { useTabsStore } from '../../state/tabs';
@@ -41,34 +42,15 @@ function containerRowMenu(tabId: string, connectionId: string, node: TreeNode): 
 // regardless of caps.canDelete (redis's own is true), per the read-only-tree-row scope decision
 // this phase does not revisit.
 function keyRowMenu(connectionId: string, node: TreeNode): MenuItem[] {
+  const row = { connectionId, path: node.path, name: node.name };
   return [
-    {
-      type: 'item',
-      id: 'open',
+    ...openItems(row, {
+      idBase: 'open',
       label: 'Open',
       icon: nodeIcon(node.kind),
-      shortcut: 'tree.open',
-      run: () => {
-        useTabsStore().openKeyValueTab(connectionId, node.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-new-tab',
-      label: 'Open in new tab',
-      icon: nodeIcon(node.kind),
-      run: () => {
-        useTabsStore().openKeyValueTab(connectionId, node.path, { newTab: true });
-      },
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(node.name),
-    },
+      openTab: (cid, path, opts) => useTabsStore().openKeyValueTab(cid, path, opts),
+    }),
+    ...copyNameItems(row),
   ];
 }
 
@@ -79,34 +61,15 @@ function objectRowMenu(tabId: string, connectionId: string, node: TreeNode): Men
   const connectionsStore = useConnectionsStore();
   const caps = connectionsStore.states[connectionId]?.caps;
   const record = connectionsStore.connectionRecord(connectionId);
+  const row = { connectionId, path: node.path, name: node.name };
   const items: MenuItem[] = [
-    {
-      type: 'item',
-      id: 'open',
+    ...openItems(row, {
+      idBase: 'open',
       label: 'Open',
       icon: nodeIcon(node.kind),
-      shortcut: 'tree.open',
-      run: () => {
-        useTabsStore().openKeyValueTab(connectionId, node.path);
-      },
-    },
-    {
-      type: 'item',
-      id: 'open-new-tab',
-      label: 'Open in new tab',
-      icon: nodeIcon(node.kind),
-      run: () => {
-        useTabsStore().openKeyValueTab(connectionId, node.path, { newTab: true });
-      },
-    },
-    {
-      type: 'item',
-      id: 'copy-name',
-      label: 'Copy name',
-      icon: 'copy',
-      shortcut: 'tree.copyName',
-      run: () => copyText(node.name),
-    },
+      openTab: (cid, path, opts) => useTabsStore().openKeyValueTab(cid, path, opts),
+    }),
+    ...copyNameItems(row),
   ];
 
   if (caps?.fileTransfer) {

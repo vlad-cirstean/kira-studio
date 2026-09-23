@@ -1,13 +1,11 @@
 import {
   chunkRowsForColumns,
-  emptyScan,
-  runChunkedScan,
+  runPageScan,
   type SearchHandle,
   type SearchQuery,
   tabularRowScanner,
 } from '../shared/page/scan';
 import { createPageSearch } from '../shared/page/search';
-import { visibleRowsOf } from '../shared/page/visibleRows';
 import { getPage, pageVersion } from './page';
 
 export interface Match {
@@ -28,21 +26,15 @@ function runSearch(
   ) => void,
 ): SearchHandle<Match> {
   const page = getPage(tabId);
-  if (!page || q.text === '') return emptyScan();
-
-  return runChunkedScan<Match>(
-    page.rowCount,
-    tabularRowScanner(page, (row, col, start, end) => ({ row, col, start, end })),
+  return runPageScan(
+    page,
+    tabId,
+    (p) => tabularRowScanner(p, (row, col, start, end) => ({ row, col, start, end })),
     q,
     onProgress,
-    {
-      // P42 D39: the rows DataGrid.vue currently has on screen, scanned first (D37) — the ones the
-      // find highlight actually needs to reach before anything else.
-      priority: visibleRowsOf(tabId) ?? undefined,
-      // P21 round 3 performance finding 1: a cell-based chunk budget, not a flat 2 000 rows —
-      // see scan.ts's own comment on chunkRowsForColumns.
-      chunkRows: chunkRowsForColumns(page.columns.length),
-    },
+    // P21 round 3 performance finding 1: a cell-based chunk budget, not a flat 2 000 rows — see
+    // scan.ts's own comment on chunkRowsForColumns.
+    { chunkRows: page ? chunkRowsForColumns(page.columns.length) : undefined },
   );
 }
 

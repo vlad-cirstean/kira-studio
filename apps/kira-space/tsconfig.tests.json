@@ -19,7 +19,11 @@
       "@theme/*": ["../../packages/theme/src/*"],
       "@workbench/*": ["../../packages/workbench/src/*"],
       "@kira/git-ipc": ["../../packages/git-ipc/src/index.ts"],
-      "@kira/git-ipc/codec": ["../../packages/git-ipc/src/codec.ts"]
+      "@kira/git-ipc/codec": ["../../packages/git-ipc/src/codec.ts"],
+      // P107 I2-27: graphStreamFixture.ts's own testing-only import of the shared packed-chunk
+      // builder (fakeGraphHost.ts's VS Code analogue imports the same, via its real workspace
+      // dependency on @kira/git-core — this project maps every cross-package import explicitly).
+      "@kira/git-core/testing/packedChunk": ["../../packages/git-core/src/testing/packedChunk.ts"]
     }
   },
   "include": [

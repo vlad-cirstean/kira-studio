@@ -11,6 +11,7 @@ import '@workbench/testing/unit/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcCallEvent, GrpcCallResultWire, GrpcSchemaWire } from '@shared/domain/grpc';
+import { deferred } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -40,14 +41,6 @@ let capturedCallback: ((event: GrpcCallEvent) => void) | null = null;
   capturedCallback = cb;
   return () => {};
 };
-
-function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
-  let resolve!: (v: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
 
 function streamingSchema(): GrpcSchemaWire {
   return {

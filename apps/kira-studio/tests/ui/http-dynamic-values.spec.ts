@@ -1,6 +1,7 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab, openHttpModeAndNewRequest as openHttpMode } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
 // P6 §6.3: `tests/ui` drives the real built bundle in real WebKit with both wire planes mocked, so
@@ -15,14 +16,8 @@ import { IPC } from './support/ipcChannels';
 const NOW = '2026-01-01T00:00:00.000Z';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
 async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
+  await openHttpMode(page);
   await expect(page.locator('[data-testid="http-request-view"]')).toBeVisible();
 }
 

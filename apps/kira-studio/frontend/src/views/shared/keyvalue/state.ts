@@ -5,7 +5,9 @@ import { defineStore } from 'pinia';
 import { data } from '../../../bridge/data';
 import { pinia } from '../../../state/pinia';
 import { registerTabReload } from '../../../state/viewCommands';
-import { applyLoadFailure, beginOp, createRuntimeStore, runPagedCount, stopOp } from '../viewOp';
+import { runPagedLoad } from '../page/load';
+import { createPageNavigation } from '../page/navigation';
+import { beginOp, createRuntimeStore, runPagedCount, stopOp } from '../viewOp';
 import { keyValueHost } from './host';
 import { getPage, setPage } from './page';
 
@@ -104,41 +106,40 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     if (rt.opId) stopOp(rt);
     const opId = beginOp(rt);
 
-    try {
-      const response = await data.read({
-        opId,
-        tabId: viewKey,
-        connectionId: host.connectionId,
-        path: host.path,
-        projection: null,
-        filter: null,
-        sort: null,
-        pageSize: host.pageSize,
-        cursor: effectiveCursor,
-      });
-      // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
-      // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
-      // catch this and setPage below would leak a page keyed by a viewKey nothing can reach again.
-      if (!runtime[viewKey]) return;
-      if (rt.opId !== opId) return;
-      if (response.page.kind !== 'keyvalue') {
-        throw new Error(`unexpected page kind for a key/value tab: ${response.page.kind}`);
-      }
-
-      setPage(viewKey, response.page);
-      rt.status = 'idle';
-      rt.opId = null;
-      rt.rowCount = response.page.rowCount;
-      rt.hasMore = response.page.position.hasMore;
-      rt.nextToken = response.page.position.nextToken;
-      rt.prevToken = response.page.position.prevToken;
-    } catch (err) {
-      const superseded = rt.opId !== opId;
-      applyLoadFailure(rt, opId, err, viewKey);
-      if (!superseded && revertPageIndexOnFailure !== undefined) {
-        host.patch({ pageIndex: revertPageIndexOnFailure });
-      }
-    }
+    await runPagedLoad({
+      rt,
+      opId,
+      stillMounted: () => Boolean(runtime[viewKey]),
+      read: () =>
+        data.read({
+          opId,
+          tabId: viewKey,
+          connectionId: host.connectionId as string,
+          path: host.path,
+          projection: null,
+          filter: null,
+          sort: null,
+          pageSize: host.pageSize,
+          cursor: effectiveCursor,
+        }),
+      expectKind: 'keyvalue',
+      id: viewKey,
+      tabNoun: 'key/value tab',
+      apply: (page) => {
+        setPage(viewKey, page);
+        rt.status = 'idle';
+        rt.opId = null;
+        rt.rowCount = page.rowCount;
+        rt.hasMore = page.position.hasMore;
+        rt.nextToken = page.position.nextToken;
+        rt.prevToken = page.position.prevToken;
+      },
+      onFailure: (superseded) => {
+        if (!superseded && revertPageIndexOnFailure !== undefined) {
+          host.patch({ pageIndex: revertPageIndexOnFailure });
+        }
+      },
+    });
   }
 
   async function reload(viewKey: string): Promise<void> {
@@ -158,38 +159,18 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
     );
   }
 
-  function stop(viewKey: string): void {
-    stopOp(runtime[viewKey]);
-  }
-
-  // D7's cursor choice, mirrors grid/state.ts's goNext/goPrev: prefer the token when one is
-  // available (hash/set/zset/stream's cursor strategy), falling back to `pageIndex`-tracked offset
-  // paging (a list key's LRANGE offset strategy has no token to advance by).
-  async function goNext(viewKey: string): Promise<void> {
-    const host = keyValueHost(viewKey);
-    if (!host) return;
-    const rt = ensureRuntime(viewKey);
-    const prevIndex = host.pageIndex;
-    const nextIndex = prevIndex + 1;
-    const cursor: PageCursor = rt.nextToken
-      ? { mode: 'after', token: rt.nextToken }
-      : { mode: 'offset', offset: nextIndex * host.pageSize };
-    host.patch({ pageIndex: nextIndex });
-    await load(viewKey, cursor, prevIndex);
-  }
-
-  async function goPrev(viewKey: string): Promise<void> {
-    const host = keyValueHost(viewKey);
-    if (!host) return;
-    const rt = ensureRuntime(viewKey);
-    const prevIndex = host.pageIndex;
-    const targetIndex = Math.max(0, prevIndex - 1);
-    const cursor: PageCursor = rt.prevToken
-      ? { mode: 'before', token: rt.prevToken }
-      : { mode: 'offset', offset: targetIndex * host.pageSize };
-    host.patch({ pageIndex: targetIndex });
-    await load(viewKey, cursor, prevIndex);
-  }
+  // I2-14: stop/goNext/goPrev mirror views/grid/state.ts's own set exactly, modulo the tab
+  // accessor pair below — hash/set/zset/stream's cursor strategy is preferred when available,
+  // falling back to `pageIndex`-tracked offset paging (a list key's LRANGE offset strategy has no
+  // token to advance by). Only stop/goNext/goPrev are exposed — this view has no goFirst/goLast/
+  // goToPage (a key's rows have no addressable position to jump to the way a table's do).
+  const { stop, goNext, goPrev, resetTokens } = createPageNavigation({
+    tab: (viewKey) => keyValueHost(viewKey) ?? undefined,
+    patch: (viewKey, p) => keyValueHost(viewKey)?.patch(p),
+    runtime: (viewKey) => runtime[viewKey],
+    ensureRuntime,
+    load,
+  });
 
   // Mirrors grid/state.ts's setPageSize: resets to the first page and clears whatever cursor
   // tokens were held for the old page size (a SCAN cursor from a 100-sized page is not valid
@@ -197,9 +178,7 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
   async function setPageSize(viewKey: string, pageSize: PageSize): Promise<void> {
     const host = keyValueHost(viewKey);
     const prevIndex = host?.pageIndex;
-    const rt = ensureRuntime(viewKey);
-    rt.nextToken = null;
-    rt.prevToken = null;
+    resetTokens(viewKey);
     host?.patch({ pageSize, pageIndex: 0 });
     await load(viewKey, { mode: 'offset', offset: 0 }, prevIndex);
   }

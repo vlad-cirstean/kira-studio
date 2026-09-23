@@ -4,84 +4,20 @@
 // that catches that failure mode; nothing else would (it's invisible at runtime until the exact
 // SQL shape that depends on it appears).
 import { describe, expect, test } from 'bun:test';
-import { keywordsFor, type SqlDialect, typesFor } from '@shared/domain/sql-keywords';
+import {
+  keywordsFor,
+  REQUIRED_MINIMUM,
+  type SqlDialect,
+  typesFor,
+} from '@shared/domain/sql-keywords';
 
 const DIALECTS: readonly SqlDialect[] = ['postgres', 'mysql', 'sqlite', 'clickhouse'];
-
-// ddl.ts's TABLE_CONSTRAINT_LEADING + TYPE_STOP_WORDS, sqlRefs.ts's END_FROM + joinStart, and the
-// statement/clause words the walkers themselves consume — the exact union §3.3 requires.
-const REQUIRED_MINIMUM = [
-  'primary',
-  'unique',
-  'foreign',
-  'constraint',
-  'key',
-  'check',
-  'index',
-  'fulltext',
-  'spatial',
-  'not',
-  'default',
-  'references',
-  'collate',
-  'generated',
-  'auto_increment',
-  'autoincrement',
-  'comment',
-  'materialized',
-  'alias',
-  'codec',
-  'ttl',
-  'where',
-  'group',
-  'having',
-  'order',
-  'union',
-  'intersect',
-  'except',
-  'all',
-  'distinct',
-  'limit',
-  'offset',
-  'fetch',
-  'for',
-  'join',
-  'left',
-  'right',
-  'inner',
-  'full',
-  'cross',
-  'natural',
-  'create',
-  'or',
-  'replace',
-  'table',
-  'view',
-  'alter',
-  'add',
-  'column',
-  'on',
-  'is',
-  'if',
-  'exists',
-  'as',
-  'with',
-  'recursive',
-  'from',
-  'using',
-  'set',
-  'values',
-  'insert',
-  'update',
-  'delete',
-  'select',
-];
 
 describe('keywordsFor — every dialect carries the required minimum union', () => {
   for (const dialect of DIALECTS) {
     test(`${dialect}`, () => {
       const words = keywordsFor(dialect);
-      const missing = REQUIRED_MINIMUM.filter((w) => !words.has(w));
+      const missing = [...REQUIRED_MINIMUM].filter((w) => !words.has(w));
       expect(missing).toEqual([]);
     });
   }

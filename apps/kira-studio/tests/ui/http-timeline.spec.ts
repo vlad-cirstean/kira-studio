@@ -1,6 +1,7 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { httpResponse as buildHttpResponse, openHttpModeAndNewRequest } from './support/apiMode';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
@@ -9,18 +10,10 @@ import { IPC } from './support/ipcChannels';
 // entry's real timeline vs. Raw's own empty state (D10/P9 D7), and a failed send's partial
 // timeline (D15/C5).
 
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
-
+// This file's own fixture defaults diverge from the shared canonical shape (below) — passed as
+// `base` rather than changed on the shared default (http-raw.spec.ts's own reasoning applies).
 function httpResponse(overrides: Record<string, unknown>): Record<string, unknown> {
-  return {
+  return buildHttpResponse(overrides, {
     status: 200,
     statusText: 'OK',
     proto: 'HTTP/1.1',
@@ -32,8 +25,7 @@ function httpResponse(overrides: Record<string, unknown>): Record<string, unknow
     elapsedMs: 45,
     finalUrl: 'https://api.example.com/final',
     redirects: [],
-    ...overrides,
-  };
+  });
 }
 
 // F1's own shape: a same-host 301->302->307->200 chain, hop 0 fresh, hops 1-3 reused — exactly

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { createServer, type Server } from 'node:http';
+import { createServer, type Server, type ServerResponse } from 'node:http';
 import { extname, join } from 'node:path';
 
 // Built by `bun run build:studio`/`build:space` (each app's own vite.config.ts → frontend/dist), the exact
@@ -21,11 +21,43 @@ const MIME: Readonly<Record<string, string>> = {
   '.png': 'image/png',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
 };
 
 export interface UiServer {
   url: string;
   close(): Promise<void>;
+}
+
+/**
+ * Serves one static file under `distDir` for `pathname` — the shared tail every fixture server in
+ * this repo ends on once it has ruled out its own dynamic routes (P107 I2-27: previously a
+ * separate copy in `apps/kira-space-vscode/tests/{interaction,layout}/support/server.ts`). Maps
+ * `/` to `index.html`, same as before consolidation; the vscode webview server never requests a
+ * bare `/`, so that mapping is a no-op there.
+ */
+export async function serveStatic(
+  distDir: string,
+  pathname: string,
+  res: ServerResponse,
+): Promise<void> {
+  const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  const filePath = join(distDir, rel);
+  if (!filePath.startsWith(distDir)) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+  try {
+    const body = await readFile(filePath);
+    res.writeHead(200, {
+      'Content-Type': MIME[extname(filePath)] ?? 'application/octet-stream',
+    });
+    res.end(body);
+  } catch {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end(`not found: ${pathname}`);
+  }
 }
 
 /**
@@ -49,23 +81,7 @@ export async function startServer(distDir: string): Promise<UiServer> {
         );
         return;
       }
-      const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
-      const filePath = join(distDir, rel);
-      if (!filePath.startsWith(distDir)) {
-        res.writeHead(403);
-        res.end();
-        return;
-      }
-      try {
-        const body = await readFile(filePath);
-        res.writeHead(200, {
-          'Content-Type': MIME[extname(filePath)] ?? 'application/octet-stream',
-        });
-        res.end(body);
-      } catch {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end(`not found: ${pathname}`);
-      }
+      await serveStatic(distDir, pathname, res);
     })();
   });
 

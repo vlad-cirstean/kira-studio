@@ -147,147 +147,127 @@ defineExpose({
   responseHost: responseHostRef,
   getDocs: () => ({ request: requestText.value, response: responseText.value }),
 });
+
+// P107 I2-38: the wire and reconstructed branches rebuilt the same request/response section
+// markup — one v-for over this instead. noteBefore/noteAfter are '' outside the `wire` branch
+// (the reconstructed branch shows neither the elision nor the order note, exactly as before).
+interface RawSection {
+  key: 'request' | 'response';
+  caption: string;
+  captionTestid?: string;
+  copyLabel: string;
+  copyTestid: string;
+  onCopy: () => void;
+  doc: string;
+  highlights?: (doc: string) => readonly RangeHighlight[];
+  editorTestid: string;
+  noteBefore: string;
+  noteBeforeTestid?: string;
+  noteAfter: string;
+  noteAfterTestid?: string;
+}
+
+const rawSections = computed<RawSection[]>(() => [
+  {
+    key: 'request',
+    caption: requestCaption.value,
+    captionTestid: 'http-wire-request-caption',
+    copyLabel: 'Copy request',
+    copyTestid: 'http-wire-request-copy',
+    onCopy: onCopyRequest,
+    doc: requestText.value,
+    highlights: props.requestHighlights,
+    editorTestid: 'http-wire-request-editor',
+    noteBefore: wire.value ? elisionNote.value : '',
+    noteBeforeTestid: 'http-wire-elision-note',
+    noteAfter: '',
+  },
+  {
+    key: 'response',
+    caption: '←',
+    copyLabel: 'Copy response',
+    copyTestid: 'http-wire-response-copy',
+    onCopy: onCopyResponse,
+    doc: responseText.value,
+    highlights: props.responseHighlights,
+    editorTestid: 'http-wire-response-editor',
+    noteBefore: '',
+    noteAfter: wire.value
+      ? "Response headers are shown alphabetised and in canonical case — Go's HTTP client does not expose them in received order."
+      : '',
+    noteAfterTestid: 'http-wire-order-note',
+  },
+]);
+
+function setHostRef(key: RawSection['key'], instance: unknown): void {
+  const host = instance as FindBarHost | null;
+  if (key === 'request') requestHostRef.value = host;
+  else responseHostRef.value = host;
+}
 </script>
 
 <template>
   <div class="raw-exchange-pane" data-testid="http-raw-pane">
-    <template v-if="wire">
-      <Alert :class="fidelityTone === 'warn' ? 'strip-warn' : 'strip-note'" data-testid="http-wire-fidelity">
-        <AlertDescription :class="fidelityTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'">{{ fidelityText }}</AlertDescription>
-      </Alert>
-      <Alert v-if="maskingNote" class="strip-note" data-testid="http-wire-masking-note">
-        <AlertDescription class="strip-note-text">{{ maskingNote }}</AlertDescription>
-      </Alert>
-
-      <div class="raw-section">
-        <div class="raw-section-header">
-          <span class="p-xs dim mono raw-caption" data-testid="http-wire-request-caption">
-            {{ requestCaption }}
-          </span>
-          <span class="p-push" />
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Copy request" data-testid="http-wire-request-copy" @click="onCopyRequest">
-                <CodiconIcon name="copy" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Copy request</TooltipContent>
-          </Tooltip>
-        </div>
-        <Alert v-if="elisionNote" class="strip-note" data-testid="http-wire-elision-note">
-          <AlertDescription class="strip-note-text">{{ elisionNote }}</AlertDescription>
+    <template v-if="wire || showReconstructed">
+      <template v-if="wire">
+        <Alert :class="fidelityTone === 'warn' ? 'strip-warn' : 'strip-note'" data-testid="http-wire-fidelity">
+          <AlertDescription :class="fidelityTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'">{{ fidelityText }}</AlertDescription>
         </Alert>
-        <div class="raw-editor">
-          <MonacoHost
-            ref="requestHostRef"
-            :doc="requestText"
-            language="plain"
-            :read-only="true"
-            :range-highlights="requestHighlights"
-            data-testid="http-wire-request-editor"
-          />
-        </div>
-      </div>
-
-      <div class="raw-section">
-        <div class="raw-section-header">
-          <span class="p-xs dim mono raw-caption">←</span>
-          <span class="p-push" />
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Copy response" data-testid="http-wire-response-copy" @click="onCopyResponse">
-                <CodiconIcon name="copy" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Copy response</TooltipContent>
-          </Tooltip>
-        </div>
-        <div class="raw-editor">
-          <MonacoHost
-            ref="responseHostRef"
-            :doc="responseText"
-            language="plain"
-            :read-only="true"
-            :range-highlights="responseHighlights"
-            data-testid="http-wire-response-editor"
-          />
-        </div>
-        <Alert class="strip-note" data-testid="http-wire-order-note">
+        <Alert v-if="maskingNote" class="strip-note" data-testid="http-wire-masking-note">
+          <AlertDescription class="strip-note-text">{{ maskingNote }}</AlertDescription>
+        </Alert>
+      </template>
+      <!-- P18 D8: a stored entry's Raw pane, reconstructed from the four stage-1 fields the
+           snapshot carries rather than a live `wire` dump (which P9 D7 never stores). Not claimed
+           as one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so
+           this gets its own honest strip rather than a fourth, misleading fidelity value. -->
+      <template v-else>
+        <Alert class="strip-note" data-testid="http-raw-reconstructed">
           <AlertDescription class="strip-note-text">
-            Response headers are shown alphabetised and in canonical case — Go's HTTP client does not
-            expose them in received order.
+            Reconstructed from what this request was recorded as — not the exact bytes on the wire.
           </AlertDescription>
         </Alert>
-      </div>
-    </template>
+        <Alert v-if="requestBodyStorageTruncated" class="strip-note" data-testid="http-history-request-truncated">
+          <AlertDescription class="strip-note-text">
+            Only the first 256 KB of this request's body was kept in history.
+          </AlertDescription>
+        </Alert>
+      </template>
 
-    <!-- P18 D8: a stored entry's Raw pane, reconstructed from the four stage-1 fields the
-         snapshot carries rather than a live `wire` dump (which P9 D7 never stores). Not claimed as
-         one of P9 D3's three HttpWireFidelity values — a reconstruction is none of them — so this
-         gets its own honest strip rather than a fourth, misleading fidelity value. -->
-    <template v-else-if="showReconstructed">
-      <Alert class="strip-note" data-testid="http-raw-reconstructed">
-        <AlertDescription class="strip-note-text">
-          Reconstructed from what this request was recorded as — not the exact bytes on the wire.
-        </AlertDescription>
-      </Alert>
-      <Alert v-if="requestBodyStorageTruncated" class="strip-note" data-testid="http-history-request-truncated">
-        <AlertDescription class="strip-note-text">
-          Only the first 256 KB of this request's body was kept in history.
-        </AlertDescription>
-      </Alert>
-
-      <div class="raw-section">
-        <div class="raw-section-header">
-          <span class="p-xs dim mono raw-caption" data-testid="http-wire-request-caption">
-            {{ requestCaption }}
-          </span>
-          <span class="p-push" />
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Copy request" data-testid="http-wire-request-copy" @click="onCopyRequest">
-                <CodiconIcon name="copy" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Copy request</TooltipContent>
-          </Tooltip>
+      <template v-for="section in rawSections" :key="section.key">
+        <div class="raw-section">
+          <div class="raw-section-header">
+            <span class="p-xs dim mono raw-caption" :data-testid="section.captionTestid">
+              {{ section.caption }}
+            </span>
+            <span class="p-push" />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button variant="toolbar" size="kira-icon" :aria-label="section.copyLabel" :data-testid="section.copyTestid" @click="section.onCopy">
+                  <CodiconIcon name="copy" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ section.copyLabel }}</TooltipContent>
+            </Tooltip>
+          </div>
+          <Alert v-if="section.noteBefore" class="strip-note" :data-testid="section.noteBeforeTestid">
+            <AlertDescription class="strip-note-text">{{ section.noteBefore }}</AlertDescription>
+          </Alert>
+          <div class="raw-editor">
+            <MonacoHost
+              :ref="(el) => setHostRef(section.key, el)"
+              :doc="section.doc"
+              language="plain"
+              :read-only="true"
+              :range-highlights="section.highlights"
+              :data-testid="section.editorTestid"
+            />
+          </div>
+          <Alert v-if="section.noteAfter" class="strip-note" :data-testid="section.noteAfterTestid">
+            <AlertDescription class="strip-note-text">{{ section.noteAfter }}</AlertDescription>
+          </Alert>
         </div>
-        <div class="raw-editor">
-          <MonacoHost
-            ref="requestHostRef"
-            :doc="requestText"
-            language="plain"
-            :read-only="true"
-            :range-highlights="requestHighlights"
-            data-testid="http-wire-request-editor"
-          />
-        </div>
-      </div>
-
-      <div class="raw-section">
-        <div class="raw-section-header">
-          <span class="p-xs dim mono raw-caption">←</span>
-          <span class="p-push" />
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Copy response" data-testid="http-wire-response-copy" @click="onCopyResponse">
-                <CodiconIcon name="copy" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Copy response</TooltipContent>
-          </Tooltip>
-        </div>
-        <div class="raw-editor">
-          <MonacoHost
-            ref="responseHostRef"
-            :doc="responseText"
-            language="plain"
-            :read-only="true"
-            :range-highlights="responseHighlights"
-            data-testid="http-wire-response-editor"
-          />
-        </div>
-      </div>
+      </template>
     </template>
 
     <template v-else-if="emptyLabel">

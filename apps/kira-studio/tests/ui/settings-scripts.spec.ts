@@ -1,14 +1,10 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { openSettings } from './support/settings';
 
 // P85 §10: the Scripts section is instant-effect like Connected editors and Database MCP — a CRUD
 // section, not a staged draft/Save leaf.
-
-async function openSettings(page: Page): Promise<void> {
-  await page.click('[data-testid="open-settings"]');
-  await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
-}
 
 function dialog(page: Page) {
   return page.locator('[data-testid="settings-dialog"]');

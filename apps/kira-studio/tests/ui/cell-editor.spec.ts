@@ -17,6 +17,7 @@ import {
   WIDE_TABLE_COLUMNS,
   WIDE_TABLE_ROWS,
 } from './support/cellEditorCaptures';
+import { connectionCreateArgs } from './support/connect';
 import { editorText as sharedEditorText } from './support/editorText';
 import { gridCell, gridCellSelector, gridScroller } from './support/grid';
 import { IPC } from './support/ipcChannels';
@@ -144,33 +145,6 @@ function tableReadsFor(connectionId: string, paths: string[]): PortSnapshot[] {
       },
     };
   });
-}
-
-function connectionCreateArgs(name: string, color: string, readOnly = false) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
-  };
 }
 
 async function cellText(
@@ -338,13 +312,13 @@ const CONTROL_1: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Cell Editor DB', 'green'),
+    args: connectionCreateArgs('Cell Editor DB', 'green', { mcp: true }),
     response: CONNECTION_SUMMARY,
   },
   ...connectAndExpandControl(CONNECTION_ID),
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Cell Editor DB (RO)', 'red', true),
+    args: connectionCreateArgs('Cell Editor DB (RO)', 'red', { readOnly: true, mcp: true }),
     response: RO_CONNECTION_SUMMARY,
   },
   ...connectAndExpandControl(RO_CONNECTION_ID),
@@ -824,7 +798,7 @@ const CONTROL_2: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Format Actions DB', 'blue'),
+    args: connectionCreateArgs('Format Actions DB', 'blue', { mcp: true }),
     response: CONNECTION_SUMMARY_2,
   },
   ...connectAndExpandControl(CONNECTION_ID_2),
@@ -1150,7 +1124,7 @@ const CONTROL_3: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Ownership DB', 'green'),
+    args: connectionCreateArgs('Ownership DB', 'green', { mcp: true }),
     response: CONNECTION_SUMMARY_3,
   },
   ...connectAndExpandControl(CONNECTION_ID_3),

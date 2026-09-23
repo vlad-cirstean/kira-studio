@@ -2,7 +2,9 @@ import type { Locator, Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { connectionCreateArgs, openConsoleFromMenu } from './support/connect';
 import { acceptConfirm } from './support/dialogs';
+import { typeInto } from './support/editor';
 import { IPC } from './support/ipcChannels';
 import {
   APP_PATH,
@@ -88,19 +90,9 @@ async function connectAndExpand(page: Page, name: string): Promise<void> {
   await expandRow(page, APP_PATH);
 }
 
-async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
-  await openRowMenu(page, path);
-  await page.click('[data-testid="menu-item-open-console"]');
-}
-
 async function openDefinitionFromMenu(page: Page, path: string): Promise<void> {
   await openRowMenu(page, path);
   await page.click('[data-testid="menu-item-open-definition"]');
-}
-
-async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.view-lines').click();
-  await page.keyboard.type(text);
 }
 
 async function retainedBytes(page: Page): Promise<number> {
@@ -208,44 +200,17 @@ const ORDER_ITEMS_DEFINITION = {
   generatedAt: '2026-08-30T19:09:27.825Z',
 };
 
-function connectionCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
-  };
-}
-
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Leaks A', 'blue'),
+    args: connectionCreateArgs('Leaks A', 'blue', { mcp: true }),
     response: SUMMARY_A,
   },
   ...FIXTURE_A.control,
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Leaks B', 'magenta'),
+    args: connectionCreateArgs('Leaks B', 'magenta', { mcp: true }),
     response: SUMMARY_B,
   },
   ...FIXTURE_B.control,

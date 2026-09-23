@@ -6,9 +6,9 @@ import type {
   ReviewDiffMode,
   ReviewFileEntry,
 } from '@kira/git-ipc';
-import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createLatestRequest, runLatest } from './latestRequest.ts';
 
 export type ReviewFileDiffBody = ResultOf<'review.fileDiff'>['body'];
 
@@ -77,8 +77,8 @@ export class ReviewFilesState {
 
   readonly #bridge: BridgeClient;
   #target: ReviewFilesTarget | undefined;
-  #filesController: AbortController | undefined;
-  #diffController: AbortController | undefined;
+  readonly #filesRequest = createLatestRequest<ResultOf<'review.files'>>();
+  readonly #diffRequest = createLatestRequest<ResultOf<'review.fileDiff'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -111,29 +111,26 @@ export class ReviewFilesState {
   async #loadFiles(): Promise<void> {
     const target = this.#target;
     if (!target) return;
-    this.#filesController?.abort();
-    const controller = new AbortController();
-    this.#filesController = controller;
-    this.loading.value = true;
-    const stillCurrent = (): boolean => this.#target === target;
-    try {
-      const result = await this.#bridge.request(
-        'review.files',
-        { repoId: target.repoId, branch: target.branch, base: target.base },
-        controller.signal,
-      );
-      if (!stillCurrent()) return;
-      this.files.value = result.files;
-      this.#branchTip = result.branchTip;
-      this.#mergeBase = result.mergeBase;
-    } catch (error) {
-      if (error instanceof TransportError && error.code === 'cancelled') return;
-      if (!stillCurrent()) return;
-      this.loadError.value = error instanceof Error ? error.message : String(error);
-    } finally {
-      if (stillCurrent()) this.loading.value = false;
-      if (this.#filesController === controller) this.#filesController = undefined;
-    }
+    await runLatest(this.#filesRequest, {
+      request: (signal) =>
+        this.#bridge.request(
+          'review.files',
+          { repoId: target.repoId, branch: target.branch, base: target.base },
+          signal,
+        ),
+      stillCurrent: () => this.#target === target,
+      onResult: (result) => {
+        this.files.value = result.files;
+        this.#branchTip = result.branchTip;
+        this.#mergeBase = result.mergeBase;
+      },
+      onError: (message) => {
+        this.loadError.value = message;
+      },
+      setLoading: (loading) => {
+        this.loading.value = loading;
+      },
+    });
   }
 
   /** Opens path in VS Code's native diff (G12 D12) — a no-op re-selection of the file already
@@ -209,31 +206,27 @@ export class ReviewFilesState {
     const target = this.#target;
     const path = this.selectedPath.value;
     if (!target || path === null) return;
-    this.#diffController?.abort();
-    const controller = new AbortController();
-    this.#diffController = controller;
     const mode = this.diffMode.value;
     this.diffError.value = undefined;
-    const stillCurrent = (): boolean =>
-      this.#target === target && this.selectedPath.value === path && this.diffMode.value === mode;
-    try {
-      const result = await this.#bridge.request(
-        'review.fileDiff',
-        { repoId: target.repoId, branch: target.branch, base: target.base, path, mode },
-        controller.signal,
-      );
-      if (!stillCurrent()) return;
-      this.deltaSource.value = result.deltaSource;
-      this.body.value = result.body;
-      this.reviewedRanges.value = result.reviewedRanges;
-      this.reviewedAtSha.value = result.reviewedAtSha;
-    } catch (error) {
-      if (error instanceof TransportError && error.code === 'cancelled') return;
-      if (!stillCurrent()) return;
-      this.diffError.value = error instanceof Error ? error.message : String(error);
-    } finally {
-      if (this.#diffController === controller) this.#diffController = undefined;
-    }
+    await runLatest(this.#diffRequest, {
+      request: (signal) =>
+        this.#bridge.request(
+          'review.fileDiff',
+          { repoId: target.repoId, branch: target.branch, base: target.base, path, mode },
+          signal,
+        ),
+      stillCurrent: () =>
+        this.#target === target && this.selectedPath.value === path && this.diffMode.value === mode,
+      onResult: (result) => {
+        this.deltaSource.value = result.deltaSource;
+        this.body.value = result.body;
+        this.reviewedRanges.value = result.reviewedRanges;
+        this.reviewedAtSha.value = result.reviewedAtSha;
+      },
+      onError: (message) => {
+        this.diffError.value = message;
+      },
+    });
   }
 
   #clearDiff(): void {
@@ -290,7 +283,7 @@ export class ReviewFilesState {
   }
 
   #abortAll(): void {
-    this.#filesController?.abort();
-    this.#diffController?.abort();
+    this.#filesRequest.abort();
+    this.#diffRequest.abort();
   }
 }

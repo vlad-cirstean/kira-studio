@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab } from './support/apiMode';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 
@@ -10,9 +11,6 @@ import { IPC } from './support/ipcChannels';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
 async function openHttpMode(page: Page): Promise<void> {
   await modeTab(page, 'api').click();
 }

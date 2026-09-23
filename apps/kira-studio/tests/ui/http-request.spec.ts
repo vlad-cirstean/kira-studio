@@ -1,6 +1,7 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
@@ -8,16 +9,6 @@ import { IPC } from './support/ipcChannels';
 // matches on args, and the send's renderer-minted opId makes those args unmatchable across two
 // sends in one test; OQ-8 hands the contained fix, a per-snapshot matchIgnoreKeys, forward for
 // whichever phase actually needs two responses on one channel).
-
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
 
 test('Http request — send, view a JSON response, and Params-table <-> URL sync', async ({
   relaunch,

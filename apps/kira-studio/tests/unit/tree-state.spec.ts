@@ -19,6 +19,7 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { sleep } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
 import { effect, isShallow } from 'vue';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -27,10 +28,6 @@ setActivePinia(pinia);
 
 const { useTreeStore } = await import('../../frontend/src/project/state/tree');
 const treeStore = useTreeStore();
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 describe('tree state reactivity (P2 R1)', () => {
   test('1. treeStore.children is a shallow-reactive cache, not a deep one', () => {

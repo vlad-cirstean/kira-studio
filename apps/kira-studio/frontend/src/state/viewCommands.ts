@@ -27,7 +27,7 @@ export function reloadTab(kind: CommandTabKind, tabId: string): void {
   void fn(tabId);
 }
 
-type CountableKind = 'data' | 'document';
+export type CountableKind = 'data' | 'document';
 
 const counters = new Map<CountableKind, (tabId: string) => Promise<void>>();
 

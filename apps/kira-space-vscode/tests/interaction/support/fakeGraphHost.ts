@@ -17,6 +17,8 @@
  * which dispatches a real, wire-correct `repo.changed` event frame so `graph-columns.spec.ts` can
  * drive the auto-refresh path end to end without a real watcher or a real `git` process.
  */
+
+import { buildPackedChunk as buildChunk } from '@kira/git-core/testing/packedChunk';
 import type { DecorationRef, PackedCommitChunk, RefRow, StashEntry } from '@kira/git-ipc';
 import { CONTRACT_VERSION } from '@kira/git-ipc';
 import { encode, encodeStreamPayload } from '@kira/git-ipc/codec';
@@ -77,26 +79,7 @@ function buildPackedChunkAt(
   // keyed by the chunk-local index `i`, never the global store row `from + i`).
   decoration: readonly DecorationRef[] = [],
 ): PackedCommitChunk {
-  const shaBytes = Buffer.from(sha, 'hex');
-  const subjectBytes = Buffer.from(subject, 'utf8');
-  return {
-    from,
-    to: from + 1,
-    shaWidthBytes: 20,
-    shas: shaBytes.buffer.slice(shaBytes.byteOffset, shaBytes.byteOffset + shaBytes.byteLength),
-    parentOffsets: Uint32Array.from([0, 0]).buffer,
-    parentShas: new ArrayBuffer(0),
-    identityIds: Uint32Array.from([0, 1, 0, 1]).buffer,
-    times: Uint32Array.from([WIDEST_SAMPLE_TIMESTAMP, WIDEST_SAMPLE_TIMESTAMP]).buffer,
-    subjectBytes: subjectBytes.buffer.slice(
-      subjectBytes.byteOffset,
-      subjectBytes.byteOffset + subjectBytes.byteLength,
-    ),
-    subjectOffsets: Uint32Array.from([0, subjectBytes.byteLength]).buffer,
-    dictionaryBase,
-    dictionary: [...dictionary],
-    decorations: decoration.length > 0 ? [[0, decoration]] : [],
-  };
+  return buildChunk([{ sha, subject, decoration }], { from, dictionary, dictionaryBase });
 }
 
 function buildPackedChunk(): PackedCommitChunk {
@@ -170,65 +153,21 @@ const BRANCH_ORDER_PARENT_ROW: readonly (number | undefined)[] = [
   undefined,
 ];
 
-function toArrayBuffer(buffer: Buffer): ArrayBuffer {
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-}
-
 /** The whole multi-branch fixture as one `PackedCommitChunk` — every parent link resolves within
  *  this single chunk (`CommitStore.appendPacked`'s own pending-parent pass, run once the whole
  *  chunk's shas are in the table, resolves a later-row parent same as an already-loaded one), so
  *  no second chunk is needed the way `streamTwoChunksThenEnd` above needs one for its own,
  *  unrelated reason (two independent lane-0 roots). */
 function buildBranchOrderChunk(): PackedCommitChunk {
-  const rowCount = BRANCH_ORDER_SUBJECTS.length;
-
-  const shaBytes = Buffer.concat(
-    Array.from({ length: rowCount }, (_, row) => Buffer.from(branchOrderSha(row), 'hex')),
-  );
-
-  const parentOffsets: number[] = [0];
-  const parentShaBuffers: Buffer[] = [];
-  for (let row = 0; row < rowCount; row++) {
+  const rows = BRANCH_ORDER_SUBJECTS.map((subject, row) => {
     const parentRow = BRANCH_ORDER_PARENT_ROW[row];
-    if (parentRow !== undefined) {
-      parentShaBuffers.push(Buffer.from(branchOrderSha(parentRow), 'hex'));
-    }
-    parentOffsets.push(parentShaBuffers.length);
-  }
-  const parentShaBytes = Buffer.concat(parentShaBuffers);
-
-  const identityIds = new Uint32Array(rowCount * 4);
-  const times = new Uint32Array(rowCount * 2);
-  for (let row = 0; row < rowCount; row++) {
-    identityIds.set([0, 1, 0, 1], row * 4);
-    times.set([WIDEST_SAMPLE_TIMESTAMP, WIDEST_SAMPLE_TIMESTAMP], row * 2);
-  }
-
-  const subjectBuffers = BRANCH_ORDER_SUBJECTS.map((s) => Buffer.from(s, 'utf8'));
-  const subjectBytes = Buffer.concat(subjectBuffers);
-  const subjectOffsets = new Uint32Array(rowCount + 1);
-  let cursor = 0;
-  for (let row = 0; row < rowCount; row++) {
-    subjectOffsets[row] = cursor;
-    cursor += subjectBuffers[row].byteLength;
-  }
-  subjectOffsets[rowCount] = cursor;
-
-  return {
-    from: 0,
-    to: rowCount,
-    shaWidthBytes: 20,
-    shas: toArrayBuffer(shaBytes),
-    parentOffsets: Uint32Array.from(parentOffsets).buffer,
-    parentShas: toArrayBuffer(parentShaBytes),
-    identityIds: identityIds.buffer,
-    times: times.buffer,
-    subjectBytes: toArrayBuffer(subjectBytes),
-    subjectOffsets: subjectOffsets.buffer,
-    dictionaryBase: 0,
-    dictionary: ['Fake Author', 'fake@example.com'],
-    decorations: [],
-  };
+    return {
+      sha: branchOrderSha(row),
+      subject,
+      parents: parentRow !== undefined ? [branchOrderSha(parentRow)] : [],
+    };
+  });
+  return buildChunk(rows);
 }
 
 const BRANCH_ORDER_COMMITTER_DATE_NEWER = WIDEST_SAMPLE_TIMESTAMP + 2000;

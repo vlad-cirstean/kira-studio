@@ -1,7 +1,10 @@
-import type { Locator, Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
+import { connectMongo, connectRedis, openConsoleFromMenu } from './support/connect';
+import { hoverWord } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
@@ -126,15 +129,11 @@ function redisCreateArgs(name: string) {
   };
 }
 
-interface ConnectOptions {
-  expand?: boolean;
-}
-
 async function connectMariadb(
   page: Page,
   name: string,
   color: string,
-  opts: ConnectOptions = {},
+  opts: { expand?: boolean } = {},
 ): Promise<void> {
   await page.click('[data-testid="add-connection"]');
   await page.click('[data-testid="connection-kind-mariadb"]');
@@ -158,84 +157,6 @@ async function connectMariadb(
     await expandRow(page, '');
     await expandRow(page, MARIADB_DB_PATH);
   }
-}
-
-async function connectMongo(
-  page: Page,
-  name: string,
-  color: string,
-  opts: ConnectOptions = {},
-): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-mongodb"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '27017');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'kira');
-  await page.click(`[data-testid="color-${color}"]`);
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  if (opts.expand ?? true) {
-    await expandRow(page, '');
-    await expandRow(page, MONGO_DB_PATH);
-  }
-}
-
-async function connectRedis(page: Page, name: string, color: string): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-redis"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '6379');
-  await page.fill('[data-testid="connection-database"]', '0');
-  await page.click(`[data-testid="color-${color}"]`);
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-}
-
-async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
-  await openRowMenu(page, path);
-  await page.click('[data-testid="menu-item-open-console"]');
-}
-
-// Finds `word`'s own text-node offset via a real DOM Range (sql-schema.spec.ts's own identical
-// helper) — Monaco splits a line's text across several highlighting spans, so the word is not
-// reliably its own element.
-async function hoverWord(page: Page, view: Locator, word: string): Promise<void> {
-  const point = await view.locator('.view-lines').evaluate((el, w) => {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const idx = (node.textContent ?? '').indexOf(w);
-      if (idx >= 0) {
-        const range = document.createRange();
-        range.setStart(node, idx);
-        range.setEnd(node, idx + w.length);
-        const rect = range.getBoundingClientRect();
-        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-      }
-    }
-    return null;
-  }, word);
-  if (!point) throw new Error(`hoverWord: "${word}" not found in .view-lines`);
-  await page.mouse.move(0, 0);
-  await page.mouse.move(point.x, point.y);
 }
 
 test('autocomplete — SQL filter row (WHERE)', async ({ relaunch, consoleErrors }) => {
@@ -296,7 +217,7 @@ test('autocomplete — Mongo filter row', async ({ relaunch, consoleErrors }) =>
   ];
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
   await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
   const view = page.locator('[data-testid="document-view"]');
   await expect(view).toBeVisible();
@@ -364,7 +285,7 @@ test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, 
   ];
   const { window: page, stream } = await relaunch({ control: CONTROL, stream: PORT });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
   await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
   await expect(page.locator('[data-testid="document-row"]').first()).toBeVisible({
     timeout: 15_000,
@@ -421,22 +342,6 @@ test('Mongo filter row — the FILTER label lights up, an idle blur is a no-op, 
 // Same clipboard-spy approach as data-view.spec.ts's own installClipboardSpy: this tier runs
 // WebKit, which has no Chromium-style clipboard-permission grant to make, so spying on writeText
 // proves what actually landed without a real OS clipboard round trip.
-async function installClipboardSpy(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    (window as unknown as { __clipboard: string[] }).__clipboard = [];
-    navigator.clipboard.writeText = (text: string) => {
-      (window as unknown as { __clipboard: string[] }).__clipboard.push(text);
-      return Promise.resolve();
-    };
-  });
-}
-
-async function lastClipboardWrite(page: Page): Promise<string> {
-  return page.evaluate(
-    () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
-  );
-}
-
 test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
   relaunch,
   consoleErrors,
@@ -455,7 +360,7 @@ test('Mongo document row — Copy document / Copy as JSON / Copy _id', async ({
   ];
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
   await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
   await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
   const firstRow = page.locator('[data-testid="document-row"]').first();
@@ -554,7 +459,7 @@ test('Mongo document row — Copy document surfaces a rejected clipboard write',
   ];
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
   await (await findRow(page, `${MONGO_DB_PATH}/collection:widgets`)).dblclick();
   await expect(page.locator('[data-testid="document-view"]')).toBeVisible();
   const firstRow = page.locator('[data-testid="document-row"]').first();
@@ -754,7 +659,7 @@ test('autocomplete — Mongo console completes collections, methods and operator
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
 
   // realities #10's wart, fixed in the addendum (D23): the console used to be handed
   // `language="sql"` for every engine, including Mongo. It now gets its own `mongo` mode, so a
@@ -861,7 +766,7 @@ test("autocomplete — Mongo console offers a loaded collection's own field name
   ];
   const { window: page } = await relaunch({ control: CONTROL, stream: FIXTURE.port });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
 
   // Loading widgets' own page (opening its document view) is what fills the sample — the console
   // itself never fetches anything for this.
@@ -997,7 +902,7 @@ test('console lint — Mongo diagnostics (D24)', async ({ relaunch, consoleError
   ];
   const { window: page } = await relaunch({ control: CONTROL });
 
-  await connectMongo(page, 'Mongo', 'green');
+  await connectMongo(page, 'Mongo', 'green', { expand: true, dbPath: MONGO_DB_PATH });
   await openConsoleFromMenu(page, MONGO_DB_PATH);
   const mongoConsole = page.locator('[data-testid="console-view"]');
   await expect(mongoConsole).toBeVisible();

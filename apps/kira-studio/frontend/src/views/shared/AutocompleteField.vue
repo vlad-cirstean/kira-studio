@@ -458,6 +458,36 @@ function closeOnViewportChange(): void {
 }
 useEventListener(window, 'resize', closeOnViewportChange);
 useEventListener(window, 'scroll', closeOnViewportChange, true);
+
+// P107 I2-38: the textarea/input pair below bound the same 19 attributes/listeners — this is the
+// one thing that differs between them (plus each tag's own rows/wrap).
+const fieldAttrs = computed(
+  () =>
+    ({
+      value: props.modelValue,
+      placeholder: props.placeholder,
+      class: { 'has-overlay': showOverlay.value },
+      autocomplete: 'off',
+      spellcheck: 'false',
+      role: 'combobox',
+      'aria-autocomplete': 'list',
+      'aria-expanded': open.value,
+      'aria-controls': listId,
+      'aria-activedescendant':
+        open.value && filtered.value[activeIndex.value]
+          ? `${listId}-${activeIndex.value}`
+          : undefined,
+      onInput,
+      onPaste,
+      onClick,
+      onKeyup,
+      onKeydown,
+      onBlur,
+      onScroll: onInputScroll,
+      onMousemove: onInputMouseMove,
+      onMouseleave: closeHover,
+    }) as const,
+);
 </script>
 
 <template>
@@ -490,53 +520,11 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
         <textarea
           v-if="grow"
           ref="inputRef"
-          v-bind="$attrs"
           rows="1"
           wrap="soft"
-          :value="modelValue"
-          :placeholder="placeholder"
-          :class="{ 'has-overlay': showOverlay }"
-          autocomplete="off"
-          spellcheck="false"
-          role="combobox"
-          aria-autocomplete="list"
-          :aria-expanded="open"
-          :aria-controls="listId"
-          :aria-activedescendant="open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined"
-          @input="onInput"
-          @paste="onPaste"
-          @click="onClick"
-          @keyup="onKeyup"
-          @keydown="onKeydown"
-          @blur="onBlur"
-          @scroll="onInputScroll"
-          @mousemove="onInputMouseMove"
-          @mouseleave="closeHover"
+          v-bind="{ ...$attrs, ...fieldAttrs }"
         />
-        <input
-          v-else
-          ref="inputRef"
-          v-bind="$attrs"
-          :value="modelValue"
-          :placeholder="placeholder"
-          :class="{ 'has-overlay': showOverlay }"
-          autocomplete="off"
-          spellcheck="false"
-          role="combobox"
-          aria-autocomplete="list"
-          :aria-expanded="open"
-          :aria-controls="listId"
-          :aria-activedescendant="open && filtered[activeIndex] ? `${listId}-${activeIndex}` : undefined"
-          @input="onInput"
-          @paste="onPaste"
-          @click="onClick"
-          @keyup="onKeyup"
-          @keydown="onKeydown"
-          @blur="onBlur"
-          @scroll="onInputScroll"
-          @mousemove="onInputMouseMove"
-          @mouseleave="closeHover"
-        />
+        <input v-else ref="inputRef" v-bind="{ ...$attrs, ...fieldAttrs }" />
         <ComboboxAnchor :reference="inputRef ?? undefined" />
       </span>
     </span>

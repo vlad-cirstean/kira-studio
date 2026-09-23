@@ -1,5 +1,6 @@
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
 // P91 §17.2: modelled on repo-workspace.spec.ts's terminal cases (TERMINAL_OPEN_OK's shape,
@@ -25,10 +26,6 @@ const TERMINAL_OPEN_OK: ControlSnapshot = {
   channel: IPC.terminalOpen,
   response: { shell: '/bin/zsh' },
 };
-
-function modeTab(page: import('@playwright/test').Page, mode: string) {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
 
 function tab(page: import('@playwright/test').Page) {
   return page.locator('[data-testid="tab-strip-wrapper"] [data-testid="tab"]');

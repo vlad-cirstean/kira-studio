@@ -7,13 +7,9 @@ import { pinia } from '../../state/pinia';
 import type { DocumentTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabCount, registerTabReload } from '../../state/viewCommands';
-import {
-  applyLoadFailure,
-  beginOp,
-  createRuntimeStore,
-  runPagedCount,
-  stopOp,
-} from '../shared/viewOp';
+import { runPagedLoad } from '../shared/page/load';
+import { createPageNavigation } from '../shared/page/navigation';
+import { beginOp, createRuntimeStore, runPagedCount } from '../shared/viewOp';
 import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
@@ -92,41 +88,40 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     };
     const opId = beginOp(rt);
 
-    try {
-      const response = await data.read({
-        opId,
-        tabId,
-        connectionId: tab.connectionId,
-        path: tab.path,
-        projection: tab.state.projection,
-        filter: tab.state.search.trim() === '' ? null : tab.state.search,
-        sort: tab.state.sort,
-        pageSize: tab.state.pageSize,
-        cursor: effectiveCursor,
-      });
-      // P12 round 2 finding #3: the tab may have closed while this load was in flight — `rt` is
-      // still a live reference to the detached runtime object, so `rt.opId !== opId` alone doesn't
-      // catch this and setPage below would leak a page keyed by a tabId nothing can reach again.
-      if (!runtime[tabId]) return;
-      if (rt.opId !== opId) return;
-      if (response.page.kind !== 'document') {
-        throw new Error(`unexpected page kind for a document tab: ${response.page.kind}`);
-      }
-
-      setPage(tabId, response.page);
-      rt.status = 'idle';
-      rt.opId = null;
-      rt.rowCount = response.page.rowCount;
-      rt.hasMore = response.page.position.hasMore;
-      rt.nextToken = response.page.position.nextToken;
-      rt.prevToken = response.page.position.prevToken;
-    } catch (err) {
-      const superseded = rt.opId !== opId;
-      applyLoadFailure(rt, opId, err, tabId);
-      if (!superseded && revertPageIndexOnFailure !== undefined) {
-        useTabsStore().patchDocumentTabState(tabId, { pageIndex: revertPageIndexOnFailure });
-      }
-    }
+    await runPagedLoad({
+      rt,
+      opId,
+      stillMounted: () => Boolean(runtime[tabId]),
+      read: () =>
+        data.read({
+          opId,
+          tabId,
+          connectionId: tab.connectionId as string,
+          path: tab.path,
+          projection: tab.state.projection,
+          filter: tab.state.search.trim() === '' ? null : tab.state.search,
+          sort: tab.state.sort,
+          pageSize: tab.state.pageSize,
+          cursor: effectiveCursor,
+        }),
+      expectKind: 'document',
+      id: tabId,
+      tabNoun: 'document tab',
+      apply: (page) => {
+        setPage(tabId, page);
+        rt.status = 'idle';
+        rt.opId = null;
+        rt.rowCount = page.rowCount;
+        rt.hasMore = page.position.hasMore;
+        rt.nextToken = page.position.nextToken;
+        rt.prevToken = page.position.prevToken;
+      },
+      onFailure: (superseded) => {
+        if (!superseded && revertPageIndexOnFailure !== undefined) {
+          useTabsStore().patchDocumentTabState(tabId, { pageIndex: revertPageIndexOnFailure });
+        }
+      },
+    });
   }
 
   async function reload(tabId: string): Promise<void> {
@@ -153,85 +148,18 @@ export const useDocumentViewStore = defineStore('documentView', () => {
     );
   }
 
-  function stop(tabId: string): void {
-    stopOp(runtime[tabId]);
-  }
-
-  // D7's cursor choice (views/grid/state.ts's own goNext precedent): prefer the token when one is
-  // available, falling back to offset — `pageIndex` always advances by one regardless of which
-  // strategy served it. Bug fix: this used to fall back to a hardcoded `offset: 0` whenever
-  // `rt.nextToken` was null, which is exactly the case any real (non-`_id`) sort leaves it in
-  // (mongo/read.ts's skip/limit fallback never mints a token) — so Next silently reloaded page one
-  // forever instead of advancing, which is what "sort doesn't work" looked like once a collection
-  // spanned more than one page.
-  async function goNext(tabId: string): Promise<void> {
-    const tab = useTabsStore().findDocumentTab(tabId);
-    if (!tab) return;
-    const rt = ensureRuntime(tabId);
-    const prevIndex = tab.state.pageIndex;
-    const nextIndex = prevIndex + 1;
-    const cursor: PageCursor = rt.nextToken
-      ? { mode: 'after', token: rt.nextToken }
-      : { mode: 'offset', offset: nextIndex * tab.state.pageSize };
-    useTabsStore().patchDocumentTabState(tabId, { pageIndex: nextIndex });
-    await load(tabId, cursor, prevIndex);
-  }
-
-  async function goPrev(tabId: string): Promise<void> {
-    const tab = useTabsStore().findDocumentTab(tabId);
-    if (!tab) return;
-    const rt = ensureRuntime(tabId);
-    const prevIndex = tab.state.pageIndex;
-    const targetIndex = Math.max(0, prevIndex - 1);
-    const cursor: PageCursor = rt.prevToken
-      ? { mode: 'before', token: rt.prevToken }
-      : { mode: 'offset', offset: targetIndex * tab.state.pageSize };
-    useTabsStore().patchDocumentTabState(tabId, { pageIndex: targetIndex });
-    await load(tabId, cursor, prevIndex);
-  }
-
-  // First/last/jump — mirrors views/grid/state.ts's own goFirst/goLast/goToPage exactly. Mongo
-  // supports an arbitrary skip()/limit() offset (unlike Redis's SCAN cursor or Kafka/SQS's
-  // per-partition offsets), so a page-N jump is just as meaningful here as it is for SQL.
-  async function goFirst(tabId: string): Promise<void> {
-    const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;
-    useTabsStore().patchDocumentTabState(tabId, { pageIndex: 0 });
-    await load(tabId, { mode: 'offset', offset: 0 }, prevIndex);
-  }
-
-  // Requires a count, same as the grid's own goLast — the toolbar disables the Last-page button
-  // until an exact/estimated count has run.
-  async function goLast(tabId: string): Promise<void> {
-    const tab = useTabsStore().findDocumentTab(tabId);
-    const rt = runtime[tabId];
-    if (!tab || !rt?.count) return;
-    const prevIndex = tab.state.pageIndex;
-    const pageCount = Math.max(1, Math.ceil(rt.count.value / tab.state.pageSize));
-    const lastIndex = pageCount - 1;
-    useTabsStore().patchDocumentTabState(tabId, { pageIndex: lastIndex });
-    await load(tabId, { mode: 'offset', offset: lastIndex * tab.state.pageSize }, prevIndex);
-  }
-
-  async function goToPage(tabId: string, n: number): Promise<void> {
-    const tab = useTabsStore().findDocumentTab(tabId);
-    if (!tab) return;
-    const prevIndex = tab.state.pageIndex;
-    const index = Math.max(0, n);
-    useTabsStore().patchDocumentTabState(tabId, { pageIndex: index });
-    await load(tabId, { mode: 'offset', offset: index * tab.state.pageSize }, prevIndex);
-  }
-
-  // P43 F8/D11: mirrors views/grid/state.ts's own resetTokens exactly — a keyset token is only
-  // meaningful under the query that produced it. On the happy path the very next load() overwrites
-  // nextToken/prevToken anyway, which is why this gap was never seen; when that load fails or is
-  // superseded (load()'s own `if (rt.opId !== opId) return`), goNext/goPrev would otherwise send a
-  // cursor built under the *old* filter/sort/projection. The grid already guards this; this view
-  // didn't.
-  function resetTokens(tabId: string): void {
-    const rt = ensureRuntime(tabId);
-    rt.nextToken = null;
-    rt.prevToken = null;
-  }
+  // I2-14: stop/goNext/goPrev/goFirst/goLast/goToPage/resetTokens — mirrors views/grid/state.ts's
+  // own set exactly, modulo the tab accessor pair below. Mongo supports an arbitrary skip()/
+  // limit() offset (unlike Redis's SCAN cursor or Kafka/SQS's per-partition offsets), so a
+  // page-N jump is just as meaningful here as it is for SQL; goLast requires a count, same as the
+  // grid's own, since the toolbar disables the Last-page button until one has run.
+  const { stop, goNext, goPrev, goFirst, goLast, goToPage, resetTokens } = createPageNavigation({
+    tab: (tabId) => useTabsStore().findDocumentTab(tabId)?.state,
+    patch: (tabId, p) => useTabsStore().patchDocumentTabState(tabId, p),
+    runtime: (tabId) => runtime[tabId],
+    ensureRuntime,
+    load,
+  });
 
   function setSearch(tabId: string, text: string): void {
     const prevIndex = useTabsStore().findDocumentTab(tabId)?.state.pageIndex;

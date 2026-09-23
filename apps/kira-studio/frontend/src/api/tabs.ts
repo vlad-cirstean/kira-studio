@@ -41,6 +41,37 @@ export function openApiRequestTab(): string {
   ).id;
 }
 
+// P107 I2-16: openCollectionRequestTab/openCollectionGrpcRequestTab shared this exact
+// find-by-itemId/activate/schema.parse({...defaults, ...fromSaved, itemId, name})/openTab shape,
+// differing only in kind and which schema/defaults/converter each uses.
+function openSavedRequestTab<S extends { itemId: string | null }>(opts: {
+  kind: 'http-request' | 'grpc-request';
+  itemId: string;
+  name: string;
+  schema: { parse(v: unknown): S };
+  defaults: S;
+  fromSaved: Partial<S>;
+}): OpenTabResult {
+  const tabsStore = useTabsStore();
+  const existing = tabsStore.tabs.find(
+    (t) => t.kind === opts.kind && (t as unknown as { state: S }).state.itemId === opts.itemId,
+  );
+  if (existing) {
+    tabsStore.activateTab(existing.id);
+    return { id: existing.id, reused: true };
+  }
+  // D4: the one boundary where a stored saved request becomes tab state, and so the one place it
+  // is Zod-parsed — reusing TabKindDef.parseState's own mechanism rather than adding a second
+  // trust boundary. fromSavedRequest/fromSavedGrpcRequest carry F4's method coercion.
+  const state = opts.schema.parse({
+    ...opts.defaults,
+    ...opts.fromSaved,
+    itemId: opts.itemId,
+    name: opts.name,
+  });
+  return tabsStore.openTab(opts.kind, null, 'request', () => state, { reuse: false });
+}
+
 // P4 D14: a saved request opens the **existing** 'http-request' tab kind — the same view P2 and
 // P3 built, with its state sourced from a collection row instead of defaultHttpRequestTabState().
 // No new tab kind, so tabKindSchema, RENDERABLE_TAB_KINDS, TAB_KIND_MODE, tabRecordSchema and Go's
@@ -58,24 +89,14 @@ export function openCollectionRequestTab(
   name: string,
   saved: HttpSavedRequest,
 ): OpenTabResult {
-  const tabsStore = useTabsStore();
-  const existing = tabsStore.tabs.find(
-    (t) => t.kind === 'http-request' && (t as HttpRequestTabRecord).state.itemId === itemId,
-  );
-  if (existing) {
-    tabsStore.activateTab(existing.id);
-    return { id: existing.id, reused: true };
-  }
-  // D4: the one boundary where a stored saved request becomes tab state, and so the one place it
-  // is Zod-parsed — reusing TabKindDef.parseState's own mechanism rather than adding a second
-  // trust boundary. fromSavedRequest carries F4's method coercion.
-  const state = httpRequestTabStateSchema.parse({
-    ...defaultHttpRequestTabState(),
-    ...fromSavedRequest(saved),
+  return openSavedRequestTab({
+    kind: 'http-request',
     itemId,
     name,
+    schema: httpRequestTabStateSchema,
+    defaults: defaultHttpRequestTabState(),
+    fromSaved: fromSavedRequest(saved),
   });
-  return tabsStore.openTab('http-request', null, 'request', () => state, { reuse: false });
 }
 
 /** Renaming a request in the tree patches every tab bound to it, so the view header and the tab
@@ -108,21 +129,14 @@ export function openCollectionGrpcRequestTab(
   name: string,
   saved: GrpcSavedRequest,
 ): OpenTabResult {
-  const tabsStore = useTabsStore();
-  const existing = tabsStore.tabs.find(
-    (t) => t.kind === 'grpc-request' && (t as GrpcRequestTabRecord).state.itemId === itemId,
-  );
-  if (existing) {
-    tabsStore.activateTab(existing.id);
-    return { id: existing.id, reused: true };
-  }
-  const state = grpcRequestTabStateSchema.parse({
-    ...defaultGrpcRequestTabState(),
-    ...fromSavedGrpcRequest(saved),
+  return openSavedRequestTab({
+    kind: 'grpc-request',
     itemId,
     name,
+    schema: grpcRequestTabStateSchema,
+    defaults: defaultGrpcRequestTabState(),
+    fromSaved: fromSavedGrpcRequest(saved),
   });
-  return tabsStore.openTab('grpc-request', null, 'request', () => state, { reuse: false });
 }
 
 export function renameGrpcRequestTabs(itemId: string, name: string): void {

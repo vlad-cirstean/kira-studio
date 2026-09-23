@@ -20,7 +20,9 @@ export type SqlDialect = 'postgres' | 'mysql' | 'sqlite' | 'clickhouse';
 // prevent). Assembled from every consumer that branches on `name === 'Keyword'`:
 // `ddl.ts`'s `TABLE_CONSTRAINT_LEADING`/`TYPE_STOP_WORDS`, `sqlRefs.ts`'s `END_FROM`/`joinStart`,
 // plus the statement/clause words the walkers themselves consume.
-const REQUIRED_MINIMUM = new Set([
+// P107 I2-41: exported so `sql-keywords.spec.ts` asserts against this set directly, rather than
+// keeping its own duplicated copy that could drift from it silently.
+export const REQUIRED_MINIMUM = new Set([
   // TABLE_CONSTRAINT_LEADING (ddl.ts)
   'primary',
   'unique',

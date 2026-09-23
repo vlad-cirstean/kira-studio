@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
-import { test as base, type Page } from '@playwright/test';
-import { startServer, type UiServer } from '@workbench/testing/ui/server';
+import type { Page } from '@playwright/test';
+import { createUiFixtures, type UiFixturesOptions } from '@workbench/testing/ui/fixtures';
 import { mergeBootSnapshots } from './support/bootSnapshots';
 import { type ControlMockHandle, installControlMocks } from './support/mockRuntime';
 import type { ControlSnapshot } from './support/types';
@@ -9,27 +9,14 @@ import type { ControlSnapshot } from './support/types';
 // @workbench/testing/ui/server — see that file's own doc comment for why it now takes `distDir`.
 const DIST_DIR = resolve(__dirname, '../../frontend/dist');
 
-export interface KiraApp {
-  window: Page;
+interface KiraAppExtra {
   control: ControlMockHandle;
 }
 
-export interface RelaunchOptions {
+export type KiraApp = { window: Page } & KiraAppExtra;
+
+export interface RelaunchOptions extends UiFixturesOptions {
   control?: readonly ControlSnapshot[];
-  /** Playwright's own `BrowserContextOptions.timezoneId`. */
-  timezoneId?: string;
-}
-
-export type Relaunch = (options?: RelaunchOptions) => Promise<KiraApp>;
-
-interface KiraFixtures {
-  consoleErrors: string[];
-  relaunch: Relaunch;
-  kira: KiraApp;
-}
-
-interface KiraWorkerFixtures {
-  uiServer: UiServer;
 }
 
 /**
@@ -41,52 +28,11 @@ interface KiraWorkerFixtures {
  * entirely, mocked per-spec by `installGitStreamMock` (support/gitStreamMock.ts), not by this
  * fixture's own boot-time `relaunch()`.
  */
-export const test = base.extend<KiraFixtures, KiraWorkerFixtures>({
-  uiServer: [
-    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
-    async ({}, use) => {
-      const server = await startServer(DIST_DIR);
-      await use(server);
-      await server.close();
-    },
-    { scope: 'worker' },
-  ],
-
-  // biome-ignore lint/correctness/noEmptyPattern: Playwright requires a literal destructuring pattern here, even with no fixture deps.
-  consoleErrors: async ({}, use) => {
-    await use([]);
-  },
-
-  relaunch: async ({ browser, uiServer, consoleErrors }, use) => {
-    let current: Page | undefined;
-
-    const launch = async (options?: RelaunchOptions): Promise<KiraApp> => {
-      if (current) await current.close();
-      const page = await browser.newPage({ timezoneId: options?.timezoneId });
-      page.on('console', (msg) => {
-        if (msg.type() === 'error') consoleErrors.push(msg.text());
-      });
-      await page.setViewportSize({ width: 1440, height: 960 });
-
-      // Must land before the first navigation — the same ordering rule Kira Studio's own
-      // fixtures.ts follows.
-      const control = await installControlMocks(page, mergeBootSnapshots(options?.control ?? []));
-
-      await page.goto(uiServer.url);
-      await page.waitForSelector('[data-testid="status-bar"]');
-
-      current = page;
-      return { window: page, control };
-    };
-
-    await use(launch);
-
-    if (current) await current.close();
-  },
-
-  kira: async ({ relaunch }, use) => {
-    await use(await relaunch());
-  },
+export const test = createUiFixtures<KiraAppExtra, RelaunchOptions>({
+  distDir: DIST_DIR,
+  installMocks: async (page, options) => ({
+    control: await installControlMocks(page, mergeBootSnapshots(options?.control ?? [])),
+  }),
 });
 
 export { expect } from '@playwright/test';

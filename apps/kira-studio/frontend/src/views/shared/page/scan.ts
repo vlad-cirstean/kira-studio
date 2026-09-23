@@ -1,5 +1,6 @@
 import { cellText, isNull, type TabularPage, type TextColumnChunk } from '@shared/protocol/page';
 import { compileSearchPattern } from '../../../editor/searchPattern';
+import { visibleRowsOf } from './visibleRows';
 
 // P39 F10: grid/search.ts, documents/search.ts and keyvalue/search.ts declared the same
 // SearchQuery/SearchHandle/CHUNK_ROWS/escapeRegExp and the same rAF-chunked driver with the same
@@ -173,6 +174,26 @@ export function runChunkedScan<M>(
 // for "no page yet, or an empty query" — a scan that never starts.
 export function emptyScan<M>(): SearchHandle<M> {
   return { cancel() {}, done: Promise.resolve({ matches: [], found: 0 }) };
+}
+
+// P107 I2-14: grid/search.ts, documents/search.ts and shared/keyvalue/search.ts each wrapped
+// runChunkedScan in the same "no page or empty query -> emptyScan; else scan with this tab's
+// visible rows as scan priority" shell around their own per-row scanner. `visibleRowsOf` needs no
+// import at each call site any more; only the scanner itself (a plain row scan body, or one built
+// from tabularRowScanner/keyValueRowScanner) stays per view.
+export function runPageScan<M, Pg extends { rowCount: number }>(
+  page: Pg | null | undefined,
+  tabId: string,
+  makeScanRow: (page: Pg) => (row: number, pattern: RegExp, out: M[]) => void,
+  q: SearchQuery,
+  onProgress: (found: number, rowsScanned: number, totalRows: number, soFar: readonly M[]) => void,
+  opts?: { chunkRows?: number },
+): SearchHandle<M> {
+  if (!page || q.text === '') return emptyScan();
+  return runChunkedScan<M>(page.rowCount, makeScanRow(page), q, onProgress, {
+    priority: visibleRowsOf(tabId) ?? undefined,
+    ...opts,
+  });
 }
 
 /** P48 F9: the tabular per-row scan body grid/search.ts and console/search.ts's tabular branch
