@@ -154,6 +154,13 @@ func AttachCloseFlush(
 				// Dock-click, which a page unload would throw away for no benefit (nothing here
 				// is actually being reclaimed; the process stays up either way).
 				win.Hide()
+				// F2: reset flushing so a later Dock-reshow -> close cycle on this same window
+				// re-enters this hook instead of finding it stuck true forever. Safe exactly
+				// because Hide() never emits WindowClosing (this function's own doc comment,
+				// above) — nothing can re-enter this closure between win.Hide() and this store, so
+				// there is no window for a second, real close to slip past the CompareAndSwap
+				// while this one is still mid-flight.
+				flushing.Store(false)
 				return
 			}
 			// P28 D20: drop this window's page before the native close — this app's own
