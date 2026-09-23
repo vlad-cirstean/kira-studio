@@ -31,41 +31,6 @@
   flex-shrink: 0;
 }
 
-/* ---------- P1 icon button ---------- */
-.p-iconbtn {
-  height: var(--kira-control-h);
-  width: var(--kira-control-h);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--kira-radius-sm);
-  color: var(--kira-fg-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.p-iconbtn:hover,
-.p-iconbtn.is-hover {
-  background: var(--kira-hover);
-  color: var(--kira-fg);
-}
-.p-iconbtn.is-active {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-}
-.p-iconbtn:disabled,
-.p-iconbtn.is-disabled {
-  color: var(--kira-fg-disabled);
-  cursor: default;
-}
-/* A Stop button tints itself red exactly while there's a live op it could actually cancel
-   (DataToolbar.vue's original `.p-iconbtn.is-live`, ported here so ViewChrome.vue's shared
-   Stop — used by every non-grid view — gets the same cue instead of looking permanently
-   muted). `is-live` and `:disabled` are mutually exclusive by construction (both callers key
-   both off the same boolean), so there's no specificity fight between the two rules. */
-.p-iconbtn.is-live {
-  color: var(--kira-error);
-}
-
 /* ---------- P2 text button ---------- */
 .p-btn {
   height: var(--kira-control-h);
@@ -334,66 +299,6 @@
   box-sizing: border-box;
 }
 
-/* ---------- P15 checkbox ---------- */
-/* Ported from docs/design/kira-design-system/parts/_dlgcss.html's own `.box`/`.box.on` — the one
-   checkbox object the design system already specified with no primitive consuming it. The real
-   <input> is the styled box (appearance: none), not a sibling hidden input — see Checkbox.vue's
-   own comment for why. margin-top/flex-shrink match `.box` exactly: a checkbox beside a wrapped
-   label sits flush with the label's first line, and never shrinks in a flex row. */
-.p-check {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--kira-control-inline-h);
-  height: var(--kira-control-inline-h);
-  margin-top: var(--kira-s-1);
-  flex-shrink: 0;
-}
-.p-check input[type="checkbox"] {
-  appearance: none;
-  margin: 0;
-  width: var(--kira-control-inline-h);
-  height: var(--kira-control-inline-h);
-  border-radius: 3px;
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  background: var(--kira-bg-input);
-  cursor: pointer;
-}
-.p-check input[type="checkbox"]:checked,
-.p-check input[type="checkbox"]:indeterminate {
-  background: var(--kira-accent);
-  border-color: var(--kira-accent);
-}
-.p-check input[type="checkbox"]:focus-visible {
-  outline: var(--kira-border-width) solid var(--kira-focus);
-  outline-offset: 1px;
-}
-.p-check input[type="checkbox"]:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-.p-check .glyph {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--kira-accent-fg);
-  pointer-events: none;
-}
-/* P88: flex-centering the glyph tile isn't the same as centering the glyph's own ink — codicon's
-   check/dash artwork isn't centered within its own 16x16 tile (measured against
-   @vscode/codicons' own SVG source: check's ink sits 0.5/16 units high, dash's 0.5/16 units low),
-   so the tile-center rule above faithfully reproduces that bias instead of correcting it. `em`
-   ties the nudge to font-size (CodiconIcon's own `:size`), so it stays correct at any glyph size. */
-.p-check .glyph.codicon-check {
-  transform: translateY(0.03125em);
-}
-.p-check .glyph.codicon-dash {
-  transform: translateY(-0.03125em);
-}
-
 /* ---------- P13 dialog body ---------- */
 /* The column wrapper every DialogFrame consumer puts inside .dialog-body (which is the scroll
    container and deliberately has no padding of its own). Promoted from the identical
@@ -524,42 +429,6 @@
    every other state rule above it. */
 .p-select.is-invalid {
   border-color: var(--kira-error);
-}
-
-/* ---------- P6 segmented ---------- */
-.p-seg {
-  display: inline-flex;
-  height: var(--kira-control-h);
-  border: var(--kira-border-width) solid var(--kira-border-strong);
-  border-radius: var(--kira-radius-sm);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.p-seg.md {
-  height: var(--kira-control-h-lg);
-}
-.p-seg > * {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 var(--kira-s-3);
-  color: var(--kira-fg-muted);
-  font-size: var(--kira-t-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  border: none;
-  background: none;
-}
-.p-seg > * + * {
-  border-left: var(--kira-border-width) solid var(--kira-border-strong);
-}
-.p-seg > .on {
-  background: var(--kira-bg-input);
-  color: var(--kira-fg);
-}
-.p-seg > *:disabled {
-  cursor: default;
-  opacity: 0.5;
 }
 
 /* ---------- P7 tab ---------- */
@@ -791,13 +660,6 @@
   font-size: var(--kira-t-xs);
   flex-shrink: 0;
 }
-/* No plain-popup consumer today (AutocompleteField.vue's own candidates carry no match-highlight
-   concept) — declared here anyway so the one CodeMirror consumer (editor/theme.ts's
-   .cm-completionMatchedText) still reads its colour off this shared spec rather than a literal. */
-.p-completion-match {
-  color: var(--kira-syntax-function);
-}
-
 /* ---------- P12 panel ---------- */
 .p-panel {
   border: var(--kira-border-width) solid var(--kira-border);
