@@ -2136,6 +2136,146 @@ risk was resolved by §7.2's own procedure (embedding kept); no new hand-rolled 
 no cross-app `internal/` import or shared-package-imports-app crept in; `test:visual`'s 5 known
 failures stayed at 5, no sixth.
 
+## P104 result
+
+Landed as 99 commits against `0d2936a1` (the plan doc) across Streams A/B plus A-final's join,
+closed out by this session's own §10 verification pass: `4c2eb237` (stale `data-kira-tip` reads,
+doc/comment cleanup), `cedf1edf` (nested-dialog stacking bug, stale test selectors), `b3f2d3dd`
+(status-dot tooltip hover race), `34ec2e4b` (visual-baseline re-record), plus this section's own
+commit. Plan: `docs/v1.9/plans/P104-primitive-swap.md` §9/§10. 260 files changed, 14,395
+insertions(+), 10,843 deletions(-) across the whole phase (`git diff --shortstat 0d2936a1 HEAD`).
+
+**This session's own closing-audit pass, resuming from the `a8d57f87` checkpoint** (a prior agent's
+work, confirmed built/lint/typecheck clean before the resume):
+
+1. Swept every remaining literal `theme/primitives/*` path reference out of comments (`AutocompleteField.vue`,
+   `VariableSetView.vue`, `treeVirtualRows.ts`/`virtualRows.ts`, `headers.ts`, `KuiPopoverPanel.vue`) and
+   `ARCHITECTURE.md` (lines ~939, 1497-1508, 1657-1660, the `.p-check` description at ~3161); extracted the
+   e2e-real/ipc specs' repeated hover-assertion pattern into a shared `tests/ui/support/tooltip.ts` helper
+   (`assertTooltipShows`/`tooltipContent`), replacing 8 stale `data-kira-tip`-attribute reads across
+   `postgres-real.spec.ts`, `sqlite-real.spec.ts`, `mariadb-real.spec.ts`, and the mysql/kafka/clickhouse/mariadb
+   `*.frontend.spec.ts` ipc specs (`4c2eb237`).
+2. Running the fixed-up suite surfaced two real bugs, both root-caused and fixed, not just noted: a
+   nested-dialog DOM-stacking bug in `ConfirmDialog.vue` — bound only by `:open`, its `Dialog` claimed a
+   fixed, early DOM position from app boot (reka's `DialogPortal` teleports each *open* dialog's content
+   to the end of `<body>` at open time, so DOM/paint order tracks open order), permanently under any
+   dialog opened later; fixed by gating the `<Dialog>` itself on `v-if`, mirroring
+   `DbMcpApprovalDialog.vue`'s own existing precedent for the identical problem — and two stale test
+   selectors left over from the primitive swap (`fake-data.spec.ts`'s `.p-input` wrapper, no longer
+   present once `ui/input` renders the `<input>` directly; `sql-schema.spec.ts`'s `.dialog-footer` class,
+   replaced everywhere else by `data-slot="dialog-footer"` but missed at 4 call sites) (`cedf1edf`).
+3. The same run then exposed a hover-timing race this session's own `data-kira-tip`→`assertTooltipShows`
+   swap introduced for the ipc-frontend project's status-dot assertions (mysql/kafka/clickhouse): 3 of 7
+   `test:ipc:fe:studio` tests failed. Root-caused by instrumenting real event delivery against this exact
+   build — two independent effects stack: reka's `TooltipTrigger` opens on `pointermove`, not
+   `pointerenter`/`mouseenter`, so a `.hover()` landing at the pointer's already-current position (right
+   after clicking a context-menu item near the trigger) dispatches no real pointer event at all; and even
+   past that, one hover cycle right after the DOM attribute a caller polled for (`data-status`) updates
+   isn't reliably enough — a `toBeVisible` wait held *past* 600ms never opened the tooltip across 10
+   straight attempts, while a wait held *at* 600ms and retried opened it on the 2nd attempt, 8/8 runs (an
+   empirical, reproducible quirk in how reka's delay/skip-delay timers interact with a longer poll, not
+   settled further than that). Fixed with a move-to-a-neutral-corner-then-hover retry loop, bounded by an
+   overall deadline, in the shared helper — verified against all 7 `ipc-frontend` tests (2 clean runs) and
+   `tooltips.spec.ts`'s own 3 tests including its delay-sensitive scenario 1, which doesn't route through
+   the shared helper and was confirmed unaffected (`b3f2d3dd`).
+
+**§10.5 closing audit — 12 checks, each run as a real command:**
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `find .../theme/primitives -name '*.vue'` (both trees) | No such paths |
+| 2 | `grep -rn "primitives/"` (`.vue`/`.ts`) | 0 hits |
+| 3 | Every surviving `components/ui/*` set has an outside importer | 15 sets, 1-90 outside importers each — not 16: `scroll-area` and `context-menu` both deleted with no honest consumer (§2.2's own precedent), `ARCHITECTURE.md` line 35 already states "17 fetched … 15 surviving" correctly |
+| 4 | `grep` for un-converted spacing/sizing bracket utilities | 0 real hits (1 regex false-positive: `bg-[var(--kira-state-on)]` matches the `--kira-s` prefix against a color/state token, not spacing) |
+| 5 | `grep -rn "v-tooltip\|vTooltip"` | 0 hits |
+| 6 | `grep -rn "data-kira-tip"` | Only the two `tooltipAttrs()` writers (`SlickGridHost.vue`, `ConsoleSlickGrid.vue`), the grid-header bridge (`AttributeTooltip.vue`, `state/tooltip.ts`), `tooltips.spec.ts`'s own kept geometry-test mechanism (§6.5), and comments narrating the migration — no live non-grid-header consumer |
+| 7 | `grep -rn "text-accent-fg"` | 0 hits |
+| 8 | `grep -c "^\."` `primitives.css` | 152 selector rules, 53 classes, every one named in `ARCHITECTURE.md` line 35 |
+| 9 | `bun run lint:dead` | Exact pre-existing baseline: 6 duplicate-export pairs, 7 configuration hints, 0 new findings |
+| 10 | `typecheck && lint && build:studio && build:space` | All clean |
+| 11 | `ARCHITECTURE.md` Stack row + stale references | Updated (line 35; ~939, 1497-1508, 1657-1660; `.p-check` at ~3161) |
+| 12 | This section | Written |
+
+**§10.2 combined verification, run fresh:**
+
+- `bun run typecheck`: clean, all 8 projects.
+- `bun run lint`: clean (Biome 0/0/0 + `check-tokens.sh`).
+- `bun run lint:dead`: exact pre-existing baseline (6 duplicate exports, 7 configuration hints).
+- `bun run build:studio` / `bun run build:space`: both clean (only the pre-existing >500 kB chunk +
+  ineffective-dynamic-import advisories).
+- `bun run test:unit`: **1535 pass, 0 fail** — matches baseline exactly.
+- `bun run test:webview`: **55 passed** — matches baseline exactly (`packages/git-ui` untouched, as expected).
+- `bun run test:ui:studio` (post-P106 rename, `--project=ui --project=ui-timing`): two full runs, each a
+  different, non-overlapping failure set under this sandbox's full-parallel (`workers: '100%'`) load — run
+  1: 274/279 passed, 1 failure (`cell-editor.spec.ts`, a browser-crash artifact: "Target page, context or
+  browser has been closed"), 4 did not run; run 2: 269/279 passed, 6 failures
+  (`api-secret-reveal-isolation.spec.ts`, `cell-editor.spec.ts`, `document-view-readonly.spec.ts`,
+  `leaks.spec.ts`, `sql-schema.spec.ts`, `tree.spec.ts`), 4 did not run. **All 7 distinct failing tests
+  passed cleanly re-run in isolation** (individually, then all 6 of run 2's together at reduced
+  parallelism — 6/6 in 59s). Matches the cross-file-worker-contention flake class P99/P103's own result
+  sections already document for this sandbox's `fullyParallel: true, workers: '100%'` config; none relates
+  functionally to this phase's diff. Narrowing that config is a test-infra call this phase doesn't own —
+  named here, not chased further.
+- `bun run test:ui:space`: **20/20 passed**, clean, no flakes.
+- `bun run test:visual:studio`: see §10.3.
+
+**§10.3 visual baselines — all 5 re-recorded, each for the reason the plan's own table named:**
+
+| Spec | Why it changed |
+|---|---|
+| `workbench.spec.ts` | Title bar, tab strip, status bar and context menu move to shadcn/reka; splitter becomes reka's `Splitter*` |
+| `console.spec.ts` | Toolbar buttons, segmented control and empty state swap; spacing normalizes onto Tailwind's scale |
+| `data-view.spec.ts` | Grid toolbar, checkbox glyph (`CheckboxRoot`'s `<button role="checkbox">`, not a native `<input>`) and tooltip surface swap |
+| `connection-dialog.spec.ts` | `DialogFrame` → `ui/dialog`, `TextField` → `ui/input`+`input-group`, `Checkbox` → `ui/checkbox` |
+| `schema-dialog.spec.ts` | Same dialog/field/checkbox swap, plus tree rows on `@tanstack/vue-virtual` |
+
+Re-recorded with `bun run test:visual:update:studio` (`34ec2e4b`). A clean re-run afterward passed 4/5;
+`console.spec.ts` alone showed a 0.01-ratio (36px) diff against its own just-recorded baseline — exactly
+the glyph-rendering noise `ARCHITECTURE.md` already documents for baselines captured outside CI's
+`ubuntu-latest` image, not chased to zero per the plan's own instruction. One separate, real,
+pre-existing bug this pass found and root-caused, **not fixed here — already its own named follow-up
+row**: a `--color-muted` custom-property collision between `base.css` (foreground-gray) and
+`shadcn-bridge.css` (shadcn's semantic background token), confirmed to predate P104 (`git log` on both
+definitions); `docs/v1.9/SPEC.md`'s own P110 row already covers it.
+
+**§10.4 notes for P105 (measured, not fixed here):**
+
+`biome check` with `**/*.vue`'s `a11y: off` override temporarily removed (a local experiment only —
+`biome.json` reverted immediately after, unchanged in this commit): **254 errors**, against P99's own
+recount of 255 findings across 86 files — flat in raw count despite the full primitive swap, but the
+composition shifted:
+
+| Rule | Count |
+|---|---|
+| `noNoninteractiveTabindex` | 81 |
+| `noStaticElementInteractions` | 62 |
+| `useKeyWithClickEvents` | 46 |
+| `useSemanticElements` | 20 |
+| `noAutofocus` | 14 |
+| `useAriaPropsSupportedByRole` | 11 |
+| `useButtonType` | 5 |
+| `useFocusableInteractive` | 4 |
+| `noLabelWithoutControl` | 4 |
+| `noHeaderScope` | 3 |
+| `noNoninteractiveElementToInteractiveRole` | 2 |
+| `useAriaPropsForRole` | 1 |
+| `noSvgWithoutTitle` | 1 |
+
+`useButtonType`/`useFocusableInteractive` fell sharply as predicted (every `components/ui` component
+ships `type="button"` and correct roles). `noNoninteractiveTabindex` is now the largest single class —
+§6.3's `<span tabindex="0">` disabled-hover wrappers are exactly the documented reason.
+`noLabelWithoutControl` is down to 4, reflecting `ui/label` adoption. P105 starts from this 254/13-rule
+breakdown, not P99's 255/86-file figure.
+
+**Every hook run clean on every commit this session made, no `--no-verify`.** Pre-commit (`bun run lint`
++ `bun run typecheck`) passed on `4c2eb237`, `cedf1edf`, `b3f2d3dd`, `34ec2e4b`, and this section's own.
+
+All of P104 is now complete. The §11 risks this session's own closing pass touched: the disabled-control
+tooltip risk (row 2) — a real instance found and fixed (the status-dot hover race), not merely audited;
+the `text-accent-fg` risk (row 3) — audit check 7 clean; the visual-baseline-divergence risk (row 9) — the
+known ~0.01 ratio caveat, not a new issue. The `--color-muted` collision this pass found is out of P104's
+own scope by design and already has its own follow-up row, P110.
+
 ## P106 result
 
 Landed as 2 commits against `c2ce9969`: `a93eca58` (the rename) and `348deb0a` (the doc/comment
