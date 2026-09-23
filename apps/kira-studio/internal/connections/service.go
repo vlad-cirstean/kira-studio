@@ -503,44 +503,43 @@ func (s *Service) Reveal(id string, confirmed bool) RevealResult {
 // on Test below): a draft edited to reach a different destination must never get the old
 // destination's password handed to it.
 //
-// P12 round 2 finding #1: compares every ConnectionFields member EXCEPT the ones genuinely
-// cosmetic/safe to change without re-gating (Name, Color, ReadOnly, AutoExplain) — deny-list, not
-// allow-list. Round 1's original fix (host/port/database/URI only) and this finding
-// (Preconnect/PreconnectSidecar/Options, e.g. sslmode or an S3 endpoint) are the same bug class:
-// a field left out of an allowlist defaults to "leaked" instead of "gated". A denylist means a
-// future new field defaults to gated instead of forgotten.
-//
-// P28 §5.5: ThrottlePerSec joins the exception list deliberately, not by oversight — it paces
-// commands against whatever destination is already resolved, so it never changes what a
-// destination-unchanged edit actually connects to. Leaving it out of the compare (the same way
-// Name/Color/ReadOnly/AutoExplain are) is what keeps "edit the throttle → Test connection" still
-// injecting the stored password instead of silently testing with none.
-//
-// M1 §6.1: McpEnabled joins the same exception list for the same reason — it gates whether this
-// connection is exposed to the DB MCP server, never what it connects to.
-//
-// M3: McpAutoExplain joins the same exception list for the same reason as McpEnabled — it gates
-// what this connection does on the MCP path (whether run_query plans a SELECT first), never what
-// it connects to.
+// F5 (P108 Part 3): a real denylist, not one shaped like an allowlist that merely happened to
+// cover every currently-present field — zeroExemptFields clears every member this function does
+// not gate on, then reflect.DeepEqual compares what is left. Every field zeroExemptFields does
+// not name is therefore gated by construction: a future new ConnectionFields member defaults to
+// gated (safe) instead of silently falling through an allowlist the way P12 round 1's original
+// fix (host/port/database/URI only, missing Preconnect/PreconnectSidecar/Options) once did.
 func destinationUnchanged(in Input, stored model.ConnectionFields) bool {
-	return in.Kind == stored.Kind &&
-		in.Mode == stored.Mode &&
-		equalPtr(in.Host, stored.Host) &&
-		equalPtr(in.Port, stored.Port) &&
-		equalPtr(in.Database, stored.Database) &&
-		equalPtr(in.Username, stored.Username) &&
-		equalPtr(in.URI, stored.URI) &&
-		reflect.DeepEqual(in.Options, stored.Options) &&
-		equalPtr(in.Preconnect, stored.Preconnect) &&
-		in.PreconnectSidecar == stored.PreconnectSidecar
+	a, b := in.ConnectionFields, stored
+	zeroExemptFields(&a)
+	zeroExemptFields(&b)
+	return reflect.DeepEqual(a, b)
 }
 
-// equalPtr reports whether two pointers are both nil or both point at equal values.
-func equalPtr[T comparable](a, b *T) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
+// zeroExemptFields clears every ConnectionFields member that is genuinely safe to change without
+// re-gating Test's stored-password injection — every field zeroExemptFields leaves untouched is
+// exactly what destinationUnchanged compares.
+//
+// Name/Color are purely cosmetic. ReadOnly/AutoExplain gate this app's own console, never what a
+// connection connects to. P28 §5.5: ThrottlePerSec paces commands against whatever destination is
+// already resolved, so it never changes what a destination-unchanged edit actually connects to —
+// "edit the throttle → Test connection" must still inject the stored password. M1 §6.1: McpEnabled
+// gates whether this connection is exposed to the DB MCP server, never what it connects to. M2:
+// McpDescription is free-text metadata, never interpreted; McpReadMode/McpWriteMode/McpDdlMode gate
+// DB-MCP-path permissions, not the destination. M3: McpAutoExplain gates DB-MCP-path plan-first
+// behaviour, the same non-destination footing as AutoExplain.
+func zeroExemptFields(f *model.ConnectionFields) {
+	f.Name = ""
+	f.Color = ""
+	f.ReadOnly = false
+	f.AutoExplain = false
+	f.ThrottlePerSec = 0
+	f.McpEnabled = false
+	f.McpDescription = ""
+	f.McpReadMode = ""
+	f.McpWriteMode = ""
+	f.McpDdlMode = ""
+	f.McpAutoExplain = false
 }
 
 // Test never errors: a test run is never armed and never leaves a process behind, however it
