@@ -77,7 +77,8 @@ type Session struct {
 
 	mu          sync.Mutex
 	proc        gitclient.Process
-	splitter    *porcelain.RecordSplitter
+	splitter    *porcelain.RecordSplitter // NUL-delimited FIELD stream (F3), not whole records
+	grouper     *porcelain.FieldGrouper   // groups splitter's fields into FieldCount-sized records
 	currentArgs []string
 	pending     []porcelain.CommitRecord // parsed but not yet delivered to a caller (F13)
 	loadedCount int
@@ -211,15 +212,18 @@ func (s *Session) fillLocked(ctx context.Context, sink func(porcelain.CommitReco
 	return appended, nil
 }
 
-// consumeChunkLocked splits one raw chunk into records and delivers or queues each — fillLocked's
-// own per-chunk paging step. Caller holds mu.
+// consumeChunkLocked splits one raw chunk into fields, groups every FieldCount of them into one
+// record (F3: LogFormat is NUL-delimited field to field, so s.splitter's own NUL delimiter now
+// splits fields, not whole records — s.grouper is what finds each record's own boundary) and
+// delivers or queues each resulting record — fillLocked's own per-chunk paging step. Caller holds
+// mu.
 func (s *Session) consumeChunkLocked(chunk []byte, sink func(porcelain.CommitRecord), pageSize, appended int) (int, error) {
-	recs, splitErr := s.splitter.Push(chunk)
+	toks, splitErr := s.splitter.Push(chunk)
 	if splitErr != nil {
 		return appended, s.failLocked(splitErr)
 	}
-	for _, rec := range recs {
-		cr, parseErr := porcelain.ParseLogRecord(rec)
+	for _, fields := range s.grouper.Push(toks) {
+		cr, parseErr := porcelain.ParseLogRecord(fields)
 		if parseErr != nil {
 			return appended, s.failLocked(parseErr)
 		}
@@ -251,11 +255,15 @@ func (s *Session) failLocked(err error) error {
 	return s.failed
 }
 
-// finishEOFLocked is fillLocked's own EOF tail: flush the splitter (any leftover bytes are a
-// protocol violation), reap the child, and classify its exit. Caller holds mu.
+// finishEOFLocked is fillLocked's own EOF tail: flush the splitter and the field grouper (any
+// leftover bytes, or fields short of a full record, are a protocol violation), reap the child, and
+// classify its exit. Caller holds mu.
 func (s *Session) finishEOFLocked(ctx context.Context) error {
 	if flushed := s.splitter.Flush(); len(flushed) > 0 {
-		return fmt.Errorf("logsession: unterminated trailing record at EOF (%d bytes)", len(flushed))
+		return fmt.Errorf("logsession: unterminated trailing field at EOF (%d bytes)", len(flushed))
+	}
+	if pending := s.grouper.Flush(); len(pending) > 0 {
+		return fmt.Errorf("logsession: unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
 	}
 	res, waitErr := s.proc.Wait()
 	s.proc = nil
@@ -297,6 +305,7 @@ func (s *Session) spawnOrResumeLocked(ctx context.Context) (stale bool, err erro
 	s.proc = proc
 	s.currentArgs = args
 	s.splitter = porcelain.NewRecordSplitter(0)
+	s.grouper = porcelain.NewFieldGrouper(porcelain.FieldCount)
 	return false, nil
 }
 

@@ -23,11 +23,11 @@ func TestSubtractOwnWorktree_NFDWorktreePathMatchesNFCOwnRoot(t *testing.T) {
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 
-	// A hand-built LF-framed for-each-ref record (RefsFormat's own eleven \x1f-delimited fields)
+	// A hand-built LF-framed for-each-ref record (RefsFormat's own eleven \x00-delimited fields, F3)
 	// whose %(worktreepath) is spelled NFD — exactly as git's own worktree registry could report
 	// it before D3's core.precomposeunicode=true, or on a pre-G27 client's persisted state.
-	record := "refs/heads/main\x1f" + strings.Repeat("a", 40) + "\x1fcommit\x1f\x1f\x1f0\x1f*\x1f\x1f" +
-		"/repo/caf" + decomposedE + "\x1f\x1f\n"
+	record := "refs/heads/main\x00" + strings.Repeat("a", 40) + "\x00commit\x00\x00\x000\x00*\x00\x00" +
+		"/repo/caf" + decomposedE + "\x00\x00\n"
 	rows, err := porcelain.ParseRefRows([]byte(record), false)
 	if err != nil {
 		t.Fatalf("ParseRefRows: %v", err)

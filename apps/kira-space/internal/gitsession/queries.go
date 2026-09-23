@@ -152,11 +152,10 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 	if err != nil {
 		return porcelain.CommitDetail{}, err
 	}
-	metaRec, err := oneRecord(metaRaw)
-	if err != nil {
-		return porcelain.CommitDetail{}, err
-	}
-	meta, err := porcelain.ParseLogRecord(metaRec)
+	// F3: LogFormat is NUL-delimited field to field, so ShowMetadataArgs' single record no longer
+	// fits oneRecord's generic "split on one delimiter occurrence" contract — ParseLogRecordFromRaw
+	// does its own fixed-field-count split.
+	meta, err := porcelain.ParseLogRecordFromRaw(metaRaw)
 	if err != nil {
 		return porcelain.CommitDetail{}, err
 	}

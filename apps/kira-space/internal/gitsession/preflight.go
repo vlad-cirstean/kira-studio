@@ -91,11 +91,9 @@ func (e *RepoEntry) revertMergeParents(ctx context.Context, shas []string) (map[
 		if err != nil {
 			return nil, err
 		}
-		rec, err := oneRecord(raw)
-		if err != nil {
-			return nil, err
-		}
-		parsed, err := porcelain.ParseLogRecord(rec)
+		// F3: ShowMetadataArgs' LogFormat is NUL-delimited field to field now — ParseLogRecordFromRaw
+		// does its own fixed-field-count split rather than oneRecord's single-delimiter one.
+		parsed, err := porcelain.ParseLogRecordFromRaw(raw)
 		if err != nil {
 			return nil, err
 		}
@@ -120,11 +118,7 @@ func (e *RepoEntry) revertMergeParents(ctx context.Context, shas []string) (map[
 		if err != nil {
 			return nil, err
 		}
-		rec, err := oneRecord(raw)
-		if err != nil {
-			return nil, err
-		}
-		parsed, err := porcelain.ParseLogRecord(rec)
+		parsed, err := porcelain.ParseLogRecordFromRaw(raw)
 		if err != nil {
 			return nil, err
 		}
@@ -279,11 +273,7 @@ func (e *RepoEntry) resolveCommit(ctx context.Context, ref string) (*resolvedCom
 	if res.ExitCode == 128 {
 		return nil, nil
 	}
-	rec, err := oneRecord(res.Stdout)
-	if err != nil {
-		return nil, err
-	}
-	parsed, err := porcelain.ParseLogRecord(rec)
+	parsed, err := porcelain.ParseLogRecordFromRaw(res.Stdout)
 	if err != nil {
 		return nil, err
 	}

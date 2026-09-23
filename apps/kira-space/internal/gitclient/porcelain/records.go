@@ -9,6 +9,15 @@ import (
 // this package uses between fields within one record. The record delimiter itself is always NUL
 // (git's own `-z`), never this byte, which is what lets the final field safely contain a literal
 // 0x1f (a pathological commit subject) without corrupting the split (SplitLimitedFields, below).
+//
+// LogFormat/ScanFormat and RefsFormat/TagRefsFormat do NOT use fieldDelim any more (F3): a
+// hostile author/committer/tagger name or email CAN carry a literal 0x1f (verified with
+// GIT_AUTHOR_NAME=$'Mal\x1fory'), which would silently shift every field after it when that field
+// is not last. Those formats are NUL-delimited instead (FieldGrouper/splitOneNULRecord, below) —
+// NUL is the one byte git guarantees can never appear inside any of its own field values. fieldDelim
+// stays 0x1f only where the hostile field is provably already last (StashFormat's own %gs,
+// bodyAndSignatureFormat's own %b) — SplitLimitedFields' absorb-the-last-field behavior is exactly
+// what makes 0x1f safe there.
 const fieldDelim = 0x1f
 
 // maxRemainderBytes bounds how much unterminated data RecordSplitter buffers across Push calls —
@@ -26,6 +35,9 @@ var ErrRecordTooLarge = errors.New("porcelain: an unterminated record exceeded t
 // chunks that can split a record (or even a single delimiter byte's neighbourhood) anywhere.
 // Every record Push returns is a fresh copy, never a slice into the caller's chunk or this
 // splitter's own internal buffer — both may be reused or mutated after Push returns.
+//
+// A NUL-delimited caller (LogFormat/ScanFormat, F3) uses this same type to split a flat FIELD
+// stream, not a record stream — see FieldGrouper's own doc comment for why.
 type RecordSplitter struct {
 	delim     byte
 	remainder []byte
@@ -73,6 +85,69 @@ func (s *RecordSplitter) Flush() []byte {
 	rest := s.remainder
 	s.remainder = nil
 	return rest
+}
+
+// FieldGrouper batches a flat NUL-delimited field stream into fixed-size records (F3): git
+// cannot put a literal NUL inside any field value (the one structural guarantee it makes about
+// its own metadata), which is what makes NUL the only field delimiter that is safe even in a
+// non-last position — unlike 0x1f, which a hostile author/committer/tagger name or email can
+// carry. But once every field (LogFormat/ScanFormat's own %x00) AND the record terminator (`-z`'s
+// own automatic per-commit NUL) are the identical byte, a record boundary is no longer a
+// distinguishable delimiter occurrence — it is purely "every fieldCount-th token" of a
+// RecordSplitter(0) fed the same stream. FieldGrouper carries a partial group of fields across
+// Push calls exactly like RecordSplitter carries a partial record.
+type FieldGrouper struct {
+	fieldCount int
+	pending    [][]byte
+}
+
+// NewFieldGrouper constructs a grouper over fieldCount — LogFormat/ScanFormat's own FieldCount/
+// ScanFieldCount for every caller in this package today.
+func NewFieldGrouper(fieldCount int) *FieldGrouper {
+	return &FieldGrouper{fieldCount: fieldCount}
+}
+
+// Push appends newFields (as a RecordSplitter(0) Push over the same underlying NUL-delimited
+// stream returns them — each token IS one field here, not one whole record) and returns every
+// complete fieldCount-sized group now available, oldest first.
+func (g *FieldGrouper) Push(newFields [][]byte) [][][]byte {
+	g.pending = append(g.pending, newFields...)
+	var groups [][][]byte
+	for len(g.pending) >= g.fieldCount {
+		group := make([][]byte, g.fieldCount)
+		copy(group, g.pending[:g.fieldCount])
+		groups = append(groups, group)
+		g.pending = g.pending[g.fieldCount:]
+	}
+	return groups
+}
+
+// Flush returns whatever fields remain ungrouped, clearing the grouper's own buffer — non-empty
+// only on a genuine protocol violation (a stream that ended mid-record).
+func (g *FieldGrouper) Flush() [][]byte {
+	if len(g.pending) == 0 {
+		return nil
+	}
+	rest := g.pending
+	g.pending = nil
+	return rest
+}
+
+// splitOneNULRecord splits raw — exactly one NUL-fielded record (F3's LogFormat/ScanFormat
+// framing, where field and record delimiters are the identical byte) — into fieldCount fields.
+// raw must end with the record's own trailing NUL (git's `-z` own per-record terminator, which
+// lands right after the last field since the format string carries no separate delimiter after
+// it — probed against real git 2.43.0). Used by one-shot, whole-buffer callers (a single `show -s
+// -z` spawn); a streaming caller uses RecordSplitter+FieldGrouper instead.
+func splitOneNULRecord(raw []byte, fieldCount int) ([][]byte, error) {
+	if len(raw) == 0 || raw[len(raw)-1] != 0 {
+		return nil, errors.New("porcelain: NUL-fielded record missing its trailing NUL terminator")
+	}
+	fields := bytes.Split(raw[:len(raw)-1], []byte{0})
+	if len(fields) != fieldCount {
+		return nil, errors.New("porcelain: NUL-fielded record has the wrong field count")
+	}
+	return fields, nil
 }
 
 // SplitLimitedFields splits b on delim into exactly n fields when at least n-1 delimiters are

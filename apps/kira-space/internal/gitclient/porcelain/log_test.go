@@ -75,7 +75,9 @@ func TestRevSetArgs_IncludeStashShasAppendAfterExcludes(t *testing.T) {
 }
 
 // parseFixture reads and fully parses a committed .bin fixture into every CommitRecord it holds,
-// in the order git emitted them.
+// in the order git emitted them. F3: LogFormat is NUL-delimited field to field, so splitter.Push
+// returns individual fields, not whole records — a FieldGrouper groups every FieldCount of them
+// into one record, same as production's logsession.consumeChunkLocked.
 func parseFixture(t *testing.T, relPath string) []porcelain.CommitRecord {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join("testdata", relPath))
@@ -83,16 +85,21 @@ func parseFixture(t *testing.T, relPath string) []porcelain.CommitRecord {
 		t.Fatalf("read fixture %s: %v (run KIRA_GIT_FIXTURES=write to regenerate the golden corpus)", relPath, err)
 	}
 	splitter := porcelain.NewRecordSplitter(0)
-	recs, err := splitter.Push(b)
+	toks, err := splitter.Push(b)
 	if err != nil {
 		t.Fatalf("split %s: %v", relPath, err)
 	}
 	if flushed := splitter.Flush(); flushed != nil {
 		t.Fatalf("%s: unterminated trailing bytes: %q", relPath, flushed)
 	}
-	out := make([]porcelain.CommitRecord, len(recs))
-	for i, rec := range recs {
-		cr, err := porcelain.ParseLogRecord(rec)
+	grouper := porcelain.NewFieldGrouper(porcelain.FieldCount)
+	groups := grouper.Push(toks)
+	if pending := grouper.Flush(); len(pending) != 0 {
+		t.Fatalf("%s: %d fields left ungrouped at EOF", relPath, len(pending))
+	}
+	out := make([]porcelain.CommitRecord, len(groups))
+	for i, fields := range groups {
+		cr, err := porcelain.ParseLogRecord(fields)
 		if err != nil {
 			t.Fatalf("parse record %d of %s: %v", i, relPath, err)
 		}
@@ -264,11 +271,11 @@ func TestLog_HandAuthoredEdgeCases(t *testing.T) {
 // or any future one) is dropped rather than failing the whole record's parse.
 func TestParseDecoration_UnrecognisedBareTokenIgnored(t *testing.T) {
 	t.Parallel()
-	record := joinFields(
+	fields := fieldsOf(
 		"deadbeef", "", "Name", "e@x", "1", "Name", "e@x", "1",
 		"grafted, HEAD -> refs/heads/main, replaced", "subject",
 	)
-	got, err := porcelain.ParseLogRecord(record)
+	got, err := porcelain.ParseLogRecord(fields)
 	if err != nil {
 		t.Fatalf("ParseLogRecord: %v", err)
 	}

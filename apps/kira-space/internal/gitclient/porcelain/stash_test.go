@@ -219,7 +219,7 @@ func TestParseGlobalStashList_TwoParent(t *testing.T) {
 	sha := hex('a')
 	base := hex('b')
 	indexSha := hex('c')
-	raw := []byte(sha + "\x1f" + sha + "\x1f" + base + " " + indexSha + "\x1f" + "On main: my label" + "\x1f" + "1690000000\x00" +
+	raw := []byte(sha + "\x1f" + sha + "\x1f" + base + " " + indexSha + "\x1f" + "1690000000" + "\x1f" + "On main: my label\x00" +
 		"\n1\t1\tfile.txt\x00")
 
 	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
@@ -267,7 +267,7 @@ func TestParseGlobalStashList_ThreeParentUntrackedZeroNumstat(t *testing.T) {
 	indexSha := hex('3')
 	untrackedSha := hex('4')
 	raw := []byte(sha + "\x1f" + sha + "\x1f" + base + " " + indexSha + " " + untrackedSha + "\x1f" +
-		"On feature: untracked only" + "\x1f" + "1690000001\x00")
+		"1690000001" + "\x1f" + "On feature: untracked only\x00")
 
 	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
 	if err != nil {
@@ -302,9 +302,9 @@ func TestParseGlobalStashList_TwoEntryHeaderShapedPathNeverMisdetected(t *testin
 	sha2 := hex('e')
 
 	raw := []byte(
-		sha1 + "\x1f" + sha1 + "\x1f" + base + " " + indexSha + "\x1f" + "On main: one" + "\x1f" + "1690000000\x00" +
+		sha1 + "\x1f" + sha1 + "\x1f" + base + " " + indexSha + "\x1f" + "1690000000" + "\x1f" + "On main: one\x00" +
 			"\n1\t1\t" + pathologicalPath + "\x00" +
-			sha2 + "\x1f" + sha2 + "\x1f" + base + "\x1f" + "On main: two" + "\x1f" + "1690000001\x00",
+			sha2 + "\x1f" + sha2 + "\x1f" + base + "\x1f" + "1690000001" + "\x1f" + "On main: two\x00",
 	)
 
 	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)

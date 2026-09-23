@@ -47,19 +47,19 @@ func TestLogScanArgs_UsesSameWalkArgsCallAsLogSessionArgs(t *testing.T) {
 	}
 }
 
-// joinFields builds one raw 0x1f-delimited record (as RecordSplitter would hand ParseScanRecord,
-// i.e. with the record's own NUL terminator already stripped).
-func joinFields(fields ...string) []byte {
-	out := []byte(fields[0])
-	for _, f := range fields[1:] {
-		out = append(out, 0x1f)
-		out = append(out, []byte(f)...)
+// fieldsOf converts a variadic field list into [][]byte — the shape ParseLogRecord/ParseScanRecord
+// take directly now that LogFormat/ScanFormat are NUL-delimited (F3): a caller hands over already-
+// split fields, since there is no longer a joined byte record to re-split.
+func fieldsOf(fields ...string) [][]byte {
+	out := make([][]byte, len(fields))
+	for i, f := range fields {
+		out[i] = []byte(f)
 	}
 	return out
 }
 
-func scanRecordBytes(subject, body string) []byte {
-	return joinFields(
+func scanRecordBytes(subject, body string) [][]byte {
+	return fieldsOf(
 		"abc123", "", "Ada", "ada@example.com", "1700000000",
 		"Bea", "bea@example.com", "1700000100", "", subject, body,
 	)
@@ -83,7 +83,7 @@ func TestParseScanRecord(t *testing.T) {
 		}
 	})
 
-	t.Run("body containing a literal 0x1f is absorbed by the final field, not split", func(t *testing.T) {
+	t.Run("body containing a literal 0x1f is preserved verbatim (F3: no longer a delimiter at all)", func(t *testing.T) {
 		rec := scanRecordBytes("subject", "body with a stray \x1f byte in it\n")
 		got, err := porcelain.ParseScanRecord(rec)
 		if err != nil {
@@ -128,14 +128,14 @@ func TestParseScanRecord(t *testing.T) {
 	})
 
 	t.Run("a record shorter than ScanFieldCount fields is a parse error", func(t *testing.T) {
-		rec := joinFields("abc123", "", "Ada")
+		rec := fieldsOf("abc123", "", "Ada")
 		if _, err := porcelain.ParseScanRecord(rec); err == nil {
 			t.Fatal("expected a parse error for a short record")
 		}
 	})
 
 	t.Run("field indices track LogFormat exactly -- %P and %D are dropped, not misread as subject/body", func(t *testing.T) {
-		rec := joinFields(
+		rec := fieldsOf(
 			"deadbeef", "parent1 parent2", "Ada", "ada@example.com", "1700000000",
 			"Bea", "bea@example.com", "1700000100", "HEAD -> main, tag: v1.0", "the subject", "the body\n",
 		)
@@ -149,16 +149,16 @@ func TestParseScanRecord(t *testing.T) {
 	})
 }
 
-// TestScanFormat_FieldCount pins ScanFormat's own %x1f count against ScanFieldCount, the same
-// belt-and-suspenders LogFormat/FieldCount already get. %x1f appears in the format STRING as four
-// literal characters ('%','x','1','f'), so this counts substring occurrences rather than the byte
-// itself.
+// TestScanFormat_FieldCount pins ScanFormat's own %x00 count against ScanFieldCount (F3: NUL, not
+// %x1f, is the field delimiter now), the same belt-and-suspenders LogFormat/FieldCount already
+// get. %x00 appears in the format STRING as four literal characters ('%','x','0','0'), so this
+// counts substring occurrences rather than the byte itself.
 func TestScanFormat_FieldCount(t *testing.T) {
 	t.Parallel()
 	got := 0
 	rest := porcelain.ScanFormat
 	for {
-		i := indexOf(rest, "%x1f")
+		i := indexOf(rest, "%x00")
 		if i < 0 {
 			break
 		}
@@ -166,7 +166,7 @@ func TestScanFormat_FieldCount(t *testing.T) {
 		rest = rest[i+4:]
 	}
 	if got+1 != porcelain.ScanFieldCount {
-		t.Fatalf("ScanFormat has %d %%x1f separators (%d fields), want ScanFieldCount = %d", got, got+1, porcelain.ScanFieldCount)
+		t.Fatalf("ScanFormat has %d %%x00 separators (%d fields), want ScanFieldCount = %d", got, got+1, porcelain.ScanFieldCount)
 	}
 }
 

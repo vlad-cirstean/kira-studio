@@ -76,7 +76,7 @@ func TestParseRefRows_Heads(t *testing.T) {
 		t.Fatalf("feature2.CheckedOutIn = %q, want it to end in the worktree dir", *feature2.CheckedOutIn)
 	}
 	// Every branch/remote-branch row's own trailing field (taggerdate:unix) is empty and last —
-	// SplitLimitedFields must still return all 11 fields rather than silently dropping it.
+	// parseRefRow must still see all 11 NUL-delimited fields rather than silently dropping it.
 	if feature2.Annotation != nil {
 		t.Fatalf("feature2.Annotation = %+v, want nil (not a tag at all)", feature2.Annotation)
 	}
@@ -158,7 +158,7 @@ func TestParseRefRows_EmptyInput(t *testing.T) {
 // a stream whose final split does not leave exactly "\n" is a malformed stream, not a silent skip.
 func TestParseRefRows_NULFramingMalformed(t *testing.T) {
 	t.Parallel()
-	raw := []byte("refs/tags/x\x1fsha\x1fcommit\x1f\x1f\x1f0\x1f \x1f\x1f\x1f\x1f\x1fsubj\x1fbody\x00")
+	raw := []byte("refs/tags/x\x00sha\x00commit\x00\x00\x000\x00 \x00\x00\x00\x00\x00subj\x00body\x00")
 	if _, err := porcelain.ParseRefRows(raw, true); err == nil {
 		t.Fatal("expected an error for a stream missing its trailing \\n after the final NUL")
 	}
@@ -166,15 +166,15 @@ func TestParseRefRows_NULFramingMalformed(t *testing.T) {
 
 // TestParseRefRows_WorktreePathComposesToNFC is G27 D5c/D12's tier-1 positive: %(worktreepath) is
 // an absolute worktree directory, so a decomposed spelling in git's own output must come back
-// composed. A hand-built LF-framed record (RefsFormat's own eleven \x1f-delimited fields), not a
+// composed. A hand-built LF-framed record (RefsFormat's own eleven \x00-delimited fields, F3), not a
 // testdata fixture (D12 forbids adding a new one this phase has no real macOS output to record).
 func TestParseRefRows_WorktreePathComposesToNFC(t *testing.T) {
 	t.Parallel()
 	decomposedE := string([]byte{0x65, 0xcc, 0x81}) // "e" + U+0301, decomposed "é"
 	composedE := string([]byte{0xc3, 0xa9})         // U+00E9, composed "é"
 
-	record := "refs/heads/main\x1f" + strings.Repeat("a", 40) + "\x1fcommit\x1f\x1f\x1f0\x1f*\x1f\x1f" +
-		"/repo/caf" + decomposedE + "\x1f\x1f\n"
+	record := "refs/heads/main\x00" + strings.Repeat("a", 40) + "\x00commit\x00\x00\x000\x00*\x00\x00" +
+		"/repo/caf" + decomposedE + "\x00\x00\n"
 
 	rows, err := porcelain.ParseRefRows([]byte(record), false)
 	if err != nil {

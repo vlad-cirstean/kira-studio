@@ -11,9 +11,13 @@ import (
 // selector — read back as StashEntry.Index, decoupled from output order, since a stack mutation
 // elsewhere can shift it between reads), %H (the stash commit's own sha), %P (every parent,
 // space-separated — baseSha first, indexSha second, untrackedSha third iff -u was used, mirroring
-// @kira/git-core's model/stash.ts "Parent 1/2/3" doc comments exactly), %gs (the REFLOG subject,
-// NOT %s — see StashEntry.Message's own doc comment on why), %at (push time).
-const StashFormat = "%gd%x1f%H%x1f%P%x1f%gs%x1f%at"
+// @kira/git-core's model/stash.ts "Parent 1/2/3" doc comments exactly), %at (push time), %gs (the
+// REFLOG subject, NOT %s — see StashEntry.Message's own doc comment on why) — %gs is LAST, not
+// fourth (F3): git keeps a literal 0x1f inside a hostile default stash message (it embeds the
+// HEAD commit's own subject verbatim, e.g. "WIP on main: " + a subject containing 0x1f), which
+// would otherwise shift %at into the message and corrupt every field after it — the same reason
+// %s sits last in LogFormat.
+const StashFormat = "%gd%x1f%H%x1f%P%x1f%at%x1f%gs"
 
 const stashFormatFieldCount = 5
 
@@ -163,11 +167,11 @@ func parseStashRecords(
 		if len(parents) < 1 {
 			return nil, fmt.Errorf("porcelain: stash list: entry %s has no parents", sha)
 		}
-		message := string(fields[3])
-		timestamp, err := parseUnixSeconds(fields[4])
+		timestamp, err := parseUnixSeconds(fields[3])
 		if err != nil {
 			return nil, fmt.Errorf("porcelain: stash list: entry %s: timestamp: %w", sha, err)
 		}
+		message := string(fields[4])
 
 		var indexSha string
 		var untrackedSha *string
@@ -226,9 +230,10 @@ func ParseStashList(raw []byte, subjects map[string]string) ([]StashEntry, error
 
 // GlobalStashFormat is StashFormat with %gd replaced by %H (there is no reflog selector for a
 // namespace ref, probe P13) and %gs replaced by %s (the commit's own subject IS the message here,
-// because stash create / commit-tree wrote it, probes P4/P23). Field count and order are otherwise
-// identical, so parseStashRecords' own record walk is reused verbatim (G28 D9).
-const GlobalStashFormat = "%H%x1f%H%x1f%P%x1f%s%x1f%at"
+// because stash create / commit-tree wrote it, probes P4/P23) — %s sits last for the same F3
+// reason StashFormat's own %gs does. Field order otherwise identical, so parseStashRecords' own
+// record walk is reused verbatim (G28 D9).
+const GlobalStashFormat = "%H%x1f%H%x1f%P%x1f%at%x1f%s"
 
 // GlobalStashLogArgs builds globalStash.list's own second spawn (D9, probe P12): `log --no-walk -m
 // --first-parent -z --numstat -M -C --format=<GlobalStashFormat> <shas...>` — structurally

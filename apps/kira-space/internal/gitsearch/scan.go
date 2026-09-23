@@ -71,8 +71,9 @@ const DefaultLimit = 200
 const scanReadChunkSize = 64 * 1024
 
 // Scan runs one streaming, cancellable, time-boxed tail scan: Runner.Start -> a 64 KiB read loop
-// (cancellable exactly like logsession.readChunkLocked) -> porcelain.RecordSplitter.Push ->
-// porcelain.ParseScanRecord -> Matcher.MatchFields — the same three spawn/split/classify pieces
+// (cancellable exactly like logsession.readChunkLocked) -> porcelain.RecordSplitter.Push (NUL-
+// delimited fields, F3) -> porcelain.FieldGrouper.Push (groups into records) ->
+// porcelain.ParseScanRecord -> Matcher.MatchFields — the same spawn/split/group/classify pieces
 // logsession already composes, built fresh rather than reused (F9: a paused logsession cannot be
 // read from without consuming the paging walk's own records, and its argv differs anyway).
 //
@@ -95,11 +96,16 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 	}
 
 	result := Result{Complete: true}
+	// splitter yields NUL-delimited FIELDS (F3: ScanFormat is %x00-delimited, not %x1f), grouper
+	// finds each record's own boundary by counting to ScanFieldCount — see porcelain.FieldGrouper's
+	// own doc comment for why field and record delimiters being the same byte means a fixed count
+	// is the only way to tell them apart.
 	splitter := porcelain.NewRecordSplitter(0)
+	grouper := porcelain.NewFieldGrouper(porcelain.ScanFieldCount)
 	deadline := time.Now().Add(budget)
 
 	for {
-		cont, roundErr := scanRound(ctx, proc, splitter, opts, limit, deadline, &result)
+		cont, roundErr := scanRound(ctx, proc, splitter, grouper, opts, limit, deadline, &result)
 		if roundErr != nil {
 			return Result{}, roundErr
 		}
@@ -115,7 +121,11 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 
 	if flushed := splitter.Flush(); len(flushed) > 0 {
 		_ = proc.Close()
-		return Result{}, fmt.Errorf("gitsearch: unterminated trailing record at EOF (%d bytes)", len(flushed))
+		return Result{}, fmt.Errorf("gitsearch: unterminated trailing field at EOF (%d bytes)", len(flushed))
+	}
+	if pending := grouper.Flush(); len(pending) > 0 {
+		_ = proc.Close()
+		return Result{}, fmt.Errorf("gitsearch: unterminated trailing record at EOF (%d fields short of a full record)", len(pending))
 	}
 	res, waitErr := proc.Wait()
 	if cerr := gitclient.Classify(ctx, opts.Args, res, waitErr); cerr != nil {
@@ -131,17 +141,17 @@ func Scan(ctx context.Context, deps Deps, opts Options) (Result, error) {
 // every 1024 scanned records, same as the unextracted loop) — that last case leaves result.Complete
 // false, which the caller uses to skip the post-loop flush/Wait and return result immediately, byte
 // for byte as the original inline loop did.
-func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, opts Options, limit int, deadline time.Time, result *Result) (bool, error) {
+func scanRound(ctx context.Context, proc gitclient.Process, splitter *porcelain.RecordSplitter, grouper *porcelain.FieldGrouper, opts Options, limit int, deadline time.Time, result *Result) (bool, error) {
 	chunk, readErr := readScanChunk(ctx, proc)
 	if len(chunk) > 0 {
-		recs, splitErr := splitter.Push(chunk)
+		toks, splitErr := splitter.Push(chunk)
 		if splitErr != nil {
 			_ = proc.Close()
 			return false, splitErr
 		}
-		for _, rec := range recs {
+		for _, fields := range grouper.Push(toks) {
 			result.Scanned++
-			cr, perr := porcelain.ParseScanRecord(rec)
+			cr, perr := porcelain.ParseScanRecord(fields)
 			if perr != nil {
 				_ = proc.Close()
 				return false, perr

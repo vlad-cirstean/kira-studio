@@ -6,22 +6,31 @@ import (
 	"strings"
 )
 
-// LogFormat is upstream's own ten-%x1f-separated-field format string, subject last so it can
-// safely absorb a stray 0x1f or a run of extra fields (SplitLimitedFields) — never reordered
+// LogFormat is upstream's own ten-field format string, %x00-separated (F3, not %x1f): git keeps
+// a literal 0x1f inside a hostile author/committer name or email (verified with
+// GIT_AUTHOR_NAME=$'Mal\x1fory'), which would silently shift every field after it in a non-last
+// position — %x1f is only ever safe in the SUBJECT, the one field that is already last. NUL is
+// the one byte git guarantees can never appear inside any of its own field values, so it is the
+// only field delimiter that is safe everywhere, not just in the last position — never reordered
 // without also updating FieldCount and ParseLogRecord's own field indices below.
-const LogFormat = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%cn%x1f%ce%x1f%ct%x1f%D%x1f%s"
+const LogFormat = "%H%x00%P%x00%an%x00%ae%x00%at%x00%cn%x00%ce%x00%ct%x00%D%x00%s"
 
 // FieldCount is LogFormat's own field count.
 const FieldCount = 10
 
 // logBaseArgs is the walk's fixed argv prefix, shared by every consumer of LogFormat: decorate=
 // full is load-bearing (short ref names cannot be classified — see parseDecorationToken),
-// topo-order is what makes the graph's lanes meaningful, and -z is what makes RecordSplitter's
-// NUL-delimited framing correct. --decorate-refs-exclude (G32 round-3 functional-correctness
-// review, finding #5, the log-decoration half — HeadsRefsArgs' own doc comment covers the
-// refs.list half) drops refs/remotes/<remote>/HEAD, the symbolic pointer every `git clone`d repo
-// carries, from %D before parseDecorationToken ever sees it — without this the default branch's
-// graph row carried a duplicate, phantom "origin/HEAD" badge alongside its real tracking badge.
+// topo-order is what makes the graph's lanes meaningful, and -z terminates each record with the
+// same NUL byte LogFormat's own %x00 already uses between fields (F3) — the format's own last
+// field carries no trailing delimiter, so -z's automatic per-record NUL lands exactly once, right
+// after it, with no double delimiter and nothing to strip. Field and record boundaries are the
+// same byte here, which is exactly why porcelain.FieldGrouper groups a flat NUL-field stream by a
+// fixed count rather than a distinguishable record delimiter. --decorate-refs-exclude (G32 round-3
+// functional-correctness review, finding #5, the log-decoration half — HeadsRefsArgs' own doc
+// comment covers the refs.list half) drops refs/remotes/<remote>/HEAD, the symbolic pointer every
+// `git clone`d repo carries, from %D before parseDecorationToken ever sees it — without this the
+// default branch's graph row carried a duplicate, phantom "origin/HEAD" badge alongside its real
+// tracking badge.
 func logBaseArgs() []string {
 	return []string{
 		"log", "--decorate=full", "--decorate-refs-exclude=refs/remotes/*/HEAD",
@@ -85,10 +94,10 @@ func LogSessionSkipArgs(spec WalkSpec, skip int) []string {
 	return append(args, WalkArgs(spec)...)
 }
 
-// ScanFormat is LogFormat plus the raw body, LAST — so SplitLimitedFields' "the final field
-// absorbs every extra delimiter" rule keeps a body containing a stray 0x1f harmless, exactly why
-// %s is last in LogFormat itself (G23 D1).
-const ScanFormat = LogFormat + "%x1f%b"
+// ScanFormat is LogFormat plus the raw body — %x00-delimited same as every other field (F3), so a
+// body containing a stray 0x1f, a raw newline, or any other byte except NUL itself stays harmless
+// (G23 D1).
+const ScanFormat = LogFormat + "%x00%b"
 
 // ScanFieldCount is ScanFormat's own field count.
 const ScanFieldCount = 11
@@ -129,10 +138,11 @@ func parseIdentities(fields [][]byte) (author, committer CommitIdentity, err err
 	return author, committer, nil
 }
 
-// ParseLogRecord parses one NUL-delimited record (as RecordSplitter returns it) against
-// LogFormat's ten %x1f-separated fields.
-func ParseLogRecord(record []byte) (CommitRecord, error) {
-	fields := SplitLimitedFields(record, fieldDelim, FieldCount)
+// ParseLogRecord parses one LogFormat record, already split into exactly FieldCount fields (a
+// porcelain.FieldGrouper's own output for a streaming caller, or ParseLogRecordFromRaw's for a
+// one-shot buffer — F3: LogFormat's fields are NUL-delimited, so there is no absorb-the-last-field
+// splitting left to do here, unlike the old %x1f design).
+func ParseLogRecord(fields [][]byte) (CommitRecord, error) {
 	if len(fields) != FieldCount {
 		return CommitRecord{}, fmt.Errorf("porcelain: log record has %d fields, want %d", len(fields), FieldCount)
 	}
@@ -156,6 +166,19 @@ func ParseLogRecord(record []byte) (CommitRecord, error) {
 	}, nil
 }
 
+// ParseLogRecordFromRaw parses ONE ShowMetadataArgs-shaped raw stdout buffer (a single `-z`-
+// terminated LogFormat record) directly, without a separate RecordSplitter pass — F3's NUL-fielded
+// framing makes field and record delimiters the same byte, so the old "split on the next single
+// delimiter occurrence, that's one record" contract no longer applies to this format; splitting by
+// a fixed field count is exact instead (splitOneNULRecord).
+func ParseLogRecordFromRaw(raw []byte) (CommitRecord, error) {
+	fields, err := splitOneNULRecord(raw, FieldCount)
+	if err != nil {
+		return CommitRecord{}, err
+	}
+	return ParseLogRecord(fields)
+}
+
 // ScanRecord is one G23 tail-scan record: every field gitsearch matches on, and nothing else.
 type ScanRecord struct {
 	SHA       string
@@ -165,13 +188,13 @@ type ScanRecord struct {
 	Committer CommitIdentity
 }
 
-// ParseScanRecord splits ScanFormat's eleven %x1f fields. Deliberately leaner than
-// ParseLogRecord: %P and %D are split off positionally and then DROPPED unparsed, because this
-// backend never walks refs/stash — WalkSpec.IncludeStash is false at every call site in this repo
-// (G17 D1) — so there is nothing to filter and no reason to pay parseDecoration per record over a
-// 100k-commit walk. The field INDICES still track LogFormat exactly (G23 D2).
-func ParseScanRecord(record []byte) (ScanRecord, error) {
-	fields := SplitLimitedFields(record, fieldDelim, ScanFieldCount)
+// ParseScanRecord parses one ScanFormat record, already split into exactly ScanFieldCount NUL-
+// delimited fields (F3). Deliberately leaner than ParseLogRecord: %P and %D are read positionally
+// and then DROPPED unparsed, because this backend never walks refs/stash — WalkSpec.IncludeStash
+// is false at every call site in this repo (G17 D1) — so there is nothing to filter and no reason
+// to pay parseDecoration per record over a 100k-commit walk. The field INDICES still track
+// LogFormat exactly (G23 D2).
+func ParseScanRecord(fields [][]byte) (ScanRecord, error) {
 	if len(fields) != ScanFieldCount {
 		return ScanRecord{}, fmt.Errorf("porcelain: scan record has %d fields, want %d", len(fields), ScanFieldCount)
 	}

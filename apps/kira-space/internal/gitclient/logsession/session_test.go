@@ -320,9 +320,14 @@ func (r *routingRunner) Start(ctx context.Context, gitPath string, spec gitclien
 	return r.blocking, nil
 }
 
+// corruptLogRecord is a full 10-field LogFormat record (F3: NUL-delimited, matching
+// porcelain.FieldCount exactly, so consumeChunkLocked's own FieldGrouper completes a group and
+// hands it to ParseLogRecord) whose author-time field ("BADTIME") is not a valid integer —
+// F2's own parse-error trigger.
+var corruptLogRecord = []byte("sha\x00\x00an\x00ae\x00BADTIME\x00cn\x00ce\x00123\x00\x00subject\x00")
+
 // corruptLogRunner answers a for-each-ref (the ref-snapshot guard) with a canned empty snapshot
-// and every "log" spawn with a static process whose stdout is one NUL-terminated record with too
-// few %x1f fields — F2's own parse-error trigger.
+// and every "log" spawn with a static process whose stdout is corruptLogRecord.
 type corruptLogRunner struct {
 	mu     sync.Mutex
 	spawns int
@@ -335,7 +340,7 @@ func (r *corruptLogRunner) Start(ctx context.Context, gitPath string, spec gitcl
 	r.mu.Lock()
 	r.spawns++
 	r.mu.Unlock()
-	return &staticProcess{stdout: []byte("not-enough-fields\x00")}, nil
+	return &staticProcess{stdout: corruptLogRecord}, nil
 }
 func (r *corruptLogRunner) logSpawns() int {
 	r.mu.Lock()
