@@ -173,7 +173,7 @@ async function onAddScript(): Promise<void> {
                   <input
                     type="radio"
                     :name="`script-color-${script.id}`"
-                    class="peer sr-only"
+                    class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
                     :value="color"
                     :checked="script.color === color"
                     :aria-label="color === 'none' ? 'No colour' : color"
@@ -252,7 +252,7 @@ async function onAddScript(): Promise<void> {
                 <input
                   type="radio"
                   name="new-script-color"
-                  class="peer sr-only"
+                  class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   :value="color"
                   :checked="newScriptColor === color"
                   :aria-label="color === 'none' ? 'No colour' : color"

@@ -504,7 +504,11 @@ function onBulkClose(): void {
         <!-- P105 §7: `role="radio"` on a `<Button>` wants a real radio input (`useSemanticElements`)
              — a visually-hidden native `<input type="radio">` per swatch keeps the circle's own
              styling exactly (an actual `ToggleGroupItem` would swap in `toggleVariants`' own
-             rectangular look), with native Tab/Arrow-key/checked behaviour for free. -->
+             rectangular look), with native Tab/Arrow-key/checked behaviour for free. `opacity-0`
+             over the swatch's full area rather than `sr-only`'s 1px-clip technique — Playwright's
+             `.click()` (this file's own e2e suite, `connections.spec.ts` and others) refuses a
+             target with a near-zero bounding box; a real-size, invisible overlay stays clickable
+             both for a person and for a test, same as a custom file-input skin. -->
         <fieldset
           class="color-picker m-0 flex h-6.5 flex-wrap items-center gap-1 border-0 p-0"
           aria-label="Environment color"
@@ -516,7 +520,7 @@ function onBulkClose(): void {
                 <input
                   type="radio"
                   name="environment-color"
-                  class="peer sr-only"
+                  class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   :value="color"
                   :checked="owningEnvironment.color === color"
                   :aria-label="color === 'none' ? 'No colour' : color"

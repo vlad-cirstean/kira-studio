@@ -235,7 +235,9 @@ function onKindChange(kind: ConnectionKind): void {
 
 // Engine tiles pick and, since the engine is all step 1 exists for, immediately advance —
 // the same radio-button "click selects" interaction this picker already had, just now
-// followed by a step change instead of nothing.
+// followed by a step change instead of nothing. Bound to both click and change on the radio
+// input (below): change alone never fires for re-clicking the already-checked default kind,
+// which would otherwise strand the dialog on step 1.
 function pickKind(kind: ConnectionKind): void {
   if (!SUPPORTED_KINDS.has(kind)) return;
   onKindChange(kind);
@@ -637,11 +639,12 @@ const preconnectText = computed({
                 <input
                   type="radio"
                   name="connection-kind"
-                  class="sr-only"
+                  class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   :value="kind"
                   :checked="draft.kind === kind"
                   :disabled="!SUPPORTED_KINDS.has(kind)"
                   :data-testid="`connection-kind-${kind}`"
+                  @click="pickKind(kind)"
                   @change="pickKind(kind)"
                 />
                 <span
@@ -736,7 +739,7 @@ const preconnectText = computed({
                       <input
                         type="radio"
                         name="connection-color"
-                        class="peer sr-only"
+                        class="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
                         :value="color"
                         :checked="draft.color === color"
                         :aria-label="color === 'none' ? 'No colour' : color"
@@ -1569,6 +1572,7 @@ const preconnectText = computed({
 }
 
 .kind {
+  position: relative;
   padding: var(--kira-s-5) var(--kira-s-4);
   border: var(--kira-border-width) solid var(--kira-border);
   border-radius: var(--kira-radius);
