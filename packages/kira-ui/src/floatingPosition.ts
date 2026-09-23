@@ -31,13 +31,20 @@ export interface FloatOptions {
   flip?: boolean;
   /** `shift()`'s own viewport-clamp padding, in px. Default `4`. */
   padding?: number;
+  /** CSS custom-property prefix `size()`'s own middleware writes onto the floating element
+   *  (`-w`/`-h` appended) — default `'--kui-float-max-'` (T1-15: `packages/workbench`'s own
+   *  callers pass `'--kira-float-max-'`, that package's own token prefix, rather than this
+   *  package hardcoding a second prefix or workbench re-deriving the whole middleware chain
+   *  itself). */
+  maxVarPrefix?: string;
 }
 
-/** The CSS custom properties `size()` writes onto the floating element — a consumer opts in by
- *  reading them (`max-height: var(--kui-float-max-h)`); a surface that already fits is
- *  unaffected, since these are only ever a maximum. */
-export const FLOAT_MAX_WIDTH_VAR = '--kui-float-max-w';
-export const FLOAT_MAX_HEIGHT_VAR = '--kui-float-max-h';
+/** The default CSS custom-property prefix — a consumer opts in by reading the two properties it
+ *  produces (`max-height: var(--kui-float-max-h)`); a surface that already fits is unaffected,
+ *  since these are only ever a maximum. */
+const DEFAULT_MAX_VAR_PREFIX = '--kui-float-max-';
+export const FLOAT_MAX_WIDTH_VAR = `${DEFAULT_MAX_VAR_PREFIX}w`;
+export const FLOAT_MAX_HEIGHT_VAR = `${DEFAULT_MAX_VAR_PREFIX}h`;
 
 function setIfChanged(el: HTMLElement, prop: string, px: number): void {
   const next = `${Math.max(0, Math.round(px))}px`;
@@ -50,6 +57,7 @@ export async function computeFloatPosition(
   opts: FloatOptions = {},
 ): Promise<{ left: number; top: number }> {
   const padding = opts.padding ?? 4;
+  const prefix = opts.maxVarPrefix ?? DEFAULT_MAX_VAR_PREFIX;
   const middleware: Middleware[] = [offset(opts.offset ?? 4)];
   if (opts.flip ?? true) middleware.push(flip());
   middleware.push(shift({ padding }));
@@ -62,8 +70,8 @@ export async function computeFloatPosition(
     size({
       padding,
       apply({ availableWidth, availableHeight, elements }) {
-        setIfChanged(elements.floating, FLOAT_MAX_WIDTH_VAR, availableWidth);
-        setIfChanged(elements.floating, FLOAT_MAX_HEIGHT_VAR, availableHeight);
+        setIfChanged(elements.floating, `${prefix}w`, availableWidth);
+        setIfChanged(elements.floating, `${prefix}h`, availableHeight);
       },
     }),
   );

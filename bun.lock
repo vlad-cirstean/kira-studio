@@ -6,7 +6,6 @@
       "name": "kira-studio",
       "dependencies": {
         "@faker-js/faker": "10.6.0",
-        "@floating-ui/dom": "1.8.0",
         "@lucide/vue": "1.47.0",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/vue-query": "5.103.2",
@@ -159,6 +158,9 @@
     "packages/workbench": {
       "name": "@kira/workbench",
       "version": "0.0.0",
+      "dependencies": {
+        "@kira/kira-ui": "workspace:*",
+      },
     },
   },
   "packages": {
