@@ -24,47 +24,40 @@ func UpsertLeaf(tx *sql.Tx, key string, value any) error {
 	return nil
 }
 
+// UpsertOptional upserts key from *v when v is non-nil, a no-op otherwise — the `if p.X != nil {
+// UpsertLeaf(tx, key, *p.X) }` guard every section-upsert function (here and each app's own
+// settings/layout repo) repeated per field (P107 I2-1).
+func UpsertOptional[T any](tx *sql.Tx, key string, v *T) error {
+	if v == nil {
+		return nil
+	}
+	return UpsertLeaf(tx, key, *v)
+}
+
 // UpsertAppearance mirrors both apps' own former upsertAppearanceSection verbatim.
 func UpsertAppearance(tx *sql.Tx, a *AppearancePatch) error {
 	if a == nil {
 		return nil
 	}
-	if a.FontFamily != nil {
-		if err := UpsertLeaf(tx, "appearance.fontFamily", *a.FontFamily); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "appearance.fontFamily", a.FontFamily); err != nil {
+		return err
 	}
-	if a.FontSize != nil {
-		if err := UpsertLeaf(tx, "appearance.fontSize", *a.FontSize); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "appearance.fontSize", a.FontSize); err != nil {
+		return err
 	}
-	if a.RowDensity != nil {
-		if err := UpsertLeaf(tx, "appearance.rowDensity", *a.RowDensity); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "appearance.rowDensity", a.RowDensity); err != nil {
+		return err
 	}
-	if a.WordWrap != nil {
-		if err := UpsertLeaf(tx, "appearance.wordWrap", *a.WordWrap); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "appearance.wordWrap", a.WordWrap); err != nil {
+		return err
 	}
-	if a.RowColoring != nil {
-		if err := UpsertLeaf(tx, "appearance.rowColoring", *a.RowColoring); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "appearance.rowColoring", a.RowColoring); err != nil {
+		return err
 	}
-	if a.InlineBlame != nil {
-		if err := UpsertLeaf(tx, "appearance.inlineBlame", *a.InlineBlame); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "appearance.inlineBlame", a.InlineBlame); err != nil {
+		return err
 	}
-	if a.DateFormat != nil {
-		if err := UpsertLeaf(tx, "appearance.dateFormat", *a.DateFormat); err != nil {
-			return err
-		}
-	}
-	return nil
+	return UpsertOptional(tx, "appearance.dateFormat", a.DateFormat)
 }
 
 // UpsertGit mirrors both apps' own former upsertGitSection verbatim — "git.path" (not
@@ -73,27 +66,16 @@ func UpsertGit(tx *sql.Tx, g *GitPatch) error {
 	if g == nil {
 		return nil
 	}
-	if g.ProtectedBranches != nil {
-		if err := UpsertLeaf(tx, "git.protectedBranches", *g.ProtectedBranches); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "git.protectedBranches", g.ProtectedBranches); err != nil {
+		return err
 	}
-	if g.FetchAutoIntervalMinutes != nil {
-		if err := UpsertLeaf(tx, "git.fetchAutoIntervalMinutes", *g.FetchAutoIntervalMinutes); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "git.fetchAutoIntervalMinutes", g.FetchAutoIntervalMinutes); err != nil {
+		return err
 	}
-	if g.GitPath != nil {
-		if err := UpsertLeaf(tx, "git.path", *g.GitPath); err != nil {
-			return err
-		}
+	if err := UpsertOptional(tx, "git.path", g.GitPath); err != nil {
+		return err
 	}
-	if g.GraphFontSize != nil {
-		if err := UpsertLeaf(tx, "git.graphFontSize", *g.GraphFontSize); err != nil {
-			return err
-		}
-	}
-	return nil
+	return UpsertOptional(tx, "git.graphFontSize", g.GraphFontSize)
 }
 
 // Leaf mirrors both apps' own former leaf[T] verbatim: overwrites *dst with the stored value for
