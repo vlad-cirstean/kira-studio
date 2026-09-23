@@ -198,7 +198,7 @@ function editEnvironmentVariables(): void {
 @reference "@theme/base.css";
 
 .overview-panel {
-  @apply flex max-h-[420px] flex-col;
+  @apply flex max-h-105 flex-col;
 }
 
 .overview-list {

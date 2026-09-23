@@ -114,7 +114,7 @@ defineSlots<{
 @reference "@theme/base.css";
 
 .saved-list-menu-inner {
-  @apply max-h-[400px] overflow-y-auto;
+  @apply max-h-100 overflow-y-auto;
 }
 
 .empty-row {

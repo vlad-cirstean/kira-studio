@@ -31,7 +31,7 @@ function onImportCurl(): void {
     class="flex flex-1 min-h-0 items-center justify-center overflow-auto p-4"
     data-testid="api-start"
   >
-    <div class="flex w-[420px] max-w-full flex-col items-center gap-2 text-center">
+    <div class="flex w-105 max-w-full flex-col items-center gap-2 text-center">
       <span class="dim"><CodiconIcon name="globe" :size="32" /></span>
       <div class="tracking-normal text-fg text-kira-xl">No request open</div>
       <div class="muted leading-normal text-kira-md">
