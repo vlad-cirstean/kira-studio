@@ -3,7 +3,6 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
-	"strconv"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -100,7 +99,7 @@ func listTablesAndRoutines(ctx context.Context, exec queryExec, database string)
 		}
 		var detail *string
 		if kind == "table" && tableRows != nil {
-			d := "~" + abbreviateCount(*tableRows) + " rows"
+			d := "~" + adapters.AbbreviateCount(*tableRows) + " rows"
 			detail = &d
 		}
 		nodes = append(nodes, model.TreeNode{
@@ -175,7 +174,7 @@ func listColumns(ctx context.Context, exec queryExec, database, table string) ([
 // listSchemaColumns is P22c D1's SchemaColumns, F9's schema-wide widening of listColumns above:
 // the same information_schema.COLUMNS join, minus the TABLE_NAME filter, plus COLUMN_KEY (already
 // on the same row — no second query) so IsPrimaryKey is populated without listIndexes' own
-// per-relation round trip. Views (COLUMN_KEY is always '' for them) are included; sequences and
+// per-relation round trip. Views (COLUMN_KEY is always ” for them) are included; sequences and
 // routines have no columns and are excluded by the JOIN itself. Every column here is
 // byte-identical to what listColumns/Describe reports for the same column (P22c §4.1).
 func listSchemaColumns(ctx context.Context, exec queryExec, database string) ([]model.RelationColumns, error) {
@@ -427,47 +426,4 @@ func getReadTarget(ctx context.Context, exec queryExec, database, table string) 
 		QualifiedName: QualifiedName{Database: database, Table: table},
 		Columns:       shape.Columns, PrimaryKey: shape.PrimaryKey, UniqueKeys: shape.UniqueKeys,
 	}, nil
-}
-
-// abbreviateCount mirrors @shared/format's abbreviateCount (postgres/catalog.go's own copy,
-// deliberately duplicated per package rather than shared — see that file's comment).
-var abbreviateUnits = []struct {
-	threshold int64
-	suffix    string
-}{
-	{1_000_000_000_000, "T"},
-	{1_000_000_000, "B"},
-	{1_000_000, "M"},
-	{1_000, "K"},
-}
-
-func abbreviateCount(n int64) string {
-	sign := ""
-	abs := n
-	if abs < 0 {
-		sign = "-"
-		abs = -abs
-	}
-	for _, u := range abbreviateUnits {
-		if abs < u.threshold {
-			continue
-		}
-		scaled := float64(abs) / float64(u.threshold)
-		var text string
-		if scaled < 10 {
-			text = trimTrailingZero(scaled)
-		} else {
-			text = strconv.FormatInt(int64(scaled+0.5), 10)
-		}
-		return sign + text + u.suffix
-	}
-	return sign + strconv.FormatInt(abs, 10)
-}
-
-func trimTrailingZero(f float64) string {
-	s := strconv.FormatFloat(f, 'f', 1, 64)
-	if len(s) >= 2 && s[len(s)-2:] == ".0" {
-		return s[:len(s)-2]
-	}
-	return s
 }

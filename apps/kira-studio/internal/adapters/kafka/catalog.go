@@ -8,53 +8,9 @@ import (
 
 	"github.com/twmb/franz-go/pkg/kadm"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
-
-// abbreviateCount mirrors @shared/format's abbreviateCount (every SQL adapter's own local copy —
-// postgres/catalog.go's is the original) closely enough for the tree's own partition-count badge.
-// No shared Go home exists for it yet (§4.2), and a partition count reaching four digits on a
-// real cluster is possible, so a plain strconv.Itoa is not equivalent.
-var abbreviateUnits = []struct {
-	threshold int
-	suffix    string
-}{
-	{1_000_000_000_000, "T"},
-	{1_000_000_000, "B"},
-	{1_000_000, "M"},
-	{1_000, "K"},
-}
-
-func abbreviateCount(n int) string {
-	sign := ""
-	abs := n
-	if abs < 0 {
-		sign = "-"
-		abs = -abs
-	}
-	for _, u := range abbreviateUnits {
-		if abs < u.threshold {
-			continue
-		}
-		scaled := float64(abs) / float64(u.threshold)
-		var text string
-		if scaled < 10 {
-			text = trimTrailingZero(scaled)
-		} else {
-			text = strconv.Itoa(int(scaled + 0.5))
-		}
-		return sign + text + u.suffix
-	}
-	return sign + strconv.Itoa(abs)
-}
-
-func trimTrailingZero(f float64) string {
-	s := strconv.FormatFloat(f, 'f', 1, 64)
-	if len(s) >= 2 && s[len(s)-2:] == ".0" {
-		return s[:len(s)-2]
-	}
-	return s
-}
 
 // isInternalGroup mirrors catalog.ts's isInternal — kept for groups only. kadm.ListedGroup has no
 // internal flag the broker itself supplies, unlike a topic's own IsInternal (P58e E10).
@@ -92,7 +48,7 @@ func listTopics(ctx context.Context, adm *kadm.Client) ([]model.TreeNode, error)
 		if count == 1 {
 			plural = ""
 		}
-		detail := abbreviateCount(count) + " partition" + plural
+		detail := adapters.AbbreviateCount(int64(count)) + " partition" + plural
 		nodes = append(nodes, model.TreeNode{
 			Kind: "topic", Name: t.Topic,
 			Path:        model.EncodePath([]model.PathSegment{{Kind: "topic", Name: t.Topic}}),

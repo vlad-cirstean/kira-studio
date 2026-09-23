@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 
@@ -132,7 +131,7 @@ func listRelationsAndFunctions(ctx context.Context, exec queryExec, databaseSegm
 			var detail *string
 			// Postgres uses -1 for "never analysed" — render nothing, never the raw -1.
 			if (kind == "table" || kind == "matview") && rowEstimate != nil && *rowEstimate >= 0 {
-				d := "~" + abbreviateCount(*rowEstimate) + " rows"
+				d := "~" + adapters.AbbreviateCount(*rowEstimate) + " rows"
 				detail = &d
 			}
 			nodes = append(nodes, model.TreeNode{
@@ -465,50 +464,4 @@ func listReferencedBy(ctx context.Context, exec queryExec, relOID, databaseSegme
 		return nil, err
 	}
 	return edgesToForeignKeys(edges, databaseSegment), nil
-}
-
-// abbreviateCount mirrors @shared/format's abbreviateCount closely enough for the tree's own "~N
-// rows" detail string: this package's own copy rather than a shared import, since it is the one
-// place in the Go adapter that needs it and importing a renderer-facing formatting helper from the
-// shared TS-mirroring model package would be the wrong direction of coupling.
-// abbreviateUnits mirrors format.ts's UNITS, largest threshold first.
-var abbreviateUnits = []struct {
-	threshold int64
-	suffix    string
-}{
-	{1_000_000_000_000, "T"},
-	{1_000_000_000, "B"},
-	{1_000_000, "M"},
-	{1_000, "K"},
-}
-
-func abbreviateCount(n int64) string {
-	sign := ""
-	abs := n
-	if abs < 0 {
-		sign = "-"
-		abs = -abs
-	}
-	for _, u := range abbreviateUnits {
-		if abs < u.threshold {
-			continue
-		}
-		scaled := float64(abs) / float64(u.threshold)
-		var text string
-		if scaled < 10 {
-			text = trimTrailingZero(scaled)
-		} else {
-			text = strconv.FormatInt(int64(scaled+0.5), 10)
-		}
-		return sign + text + u.suffix
-	}
-	return sign + strconv.FormatInt(abs, 10)
-}
-
-func trimTrailingZero(f float64) string {
-	s := strconv.FormatFloat(f, 'f', 1, 64)
-	if len(s) >= 2 && s[len(s)-2:] == ".0" {
-		return s[:len(s)-2]
-	}
-	return s
 }

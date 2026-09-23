@@ -108,7 +108,7 @@ func listTablesAndViews(ctx context.Context, h *Handle, queryID string, op *adap
 		var detail *string
 		if kind == "table" && row.TotalRows != nil {
 			if n, perr := strconv.ParseInt(*row.TotalRows, 10, 64); perr == nil {
-				d := "~" + abbreviateCount(n) + " rows"
+				d := "~" + adapters.AbbreviateCount(n) + " rows"
 				detail = &d
 			}
 		}
@@ -417,47 +417,4 @@ func getReadTarget(ctx context.Context, h *Handle, queryID string, op *adapters.
 		PrimaryKeyExpression: tableRow.PrimaryKey, PartitionKey: tableRow.PartitionKey,
 		TotalRows: totalRows, Comment: comment, CreateTableQuery: tableRow.CreateTableQuery,
 	}, nil
-}
-
-// abbreviateCount mirrors @shared/format's abbreviateCount (postgres/catalog.go's own copy,
-// deliberately duplicated per package rather than shared).
-var abbreviateUnits = []struct {
-	threshold int64
-	suffix    string
-}{
-	{1_000_000_000_000, "T"},
-	{1_000_000_000, "B"},
-	{1_000_000, "M"},
-	{1_000, "K"},
-}
-
-func abbreviateCount(n int64) string {
-	sign := ""
-	abs := n
-	if abs < 0 {
-		sign = "-"
-		abs = -abs
-	}
-	for _, u := range abbreviateUnits {
-		if abs < u.threshold {
-			continue
-		}
-		scaled := float64(abs) / float64(u.threshold)
-		var text string
-		if scaled < 10 {
-			text = trimTrailingZero(scaled)
-		} else {
-			text = strconv.FormatInt(int64(scaled+0.5), 10)
-		}
-		return sign + text + u.suffix
-	}
-	return sign + strconv.FormatInt(abs, 10)
-}
-
-func trimTrailingZero(f float64) string {
-	s := strconv.FormatFloat(f, 'f', 1, 64)
-	if len(s) >= 2 && s[len(s)-2:] == ".0" {
-		return s[:len(s)-2]
-	}
-	return s
 }
