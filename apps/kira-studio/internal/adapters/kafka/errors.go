@@ -3,7 +3,6 @@ package kafka
 import (
 	"context"
 	"errors"
-	"net"
 
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -38,9 +37,7 @@ func mapError(err error) *adapters.Error {
 	// pattern postgres/errors.go, mysqlfamily/errors.go, redis/errors.go and awscfg/errors.go
 	// already use. KF-4(g): Ping against an unreachable host returns a *fmt.wrapError around a
 	// plain *net.OpError, reachable via errors.As, in ~280µs.
-	var dnsErr *net.DNSError
-	var opErr *net.OpError
-	if errors.As(err, &dnsErr) || errors.As(err, &opErr) {
+	if ne := adapters.ClassifyNetError(err); ne.DNS || ne.OpError != nil {
 		return adapters.New(adapters.CodeConnect, message, err)
 	}
 	if errors.Is(err, context.DeadlineExceeded) {

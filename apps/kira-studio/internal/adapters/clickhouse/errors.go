@@ -3,7 +3,6 @@ package clickhouse
 import (
 	"context"
 	"errors"
-	"net"
 	"os"
 	"regexp"
 	"strconv"
@@ -83,17 +82,15 @@ func mapTransportError(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return adapters.New(adapters.CodeTimeout, err.Error(), err)
 	}
-	var netErr net.Error
-	if errors.As(err, &netErr) && netErr.Timeout() {
+	ne := adapters.ClassifyNetError(err)
+	if ne.NetTimeout {
 		return adapters.New(adapters.CodeTimeout, err.Error(), err)
 	}
-	var dnsErr *net.DNSError
-	if errors.As(err, &dnsErr) {
+	if ne.DNS {
 		return adapters.New(adapters.CodeConnect, err.Error(), err)
 	}
-	var opErr *net.OpError
-	if errors.As(err, &opErr) {
-		if errors.Is(opErr.Err, os.ErrDeadlineExceeded) {
+	if ne.OpError != nil {
+		if errors.Is(ne.OpError.Err, os.ErrDeadlineExceeded) {
 			return adapters.New(adapters.CodeTimeout, err.Error(), err)
 		}
 		return adapters.New(adapters.CodeConnect, err.Error(), err)

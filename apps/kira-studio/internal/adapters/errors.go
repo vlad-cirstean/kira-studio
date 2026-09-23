@@ -3,8 +3,10 @@ package adapters
 import (
 	"context"
 	"errors"
+	"net"
 	"regexp"
 	"strings"
+	"syscall"
 	"unicode"
 )
 
@@ -429,4 +431,36 @@ func RequireConnected[T any](handle *T) (*T, error) {
 		return nil, New(CodeConnect, "adapter is not connected", nil)
 	}
 	return handle, nil
+}
+
+// NetError is ClassifyNetError's result — the independent facts six adapters' own mapError
+// functions each re-derived inline (P107 I2-37). A shared detection pass, not a shared decision:
+// the six route these facts to different ErrorCodes in different priority order (mysqlfamily and
+// postgres treat a timeout as CodeConnect; clickhouse treats it as CodeTimeout; redis matches any
+// net.Error unconditionally; kafka and awscfg match *net.OpError with no timeout distinction at
+// all), so ClassifyNetError reports facts only and leaves that dispatch to each caller.
+type NetError struct {
+	DNS        bool
+	Refused    bool
+	OpError    *net.OpError
+	NetTimeout bool
+	IsNetError bool
+}
+
+// ClassifyNetError runs the errors.As/errors.Is checks every adapter's mapError repeated inline.
+func ClassifyNetError(err error) NetError {
+	var ne NetError
+	var dnsErr *net.DNSError
+	ne.DNS = errors.As(err, &dnsErr)
+	ne.Refused = errors.Is(err, syscall.ECONNREFUSED)
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		ne.OpError = opErr
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		ne.IsNetError = true
+		ne.NetTimeout = netErr.Timeout()
+	}
+	return ne
 }
