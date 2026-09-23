@@ -9,6 +9,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
 // --- opSlot: D24's own ≤1-slot concurrency matrix -----------------------------------------
@@ -487,7 +488,11 @@ func TestWantsRebaseMerges(t *testing.T) {
 		runGitStack(t, dir, "init", "-q", "-b", "main")
 		runGitStack(t, dir, "config", "pull.rebase", "merges")
 		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
-		if !entry.wantsRebaseMerges(context.Background(), "main") {
+		got, err := entry.wantsRebaseMerges(context.Background(), "main")
+		if err != nil {
+			t.Fatalf("wantsRebaseMerges: %v", err)
+		}
+		if !got {
 			t.Fatal("wantsRebaseMerges = false, want true (pull.rebase=merges)")
 		}
 	})
@@ -498,7 +503,11 @@ func TestWantsRebaseMerges(t *testing.T) {
 		runGitStack(t, dir, "init", "-q", "-b", "main")
 		runGitStack(t, dir, "config", "branch.main.rebase", "m")
 		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
-		if !entry.wantsRebaseMerges(context.Background(), "main") {
+		got, err := entry.wantsRebaseMerges(context.Background(), "main")
+		if err != nil {
+			t.Fatalf("wantsRebaseMerges: %v", err)
+		}
+		if !got {
 			t.Fatal("wantsRebaseMerges = false, want true (branch.main.rebase=m)")
 		}
 	})
@@ -513,7 +522,11 @@ func TestWantsRebaseMerges(t *testing.T) {
 		runGitStack(t, dir, "config", "branch.main.rebase", "true")
 		runGitStack(t, dir, "config", "pull.rebase", "merges")
 		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
-		if entry.wantsRebaseMerges(context.Background(), "main") {
+		got, err := entry.wantsRebaseMerges(context.Background(), "main")
+		if err != nil {
+			t.Fatalf("wantsRebaseMerges: %v", err)
+		}
+		if got {
 			t.Fatal("wantsRebaseMerges = true, want false -- branch.main.rebase=true is the winning, recognised value")
 		}
 	})
@@ -523,8 +536,48 @@ func TestWantsRebaseMerges(t *testing.T) {
 		dir := t.TempDir()
 		runGitStack(t, dir, "init", "-q", "-b", "main")
 		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
-		if entry.wantsRebaseMerges(context.Background(), "main") {
+		got, err := entry.wantsRebaseMerges(context.Background(), "main")
+		if err != nil {
+			t.Fatalf("wantsRebaseMerges: %v", err)
+		}
+		if got {
 			t.Fatal("wantsRebaseMerges = true, want false")
+		}
+	})
+
+	// F6 (P108 Part 16 review): an explicit Kira Space setting choosing "rebase" outranks config
+	// in ResolvePullStrategy's own ladder -- --rebase-merges must not apply just because config
+	// ALSO happens to say "merges", since the setting (not config) is what actually decided to
+	// rebase at all.
+	t.Run("explicit setting outranks a config-level merges", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		runGitStack(t, dir, "init", "-q", "-b", "main")
+		runGitStack(t, dir, "config", "branch.main.rebase", "merges")
+		runGitStack(t, dir, "config", "pull.rebase", "merges")
+		registry := NewRegistry(gitclient.NewExecRunner())
+		registry.RepoSettingsGet = func(string) (model.GitRepoSettings, error) {
+			s := model.DefaultGitRepoSettings()
+			s.PullStrategy = "rebase"
+			return s, nil
+		}
+		t.Cleanup(registry.Close)
+		conn := NewConn(ConnID("f6-test-conn"), "test-client", "test-client-label", nil)
+		summary, err := conn.Open(context.Background(), registry, "git", dir)
+		if err != nil {
+			t.Fatalf("conn.Open: %v", err)
+		}
+		t.Cleanup(conn.Close)
+		entry, ok := conn.Entry(summary.RepoID)
+		if !ok {
+			t.Fatal("conn.Entry: not held after Open")
+		}
+		got, err := entry.wantsRebaseMerges(context.Background(), "main")
+		if err != nil {
+			t.Fatalf("wantsRebaseMerges: %v", err)
+		}
+		if got {
+			t.Fatal("wantsRebaseMerges = true, want false -- the explicit setting, not config, decided to rebase")
 		}
 	})
 }

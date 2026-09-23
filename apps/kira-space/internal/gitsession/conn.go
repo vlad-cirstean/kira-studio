@@ -357,13 +357,14 @@ func disposePair(pair *walkPair) {
 // FIRST open, never a value that overwrites a walk already under way).
 func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, pageSize int, precomputedTotal *int) (*Walk, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	if c.closed {
+		c.mu.Unlock()
 		return nil, ErrRepoNotHeld
 	}
 	h, ok := c.held[repoID]
 	if !ok {
+		c.mu.Unlock()
 		return nil, ErrRepoNotHeld
 	}
 
@@ -378,16 +379,26 @@ func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, page
 		slot = &pair.review
 	}
 
-	if *slot != nil {
-		if (*slot).matchesSpec(spec) {
-			return *slot, nil
-		}
-		(*slot).dispose()
-		*slot = nil
+	if *slot != nil && (*slot).matchesSpec(spec) {
+		w := *slot
+		c.mu.Unlock()
+		return w, nil
 	}
 
+	// F7 (P108 Part 16 review): swap the slot under c.mu, then dispose the OLD walk only after
+	// unlocking — the same shape CloseRepo/Close already use in this file. dispose() takes the
+	// walk's own lock, which a running Stream holds across a git page read and its own emit
+	// backpressure; disposing while still holding c.mu would stall every other c.mu user on this
+	// connection (Entry, alreadyHeld, the subscriber goroutine's markWalksStale) behind that same
+	// page read — breaking the documented "subscriber never blocks behind a page read" rule.
+	old := *slot
 	w := newWalk(h.entry, gitPath, spec, pageSize, precomputedTotal)
 	*slot = w
+	c.mu.Unlock()
+
+	if old != nil {
+		old.dispose()
+	}
 	return w, nil
 }
 

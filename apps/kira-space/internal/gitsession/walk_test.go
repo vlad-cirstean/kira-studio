@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
@@ -583,5 +584,87 @@ func TestWalk_DisposingConnDoesNotBlockAFreshOpenOfTheSameRepo(t *testing.T) {
 	defer conn2.Close()
 	if _, err := conn2.Open(context.Background(), registry, "git", repoDir); err != nil {
 		t.Fatalf("second conn.Open after disposing the first: %v", err)
+	}
+}
+
+// TestConn_WalkReplaceDoesNotBlockOtherConnOps is F7's own regression proof (P108 Part 16 review):
+// Conn.Walk used to dispose the OLD walk (rebuilt because its spec no longer matches) while still
+// holding c.mu. dispose() takes the walk's own lock, which a running Stream holds across its own
+// emit call (Stream's own doc comment: "emit runs synchronously while mu is held for the whole
+// call") — so replacing a walk mid-Stream used to stall every other c.mu user on the connection
+// (Entry among them) behind that same blocked emit, breaking the documented "subscriber never
+// blocks behind a page read" rule.
+func TestConn_WalkReplaceDoesNotBlockOtherConnOps(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 5)
+	conn, _, repoID := newWalkTestConn(t, repoDir)
+	defer conn.Close()
+
+	w1, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "all"}, 0, nil)
+	if err != nil {
+		t.Fatalf("Walk (first): %v", err)
+	}
+
+	blockEmit := make(chan struct{})
+	emitEntered := make(chan struct{})
+	var emitEnteredOnce sync.Once
+	streamDone := make(chan error, 1)
+	go func() {
+		streamDone <- w1.Stream(context.Background(), nil, 1, func(StreamChunk) error {
+			emitEnteredOnce.Do(func() { close(emitEntered) })
+			<-blockEmit
+			return nil
+		})
+	}()
+
+	select {
+	case <-emitEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stream's own emit never started")
+	}
+	// w1.mu is now held for the whole duration of the blocked emit call above.
+
+	// A different Scope forces pair.graph's own rebuild -- the OLD walk (w1) must be disposed.
+	// Conn.Walk's own caller legitimately waits for that dispose to finish (unavoidable: replacing
+	// a busy walk means waiting for it to release its own lock) -- rebuildDone is expected to stay
+	// open until blockEmit closes, below. What must NOT wait behind it is any OTHER c.mu user.
+	rebuildDone := make(chan struct{})
+	go func() {
+		defer close(rebuildDone)
+		if _, err := conn.Walk(repoID, "git", porcelain.WalkSpec{Scope: "HEAD"}, 0, nil); err != nil {
+			t.Errorf("Walk (rebuild): %v", err)
+		}
+	}()
+
+	// Give the rebuild goroutine a moment to reach (and start blocking inside) dispose().
+	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-rebuildDone:
+		t.Fatal("Walk (rebuild) finished before blockEmit closed -- the old walk's Stream/emit was not actually still in flight; test setup is wrong")
+	default:
+	}
+
+	// Entry, another c.mu user, must stay unblocked WHILE the rebuild above is still stuck inside
+	// dispose() -- the actual F7 regression: dispose() used to run before c.mu was released.
+	entryDone := make(chan struct{})
+	go func() {
+		defer close(entryDone)
+		conn.Entry(repoID)
+	}()
+	select {
+	case <-entryDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Conn.Entry blocked behind the OLD walk's in-flight Stream/emit")
+	}
+
+	close(blockEmit)
+	if err := <-streamDone; err != nil {
+		t.Fatalf("Stream: %v", err)
+	}
+	select {
+	case <-rebuildDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Walk (rebuild) never finished after blockEmit closed")
 	}
 }
