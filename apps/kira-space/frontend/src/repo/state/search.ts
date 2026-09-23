@@ -1,7 +1,8 @@
 import type { CodeSearchEvent, FileMatches, SearchStats } from '@shared/domain/repo';
 import { defineStore } from 'pinia';
-import { markRaw, reactive, ref } from 'vue';
+import { markRaw, ref } from 'vue';
 import { control } from '../../bridge/control';
+import { createPerRepoState } from './perRepo.ts';
 
 // C7 §7.2: the repository-wide search store — one entry per open repo workspace, the panel's
 // Files/Search switch (D9), the query/options, and the streamed result list. A search runs on
@@ -92,20 +93,9 @@ export interface RepoSearchRowVm {
 }
 
 export const useRepoSearchStore = defineStore('repoSearch', () => {
-  // One entry per open repo workspace — reactive Map for the identical reason state/fileTree.ts's
-  // own byRepo is: an untracked `.get()` on a plain Map never re-renders a computed that reads it
-  // before the entry exists (repoSearchView's own first read, evaluated before startRepoSearch has
-  // ever created one).
-  const byRepo = reactive(new Map<string, RepoSearchState>());
-
-  function stateFor(repoId: string): RepoSearchState {
-    let state = byRepo.get(repoId);
-    if (!state) {
-      state = reactive(emptySearchState()) as RepoSearchState;
-      byRepo.set(repoId, state);
-    }
-    return state;
-  }
+  const perRepo = createPerRepoState(emptySearchState);
+  const byRepo = perRepo.all;
+  const { stateFor } = perRepo;
 
   function repoSearchView(repoId: string): 'files' | 'search' {
     return byRepo.get(repoId)?.view ?? 'files';
@@ -272,7 +262,7 @@ export const useRepoSearchStore = defineStore('repoSearch', () => {
   function dropRepoSearch(repoId: string): void {
     const state = byRepo.get(repoId);
     if (state?.searchId) repoBySearchId.delete(state.searchId);
-    byRepo.delete(repoId);
+    perRepo.drop(repoId);
   }
 
   return {
