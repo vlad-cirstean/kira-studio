@@ -41,15 +41,7 @@ const (
 // StartClickHouse is support/clickhouse.ts's startClickHouse. See fixture.go's own doc comment for
 // why termination is never wired to t.Cleanup (B15).
 func StartClickHouse(t *testing.T) *ClickHouseFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	fixture, err := clickhouseMemo.get(startClickHouse)
-	if err != nil {
-		t.Fatalf("clickhouse container: %v", err)
-	}
-	return fixture
+	return clickhouseMemo.start(t, "clickhouse container", startClickHouse)
 }
 
 // StopClickHouse terminates the memoized container, if one was ever started. Call once, from the

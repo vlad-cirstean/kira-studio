@@ -50,15 +50,7 @@ var kafkaMemo fixture[KafkaFixture]
 
 // StartKafka is support/kafka.ts's startKafka. Skips the test when Docker is unreachable.
 func StartKafka(t *testing.T) *KafkaFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	f, err := kafkaMemo.get(startKafka)
-	if err != nil {
-		t.Fatalf("kafka container: %v", err)
-	}
-	return f
+	return kafkaMemo.start(t, "kafka container", startKafka)
 }
 
 // StopKafka terminates the memoized container and closes its side client, if ever started. Call

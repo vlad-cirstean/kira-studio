@@ -77,15 +77,7 @@ const (
 // §11b/B15) — termination is deliberately NOT wired to any one test's t.Cleanup: see fixture.go's
 // own doc comment for why. Call StopPostgres from the package's own TestMain instead.
 func StartPostgres(t *testing.T) *PgFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	fixture, err := pgMemo.get(startPostgres)
-	if err != nil {
-		t.Fatalf("postgres container: %v", err)
-	}
-	return fixture
+	return pgMemo.start(t, "postgres container", startPostgres)
 }
 
 // StopPostgres terminates the memoized container, if one was ever started. Call once, from the

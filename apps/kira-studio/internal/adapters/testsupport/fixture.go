@@ -1,6 +1,9 @@
 package testsupport
 
-import "sync"
+import (
+	"sync"
+	"testing"
+)
 
 // fixture memoizes one expensive resource (typically a real container) per test binary: started
 // lazily on the first get() call and reused by every later call in the same process. Stop is
@@ -35,6 +38,21 @@ func (f *fixture[T]) get(start func() (*T, error)) (*T, error) {
 	}
 	f.val = val
 	return val, nil
+}
+
+// start is every package-level Start<X>'s own body (P107 T2-5): skip the test when Docker isn't
+// available, memoize via get, fail the test on error. label names the failure in the t.Fatalf
+// message ("postgres container").
+func (f *fixture[T]) start(t *testing.T, label string, startFn func() (*T, error)) *T {
+	t.Helper()
+	if !IsDockerAvailable() {
+		t.Skip(DockerUnavailableMessage)
+	}
+	val, err := f.get(startFn)
+	if err != nil {
+		t.Fatalf("%s: %v", label, err)
+	}
+	return val
 }
 
 // stop calls terminate on the memoized value, if one was ever started, and clears the fixture so a

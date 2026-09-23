@@ -62,15 +62,7 @@ var kafkaSaslMemo fixture[KafkaSaslFixture]
 // StartKafkaSasl skips the test when Docker is unreachable, exactly like every other fixture in
 // this package.
 func StartKafkaSasl(t *testing.T) *KafkaSaslFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	f, err := kafkaSaslMemo.get(startKafkaSasl)
-	if err != nil {
-		t.Fatalf("kafka sasl container: %v", err)
-	}
-	return f
+	return kafkaSaslMemo.start(t, "kafka sasl container", startKafkaSasl)
 }
 
 // StopKafkaSasl terminates the memoized container, if one was ever started. Call once, from the

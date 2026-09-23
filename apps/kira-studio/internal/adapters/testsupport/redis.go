@@ -65,15 +65,7 @@ var redisMemo fixture[RedisFixture]
 
 // StartRedis is support/redis.ts's startRedis. Skips the test when Docker is unreachable.
 func StartRedis(t *testing.T) *RedisFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	f, err := redisMemo.get(startRedis)
-	if err != nil {
-		t.Fatalf("redis container: %v", err)
-	}
-	return f
+	return redisMemo.start(t, "redis container", startRedis)
 }
 
 // StopRedis terminates the memoized container, if one was ever started. Call once, from the test
