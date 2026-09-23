@@ -308,7 +308,7 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 		if err != nil {
 			return model.ObjectMeta{}, err
 		}
-		indexes, err := listIndexes(exec, objectSegment.Name)
+		indexes, err := listIndexes(exec, databaseSegment.Name, objectSegment.Name)
 		if err != nil {
 			return model.ObjectMeta{}, err
 		}

@@ -27,7 +27,7 @@ func buildConstraints(exec QueryExecutor, schema, table string, target ReadTarge
 		})
 	}
 
-	indexes, err := listIndexes(exec, table)
+	indexes, err := listIndexes(exec, schema, table)
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +80,11 @@ func buildDefinition(exec QueryExecutor, segments []model.PathSegment, schema st
 	if kind == "view" {
 		masterType = "view"
 	}
+	// F9: quoted "<schema>".sqlite_master — an unqualified sqlite_master always resolves to "main",
+	// which can shadow a same-named table/view in an ATTACHed or TEMP schema.
 	var raw sql.NullString
 	found := false
-	err := exec("SELECT sql FROM sqlite_master WHERE type = ? AND name = ?", []any{masterType, name}, func(r *sql.Rows) error {
+	err := exec("SELECT sql FROM "+quoteIdent(schema)+".sqlite_master WHERE type = ? AND name = ?", []any{masterType, name}, func(r *sql.Rows) error {
 		found = true
 		return r.Scan(&raw)
 	})

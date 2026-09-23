@@ -231,10 +231,12 @@ func scanXInfoRow(r *sql.Rows) (tableXInfoRow, error) {
 // listColumns is catalog.ts's own — F18: `table_xinfo`, not `table_info` — the latter omits
 // generated columns that `SELECT *` still returns. hidden 1 marks a virtual table's shadow-only
 // column (excluded); hidden 0/2/3 (ordinary / VIRTUAL generated / STORED generated) are all real,
-// selectable columns.
-func listColumns(exec QueryExecutor, table string) ([]model.ColumnMeta, []tableXInfoRow, error) {
+// selectable columns. schema is passed as the pragma's own second argument (finding F9) — without
+// it, an ATTACHed or TEMP table can shadow a main-schema table of the same name (SQLite's own
+// default resolution order for an unqualified table-valued pragma call, confirmed empirically).
+func listColumns(exec QueryExecutor, schema, table string) ([]model.ColumnMeta, []tableXInfoRow, error) {
 	var raw []tableXInfoRow
-	err := exec("SELECT * FROM pragma_table_xinfo(?)", []any{table}, func(r *sql.Rows) error {
+	err := exec("SELECT * FROM pragma_table_xinfo(?, ?)", []any{table, schema}, func(r *sql.Rows) error {
 		row, err := scanXInfoRow(r)
 		if err != nil {
 			return err
@@ -289,11 +291,15 @@ func listSchemaColumns(exec QueryExecutor, schema string) ([]model.RelationColum
 		placeholders[i] = "?"
 		args[i] = t.name
 	}
+	// F9: quoted "<schema>".sqlite_master and pragma_table_xinfo's own schema argument — an
+	// unqualified sqlite_master always resolves to "main", and an unqualified pragma call follows
+	// SQLite's own default resolution order, either of which can shadow a same-named ATTACHed/TEMP
+	// table when schema isn't "main".
 	query := `SELECT m.name AS table_name, p.cid, p.name, p.type, p."notnull", p.dflt_value, p.pk, p.hidden
-	 FROM sqlite_master m, pragma_table_xinfo(m.name) p
+	 FROM ` + quoteIdent(schema) + `.sqlite_master m, pragma_table_xinfo(m.name, ?) p
 	 WHERE m.name IN (` + strings.Join(placeholders, ",") + `)
 	 ORDER BY m.name, p.cid`
-	err = exec(query, args, func(r *sql.Rows) error {
+	err = exec(query, append([]any{schema}, args...), func(r *sql.Rows) error {
 		var tableName string
 		var row tableXInfoRow
 		if err := r.Scan(&tableName, &row.cid, &row.name, &row.typ, &row.notnull, &row.dflt, &row.pk, &row.hidden); err != nil {
@@ -353,15 +359,55 @@ func primaryKeyFromColumns(columns []model.ColumnMeta, raw []tableXInfoRow) []st
 	return names
 }
 
-// listIndexes is catalog.ts's own.
-func listIndexes(exec QueryExecutor, table string) ([]model.IndexMeta, error) {
+// pkIsKeysetEligible reports whether primaryKey is safe to use as a keyset tiebreaker (finding F8).
+// SQLite is the one dialect here where PRIMARY KEY does not imply NOT NULL: per SQLite's own
+// documented quirk, a composite PK or a non-INTEGER single-column PK on a rowid table can genuinely
+// hold NULL regardless of whether NOT NULL was declared — nothing but a real NOT NULL constraint
+// (table_xinfo's own notnull flag, already resolved into columns' Nullable) ever prevents it there.
+// Two shapes SQLite itself guarantees can never actually store NULL are exempted even when
+// table_xinfo's notnull flag reports false (it is not rewritten to reflect either guarantee): a
+// WITHOUT ROWID table's own declared primary key (SQLite refuses a NULL there at INSERT time,
+// independent of any declared NOT NULL), and a rowid table's single-column INTEGER PRIMARY KEY (the
+// rowid alias — inserting NULL there auto-assigns the next rowid instead of ever storing NULL).
+func pkIsKeysetEligible(primaryKey []string, columns []model.ColumnMeta, withoutRowid bool) bool {
+	if len(primaryKey) == 0 {
+		return false
+	}
+	if withoutRowid {
+		return true
+	}
+	byName := make(map[string]model.ColumnMeta, len(columns))
+	for _, c := range columns {
+		byName[c.Name] = c
+	}
+	if len(primaryKey) == 1 {
+		c, ok := byName[primaryKey[0]]
+		if !ok {
+			return false
+		}
+		if strings.EqualFold(strings.TrimSpace(c.DataType), "INTEGER") {
+			return true
+		}
+		return !c.Nullable
+	}
+	for _, name := range primaryKey {
+		if c, ok := byName[name]; !ok || c.Nullable {
+			return false
+		}
+	}
+	return true
+}
+
+// listIndexes is catalog.ts's own. schema is passed as each pragma's own second argument (finding
+// F9) — see listColumns' identical reasoning.
+func listIndexes(exec QueryExecutor, schema, table string) ([]model.IndexMeta, error) {
 	type idxRow struct {
 		name   string
 		unique bool
 		origin string
 	}
 	var indexes []idxRow
-	err := exec("SELECT * FROM pragma_index_list(?)", []any{table}, func(r *sql.Rows) error {
+	err := exec("SELECT * FROM pragma_index_list(?, ?)", []any{table, schema}, func(r *sql.Rows) error {
 		var seq int
 		var name string
 		var unique, partial int
@@ -379,7 +425,7 @@ func listIndexes(exec QueryExecutor, table string) ([]model.IndexMeta, error) {
 	result := make([]model.IndexMeta, len(indexes))
 	for i, idx := range indexes {
 		var columns []string
-		err := exec("SELECT * FROM pragma_index_info(?)", []any{idx.name}, func(r *sql.Rows) error {
+		err := exec("SELECT * FROM pragma_index_info(?, ?)", []any{idx.name, schema}, func(r *sql.Rows) error {
 			var seqno, cid int
 			var name sql.NullString
 			if err := r.Scan(&seqno, &cid, &name); err != nil {
@@ -413,9 +459,10 @@ type foreignKeyListRow struct {
 	onDelete string
 }
 
-func fetchForeignKeyList(exec QueryExecutor, table string) ([]foreignKeyListRow, error) {
+// fetchForeignKeyList's schema arg is finding F9's fix — see listColumns' identical reasoning.
+func fetchForeignKeyList(exec QueryExecutor, schema, table string) ([]foreignKeyListRow, error) {
 	var rows []foreignKeyListRow
-	err := exec("SELECT * FROM pragma_foreign_key_list(?)", []any{table}, func(r *sql.Rows) error {
+	err := exec("SELECT * FROM pragma_foreign_key_list(?, ?)", []any{table, schema}, func(r *sql.Rows) error {
 		var row foreignKeyListRow
 		var match string
 		if err := r.Scan(&row.id, &row.seq, &row.table, &row.from, &row.to, &row.onUpdate, &row.onDelete, &match); err != nil {
@@ -454,7 +501,7 @@ func groupByID(rows []foreignKeyListRow) [][]foreignKeyListRow {
 
 // listForeignKeys is catalog.ts's own.
 func listForeignKeys(exec QueryExecutor, schema, table string) ([]model.ForeignKeyMeta, error) {
-	rows, err := fetchForeignKeyList(exec, table)
+	rows, err := fetchForeignKeyList(exec, schema, table)
 	if err != nil {
 		return nil, err
 	}
@@ -492,13 +539,15 @@ type referencingFKRow struct {
 // target — supported since SQLite 3.16 (table-valued functions), collapsing what used to be N
 // separate round trips (one per table in the database) into one. The `match` column
 // fetchForeignKeyList also scans is omitted here too — nothing downstream ever read it.
-func fetchReferencingForeignKeys(exec QueryExecutor, target string) ([]referencingFKRow, error) {
+// schema is quoted onto sqlite_master and passed as pragma_foreign_key_list's own second argument
+// (finding F9) — see listColumns' identical reasoning.
+func fetchReferencingForeignKeys(exec QueryExecutor, schema, target string) ([]referencingFKRow, error) {
 	var rows []referencingFKRow
 	err := exec(`
 		SELECT m.name AS src, f.id, f.seq, f."table", f."from", f."to", f.on_update, f.on_delete
-		  FROM sqlite_master m JOIN pragma_foreign_key_list(m.name) f
+		  FROM `+quoteIdent(schema)+`.sqlite_master m JOIN pragma_foreign_key_list(m.name, ?) f
 		 WHERE m.type = 'table' AND f."table" = ?
-	`, []any{target}, func(r *sql.Rows) error {
+	`, []any{schema, target}, func(r *sql.Rows) error {
 		var row referencingFKRow
 		if err := r.Scan(&row.src, &row.id, &row.seq, &row.table, &row.from, &row.to, &row.onUpdate, &row.onDelete); err != nil {
 			return err
@@ -521,7 +570,7 @@ func fetchReferencingForeignKeys(exec QueryExecutor, target string) ([]referenci
 // same way the old per-table loop did (each source table's own group of FKs, in that table's own
 // position in allTables, first-seen id order within it).
 func listReferencedBy(exec QueryExecutor, schema, table string, allTables []string) ([]model.ForeignKeyMeta, error) {
-	rows, err := fetchReferencingForeignKeys(exec, table)
+	rows, err := fetchReferencingForeignKeys(exec, schema, table)
 	if err != nil {
 		return nil, err
 	}
@@ -629,13 +678,13 @@ func pickRowidColumn(columns []model.ColumnMeta, isRowidTable bool) *string {
 // rowid shape in one shot, resolved fresh on every uncached read (same discipline as the other SQL
 // adapters' getReadTarget).
 func getReadTarget(exec QueryExecutor, schema, table string) (ReadTarget, error) {
-	columns, raw, err := listColumns(exec, table)
+	columns, raw, err := listColumns(exec, schema, table)
 	if err != nil {
 		return ReadTarget{}, err
 	}
 	primaryKey := primaryKeyFromColumns(columns, raw)
 
-	indexes, err := listIndexes(exec, table)
+	indexes, err := listIndexes(exec, schema, table)
 	if err != nil {
 		return ReadTarget{}, err
 	}
@@ -666,10 +715,16 @@ func getReadTarget(exec QueryExecutor, schema, table string) (ReadTarget, error)
 	// `type` has to be checked too: pragma_table_list reports wr:0 for a *view* as well (the field
 	// is meaningless there, not "false") — found empirically, reading a view crashed with
 	// "no such column: rowid" before this check existed.
+	//
+	// pragma_table_list takes a single table-name argument, filtering by name only (confirmed
+	// empirically — no second, schema-scoping argument exists for it, unlike table_xinfo/index_list/
+	// foreign_key_list above), so an ATTACHed or TEMP table sharing table's own bare name would
+	// otherwise return more than one row here with no way to ask the pragma itself to pick one.
+	// Filtering by its own `schema` output column instead (finding F9) disambiguates correctly.
 	var tableType string
 	var wr int
 	hasRow := false
-	err = exec("SELECT type, wr FROM pragma_table_list(?)", []any{table}, func(r *sql.Rows) error {
+	err = exec("SELECT type, wr FROM pragma_table_list(?) WHERE schema = ?", []any{table, schema}, func(r *sql.Rows) error {
 		hasRow = true
 		return r.Scan(&tableType, &wr)
 	})
@@ -678,6 +733,16 @@ func getReadTarget(exec QueryExecutor, schema, table string) (ReadTarget, error)
 	}
 	isRowidTable := hasRow && tableType != "view" && wr == 0
 	rowidColumn := pickRowidColumn(columns, isRowidTable)
+
+	// F8: a PK carrying a nullable column is not a safe keyset tiebreaker — ComputeEffectiveOrder
+	// downstream has no per-row way to know a page's boundary row happened to have a NULL key, so
+	// keysetValueAt hard-fails and a NULL-keyed row silently drops from every keyset page. Excluded
+	// here (before readPage/relationalpage.go's own selectTiebreaker ever sees it) rather than left
+	// to fall through to a unique key or rowid instead.
+	withoutRowid := hasRow && tableType != "view" && wr == 1
+	if !pkIsKeysetEligible(primaryKey, columns, withoutRowid) {
+		primaryKey = nil
+	}
 
 	generated := make(map[string]bool)
 	for _, r := range raw {

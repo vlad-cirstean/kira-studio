@@ -31,9 +31,17 @@ func cellText(raw []byte, dbType string) string {
 }
 
 var tinyint1 = regexp.MustCompile(`^tinyint\(1\)`)
-var numberType = regexp.MustCompile(`^(tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double|bit)\b`)
+var numberType = regexp.MustCompile(`^(tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|float|double)\b`)
 var temporalType = regexp.MustCompile(`^(date|datetime|timestamp|time|year)\b`)
-var binaryType = regexp.MustCompile(`^(binary|varbinary|tinyblob|blob|mediumblob|longblob|geometry)\b`)
+
+// binaryType classifies bit alongside binary/blob/geometry (finding F7): binaryDatabaseTypes above
+// already renders a BIT column's cellText as 0x<hex> (go-sql-driver's own DatabaseTypeName()
+// reports it as "BIT"), but typeClassFor used to classify catalog type "bit(8)" as a number
+// (matched by numberType above, which used to list bit too) — that mismatch let BinaryColumnsOf's
+// isBinary lookup (sqlmutate.go) miss it, so NewParamRenderer bound the literal "0x05" display text
+// straight into a BIT column instead of decoding it back to raw bytes, failing ("data too long") in
+// strict mode or storing the wrong bits otherwise.
+var binaryType = regexp.MustCompile(`^(binary|varbinary|tinyblob|blob|mediumblob|longblob|geometry|bit)\b`)
 
 // typeClassFor is read.ts's typeClassFor — §5d's MariaDB/MySQL mapping. tinyint(1) is checked
 // ahead of the general number match — it is how this family spells boolean.
