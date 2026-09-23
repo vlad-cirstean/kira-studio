@@ -956,54 +956,46 @@ func (r *VariablesRepo) History(variableID string) ([]model.VariableHistoryEntry
 // ---- the gated reveal's own accessors (D8) — called only after apivars.Service has already
 // authorized the reveal; neither method gates anything itself. ----
 
+// revealSecret is RevealValue's and RevealHistoryValue's own shared shape (P107 I2-9): read
+// is_secret/secret_value off table by id, refuse a missing row or a non-secret one, decrypt under
+// scope. noun names the row in every error string ("variable" / "history entry") — RevealValue's
+// own decrypt error previously omitted it ("decrypt %s: %w") where RevealHistoryValue's included
+// it; unified to always include it here (a log-string-only difference no caller or test ever
+// asserted on, confirmed via a repo-wide search).
+func (r *VariablesRepo) revealSecret(table string, scope secrets.Scope, noun, id string) (string, error) {
+	var (
+		isSecretInt int
+		secretValue sql.NullString
+	)
+	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM `+table+` WHERE id = ?`, id).Scan(&isSecretInt, &secretValue)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("repos/variables: no %s %s", noun, id)
+	}
+	if err != nil {
+		return "", fmt.Errorf("repos/variables: read %s %s: %w", noun, id, err)
+	}
+	if isSecretInt == 0 || !secretValue.Valid {
+		return "", fmt.Errorf("repos/variables: %s %s is not a secret", noun, id)
+	}
+	plain, err := r.cipher.Decrypt(scope, secretValue.String)
+	if err != nil {
+		return "", fmt.Errorf("repos/variables: decrypt %s %s: %w", noun, id, err)
+	}
+	return plain, nil
+}
+
 // RevealValue decrypts one variable's stored secret. Returns an error for a variable that either
 // does not exist or is not a secret — apivars.Service.Reveal turns that into its own
 // never-throws RevealResult, exactly as connections.Service.Reveal already does for a decrypt
 // failure.
 func (r *VariablesRepo) RevealValue(variableID string) (string, error) {
-	var (
-		isSecretInt int
-		secretValue sql.NullString
-	)
-	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM api_variables WHERE id = ?`, variableID).Scan(&isSecretInt, &secretValue)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("repos/variables: no variable %s", variableID)
-	}
-	if err != nil {
-		return "", fmt.Errorf("repos/variables: read variable %s: %w", variableID, err)
-	}
-	if isSecretInt == 0 || !secretValue.Valid {
-		return "", fmt.Errorf("repos/variables: variable %s is not a secret", variableID)
-	}
-	plain, err := r.cipher.Decrypt(secrets.ScopeVariable, secretValue.String)
-	if err != nil {
-		return "", fmt.Errorf("repos/variables: decrypt %s: %w", variableID, err)
-	}
-	return plain, nil
+	return r.revealSecret("api_variables", secrets.ScopeVariable, "variable", variableID)
 }
 
 // RevealHistoryValue is RevealValue's sibling over api_variable_history — a secret's old value is
 // exactly as sensitive as its current one (D13).
 func (r *VariablesRepo) RevealHistoryValue(historyID string) (string, error) {
-	var (
-		isSecretInt int
-		secretValue sql.NullString
-	)
-	err := r.db.QueryRow(`SELECT is_secret, secret_value FROM api_variable_history WHERE id = ?`, historyID).Scan(&isSecretInt, &secretValue)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("repos/variables: no history entry %s", historyID)
-	}
-	if err != nil {
-		return "", fmt.Errorf("repos/variables: read history entry %s: %w", historyID, err)
-	}
-	if isSecretInt == 0 || !secretValue.Valid {
-		return "", fmt.Errorf("repos/variables: history entry %s is not a secret", historyID)
-	}
-	plain, err := r.cipher.Decrypt(secrets.ScopeVariableHistory, secretValue.String)
-	if err != nil {
-		return "", fmt.Errorf("repos/variables: decrypt history entry %s: %w", historyID, err)
-	}
-	return plain, nil
+	return r.revealSecret("api_variable_history", secrets.ScopeVariableHistory, "history entry", historyID)
 }
 
 // SecretsFor decrypts every secret variable reachable from a send — D2's precedence, environment

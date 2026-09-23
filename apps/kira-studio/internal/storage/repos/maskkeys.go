@@ -27,7 +27,7 @@ func NewMaskKeys(db *sql.DB, cipher Cipher) *MaskKeysRepo {
 	return &MaskKeysRepo{db: db, cipher: cipher}
 }
 
-// Get returns the connection's own key, or nil when none has been minted yet ('' stored). Never
+// Get returns the connection's own key, or nil when none has been minted yet (” stored). Never
 // mints — EnsureKey is the only writer.
 func (r *MaskKeysRepo) Get(connectionID string) ([]byte, error) {
 	var stored string
@@ -53,7 +53,7 @@ func (r *MaskKeysRepo) Get(connectionID string) ([]byte, error) {
 //
 // Two callers can race here on first use (M7 finding: the MCP render path's own MaskSetFor and the
 // grid preview's own CorrelationKeyHex, both resolving the same connection's key at once). The
-// write below is guarded by `WHERE mask_correlation_key = ''` rather than an unconditional UPDATE,
+// write below is guarded by `WHERE mask_correlation_key = ”` rather than an unconditional UPDATE,
 // so only the first writer's key is ever persisted; a losing caller's RowsAffected is 0 and it
 // re-reads the winner's key instead of returning the one it generated but never actually stored —
 // both callers then build their own mask.Set from the same bytes, with nothing left to invalidate.

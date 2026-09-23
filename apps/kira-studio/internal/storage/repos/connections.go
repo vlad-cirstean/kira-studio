@@ -20,6 +20,35 @@ type ConnectionsRepo struct {
 	DB *sql.DB
 }
 
+// connectionColumns is the connections table's 21 config columns, shared by every write below
+// (P107 I2-9) — id/created_at/updated_at/sort_order/password sit outside it since which of those a
+// statement needs (and how) is exactly what differs between Insert/InsertWithSecret/
+// InsertDuplicateWithSecret and Update/UpdateWithSecret; connectionSetColumns is the same list as
+// an UPDATE "col = ?" clause.
+const connectionColumns = `name, kind, color, mode, read_only, host, port, database, username, uri,
+	options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
+	mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain`
+
+const connectionSetColumns = `name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
+	database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
+	preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
+	mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
+	mcp_auto_explain = ?`
+
+// connectionArgs is connectionColumns's own 21 values off f, in the same order — every write that
+// binds the full column set (Insert, InsertWithSecret, Update, both UpdateWithSecret branches)
+// uses this. InsertDuplicateWithSecret does not: it forces mcp_enabled to a SQL literal 0
+// regardless of f.McpEnabled (see its own doc comment), so one of these 21 values would never
+// actually be bound there — it builds its own arg list by hand instead of trimming this one.
+func connectionArgs(f model.ConnectionFields, optionsJSON string) []any {
+	return []any{
+		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
+		f.Username, f.URI, optionsJSON, f.Preconnect, boolToInt(f.PreconnectSidecar),
+		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
+		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
+	}
+}
+
 // rowScanner is satisfied by both *sql.Rows and *sql.Row, letting scanConnectionRow serve both
 // List (many rows) and Get (one row) with the same column layout and validation.
 type rowScanner interface {
@@ -183,17 +212,10 @@ func (r *ConnectionsRepo) Insert(connID string, f model.ConnectionFields, create
 	}
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
-			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
-			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
-			created_at, updated_at, sort_order
+			id, `+connectionColumns+`, created_at, updated_at, sort_order
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
-		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-		createdAt, createdAt, sortOrder,
+		append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder)...,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -218,18 +240,10 @@ func (r *ConnectionsRepo) Update(connID string, f model.ConnectionFields, update
 	}
 	if _, err := r.DB.Exec(`
 		UPDATE connections
-		   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
-		       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-		       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
-		       mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
-		       mcp_auto_explain = ?, updated_at = ?
+		   SET `+connectionSetColumns+`, updated_at = ?
 		 WHERE id = ?
 	`,
-		f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
-		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-		updatedAt, connID,
+		append(append(connectionArgs(f, string(optionsJSON)), updatedAt), connID)...,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: update %s: %w", connID, err)
 	}
@@ -271,17 +285,10 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 	}
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
-			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
-			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
-			created_at, updated_at, sort_order, password
+			id, `+connectionColumns+`, created_at, updated_at, sort_order, password
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		connID, f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-		f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-		boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
-		f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-		createdAt, createdAt, sortOrder, secretEnc,
+		append(append([]any{connID}, connectionArgs(f, string(optionsJSON))...), createdAt, createdAt, sortOrder, secretEnc)...,
 	); err != nil {
 		return model.ConnectionSummary{}, fmt.Errorf("repos/connections: insert %s: %w", connID, err)
 	}
@@ -308,7 +315,7 @@ func (r *ConnectionsRepo) InsertWithSecret(connID string, f model.ConnectionFiel
 // longer leave a passwordless duplicate behind the way two separate statements could.
 //
 // M5: this INSERT does not name mask_correlation_key, so the duplicate gets the column's own
-// DEFAULT '' — deliberately NOT copied from fromConnectionID (unlike password, just above). A
+// DEFAULT ” — deliberately NOT copied from fromConnectionID (unlike password, just above). A
 // copied key would make the duplicate's masked correlation tags linkable back to the original's,
 // silently breaking the "key is scoped to one connection" invariant plan §2.5 states. The
 // duplicate mints its own key lazily, the same as any other connection with no key yet
@@ -339,10 +346,7 @@ func (r *ConnectionsRepo) InsertDuplicateWithSecret(fromConnectionID, toConnecti
 	}
 	if _, err := tx.Exec(`
 		INSERT INTO connections (
-			id, name, kind, color, mode, read_only, host, port, database, username, uri,
-			options_json, preconnect, preconnect_sidecar, auto_explain, throttle_per_sec, mcp_enabled,
-			mcp_description, mcp_read_mode, mcp_write_mode, mcp_ddl_mode, mcp_auto_explain,
-			created_at, updated_at, sort_order, password
+			id, `+connectionColumns+`, created_at, updated_at, sort_order, password
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			(SELECT password FROM connections WHERE id = ?))
 	`,
@@ -410,34 +414,18 @@ func (r *ConnectionsRepo) UpdateWithSecret(connID string, f model.ConnectionFiel
 	if hasSecret {
 		_, execErr = r.DB.Exec(`
 			UPDATE connections
-			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
-			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
-			       mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
-			       mcp_auto_explain = ?, updated_at = ?, password = ?
+			   SET `+connectionSetColumns+`, updated_at = ?, password = ?
 			 WHERE id = ?
 		`,
-			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
-			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-			updatedAt, secretEnc, connID,
+			append(append(connectionArgs(f, string(optionsJSON)), updatedAt, secretEnc), connID)...,
 		)
 	} else {
 		_, execErr = r.DB.Exec(`
 			UPDATE connections
-			   SET name = ?, kind = ?, color = ?, mode = ?, read_only = ?, host = ?, port = ?,
-			       database = ?, username = ?, uri = ?, options_json = ?, preconnect = ?,
-			       preconnect_sidecar = ?, auto_explain = ?, throttle_per_sec = ?, mcp_enabled = ?,
-			       mcp_description = ?, mcp_read_mode = ?, mcp_write_mode = ?, mcp_ddl_mode = ?,
-			       mcp_auto_explain = ?, updated_at = ?
+			   SET `+connectionSetColumns+`, updated_at = ?
 			 WHERE id = ?
 		`,
-			f.Name, f.Kind, f.Color, f.Mode, boolToInt(f.ReadOnly), f.Host, f.Port, f.Database,
-			f.Username, f.URI, string(optionsJSON), f.Preconnect, boolToInt(f.PreconnectSidecar),
-			boolToInt(f.AutoExplain), f.ThrottlePerSec, boolToInt(f.McpEnabled),
-			f.McpDescription, f.McpReadMode, f.McpWriteMode, f.McpDdlMode, boolToInt(f.McpAutoExplain),
-			updatedAt, connID,
+			append(append(connectionArgs(f, string(optionsJSON)), updatedAt), connID)...,
 		)
 	}
 	if execErr != nil {
