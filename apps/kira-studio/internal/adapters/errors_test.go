@@ -41,6 +41,18 @@ func TestStripSQLComments(t *testing.T) {
 		{"version-gated executable comment body survives", "/*!50000 COMMIT */", "  COMMIT  "},
 		{"ordinary block comment is still stripped", "/* COMMIT */ SELECT 1", "  SELECT 1"},
 		{"exec comment nested inside ordinary comment is not recognised", "/* /*!COMMIT*/ */", " "},
+		// Finding F1: an E'...'/e'...' string's backslash-escaped quote is now recognized as an
+		// escape, so the scanner correctly runs the quoted span past it to the real closing quote
+		// instead of stopping right after the escaped one and exposing ` -- ` as a real comment
+		// opener.
+		{"e-string backslash-escaped quote does not end the string early", `SELECT E'\' -- '`, `SELECT E'\' -- '`},
+		{"lowercase e-string backslash-escaped quote does not end the string early", `SELECT e'\' -- '`, `SELECT e'\' -- '`},
+		// An identifier merely ending in e/E (no word boundary before the quote) must not be
+		// mistaken for the E-string prefix: were it, the backslash right before the quote would
+		// wrongly be read as an escape too, extending the "string" past its real end (right after
+		// that quote) and hiding the genuine `; DROP TABLE x` that follows as if it were part of the
+		// string's own content instead of live SQL text.
+		{"identifier ending in e is not mistaken for the E-string prefix", `SELECT value'\' ; DROP TABLE x -- ' FROM t`, `SELECT value'\' ; DROP TABLE x  `},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -122,6 +134,17 @@ func TestAssertNoTransactionEscalation(t *testing.T) {
 		{"mysql executable comment tx_read_only off is rejected", []string{"/*!SET SESSION tx_read_only = OFF*/"}, true},
 		{"version-gated executable comment commit is rejected", []string{"/*!50000COMMIT*/"}, true},
 		{"ordinary block comment commit is still just a comment", []string{"/* COMMIT */ SELECT 1"}, false},
+		// Finding F1 (HIGH, security): a Postgres E'...' string's backslash-escaped quote closed the
+		// scanner's idea of the string early, so `-- '` right after it looked like a real line
+		// comment — which then swallowed a genuine COMMIT/SET escalation chain (ending the wrapping
+		// read-only transaction, then flipping the session writable) along with the DELETE it was
+		// hiding. Pre-fix, AssertNoTransactionEscalation on this exact chain returned nil (allowed);
+		// it must now reject.
+		{"e-string backslash-escaped quote hides a commit/set escalation chain", []string{`SELECT E'\' -- ' ; COMMIT; SET transaction_read_only = off; DELETE FROM t`}, true},
+		// A quoted run containing a raw backslash is rejected outright regardless of whether it
+		// parses as an E-string: standard_conforming_strings=off makes even a plain '...' string
+		// honour backslash escaping, which this scanner cannot detect at runtime, so it fails closed.
+		{"plain quoted string containing a backslash is rejected outright", []string{`SELECT '\' AS note`}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

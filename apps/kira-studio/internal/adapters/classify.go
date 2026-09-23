@@ -134,9 +134,16 @@ func ClassifySQL(statement string) OpClass {
 
 	// Embedded-semicolon guard: a leading keyword says nothing about a second statement smuggled
 	// behind it, and whether a driver executes both is a per-driver DSN detail this classifier must
-	// not depend on. A semicolon inside a string literal costs a false ClassUnknown (a prompt); a
-	// missed second statement costs a silent write. Only one of those is acceptable.
-	if strings.Contains(stripped, ";") {
+	// not depend on. Run against the RAW statement (finding F1, HIGH/security) — never the
+	// comment-stripped stripped above: StripSQLComments' quote scanner can itself be fooled by a
+	// backslash-escaped quote in a dialect whose strings honour backslash (Postgres
+	// E'...'/standard_conforming_strings=off, MySQL/MariaDB's own default), closing a quoted run
+	// early and exposing a real trailing `;` as though it sat inside a `--` comment it never
+	// actually was — checking raw text side-steps that class of bug entirely. A semicolon inside a
+	// legitimate string literal (or genuinely inside a real comment) costs a false ClassUnknown (a
+	// prompt); a missed second statement costs a silent write. Only one of those is acceptable.
+	raw := StripOneTrailingSemicolon(strings.TrimSpace(statement))
+	if strings.Contains(raw, ";") {
 		return ClassUnknown
 	}
 

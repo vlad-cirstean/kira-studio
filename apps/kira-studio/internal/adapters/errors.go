@@ -128,21 +128,34 @@ func endsTransaction(stmt string) bool {
 // repeats the quote character as content rather than closing). Runs to len(r) — the caller's own
 // EOF — when unterminated, never past it.
 //
-// Backslash is deliberately never treated as an escape here, unlike sql-lex.ts's own default
-// (packages/shared/domain/sql-lex.ts): this scanner backs every SQL dialect this app supports
-// without knowing which one is live, and Postgres's own standard-conforming strings (the default
-// since 9.1) do not honour a backslash escape at all. Assuming one when the live dialect is
-// Postgres would extend a quoted span past where Postgres itself ends it, hiding a real statement
-// separator inside what this scanner would wrongly still consider a string — exactly the class of
-// bug this function exists to close (finding #1, M6). Treating backslash as an ordinary character
-// only ever makes a detected span shorter than or equal to the real one on every dialect (MySQL
-// included, where backslash is an escape by default): worst case a real escaped quote closes our
-// span early and leftover text reads as loose SQL, costing a false ClassUnknown — never a missed
-// statement boundary the far more dangerous direction.
-func scanQuote(r []rune, i int) int {
+// Backslash is deliberately never treated as an escape here, with one exception (escapeBackslash),
+// unlike sql-lex.ts's own default (packages/shared/domain/sql-lex.ts): this scanner backs every SQL
+// dialect this app supports without knowing which one is live, and Postgres's own
+// standard-conforming strings (the default since 9.1) do not honour a backslash escape at all.
+// Assuming one unconditionally would extend a quoted span past where a standard-conforming Postgres
+// string actually ends it, hiding a real statement separator inside what this scanner would wrongly
+// still consider a string.
+//
+// escapeBackslash is true only for a Postgres E'...'/e'...' string (isEStringOpen, checked by the
+// caller): Postgres treats backslash as an escape inside an E-string unconditionally, regardless of
+// standard_conforming_strings, so this one case is safe to special-case rather than guess. Without
+// it (finding F1, HIGH/security): `E'\' -- '` — a real Postgres string whose content is `\` followed
+// by ` -- ` — was read as ending right after the backslash-escaped quote, with the genuine closing
+// quote and everything after it (a real `;` and a smuggled second statement) left to be swallowed by
+// what then looked like a `--` line comment starting right after the falsely-closed string,
+// bypassing both ClassifySQL and AssertNoTransactionEscalation. Every other quoted run (plain `'...'`
+// strings when standard_conforming_strings is off at runtime — unknowable here — MySQL/MariaDB's own
+// default backslash escaping, double-quoted identifiers, backtick identifiers) still treats
+// backslash as ordinary content: AssertNoTransactionEscalation's own quoteHasBackslash is the
+// fail-closed backstop for exactly those cases this scanner cannot resolve on its own.
+func scanQuote(r []rune, i int, escapeBackslash bool) int {
 	quote := r[i]
 	j := i + 1
 	for j < len(r) {
+		if escapeBackslash && r[j] == '\\' {
+			j += 2
+			continue
+		}
 		if r[j] == quote {
 			if j+1 < len(r) && r[j+1] == quote {
 				j += 2
@@ -153,6 +166,29 @@ func scanQuote(r []rune, i int) int {
 		j++
 	}
 	return j
+}
+
+// isEStringOpen reports whether the quote at r[i] opens a Postgres E'...'/e'...' string — the one
+// case backslash unconditionally escapes regardless of standard_conforming_strings (finding F1).
+// Requires r[i] == '\'' and the immediately preceding rune to be a standalone E/e: a word boundary
+// before it (or start of input), so an identifier merely ending in e/E (`table`, `value`) is never
+// mistaken for the prefix.
+func isEStringOpen(r []rune, i int) bool {
+	if r[i] != '\'' || i == 0 {
+		return false
+	}
+	prev := r[i-1]
+	if prev != 'E' && prev != 'e' {
+		return false
+	}
+	if i-2 >= 0 && isSQLIdentRune(r[i-2]) {
+		return false
+	}
+	return true
+}
+
+func isSQLIdentRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // scanDollarQuote reports the end index (exclusive) of a Postgres dollar-quoted string opened by
@@ -312,7 +348,7 @@ func startsBlockCommentClose(r []rune, i int) bool {
 
 // scanQuoteArm handles a quoted run opened at r[i] — StripSQLComments's quote-aware pass-through.
 func scanQuoteArm(r []rune, i int) (next int, chunk string) {
-	end := scanQuote(r, i)
+	end := scanQuote(r, i, isEStringOpen(r, i))
 	return end, string(r[i:end])
 }
 
@@ -396,12 +432,70 @@ func execCommentMarkerLen(r []rune, i int) int {
 // session default plus the wrapping transaction), not a substitute for it.
 func AssertNoTransactionEscalation(statements []string) error {
 	for _, stmt := range statements {
+		if err := AssertNoHiddenStatement(stmt); err != nil {
+			return err
+		}
 		stripped := StripSQLComments(stmt)
 		if sqlReadWrite.MatchString(stripped) || sqlReadOnlyVarOff.MatchString(stripped) || endsTransaction(stripped) {
 			return New(CodeUnsupported, "connection is read-only", nil)
 		}
 	}
 	return nil
+}
+
+// AssertNoHiddenStatement is F1's fail-closed backstop for a read-only Postgres connection, over
+// any raw SQL fragment this app treats as one unit without ever fully parsing it: a console
+// statement (via AssertNoTransactionEscalation above), or a grid filter / text-sort clause
+// concatenated straight into a WHERE/ORDER BY and run over pgx's simple protocol with no wrapping
+// transaction or classification of its own — the second, lower-weight path finding F1 names.
+// Postgres's simple protocol executes every statement found in a string it is handed, so either
+// input hiding a second top-level statement must be rejected outright rather than let the extra
+// statement run:
+//
+//   - quoteHasBackslash: a quoted run containing a backslash. scanQuote only special-cases a
+//     Postgres E'...'/e'...' string; an ordinary '...' string honours a backslash escape too
+//     whenever standard_conforming_strings is off at runtime, which nothing at parse time can
+//     detect, so this scanner's own idea of where such a quote ends cannot be trusted — treated as
+//     a reject, not a guess.
+//   - a `;` that survives in the comment-stripped text after exactly one legitimate trailing
+//     semicolon is removed — a hidden second statement a naive split missed.
+func AssertNoHiddenStatement(s string) error {
+	if quoteHasBackslash(s) {
+		return New(CodeUnsupported, "connection is read-only", nil)
+	}
+	stripped := strings.TrimSpace(StripOneTrailingSemicolon(strings.TrimSpace(StripSQLComments(s))))
+	if strings.Contains(stripped, ";") {
+		return New(CodeUnsupported, "connection is read-only", nil)
+	}
+	return nil
+}
+
+// quoteHasBackslash reports whether any quoted run in s (as scanQuote's own doubled-quote
+// convention delimits it, backslash never treated as an escape here — the ordinary, conservative
+// reading) contains a raw backslash. A Postgres dollar-quoted run is skipped over (never itself
+// ambiguous — its terminator is its own repeated `$tag$`, not a quote character a backslash could
+// interact with) so it is never mistaken for one.
+func quoteHasBackslash(s string) bool {
+	r := []rune(s)
+	for i := 0; i < len(r); {
+		switch {
+		case isQuoteStart(r[i]):
+			end := scanQuote(r, i, false)
+			if strings.ContainsRune(string(r[i:end]), '\\') {
+				return true
+			}
+			i = end
+		case r[i] == '$':
+			if end := scanDollarQuote(r, i); end >= 0 {
+				i = end
+				continue
+			}
+			i++
+		default:
+			i++
+		}
+	}
+	return false
 }
 
 // CheckNotStarted is errors.ts's assertNotCancelled(ctx) — Adapter rule 2's pre-flight check,

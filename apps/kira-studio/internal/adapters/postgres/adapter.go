@@ -305,6 +305,9 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
+	if err := assertReadOnlyFilterSortSafe(a.readOnly, req.Filter, req.Sort); err != nil {
+		return nil, err
+	}
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)
 	if err != nil {
 		return nil, err
@@ -328,6 +331,9 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adapters.OpCtx) (adapters.CountResult, error) {
 	databaseSegment, schemaSegment, objectSegment, err := requireThreeSegmentDataPath(req.Path.Segments, "count")
 	if err != nil {
+		return adapters.CountResult{}, err
+	}
+	if err := assertReadOnlyFilterSortSafe(a.readOnly, req.Filter, nil); err != nil {
 		return adapters.CountResult{}, err
 	}
 	conn, release, err := a.requireClient(ctx, databaseSegment.Name)

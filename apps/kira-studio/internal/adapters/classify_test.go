@@ -94,6 +94,16 @@ func TestClassifySQL(t *testing.T) {
 		{"empty statement is unknown", "", adapters.ClassUnknown},
 		{"whitespace-only statement is unknown", "   \n\t  ", adapters.ClassUnknown},
 		{"comment-only statement is unknown", "-- just a comment", adapters.ClassUnknown},
+
+		// Finding F1 (HIGH, security): a Postgres E'...' string's backslash-escaped quote was never
+		// recognized as an escape, so the scanner read the string as closing right after it —
+		// exposing the genuine trailing `-- '` as if it opened a real line comment, which then
+		// swallowed the real `;` and the smuggled DELETE along with it. Pre-fix this classified
+		// ClassRead (confirmed against the pre-fix scanner); the embedded-semicolon guard now runs
+		// against the raw statement, so it classifies ClassUnknown regardless of whether the
+		// E-string scanning fix alone would also have exposed the real `;`.
+		{"postgres E-string backslash-escaped quote hides a real semicolon and delete", `SELECT E'\' -- ' ; DELETE FROM t`, adapters.ClassUnknown},
+		{"lowercase e-string backslash-escaped quote hides a real semicolon", `SELECT e'\' -- ' ; DELETE FROM t`, adapters.ClassUnknown},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

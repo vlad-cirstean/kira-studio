@@ -10,6 +10,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
 // quoteIdent is read.ts's quoteIdent. The NUL check is unreachable with any real Postgres
@@ -61,6 +62,32 @@ func normalizeCellText(value string, typeClass page.TypeClass) string {
 
 // readReq is adapter.ts's ReadRequest minus Path — the request shape readPage actually consumes.
 type readReq = adapters.ReadReq
+
+// assertReadOnlyFilterSortSafe is F1 fix step 3's own guard, called from Read/Count before either
+// touches a connection: a grid filter and a text-sort clause are raw SQL fragments concatenated
+// straight into a WHERE/ORDER BY and run over pgx's simple protocol (query.go's TextMode) with no
+// wrapping read-only transaction and no classification of their own — unlike a console statement,
+// which AssertNoTransactionEscalation already covers. Postgres's simple protocol runs every
+// statement found in a string it is handed, so on a read-only connection either input hiding a
+// second top-level statement is rejected outright rather than let it run. Only gated on readOnly
+// (finding F1's own fix step 3 scope): a non-read-only connection's own MCP write-permission gate
+// is a separate concern this function does not attempt to close.
+func assertReadOnlyFilterSortSafe(readOnly bool, filter *string, sort *model.SortSpec) error {
+	if !readOnly {
+		return nil
+	}
+	if filter != nil {
+		if err := adapters.AssertNoHiddenStatement(*filter); err != nil {
+			return err
+		}
+	}
+	if sort != nil && sort.Kind == "text" {
+		if err := adapters.AssertNoHiddenStatement(sort.Text); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // readPage is read.ts's readPage — the densest function in the package.
 func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {

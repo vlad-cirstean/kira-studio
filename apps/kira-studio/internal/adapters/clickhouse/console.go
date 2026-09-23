@@ -28,6 +28,15 @@ func (a *Adapter) ClassifyStatement(_ context.Context, statement string) (adapte
 // ANALYZE is present, applied here unconditionally since this dialect's plain form is not cleared
 // either.
 func classifyClickHouseSQL(statement string) adapters.OpClass {
+	// Embedded-semicolon guard against the RAW statement, same reasoning and same direction as
+	// ClassifySQL's own (finding F1) — checked here too since the EXPLAIN-target recursion below
+	// calls adapters.ClassifySQL on a substring that no longer includes whatever preceded the
+	// EXPLAIN keyword itself.
+	raw := adapters.StripOneTrailingSemicolon(strings.TrimSpace(statement))
+	if strings.Contains(raw, ";") {
+		return adapters.ClassUnknown
+	}
+
 	stripped := strings.TrimSpace(adapters.StripOneTrailingSemicolon(adapters.StripSQLComments(statement)))
 	fields := strings.Fields(stripped)
 	if len(fields) > 0 && strings.EqualFold(fields[0], "EXPLAIN") {
