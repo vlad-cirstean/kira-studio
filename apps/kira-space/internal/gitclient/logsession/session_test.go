@@ -320,6 +320,64 @@ func (r *routingRunner) Start(ctx context.Context, gitPath string, spec gitclien
 	return r.blocking, nil
 }
 
+// corruptLogRunner answers a for-each-ref (the ref-snapshot guard) with a canned empty snapshot
+// and every "log" spawn with a static process whose stdout is one NUL-terminated record with too
+// few %x1f fields — F2's own parse-error trigger.
+type corruptLogRunner struct {
+	mu     sync.Mutex
+	spawns int
+}
+
+func (r *corruptLogRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	if len(spec.Args) > 0 && spec.Args[0] == "for-each-ref" {
+		return &staticProcess{stdout: nil}, nil
+	}
+	r.mu.Lock()
+	r.spawns++
+	r.mu.Unlock()
+	return &staticProcess{stdout: []byte("not-enough-fields\x00")}, nil
+}
+func (r *corruptLogRunner) logSpawns() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.spawns
+}
+
+// TestSession_ParseErrorPermanentlyFailsSession is F2's own regression guard: a parse error must
+// kill the walk's process and fail the Session permanently, never silently resume past the
+// corrupt chunk on a later ReadPage (which would drop the rest of that chunk's records and drift
+// readCount, duplicating rows on a --skip resume).
+func TestSession_ParseErrorPermanentlyFailsSession(t *testing.T) {
+	runner := &corruptLogRunner{}
+	sess := logsession.Open(
+		logsession.Deps{Runner: runner, GitPath: "git", Dir: ".", Read: passthroughRead},
+		logsession.Options{Walk: porcelain.WalkSpec{Scope: "all"}, PageSize: 10, IdleReclaim: -1},
+	)
+	defer sess.Close()
+
+	_, err := sess.ReadPage(context.Background(), func(porcelain.CommitRecord) {
+		t.Fatal("sink must not be called for a corrupt record")
+	})
+	if err == nil {
+		t.Fatal("ReadPage: want a parse error, got nil")
+	}
+	if runner.logSpawns() != 1 {
+		t.Fatalf("log spawns after the corrupt page = %d, want 1", runner.logSpawns())
+	}
+
+	// A second ReadPage must not silently resume (a --skip respawn past the corrupt chunk) — it
+	// must return the SAME failure, with no further spawn.
+	_, err2 := sess.ReadPage(context.Background(), func(porcelain.CommitRecord) {
+		t.Fatal("sink must not be called once the session has failed")
+	})
+	if err2 == nil {
+		t.Fatal("second ReadPage: want the session's permanent failure, got nil")
+	}
+	if runner.logSpawns() != 1 {
+		t.Fatalf("log spawns after second ReadPage = %d, want still 1 (no resume past a corrupt chunk)", runner.logSpawns())
+	}
+}
+
 func TestSession_CancellationMidPage_KillsChildAndReturnsPromptly(t *testing.T) {
 	runner := &routingRunner{blocking: newBlockingProcess()}
 	sess := logsession.Open(

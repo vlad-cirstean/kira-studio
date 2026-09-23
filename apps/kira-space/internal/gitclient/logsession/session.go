@@ -97,6 +97,12 @@ type Session struct {
 	baseSnapshot map[string]string // refname -> object id, captured before the first spawn (D9)
 	reclaimTimer *time.Timer
 	cachedTotal  *int
+	// failed is set once, permanently, by consumeChunkLocked/failLocked on a split or parse error
+	// (F2): the process is killed immediately rather than left running with the splitter's stream
+	// position desynced from readCount, and every subsequent ReadPage returns this same error
+	// instead of silently spawning a --skip=readCount resume that would duplicate the records the
+	// corrupt chunk never delivered.
+	failed error
 }
 
 // exhaustedLocked is what every caller means by "exhausted": the walk's process drained AND every
@@ -125,6 +131,10 @@ func (s *Session) ReadPage(ctx context.Context, sink func(porcelain.CommitRecord
 	defer s.mu.Unlock()
 
 	s.disarmReclaimLocked()
+
+	if s.failed != nil {
+		return Outcome{}, s.failed
+	}
 
 	if s.exhaustedLocked() {
 		return Outcome{Exhausted: true}, nil
@@ -206,12 +216,12 @@ func (s *Session) fillLocked(ctx context.Context, sink func(porcelain.CommitReco
 func (s *Session) consumeChunkLocked(chunk []byte, sink func(porcelain.CommitRecord), pageSize, appended int) (int, error) {
 	recs, splitErr := s.splitter.Push(chunk)
 	if splitErr != nil {
-		return appended, splitErr
+		return appended, s.failLocked(splitErr)
 	}
 	for _, rec := range recs {
 		cr, parseErr := porcelain.ParseLogRecord(rec)
 		if parseErr != nil {
-			return appended, parseErr
+			return appended, s.failLocked(parseErr)
 		}
 		s.readCount++
 		if appended < pageSize {
@@ -223,6 +233,22 @@ func (s *Session) consumeChunkLocked(chunk []byte, sink func(porcelain.CommitRec
 		}
 	}
 	return appended, nil
+}
+
+// failLocked marks the session permanently failed (F2): a split/parse error means the splitter's
+// stream position and s.readCount have already diverged from what the child has actually written,
+// so continuing to read would either silently drop the rest of this chunk's records or, on a
+// later reclaim, resume with a --skip offset that duplicates rows. Killing the process now instead
+// of leaving it running-but-unread also frees it rather than letting it sit blocked on a full pipe
+// until GC/idle-reclaim. Caller holds mu.
+func (s *Session) failLocked(err error) error {
+	if s.proc != nil {
+		_ = s.proc.Close()
+		s.proc = nil
+	}
+	s.eof = false // this is a hard failure, not a clean drain -- exhaustedLocked must stay false
+	s.failed = fmt.Errorf("logsession: %w", err)
+	return s.failed
 }
 
 // finishEOFLocked is fillLocked's own EOF tail: flush the splitter (any leftover bytes are a

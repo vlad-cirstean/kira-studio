@@ -227,6 +227,14 @@ func (w *Walk) readPageLocked(ctx context.Context) (appended int, err error) {
 			w.store.Append(cr)
 		})
 		if rerr != nil {
+			// F2 cross-chunk fix (Part 14, flagged for Part 16's own reviewer): a logsession
+			// split/parse error now leaves that Session permanently failed — every further
+			// ReadPage on it returns the same error rather than silently resuming past the
+			// corrupt chunk. Without resetLocked here, this walk would stay wedged behind that
+			// same dead session forever (every later loadMore hitting the identical error). Reset
+			// so the NEXT attempt opens a fresh session instead; this one still surfaces rerr to
+			// its own caller so the failed page read is not silently swallowed.
+			w.resetLocked()
 			return 0, rerr
 		}
 		if outcome.Stale {
