@@ -581,7 +581,7 @@ func (e *RepoEntry) runPullOp(roCtx, spawnCtx context.Context, conn *Conn, deps 
 	case gitpreflight.PullMerge:
 		integrateArgv = gitops.MergeArgs(upstream)
 	case gitpreflight.PullRebase:
-		integrateArgv = gitops.RebaseArgs(upstream)
+		integrateArgv = gitops.RebaseArgs(upstream, e.wantsRebaseMerges(roCtx, params.Branch))
 	default:
 		integrateArgv = gitops.MergeFFOnlyArgs(upstream)
 	}
@@ -707,6 +707,37 @@ func parsePullConfig(raw []byte, branch string) gitpreflight.PullConfigValues {
 		}
 	}
 	return cfg
+}
+
+// wantsRebaseMerges is P108 Part 15 F6's own fix, flagged for this file's own future review (Part
+// 16 — this fix's exact boundary sits here, at gitsession's own executor, same pattern F1 already
+// established in this same file): PullPreflight's own resolved PullStrategy is a wire value with
+// exactly three members (@kira/git-ipc's own union) — widening it to a fourth so the client could
+// carry "and use --rebase-merges" back to the executor would be a git-ipc contract change (Part
+// 17's own boundary, not yet reviewed). Instead, this re-reads the SAME one config spawn
+// PullPreflight already made (gitops.PullConfigArgs/parsePullConfig), right before the rebase
+// actually runs, and asks gitpreflight's own pure classifiers — the same branch.<name>.rebase-
+// over-pull.rebase precedence ResolvePullStrategy's own ladder already uses (MapRebaseValue's own
+// ok return: an unset/unrecognised branch-level key must still fall through to pull.rebase, not be
+// treated as "no").
+//
+// Known limitation, not fully resolved within gitpreflight/gitops's own chunk (flagged rather than
+// guessed at, per this fix's own instructions): an EXPLICIT strategy override (params.Strategy set
+// by the user's own choice, not derived from config at all) is indistinguishable, from here, from
+// one the config ladder itself produced — this re-read cannot tell "the user explicitly chose
+// plain rebase, overriding a configured pull.rebase=merges" from "pull.rebase=merges is exactly
+// why we are rebasing at all." A git-ipc wire change (threading the ladder's own decision through
+// as a fourth, non-strategy field) is what would close that gap; out of scope here.
+func (e *RepoEntry) wantsRebaseMerges(ctx context.Context, branch string) bool {
+	raw, err := e.runAllowingExit(ctx, gitops.PullConfigArgs(branch), 0, 1)
+	if err != nil {
+		return false
+	}
+	cfg := parsePullConfig(raw.Stdout, branch)
+	if _, ok := gitpreflight.MapRebaseValue(cfg.BranchRebase); ok {
+		return gitpreflight.WantsRebaseMerges(cfg.BranchRebase)
+	}
+	return gitpreflight.WantsRebaseMerges(cfg.PullRebase)
 }
 
 // PullPreflight is remote.pullPreflight's own orchestration (D18): one config --null --get-regexp

@@ -1,5 +1,7 @@
 package gitpreflight
 
+import "strings"
+
 // PullStrategy mirrors @kira/git-ipc's own PullStrategy union verbatim.
 type PullStrategy string
 
@@ -55,19 +57,51 @@ type PullConfigValues struct {
 	PullFf *string
 }
 
-// mapRebaseValue maps true/interactive/merges -> rebase, false -> merge; anything else (including
-// an unrecognised string, or nil) is not a decision this key makes.
-func mapRebaseValue(raw *string) (PullStrategy, bool) {
+// MapRebaseValue maps a raw `branch.<name>.rebase`/`pull.rebase` config value onto a PullStrategy:
+// true (and its own synonyms) or interactive/merges -> rebase, false (and its own synonyms) ->
+// merge; anything else (including an unrecognised string, or nil) is not a decision this key
+// makes, ok is false. Exported (P108 Part 15 F6 fix) so gitsession's own executor can re-derive
+// the SAME precedence decision at pull-execution time (wantsRebaseMerges, remote.go) without
+// duplicating this table.
+//
+// F6 fix: git itself accepts boolean synonyms case-insensitively — `git_config_bool`'s own
+// accepted spellings are yes/on/1 (true) and no/off/0 (false), alongside true/false themselves —
+// plus the short forms `i` (interactive) and `m` (merges). Before this fix, only the four exact
+// strings "true"/"false"/"interactive"/"merges" were recognised, so e.g. `pull.rebase=yes` fell
+// through to this key making no decision at all, silently landing on the ff-only default instead
+// of rebasing as configured.
+func MapRebaseValue(raw *string) (PullStrategy, bool) {
 	if raw == nil {
 		return "", false
 	}
-	switch *raw {
-	case "false":
+	switch strings.ToLower(*raw) {
+	case "false", "no", "off", "0":
 		return PullMerge, true
-	case "true", "interactive", "merges":
+	case "true", "yes", "on", "1", "interactive", "i", "merges", "m":
 		return PullRebase, true
 	default:
 		return "", false
+	}
+}
+
+// WantsRebaseMerges reports whether raw (the SAME `branch.<name>.rebase`/`pull.rebase` value
+// MapRebaseValue above already classified as PullRebase) specifically asked for `--rebase-merges`
+// rather than a plain rebase (F6): git's own "merges"/"m" shorthand preserves merge commits during
+// the rebase instead of linearizing them away. Kept as its own function, not folded into
+// MapRebaseValue's own return: PullStrategy's wire union stays exactly the three values
+// @kira/git-ipc already declares (widening it to a fourth is a git-ipc contract change, Part 17's
+// own boundary) — gitsession's own executor re-reads this SAME config value a second time, right
+// before the rebase actually runs, and asks this function instead (remote.go's own
+// wantsRebaseMerges).
+func WantsRebaseMerges(raw *string) bool {
+	if raw == nil {
+		return false
+	}
+	switch strings.ToLower(*raw) {
+	case "merges", "m":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -86,10 +120,10 @@ func ResolvePullStrategy(explicit *PullStrategy, settingStrategy string, cfg Pul
 	if settingStrategy != "" && settingStrategy != "auto" {
 		return PullStrategy(settingStrategy), SourceSetting
 	}
-	if s, ok := mapRebaseValue(cfg.BranchRebase); ok {
+	if s, ok := MapRebaseValue(cfg.BranchRebase); ok {
 		return s, SourceBranchConfig
 	}
-	if s, ok := mapRebaseValue(cfg.PullRebase); ok {
+	if s, ok := MapRebaseValue(cfg.PullRebase); ok {
 		return s, SourcePullConfig
 	}
 	if cfg.PullFf != nil && *cfg.PullFf == "only" {

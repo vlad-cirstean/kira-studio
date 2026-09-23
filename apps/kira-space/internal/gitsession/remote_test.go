@@ -442,6 +442,62 @@ func TestPushPreflight_ProtectedByChecksUpstreamName(t *testing.T) {
 	}
 }
 
+// TestWantsRebaseMerges is P108 Part 15 F6's own regression proof, flagged for Part 16's future
+// reviewer (same boundary as F1's own touches in this file): the executor must re-derive
+// "--rebase-merges wanted" using the SAME branch.<name>.rebase-over-pull.rebase precedence
+// ResolvePullStrategy's own ladder already uses, not just pull.rebase alone.
+func TestWantsRebaseMerges(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+
+	t.Run("pull.rebase=merges", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		runGitStack(t, dir, "init", "-q", "-b", "main")
+		runGitStack(t, dir, "config", "pull.rebase", "merges")
+		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+		if !entry.wantsRebaseMerges(context.Background(), "main") {
+			t.Fatal("wantsRebaseMerges = false, want true (pull.rebase=merges)")
+		}
+	})
+
+	t.Run("branch-level merges wins over an unset pull.rebase", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		runGitStack(t, dir, "init", "-q", "-b", "main")
+		runGitStack(t, dir, "config", "branch.main.rebase", "m")
+		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+		if !entry.wantsRebaseMerges(context.Background(), "main") {
+			t.Fatal("wantsRebaseMerges = false, want true (branch.main.rebase=m)")
+		}
+	})
+
+	// branch.<name>.rebase=true is a RECOGNISED value (ok=true from MapRebaseValue) that is not
+	// "merges" -- it must win over pull.rebase=merges, not fall through to it, matching
+	// ResolvePullStrategy's own precedence exactly.
+	t.Run("recognised branch-level value wins over pull.rebase=merges", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		runGitStack(t, dir, "init", "-q", "-b", "main")
+		runGitStack(t, dir, "config", "branch.main.rebase", "true")
+		runGitStack(t, dir, "config", "pull.rebase", "merges")
+		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+		if entry.wantsRebaseMerges(context.Background(), "main") {
+			t.Fatal("wantsRebaseMerges = true, want false -- branch.main.rebase=true is the winning, recognised value")
+		}
+	})
+
+	t.Run("neither key set", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		runGitStack(t, dir, "init", "-q", "-b", "main")
+		entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+		if entry.wantsRebaseMerges(context.Background(), "main") {
+			t.Fatal("wantsRebaseMerges = true, want false")
+		}
+	})
+}
+
 func runGitStackOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)

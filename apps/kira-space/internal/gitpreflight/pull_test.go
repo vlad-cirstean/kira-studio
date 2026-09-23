@@ -100,6 +100,55 @@ func TestResolvePullStrategy_BranchConfigValueMapping(t *testing.T) {
 	}
 }
 
+// TestMapRebaseValue_GitOwnSynonyms is P108 Part 15 F6's own regression proof: git's own
+// git_config_bool accepts these synonyms case-insensitively, and "i"/"m" as interactive/merges'
+// own short forms — before this fix, only the four exact strings "true"/"false"/"interactive"/
+// "merges" were recognised, so e.g. pull.rebase=yes silently fell through to the ff-only default.
+func TestMapRebaseValue_GitOwnSynonyms(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		raw  string
+		want gitpreflight.PullStrategy
+	}{
+		{"yes", gitpreflight.PullRebase},
+		{"On", gitpreflight.PullRebase},
+		{"1", gitpreflight.PullRebase},
+		{"True", gitpreflight.PullRebase},
+		{"i", gitpreflight.PullRebase},
+		{"m", gitpreflight.PullRebase},
+		{"no", gitpreflight.PullMerge},
+		{"Off", gitpreflight.PullMerge},
+		{"0", gitpreflight.PullMerge},
+		{"False", gitpreflight.PullMerge},
+	}
+	for _, c := range cases {
+		strategy, ok := gitpreflight.MapRebaseValue(&c.raw)
+		if !ok || strategy != c.want {
+			t.Fatalf("MapRebaseValue(%q) = (%q, %v), want (%q, true)", c.raw, strategy, ok, c.want)
+		}
+	}
+}
+
+// TestWantsRebaseMerges is F6's own second regression proof: "merges"/"m" must additionally signal
+// --rebase-merges, not just an ordinary PullRebase strategy — matched case-insensitively, same as
+// MapRebaseValue's own synonyms.
+func TestWantsRebaseMerges(t *testing.T) {
+	t.Parallel()
+	for _, raw := range []string{"merges", "Merges", "m", "M"} {
+		if !gitpreflight.WantsRebaseMerges(&raw) {
+			t.Fatalf("WantsRebaseMerges(%q) = false, want true", raw)
+		}
+	}
+	for _, raw := range []string{"true", "interactive", "false", ""} {
+		if gitpreflight.WantsRebaseMerges(&raw) {
+			t.Fatalf("WantsRebaseMerges(%q) = true, want false", raw)
+		}
+	}
+	if gitpreflight.WantsRebaseMerges(nil) {
+		t.Fatal("WantsRebaseMerges(nil) = true, want false")
+	}
+}
+
 func TestClassifyPull_CleanNoBlockers(t *testing.T) {
 	t.Parallel()
 	got := gitpreflight.ClassifyPull(gitpreflight.ClassifyPullInput{
