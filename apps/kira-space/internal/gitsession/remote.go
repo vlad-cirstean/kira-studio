@@ -296,10 +296,27 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 	protectedBranches, _, _ := e.settings()
 
 	if params.Kind == "forcePush" || params.Kind == "deleteRemoteBranch" {
-		if match := gitpreflight.MatchProtectedBranch(params.Branch, protectedBranches); match != nil && params.ConfirmToken != params.Branch {
+		// P108 Part 15 F1 fix (flagged for Part 16's future reviewer — the bug and its fix both sit
+		// at this exact boundary, but this file belongs to Part 16, not yet reviewed): this gate must
+		// match/confirm against the UPSTREAM's branch name, not params.Branch's LOCAL one —
+		// runPushFamily below force-pushes to resolveUpstreamRemoteBranch's result, which can differ
+		// from params.Branch (a local "feat" tracking "origin/main"). Checking params.Branch let a
+		// force-push to a differently-named protected upstream skip the typed-confirmation gate
+		// entirely: MatchProtectedBranch never saw the real destination name. deleteRemoteBranch
+		// already names the remote branch directly in params.Branch (runPushFamily's own default
+		// case), so only forcePush needs the resolve.
+		checkBranch := params.Branch
+		if params.Kind == "forcePush" {
+			remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
+			if uerr != nil {
+				return RemoteOpResult{}, uerr
+			}
+			checkBranch = remoteBranch
+		}
+		if match := gitpreflight.MatchProtectedBranch(checkBranch, protectedBranches); match != nil && params.ConfirmToken != checkBranch {
 			return e.remoteResultNoSpawn(ctx, &RemoteOpError{
 				Kind:    "ProtectedBranch",
-				Message: fmt.Sprintf("%s is protected by %q — type the branch name to confirm", params.Branch, match.Pattern),
+				Message: fmt.Sprintf("%s is protected by %q — type the branch name to confirm", checkBranch, match.Pattern),
 			})
 		}
 	}
@@ -653,7 +670,10 @@ func (e *RepoEntry) PushPreflight(ctx context.Context, remote, branch string) (g
 	}
 
 	return gitpreflight.ClassifyPush(gitpreflight.ClassifyPushInput{
-		Branch: branch, Upstream: upstream, Ahead: ahead, Behind: behind,
+		// P108 Part 15 F1 fix (flagged for Part 16's future reviewer, same boundary as the
+		// RunRemote gate above): protected-branch matching must run against the branch this push
+		// actually targets on the remote (remoteBranch), not the local branch's own name.
+		Branch: remoteBranch, Upstream: upstream, Ahead: ahead, Behind: behind,
 		RemoteTip: remoteTip, ProtectedBranches: protectedBranches,
 	}), nil
 }

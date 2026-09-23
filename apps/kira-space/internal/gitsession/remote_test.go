@@ -329,6 +329,119 @@ func TestPushPreflight_DifferentlyNamedUpstreamIsNotWouldSetUpstream(t *testing.
 	}
 }
 
+// TestRunRemote_ForcePush_ProtectedGateChecksUpstreamName is P108 Part 15 F1's own regression
+// proof, a security-relevant force-push bypass (flagged for Part 16's future reviewer — this file
+// is Part 16's, not yet reviewed, but the bug and its fix both sit at this exact boundary). Before
+// the fix, RunRemote's protected-branch gate matched/confirmed against params.Branch, the LOCAL
+// branch name — but a force-push actually lands on resolveUpstreamRemoteBranch's result, which can
+// differ. A local "feat" tracking a protected "origin/main" upstream slipped past the gate
+// entirely: MatchProtectedBranch never saw "main", so any (or no) confirmation matched by omission.
+func TestRunRemote_ForcePush_ProtectedGateChecksUpstreamName(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+
+	remoteDir := t.TempDir()
+	runGitStack(t, remoteDir, "init", "-q", "--bare", "-b", "main")
+
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "x\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "remote", "add", "origin", remoteDir)
+	runGitStack(t, dir, "push", "-q", "origin", "main")
+	runGitStack(t, dir, "fetch", "-q", "origin")
+	// feat tracks origin/main -- a differently-named upstream, "main" is the protected pattern.
+	runGitStack(t, dir, "branch", "feat")
+	runGitStack(t, dir, "config", "branch.feat.remote", "origin")
+	runGitStack(t, dir, "config", "branch.feat.merge", "refs/heads/main")
+	mainSha := runGitStackOutput(t, dir, "rev-parse", "refs/remotes/origin/main")
+
+	registry := NewRegistry(gitclient.NewExecRunner())
+	registry.Settings = func() ([]string, int, string) { return []string{"main"}, 0, "" }
+	t.Cleanup(registry.Close)
+	conn := NewConn(ConnID("f1-test-conn"), "test-client", "test-client-label", nil)
+	summary, err := conn.Open(context.Background(), registry, "git", dir)
+	if err != nil {
+		t.Fatalf("conn.Open: %v", err)
+	}
+	t.Cleanup(conn.Close)
+	entry, ok := conn.Entry(summary.RepoID)
+	if !ok {
+		t.Fatal("conn.Entry: not held after Open")
+	}
+	ctx := context.Background()
+
+	// Typing the LOCAL branch name ("feat") must NOT clear the gate -- "main" is what's actually
+	// protected and what this force-push actually targets on the remote.
+	result, err := entry.RunRemote(ctx, conn, RemoteOpParams{
+		Kind: "forcePush", Remote: "origin", Branch: "feat", ConfirmToken: "feat",
+		ExpectedRemoteTip: &mainSha,
+	}, RemoteDeps{})
+	if err != nil {
+		t.Fatalf("RunRemote(forcePush, confirm=feat): %v", err)
+	}
+	if result.OK || result.Error == nil || result.Error.Kind != "ProtectedBranch" {
+		t.Fatalf("RunRemote(forcePush, confirm=feat) = %+v, want a blocked ProtectedBranch result -- "+
+			"feat's upstream is origin/main, a protected branch, regardless of feat's own local name", result)
+	}
+
+	// Typing the UPSTREAM's real name ("main") clears the gate -- the push may still fail or
+	// succeed past this point, but never on ProtectedBranch again.
+	result, err = entry.RunRemote(ctx, conn, RemoteOpParams{
+		Kind: "forcePush", Remote: "origin", Branch: "feat", ConfirmToken: "main",
+		ExpectedRemoteTip: &mainSha,
+	}, RemoteDeps{})
+	if err != nil {
+		t.Fatalf("RunRemote(forcePush, confirm=main): %v", err)
+	}
+	if result.Error != nil && result.Error.Kind == "ProtectedBranch" {
+		t.Fatalf("RunRemote(forcePush, confirm=main) = %+v, want the gate cleared once the real upstream name is typed", result)
+	}
+}
+
+// TestPushPreflight_ProtectedByChecksUpstreamName is P108 Part 15 F1's own second regression proof:
+// PushPreflight's ClassifyPushInput.Branch had the identical local-vs-upstream bug — a differently
+// named upstream's protection never surfaced in the preflight's own protectedBy field.
+func TestPushPreflight_ProtectedByChecksUpstreamName(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "x\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "branch", "feat")
+	runGitStack(t, dir, "remote", "add", "origin", t.TempDir())
+	headSha := runGitStackOutput(t, dir, "rev-parse", "feat")
+	runGitStack(t, dir, "update-ref", "refs/remotes/origin/main", headSha)
+	runGitStack(t, dir, "config", "branch.feat.remote", "origin")
+	runGitStack(t, dir, "config", "branch.feat.merge", "refs/heads/main")
+
+	registry := NewRegistry(gitclient.NewExecRunner())
+	registry.Settings = func() ([]string, int, string) { return []string{"main"}, 0, "" }
+	t.Cleanup(registry.Close)
+	conn := NewConn(ConnID("f1-preflight-conn"), "test-client", "test-client-label", nil)
+	summary, err := conn.Open(context.Background(), registry, "git", dir)
+	if err != nil {
+		t.Fatalf("conn.Open: %v", err)
+	}
+	t.Cleanup(conn.Close)
+	entry, ok := conn.Entry(summary.RepoID)
+	if !ok {
+		t.Fatal("conn.Entry: not held after Open")
+	}
+
+	got, err := entry.PushPreflight(context.Background(), "origin", "feat")
+	if err != nil {
+		t.Fatalf("PushPreflight: %v", err)
+	}
+	if got.ProtectedBy == nil || *got.ProtectedBy != "main" {
+		t.Fatalf("ProtectedBy = %v, want \"main\" -- feat's real upstream (origin/main) is protected, "+
+			"regardless of feat's own local name", got.ProtectedBy)
+	}
+}
+
 func runGitStackOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
