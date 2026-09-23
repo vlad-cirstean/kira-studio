@@ -14,6 +14,7 @@ import '@workbench/testing/unit/window';
 import { describe, expect, test } from 'bun:test';
 import type { PageCursor } from '@shared/protocol/data-ops';
 import type { KeyValuePage, TextColumnChunk } from '@shared/protocol/page';
+import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { isReactive } from 'vue';
@@ -34,20 +35,6 @@ const keyValueViewStore = useKeyValueViewStore();
 const { setPage } = await import('../../frontend/src/views/shared/keyvalue/page');
 const { useGridViewStore } = await import('../../frontend/src/views/grid/state');
 const gridViewStore = useGridViewStore();
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (v: T) => void;
-  reject: (e: unknown) => void;
-} {
-  let resolve!: (v: T) => void;
-  let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 function emptyChunk(): TextColumnChunk {
   return {

@@ -1,72 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 import type {
   CheckoutPreflight,
-  EventKey,
-  EventPayload,
   OpResult,
-  ParamsOf,
   PullPreflight,
   RefRow,
   RemoteOpResult,
-  RequestKey,
-  ResultOf,
   RevertPreflight,
   StashEntry,
   StatusSummary,
-  StreamChunkOf,
-  StreamKey,
-  StreamParamsOf,
-  Transport,
 } from '@kira/git-ipc';
+import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
+import { FakeTransport } from '../testing/fakeTransport.ts';
 import { OpsState, remoteFromUpstreamRef } from './ops.ts';
 import { RefsState } from './refs.ts';
-
-/** Same fake `Transport` shape `pr.test.ts` already established — request() is scripted per
- *  method via `onRequest`, which receives the method name so one script can branch on it. */
-class FakeTransport implements Transport {
-  onRequest: (method: RequestKey, params: unknown) => unknown = () => {
-    throw new Error('unscripted request');
-  };
-  readonly calls: Array<{ method: RequestKey; params: unknown }> = [];
-  #handlers = new Map<EventKey, Set<(payload: unknown) => void>>();
-
-  request<K extends RequestKey>(method: K, params: ParamsOf<K>): Promise<ResultOf<K>> {
-    this.calls.push({ method, params });
-    return Promise.resolve(this.onRequest(method, params) as ResultOf<K>);
-  }
-
-  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
-    let set = this.#handlers.get(method);
-    if (!set) {
-      set = new Set();
-      this.#handlers.set(method, set);
-    }
-    const wrapped = handler as (payload: unknown) => void;
-    set.add(wrapped);
-    return () => set?.delete(wrapped);
-  }
-
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
-    for (const handler of this.#handlers.get(method) ?? []) {
-      handler(payload);
-    }
-  }
-
-  stream<K extends StreamKey>(
-    _method: K,
-    _params: StreamParamsOf<K>,
-    _onChunk: (chunk: StreamChunkOf<K>) => void,
-  ): Promise<void> {
-    return Promise.reject(new Error('not used by these tests'));
-  }
-
-  dispose(): void {}
-}
-
-function tick(ms = 0): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 const REPO = '/repos/a';
 
@@ -155,12 +102,12 @@ describe('OpsState — #stashAndCarry (via runPull) never touches a pre-existing
       }
     };
     ops.setRepoId(REPO);
-    await tick(); // let setRepoId's own fire-and-forget refreshStatus/refreshUndo settle first.
+    await sleep(); // let setRepoId's own fire-and-forget refreshStatus/refreshUndo settle first.
 
     const runPromise = ops.runPull('origin', 'main');
     // runPull's blockers.length > 0 branch awaits #confirmPull before doing anything else —
     // resolve it exactly as PullDialog.vue's own "Stash and pull" button would.
-    await tick();
+    await sleep();
     ops.resolvePullDialog(true);
     await runPromise;
 
@@ -287,12 +234,12 @@ describe('OpsState — post-checkout pull prompt', () => {
       return originalOnRequest(method, params);
     };
 
-    await tick();
+    await sleep();
     const runPromise = ops.runCheckout('feature', 'switch');
     // runCheckout's own post-switch prompt awaits #confirmPostCheckoutPull — resolve it exactly
     // as PostCheckoutPullDialog.vue's own "Pull now" button would, before awaiting the call's own
     // completion (it does not resolve until the dialog does).
-    await tick();
+    await sleep();
     expect(ops.pendingPostCheckoutPull.value).toEqual({
       branch: 'feature',
       remote: 'origin',
@@ -313,9 +260,9 @@ describe('OpsState — post-checkout pull prompt', () => {
 
   test('"Not now" leaves the branch checked out without pulling', async () => {
     const { ops, transport } = setUp([branchRow()]);
-    await tick();
+    await sleep();
     const runPromise = ops.runCheckout('feature', 'switch');
-    await tick();
+    await sleep();
 
     expect(ops.pendingPostCheckoutPull.value).toBeDefined();
     ops.resolvePostCheckoutPullDialog(false);
@@ -327,28 +274,28 @@ describe('OpsState — post-checkout pull prompt', () => {
 
   test('no prompt when the branch is already up to date', async () => {
     const { ops } = setUp([branchRow({ track: { ahead: 0, behind: 0 } })]);
-    await tick();
+    await sleep();
     await ops.runCheckout('feature', 'switch');
     expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
   });
 
   test('no prompt when the branch has no upstream', async () => {
     const { ops } = setUp([branchRow({ track: undefined, upstream: undefined })]);
-    await tick();
+    await sleep();
     await ops.runCheckout('feature', 'switch');
     expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
   });
 
   test('no prompt when the upstream is gone', async () => {
     const { ops } = setUp([branchRow({ track: 'gone' })]);
-    await tick();
+    await sleep();
     await ops.runCheckout('feature', 'switch');
     expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
   });
 
   test('no prompt on a detach, even to a target behind its own upstream', async () => {
     const { ops } = setUp([branchRow()]);
-    await tick();
+    await sleep();
     await ops.runCheckout('feature', 'detach');
     expect(ops.pendingPostCheckoutPull.value).toBeUndefined();
   });
@@ -396,17 +343,17 @@ describe('OpsState — a stale confirm dialog no-ops if the active repo changed 
       }
     };
     ops.setRepoId(REPO);
-    await tick();
+    await sleep();
 
     const runPromise = ops.runRevert(['sha1']);
     // runRevert's willConflict verdict awaits #confirmRevert before doing anything else.
-    await tick();
+    await sleep();
     expect(ops.pendingRevert.value).toBeDefined();
 
     // The active repo changes while the dialog is still open — e.g. the user clicked "Open in
     // graph" on a commit from a different repo entirely.
     ops.setRepoId(OTHER_REPO);
-    await tick();
+    await sleep();
 
     // Now the (stale) dialog resolves, as if the user had just clicked its confirm button.
     ops.resolveRevertDialog({ mainline: undefined, noCommit: false });

@@ -1,70 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import type {
-  EventKey,
-  EventPayload,
-  ParamsOf,
-  RequestKey,
-  ResultOf,
-  StreamChunkOf,
-  StreamKey,
-  StreamParamsOf,
-  Transport,
-} from '@kira/git-ipc';
+import type { ResultOf } from '@kira/git-ipc';
+import { deferred, sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
+import { FakeTransport } from '../testing/fakeTransport.ts';
 import { WorkingDetailState } from './working.ts';
-
-/** Same fake `Transport` shape `pr.test.ts`/`repoSettings.test.ts` already establish — request()
- *  is scripted per call via `onRequest`, deferred resolution controlled by the test itself (needed
- *  for the stale-response case below). */
-class FakeTransport implements Transport {
-  onRequest: (method: RequestKey, params: unknown) => unknown = () => {
-    throw new Error('unscripted request');
-  };
-  readonly calls: Array<{ method: RequestKey; params: unknown }> = [];
-  #handlers = new Map<EventKey, Set<(payload: unknown) => void>>();
-
-  request<K extends RequestKey>(method: K, params: ParamsOf<K>): Promise<ResultOf<K>> {
-    this.calls.push({ method, params });
-    return Promise.resolve(this.onRequest(method, params) as ResultOf<K>);
-  }
-
-  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
-    let set = this.#handlers.get(method);
-    if (!set) {
-      set = new Set();
-      this.#handlers.set(method, set);
-    }
-    const wrapped = handler as (payload: unknown) => void;
-    set.add(wrapped);
-    return () => set?.delete(wrapped);
-  }
-
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
-    for (const handler of this.#handlers.get(method) ?? []) handler(payload);
-  }
-
-  stream<K extends StreamKey>(
-    _method: K,
-    _params: StreamParamsOf<K>,
-    _onChunk: (chunk: StreamChunkOf<K>) => void,
-  ): Promise<void> {
-    return Promise.reject(new Error('not used by these tests'));
-  }
-
-  dispose(): void {}
-}
-
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
-
-function tick(ms = 0): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 const REPO = '/repos/a';
 const oneFile = {
@@ -86,7 +25,7 @@ describe('WorkingDetailState', () => {
     transport.onRequest = () => ({ files: [oneFile] });
 
     working.select(true);
-    await tick();
+    await sleep();
 
     expect(working.selected.value).toBe(true);
     expect(working.files.value).toEqual([oneFile]);
@@ -108,7 +47,7 @@ describe('WorkingDetailState', () => {
     expect(working.files.value).toEqual([]);
 
     first.resolve({ files: [oneFile] });
-    await tick();
+    await sleep();
     // The late resolution of the aborted request must never repopulate files after select(false).
     expect(working.files.value).toEqual([]);
   });
@@ -121,10 +60,10 @@ describe('WorkingDetailState', () => {
     transport.onRequest = () => ({ files: [oneFile] });
 
     working.select(true);
-    await tick();
+    await sleep();
     working.select(false);
     working.select(true);
-    await tick();
+    await sleep();
 
     expect(working.files.value).toEqual([oneFile]);
     expect(transport.calls.length).toBe(2);
@@ -138,15 +77,15 @@ describe('WorkingDetailState', () => {
     transport.onRequest = () => ({ files: [oneFile] });
 
     working.refresh();
-    await tick();
+    await sleep();
     expect(transport.calls.length).toBe(0);
 
     working.select(true);
-    await tick();
+    await sleep();
     expect(transport.calls.length).toBe(1);
 
     working.refresh();
-    await tick();
+    await sleep();
     expect(transport.calls.length).toBe(2);
   });
 
@@ -169,7 +108,7 @@ describe('WorkingDetailState', () => {
     };
 
     working.select(true);
-    await tick();
+    await sleep();
 
     expect(working.error.value).toBeDefined();
     expect(working.files.value).toEqual([]);

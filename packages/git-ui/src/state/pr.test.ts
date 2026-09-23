@@ -1,67 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import type { CommitRecord } from '@kira/git-core';
 import { CommitStore } from '@kira/git-core';
-import type {
-  EventKey,
-  EventPayload,
-  GhStatus,
-  ParamsOf,
-  RequestKey,
-  ResultOf,
-  StreamChunkOf,
-  StreamKey,
-  StreamParamsOf,
-  Transport,
-} from '@kira/git-ipc';
+import type { GhStatus } from '@kira/git-ipc';
+import { sleep } from '@workbench/testing/unit/async';
 import { BridgeClient } from '../bridge/client.ts';
+import { FakeTransport } from '../testing/fakeTransport.ts';
 import { PrState } from './pr.ts';
-
-/** Same fake `Transport` shape `repoSettings.test.ts` already established — request() is scripted
- *  per call via `onRequest`, and `deferred` lets a test control exactly when each call's own
- *  promise resolves (needed for the stale-response test below). */
-class FakeTransport implements Transport {
-  onRequest: (method: RequestKey, params: unknown) => unknown = () => {
-    throw new Error('unscripted request');
-  };
-  readonly calls: Array<{ method: RequestKey; params: unknown }> = [];
-  #handlers = new Map<EventKey, Set<(payload: unknown) => void>>();
-
-  request<K extends RequestKey>(method: K, params: ParamsOf<K>): Promise<ResultOf<K>> {
-    this.calls.push({ method, params });
-    return Promise.resolve(this.onRequest(method, params) as ResultOf<K>);
-  }
-
-  on<K extends EventKey>(method: K, handler: (payload: EventPayload<K>) => void): () => void {
-    let set = this.#handlers.get(method);
-    if (!set) {
-      set = new Set();
-      this.#handlers.set(method, set);
-    }
-    const wrapped = handler as (payload: unknown) => void;
-    set.add(wrapped);
-    return () => set?.delete(wrapped);
-  }
-
-  emit<K extends EventKey>(method: K, payload: EventPayload<K>): void {
-    for (const handler of this.#handlers.get(method) ?? []) {
-      handler(payload);
-    }
-  }
-
-  stream<K extends StreamKey>(
-    _method: K,
-    _params: StreamParamsOf<K>,
-    _onChunk: (chunk: StreamChunkOf<K>) => void,
-  ): Promise<void> {
-    return Promise.reject(new Error('not used by these tests'));
-  }
-
-  dispose(): void {}
-}
-
-function tick(ms = 0): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 const REPO = '/repos/a';
 
@@ -110,7 +54,7 @@ describe('PrState — per-commit selection debounce', () => {
     pr.select('sha1');
     pr.select('sha2');
     pr.select('sha3');
-    await tick(350);
+    await sleep(350);
 
     const resolveCalls = transport.calls.filter((c) => c.method === 'commit.resolvePr');
     expect(resolveCalls.length).toBe(1);
@@ -152,10 +96,10 @@ describe('PrState — stale-response drop', () => {
     };
 
     pr.select('sha-old');
-    await tick(350); // let the debounce fire and the request actually start (and hang).
+    await sleep(350); // let the debounce fire and the request actually start (and hang).
 
     pr.select('sha-new');
-    await tick(350); // sha-new's own request resolves immediately (a plain Promise.resolve).
+    await sleep(350); // sha-new's own request resolves immediately (a plain Promise.resolve).
 
     expect(pr.selected.value?.kind).toBe('ok');
     if (pr.selected.value?.kind === 'ok') {
@@ -178,7 +122,7 @@ describe('PrState — stale-response drop', () => {
         },
       ],
     });
-    await tick(10);
+    await sleep(10);
 
     expect(pr.selected.value?.kind).toBe('ok');
     if (pr.selected.value?.kind === 'ok') {
@@ -211,7 +155,7 @@ describe('PrState — refsChanged clears everything', () => {
       ],
     });
     pr.select('sha1');
-    await tick(350);
+    await sleep(350);
     expect(pr.bySha.value.size).toBe(1);
     expect(pr.selected.value?.kind).toBe('ok');
 
@@ -235,12 +179,12 @@ describe('PrState — a disabled repo never re-requests', () => {
 
     transport.onRequest = () => ({ kind: 'disabled' });
     pr.select('sha1');
-    await tick(350);
+    await sleep(350);
     expect(pr.selected.value?.kind).toBe('disabled');
     const callsAfterFirst = transport.calls.length;
 
     pr.select('sha2');
-    await tick(350);
+    await sleep(350);
     expect(pr.selected.value?.kind).toBe('disabled');
     // No new request at all — the synchronous disabled short-circuit in select() fired instead.
     expect(transport.calls.length).toBe(callsAfterFirst);
@@ -258,13 +202,13 @@ describe('PrState — a disabled repo never re-requests', () => {
     pr.setRepoId(REPO);
     transport.onRequest = () => ({ kind: 'disabled' });
     pr.select('sha1');
-    await tick(350);
+    await sleep(350);
     expect(pr.selected.value?.kind).toBe('disabled');
 
     pr.setRepoId('/repos/b');
     transport.onRequest = () => ({ kind: 'ok', prs: [] });
     pr.select('sha1');
-    await tick(350);
+    await sleep(350);
     expect(pr.selected.value?.kind).toBe('ok');
     pr.dispose();
   });
@@ -280,7 +224,7 @@ describe('PrState — unavailable surfaces GhStatus', () => {
     transport.onRequest = () => ({ kind: 'unavailable', gh });
 
     pr.select('sha1');
-    await tick(350);
+    await sleep(350);
 
     expect(pr.selected.value).toEqual({ kind: 'unavailable', gh });
     expect(pr.status.value).toEqual(gh);
@@ -369,7 +313,7 @@ describe('PrState — ensureSnapshot bounds its own fan-out', () => {
     // would show up as a batch bigger than 6 on a later iteration too.
     let resolvedCount = 0;
     while (resolvedCount < branches.length) {
-      await tick(10); // let every worker that's going to start this round actually start.
+      await sleep(10); // let every worker that's going to start this round actually start.
       expect(resolvers.length).toBeGreaterThan(0);
       expect(resolvers.length).toBeLessThanOrEqual(6);
       const batch = resolvers.splice(0, resolvers.length);

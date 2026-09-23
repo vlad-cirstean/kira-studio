@@ -15,6 +15,7 @@ import '@workbench/testing/unit/window';
 import { describe, expect, test } from 'bun:test';
 import type { ExecuteResponse } from '@shared/protocol/data-ops';
 import type { Page } from '@shared/protocol/page';
+import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
@@ -31,14 +32,6 @@ const { useConsoleViewStore, resultPageKey } = await import(
 );
 const consoleViewStore = useConsoleViewStore();
 const { getPage } = await import('../../frontend/src/views/console/resultPages');
-
-function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
-  let resolve!: (v: T) => void;
-  const promise = new Promise<T>((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
-}
 
 function fakePage(): Page {
   // biome-ignore lint/suspicious/noExplicitAny: minimal fake page, run() only reads kind/rowCount

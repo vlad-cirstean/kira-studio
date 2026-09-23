@@ -8,6 +8,7 @@ import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
 import type { CollectionItemSummary, CollectionSummary } from '@shared/domain/collections';
+import { sleep } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
 
@@ -16,10 +17,6 @@ setActivePinia(pinia);
 const { useCollectionsStore } = await import('../../frontend/src/api/state/collections');
 
 const collectionsStore = useCollectionsStore();
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function collection(id: string, name: string, sortOrder = 0): CollectionSummary {
   return { id, name, sortOrder, createdAt: '', updatedAt: '' };

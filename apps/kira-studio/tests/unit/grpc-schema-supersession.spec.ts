@@ -10,6 +10,7 @@ import '@workbench/testing/unit/window';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 import type { GrpcSchemaWire } from '@shared/domain/grpc';
+import { deferred } from '@workbench/testing/unit/async';
 import { setActivePinia } from 'pinia';
 import { pinia } from '../../frontend/src/state/pinia';
 
@@ -30,20 +31,6 @@ const originalGrpcDescribe = control.grpcDescribe;
 afterEach(() => {
   control.grpcDescribe = originalGrpcDescribe;
 });
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (v: T) => void;
-  reject: (e: unknown) => void;
-} {
-  let resolve!: (v: T) => void;
-  let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 function schemaNamed(name: string): GrpcSchemaWire {
   return { services: [{ name, methods: [] }], mode: 'proto', warnings: [] };

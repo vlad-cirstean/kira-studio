@@ -8,26 +8,13 @@
 import '@workbench/testing/unit/window';
 
 import { describe, expect, test } from 'bun:test';
+import { deferred } from '@workbench/testing/unit/async';
 import { restoreAfterEach } from '@workbench/testing/unit/restoreAfterEach';
 
 const { control } = await import('../../frontend/src/bridge/control');
 restoreAfterEach(control);
 const { ensureDdl, saveDdl, schemaQueryKey } = await import('../../frontend/src/state/schemas');
 const { queryClient } = await import('@workbench/state/queryClient');
-
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve: (v: T) => void;
-  reject: (e: unknown) => void;
-} {
-  let resolve!: (v: T) => void;
-  let reject!: (e: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
 
 describe('state/schemas.ts — ensureDdl pending-load cache (P12 round 1 F4)', () => {
   test('a rejected load does not poison later calls for the same connection', async () => {

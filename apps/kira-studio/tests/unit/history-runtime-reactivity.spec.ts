@@ -9,6 +9,7 @@
 // nor a mocked control.ts.
 
 import { describe, expect, test } from 'bun:test';
+import { deferred } from '@workbench/testing/unit/async';
 import { effect } from 'vue';
 import { createHistoryStore } from '../../frontend/src/api/state/history';
 
@@ -48,14 +49,6 @@ function makeStore(listImpl?: () => Promise<FakeEntry[]>) {
 
 /** A promise plus its own resolve, so a test can control exactly when an in-flight `list()` call
  *  settles relative to some other event. */
-function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => {
-    resolve = r;
-  });
-  return { promise, resolve };
-}
-
 describe('createHistoryStore reactivity and refresh policy (P18 D1/D2/D3)', () => {
   test('1. a write through the FIRST-EVER ensure() call for a tab is tracked (D2)', () => {
     const { ensure, runtime } = makeStore();
