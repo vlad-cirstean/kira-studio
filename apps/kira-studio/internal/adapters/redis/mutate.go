@@ -166,23 +166,10 @@ func mutateDB(ctx context.Context, conn *goredis.Client, op *adapters.OpCtx, rea
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	commandText := ""
-	for i, s := range statements {
-		if i > 0 {
-			commandText += ";\n"
-		}
-		commandText += s
-	}
-	op.SetCommand(commandText)
 
-	return adapters.RunRowOps(ctx, plan, readOnly, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
-		switch rowOp.Kind {
-		case "update":
-			return applyUpdate(ctx, conn, rowOp)
-		case "delete":
-			return applyDelete(ctx, conn, rowOp)
-		default: // insert
-			return applyInsert(ctx, conn, rowOp)
-		}
-	})
+	return adapters.RunKindDispatched(ctx, op, plan, readOnly, statements, adapters.DispatchUpdateDeleteInsert(
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyUpdate(ctx, conn, rowOp) },
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyDelete(ctx, conn, rowOp) },
+		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) { return applyInsert(ctx, conn, rowOp) },
+	))
 }

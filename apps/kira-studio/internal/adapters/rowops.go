@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -27,6 +28,32 @@ func RunRowOps(ctx context.Context, plan model.MutationPlan, readOnly bool, appl
 		affectedRows += affected
 	}
 	return model.MutationResult{AffectedRows: affectedRows}, nil
+}
+
+// RunKindDispatched folds mutate's own statements-join + SetCommand + RunRowOps call, repeated
+// across mongo/redis/s3/sqs (P107 I2-12) with a hand-rolled ";\n" join loop T1-3's own
+// strings.Join replacement missed. dispatch is the caller's own per-op-kind switch — sqs's own
+// switch (no true "update" case, an unsupported error instead) genuinely differs from
+// mongo/redis/s3's shared "update/delete/default-insert" shape (DispatchUpdateDeleteInsert
+// below), so the switch itself is the caller's, not folded in here.
+func RunKindDispatched(ctx context.Context, op *OpCtx, plan model.MutationPlan, readOnly bool, statements []string, dispatch func(ctx context.Context, i int, rowOp model.MutationRowOp) (int, error)) (model.MutationResult, error) {
+	op.SetCommand(strings.Join(statements, ";\n"))
+	return RunRowOps(ctx, plan, readOnly, dispatch)
+}
+
+// DispatchUpdateDeleteInsert wraps mongo/redis/s3's own shared per-op switch (update, delete,
+// default insert) as a RunKindDispatched dispatch func (P107 I2-12).
+func DispatchUpdateDeleteInsert(update, delete, insert func(ctx context.Context, rowOp model.MutationRowOp) (int, error)) func(ctx context.Context, i int, rowOp model.MutationRowOp) (int, error) {
+	return func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
+		switch rowOp.Kind {
+		case "update":
+			return update(ctx, rowOp)
+		case "delete":
+			return delete(ctx, rowOp)
+		default: // insert
+			return insert(ctx, rowOp)
+		}
+	}
 }
 
 // ParseHeaderJSON is kafka/produce.go's parseProduceHeaders == sqs/mutate.go's parseHeaders: a
