@@ -33,6 +33,7 @@ import type {
   Windows,
   WorkspaceRoots,
 } from '@kira/git-core';
+import { findChangeInDetail as lookupChangeInDetail } from '@kira/git-core';
 import type {
   GitStatus,
   RequestHandler,
@@ -182,9 +183,7 @@ async function findChangeInDetail(
   signal: AbortSignal,
 ): Promise<{ readonly change: FileChange; readonly baseSha: string | null } | undefined> {
   const detail = await connection.request('commit.detail', { repoId, sha, parentIndex }, signal);
-  const change = detail.files.find((f) => f.path === path);
-  if (!change) return undefined;
-  return { change, baseSha: detail.parents[detail.parentIndex] ?? null };
+  return lookupChangeInDetail(detail, path);
 }
 
 export function createProxyHandlers(deps: CreateProxyHandlersDeps): ServerHandlers {

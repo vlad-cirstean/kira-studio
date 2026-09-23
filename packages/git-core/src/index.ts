@@ -1,3 +1,5 @@
+export type { DetailFileLookup } from './detail/find.ts';
+export { findChangeInDetail } from './detail/find.ts';
 export { advanceColorState, allocateColor, initialColorState } from './graph/colors.ts';
 export type { BuiltEdges } from './graph/edges.ts';
 export { EdgeBuffer } from './graph/edges.ts';
