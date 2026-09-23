@@ -46,6 +46,11 @@ type fakeBackend struct {
 	// childrenErr, when set, makes the next Children call fail instead of answering — used by
 	// TestStalePayloadIsNotDropped to prove a failed re-fetch never destroys the stale cache row.
 	childrenErr error
+	// childrenMidFlight, when set, runs right before Children returns its result — F7's own hook
+	// for simulating a reconnect that lands while this fetch's own backend call is still in
+	// flight (moving the connection's epoch forward between when Children captured it and when
+	// this call actually returns).
+	childrenMidFlight func()
 }
 
 func (b *fakeBackend) Children(ctx context.Context, connectionID string, path model.NodePath) (adapters.TreeChildren, error) {
@@ -55,6 +60,9 @@ func (b *fakeBackend) Children(ctx context.Context, connectionID string, path mo
 	}
 	nodes := []model.TreeNode{{Kind: "table", Name: "x", Path: "table:x", HasChildren: false}}
 	last := path.Segments[len(path.Segments)-1]
+	if b.childrenMidFlight != nil {
+		b.childrenMidFlight()
+	}
 	if strings.HasPrefix(last.Name, "trunc-") {
 		t := true
 		return adapters.TreeChildren{Nodes: nodes, Truncated: &t}, nil
@@ -719,6 +727,45 @@ func TestInvalidateConnectionDropsEveryPath(t *testing.T) {
 	}
 	if got := requestCount(t, h, "adapter:children"); got != before {
 		t.Errorf("c2's cache was invalidated by c1's connection-wide Invalidate")
+	}
+}
+
+// TestFetchRacingAReconnectIsNotCachedAsFresh is F7 (P108 Part 6): a fetch that captured the
+// connection's epoch before calling the backend must not have its own result cached as fresh once
+// a reconnect moves that epoch forward before the fetch returns — the result would otherwise get
+// its metadata_cache row's fetchedAt stamped at Put time (after the new epoch), which reads as
+// fresh against the connection's new state under freshnessFloor's own comparison, wrongly serving
+// a listing that belongs to the connection's old target.
+func TestFetchRacingAReconnectIsNotCachedAsFresh(t *testing.T) {
+	h := newHarness(t)
+	h.seedConnection(t, "c1", "Conn One")
+	path := model.EncodePath([]model.PathSegment{{Kind: "database", Name: "app"}})
+
+	// Simulates a reconnect landing while this fetch's own backend call is still in flight — the
+	// epoch changes after Children captured it but before Children returns.
+	h.backend.childrenMidFlight = func() { h.advanceSince(t, "c1") }
+	result, err := h.svc.Children("c1", path, false)
+	if err != nil {
+		t.Fatalf("Children (racing a reconnect): %v", err)
+	}
+	if result.Source != "server" {
+		t.Fatalf("Source = %q, want server", result.Source)
+	}
+	h.backend.childrenMidFlight = nil
+
+	if got, _, _ := h.repos.Metadata.Get("c1", path, "children"); got != nil {
+		t.Errorf("a fetch racing a reconnect must not have cached its result, got a row: %s", got)
+	}
+
+	// The next read (now against the connection's already-current, post-reconnect epoch) must
+	// still go to the server — a cache hit here would mean the race's own stale result got served
+	// back as fresh.
+	before := requestCount(t, h, "adapter:children")
+	if _, err := h.svc.Children("c1", path, false); err != nil {
+		t.Fatalf("Children (post-race): %v", err)
+	}
+	if got := requestCount(t, h, "adapter:children"); got != before+1 {
+		t.Errorf("backend calls after the race = %d, want %d (the raced fetch's result must not have been served as a cache hit)", got, before+1)
 	}
 }
 

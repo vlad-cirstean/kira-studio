@@ -157,6 +157,28 @@ func (s *Service) resolvePath(connectionID, path string) (model.NodePath, error)
 	return nodePath, nil
 }
 
+// sinceEpoch returns connectionID's current Since — the reconnect epoch a fetch is about to run
+// against (F7, P108 Part 6). Only meaningful once resolvePath's own requireConnected has already
+// confirmed the connection is connected (StateOf's synthetic "disconnected" fallback stamps a
+// fresh nowMillis() on every call, which would never compare equal to itself across two calls).
+func (s *Service) sinceEpoch(connectionID string) int64 {
+	return s.states.StateOf(connectionID).Since
+}
+
+// putIfSinceUnchanged stores encoded for (connectionID, path, kind) only if the connection's own
+// Since is still what it was when the fetch that produced encoded began (since) — F7: a fetch
+// started just before a reconnect gets its own metadata_cache row's fetchedAt stamped at Put time
+// (metadata_cache.go's Put), which lands *after* the new freshness floor the reconnect just
+// established (freshnessFloor reads this same Since) — without this guard, a listing fetched
+// against the connection's old target would be wrongly treated as fresh the moment the reconnect
+// completes, matters especially right after an edit-and-reconnect sequence.
+func (s *Service) putIfSinceUnchanged(connectionID, path, kind string, since int64, encoded []byte) {
+	if s.sinceEpoch(connectionID) != since {
+		return
+	}
+	_ = s.meta.Put(connectionID, path, kind, encoded)
+}
+
 // Children ports tree-service.ts:82-108, including P43 iter2 D22 (a truncated listing is never
 // cached) and P43 iter3 D38 (a truncated refresh drops any older complete row for the same path).
 func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenResult, error) {
@@ -172,6 +194,7 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 	if err != nil {
 		return ChildrenResult{}, err
 	}
+	since := s.sinceEpoch(connectionID)
 	result, err := s.backend.Children(context.Background(), connectionID, nodePath)
 	if err != nil {
 		return ChildrenResult{}, err
@@ -180,7 +203,7 @@ func (s *Service) Children(connectionID, path string, refresh bool) (ChildrenRes
 	if truncated {
 		_ = s.meta.Drop(connectionID, path)
 	} else if encoded, err := json.Marshal(result.Nodes); err == nil {
-		_ = s.meta.Put(connectionID, path, "children", encoded)
+		s.putIfSinceUnchanged(connectionID, path, "children", since, encoded)
 	}
 	return ChildrenResult{Nodes: result.Nodes, Source: "server", Truncated: truncated}, nil
 }
@@ -201,12 +224,13 @@ func (s *Service) Describe(connectionID, path string, refresh bool, tabID *strin
 	if err != nil {
 		return DescribeResult{}, err
 	}
+	since := s.sinceEpoch(connectionID)
 	meta, err := s.backend.Describe(context.Background(), connectionID, nodePath, tabID)
 	if err != nil {
 		return DescribeResult{}, err
 	}
 	if encoded, err := json.Marshal(meta); err == nil {
-		_ = s.meta.Put(connectionID, path, "describe", encoded)
+		s.putIfSinceUnchanged(connectionID, path, "describe", since, encoded)
 	}
 	return DescribeResult{Meta: meta, Source: "server"}, nil
 }
@@ -225,12 +249,13 @@ func (s *Service) Definition(connectionID, path string, refresh bool, tabID *str
 	if err != nil {
 		return DefinitionResult{}, err
 	}
+	since := s.sinceEpoch(connectionID)
 	definition, err := s.backend.Definition(context.Background(), connectionID, nodePath, tabID)
 	if err != nil {
 		return DefinitionResult{}, err
 	}
 	if encoded, err := json.Marshal(definition); err == nil {
-		_ = s.meta.Put(connectionID, path, "definition", encoded)
+		s.putIfSinceUnchanged(connectionID, path, "definition", since, encoded)
 	}
 	return DefinitionResult{Definition: definition, Source: "server"}, nil
 }
@@ -252,6 +277,7 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 	if err != nil {
 		return SchemaColumnsResult{}, err
 	}
+	since := s.sinceEpoch(connectionID)
 	relations, err := s.backend.SchemaColumns(context.Background(), connectionID, nodePath)
 	if err != nil {
 		return SchemaColumnsResult{}, err
@@ -260,7 +286,7 @@ func (s *Service) SchemaColumns(connectionID, path string, refresh bool) (Schema
 		relations = []model.RelationColumns{}
 	}
 	if encoded, err := json.Marshal(relations); err == nil {
-		_ = s.meta.Put(connectionID, path, "columns", encoded)
+		s.putIfSinceUnchanged(connectionID, path, "columns", since, encoded)
 	}
 	return SchemaColumnsResult{Relations: relations, Source: "server"}, nil
 }
