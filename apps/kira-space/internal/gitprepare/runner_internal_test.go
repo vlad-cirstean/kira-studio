@@ -66,3 +66,35 @@ func TestRun_CancellationStopsEscalationTimerAfterCleanExit(t *testing.T) {
 		t.Fatalf("SIGKILL attempted %d time(s) after a clean SIGTERM exit — the escalation timer was not stopped", sigkillCalls)
 	}
 }
+
+// TestRun_BackgroundChildHoldingPipesReturnsIncompleteResult is P108 Part 15 F7's own regression
+// proof: a script that exits 0 while a background child it spawned still holds stdout/stderr open
+// must not turn into a bare Go error and lose the whole transcript — cmd.Wait returns a wrapped
+// exec.ErrWaitDelay once WaitDelay's own deadline stops waiting on that redirection, which is
+// neither a timeout nor a cancellation nor a genuine spawn failure.
+func TestRun_BackgroundChildHoldingPipesReturnsIncompleteResult(t *testing.T) {
+	oldDelay := gracefulStopDelay
+	gracefulStopDelay = 100 * time.Millisecond
+	t.Cleanup(func() { gracefulStopDelay = oldDelay })
+
+	dir := t.TempDir()
+	// `(sleep 5 &)` backgrounds a grandchild that inherits this process's own stdout/stderr fds
+	// but is disowned from the subshell — the outer `sh` exits 0 immediately, while the sleep
+	// keeps the pipe's write end open well past gracefulStopDelay.
+	res, err := NewOSRunner().Run(context.Background(), Spec{
+		Shell: "/bin/sh", LoginShell: false, Script: "echo hello; (sleep 5 &); exit 0",
+		Dir: dir, Env: []string{"PATH=/usr/bin:/bin"},
+	})
+	if err != nil {
+		t.Fatalf("Run returned an error %v, want a normal (if incomplete) result — the transcript must not be discarded", err)
+	}
+	if res.ExitCode != 0 {
+		t.Fatalf("ExitCode = %d, want 0 (the script itself exited cleanly)", res.ExitCode)
+	}
+	if res.TimedOut || res.Cancelled {
+		t.Fatalf("TimedOut=%v Cancelled=%v, want both false — WaitDelay is not a script timeout", res.TimedOut, res.Cancelled)
+	}
+	if !res.Incomplete {
+		t.Fatal("Incomplete = false, want true — a background child still held stdout/stderr open")
+	}
+}

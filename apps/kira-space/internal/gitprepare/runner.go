@@ -47,6 +47,11 @@ type Result struct {
 	Cancelled bool
 	Output    []Line
 	Truncated bool
+	// Incomplete is P108 Part 15 F7's own signal, distinct from Truncated (which means "hit the
+	// size cap"): true when the script itself exited successfully but a background process it
+	// spawned still held stdout/stderr open past WaitDelay, so the transcript may be missing
+	// whatever that lingering process still had buffered or went on to write.
+	Incomplete bool
 }
 
 // Runner is the spawn seam (D18/F5) — the one thing gitsession's own tests fake; NewOSRunner is the
@@ -140,8 +145,26 @@ func (osRunner) Run(ctx context.Context, spec Spec) (Result, error) {
 		return result, nil
 	}
 	var exitErr *exec.ExitError
-	if errors.As(waitErr, &exitErr) {
+	hasExitErr := errors.As(waitErr, &exitErr)
+	if hasExitErr {
 		result.ExitCode = exitErr.ExitCode()
+	}
+	if errors.Is(waitErr, exec.ErrWaitDelay) {
+		// P108 Part 15 F7 fix: the script's own process can exit successfully while a background
+		// child it spawned still holds stdout/stderr open — WaitDelay's own deadline then stops
+		// waiting on that redirection and Wait returns a wrapped ErrWaitDelay (alone, on a clean
+		// exit; joined with the *exec.ExitError above, on a non-zero one). Neither a timeout/
+		// cancellation nor a genuine spawn failure: cmd.ProcessState is still populated (the
+		// process itself already exited), so take the exit code from there when no *exec.ExitError
+		// already supplied one, and mark the transcript as possibly incomplete rather than
+		// discarding it as a bare RPC error.
+		if !hasExitErr && cmd.ProcessState != nil {
+			result.ExitCode = cmd.ProcessState.ExitCode()
+		}
+		result.Incomplete = true
+		return result, nil
+	}
+	if hasExitErr {
 		return result, nil
 	}
 	if timedOut || cancelled {
