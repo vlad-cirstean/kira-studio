@@ -89,8 +89,16 @@ func loadOrCreateKeyIn(service, account string) ([]byte, error) {
 			if reErr != nil {
 				return nil, fmt.Errorf("secrets: re-query after duplicate item: %w", reErr)
 			}
-			if len(results) == 1 {
+			// F7 (P108 Part 3): the main path above (line 52) applies this same keyBytes check —
+			// without it here too, a wrong-length item (foreign, corrupt, or from an old app
+			// version) reaches secrets.New()'s aes.NewCipher(key) and panics the app at startup
+			// instead of reporting secret storage as unavailable, the way every other malformed-key
+			// path in this file already does.
+			if len(results) == 1 && len(results[0].Data) == keyBytes {
 				return results[0].Data, nil
+			}
+			if len(results) == 1 {
+				return nil, fmt.Errorf("secrets: duplicate item has an unexpected length (%d bytes, want %d)", len(results[0].Data), keyBytes)
 			}
 			return nil, fmt.Errorf("secrets: duplicate item reported but not found on re-query")
 		}
