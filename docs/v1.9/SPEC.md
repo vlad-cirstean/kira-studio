@@ -3359,6 +3359,194 @@ content was lost and re-committing identical content would only fragment the his
   F9/F10 are new functions with no pre-fix equivalent to revert to — before landing, passing after).
 - Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never used.
 
+## P108 Part 16 result
+
+Reviewed per `plans/P108-part16-space-git-session.md` (Opus reviewer, no fixing); one Sonnet fixer
+landed all 13 findings (F1-F13) against `7d68066`, none dismissed or deferred, as 11 commits (F6+F7
+grouped — both landed in one commit after a shared-index race, see the working-tree note below;
+every other finding its own commit).
+
+- **F1 (HIGH) `b064fde`** — four preflight RPCs (`preflight.checkout`'s target,
+  `revertMergeParents`'s shas — reached by both `preflight.revert` and `preflight.cherryPick` —
+  `preflight.cherryPick`'s own sha, `preflight.stashPop`'s targetSha) let a client-supplied value
+  reach a git argv as a bare token with no validation beyond non-empty — a leading `-` reads as a
+  flag rather than a rev (`--output=<path>` on `git show`/`git diff` writes or truncates an
+  arbitrary file, verified against real git 2.43). Added a `validOpArg` guard (op.run's own
+  `prepare*` precedent) at each of the four gitsession entry points, plus a second, defense-in-depth
+  layer in the gitrpc handlers that front them (`refs.go`, `reset.go`, `stash.go`, `validRefArg`).
+  Extracted `resolveStashPopTarget` out of `PreflightStashPop` to stay under golangci-lint's
+  cognitive-complexity threshold after adding its own guard. Regression tests
+  (`preflight_test.go`) cover all four entry points; two trip the actual porcelain parser
+  (confirming real argv injection, not just "no error") when reverted locally.
+- **F2 (HIGH) `eb6bb31`** — Part 15's F1 fix (correct on the backend) requires `ConfirmToken` to
+  equal the resolved UPSTREAM branch name, but nothing on the wire carried that name —
+  `ForcePushDialog.vue` could only compare/send the LOCAL branch name, so a local branch tracking a
+  differently-named protected upstream could never be confirmed. Added `PushPreflight.ResolvedBranch`
+  (Go/`@kira/git-ipc`/git-core's mirrored type — additive, `ClassifyPush`'s own `in.Branch` already
+  carried the resolved name for its `protectedBy` match); resolved the upstream branch name ONCE per
+  `RunRemote` call (was three separate `resolveUpstreamRemoteBranch` reads across the gate, the
+  lease check and `runPushFamily`'s own spawn) and threaded it through. **Cross-chunk touch into
+  `packages/git-ui/src/components/dialogs/ForcePushDialog.vue` (Part 19's file, not yet
+  reviewed)** — targeted only: gate/display/send the resolved branch name instead of the local one.
+  Flagged for Part 19's future reviewer. Regression test
+  `TestPushPreflight_ResolvedBranchIsUpstreamName`.
+- **F3 (MEDIUM-HIGH) `0f44e51`** — two concurrent `repo.open` calls for the same repo on one
+  connection each call `entry.Subscribe(c.ID, ...)` before either learns which wins `conn.held`'s
+  own race; `subs` was keyed by `ConnID`, so the second call's subscriber silently overwrote the
+  first's (orphaning its goroutine), and whichever call's own unsubscribe fired first then
+  deleted-and-closed whatever currently occupied that slot — leaving zero subscribers registered
+  (no `repo.changed` delivery) until the next `repo.open`. Reviewer's own probe: 8 concurrent Opens
+  x 200 trials, 27/200 ended with zero subscribers. Keyed `e.subs` by a new per-call
+  `subscriptionID` (a monotonic counter under `e.mu`, never reused) instead of `ConnID` — each
+  call's own unsubscribe can then only ever find, remove and close its own entry. Regression test
+  `TestConcurrent_SubscribeSameConnNeverOrphansTheWinner` (this file's own `TestConcurrent_*` tier,
+  run at `-race`); failed on trial 0 pre-fix.
+- **F4 (MEDIUM) `b31977b`** — Part 14's own F2 fix reset the whole walk on EVERY `ReadPage` error,
+  not just a permanently-failed session — a plain client cancel (`readChunkLocked` returns
+  `ctx.Err()` with `readCount` left exact, fully resumable) or a transient spawn/snapshot/read
+  failure hit the same `resetLocked` call and wrongly discarded the whole loaded store. **Cross-chunk
+  touch into `apps/kira-space/internal/gitclient/logsession/session.go` (Part 14's file, not yet
+  reviewed)** — targeted only: added `Session.Failed() bool`, reflecting the session's already-
+  existing internal `failed` state. Flagged for Part 14's future reviewer. `walk.go`'s
+  `readPageLocked` now resets only when `w.log.Failed()`. Regression test
+  `TestWalk_ReadPageCancelDoesNotDiscardLoadedStore` drives a scripted `Runner` (real captured git
+  output through a controlled pipe) so the cancellation lands on a genuinely in-flight read
+  deterministically, rather than racing real OS pipe buffering.
+- **F5 (MEDIUM) `cc9dd05`** — `runPullOp`'s "is the pulled branch still checked out" re-check used
+  `e.Head`'s cached value and ran before `Repo.Write` was even acquired — staleness-gated caching
+  and a non-atomic check-then-write both left a real window for another window's checkout to slip
+  in. Moved the check inside the `Repo.Write` closure, calling `gitclient.ResolveHead` fresh there
+  (never cached), immediately before the merge/rebase spawns. Regression test
+  `TestRunRemote_Pull_BranchChangedIsDetectedInsideTheWrite`.
+- **F6 (MEDIUM) `a2d64e2`** — `wantsRebaseMerges` added `--rebase-merges` whenever
+  `branch.<name>.rebase`/`pull.rebase` said "merges", regardless of what actually decided to rebase
+  at all — a `kiraSpace.pull.strategy` setting of plain "rebase" (ranked above config in
+  `ResolvePullStrategy`'s own ladder) still got `--rebase-merges` if config happened to also say
+  merges; a config-read error also silently downgraded to a plain rebase. Re-runs
+  `ResolvePullStrategy` with a fresh `cfg` and honors `--rebase-merges` only when the ladder's own
+  result is genuinely config-derived (`SourceBranchConfig`/`SourcePullConfig`); surfaces a
+  config-read error instead of swallowing it. **Known, explicitly named open item (unchanged from
+  Part 15's own F6): an explicit strategy override is still indistinguishable, from this re-read
+  alone, from one the config ladder itself would also have produced.** Follow-up phase needed
+  (orchestrating session to add to `SPEC.md`): a `@kira/git-ipc` wire-contract change threading the
+  ladder's own resolved `PullStrategySource` (or a plain `rebaseMerges` flag) from preflight through
+  `remote.run`'s own params — Part 17's own boundary, not attempted here. Regression subtest
+  "explicit setting outranks a config-level merges" (`TestWantsRebaseMerges`).
+- **F7 (LOW-MEDIUM) `a2d64e2`** — `Conn.Walk` disposed the OLD walk (rebuilt on a spec mismatch)
+  while still holding `c.mu`; `dispose()` takes the walk's own lock, which a running `Stream` holds
+  across a git page read and its own emit backpressure — replacing a walk mid-`Stream` stalled every
+  other `c.mu` user on the connection (`Entry` among them), breaking the documented "subscriber
+  never blocks behind a page read" rule. Swaps the slot under `c.mu`, then disposes the old walk only
+  after unlocking — the same shape `CloseRepo`/`Close` already use in this file. Regression test
+  `TestConn_WalkReplaceDoesNotBlockOtherConnOps`; confirmed `Conn.Entry` blocks in `alreadyHeld`'s
+  mutex acquire pre-fix.
+- **F8 (LOW) `1de8694`** — a disposed walk had no `disposed` flag, so a handler holding the `*Walk`
+  reference from before `CloseRepo` (or a spec-change rebuild) could still call
+  `ReadPage`/`Stream`/`Status`/`Search`, spawning a fresh `git log` nothing then closes until the
+  5-minute idle reclaim. Added a `disposed` flag, set inside `dispose()`; all four public entry
+  points (plus `resetLocked`) check it first and refuse with `ErrRepoNotHeld`. Regression test
+  `TestWalk_DisposedRefusesEveryOperation` confirms all four refuse post-dispose AND that no new log
+  process spawns to do so.
+- **F9 (LOW-MEDIUM) `38f7f51`** — three cases where a PRIOR op's undo record survived a LATER op
+  that partially wrote before failing: `RunOp`'s multi-argv loop returning early on a genuine
+  Go-level `werr` (e.g. the auto-stash checkout's `[stash push, switch]`) skipped the
+  end-of-function `e.undo.Set(record)` entirely; `runRestackPlan`'s/`restoreHead`'s own `werr`/`terr`
+  branches did the same after an earlier planned branch's own rebase had already landed;
+  `CancelRestack` racing `Repo.Write`'s own gate wait inside `runRestackSpawn` returned raw
+  `gitclient.ErrCancelled` instead of the documented `Cancelled` `OpResult` every other cancellation
+  branch in the same loop already produces (and left undo stale too). Cleared `e.undo` once, before
+  the first write, in `RunOp` and in `RunRestack` (same precedent as `runPullOp:576`); mapped
+  `ErrCancelled` explicitly. Three regression tests, the restack-cancellation one driving
+  `runRestackPlan` directly against a genuinely contended `Repo.Write` gate (held open by a separate
+  goroutine — an uncontended `Write` never checks `ctx.Done()` at all, so real contention, not
+  timing, makes the race deterministic).
+- **F10 (LOW-MEDIUM) `5fd4ef6`** — nothing stopped a read that started before a ref change from
+  calling its own `cache.set()`/`setHead()` after that change already cleared the cache for it —
+  serving pre-change data even to the client's own refetch after the `repo.changed` event the same
+  change triggers. Added `RepoEntry.cacheGen`, bumped by `invalidateAfterWrite` and `note`'s own
+  `refsChanged` branch alongside every existing cache drop; `Refs`/`CommitDetail`/`Stacks`/
+  `mergeBase`/`statusAndInProgress` each capture the generation before spawning and only write back
+  if it still matches. Regression test `TestRefs_ConcurrentInvalidationDuringSpawnNotClobbered`
+  fires the entry's own `refsChanged` signal synchronously mid-spawn via a wrapped `Runner`,
+  deterministically rather than racing real timing.
+- **F11 (LOW) `ac4d967`** — the repo-wide open-PR snapshot matched a branch by `HeadRef` alone,
+  unlike `PullsForBranch`'s own `head=owner:branch` query, which already filters server-side by
+  owner — a fork's PR from a commonly-named branch (`main`, `master`, `patch-1`) got badged onto an
+  unrelated local branch of the same name. Carried `head.repo.owner.login` through as
+  `ghclient.PR.HeadRepoOwner` (empty when GitHub reports `head.repo` as null); the snapshot match now
+  requires `HeadRepoOwner == repo.Owner`, falling through to the per-branch query on a mismatch.
+  Regression test `TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch`.
+- **F12 (LOW) `f92f29d`** — `prepareCheckout`'s own doc comment claimed the auto-stash's
+  `stash push` and its `switch` ran under one `Repo.Write` acquisition, but `RunOp`'s loop took
+  `Repo.Write` separately per argv (`runWriteArgv`) — the claim did not actually hold. New
+  `runWriteArgvList` runs a whole `argvList` under ONE `Repo.Write` acquisition; if the switch still
+  fails after the stash genuinely succeeded, the error message now names the exact stash ref (a
+  fresh `rev-parse refs/stash`, read after the write since the stash already landed) instead of
+  leaving that fact silent. Regression test
+  `TestRunOp_AutoStashCheckout_SwitchFailureMentionsTheStash` drives a real git-level switch failure
+  after a real, successful stash push.
+- **F13 (LOW) `362f6fb`** — `Registry.release` closed the entry's cat-file session
+  (`closeCatFile`, which can block on an in-flight request — e.g. a slow lazy-object fetch in a
+  partial clone) while still holding `reg.mu`, blocking every OTHER repo's own
+  Acquire/release/IsOpen/ReconcileAutoFetch behind it. Moved the `closeCatFile` call to after
+  `reg.mu` is released (bookkeeping — refcount, linger timer — stays under the lock as before);
+  `closeCatFile` is idempotent and guarded by its own entry-local `catfileMu`, independent of
+  `reg.mu`, so a concurrent expire/teardown racing the same entry is unaffected by the reordering.
+  No dedicated regression test — reproducing genuine catfile-request contention deterministically
+  needs a real in-flight `cat-file --batch` request mid-write/read, disproportionate for a
+  LOW-severity, mechanical lock-reordering fix not in this review's own required-test list; verified
+  by code reading and mirrors this same phase's own F7 fix (the identical "compute under the lock,
+  do the slow part after unlocking" shape).
+
+**Cross-chunk touches, flagged for their own future reviewers, both minimal and at the exact
+boundary each finding named — never a broader review of those files:** F2 →
+`packages/git-ui/src/components/dialogs/ForcePushDialog.vue` (Part 19, not yet reviewed) — gate/
+display/send the resolved branch name instead of the local one. F4 →
+`apps/kira-space/internal/gitclient/logsession/session.go` (Part 14, not yet reviewed) — added
+`Session.Failed() bool`.
+
+**F6's own follow-up phase, for the orchestrating session to add to `SPEC.md`:** a `@kira/git-ipc`
+wire-contract change threading the pull-strategy ladder's own resolved source (or a plain
+`rebaseMerges` bool) from `remote.pullPreflight`'s result through `remote.run`'s own request params,
+so `wantsRebaseMerges` can tell "an explicit override chose to rebase" apart from "config is what
+chose it" without re-deriving the ladder a second time and guessing. Sits in Part 17's own boundary
+(`gitrpc`/the wire contract), same as Part 15's own F3 (the `am` `InProgressKind` widening) was
+deferred there.
+
+**Working-tree note.** A concurrent Part 5 fixer session was committing in
+`apps/kira-studio/internal/adapters/**` throughout this phase, followed by a concurrent Part 6
+session (no scope overlap by design, per `CLAUDE.md`'s own concurrency guidance: `git add` only this
+phase's own files, `git status`/`git show --stat HEAD` checked immediately after every commit). Two
+of this phase's own commits nonetheless briefly absorbed the other session's own uncommitted, staged
+changes — the same shared-index race Part 15's own result section already documented: `cc9dd05` (F5)
+picked up `apps/kira-studio/internal/adapters/{mongo,redis}/client.go`; `362f6fb` (F13) picked up
+`apps/kira-studio/internal/adapterhost/{host,router}.go`, a new
+`router_reconnect_race_test.go`, and `apps/kira-studio/internal/adapters/live.go`. Both caught
+immediately by diffing `git show --stat HEAD` against this phase's own intended file list; both
+confirmed non-destructive — every absorbed file's content matched the other session's own working
+tree exactly (`git diff` empty) both times, so nothing was lost, only committed under this phase's
+message instead of that session's own. Not re-committed a second time, matching Part 15's own
+precedent, since no fix content was lost and doing so would only fragment the history further.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0 (repo-wide, after both concurrent sessions' own work had also landed).
+- `go test ./...`: full suite, run once near the end — 0 failures repo-wide.
+- `go test ./apps/kira-space/internal/gitsession/... -race`: clean (every concurrency-sensitive
+  regression test in this chunk — F3, F7, F9's restack-cancellation case — run under `-race`).
+- `bun run lint:go` (`golangci-lint run`): 0 issues.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration hints,
+  all frontend TS/Vue) — this chunk touches nothing knip already flags.
+- `bun run typecheck`: exit 0 (covers F2's `packages/git-ipc`/`packages/git-core`/
+  `packages/git-ui` touch).
+- Every regression test added (F1 x4, F3, F4, F5, F6, F7, F8, F9 x3, F10, F11, F12 — F13 excepted,
+  see its own entry above) was confirmed to fail against the pre-fix code before landing, either via
+  a scoped `git stash push -- <files>` (for an existing function's changed behavior) or a local
+  revert-then-restore (for a brand-new function with no pre-fix equivalent to stash to), passing
+  clean afterward.
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never
+  used.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
