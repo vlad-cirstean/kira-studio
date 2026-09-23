@@ -4,6 +4,7 @@ import (
 	"context"
 	"regexp"
 	"strconv"
+	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -20,9 +21,52 @@ func init() {
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards every field below (F3): Connect/Disconnect write set/defaultDbIndex/readOnly from
+	// whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op reading
+	// them — the same class of unguarded-field race Part 4's own F3 fixed for the SQL engines.
+	mu             sync.Mutex
 	set            *dbConnectionSet
 	defaultDbIndex int
 	readOnly       bool
+}
+
+// getSet is every op's own locked read of a.set (F3) — requireSet's RequireConnected call takes
+// its result, never a.set directly.
+func (a *Adapter) getSet() *dbConnectionSet {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.set
+}
+
+// getDefaultDbIndex is Execute's own locked read of a.defaultDbIndex (F3).
+func (a *Adapter) getDefaultDbIndex() int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.defaultDbIndex
+}
+
+// getReadOnly is Mutate/Execute's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
+}
+
+// setConnected is Connect's own locked write of every field a successful connect fills in (F3).
+func (a *Adapter) setConnected(set *dbConnectionSet, defaultDbIndex int, readOnly bool) {
+	a.mu.Lock()
+	a.set = set
+	a.defaultDbIndex = defaultDbIndex
+	a.readOnly = readOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write, once closeAll (a real network call, run with no
+// lock held) has returned (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.set = nil
+	a.mu.Unlock()
 }
 
 func (a *Adapter) Kind() string        { return "redis" }
@@ -42,9 +86,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		return adapters.ConnectInfo{}, err
 	}
 
-	a.set = set
-	a.defaultDbIndex = defaultDbIndex
-	a.readOnly = cfg.ReadOnly
+	a.setConnected(set, defaultDbIndex, cfg.ReadOnly)
 
 	version := "unknown"
 	// P25 §1.3: INFO is in Redis's own @dangerous ACL category, so a perfectly ordinary
@@ -60,21 +102,21 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	}
 	return adapters.ConnectInfo{
 		ServerVersion: "Redis " + version,
-		Details:       map[string]string{"database": "db" + strconv.Itoa(a.defaultDbIndex)},
+		Details:       map[string]string{"database": "db" + strconv.Itoa(defaultDbIndex)},
 	}, nil
 }
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	if a.set != nil {
-		a.set.closeAll()
+	if set := a.getSet(); set != nil {
+		set.closeAll()
 	}
-	a.set = nil
+	a.clearConnected()
 	return nil
 }
 
 func (a *Adapter) requireSet() (*dbConnectionSet, error) {
-	return adapters.RequireConnected(a.set)
+	return adapters.RequireConnected(a.getSet())
 }
 
 // Children is index.ts's children.
@@ -219,7 +261,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutateDB(ctx, conn, op, a.readOnly, plan)
+	return mutateDB(ctx, conn, op, a.getReadOnly(), plan)
 }
 
 // Execute is index.ts's execute.
@@ -228,7 +270,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 	if err != nil {
 		return nil, err
 	}
-	dbIndex := a.defaultDbIndex
+	dbIndex := a.getDefaultDbIndex()
 	if len(req.Path.Segments) > 0 && req.Path.Segments[0].Kind == "database" {
 		idx, err := dbIndexFromName(req.Path.Segments[0].Name)
 		if err != nil {
@@ -236,7 +278,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		}
 		dbIndex = idx
 	}
-	return execute(ctx, set, dbIndex, a.readOnly, op, req.Statements)
+	return execute(ctx, set, dbIndex, a.getReadOnly(), op, req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false; never reached.

@@ -57,6 +57,69 @@ func TestTokenize_EscapeOutsideQuotesNotHonoured(t *testing.T) {
 	}
 }
 
+// TestTokenize_NewlineEscapeInsideDoubleQuotes is F12's own regression: a `\n` inside a
+// double-quoted token must become a real newline byte, matching redis-cli's own sdssplitargs —
+// the previous tokenizer took the escaped rune literally (`\n` became the two-byte text "an"
+// glued to the quote, i.e. "n" itself, not a newline), so `SET k "a\nb"` stored the literal text
+// "anb" instead of a newline.
+func TestTokenize_NewlineEscapeInsideDoubleQuotes(t *testing.T) {
+	tokens, err := tokenize(`SET k "a\nb"`)
+	if err != nil {
+		t.Fatalf("tokenize: %v", err)
+	}
+	if len(tokens) != 3 || tokens[2] != "a\nb" {
+		t.Errorf("tokens = %q, want the middle token to contain a real newline", tokens)
+	}
+}
+
+// TestTokenize_HexEscapeInsideDoubleQuotes covers F12's \xHH support (redis-cli's own
+// sdssplitargs), including a byte that isn't valid standalone UTF-8 — exercising the
+// binary-unsafe-key round trip the review's own edge-case list calls out.
+func TestTokenize_HexEscapeInsideDoubleQuotes(t *testing.T) {
+	tokens, err := tokenize(`SET k "a\xffb"`)
+	if err != nil {
+		t.Fatalf("tokenize: %v", err)
+	}
+	want := "a\xffb"
+	if len(tokens) != 3 || tokens[2] != want {
+		t.Errorf("tokens = %q, want %q as the middle token", tokens, want)
+	}
+}
+
+// TestTokenize_SingleQuoteOnlyEscapesApostrophe: F12's own single-quote rule — only \' is special;
+// every other backslash sequence (including \n) stays completely literal, unlike double quotes.
+func TestTokenize_SingleQuoteOnlyEscapesApostrophe(t *testing.T) {
+	tokens, err := tokenize(`SET k 'a\nb'`)
+	if err != nil {
+		t.Fatalf("tokenize: %v", err)
+	}
+	if len(tokens) != 3 || tokens[2] != `a\nb` {
+		t.Errorf("tokens = %q, want the backslash-n preserved literally inside single quotes", tokens)
+	}
+
+	tokens, err = tokenize(`SET k 'it\'s'`)
+	if err != nil {
+		t.Fatalf("tokenize: %v", err)
+	}
+	if len(tokens) != 3 || tokens[2] != `it's` {
+		t.Errorf("tokens = %q, want \\' resolved to a literal apostrophe", tokens)
+	}
+}
+
+// TestTokenize_TrailingContentAfterClosingQuoteIsError: redis-cli itself rejects a closing quote
+// immediately followed by a non-space character (F12) — glued-on trailing content is never silently
+// merged into the token or split into a separate one.
+func TestTokenize_TrailingContentAfterClosingQuoteIsError(t *testing.T) {
+	_, err := tokenize(`SET k "bar"baz`)
+	if err == nil {
+		t.Fatal("want an error, got nil")
+	}
+	code, _ := adapters.CodeOf(err)
+	if code != adapters.CodeQuery {
+		t.Errorf("code = %v, want E_QUERY", code)
+	}
+}
+
 func TestTokenize_UnterminatedQuoteIsError(t *testing.T) {
 	_, err := tokenize(`SET foo "bar`)
 	if err == nil {
