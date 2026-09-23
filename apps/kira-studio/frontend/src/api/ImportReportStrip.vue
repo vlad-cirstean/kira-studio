@@ -102,18 +102,18 @@ function plural(n: number, noun: string): string {
   @apply m-0 flex flex-col gap-0.5 pl-2;
 }
 
-/* Alert tone classes replacing the raw `.p-strip` warn/note markers (P104 §9 rule 5: literal hex,
-   not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+/* Alert tone classes replacing the raw `.p-strip` warn/note markers (now --kira-warn-text/--kira-
+   note-text in tokens.css, promoted off this rule's literal-hex carve-out). */
 .strip-note {
   @apply bg-info/8 border-info/20;
 }
 .strip-note-text {
-  @apply text-[#a8c8ee];
+  @apply text-note-text;
 }
 .strip-warn {
   @apply bg-warn/10 border-warn/20;
 }
 .strip-warn-text {
-  @apply text-[#d9c47a];
+  @apply text-warn-text;
 }
 </style>

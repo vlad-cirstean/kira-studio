@@ -136,12 +136,12 @@ function splitTarget(value: string): [string, string | null] {
 <style scoped>
 @reference "@theme/base.css";
 
-/* Alert tone class replacing MessageStrip's warn marker (P104 §9 rule 5: literal hex, not a
-   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+/* Alert tone class replacing MessageStrip's warn marker (now --kira-warn-text/--kira-note-text in
+   tokens.css, promoted off this rule's literal-hex carve-out). */
 .strip-warn {
   @apply bg-warn/10 border-warn/20;
 }
 .strip-warn-text {
-  @apply text-[#d9c47a];
+  @apply text-warn-text;
 }
 </style>

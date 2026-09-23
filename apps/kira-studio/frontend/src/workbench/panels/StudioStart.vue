@@ -118,7 +118,7 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .start-inner {
-  @apply w-[560px] max-w-full;
+  @apply w-140 max-w-full;
 }
 
 .first-run-actions {
@@ -174,7 +174,7 @@ function openRecent(entry: RecentTableEntry): void {
 }
 
 .rail-dot {
-  @apply w-0.5 h-3.5 rounded-[1px] shrink-0;
+  @apply w-0.5 h-3.5 rounded-xs shrink-0;
 }
 
 .entry-path {

@@ -771,7 +771,10 @@
   height: 11px;
   border-radius: 50%;
   flex-shrink: 0;
-  border: 1.5px solid var(--kira-border-strong);
+  /* v1.9 tailwind-declines deep dive: 2px, not 1.5px — kept numerically in sync with every
+     view's own `border-2` (was `border-[1.5px]`), which this rule's higher specificity
+     (two classes vs. one) otherwise silently overrides regardless of what those views set. */
+  border: 2px solid var(--kira-border-strong);
 }
 .p-run-state.is-running {
   color: var(--kira-info);

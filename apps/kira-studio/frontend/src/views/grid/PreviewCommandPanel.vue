@@ -51,7 +51,7 @@ function close(): void {
 </script>
 
 <template>
-  <PopoverContent align="end" class="w-[480px] gap-0 p-0" data-testid="preview-command-panel">
+  <PopoverContent align="end" class="w-120 gap-0 p-0" data-testid="preview-command-panel">
     <div class="preview-panel-inner">
       <div class="preview-panel-header p-panel-head">
         <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>

@@ -46,6 +46,8 @@
   /* P104 completion pass: the "is this filtered/active?" indicator dot's own colour -- §1.4's
      "existing colour utilities" disposition, missing an actual @theme entry until now. */
   --color-state-on: var(--kira-state-on);
+  --color-warn-text: var(--kira-warn-text);
+  --color-note-text: var(--kira-note-text);
 
   --color-conn-red: var(--kira-conn-red);
   --color-conn-orange: var(--kira-conn-orange);
@@ -86,6 +88,12 @@
 
   --shadow-kira: var(--kira-shadow);
   --shadow-kira-dialog: var(--kira-shadow-dialog);
+
+  /* v1.9 tailwind-declines deep dive: names primitives.css's own `@keyframes p-spin` as a real
+     `animate-kira-spin` utility, replacing a dozen `animate-[spin_0.7s_linear_infinite]` arbitrary
+     values with the app's existing spinner speed (0.7s) instead of falling back to Tailwind's
+     default `animate-spin` (1s), which would be a real timing change with no real benefit. */
+  --animate-kira-spin: p-spin 0.7s linear infinite;
 }
 
 html,

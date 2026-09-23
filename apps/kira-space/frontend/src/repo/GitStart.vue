@@ -49,7 +49,7 @@ async function onImport(): Promise<void> {
 }
 
 .start-inner {
-  @apply w-[420px] max-w-full;
+  @apply w-105 max-w-full;
 }
 
 .error-note {

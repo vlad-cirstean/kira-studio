@@ -424,12 +424,12 @@ onUnmounted(() => {
   @apply h-full;
 }
 
-/* Alert tone class replacing the raw MessageStrip note marker (P104 §9 rule 5: literal hex, not a
-   --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+/* Alert tone class replacing the raw MessageStrip note marker (now --kira-warn-text/--kira-note-
+   text in tokens.css, promoted off this rule's literal-hex carve-out). */
 .strip-note {
   @apply bg-info/8 border-info/20;
 }
 .strip-note-text {
-  @apply text-[#a8c8ee];
+  @apply text-note-text;
 }
 </style>

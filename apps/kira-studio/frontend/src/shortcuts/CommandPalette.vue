@@ -66,6 +66,6 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .palette {
-  @apply w-[420px] flex flex-col;
+  @apply w-105 flex flex-col;
 }
 </style>
