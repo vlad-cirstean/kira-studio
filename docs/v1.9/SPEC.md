@@ -3171,6 +3171,194 @@ contain exactly its own intended file list once landed.
   `git stash` on the exact changed file) before landing, passing after, per `CLAUDE.md`'s own test
   bar for parser-with-interacting-rules and keyset-boundary-arithmetic logic.
 
+## P108 Part 5 result
+
+Reviewed per `plans/P108-part5-studio-nosql-adapters.md` (Opus reviewer, no fixing, tree surveyed at
+`40cb03e`); one Sonnet fixer landed all 14 findings (F1-F14), none dismissed or deferred beyond the
+one explicit Part 6 hand-off the plan itself names, as 6 commits (`db31007`, `b860af2`, `7c6088d`,
+`acbb7a6`, `510b869`, and F13 landed inside a concurrent session's own `cc9dd05` — see the
+working-tree note below).
+
+- **F1 (HIGH, data integrity) `b860af2`** — Redis console `execute` sent any command straight to
+  `conn.Do` on the shared pooled `*goredis.Client`, which does not track state a raw command
+  changes: `SELECT` repointed the pooled per-db-index connection at a different db for every later
+  op sharing it; `MULTI`/`EXEC`/`DISCARD`/`WATCH`/`UNWATCH` left a transaction half-open or made
+  later commands reply `QUEUED`; `SUBSCRIBE` and siblings left the connection stuck in push mode;
+  `MONITOR` never stopped streaming; `HELLO`/`AUTH`/`RESET` changed the negotiated protocol or
+  effective user; `QUIT` closed the connection out from under the pool; `CLIENT REPLY OFF|SKIP`
+  desynced replies. `rejectConnectionStateCommand` now denies the full denylist outright before any
+  reaches `Do`, matching `CLIENT REPLY` as its own two-token command so ordinary `CLIENT`
+  subcommands (`GETNAME`/`INFO`/`LIST`) stay usable, and points `SELECT` specifically at the app's
+  own database selector.
+- **F2 (HIGH, silent data loss) `7c6088d`** — Kafka's `advanceWindows` clamped a touched partition to
+  `Next = End` whenever the round as a whole wasn't page-capped and that partition's own reported
+  watermark had reached `End` — but franz-go caps each partition's own fetch at 1 MiB per round
+  (confirmed: `config.go`'s `maxPartBytes`), independent of the overall page budget, so a partition
+  could have real, un-fetched data left in `[Next, End)` even in a round that, as a whole, came in
+  under the page budget. `advanceWindows` now additionally requires that *this* round delivered or
+  skipped zero records for that specific partition (`recordsThisRound`, counted over the full
+  `fetches.Records()` before the page-budget break that stops pushing them) before clamping; true
+  exhaustion still falls back to the existing `exhaustedByEmptyPolls` latch. Regression test
+  `TestAdvanceWindows` (the F2 case) confirmed failing against the pre-fix function (a bare `bool`
+  "was the round page-capped") via a scoped, restored local revert before landing.
+- **F3 (MEDIUM) `db31007`/`b860af2`/`7c6088d`/`acbb7a6`/`510b869`** — every one of the five engines'
+  own handle fields (Mongo's `client`/`defaultDatabase`/`readOnly`; Redis's `set`/`defaultDbIndex`/
+  `readOnly`; Kafka's `client`/`admin`/`opts`/`readOnly`; SQS's `client`/`readOnly`/`queueURLs`/
+  `receiptHandles`; S3's `client`/`scopedBucket`/`readOnly`) was written by Connect/Disconnect with
+  no lock despite being read by an op running on whatever goroutine `adapterhost` dispatches it on —
+  the same class Part 4's own F3 fixed for the SQL engines. Locked get/set/clear accessors, mirroring
+  Part 4's own shape, now guard every field in all five adapters. SQS's own `cacheQueueURL` is
+  additionally a no-op once Disconnect has nilled the map (defense in depth, on top of the locking
+  fix) — an op already past `requireClient` could otherwise still reach it after a concurrent
+  Disconnect and panic writing to a nil map (recovered by `safeRun` into a bare `E_INTERNAL`
+  pre-fix, but a genuine bug regardless).
+- **F4 (MEDIUM) `db31007`** — Mongo's own `inFlight sync.WaitGroup` doc comment claimed it tracked
+  `RunWithAbortRace`'s detached background goroutines, but every `RunWithAbortRace` call site in
+  `read.go`/`mutate.go`/`console.go` passed a no-op release — nothing was ever counted, and
+  `Add`/`Done` only wrapped the synchronous foreground call in `Read`/`Count`/`Mutate`/`Execute`,
+  proving nothing about the goroutine `RunWithAbortRace` itself spawns; `Disconnect`'s own
+  `inFlight.Wait()` was also unbounded, ignoring ctx. Replaced with `adapters.QueryTracker[uint64]`
+  (mirroring postgres/mysqlfamily/clickhouse's own shared tracker, Part 4's own F3/F4 fix), registered
+  directly at each `RunWithAbortRace` call site via a new `TrackQuery` hook threaded through
+  `read.go`/`mutate.go`/`console.go` (a package-level `queryTokenSeq` disambiguates two overlapping
+  registrations under the same opID, the way postgres's own backend PID does); `Disconnect` now
+  `Snapshot`s and `killOp`/`Cancel`s every opID it still tracks before `Drain`ing (bounded by ctx),
+  then gives `client.Disconnect` its own explicit deadline (`disconnectTimeout`) so an in-use
+  connection is force-closed regardless of what ctx this call was handed. **`Router.Connect`'s own
+  reconnect path passing `context.Background()` unbounded to `Disconnect` is `adapterhost`'s file
+  (Part 6) — not touched here, per the plan's own hand-off; the Mongo-side bound (`disconnectTimeout`)
+  is fully containable in this chunk's own files and closes the practical exposure regardless of what
+  ctx Part 6's own callers eventually pass.**
+- **F5 (MEDIUM, security downgrade) `510b869`** — S3's `applyPreservedAttributes` claimed to carry
+  over every attribute `HeadObject` returns and `PutObject` accepts, but missed
+  `ServerSideEncryption`/`SSEKMSKeyId`/`BucketKeyEnabled` (an SSE-KMS object was silently
+  re-encrypted under the bucket default after any edit — `kms:Decrypt` no longer needed to read it),
+  `Expires`, `WebsiteRedirectLocation`, and the three object-lock fields — all now copied. **Tag
+  design choice:** rather than a second `GetObjectTagging`/`PutObjectTagging` round trip, `applyUpdate`
+  refuses an edit outright when `head.TagCount > 0`, with a clear message — the more contained fix per
+  the finding's own either/or, and it never silently drops data the user didn't know was there.
+  `applyUpdate` also now sends `IfMatch: head.ETag` (a concurrent writer's own change is refused with
+  a clear "reload and try again" rather than silently overwritten) and `applyInsert` sends
+  `IfNoneMatch: "*"` (a real conditional-create closing the previous HeadObject-then-Put race,
+  correcting that stale "PutObject has no conditional-create option" comment) instead of its own
+  separate HeadObject probe; both fall back to the pre-fix, unconditional behavior — logged — for an
+  S3-compatible endpoint that rejects the conditional header outright (`NotImplemented`).
+- **F6 (MEDIUM-LOW) `db31007`** — Mongo's `_id` keyset boundary's `$gt`/`$lt` only ever matched `_id`
+  values of the boundary's own BSON type (MongoDB's own query-level comparison type-brackets a
+  non-numeric type this way even though the sort itself runs in one global cross-type order) — once a
+  page ended on the last `_id` of one type (this app's own `applyInsert` mints a fresh ObjectId
+  whenever an inserted body omits `_id`, so a collection can genuinely mix `_id` types), the next
+  page's boundary matched nothing from any other type, silently stranding every document past it.
+  `keysetIDCondition` now widens with an `$or` across every BSON type that sorts on the correct side
+  of the boundary's own type (`bsonSortTiers`, MongoDB's documented cross-type comparison order,
+  collapsing the four numeric aliases into one tier since Mongo already compares those by value) —
+  stays indexable, unlike a type-agnostic scan. Regression tests in `read_internal_test.go`
+  (`TestKeysetIDCondition_TypeWidening`, plus the three pre-existing `TestMergeKeysetIDCondition_*`
+  updated to the new widened shape) confirmed failing against the pre-fix (unwidened) function via a
+  scoped, restored local revert before landing.
+- **F7 (LOW-MEDIUM) `db31007`** — a Mongo document with no `_id` at all (a `$project: {_id: 0}` view,
+  reachable elsewhere in this app) made `IDText` fail outright on an invalid BSON type, failing the
+  entire page — the console path's own `docsToPage` already handled this correctly with `id=""`.
+  `buildReadPage` now does the same, and additionally forces the page into offset pagination (no
+  keyset tokens) whenever any document in the result set lacks `_id`, since a keyset token needs a
+  real boundary to resume from. Regression test `TestBuildReadPage_MissingID` (plus the control case
+  `TestBuildReadPage_AllPresentID`) confirmed failing against the pre-fix function via a scoped,
+  restored local revert before landing.
+- **F8 (LOW-MEDIUM) `db31007`** — Mongo console's `parseStatement` never ran `ResolveEJSONWrappers`
+  on its own parsed arguments, unlike `ParseDocumentLiteral` (its own doc comment: "the one grammar
+  every Mongo text surface... parses with") — a `{$oid:...}`/`{$date:...}`/`{$numberLong:...}` value
+  copied from the grid either failed as an unknown filter operator or got silently stored as a
+  literal wrapper object. Now resolved before the `isWriteStatement` check; confirmed `aggregate`'s
+  own `$out`/`$merge` pipeline-stage detection is unaffected, since resolving a stage `bson.D`
+  preserves its own type.
+- **F9 (LOW-MEDIUM, functional) `acbb7a6`** — SQS `SendMessage` never set `MessageGroupId` (required
+  by AWS on every `.fifo` queue) or `MessageDeduplicationId` (required unless content-based dedup is
+  enabled) — yet `caps.CanInsert` reports true for every queue including FIFO ones, so every FIFO
+  insert failed with AWS's own opaque rejection. `resolveFIFOInsertFields` derives both from new
+  `$messageGroupId`/`$messageDeduplicationId` sentinel fields on the insert body for a `.fifo` queue
+  name, checking `ContentBasedDeduplication` via `GetQueueAttributes` only when a dedup id is missing
+  (no extra round trip on the common case), and returns a clear `E_QUERY` naming what's required.
+  Regression tests in `mutate_internal_test.go` cover the FIFO/non-FIFO and missing/present sentinel
+  paths — new functions with no pre-fix equivalent, so "fails without the fix" is definitional.
+- **F10 (LOW) `acbb7a6`** — SQS's cached receipt handles carried no receive-time/visibility-timeout
+  tracking, so a delete issued after the visibility timeout expired (and another consumer re-received
+  the message) could have AWS accept it against the stale handle with no actual deletion, while this
+  adapter still reported `AffectedRows:1`. `receiptHandles` now records `receivedAt` and the queue's
+  own visibility timeout (falling back to AWS's documented 30s default when the attribute couldn't be
+  read) alongside each handle; `forDelete` refuses a delete outright once past that window rather than
+  reporting a false success. Regression tests in `read_internal_test.go` cover the expiry boundary
+  directly, including the exact-boundary edge case (`time.Since == visibilityTimeout` treated as
+  expired) — CLAUDE.md's own boundary-arithmetic exception.
+- **F11 (LOW) `db31007`/`b860af2`** — both Mongo's and Redis's console `execute` parsed (and
+  read-only-checked) statement N only after 1..N-1 had already run against the connection — a typo
+  further down a batch discarded the already-committed earlier writes with no rollback path, and
+  re-running after fixing it double-applied them. Both now parse/tokenize and read-only-check every
+  statement up front, before any of them executes.
+- **F12 (LOW) `b860af2`** — Redis console tokenizer's quoted-string scanner took `\X` literally as
+  `X` for any escape, so `SET k "a\nb"` stored the literal text `anb` instead of a newline — but the
+  doc cites redis-cli syntax, which does interpret `\n`/`\r`/`\t`/`\b`/`\a`/`\xHH` inside double
+  quotes. `scanQuotedToken` now implements redis-cli's own `sdssplitargs` escaping exactly: those
+  escapes plus `\xHH` inside double quotes, only `\'` special inside single quotes (everything else
+  literal, matching redis-cli exactly), and a closing quote immediately followed by a non-space
+  character is rejected. Split out of `tokenize` into `scanQuotedToken`/`scanBareToken` to keep
+  `gocognit` under its limit. Regression tests in `console_test.go` cover the newline/hex/single-quote/
+  trailing-content cases, confirmed failing against the pre-fix scanner via a scoped, restored local
+  revert before landing.
+- **F13 (LOW) `cc9dd05`** — landed inside a concurrent session's own commit (see the working-tree
+  note below), not lost. (a) Mongo's fields-mode `buildURIFromFields` hand-rolled the URI's userinfo
+  with `url.QueryEscape`, but the driver decodes it with `url.PathUnescape` (`connstring.go`) — the
+  two schemes diverge on a space, breaking auth for any password containing one; now built via
+  `url.UserPassword(...).String()`/`url.User(...).String()`. (b) Both Mongo's `buildURIFromFields`
+  and Redis's own `dial` formatted `host:port` with a bare `%s:%d`, invalid for an IPv6 literal; both
+  now use `net.JoinHostPort`, matching Kafka's own adapter.
+- **F14 (LOW, hygiene) `7c6088d`** — `kafka/kafka.go`'s own package doc still said "Not implemented
+  yet ... returns E_UNSUPPORTED", stale since the adapter itself was registered; corrected. The S3
+  `IfNoneMatch`-comment fix and the Mongo `inFlight`-doc-comment fix are each already covered by F5's
+  and F4's own commits above, per the finding's own instruction.
+
+**Router.Connect/Part 6 hand-off.** F4's own root cause partly lives in `Router.Connect`'s reconnect
+path (`adapterhost`, Part 6's file) passing `context.Background()` unbounded to `Disconnect` — not
+touched here, per the plan's own out-of-scope note (§6) and this finding's own instruction, mirroring
+Part 4's own F3/F4 deferral. The Mongo-side fix (`disconnectTimeout` bounding `Disconnect` itself,
+`QueryTracker` tracking in-flight ops and cancelling them before draining) is fully contained within
+this chunk's own files and closes the practical exposure regardless of what Part 6 eventually does
+with the reconnect path's own ctx.
+
+**Working-tree note.** This phase's own commits landed in the same shared checkout as a concurrent
+Part 16 fixer session (`apps/kira-space/internal/gitsession/**` — no scope overlap by design). Two
+commit attempts (the mongo F3/F4/F6/F7/F8/F11 grouping, then the s3 F3/F5 grouping) were transiently
+swept into a concurrent commit from that session (`cc9dd05`, which also picked up this phase's F13
+changes to `mongo/client.go`/`redis/client.go` staged at the time) — caught immediately by checking
+`git show --stat` against the intended file list right after each attempt; both were corrected via
+`git reset --soft` + unstaging the other session's own files, then recommitted with exactly this
+phase's own intended file list. F13's content was independently confirmed present and correct inside
+`cc9dd05` (diffed against the intended change) rather than recommitted a second time, since no fix
+content was lost and re-committing identical content would only fragment the history further.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `go test ./...`: full suite, run once near the end — every `kira-studio` package (including all
+  five engines this chunk touches) clean; the one failure in the tree
+  (`apps/kira-space/internal/gitsession` build-failed, `apps/kira-space/internal/gitsock` failed) is
+  the concurrent Part 16 fixer's own in-progress, uncommitted edit at the moment this ran — outside
+  this chunk's scope entirely, not touched or fixed here.
+- `go test ./... -race` for `adapters`, `mongo`, `redis`, `kafka`, `sqs`, `s3` (the
+  concurrency-sensitive packages F1-F4 touch): clean.
+- `golangci-lint run ./apps/kira-studio/...`: 0 issues (one `gocognit` finding on F12's own
+  `tokenize` was fixed on the spot by extracting `scanQuotedToken`/`scanBareToken`, not left for a
+  follow-up). A repo-wide `golangci-lint run ./...` surfaces one finding, in
+  `apps/kira-space/internal/gitsession/walk_test.go` — the same concurrent, out-of-scope in-progress
+  edit noted above, not this chunk's.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration hints,
+  all frontend TS) — this chunk touches nothing knip already flags.
+- Docker-backed conformance suites (`SA/*/*_test.go`'s real-container tests) could not run in this
+  sandbox (no Docker) — pre-existing, expected, not something this phase could work around; every
+  unit-level test in the same packages ran and passed, including the new F2/F6/F7/F9/F10 regression
+  tests (each confirmed to fail against the pre-fix code — via a scoped, restored local revert, since
+  F9/F10 are new functions with no pre-fix equivalent to revert to — before landing, passing after).
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never used.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
