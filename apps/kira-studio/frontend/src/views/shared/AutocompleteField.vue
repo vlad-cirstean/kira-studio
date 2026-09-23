@@ -17,6 +17,18 @@ import type { SqlDialect } from './sqlIdent';
 // <input>, not on the wrapping <span class="p-input">.
 defineOptions({ inheritAttrs: false });
 
+// reka's `ListboxRoot` (which underlies `AutocompleteRoot`/`Combobox*`) `watch`es `modelValue`
+// (`immediate: true, deep: true`) and calls `highlightSelected()` on every change — every
+// keystroke here, since this field's `modelValue` is its raw text, not a "committed selection".
+// `highlightSelected` -> `changeHighlight` then really `.focus()`s the first (or previously
+// highlighted) suggestion `<li>` whenever `scroll` isn't explicitly `false` (reka-ui 2.10.5's own
+// source: `node_modules/reka-ui/dist/Listbox/ListboxRoot.js`), which is the case for every
+// keystroke after the first. No public prop suppresses it — `changeHighlight`'s own `focusable`
+// ref is never exposed. `onBlur` below is this field's fix: reclaim focus synchronously,
+// in-tick, whenever a blur's `relatedTarget` lands inside this popup — matching this field's
+// whole contract, that the real <input>/<textarea> keeps DOM focus throughout, with
+// `activeIndex` alone driving which suggestion looks current.
+
 // P104 §3.2: the reka `AutocompleteRoot`/`Combobox*` swap for theme/primitives/AutocompleteField.vue
 // — a Stream B-owned sibling rather than an edit to that file, since one of its 7 call sites
 // (DocumentView.vue) is Stream A territory. Keeps every behaviour theme/primitives/
@@ -160,6 +172,28 @@ const listId = `ac-${Math.random().toString(36).slice(2)}`;
 
 const inputRef = ref<HTMLInputElement | HTMLTextAreaElement | null>(null);
 const open = ref(false);
+
+// reka's `ListboxRoot` (which underlies `AutocompleteRoot`/`Combobox*`) auto-highlights — and via
+// `changeHighlight`'s own `focus ?? focusable.value` fallback, really `.focus()`s — a suggestion
+// every time this popup's content gains "entry focus" (mount, and every re-render while open;
+// reka-ui 2.10.5's own source: `focusable` is never exposed as a settable prop for the
+// Combobox/Autocomplete case). That's a real requirement no reka composition meets for a
+// *free-text* field: the real <input>/<textarea> must keep DOM focus throughout, with
+// `activeIndex` alone driving which suggestion looks current — never a rewritten popup/listbox,
+// per the file header above. `ListboxRoot.onEnter` (node_modules/reka-ui/dist/Listbox/
+// ListboxRoot.js) dispatches a cancelable `entryFocusEvent` and checks its own
+// `defaultPrevented` before calling `changeHighlight` at all — `AutocompleteRoot` forwards
+// `$attrs` (so `onEntryFocus` below) straight onto the underlying `ListboxRoot` vnode, so this
+// stops the steal at its one source instead of clawing focus back after it already happened.
+// The one reliable way to identify the popup's real DOM node for `onBlur`'s own containment
+// check below — `ComboboxContent`'s own `:id` binding in the template is never actually applied:
+// `ComboboxContentImpl`'s render merges its internal `rootContext.contentId` in *after* `$attrs`
+// (reka-ui 2.10.5's own source), so an outside `:id` is silently overridden (and, specific to
+// `AutocompleteRoot`, that internal id is a hardcoded `""` besides). A template `ref` on a
+// component yields its instance, not its DOM node — `.$el` is that node (a component ref works
+// for either, so this stays a component instance rather than importing reka's own internal
+// exposed-element type just for this).
+const contentRef = ref<{ $el?: HTMLElement } | null>(null);
 const activeIndex = ref(0);
 const wordStart = ref(0);
 const currentWord = ref('');
@@ -394,10 +428,18 @@ function onInputMouseMove(e: MouseEvent): void {
 }
 
 function onBlur(e: FocusEvent): void {
-  // A click on a suggestion fires this blur first (mousedown steals focus before the click handler
-  // runs) — closing here first would make the click land on nothing. The suggestion list's own
-  // @mousedown.prevent (below) keeps focus on the input instead, so this only ever fires for a
-  // genuine "left the field" blur.
+  // Belt-and-suspenders alongside `onEntryFocus` above: if focus is headed into this popup for
+  // any other reason (reka's own dismiss/pointer handling), reclaim it synchronously rather than
+  // treat it as the field being left — matching the "real input stays focused" contract.
+  // `contentRef` (not an id selector): `ComboboxContentImpl`'s own render explicitly merges its
+  // internal `rootContext.contentId` in *after* `$attrs`, so a `:id` passed to `ComboboxContent`
+  // from outside is silently overridden (confirmed against reka-ui 2.10.5's own source) — the
+  // real DOM id is never `listId`, only `contentRef.value.id` is.
+  const related = e.relatedTarget as HTMLElement | null;
+  if (related && contentRef.value?.$el?.contains(related)) {
+    inputRef.value?.focus();
+    return;
+  }
   open.value = false;
   forceAll.value = false;
   closeHover();
@@ -425,7 +467,6 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
     :open="open"
     ignore-filter
     :highlight-on-hover="false"
-    @update:open="open = $event"
   >
     <span
       class="p-input autocomplete-field relative"
@@ -502,7 +543,7 @@ useEventListener(window, 'scroll', closeOnViewportChange, true);
     <ComboboxPortal>
       <ComboboxContent
         v-if="filtered.length > 0"
-        :id="listId"
+        ref="contentRef"
         as="ul"
         position="popper"
         side="bottom"
