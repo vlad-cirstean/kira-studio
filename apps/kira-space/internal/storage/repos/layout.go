@@ -7,12 +7,11 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // LayoutRepo reads and writes the `ui_layout` table — Kira Studio's own LayoutRepo, trimmed to
 // this app's own one-panel model.Layout (P100 Part 2).
-const layoutSelectAllSQL = `SELECT key, value FROM ui_layout`
-
 type LayoutRepo struct {
 	DB *sql.DB
 
@@ -22,21 +21,9 @@ type LayoutRepo struct {
 }
 
 func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, error) {
-	if queryErr != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: query: %w", queryErr)
-	}
-	defer rows.Close()
-
-	stored := map[string]json.RawMessage{}
-	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
-			return model.Layout{}, fmt.Errorf("repos/layout: scan: %w", err)
-		}
-		stored[key] = json.RawMessage(value)
-	}
-	if err := rows.Err(); err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: rows: %w", err)
+	stored, err := appstorage.ScanLayoutRows(rows, queryErr)
+	if err != nil {
+		return model.Layout{}, err
 	}
 
 	result := model.DefaultLayout()
@@ -49,7 +36,7 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	if r.selectAll != nil {
 		return r.scanAll(r.selectAll.Query())
 	}
-	return r.scanAll(r.DB.Query(layoutSelectAllSQL))
+	return r.scanAll(r.DB.Query(appstorage.LayoutSelectAllSQL))
 }
 
 // Set writes both leaves every time, mirroring Kira Studio's own LayoutRepo.Set (the read-modify-
@@ -67,7 +54,7 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 	if r.selectAll != nil {
 		current, err = r.scanAll(tx.Stmt(r.selectAll).Query())
 	} else {
-		current, err = r.scanAll(tx.Query(layoutSelectAllSQL))
+		current, err = r.scanAll(tx.Query(appstorage.LayoutSelectAllSQL))
 	}
 	if err != nil {
 		return model.Layout{}, err

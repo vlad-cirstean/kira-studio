@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/migrations"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
@@ -40,20 +42,23 @@ func OpenAt(home string) (*DB, error) {
 	}
 
 	path := config.DbPathAt(home)
-	// sqlitex.Open runs the four steps db.go used to run inline (open with the six DSN pragmas,
-	// SetMaxOpenConns(1), Ping to force the lazy first connection — which is what actually creates
-	// the file and applies the DSN pragmas — then chmod 0600 unconditionally, not only on create)
-	// against repo-root internal/sqlitex, shared with apps/kira-space's own storage package
-	// (P100 Part 1).
-	sqlDB, err := sqlitex.Open(path)
+	steps, err := migrations.All()
 	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
+		return nil, fmt.Errorf("storage: load migrations: %w", err)
 	}
-
-	db := &DB{sqlDB}
-	if err := db.migrate(); err != nil {
-		_ = sqlDB.Close()
+	sqlitexSteps := make([]sqlitex.Migration, len(steps))
+	for i, m := range steps {
+		sqlitexSteps[i] = sqlitex.Migration{Version: m.Version, Name: m.Name, SQL: m.SQL}
+	}
+	// appstorage.OpenAt runs the four steps this used to run inline (open with the six DSN
+	// pragmas, SetMaxOpenConns(1), Ping to force the lazy first connection, chmod 0600) plus the
+	// migration run — repo-root internal/appstorage, shared with apps/kira-space's own storage
+	// package (P100 Part 1 / P107 T2-10). Not wrapped: a *sqlitex.SchemaTooNewError must reach the
+	// caller as-is, since internal/startupfail's Classify recognises it via a direct type assertion
+	// (err.(schemaTooNew)), not errors.As.
+	sqlDB, err := appstorage.OpenAt(path, sqlitexSteps)
+	if err != nil {
 		return nil, err
 	}
-	return db, nil
+	return &DB{sqlDB}, nil
 }

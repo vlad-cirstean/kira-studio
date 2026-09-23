@@ -3,10 +3,10 @@ package repos
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // WindowsRepo reads and writes the `windows` table (P8 D1/D4) — one row per workbench that is
@@ -17,6 +17,11 @@ import (
 type WindowsRepo struct {
 	DB *sql.DB
 }
+
+// shared is this repo's own row against repo-root internal/appstorage.WindowRepo, which owns
+// Exists/Create/EnsureExists/SetBounds (P107 T2-10) — everything below stays a thin delegate to
+// it, since this app's own WindowRecord has no extra column (unlike Kira Studio's own `mode`).
+func (r *WindowsRepo) shared() *appstorage.WindowRepo { return &appstorage.WindowRepo{DB: r.DB} }
 
 // List returns every window record in `order`. Not a hot boot path (read once at startup, per
 // window record), so this has no prepared statement.
@@ -54,15 +59,7 @@ func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
 
 // Exists reports whether key names a live `windows` row.
 func (r *WindowsRepo) Exists(key string) (bool, error) {
-	var one int
-	err := r.DB.QueryRow(`SELECT 1 FROM windows WHERE key = ?`, key).Scan(&one)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("repos: windows exists %s: %w", key, err)
-	}
-	return true, nil
+	return r.shared().Exists(key)
 }
 
 // Create inserts a new window record. The caller mints the key (D2: a UUID the shell owns).
@@ -70,21 +67,12 @@ func (r *WindowsRepo) Create(rec model.WindowRecord) error {
 	if err := rec.Validate(); err != nil {
 		return fmt.Errorf("repos: %w", err)
 	}
-	var boundsJSON any
+	var bounds *appstorage.WindowBounds
 	if rec.Bounds != nil {
-		encoded, err := json.Marshal(rec.Bounds)
-		if err != nil {
-			return fmt.Errorf("repos: encode window bounds: %w", err)
-		}
-		boundsJSON = string(encoded)
+		b := appstorage.WindowBounds(*rec.Bounds)
+		bounds = &b
 	}
-	if _, err := r.DB.Exec(
-		`INSERT INTO windows (key, "order", bounds_json) VALUES (?, ?, ?)`,
-		rec.Key, rec.Order, boundsJSON,
-	); err != nil {
-		return fmt.Errorf("repos: insert window %s: %w", rec.Key, err)
-	}
-	return nil
+	return r.shared().Create(rec.Key, rec.Order, bounds)
 }
 
 // EnsureExists creates a `windows` row for key if one doesn't already exist, ordered after every
@@ -92,51 +80,12 @@ func (r *WindowsRepo) Create(rec model.WindowRecord) error {
 // there. Runs inside one transaction so two concurrent Ensure calls for the same brand-new key
 // can't both observe "absent" and then race each other's INSERT.
 func (r *WindowsRepo) EnsureExists(key string) error {
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return fmt.Errorf("repos: ensure window begin: %w", err)
-	}
-	defer tx.Rollback() //nolint:errcheck
-
-	var exists bool
-	if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM windows WHERE key = ?)`, key).Scan(&exists); err != nil {
-		return fmt.Errorf("repos: ensure window exists %s: %w", key, err)
-	}
-	if !exists {
-		var maxOrder sql.NullInt64
-		if err := tx.QueryRow(`SELECT MAX("order") FROM windows`).Scan(&maxOrder); err != nil {
-			return fmt.Errorf("repos: ensure window max order: %w", err)
-		}
-		order := 0
-		if maxOrder.Valid {
-			order = int(maxOrder.Int64) + 1
-		}
-		if _, err := tx.Exec(
-			`INSERT INTO windows (key, "order", bounds_json) VALUES (?, ?, NULL)`, key, order,
-		); err != nil {
-			return fmt.Errorf("repos: ensure insert window %s: %w", key, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("repos: ensure window commit: %w", err)
-	}
-	return nil
+	return r.shared().EnsureExists(key)
 }
 
 // SetBounds persists one window's rectangle.
 func (r *WindowsRepo) SetBounds(key string, b model.WindowBounds) error {
-	encoded, err := json.Marshal(b)
-	if err != nil {
-		return fmt.Errorf("repos: encode window bounds: %w", err)
-	}
-	res, err := r.DB.Exec(`UPDATE windows SET bounds_json = ? WHERE key = ?`, string(encoded), key)
-	if err != nil {
-		return fmt.Errorf("repos: update window %s: %w", key, err)
-	}
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return fmt.Errorf("repos: %s: no such window", key)
-	}
-	return nil
+	return r.shared().SetBounds(key, appstorage.WindowBounds(b))
 }
 
 // Delete removes one window's row. Kira Studio's own Delete relies on `tabs.window_key ...

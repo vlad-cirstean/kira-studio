@@ -3,6 +3,8 @@ package repos
 import (
 	"database/sql"
 	"fmt"
+
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // Repos is every storage repo this app needs, constructed once at startup — Kira Studio's own
@@ -32,7 +34,7 @@ func New(db *sql.DB) (*Repos, error) {
 	if err != nil {
 		return nil, fmt.Errorf("repos: prepare settings select: %w", err)
 	}
-	layoutSelectAll, err := db.Prepare(layoutSelectAllSQL)
+	layoutSelectAll, err := db.Prepare(appstorage.LayoutSelectAllSQL)
 	if err != nil {
 		return nil, fmt.Errorf("repos: prepare layout select: %w", err)
 	}
@@ -56,10 +58,5 @@ func New(db *sql.DB) (*Repos, error) {
 // Close releases every prepared statement. It does not close the underlying *sql.DB, which the
 // caller (main.go) owns.
 func (r *Repos) Close() error {
-	for _, stmt := range r.stmts {
-		if err := stmt.Close(); err != nil {
-			return fmt.Errorf("repos: close statement: %w", err)
-		}
-	}
-	return nil
+	return appstorage.CloseStmts(r.stmts)
 }
