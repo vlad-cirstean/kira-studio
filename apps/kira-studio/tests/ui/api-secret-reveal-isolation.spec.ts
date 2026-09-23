@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab } from './support/apiMode';
 import { IPC } from './support/ipcChannels';
 
 // Round-1 review finding 5: revealedValues (state/variables.ts) is shared between the Variables
@@ -19,9 +20,6 @@ import { IPC } from './support/ipcChannels';
 
 const NOW = '2026-01-01T00:00:00.000Z';
 
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
 function collectionRow(page: Page, id: string): Locator {
   return page.locator(`[data-testid="collection-row"][data-id="${id}"]`);
 }

@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { grpcTab as buildGrpcTab, modeTab } from './support/apiMode';
 import { installFakeTimers } from './support/clock';
 import { acceptConfirm } from './support/dialogs';
 import { editorText } from './support/editorText';
@@ -18,10 +19,6 @@ function row(page: Page, id: string): Locator {
 // from every other tests/ui spec) — the `Call` bound-call endpoint via installControlMocks'
 // snapshot machinery, and D8's own pushed message channel via F20's new `emitWailsEvent` helper.
 
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
 async function openHttpModeAndNewGrpcRequest(page: Page): Promise<void> {
   await modeTab(page, 'api').click();
   await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
@@ -30,35 +27,12 @@ async function openHttpModeAndNewGrpcRequest(page: Page): Promise<void> {
 
 // A restored 'grpc-request' tab (grpcRequestTabStateSchema's own defaults, overridden per test) —
 // the same "skip the UI's own build-up path and start from a known state" shortcut
-// collections.spec.ts and http-request.spec.ts's third test both already use.
-function grpcTab(state: Record<string, unknown>): Record<string, unknown> {
-  return {
-    id: 'tab-grpc-1',
-    connectionId: null,
-    path: 'request',
-    kind: 'grpc-request',
-    order: 0,
-    active: true,
-    state: {
-      target: '',
-      tlsMode: 'tls',
-      caFile: '',
-      serverName: '',
-      descriptorMode: 'reflection',
-      protoPath: '',
-      importPaths: [],
-      service: '',
-      method: '',
-      message: '',
-      metadata: [],
-      itemId: null,
-      name: '',
-      requestPane: 'message',
-      responsePane: 'messages',
-      requestPaneHeight: 0,
-      ...state,
-    },
-  };
+// collections.spec.ts and http-request.spec.ts's third test both already use. This file's own
+// tests run with the Messages pane showing by default (see the D1 case below) — every other
+// caller of the shared `grpcTab` defaults to History instead, so this stays a thin local wrapper
+// supplying that one divergent field as `base` rather than changing the shared default.
+function grpcTab(state: Record<string, unknown> = {}): Record<string, unknown> {
+  return buildGrpcTab(state, { responsePane: 'messages' });
 }
 
 const UNARY_SCHEMA = {

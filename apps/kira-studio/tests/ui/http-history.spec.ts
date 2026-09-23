@@ -1,22 +1,12 @@
-import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { modeTab, openHttpModeAndNewRequest } from './support/apiMode';
 import { diffEditorText, editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // P8 §6.3: three tests, each seeding historyList (and historyGet where needed) rather than
 // sending twice — F12's whole point (P2 §8 OQ-8's predicted one-snapshot-per-channel limitation
 // does not bite here, because history never arrives through a second httpSend).
-
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
 
 // A minimal, always-present request half for a snapshot's own `request` field — no test below
 // asserts on it, only on the response side.

@@ -1,6 +1,6 @@
-import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { httpResponse as buildHttpResponse, openHttpModeAndNewRequest } from './support/apiMode';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
@@ -8,23 +8,16 @@ import { IPC } from './support/ipcChannels';
 // exact and http2/masked) and the editor (D8/D9/D10), each seeded through the same one-snapshot-
 // per-channel discipline http-request.spec.ts's own header comment states.
 
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
-
 const REQUEST_TEXT =
   'GET /v2/orders?a=1 HTTP/1.1\r\nHost: api.example.com\r\nUser-Agent: Kira Studio/1.2.3\r\nAccept-Encoding: gzip\r\n\r\n';
 const RESPONSE_HEAD = 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n';
 const RESPONSE_BODY = '{"id":1}';
 
+// This file's own fixture defaults diverge from the shared canonical shape (exact body/headers/
+// elapsedMs/finalUrl below) — its "exact fidelity" tests rely on them without overriding every
+// field explicitly, so this passes its own `base` rather than changing the shared default.
 function httpResponse(overrides: Record<string, unknown>): Record<string, unknown> {
-  return {
+  return buildHttpResponse(overrides, {
     status: 200,
     statusText: 'OK',
     proto: 'HTTP/1.1',
@@ -36,8 +29,7 @@ function httpResponse(overrides: Record<string, unknown>): Record<string, unknow
     elapsedMs: 12,
     finalUrl: 'https://api.example.com/v2/orders?a=1',
     redirects: [],
-    ...overrides,
-  };
+  });
 }
 
 test('Http raw — the inspector, exact fidelity', async ({ relaunch }) => {

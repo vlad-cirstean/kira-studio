@@ -1,22 +1,14 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { openHttpModeAndNewRequest } from './support/apiMode';
+import { typeInto as typeIntoView } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 
 // Four tests, one httpSend snapshot each (the same one-snapshot-per-test constraint
 // http-request.spec.ts's own header comment states — a channel with more than one snapshot
 // matches on args, and the send's renderer-minted opId makes two sends in one test unmatchable).
-
-function modeTab(page: Page, mode: 'studio' | 'api'): Locator {
-  return page.locator(`[data-testid="mode-tab"][data-mode="${mode}"]`);
-}
-
-async function openHttpModeAndNewRequest(page: Page): Promise<void> {
-  await modeTab(page, 'api').click();
-  await expect(page.locator('[data-testid="api-start"]')).toBeVisible();
-  await page.click('[data-testid="new-request-start"]');
-}
 
 async function openBodyPane(page: Page): Promise<void> {
   await page.click('[data-testid="http-request-pane-body"]');
@@ -28,8 +20,7 @@ async function openBodyPane(page: Page): Promise<void> {
 // that could otherwise fight an already-closed XML document (this file writes its own closing
 // tags) the way CodeMirror's autoCloseTags once did.
 async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.view-lines').click();
-  await page.keyboard.insertText(text);
+  await typeIntoView(view, page, text, { paste: true });
 }
 
 /** True when some descendant of `view` (a MonacoHost) has a token painted in the given resolved
