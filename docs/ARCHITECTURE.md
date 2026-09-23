@@ -32,7 +32,7 @@ whatever sandbox a session happens to be in),
 | Renderer build | Vite (`vite build`, `apps/kira-studio/frontend/vite.config.ts`) | builds `apps/kira-studio/frontend/src` straight into `apps/kira-studio/frontend/dist`, which `apps/kira-studio/main.go` embeds via `//go:embed all:frontend/dist` and serves through Wails' `AssetOptions.Handler`. Lazily-imported chunks, still split under Vite 8/Rolldown (P19 C6): the query console's SQL Format button reaches `sql-formatter` only through `views/console/sqlFormatterEntry.ts`'s `await import()` (~37 KB gzip); the data grid's Generate data… dialog and, as of P6, Api mode's own send path and its dynamic-values reference dialog all reach `@faker-js/faker/locale/en` — but through **two** one-line entry files, `views/grid/fakeData/fakerEntry.ts` and `packages/api-core/src/http/dynamic/fakerEntry.ts`, duplicated rather than shared because the latter is P12 D16(e)'s own no-app-import package, not just P1 D7's biome rule. Rolldown folds the two content-identical entry files into one shared stub chunk and gives the underlying locale data its own shared chunk beneath it (`en-*.js`, ~155 KB gzip — the same bytes the single pre-P6 `fakerEntry-*.js` chunk carried, just reorganised into two files instead of one, not duplicated); `packages/api-core/src/http/dynamic/generators.ts`, P6's own 58-entry `$name` → faker-call dispatch table, is genuinely new code and gets a third lazy chunk of its own (~0.8 KB gzip). A fourth, as of C5: `monaco-editor` reaches through `views/repo/monacoEntry.ts`'s own dynamic import via the shared `editor/monaco.ts#loadMonaco()` (P60a, v1.6, moved the bootstrap here from `views/repo/monaco.ts`, which re-exports it unchanged) — triggered by the first editor surface *any* session opens: as of P60b every CodeMirror mount in the app, including the SQL console and `project/SchemaDialog.vue`'s DDL editor, is behind this same one memoised import, so a session that opens none of them still fetches nothing and a session that opens its first one pays this chunk exactly once. Measured (`bun run build`): `monacoEntry-*.js` 3.81 MB raw / **972 KB gzip**, plus `monacoEntry-*.css` 162 KB raw / 24.6 KB gzip and one `editor.worker-*.js` (300 KB raw, loaded as a Worker script rather than a page asset, so it carries no separate gzip line in Vite's report) — each registered language's own Monarch grammar data lands in its own further-lazy sub-chunk (0.4-3.7 KB gzip each, two more as of P60a: `kira-mongo`/`kira-redis`, transliterated from the CodeMirror `StreamLanguage`s they replace), fetched only once a file/document of that language is actually opened. `@codemirror/merge`'s own former chunk (`views/httprequest/mergeEntry.ts`, P8) is gone — P60a moved the response-history **Compare** dialog onto Monaco's own diff editor (the same capability C5/C6's repo diff tabs already used) and deleted the dependency. All four remaining chunks are fetched on first use — the first *Generate data…* open, the first send referencing a `{{$name}}`, the first open of the dynamic-values dialog, or the first editor surface of any kind opened — and none costs a launch or grows `index-*.js` by anything but each phase's own eager app code. `index-*.js` itself dropped from 1 723.09 kB raw / 520.66 kB gzip (P60a's own baseline, still carrying the nine `@codemirror/*` packages plus `@lezer/highlight`) to 1 307.65 kB raw / 384.15 kB gzip once P60b removed them — the ten packages were eager, bundled straight into the main chunk, not a lazy one. P61's Vite 8.3.0 bump moved it again, to **1 315.59 kB raw / 387.37 kB gzip** (Rolldown chunking shift, no code change); `monacoEntry-*.js` stayed at 3.81 MB raw / 972 KB gzip and `dist/assets/` still carries exactly one `editor.worker-*.js` |
 | UI | Vue 3 (`<script setup>`, Composition API) | VDOM mode — Vapor mode evaluated and declined in P6 (`docs/v1.1/plans/P6-vue-vapor-mode.md`) |
 | Styling | Tailwind (v4, CSS-first config) | tokens mirror VS Code Dark Modern |
-| Frontend library baseline (P98) | Vue 3.5 + Vite; Tailwind v4 CSS-first, `--kira-*` bridged in `theme/base.css`; shadcn-vue on Reka UI, its palette bridged in `theme/shadcn-bridge.css`; Pinia for client state; TanStack Query for server state; VueUse for DOM composables | P98 wired dependencies and bootstrap only (Pinia/Query registered at `main.ts`, no store, no query call site moved, no component generated); P99 migrated the app's existing 39 `reactive()` state modules and 200 `.vue` files onto them |
+| Frontend library baseline (P98, completed P104) | Vue 3.5 + Vite; Tailwind v4 CSS-first, `--kira-*` bridged in `theme/base.css`; shadcn-vue on Reka UI, its palette bridged in `theme/shadcn-bridge.css`; Pinia for client state; TanStack Query for server state; VueUse for DOM composables; `@tanstack/vue-virtual` for row virtualization | P98 wired dependencies and bootstrap only (Pinia/Query registered at `main.ts`, no store, no query call site moved, no component generated); P99 migrated the app's existing 39 `reactive()` state modules and 200 `.vue` files onto them. **P104 finished the UI half**: all 20 hand-rolled `theme/primitives/*` components deleted, every call site repointed at `components/ui/*` (shadcn-vue on Reka UI) or, where no library counterpart exists for a bespoke layout container (`PanelShell`/`ViewChrome`/`ViewHeader`/`ReconnectGate`/`RunState`/`ColorPicker`), inlined as Tailwind composition over those same parts; the `v-tooltip` directive and its document-level singleton (`AppTooltip.vue`) deleted for the real `Tooltip`/`TooltipTrigger`/`TooltipContent` trio (`TooltipProvider` owns delay/rearm); `PanelSplitter`/`VirtualList`/`TreeHost` replaced by reka's `Splitter*` and `@tanstack/vue-virtual`; raw spacing/sizing scale values converted onto Tailwind's default numeric scale, with only the runtime-settable (Appearance) and z-index tokens staying var-backed/bracketed. Every one of the 17 fetched `components/ui/*` sets now has a real consumer or is deleted outright: `CommandPalette.vue` rebuilt on `ui/command` (reka's Listbox owns filtering/keyboard nav), dialog/pane `<label>`s onto `ui/label`, `.p-sep`/`.p-textarea` onto `ui/separator`/`ui/textarea`; `ui/scroll-area` and `ui/context-menu` both deleted unused — the app's own point-anchored context menu (`ContextMenu.vue`) is built on `ui/dropdown-menu` instead (§5.2). `theme/primitives.css`'s `.p-*` rules survive only where a native element (`<select>`, a handful of native `<button>`s) still consumes the class directly — see `docs/v1.9/SPEC.md`'s `## P104 result` for the exact kept set |
 | Text editing / viewing | `monaco-editor` — one engine, every editor surface in the app | CodeMirror 6 is gone entirely as of P60b: the SQL query console and `project/SchemaDialog.vue`'s DDL editor were the last two mount sites (P60a migrated the other 15), and both now mount `editor/MonacoHost.vue`. `editor/CodeMirrorHost.vue` and the nine remaining `@codemirror/*` packages plus `@lezer/highlight` are deleted from `package.json`. The two surfaces stayed on CodeMirror through P60a only because their language service (completion, diagnostics, hover, the DDL extractor) walked `@codemirror/lang-sql`'s Lezer parse tree — P60b replaced that tree with an in-house one (`packages/shared/domain/sql-tokens.ts`, below), which is what let the mounts themselves move; the SQL Monarch grammar Monaco already had (`monacoEntry.ts`) was always colouring-only and needed no change. Every editor surface — read-only viewer and real editable host alike — loads Monaco through the one shared, memoised `loadMonaco()` (`editor/monaco.ts`); nothing is eager, so a session that opens no editor fetches nothing and a session that opens its first one pays the ~972 KB gzip chunk once, cached thereafter. `docs/v1.6/plans/P60a-monaco-host-and-general-surfaces.md` and `docs/v1.6/plans/P60b-sql-language-service-monaco.md` have the full capability-by-capability mapping (theme/token colours, range highlights, hover, completion, lint, the undo boundary around an external write, wrap-on-type, auto-close brackets, and — P60b's own addition — the SQL language service itself) |
 
 **The in-house SQL tokenizer (P60b).** Three siblings now live in `packages/shared/domain/`, all built on one shared quote/comment/dollar-quote lexical scanner (`sql-lex.ts`, hoisted out of the first two to close a duplication they used to carry independently): `sql-split.ts` (statement splitting, pre-existing), `sql-lint.ts` (lexical diagnostics — unterminated quote/comment, unbalanced parens, pre-existing), and `sql-tokens.ts` (the parse layer proper, P60b). `sql-tokens.ts#tokenizeSql` produces the same shallow tree shape (`LNode`: `name`/`from`/`to`/`firstChild`/`nextSibling`, `Statement`/`Parens`/`CompositeIdentifier` the only groupings) the deleted `@codemirror/lang-sql` dependency used to hand the console's language service — every consumer (`views/console/{ddl,sqlRefs,sqlHover,sqlDiagnostics}.ts`) is unchanged apart from taking a plain `SqlDialect` string instead of a library dialect object. `packages/shared/domain/sql-keywords.ts` supplies each of the five dialects' curated keyword/type vocabulary (a membership test enforces every consumer that branches on `name === 'Keyword'` stays covered). A module-level memo in `sql-tokens.ts` (key: `(options, source)` compared by reference, size 2, FIFO) is what keeps a hover/lint/completion burst over one untouched document to one real scan — the same technique `findRanges.ts`'s own position cache and `state/schemas.ts`'s own parsed-DDL cache already use.
@@ -936,7 +936,8 @@ module, not a sibling of it).
 - **The file list is `codeworkspace.EnumerateAll`** (`internal/codeworkspace/enumerate.go`) — the
   same `git ls-files -z --cached --others --exclude-standard` argv the search scanner also uses (§C7,
   below), unfiltered by extension (D6). Capped at 200,000 paths (an honest IPC-payload limit, not a
-  UI virtualization one — `theme/primitives/TreeHost.vue` already virtualizes the rendered rows).
+  UI virtualization one — the tree view already virtualizes the rendered rows on `@tanstack/
+  vue-virtual`, P104's own replacement for the deleted `theme/primitives/TreeHost.vue`).
   **Refresh is on workspace open and an explicit Refresh action only — nothing live**: there is no
   worktree watcher of any kind, so a change made outside the app is picked up only on the next open
   or an explicit Refresh.
@@ -1493,22 +1494,21 @@ incognito op still emits live events to the Operations panel and is simply never
 `op_log`. An incognito tab's active environment is a per-tab in-memory override
 (`incognitoEnvByTab`), never a write to the shared active-environment row.
 
-**The left panel is a shell with pluggable content; the tree host is a separate, mode-agnostic
-primitive.** `theme/primitives/PanelShell.vue` (P12 D10: moved out of `workbench/panels/`, since
-it is generic chrome with no Studio- or Api-specific knowledge) owns the header geometry, the
-search reveal/toggle and the VS-Code-style type-ahead redirect — the same panel shell both
-`ProjectPanel.vue` (Studio) and `api/CollectionsPanel.vue` (Api) mount into via its
-`#title`/`#actions`/`#body`/`#empty` slots, so a second left panel was never added (there are still
-exactly three layout panels).
-Separately, `theme/primitives/TreeHost.vue` is the virtualized-tree mechanics factored out of
-`ProjectTree.vue` — `VirtualList` wiring, the pinned-ancestor sticky band
-(`theme/primitives/stickyBand.ts`), reveal-scroll with band inset — generic over any row shape
-with `depth`/`hasChildren`/`expanded`/`key`. `ProjectTree.vue` still owns every Studio-specific
+**The left panel's header/search/type-ahead is a shared composable; the tree host is a shared
+virtualization hook — both mode-agnostic, neither a component (P104 §3, replacing the P12/P4-era
+`theme/primitives/PanelShell.vue`/`TreeHost.vue`).** `usePanelHeaderSearch`
+(`packages/workbench/src/util/panelSearch.ts`) owns the header geometry's search reveal/toggle and
+the VS-Code-style type-ahead redirect; both `ProjectPanel.vue` (Studio) and
+`api/CollectionsPanel.vue` (Api) inline their own header markup over it, composed from
+`components/ui` parts, so a second left panel was never added (there are still exactly three
+layout panels) even though no shared shell component exists any more.
+Separately, `useTreeVirtualRows` (`packages/workbench/src/util/treeVirtualRows.ts`) is the
+virtualized-tree mechanics factored out of `ProjectTree.vue` — `@tanstack/vue-virtual` wiring, the
+pinned-ancestor sticky band (`packages/theme/src/primitives/stickyBand.ts`, kept: a logic helper,
+not a hand-rolled component), reveal-scroll with band inset — generic over any row shape with
+`depth`/`hasChildren`/`expanded`/`key`. `ProjectTree.vue` still owns every Studio-specific
 behaviour (the connection-driven row model, the five openable-kind dispatch, context menus,
-keyboard shortcuts) unchanged. **P4's `api/CollectionsTree.vue` is that primitive's second
-consumer**, and it landed with no change to `TreeHost.vue`, `VirtualList.vue` or `stickyBand.ts` at
-all — the props, the `#row` slot, `revealKey` and the background-contextmenu emit were exactly what
-a second tree needed, the check the factoring was meant to pass. It mounts `TreeHost` over
+keyboard shortcuts) unchanged. **`api/CollectionsTree.vue` is that hook's second consumer**, over
 its **own** row model, not a shared one: `CollectionRowVm` is four structural members plus seven of
 its own against `TreeRowVm`'s fourteen, because `connectionId`, `color`, `status`, `statusDetail`,
 `groupKind`, `badges`, `loading` and `error` mean nothing here. `api/CollectionRow.vue` is
@@ -2091,11 +2091,16 @@ rows currently on screen, reported by each view's own virtualization bounds) sca
 find on a large loaded dataset highlights what's visible before continuing the ascending pass over
 the rest in the background.
 
-**Every `ViewChrome` consumer looks the same because it mounts the same primitives, not because
-each view re-derives the look.** P48 closed the SQL grid's own last holdout — `DataView.vue` now
-mounts `<ViewChrome>` exactly like documents/keyvalue/stream/console/definition, its badges and PK
-chip in `#badges`/`#head-trailing`, `DataToolbar`/`FilterToolbar` in `#toolbar`/`#toolbar-2` — so
-every data-view kind now shares one toolbar-mounting shape, not six independently-styled ones. The
+**Every view's chrome looks the same because every view inlines the same composition, not because
+each re-derives the look.** P48 closed the SQL grid's own last holdout — `DataView.vue` composed
+its chrome exactly like documents/keyvalue/stream/console/definition, its badges and PK chip
+alongside the header, `DataToolbar`/`FilterToolbar` in the toolbar rows — so every data-view kind
+shares one toolbar-mounting shape, not six independently-styled ones. `ViewChrome`/`ViewHeader`
+were the shared components that shape lived in through P103; P104 (§3) deleted both (no
+`components/ui`/reka counterpart for a bespoke layout container) and inlined their markup at each
+call site instead, over `components/ui` parts and Tailwind utilities — the shared *look* is now a
+convention each view's own template repeats, not a component it mounts. What stayed genuinely
+shared, unaffected by that swap, is the logic beneath it. The
 per-tab runtime store (`createRuntimeStore`) owns `setActionError`/`toggleSearchOpen`/
 `setSearchOpen` rather than each view re-implementing them; `views/shared/viewOp.ts`'s `beginOp`/
 `applyLoadFailure` are the one load-op preamble and load-failure tail behind every view's own
@@ -3158,9 +3163,11 @@ CherryPickDialog, ForcePushDialog, ResetDialog) had no checkbox CSS anywhere in 
 each drew the platform's own native widget. `theme/app-shell.css` (the package's one
 document-level stylesheet) gained one rule scoped to `.kv-mount-root input[type="checkbox"]`, in
 `--kv-*`/`--vscode-*` vocabulary (never `--kira-*` — this package also renders inside the VS Code
-extension host), visually matching the host app's own `.p-check` primitive: 14px box, 3px radius,
-`appearance: none`, the already-imported codicon font's own `\eab2` glyph as a `::after`
-pseudo-element for the check mark. No markup change across the 9 dialogs.
+extension host), visually matching the host app's own checkbox styling as of P67c (`.p-check`,
+since deleted and replaced by `components/ui/checkbox` at P104 — this package is explicitly out of
+that phase's scope, §1.7, so its own literal values below were never updated to track the swap):
+14px box, 3px radius, `appearance: none`, the already-imported codicon font's own `\eab2` glyph as
+a `::after` pseudo-element for the check mark. No markup change across the 9 dialogs.
 
 ### Code review, ported natively (C11)
 
