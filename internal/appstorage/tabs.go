@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // IsJSONObject reports whether raw is valid JSON whose top-level value is an object — both apps'
@@ -92,6 +94,35 @@ func ReplaceKeyed(db *sql.DB, table, keyColumn, scopeValue string, keys []string
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("appstorage: replace %s: commit: %w", table, err)
+	}
+	return nil
+}
+
+// WindowExistsChecker is the one method SaveWindowTabs needs from an app's own *repos.WindowsRepo.
+type WindowExistsChecker interface {
+	Exists(key string) (bool, error)
+}
+
+// TabsSaver is the one method SaveWindowTabs needs from an app's own *repos.TabsRepo — Save's own
+// signature, generic over each app's own storage/model.TabRecord (a distinct type per app, P103
+// §2.3, so this can't be a plain interface without a type parameter).
+type TabsSaver[T any] interface {
+	Save(windowKey string, records []T) error
+}
+
+// SaveWindowTabs is both apps' own bridge.TabsService.Save (P107 I2-6): reject a windowKey that
+// names no `windows` row with a real E_BAD_REQUEST, rather than letting it surface as TabsRepo.
+// Save's own raw FOREIGN KEY constraint failure (C4), then persist.
+func SaveWindowTabs[T any](windows WindowExistsChecker, tabs TabsSaver[T], windowKey string, records []T) error {
+	ok, err := windows.Exists(windowKey)
+	if err != nil {
+		return ipcerr.Internal(err.Error())
+	}
+	if !ok {
+		return ipcerr.BadRequest("unknown window: " + windowKey)
+	}
+	if err := tabs.Save(windowKey, records); err != nil {
+		return ipcerr.Internal(err.Error())
 	}
 	return nil
 }

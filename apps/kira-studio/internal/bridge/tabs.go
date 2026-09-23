@@ -2,8 +2,9 @@ package bridge
 
 import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 type TabsService struct {
@@ -32,13 +33,7 @@ type TabsSaveArgs struct {
 }
 
 func (s *TabsService) Save(args TabsSaveArgs) error {
-	if err := s.checkWindow(args.WindowKey); err != nil {
-		return err
-	}
-	if err := s.Deps.Repos.Tabs.Save(args.WindowKey, args.Tabs); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return appstorage.SaveWindowTabs(s.Deps.Repos.Windows, s.Deps.Repos.Tabs, args.WindowKey, args.Tabs)
 }
 
 // checkWindow rejects a windowKey that names no `windows` row with a real E_BAD_REQUEST, rather

@@ -1,6 +1,6 @@
 package bridge
 
-import "github.com/kirathecat/kira-studio/internal/ipcerr"
+import "github.com/kirathecat/kira-studio/internal/shell"
 
 // P100 Part 2: the one file-dialog wire shape this app needs — GitStart.vue's "Import a
 // repository" affordance (frontend state/coderepos.ts's importRepoViaDialog). Kira Studio's own
@@ -35,11 +35,13 @@ type FilesService struct {
 
 // ChooseFolder is Kira Studio's own FilesService.ChooseFolder, ported unchanged.
 func (s *FilesService) ChooseFolder(args FilesChooseFolderArgs) (FilesChooseFolderResult, error) {
-	path, err := s.Dialogs.OpenDirectory(OpenDirectoryRequest{Title: args.Title})
+	path, canceled, err := shell.ChooseFolder(func(title string) (string, error) {
+		return s.Dialogs.OpenDirectory(OpenDirectoryRequest{Title: title})
+	}, args.Title)
 	if err != nil {
-		return FilesChooseFolderResult{}, ipcerr.Internal(err.Error())
+		return FilesChooseFolderResult{}, err
 	}
-	if path == "" {
+	if canceled {
 		return FilesChooseFolderResult{Canceled: true}, nil
 	}
 	return FilesChooseFolderResult{Canceled: false, Path: &path}, nil
