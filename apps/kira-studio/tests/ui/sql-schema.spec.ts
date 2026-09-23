@@ -1,6 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { openConsoleFromMenu } from './support/connect';
+import { hoverWord, typeInto } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
@@ -86,48 +88,11 @@ async function connectAndExpandPostgres(page: Page, name: string, color: string)
   await expandRow(page, DB_PATH);
 }
 
-async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
-  await openRowMenu(page, path);
-  await page.click('[data-testid="menu-item-open-console"]');
-}
-
-async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.view-lines').click();
-  await page.keyboard.type(text);
-}
-
 async function clearAndType(view: Locator, page: Page, text: string): Promise<void> {
   await view.locator('.view-lines').click();
   await page.keyboard.press('Control+a');
   await page.keyboard.press('Backspace');
   await page.keyboard.type(text);
-}
-
-// Monaco splits a line's text across several highlighting spans (like CodeMirror before it), so a
-// word is not reliably its own element for Playwright's getByText — this finds the exact
-// text-node offset via a real DOM Range instead, robust to however the syntax highlighter
-// chunked the line.
-async function hoverWord(page: Page, view: Locator, word: string): Promise<void> {
-  const point = await view.locator('.view-lines').evaluate((el, w) => {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      const idx = (node.textContent ?? '').indexOf(w);
-      if (idx >= 0) {
-        const range = document.createRange();
-        range.setStart(node, idx);
-        range.setEnd(node, idx + w.length);
-        const rect = range.getBoundingClientRect();
-        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-      }
-    }
-    return null;
-  }, word);
-  if (!point) throw new Error(`hoverWord: "${word}" not found in .view-lines`);
-  // A genuine leave-then-enter, not a teleport from wherever the mouse already sits — Monaco's
-  // hover controller only arms its delay timer on a fresh "entered this token" transition
-  // (api-ui-consistency.spec.ts's own identical note for the request body's {{variable}} hover).
-  await page.mouse.move(0, 0);
-  await page.mouse.move(point.x, point.y);
 }
 
 const TWO_TABLE_DDL = `CREATE TABLE users (

@@ -2,6 +2,8 @@ import type { Locator, Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { connectMongo, connectRedis, openConsoleFromMenu } from './support/connect';
+import { typeInto } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
@@ -110,57 +112,6 @@ async function connectAndExpandPostgres(page: Page, name: string, color: string)
   await expandRow(page, '');
   await expandRow(page, DB_PATH);
   await expandRow(page, APP_PATH);
-}
-
-async function connectMongo(page: Page, name: string, color: string): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-mongodb"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '27017');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'kira');
-  await page.click(`[data-testid="color-${color}"]`);
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-}
-
-async function connectRedis(page: Page, name: string, color: string): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-redis"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '6379');
-  await page.fill('[data-testid="connection-database"]', '0');
-  await page.click(`[data-testid="color-${color}"]`);
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-}
-
-async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
-  await openRowMenu(page, path);
-  await page.click('[data-testid="menu-item-open-console"]');
-}
-
-async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.view-lines').click();
-  await page.keyboard.type(text);
 }
 
 /** `editorText()`, not `.innerText()` — Monaco virtualises `.view-lines` (only the currently

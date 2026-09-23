@@ -1,16 +1,12 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { openSettings } from './support/settings';
 
 // P86 §19.3 — modelled on settings-code-intelligence.spec.ts, itself modelled on
 // settings-scripts.spec.ts: the Claude Code section renders with the toggle off; clicking it
 // calls agentHooksSetEnabled with {enabled: true}; a status carrying `error` renders
 // claude-code-hooks-error; a running status renders claude-code-hooks-path.
-
-async function openSettings(page: Page): Promise<void> {
-  await page.click('[data-testid="open-settings"]');
-  await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
-}
 
 function dialog(page: Page) {
   return page.locator('[data-testid="settings-dialog"]');

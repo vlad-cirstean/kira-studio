@@ -2,17 +2,13 @@ import type { Page } from '@playwright/test';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import { expect, test } from './fixtures';
 import { IPC } from './support/ipcChannels';
+import { openSettings } from './support/settings';
 
 // P17: the settings dialog stages every control into a local draft and only reaches
 // SettingsService.Set on Save — see docs/v1.1/plans/P17-settings-apply-on-save.md §6.1 for the
 // five scenarios below. A settings change is observable without opening a grid via the CSS
 // custom property applyAppearance() writes (state/settings.ts): --kira-row-height reads 28px at
 // the comfortable default and 22px for compact.
-
-async function openSettings(page: Page): Promise<void> {
-  await page.click('[data-testid="open-settings"]');
-  await expect(page.locator('[data-testid="settings-dialog"]')).toBeVisible();
-}
 
 function dialog(page: Page) {
   return page.locator('[data-testid="settings-dialog"]');
