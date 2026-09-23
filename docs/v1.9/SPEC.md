@@ -3017,6 +3017,160 @@ Verified after each correction that the other session's own next commit (`f16d9d
   confirmed to fail, or fail to compile, against the pre-fix code before landing, isolated via
   `git stash push -- <file>` on the changed production file(s) only.
 
+## P108 Part 4 result
+
+Reviewed per `plans/P108-part4-studio-sql-adapters.md` (Opus reviewer, no fixing, tree surveyed at
+`31c312f`); one Sonnet fixer landed all 12 findings (F1-F12), none dismissed or deferred, as 7
+commits (`49157a2`, `7afd713`, `f16d9db`, `ee10f4d`, `ca47bac`, `dfe536f`, `8e10867` — grouped where
+findings shared files/mechanism: F3+F4+F5 share the connect/disconnect lifecycle across all four
+adapters, F7+F8+F9 are three independent, adjacent data-integrity/catalog fixes landed together, F10+F11
+both live in `sqltext.go`, F12's two one-liners as instructed).
+
+- **F1 (HIGH, security) `49157a2`** — a Postgres `E'...'` string's backslash-escaped quote (`\'`)
+  was never recognized as an escape by the shared comment/quote scanner (`scanQuote`), so it read
+  the string as closing right after it — exposing the string's own genuine trailing content
+  (` -- ' ; DELETE FROM t`) as if it opened a real `--` line comment, which then swallowed the real
+  `;` and a smuggled second statement, bypassing both `ClassifySQL`'s MCP permission classification
+  and `AssertNoTransactionEscalation`'s read-only console guard. Confirmed against the exact probe
+  case in the finding (`ClassifySQL` returned `read`, `AssertNoTransactionEscalation` returned nil,
+  both pre-fix). Three-part fix: `scanQuote` now treats backslash as an escape specifically inside
+  an `E'...'`/`e'...'` string (`isEStringOpen`, word-boundary-checked); `ClassifySQL`/
+  `classifyClickHouseSQL`'s embedded-semicolon guard now runs against the RAW statement, never the
+  comment-stripped text, since comment-stripping itself is what a backslash-quote ambiguity can
+  fool (conservative — worst case a false `ClassUnknown`, never a false-safe read); and
+  `AssertNoTransactionEscalation` gained a fail-closed backstop (`AssertNoHiddenStatement`/
+  `quoteHasBackslash`: any quoted run containing a raw backslash is rejected outright, since
+  `standard_conforming_strings=off` makes even a plain `'...'` string honour backslash escaping and
+  nothing at parse time can tell), which now also runs — when the connection is read-only — over a
+  Postgres grid filter and text-sort clause (`assertReadOnlyFilterSortSafe` in `Read`/`Count`), the
+  finding's own second, lower-weight path. Regression tests in `classify_test.go`/`errors_test.go`
+  cover the exact probe cases (confirmed failing against the pre-fix scanner via a scoped `git
+  stash`, passing after).
+- **F2 (MEDIUM-HIGH, data integrity) `7afd713`** — `RunWithAbortRace` returns to its caller on a
+  Stop/cancel well before the background goroutine it spawned actually stops touching the
+  connection (by design). Acquire's release (the per-connection mutex unlock) and the detached
+  ROLLBACK/COMMIT cleanup in `mutate.go`/`console.go` both ran the instant the aborted call
+  returned, racing that still-running goroutine on the same connection: a real data race on
+  Postgres's `*pgx.Conn` (silently swallowed by cleanup's own `_, _ =`, leaving the pinned
+  connection wedged in an aborted or unexpectedly-open transaction for whatever op ran next); a
+  cleanup-timeout risk on MySQL/MariaDB (`database/sql` serializes access, so no true race, but
+  cleanup could still queue behind the still-running statement and blow its own 5s deadline). Both
+  `connEntry` types gained their own `inFlight sync.WaitGroup`, distinct from the adapter-wide
+  tracker `Disconnect` uses — every `RunWithAbortRace` call site now `Add()`s against it (postgres's
+  `trackedConn`, mysqlfamily's `Entry`, both embedding the driver connection so every existing
+  `conn.Query`/`conn.Exec` call site is unchanged) and composes it into the `release` callback
+  `RunWithAbortRace` already calls once the goroutine finishes; Acquire's release now `Wait()`s on
+  it before unlocking, and mutate's rollback / console's read-only-wrap COMMIT both `Wait()` before
+  issuing their own cleanup statement.
+- **F3 (MEDIUM) + F4 (MEDIUM) + F5 (MEDIUM) `f16d9db`** — F3: `adapters.ConnSet` had no `closed`
+  state (a dial in flight when `CloseAll` ran could still land in the conns map afterward, leaking
+  a connection `CloseAll` never knew about — fixed with a `closed` flag under `ConnSet`'s own `mu`);
+  an LRU eviction's `Close` could close an entry between `Get` returning it and `Acquire`'s own
+  `entry.mu.Lock()` succeeding (fixed with a new `ConnSet.Current(key)` re-check after locking,
+  retrying from the top on mismatch); every relational/clickhouse/sqlite adapter's own connection
+  handle fields (`connSet`/`cfg`/`primaryDatabase`/`readOnly`, clickhouse's `handle`, sqlite's
+  `db`/`file`/`readOnly`) were written by Connect/Disconnect with no lock despite each adapter's own
+  doc comment claiming one guarded them — a real data race against every in-flight op reading them,
+  fixed with locked get/set/clear accessors on all four adapters; `QueryTracker.TrackerFor` called
+  `inFlight.Add(1)` after releasing its own lock, a `sync.WaitGroup` misuse against a concurrent
+  `Drain` — fixed with a `draining` flag checked/set under the same lock the `Add` now runs under.
+  F4: `QueryTracker.Drain`'s own `inFlight.Wait()` had no bound and ignored ctx, so Disconnect (and
+  a reconnect's own call to it) could block the whole bridge call for as long as the longest
+  still-running query — postgres/mysqlfamily/clickhouse's own Disconnect now takes a
+  `QueryTracker.Snapshot()` of every opID it still tracks and cancels each server-side (the
+  adapter's own existing Cancel path) before calling the now ctx-bounded `Drain(ctx)`, whose
+  background goroutine keeps running past that bound so the tracker still clears correctly once the
+  real work finishes; sqlite mirrors the same shape over its own `runningByOp`/`inFlight` fields
+  (cancellation there is a local `sqlite3_interrupt` via ctx, no side connection). F5: ClickHouse's
+  `http.Client` carried a 60s `Timeout` covering the whole request including the response body, so
+  any query genuinely running longer failed client-side with no `KILL QUERY` ever sent — removed;
+  connection *setup* is now bounded instead via `http.Transport`'s own `DialContext`/
+  `TLSHandshakeTimeout` (10s each), cancellation is ctx-driven (already-existing
+  `http.NewRequestWithContext`) plus the existing `KILL QUERY`-on-cancel path.
+  **adapterhost's own reconnect-ordering (`Router.Connect`'s `existing.Disconnect` call outside
+  `RunOp`, `Router.Disconnect`'s serialization against other ops) is explicitly out of scope here
+  per the plan — deferred to Part 6, which reviews that package directly.** Verified with
+  `go test ./... -race` across all four adapters plus the shared `adapters` package.
+- **F6 (MEDIUM, conditional) `ee10f4d`** — `buildConfig` overrode `pgx.ParseConfig`'s primary
+  Host/Port/TLSConfig but kept its own `Fallbacks` (a TLS-primary + plaintext-fallback pair built
+  from `PG*` environment variables when parsing an empty connection string) — `pgconn.ConnectConfig`
+  retries any non-auth error, including "server refused TLS," against a fallback, so it could
+  silently connect to an environment-derived host or downgrade to plaintext regardless of the
+  user's own explicit sslmode. `connConfig.Fallbacks = nil` whenever `buildConfig` overrides
+  Host/Port or TLSConfig. Regression tests in `client_test.go` cover every override path plus a
+  control case confirming no-override leaves Fallbacks untouched.
+- **F7 (MEDIUM) + F8 (LOW-MEDIUM) + F9 (LOW) `ca47bac`** — F7: MySQL/MariaDB BIT columns render as
+  `0x<hex>` but `typeClassFor`'s `numberType` regex also matched `bit`, so `BinaryColumnsOf`'s
+  `isBinary` lookup (built from `typeClassFor`) never recognized a BIT column as binary —
+  `NewParamRenderer` bound the literal `0x05` display text straight into the column on edit instead
+  of decoding it back to raw bytes. Moved `bit` out of `numberType` into `binaryType`. F8: SQLite is
+  the one dialect here where PRIMARY KEY does not imply NOT NULL (a composite PK or a non-INTEGER
+  single-column PK on a rowid table can genuinely hold NULL) — `selectTiebreaker` picked a table's
+  PK for keyset pagination with no nullability check, so a page whose boundary row had a NULL key
+  hard-failed or silently dropped NULL-keyed rows. `getReadTarget` now runs the resolved PK through
+  a new `pkIsKeysetEligible`, falling through to a unique key or rowid when unsafe — except a
+  WITHOUT ROWID table's own PK and a rowid table's single-column INTEGER PRIMARY KEY (the rowid
+  alias), both of which `table_xinfo`'s own notnull flag does not correctly reflect. Covered by a
+  table-driven unit test (`catalog_internal_test.go`) — keyset boundary arithmetic is exactly
+  `CLAUDE.md`'s test-bar exception. F9: every table-valued pragma catalog query and every
+  `sqlite_master` read ran unqualified — confirmed empirically (a throwaway script against a
+  same-named ATTACHed table) that SQLite's own default resolution order lets an ATTACHed/TEMP table
+  shadow a main-schema one. Every pragma (`table_xinfo`/`index_list`/`index_info`/
+  `foreign_key_list`, all confirmed to support a schema argument) now passes schema as its own
+  second argument; `sqlite_master` is now schema-quoted everywhere it's read.
+  `pragma_table_list` is the one exception (confirmed it takes only a single table-name argument,
+  no schema-scoping form) — `getReadTarget`'s own call instead filters on the pragma's own `schema`
+  output column via `WHERE`.
+- **F10 (LOW) + F11 (LOW) `dfe536f`** — F10: `WhereClause` built `"WHERE (" + filter + ")"` with the
+  closing paren immediately after the filter text, so a filter ending in a `--` line comment
+  commented out the closing paren itself (and, for a keyset request, everything appended after it
+  too). Fixed by putting the closing paren on its own line. F11: `BuildOrderBy` uppercases
+  `Direction` for the ORDER BY text, but the keyset comparison operator/reversal logic
+  (`BuildKeysetPredicate`) compares the exact lowercase literal `"asc"` — an upper-case direction
+  built correct SQL while silently mismatching the keyset operator, mispaging with no error.
+  `ComputeEffectiveOrder` (via a new `validateRequestedTerms` helper, split out to keep
+  `gocognit` happy) and ClickHouse's own `computeOrderBySql` now reject anything but the exact
+  lowercase `asc`/`desc`, returning `CodeQuery`. Regression tests cover both — `WhereClause`'s
+  trailing-comment case, and `ComputeEffectiveOrder`'s rejection across six invalid inputs
+  (confirmed failing against the pre-fix function via a scoped `git stash`) plus a
+  `BuildKeysetPredicate` test demonstrating the exact operator flip an upper-case direction would
+  have silently produced.
+- **F12 (LOW, hygiene) `8e10867`** — (a) `rejectDSNMetacharacters` blocked `?`/`#` in a SQLite DSN
+  path but not `%`; SQLite's own URI filename parsing percent-decodes the path, so a path containing
+  `%2F`/`%20` could open a different file than the one `assertFileExists` just confirmed exists.
+  Now rejected too, with a new test case. (b) `scripts/demo-dbs/docker-compose.yml` published every
+  demo database on all interfaces with trivial passwords — every port mapping now binds to
+  `127.0.0.1` explicitly.
+
+**Working-tree note.** This phase's own commits landed in the same shared checkout as concurrent
+Part 13/14/15 fixer sessions (`apps/kira-space/**`, `packages/git-core/**` — no scope overlap by
+design). Two commit attempts (the F3/F4 grouping, then a retry) were transiently swept into or
+blocked by another session's own concurrent commit before landing cleanly — caught immediately by
+checking `git log`/`git show --stat` against the intended file list right after each attempt (once
+found genuinely absorbed into another session's commit, confirmed that session's own
+`Working-tree note` above independently records catching and correcting the same collision via
+`git reset --soft`); no fix content was lost, and every commit listed above was re-verified to
+contain exactly its own intended file list once landed.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `go test ./...`: full suite, run once near the end — clean.
+- `go test ./... -race` for `adapters`, `postgres`, `mysqlfamily`, `sqlite`, `clickhouse` (the
+  concurrency-sensitive packages F2/F3/F4 touch): clean.
+- `bun run lint:go` (`golangci-lint run`): 0 issues (one `gocognit` finding on F11's own
+  `ComputeEffectiveOrder` was fixed on the spot by extracting `validateRequestedTerms`, not left for
+  a follow-up).
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration
+  hints) — this chunk touches nothing knip already flags.
+- Docker-backed conformance suites (`SA/*/*_test.go`'s real-container tests, `scripts/test-matrix.sh`,
+  `scripts/db-compat.sh`) could not run in this sandbox (no Docker) — pre-existing, expected, not
+  something this phase could work around; every unit-level test in the same packages ran and passed.
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never used.
+- F1's and F11's regression tests were each confirmed to fail against the pre-fix code (scoped
+  `git stash` on the exact changed file) before landing, passing after, per `CLAUDE.md`'s own test
+  bar for parser-with-interacting-rules and keyset-boundary-arithmetic logic.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
