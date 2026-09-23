@@ -1,5 +1,5 @@
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError, copyText } from '@workbench/util/clipboard';
 import { beautifyJson } from '../../beautify';
 import {
   columnsToTsv,
@@ -192,14 +192,6 @@ function indented(text: string): string {
 // to scan still lands in the array unindented rather than dropping it.
 function jsonArrayOf(items: readonly string[]): string {
   return `[\n${items.map((item) => indented(item)).join(',\n')}\n]`;
-}
-
-async function copyOrReportError(text: string, onError: (message: string) => void): Promise<void> {
-  try {
-    await copyText(text);
-  } catch (err) {
-    onError(err instanceof Error ? err.message : String(err));
-  }
 }
 
 export interface RowJsonMenuContext {

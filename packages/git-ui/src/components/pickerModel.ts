@@ -29,6 +29,7 @@
  * (§6.2's "pin before cap"); `capSteps` (threaded from `BranchPicker.vue`, §6.3) lets a caller raise
  * one list's own cap for the current panel-open without touching any other list's.
  */
+import { worktreeLabel } from '@kira/git-core';
 import type { RefRow, StackBranch, StackSummary, StashEntry, WorktreeEntry } from '@kira/git-ipc';
 import { capItems, filterRefs, REF_LIST_SECTION_CAP, sortTags } from './refListModel.ts';
 import { stashLabel } from './stashListModel.ts';
@@ -88,14 +89,10 @@ function emptyList<T>(): PickerList<T> {
   return { visible: [], hiddenCount: 0 };
 }
 
-/** `WorktreeList.vue`'s own row identity text — shared here so a later filter pass (§5.1's "the
- *  text the row already renders as its identity") matches exactly what the row shows.
- *  `WorktreeList.vue` imports this rather than keeping a second copy. */
-export function worktreeLabel(entry: WorktreeEntry): string {
-  if (entry.branch) return entry.branch.replace(/^refs\/heads\//, '');
-  if (entry.isDetached && entry.head) return `detached @ ${entry.head.slice(0, 7)}`;
-  return entry.isBare ? 'bare' : 'unknown';
-}
+/** `WorktreeList.vue`'s own row identity text — `@kira/git-core`'s `worktreeLabel` (T1-24; also
+ *  Space's `repo/state/worktrees.ts`), re-exported here so `WorktreeList.vue` need not import
+ *  from two packages. */
+export { worktreeLabel };
 
 function groupStacks(stacks: readonly StackSummary[]): PickerStackGroup[] {
   return stacks.map((summary) => ({ summary, branches: summary.branches }));

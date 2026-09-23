@@ -14,6 +14,7 @@ import {
 import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { useDragReorder } from '@workbench/util/useDragReorder';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
@@ -322,30 +323,12 @@ function onReveal(id: string): void {
   void variableSetStore.revealVariable(id, onRevealError);
 }
 
-const dragIndex = ref<number | null>(null);
-
-function onDragStart(index: number): void {
-  if (isFiltered.value) return;
-  dragIndex.value = index;
-}
-function onDragOver(index: number): void {
-  if (isFiltered.value) return;
-  const from = dragIndex.value;
-  if (from === null || from === index || index >= order.value.length) return;
-  const next = [...order.value];
-  const [moved] = next.splice(from, 1);
-  next.splice(index, 0, moved);
-  order.value = next;
-  dragIndex.value = index;
-}
-async function onDragEnd(): Promise<void> {
-  if (isFiltered.value) {
-    dragIndex.value = null;
-    return;
-  }
-  dragIndex.value = null;
-  await variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, order.value);
-}
+// P107 T2-20: same drag/keyboard reorder EnvironmentsView.vue's own rows use.
+const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
+  canReorder: () => !isFiltered.value,
+  onReorder: (next) =>
+    variableSetStore.reorderVariables(props.tab.id, scope.value, ownerId.value, next),
+});
 
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   if (isFiltered.value) return;

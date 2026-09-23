@@ -11,13 +11,25 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
+
+// spawnTimeout is this package's own bound on the two spawns Install can make (`code
+// --install-extension` and `open -R`) — both local, fast operations with no network round trip of
+// their own, so a wedged child is the only failure mode a bound needs to guard against.
+const spawnTimeout = 60 * time.Second
 
 // vsixFileName is the fixed name create:app:bundle copies the packaged extension to, and the one
 // this package looks for beside the running executable (D8/D11). No version in the name — the
 // version lives inside the manifest, where `code` reads it — so this constant is the one place a
 // future phase would change to ship more than one side by side.
 const vsixFileName = "kira-space.vsix"
+
+// RunError is toolexec.ExecError under this package's own established name (P107 T2-6) — kept as
+// a type alias so install_test.go's own fake Run implementations still compile unchanged.
+type RunError = toolexec.ExecError
 
 // Deps are the four independent seams D13 calls for: locating this binary, finding `code`/`open`,
 // checking a candidate exists, and spawning one. Function fields rather than an interface — there
@@ -57,7 +69,7 @@ func New(d Deps) *Installer {
 		i.stat = realStat
 	}
 	if i.run == nil {
-		i.run = realRun
+		i.run = toolexec.Run
 	}
 	return i
 }
@@ -147,32 +159,12 @@ func codeCandidates() []string {
 	return candidates
 }
 
-func isExecutable(stat func(string) (os.FileInfo, error), path string) bool {
-	info, err := stat(path)
-	if err != nil || info.IsDir() {
-		return false
-	}
-	return info.Mode()&0o111 != 0
-}
-
 // locateCode mirrors gitclient/discovery.go's darwinLocator shape exactly (F12): PATH first, then
 // every absolute candidate in order, every path considered recorded in probed regardless of
 // outcome — so a miss can be explained (the Connected Editors pane surfaces Probed), not just
 // reported.
 func (i *Installer) locateCode() (path string, probed []string, found bool) {
-	if resolved, err := i.lookPath("code"); err == nil {
-		probed = append(probed, resolved)
-		return resolved, probed, true
-	}
-	probed = append(probed, "code (on PATH)")
-
-	for _, candidate := range codeCandidates() {
-		probed = append(probed, candidate)
-		if isExecutable(i.stat, candidate) {
-			return candidate, probed, true
-		}
-	}
-	return "", probed, false
+	return toolexec.Locate(i.lookPath, i.stat, "code", codeCandidates())
 }
 
 // locateOpen is NOT part of Probed (D12) — `open` is macOS's own, always-present reveal tool, not

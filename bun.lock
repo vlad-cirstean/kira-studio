@@ -6,7 +6,6 @@
       "name": "kira-studio",
       "dependencies": {
         "@faker-js/faker": "10.6.0",
-        "@floating-ui/dom": "1.8.0",
         "@lucide/vue": "1.47.0",
         "@tailwindcss/vite": "4.3.3",
         "@tanstack/vue-query": "5.103.2",
@@ -120,6 +119,7 @@
         "@kira/git-ipc": "workspace:*",
         "@kira/kira-ui": "workspace:*",
         "@vscode/codicons": "0.0.46-24",
+        "@vueuse/core": "15.0.0",
         "seti-icons": "0.0.4",
         "slickgrid": "5.20.0",
         "vue": "3.5.42",
@@ -136,6 +136,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@floating-ui/dom": "1.8.0",
+        "@vueuse/core": "15.0.0",
         "vue": "3.5.42",
       },
       "devDependencies": {
@@ -159,6 +160,9 @@
     "packages/workbench": {
       "name": "@kira/workbench",
       "version": "0.0.0",
+      "dependencies": {
+        "@kira/kira-ui": "workspace:*",
+      },
     },
   },
   "packages": {

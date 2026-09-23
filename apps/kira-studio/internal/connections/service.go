@@ -7,12 +7,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/localauth"
@@ -189,16 +190,6 @@ func errorMessage(err error) string {
 // wrapErr satisfies P55 §2 D5: every error crossing out of this package is an *ipcerr.Error. An
 // error that already is one (or wraps one, e.g. repos/secrets' fmt.Errorf-wrapped E_SECRET_STORE)
 // passes through with its original code and message; anything else becomes E_INTERNAL.
-func wrapErr(err error) error {
-	if err == nil {
-		return nil
-	}
-	var ie *ipcerr.Error
-	if errors.As(err, &ie) {
-		return ie
-	}
-	return ipcerr.Internal(err.Error())
-}
 
 func (s *Service) emitState(state model.ConnectionState) {
 	s.mu.Lock()
@@ -225,7 +216,7 @@ func (s *Service) emitListChanged() {
 func (s *Service) List() ([]model.ConnectionSummary, error) {
 	list, err := s.deps.Conns.List()
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, ipcerr.Wrap(err)
 	}
 	return list, nil
 }
@@ -274,7 +265,7 @@ func (s *Service) Create(in Input) (model.ConnectionSummary, error) {
 	id := uuid.NewString()
 	created, err := s.deps.Conns.InsertWithSecret(id, fields, kiratime.NowISO(), storedSecret)
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	s.emitListChanged()
 	return created, nil
@@ -292,7 +283,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	// (ReadOnly) or serve the old destination's cached data under the new one's name.
 	existing, err := s.deps.Conns.Get(id)
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	if existing == nil {
 		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
@@ -332,7 +323,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	if hasSecret && *password != "" {
 		encrypted, err := s.deps.Cipher.Encrypt(secrets.ScopeConnection, *password)
 		if err != nil {
-			return model.ConnectionSummary{}, wrapErr(err)
+			return model.ConnectionSummary{}, ipcerr.Wrap(err)
 		}
 		storedSecret = &encrypted
 	}
@@ -341,7 +332,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 	fields.URI = uri
 	updated, err := s.deps.Conns.UpdateWithSecret(id, fields, kiratime.NowISO(), hasSecret, storedSecret)
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 
 	// P21 round 2 architecture/security finding 2: destinationUnchanged is the same denylist Test
@@ -379,7 +370,7 @@ func (s *Service) Update(id string, in Input) (model.ConnectionSummary, error) {
 func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	existing, err := s.deps.Conns.Get(id)
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	if existing == nil {
 		return model.ConnectionSummary{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))
@@ -396,7 +387,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// mask rules are copied.
 	created, err := s.deps.Conns.InsertDuplicateWithSecret(id, newID, fields, kiratime.NowISO())
 	if err != nil {
-		return model.ConnectionSummary{}, wrapErr(err)
+		return model.ConnectionSummary{}, ipcerr.Wrap(err)
 	}
 	// Finding #6, M6: ConnectionFields carries the source's MCP exposure (McpEnabled/read/write/DDL
 	// modes), but mask rules live in a separate table keyed by connection_id and are never copied by
@@ -405,7 +396,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// whatever PII the original was protecting.
 	if s.deps.MaskRules != nil {
 		if err := s.copyMaskRules(id, newID); err != nil {
-			return model.ConnectionSummary{}, wrapErr(err)
+			return model.ConnectionSummary{}, ipcerr.Wrap(err)
 		}
 	}
 	// Finding #4, M7: only now — after the mask rule copy above has actually succeeded — is MCP
@@ -417,7 +408,7 @@ func (s *Service) Duplicate(id string) (model.ConnectionSummary, error) {
 	// (safe), never exposed-without-rules (unsafe).
 	if fields.McpEnabled {
 		if err := s.deps.Conns.SetMcpEnabled(newID, true, kiratime.NowISO()); err != nil {
-			return model.ConnectionSummary{}, wrapErr(err)
+			return model.ConnectionSummary{}, ipcerr.Wrap(err)
 		}
 		created.McpEnabled = true
 	}
@@ -450,10 +441,10 @@ func (s *Service) Remove(id string) error {
 	}
 	s.deps.Preconnect.Stop(id)
 	if err := s.deps.Conns.Delete(id); err != nil { // cascades filters, metadata cache, saved queries
-		return wrapErr(err)
+		return ipcerr.Wrap(err)
 	}
 	if err := s.deps.Secrets.Delete(id); err != nil {
-		return wrapErr(err)
+		return ipcerr.Wrap(err)
 	}
 	s.mu.Lock()
 	delete(s.states, id)
@@ -465,7 +456,7 @@ func (s *Service) Remove(id string) error {
 func (s *Service) Reorder(ids []string) ([]model.ConnectionSummary, error) {
 	reordered, err := s.deps.Conns.Reorder(ids)
 	if err != nil {
-		return nil, wrapErr(err)
+		return nil, ipcerr.Wrap(err)
 	}
 	s.emitListChanged()
 	return reordered, nil
@@ -630,7 +621,7 @@ func (s *Service) Connect(id string) (model.ConnectionState, error) {
 func (s *Service) doConnect(id string) (model.ConnectionState, error) {
 	summary, err := s.deps.Conns.Get(id)
 	if err != nil {
-		return model.ConnectionState{}, wrapErr(err)
+		return model.ConnectionState{}, ipcerr.Wrap(err)
 	}
 	if summary == nil {
 		return model.ConnectionState{}, ipcerr.Internal(fmt.Sprintf("connection %s not found", id))

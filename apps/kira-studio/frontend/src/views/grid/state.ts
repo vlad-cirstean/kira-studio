@@ -15,7 +15,13 @@ import {
   reloadTabsForTarget,
 } from '../../state/viewCommands';
 import type { Selection } from '../shared/slick/selection';
-import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
+import {
+  applyLoadFailure,
+  beginOp,
+  createRuntimeStore,
+  runPagedCount,
+  stopOp,
+} from '../shared/viewOp';
 import { clearCellFocus } from './focusRequest';
 import { setPage } from './page';
 import { usePendingChangesStore } from './pendingChanges';
@@ -232,26 +238,11 @@ export const useGridViewStore = defineStore('gridView', () => {
   async function runCount(tabId: string): Promise<void> {
     const tab = useTabsStore().findDataTab(tabId);
     if (!tab?.connectionId) return;
+    const connectionId = tab.connectionId;
     const rt = ensureRuntime(tabId);
-    const opId = crypto.randomUUID();
-    rt.countOpId = opId;
-    try {
-      const response = await data.count({
-        opId,
-        tabId,
-        connectionId: tab.connectionId,
-        path: tab.path,
-        filter: tab.state.filter,
-        // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
-        refresh: rt.count?.stale === true,
-      });
-      // A filter change since this count started already cleared rt.count/countOpId (setFilter) —
-      // an answer to the previous WHERE landing now would resurrect a total for the wrong query.
-      if (rt.countOpId !== opId) return;
-      rt.count = { value: response.value, exact: response.exact, stale: response.stale };
-    } catch {
-      // Leave the previous count (if any) rather than blanking it on a failed refresh.
-    }
+    await runPagedCount(rt, (opId, refresh) =>
+      data.count({ opId, tabId, connectionId, path: tab.path, filter: tab.state.filter, refresh }),
+    );
   }
 
   function stop(tabId: string): void {

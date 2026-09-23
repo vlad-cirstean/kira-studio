@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appsettings"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // LayoutRepo reads and writes the `ui_layout` table — same per-leaf-row shape as SettingsRepo,
 // for the reason layout.ts's own comment gives (a per-key row survives an old build's missing
 // keys without a schema migration).
-const layoutSelectAllSQL = `SELECT key, value FROM ui_layout`
-
 type LayoutRepo struct {
 	DB *sql.DB
 
@@ -25,29 +25,17 @@ type LayoutRepo struct {
 // (GetAll's own fast path) or a live transaction (Set's fix below) produced — factored out so
 // both callers build the same model.Layout from the same rows shape.
 func (r *LayoutRepo) scanAll(rows *sql.Rows, queryErr error) (model.Layout, error) {
-	if queryErr != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: query: %w", queryErr)
-	}
-	defer rows.Close()
-
-	stored := map[string]json.RawMessage{}
-	for rows.Next() {
-		var key, value string
-		if err := rows.Scan(&key, &value); err != nil {
-			return model.Layout{}, fmt.Errorf("repos/layout: scan: %w", err)
-		}
-		stored[key] = json.RawMessage(value)
-	}
-	if err := rows.Err(); err != nil {
-		return model.Layout{}, fmt.Errorf("repos/layout: rows: %w", err)
+	stored, err := appstorage.ScanLayoutRows(rows, queryErr)
+	if err != nil {
+		return model.Layout{}, err
 	}
 
 	result := model.DefaultLayout()
-	leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
-	leaf(stored, "panel.project.width", &result.Panel.Project.Width)
-	leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
-	leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
-	leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
+	appsettings.Leaf(stored, "panel.project.visible", &result.Panel.Project.Visible)
+	appsettings.Leaf(stored, "panel.project.width", &result.Panel.Project.Width)
+	appsettings.Leaf(stored, "panel.operations.visible", &result.Panel.Operations.Visible)
+	appsettings.Leaf(stored, "panel.operations.height", &result.Panel.Operations.Height)
+	appsettings.Leaf(stored, "panel.cellEditor.height", &result.Panel.CellEditor.Height)
 	return result, nil
 }
 
@@ -55,7 +43,7 @@ func (r *LayoutRepo) GetAll() (model.Layout, error) {
 	if r.selectAll != nil {
 		return r.scanAll(r.selectAll.Query())
 	}
-	return r.scanAll(r.DB.Query(layoutSelectAllSQL))
+	return r.scanAll(r.DB.Query(appstorage.LayoutSelectAllSQL))
 }
 
 // Set writes all six leaves every time (unlike SettingsRepo.Set's patched-leaves-only write —
@@ -79,7 +67,7 @@ func (r *LayoutRepo) Set(patch model.LayoutPatch) (model.Layout, error) {
 	if r.selectAll != nil {
 		current, err = r.scanAll(tx.Stmt(r.selectAll).Query())
 	} else {
-		current, err = r.scanAll(tx.Query(layoutSelectAllSQL))
+		current, err = r.scanAll(tx.Query(appstorage.LayoutSelectAllSQL))
 	}
 	if err != nil {
 		return model.Layout{}, err

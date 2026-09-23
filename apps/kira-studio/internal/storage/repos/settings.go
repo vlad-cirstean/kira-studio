@@ -54,22 +54,22 @@ func (r *SettingsRepo) GetAll() (model.Settings, error) {
 	result := model.DefaultSettings()
 	result.Appearance = appsettings.ReadAppearance(stored)
 	result.Git = appsettings.ReadGit(stored)
-	leafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
-	leafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, appsettings.InRange(8, 1024))
-	leafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, appsettings.InRange(1, 365))
-	leafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, appsettings.InRange(1_000, 1_000_000_000))
-	leafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
-	leafValid(stored, "api.httpVersion", &result.Api.HTTPVersion, model.ValidHTTPVersion)
-	leafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, appsettings.InRange(0, 3_600_000))
-	leafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, appsettings.InRange(0, 2048))
-	leaf(stored, "api.sslVerify", &result.Api.SSLVerify)
-	leaf(stored, "api.followRedirects", &result.Api.FollowRedirects)
-	leafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, appsettings.InRange(0, 100))
-	leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
-	leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
-	leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
-	leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
-	leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
+	appsettings.LeafValid(stored, "data.defaultPageSize", &result.Data.DefaultPageSize, model.ValidPageSize)
+	appsettings.LeafValid(stored, "cache.l2BudgetMb", &result.Cache.L2BudgetMb, appsettings.InRange(8, 1024))
+	appsettings.LeafValid(stored, "advanced.opLogRetentionDays", &result.Advanced.OpLogRetentionDays, appsettings.InRange(1, 365))
+	appsettings.LeafValid(stored, "advanced.expensiveQueryRows", &result.Advanced.ExpensiveQueryRows, appsettings.InRange(1_000, 1_000_000_000))
+	appsettings.LeafValid(stored, "advanced.gitLogLevel", &result.Advanced.GitLogLevel, appsettings.ValidLogLevel)
+	appsettings.LeafValid(stored, "api.httpVersion", &result.Api.HTTPVersion, model.ValidHTTPVersion)
+	appsettings.LeafValid(stored, "api.requestTimeoutMs", &result.Api.RequestTimeoutMs, appsettings.InRange(0, 3_600_000))
+	appsettings.LeafValid(stored, "api.maxResponseMb", &result.Api.MaxResponseMb, appsettings.InRange(0, 2048))
+	appsettings.Leaf(stored, "api.sslVerify", &result.Api.SSLVerify)
+	appsettings.Leaf(stored, "api.followRedirects", &result.Api.FollowRedirects)
+	appsettings.LeafValid(stored, "api.maxRedirects", &result.Api.MaxRedirects, appsettings.InRange(0, 100))
+	appsettings.Leaf(stored, "api.disableCookieJar", &result.Api.DisableCookieJar)
+	appsettings.Leaf(stored, "dbMcp.serverEnabled", &result.DbMcp.ServerEnabled)
+	appsettings.Leaf(stored, "claudeCode.hooksEnabled", &result.ClaudeCode.HooksEnabled)
+	appsettings.Leaf(stored, "claudeCode.hooksPromptDismissed", &result.ClaudeCode.HooksPromptDismissed)
+	appsettings.Leaf(stored, "claudeCode.keepAwakeWithAgents", &result.ClaudeCode.KeepAwakeWithAgents)
 	return result, nil
 }
 
@@ -77,14 +77,14 @@ func upsertDataSection(tx *sql.Tx, d *model.DataPatch) error {
 	if d == nil || d.DefaultPageSize == nil {
 		return nil
 	}
-	return upsertSettingsLeaf(tx, "data.defaultPageSize", *d.DefaultPageSize)
+	return appsettings.UpsertLeaf(tx, "data.defaultPageSize", *d.DefaultPageSize)
 }
 
 func upsertCacheSection(tx *sql.Tx, c *model.CachePatch) error {
 	if c == nil || c.L2BudgetMb == nil {
 		return nil
 	}
-	return upsertSettingsLeaf(tx, "cache.l2BudgetMb", *c.L2BudgetMb)
+	return appsettings.UpsertLeaf(tx, "cache.l2BudgetMb", *c.L2BudgetMb)
 }
 
 func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
@@ -92,17 +92,17 @@ func upsertAdvancedSection(tx *sql.Tx, a *model.AdvancedPatch) error {
 		return nil
 	}
 	if a.OpLogRetentionDays != nil {
-		if err := upsertSettingsLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "advanced.opLogRetentionDays", *a.OpLogRetentionDays); err != nil {
 			return err
 		}
 	}
 	if a.ExpensiveQueryRows != nil {
-		if err := upsertSettingsLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "advanced.expensiveQueryRows", *a.ExpensiveQueryRows); err != nil {
 			return err
 		}
 	}
 	if a.GitLogLevel != nil {
-		if err := upsertSettingsLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "advanced.gitLogLevel", *a.GitLogLevel); err != nil {
 			return err
 		}
 	}
@@ -114,37 +114,37 @@ func upsertApiSection(tx *sql.Tx, a *model.ApiPatch) error {
 		return nil
 	}
 	if a.HTTPVersion != nil {
-		if err := upsertSettingsLeaf(tx, "api.httpVersion", *a.HTTPVersion); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.httpVersion", *a.HTTPVersion); err != nil {
 			return err
 		}
 	}
 	if a.RequestTimeoutMs != nil {
-		if err := upsertSettingsLeaf(tx, "api.requestTimeoutMs", *a.RequestTimeoutMs); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.requestTimeoutMs", *a.RequestTimeoutMs); err != nil {
 			return err
 		}
 	}
 	if a.MaxResponseMb != nil {
-		if err := upsertSettingsLeaf(tx, "api.maxResponseMb", *a.MaxResponseMb); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.maxResponseMb", *a.MaxResponseMb); err != nil {
 			return err
 		}
 	}
 	if a.SSLVerify != nil {
-		if err := upsertSettingsLeaf(tx, "api.sslVerify", *a.SSLVerify); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.sslVerify", *a.SSLVerify); err != nil {
 			return err
 		}
 	}
 	if a.FollowRedirects != nil {
-		if err := upsertSettingsLeaf(tx, "api.followRedirects", *a.FollowRedirects); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.followRedirects", *a.FollowRedirects); err != nil {
 			return err
 		}
 	}
 	if a.MaxRedirects != nil {
-		if err := upsertSettingsLeaf(tx, "api.maxRedirects", *a.MaxRedirects); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.maxRedirects", *a.MaxRedirects); err != nil {
 			return err
 		}
 	}
 	if a.DisableCookieJar != nil {
-		if err := upsertSettingsLeaf(tx, "api.disableCookieJar", *a.DisableCookieJar); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "api.disableCookieJar", *a.DisableCookieJar); err != nil {
 			return err
 		}
 	}
@@ -155,7 +155,7 @@ func upsertDbMcpSection(tx *sql.Tx, dm *model.DbMcpPatch) error {
 	if dm == nil || dm.ServerEnabled == nil {
 		return nil
 	}
-	return upsertSettingsLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled)
+	return appsettings.UpsertLeaf(tx, "dbMcp.serverEnabled", *dm.ServerEnabled)
 }
 
 func upsertClaudeCodeSection(tx *sql.Tx, cc *model.ClaudeCodePatch) error {
@@ -163,17 +163,17 @@ func upsertClaudeCodeSection(tx *sql.Tx, cc *model.ClaudeCodePatch) error {
 		return nil
 	}
 	if cc.HooksEnabled != nil {
-		if err := upsertSettingsLeaf(tx, "claudeCode.hooksEnabled", *cc.HooksEnabled); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "claudeCode.hooksEnabled", *cc.HooksEnabled); err != nil {
 			return err
 		}
 	}
 	if cc.HooksPromptDismissed != nil {
-		if err := upsertSettingsLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "claudeCode.hooksPromptDismissed", *cc.HooksPromptDismissed); err != nil {
 			return err
 		}
 	}
 	if cc.KeepAwakeWithAgents != nil {
-		if err := upsertSettingsLeaf(tx, "claudeCode.keepAwakeWithAgents", *cc.KeepAwakeWithAgents); err != nil {
+		if err := appsettings.UpsertLeaf(tx, "claudeCode.keepAwakeWithAgents", *cc.KeepAwakeWithAgents); err != nil {
 			return err
 		}
 	}
@@ -222,52 +222,4 @@ func (r *SettingsRepo) Set(patch model.SettingsPatch) (model.Settings, error) {
 		return model.Settings{}, fmt.Errorf("repos/settings: commit: %w", err)
 	}
 	return r.GetAll()
-}
-
-func upsertSettingsLeaf(tx *sql.Tx, key string, value any) error {
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("repos/settings: encode %s: %w", key, err)
-	}
-	if _, err := tx.Exec(
-		`INSERT INTO settings (key, value) VALUES (?, ?)
-		   ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-		key, string(encoded),
-	); err != nil {
-		return fmt.Errorf("repos/settings: upsert %s: %w", key, err)
-	}
-	return nil
-}
-
-// leaf overwrites *dst with the stored value for key if present, leaving the caller's default in
-// place otherwise (settings.ts's sectionFromStore, one key at a time). An unparseable stored
-// value is a hand-edited or stale-shape row; it is left at its default rather than propagated,
-// the same "fail closed to a known-good value" discipline the TS build's zod parse enforces.
-func leaf[T any](stored map[string]json.RawMessage, key string, dst *T) {
-	raw, ok := stored[key]
-	if !ok {
-		return
-	}
-	var v T
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return
-	}
-	*dst = v
-}
-
-// leafValid is leaf plus D4's semantic validation: a stored value that parses but fails valid
-// falls back to the default too, logged by the caller's own scope elsewhere in this package.
-func leafValid[T any](stored map[string]json.RawMessage, key string, dst *T, valid func(T) bool) {
-	raw, ok := stored[key]
-	if !ok {
-		return
-	}
-	var v T
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return
-	}
-	if !valid(v) {
-		return
-	}
-	*dst = v
 }

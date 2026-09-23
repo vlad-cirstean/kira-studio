@@ -25,6 +25,7 @@ import {
   headerAwareMinWidth,
   initialWidthsByIndex,
   resetMeasureCtx,
+  tooltipAttrs,
 } from '../shared/page/columns';
 import { setVisibleRows } from '../shared/page/visibleRows';
 import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
@@ -36,6 +37,11 @@ import {
   type RowHandle,
 } from '../shared/slick/dataSource';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
+import {
+  rowsForColumnOps as sharedRowsForColumnOps,
+  visibleRowsInSpan as sharedVisibleRowsInSpan,
+} from '../shared/slick/rowVisibility';
+import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
 import {
   rangesFromSelection,
   type Selection,
@@ -72,8 +78,8 @@ const consoleViewStore = useConsoleViewStore();
 //
 // §3.5 rule 1: the scroll mechanism (KiraSlickGrid's runway/budget/chase) is inherited, never
 // re-derived — `grid.velocity`/`lastScrollEventAt`/`scrollEventSeq` are wired the same four-field
-// way SlickGridHost.vue's own onMounted does, from a velocity sampler copied structurally from
-// that file (`:532-623`).
+// way SlickGridHost.vue's own onMounted does, off the shared sampler in shared/slick/
+// scrollVelocity.ts (P107 T2-17 — SlickGridHost.vue uses the same instance-per-host tracker).
 // §3.5 rule 2: no Vue reactivity on row data — grid/dataSource/viewport/handlers below are plain
 // `let`s, never `ref`/`shallowRef`/`reactive`; every imperative call into the grid happens from a
 // `watch` callback or a DOM event handler, never from inside a `computed`.
@@ -140,20 +146,10 @@ function cellFormatter(
 }
 
 // P42 D19/D20 — the header tooltip has to be written as attributes by hand (SlickGrid's own
-// `Column` shape carries no child markup), mirroring SlickGridHost.vue's own `tooltipAttrs`: the
-// hover controller (`workbench/state/tooltip.ts`) triggers off `data-kira-tip` (the plain,
-// newline-joined text) and only then reads `data-kira-tip-parts` for the structured content, so
-// both attributes are required, not just the structured one.
-function tooltipAttrs(content: ReturnType<typeof columnHeaderTooltip>): Record<string, string> {
-  const plain = [content.title, content.meta, content.body]
-    .filter((v): v is string => !!v)
-    .join('\n');
-  return {
-    'data-kira-tip': plain,
-    'data-kira-tip-parts': JSON.stringify(content),
-    'aria-label': plain,
-  };
-}
+// `Column` shape carries no child markup) — tooltipAttrs (views/shared/page/columns.ts, P107
+// T2-17): the hover controller (`workbench/state/tooltip.ts`) triggers off `data-kira-tip` (the
+// plain, newline-joined text) and only then reads `data-kira-tip-parts` for the structured
+// content, so both attributes are required, not just the structured one.
 
 // Real-interaction fix (reported bug — column widths reset on every subsequent query in the same
 // session): §3.4 used to read "no persisted column widths — always the measured/default width,
@@ -262,47 +258,18 @@ let viewportEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let page: TabularPage | null = null;
 
-// Mirrors SlickGridHost.vue's own onScroll velocity sampler verbatim (`:528-603`) — plain
-// variables, not refs, read only from KiraSlickGrid's own `velocity` callback, itself called only
-// from inside getRenderedRange (entirely outside Vue's reactivity graph).
-let lastOffset = 0;
-let lastOffsetT = 0;
-let prevOffset = 0;
-let prevOffsetT = 0;
+// P107 T2-17: sampler itself moved to shared/slick/scrollVelocity.ts (byte-identical to
+// SlickGridHost.vue's own) — scrollEventSeq stays local, a separate simpler counter the tracker
+// doesn't own.
 let scrollEventSeq = 0;
-const MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME = 800;
-
-function freshVelocitySample(): boolean {
-  return window.__kiraGridTuning?.freshVelocitySampleOverride ?? true;
-}
-
-function recordOffsetSample(offset: number, now: number): void {
-  if (freshVelocitySample() && offset === lastOffset) return;
-  prevOffset = lastOffset;
-  prevOffsetT = lastOffsetT;
-  lastOffset = offset;
-  lastOffsetT = now;
-}
-
-function velocity(): { pxPerFrame: number; direction: 1 | -1 | 0 } {
-  if (freshVelocitySample() && viewportEl) {
-    recordOffsetSample(viewportEl.scrollTop, performance.now());
-  }
-  const dt = lastOffsetT - prevOffsetT;
-  if (!prevOffsetT || dt <= 0 || performance.now() - lastOffsetT > 150) {
-    return { pxPerFrame: 0, direction: 0 };
-  }
-  const delta = lastOffset - prevOffset;
-  const pxPerFrame = Math.abs(delta);
-  if (pxPerFrame > MAX_PLAUSIBLE_ROW_VELOCITY_PX_PER_FRAME) return { pxPerFrame: 0, direction: 0 };
-  return { pxPerFrame, direction: delta > 0 ? 1 : delta < 0 ? -1 : 0 };
-}
+const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
+const { velocity } = scrollVelocityTracker;
 
 function onViewportScroll(): void {
   const el = viewportEl;
   if (!el) return;
   scrollEventSeq++;
-  recordOffsetSample(el.scrollTop, performance.now());
+  scrollVelocityTracker.recordOffsetSample(el.scrollTop, performance.now());
 }
 
 // P22 Pass B, C1/§5 D10 — the one per-render DOM pass this migration still needs: a row's own
@@ -551,22 +518,15 @@ function rowSnapshotFor(row: number): RowSnapshot {
   return { columns: page.columns.map((c) => c.name), values };
 }
 
-// D9's own column-scoped rule, ported: a column-scoped op walks only the *visible* rows under the
-// current find-filter — copying every loaded row from a result showing 12 would be a silent
-// mismatch. No `views/grid/slick/rowValues.ts` import (console can't import grid/**, F13) — these
-// two are small enough to keep local rather than promote a third file for them.
+// D9's own column-scoped rule — views/shared/slick/rowVisibility.ts's own pure functions (P107
+// T2-17: split out of grid/slick/rowValues.ts, whose other exports console can't import, F13),
+// bound to this file's own displayRows/page.
 function rowsForColumnOps(): number[] {
-  const displayRows = matchedRows(props.tabId);
-  if (displayRows) return [...displayRows];
-  return Array.from({ length: page?.rowCount ?? 0 }, (_, i) => i);
+  return sharedRowsForColumnOps(matchedRows(props.tabId), page?.rowCount ?? 0);
 }
 
 function visibleRowsInSpan(r0: number, r1: number): number[] {
-  const lo = Math.min(r0, r1);
-  const hi = Math.max(r0, r1);
-  const displayRows = matchedRows(props.tabId);
-  if (!displayRows) return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
-  return displayRows.filter((r) => r >= lo && r <= hi);
+  return sharedVisibleRowsInSpan(matchedRows(props.tabId), r0, r1);
 }
 
 // D9: ⌘/Ctrl+C over the current selection, format-aware per kind — the same four branches
@@ -801,7 +761,7 @@ onMounted(() => {
       dataSource?.extractValue(item, String(columnDef.field)),
   });
   grid.velocity = velocity;
-  grid.lastScrollEventAt = () => lastOffsetT;
+  grid.lastScrollEventAt = () => scrollVelocityTracker.lastScrollEventAt();
   grid.scrollEventSeq = () => scrollEventSeq;
 
   // P19 D8: identical configuration to SlickGridHost.vue's own — the row's own words are "rows,
@@ -841,8 +801,7 @@ onMounted(() => {
   // these down in a specific hand-ordered position relative to eventHandler/grid.destroy().
   viewportEl = grid.getViewports()[1] ?? grid.getViewports()[0] ?? null;
   if (viewportEl) {
-    lastOffset = viewportEl.scrollTop;
-    lastOffsetT = performance.now();
+    scrollVelocityTracker.seed(viewportEl.scrollTop, performance.now());
     viewportEl.addEventListener('scroll', onViewportScroll, { passive: true });
   }
   grid.render();

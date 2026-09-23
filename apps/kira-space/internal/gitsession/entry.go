@@ -85,7 +85,7 @@ type RepoEntry struct {
 	rangeCount reviewRangeCountSlot
 
 	// remoteOp is SPEC §6's own "active remote op (≤1)" box (G7 D9/D11/D20/D21).
-	remoteOp remoteOpSlot
+	remoteOp opSlot
 	// autoFetch is G7 D23's own background-fetch timer — one per repository.
 	autoFetch autoFetchState
 	// askPassMu/askPassChecked/askPassValue cache `git config --get core.askPass` for this entry's
@@ -124,10 +124,10 @@ type RepoEntry struct {
 
 	// prepare is G25 D13's own "≤1 prepare run per repository" box — teardown force-cancels it
 	// exactly like remoteOp.
-	prepare prepareOpSlot
+	prepare opSlot
 	// restack is G26 D6/D9's own "≤1 restack run per repository" box — teardown force-cancels it
 	// exactly like remoteOp/prepare.
-	restack restackSlot
+	restack opSlot
 
 	done chan struct{}
 }

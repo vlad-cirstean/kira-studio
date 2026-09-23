@@ -55,3 +55,28 @@ export function isOverThreshold(
 ): boolean {
   return estimatedRowsRead !== undefined && estimatedRowsRead >= thresholdRows;
 }
+
+/** P107 closing S1 sweep: mariadb.ts and mysql.ts each had a byte-identical `tableLabel` — same
+ *  two fields, both dialects' own `RawTable` differs everywhere else, this pair stays structural. */
+export function tableLabel(table: { table_name?: string; access_type?: string }): string {
+  const name = table.table_name ?? '?';
+  if (table.access_type === 'ALL') return `Full scan on ${name}`;
+  if (table.access_type) return `${table.access_type} access on ${name}`;
+  return name;
+}
+
+/** P107 closing S1 sweep: mariadb.ts's `tableMetrics` and postgres.ts's `metricsFrom` were
+ *  byte-identical past the parameter name — every untyped field of a raw node/table, stringified.
+ *  mysql.ts's own version nests a second pass over an object value and stays local — a genuinely
+ *  different shape, not this pair. */
+export function rawFieldMetrics(
+  raw: object,
+  typedKeys: Set<string>,
+): Array<{ label: string; value: string }> {
+  const out: Array<{ label: string; value: string }> = [];
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typedKeys.has(key) || value === undefined) continue;
+    out.push({ label: key, value: Array.isArray(value) ? value.join(', ') : String(value) });
+  }
+  return out;
+}

@@ -1,4 +1,11 @@
-import { isOverThreshold, maxEstimatedRows, pushWideScanIssue, rollupIssues } from '../planIssues';
+import {
+  isOverThreshold,
+  maxEstimatedRows,
+  pushWideScanIssue,
+  rawFieldMetrics,
+  rollupIssues,
+  tableLabel,
+} from '../planIssues';
 import type { PlanNode, QueryPlan, ScanEstimate } from '../planModel';
 
 // P18 (v1.1) D13/D15/D16: MariaDB 11.4's `EXPLAIN FORMAT=JSON` — same statement spelling as
@@ -45,22 +52,6 @@ const TABLE_TYPED_KEYS = new Set([
   'attached_condition',
 ]);
 
-function tableMetrics(table: RawTable): Array<{ label: string; value: string }> {
-  const out: Array<{ label: string; value: string }> = [];
-  for (const [key, value] of Object.entries(table)) {
-    if (TABLE_TYPED_KEYS.has(key) || value === undefined) continue;
-    out.push({ label: key, value: Array.isArray(value) ? value.join(', ') : String(value) });
-  }
-  return out;
-}
-
-function tableLabel(table: RawTable): string {
-  const name = table.table_name ?? '?';
-  if (table.access_type === 'ALL') return `Full scan on ${name}`;
-  if (table.access_type) return `${table.access_type} access on ${name}`;
-  return name;
-}
-
 function tableNode(table: RawTable, scans: ScanEstimate[]): PlanNode {
   const node: PlanNode = {
     label: tableLabel(table),
@@ -68,7 +59,7 @@ function tableNode(table: RawTable, scans: ScanEstimate[]): PlanNode {
     detail: table.attached_condition,
     estimatedRows: table.rows,
     cost: table.cost !== undefined ? { total: table.cost } : undefined,
-    metrics: tableMetrics(table),
+    metrics: rawFieldMetrics(table, TABLE_TYPED_KEYS),
     issues: [],
     children: [],
   };

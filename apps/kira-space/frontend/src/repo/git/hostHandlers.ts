@@ -13,7 +13,7 @@
  * miss rather than guessing, exact rather than heuristic because `RepoSummary.repoId` is already
  * stored from the same `gitclient.Identify` call `repo.open` itself runs (C5's import).
  */
-import { mapLineAcrossDiff } from '@kira/git-core';
+import { findChangeInDetail as lookupChangeInDetail, mapLineAcrossDiff } from '@kira/git-core';
 import type {
   EventKey,
   EventPayload,
@@ -132,9 +132,7 @@ async function findChangeInDetail(
     { repoId: gitRepoId, sha, parentIndex },
     signal,
   );
-  const change = detail.files.find((f) => f.path === path);
-  if (!change) return undefined;
-  return { change, baseSha: detail.parents[detail.parentIndex] ?? null };
+  return lookupChangeInDetail(detail, path);
 }
 
 export interface HostHandlersDeps {

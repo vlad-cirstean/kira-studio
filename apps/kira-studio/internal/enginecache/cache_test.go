@@ -1,6 +1,7 @@
 package enginecache
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -116,7 +117,7 @@ func TestCache_InvalidateAfterMutation_DoesNotPromoteAStaleFlipInEvictionOrder(t
 }
 
 func filterFor(i int) string {
-	return "(1=1) OR (0=" + itoa(i) + ")"
+	return "(1=1) OR (0=" + strconv.Itoa(i) + ")"
 }
 
 func pageOffsetCursor(offset int) model.PageCursor {

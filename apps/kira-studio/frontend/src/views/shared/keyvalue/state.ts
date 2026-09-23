@@ -5,7 +5,7 @@ import { defineStore } from 'pinia';
 import { data } from '../../../bridge/data';
 import { pinia } from '../../../state/pinia';
 import { registerTabReload } from '../../../state/viewCommands';
-import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../viewOp';
+import { applyLoadFailure, beginOp, createRuntimeStore, runPagedCount, stopOp } from '../viewOp';
 import { keyValueHost } from './host';
 import { getPage, setPage } from './page';
 
@@ -151,26 +151,11 @@ export const useKeyValueViewStore = defineStore('keyValueView', () => {
   async function runCount(viewKey: string): Promise<void> {
     const host = keyValueHost(viewKey);
     if (!host?.connectionId) return;
+    const connectionId = host.connectionId;
     const rt = ensureRuntime(viewKey);
-    const opId = crypto.randomUUID();
-    rt.countOpId = opId;
-    try {
-      const response = await data.count({
-        opId,
-        tabId: viewKey,
-        connectionId: host.connectionId,
-        path: host.path,
-        filter: null,
-        // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
-        refresh: rt.count?.stale === true,
-      });
-      // A Refresh since this count started already stamped a newer countOpId — an answer to the
-      // previous request landing now would resurrect a stale total.
-      if (rt.countOpId !== opId) return;
-      rt.count = { value: response.value, exact: response.exact, stale: response.stale };
-    } catch {
-      // Leave the previous count (if any) rather than blanking it on a failed refresh.
-    }
+    await runPagedCount(rt, (opId, refresh) =>
+      data.count({ opId, tabId: viewKey, connectionId, path: host.path, filter: null, refresh }),
+    );
   }
 
   function stop(viewKey: string): void {

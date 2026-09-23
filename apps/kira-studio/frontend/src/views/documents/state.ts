@@ -7,7 +7,13 @@ import { pinia } from '../../state/pinia';
 import type { DocumentTabState } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabCount, registerTabReload } from '../../state/viewCommands';
-import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
+import {
+  applyLoadFailure,
+  beginOp,
+  createRuntimeStore,
+  runPagedCount,
+  stopOp,
+} from '../shared/viewOp';
 import { setPage } from './page';
 
 // Mirrors views/grid/state.ts's DataViewRuntime shape (status/pager/count) — projection, sort and
@@ -133,27 +139,18 @@ export const useDocumentViewStore = defineStore('documentView', () => {
   async function runCount(tabId: string): Promise<void> {
     const tab = useTabsStore().findDocumentTab(tabId);
     if (!tab?.connectionId) return;
+    const connectionId = tab.connectionId;
     const rt = ensureRuntime(tabId);
-    const opId = crypto.randomUUID();
-    rt.countOpId = opId;
-    try {
-      const response = await data.count({
+    await runPagedCount(rt, (opId, refresh) =>
+      data.count({
         opId,
         tabId,
-        connectionId: tab.connectionId,
+        connectionId,
         path: tab.path,
         filter: tab.state.search.trim() === '' ? null : tab.state.search,
-        // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
-        refresh: rt.count?.stale === true,
-      });
-      // A filter change since this count started already cleared rt.count/countOpId (setSearch) —
-      // an answer to the previous filter landing now would resurrect a total for the wrong query.
-      if (rt.countOpId !== opId) return;
-      rt.count = { value: response.value, exact: response.exact, stale: response.stale };
-    } catch {
-      // Leave the previous count (if any) rather than blanking it on a failed refresh (estimate
-      // path, matching Caps.count === 'estimate-only').
-    }
+        refresh,
+      }),
+    );
   }
 
   function stop(tabId: string): void {

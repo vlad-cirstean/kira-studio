@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/jackc/pgx/v5"
 
@@ -30,15 +29,7 @@ type QueryOptions struct {
 	LogParams bool
 }
 
-func setCommand(op *adapters.OpCtx, sql string, params []any, logParams bool) {
-	if logParams && len(params) > 0 {
-		if b, err := json.Marshal(params); err == nil {
-			op.SetCommand(sql + " -- params: " + string(b))
-			return
-		}
-	}
-	op.SetCommand(sql)
-}
+var setCommand = adapters.SetCommand
 
 func queryArgs(textMode bool, params []any) []any {
 	if textMode {

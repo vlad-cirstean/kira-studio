@@ -2,7 +2,6 @@ package bridge
 
 import (
 	"log/slog"
-	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/agenthooks"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
@@ -18,8 +17,31 @@ import (
 type AgentHooksService struct {
 	Deps appcore.Deps
 
-	mu     sync.Mutex
-	server *agenthooks.Server
+	embedded embeddedService[*agenthooks.Server, AgentHooksStatus]
+}
+
+// NewAgentHooksService wires the embedded lifecycle's own start/stop/status closures once, here,
+// so every other method can assume s.embedded is ready — a plain struct literal (main.go's own
+// shape before T2-13) would leave them nil.
+func NewAgentHooksService(deps appcore.Deps) *AgentHooksService {
+	s := &AgentHooksService{Deps: deps}
+	s.embedded = embeddedService[*agenthooks.Server, AgentHooksStatus]{
+		startFn: func(bool) (*agenthooks.Server, error) {
+			return agenthooks.New(agenthooks.Options{OnEvent: s.onEvent})
+		},
+		stopFn: func(srv *agenthooks.Server) {
+			if err := srv.Close(); err != nil {
+				slog.Warn("agent hooks: close embedded server", "scope", "agenthooks", "err", err)
+			}
+		},
+		statusFn: func(srv *agenthooks.Server) AgentHooksStatus {
+			if srv == nil {
+				return AgentHooksStatus{}
+			}
+			return AgentHooksStatus{Running: true, SettingsPath: srv.SettingsPath()}
+		},
+	}
+	return s
 }
 
 // AgentHooksStatus is the wire projection every method below returns.
@@ -33,32 +55,9 @@ type AgentHooksStatus struct {
 	Error string `json:"error"`
 }
 
-func (s *AgentHooksService) statusLocked() AgentHooksStatus {
-	if s.server == nil {
-		return AgentHooksStatus{}
-	}
-	return AgentHooksStatus{Running: true, SettingsPath: s.server.SettingsPath()}
-}
-
 // Status reads the embedded instance's current state — never starts or stops anything.
 func (s *AgentHooksService) Status() AgentHooksStatus {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.statusLocked()
-}
-
-// startLocked constructs and starts a new embedded instance if one is not already running. mu
-// must be held by the caller.
-func (s *AgentHooksService) startLocked() error {
-	if s.server != nil {
-		return nil
-	}
-	srv, err := agenthooks.New(agenthooks.Options{OnEvent: s.onEvent})
-	if err != nil {
-		return err
-	}
-	s.server = srv
-	return nil
+	return s.embedded.Status()
 }
 
 // onEvent is agenthooks.Options.OnEvent's own callback — broadcasts every hook firing to every
@@ -101,17 +100,6 @@ func toWireAgentEvent(ev agenthooks.Event) AgentEventWire {
 	}
 }
 
-// stopLocked stops and drops the embedded instance, if any. mu must be held by the caller.
-func (s *AgentHooksService) stopLocked() {
-	if s.server == nil {
-		return
-	}
-	if err := s.server.Close(); err != nil {
-		slog.Warn("agent hooks: close embedded server", "scope", "agenthooks", "err", err)
-	}
-	s.server = nil
-}
-
 // startIfEnabled is main.go's own boot-time call, mirroring StartDbMcpIfEnabled's own posture
 // exactly: a failure (curl missing, a bind conflict) is logged, never fatal — the app boots
 // regardless.
@@ -120,27 +108,19 @@ func (s *AgentHooksService) stopLocked() {
 // method of a registered service, and a wire-callable Start would let a stray call bypass the
 // settings leaf.
 func (s *AgentHooksService) startIfEnabled() {
-	settings, err := s.Deps.Repos.Settings.GetAll()
-	if err != nil {
-		slog.Warn("agent hooks: read settings at boot", "scope", "agenthooks", "err", err)
-		return
-	}
-	if !settings.ClaudeCode.HooksEnabled {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.startLocked(); err != nil {
-		slog.Warn("agent hooks: start at boot", "scope", "agenthooks", "err", err)
-	}
+	s.embedded.startIfEnabled("agenthooks", func() (bool, error) {
+		settings, err := s.Deps.Repos.Settings.GetAll()
+		if err != nil {
+			return false, err
+		}
+		return settings.ClaudeCode.HooksEnabled, nil
+	})
 }
 
 // stop is main.go's own shutdown call, beside bridge.StopDbMcp — see startIfEnabled's own note on
 // why this is unexported and reached only through StopAgentHooks.
 func (s *AgentHooksService) stop() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.stopLocked()
+	s.embedded.stop()
 }
 
 // StartAgentHooksIfEnabled and StopAgentHooks are main.go's own boot/shutdown hooks for the
@@ -166,19 +146,12 @@ func (s *AgentHooksService) SetEnabled(args AgentHooksSetEnabledArgs) (AgentHook
 	}
 	s.Deps.Events.Emit(ChannelSettingsChanged, merged)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if args.Enabled {
-		if err := s.startLocked(); err != nil {
-			slog.Warn("agent hooks: start on enable", "scope", "agenthooks", "err", err)
-			st := s.statusLocked()
-			st.Error = err.Error()
-			return st, nil
-		}
-	} else {
-		s.stopLocked()
+	st, err := s.embedded.setRunning(args.Enabled)
+	if err != nil {
+		slog.Warn("agent hooks: start on enable", "scope", "agenthooks", "err", err)
+		st.Error = err.Error()
 	}
-	return s.statusLocked(), nil
+	return st, nil
 }
 
 // launchFor returns the generated hooks.json path and the three env vars a Claude Code launch's
@@ -190,10 +163,10 @@ func (s *AgentHooksService) SetEnabled(args AgentHooksSetEnabledArgs) (AgentHook
 // service, and a wire-callable version of this would leak that token to anything running in the
 // webview. terminal.go reaches it directly — same package, no wire hop.
 func (s *AgentHooksService) launchFor(terminalID string) (path string, env []string, ok bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.server == nil {
+	s.embedded.mu.Lock()
+	defer s.embedded.mu.Unlock()
+	if s.embedded.server == nil {
 		return "", nil, false
 	}
-	return s.server.SettingsPath(), s.server.Env(terminalID), true
+	return s.embedded.server.SettingsPath(), s.embedded.server.Env(terminalID), true
 }

@@ -1,3 +1,4 @@
+import { base64ToBytes } from '@shared/domain/base64';
 import { canonicalPath } from '@shared/domain/path';
 import type { TerminalLaunchKind } from '@shared/domain/tabs';
 import type { TerminalEvent } from '@shared/protocol/events';
@@ -36,13 +37,6 @@ function bytesToBase64(bytes: Uint8Array): string {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
 }
 
 /** The bound-call subset this store needs — both apps' bridge/index.ts already implement it with

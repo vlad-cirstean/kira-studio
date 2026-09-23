@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 
@@ -19,29 +18,6 @@ const (
 	bodyField    = "$body"
 	headersField = "$headers"
 )
-
-func parseProduceHeaders(raw *string) (map[string]string, error) {
-	if raw == nil || *raw == "" {
-		return nil, nil
-	}
-	var parsed any
-	if err := json.Unmarshal([]byte(*raw), &parsed); err != nil {
-		return nil, adapters.New(adapters.CodeQuery, "malformed $headers JSON", err)
-	}
-	obj, ok := parsed.(map[string]any)
-	if !ok {
-		return nil, adapters.New(adapters.CodeQuery, "$headers must be a JSON object of string values", nil)
-	}
-	out := make(map[string]string, len(obj))
-	for k, v := range obj {
-		s, ok := v.(string)
-		if !ok {
-			return nil, adapters.New(adapters.CodeQuery, "$headers."+k+" must be a string", nil)
-		}
-		out[k] = s
-	}
-	return out, nil
-}
 
 // renderOpText renders the produce preview against the real kgo.ProduceSync call this adapter
 // makes (P58f D6) — produce.ts's own renderOpText named node-rdkafka's producer.produce(...), an
@@ -60,15 +36,7 @@ func renderOpText(op model.MutationRowOp, topic string) (string, error) {
 
 // preview is produce.ts's preview — synchronous (Adapter rule 3): no network, no catalog lookup.
 func preview(plan model.MutationPlan, topic string) ([]string, error) {
-	out := make([]string, len(plan.Ops))
-	for i, op := range plan.Ops {
-		text, err := renderOpText(op, topic)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = text
-	}
-	return out, nil
+	return adapters.PreviewProduce(plan, topic, renderOpText)
 }
 
 func toRecordHeaders(headers map[string]string) []kgo.RecordHeader {
@@ -117,7 +85,7 @@ func produce(ctx context.Context, client *kgo.Client, topic string, readOnly boo
 			return model.MutationResult{}, adapters.New(adapters.CodeQuery, "a new message requires a "+bodyField, nil)
 		}
 		headersRaw, _ := rowOp.Values.Get(headersField)
-		headers, err := parseProduceHeaders(headersRaw)
+		headers, err := adapters.ParseHeaderJSON(headersRaw)
 		if err != nil {
 			return model.MutationResult{}, err
 		}

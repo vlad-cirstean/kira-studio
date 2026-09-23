@@ -46,10 +46,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/wailsapp/wails/v3/pkg/application"
-	// Aliased: main.go's own `events` local var (bridge.NewEvents) would otherwise shadow this
-	// package for the rest of the function, exactly where openWindow's WindowClosing listener
-	// needs it.
-	wailsevents "github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Any files in frontend/dist are embedded into the binary — built by `bun run build` from
@@ -392,13 +388,13 @@ func wireEmbeddedServices(deps appcore.Deps, connectionsSvc *connections.Service
 	// inside DbMcpService.startLocked), so the event subscription wired below stays valid across a
 	// restart of the embedded server within one app run.
 	dbMcpApprovals := dbmcp.NewApprovalBroker(time.Now)
-	dbMcpSvc := &bridge.DbMcpService{Deps: deps, Installer: mcpinstall.New(mcpinstall.Deps{}), Approvals: dbMcpApprovals}
+	dbMcpSvc := bridge.NewDbMcpService(deps, mcpinstall.New(mcpinstall.Deps{}), dbMcpApprovals)
 	bridge.StartDbMcpIfEnabled(dbMcpSvc)
 
 	// P86 §7/§9: the Claude Code hook-reporting toggle's own embedded instance — same posture as
 	// dbMcpSvc just above (constructed before the terminal registry it feeds, started here if the
 	// leaf is already on).
-	agentHooksSvc := &bridge.AgentHooksService{Deps: deps}
+	agentHooksSvc := bridge.NewAgentHooksService(deps)
 	bridge.StartAgentHooksIfEnabled(agentHooksSvc)
 
 	// P87 §3/§4: one keep-awake assertion for the whole app, composed from the titlebar toggle and
@@ -536,21 +532,23 @@ func wireWindowsAndMenu(d postAppDeps) {
 
 	appshell.RegisterEngineStream(app, d.router)
 
-	opener := &windowOpener{
-		app:        app,
-		windowDeps: shell.WindowDeps{Windows: windowStore{d.repositories.Windows}, StartedAt: d.startedAt},
-		windows:    d.windows, closeFlush: d.closeFlush, quitter: d.quitter,
-		terminalSvc: d.terminalSvc, repositories: d.repositories,
+	deps := shell.WindowOpenerDeps{
+		App:        app,
+		WindowDeps: shell.WindowDeps{Windows: windowStore{d.repositories.Windows}, StartedAt: d.startedAt},
+		Windows:    d.windows, CloseFlush: d.closeFlush, Quitter: d.quitter,
+		Terminal: d.terminalSvc.Registry, Repo: windowStore{d.repositories.Windows},
+		Cfg: shell.Config{AppName: "Kira Studio", WindowTitle: "Kira Studio"},
 	}
-	d.windowsSvc.OpenNewWindow = opener.openNew
-	shell.AttachReopen(app, opener.reopen)
+	openNew := func() { shell.OpenNewWindow(deps) }
+	d.windowsSvc.OpenNewWindow = openNew
+	shell.AttachReopen(app, func() { shell.ReopenWindows(deps) })
 	// P87 §5: a machine resume's own trigger — Rearm() while held, a no-op while idle.
 	appshell.AttachSystemWake(app, func() { bridge.KeepAwakeSystemDidWake(d.keepAwakeSvc) })
 
 	isDev := app.Env.Info().Debug
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
 		AppName: "Kira Studio", IsDev: isDev, Template: appshell.BuildTemplate("Kira Studio", isDev),
-		OnEmit: d.events.Signal, Quit: d.quitter.RequestQuit, NewWindow: opener.openNew,
+		OnEmit: d.events.Signal, Quit: d.quitter.RequestQuit, NewWindow: openNew,
 	}))
 
 	// Startup: one window per stored record (C1's migration guarantees at least the "main" row on
@@ -568,147 +566,52 @@ func wireWindowsAndMenu(d postAppDeps) {
 		records = []model.WindowRecord{rec}
 	}
 	for _, rec := range records {
-		opener.open(rec)
+		var bounds *shell.WindowBounds
+		if rec.Bounds != nil {
+			b := shell.WindowBounds(*rec.Bounds)
+			bounds = &b
+		}
+		shell.OpenWindow(deps, shell.ToWindowRecord(rec.Key, rec.Order, bounds))
 	}
 }
 
-// windowOpener groups the three window closures (open/openNew/reopen) main used to build as
-// closures capturing the same handful of variables — a struct-of-methods instead, purely to keep
-// each one small enough to measure on its own; openNew and reopen both call open, exactly as the
-// original closures called each other.
-type windowOpener struct {
-	app          *application.App
-	windowDeps   shell.WindowDeps
-	windows      *shell.WindowRegistry
-	closeFlush   *shell.CloseFlushCoordinator
-	quitter      *shell.Quitter
-	terminalSvc  *bridge.TerminalService
-	repositories *repos.Repos
-}
-
-// windowStore adapts *repos.WindowsRepo to shell.WindowStore (P103 Part 3 §6.3) — a plain struct
-// conversion at the call site (model.WindowBounds and shell.WindowBounds are field-for-field
-// identical), not a behaviour change.
+// windowStore adapts *repos.WindowsRepo to shell.WindowRepo (P103 Part 3 §6.3 / P107 T2-15) — a
+// plain struct conversion at each call site (model.WindowBounds and shell.WindowBounds are
+// field-for-field identical), not a behaviour change.
 type windowStore struct{ repo *repos.WindowsRepo }
 
 func (w windowStore) SetBounds(key string, b shell.WindowBounds) error {
 	return w.repo.SetBounds(key, model.WindowBounds(b))
 }
 
-// toShellWindowRecord converts this app's own storage/model.WindowRecord into the two fields
-// repo-root internal/shell's window building actually reads (P103 Part 3 §6.3) — a plain struct
-// conversion, not hoisting the storage model.
-func toShellWindowRecord(rec model.WindowRecord) shell.WindowRecord {
-	var bounds *shell.WindowBounds
+func (w windowStore) List() ([]shell.WindowRecord, error) {
+	records, err := w.repo.List()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]shell.WindowRecord, len(records))
+	for i, r := range records {
+		var bounds *shell.WindowBounds
+		if r.Bounds != nil {
+			b := shell.WindowBounds(*r.Bounds)
+			bounds = &b
+		}
+		out[i] = shell.ToWindowRecord(r.Key, r.Order, bounds)
+	}
+	return out, nil
+}
+
+func (w windowStore) Create(rec shell.WindowRecord) error {
+	var bounds *model.WindowBounds
 	if rec.Bounds != nil {
-		b := shell.WindowBounds(*rec.Bounds)
+		b := model.WindowBounds(*rec.Bounds)
 		bounds = &b
 	}
-	return shell.WindowRecord{Key: rec.Key, Bounds: bounds}
+	return w.repo.Create(model.WindowRecord{Key: rec.Key, Order: rec.Order, Bounds: bounds})
 }
 
-// open opens one workbench from an already-persisted record and registers it — the one path every
-// window (startup, reopen, "New Window") ultimately goes through. Its own WindowClosing listener
-// implements D5: delete the row only if another window remains open, so closing the last window
-// leaves it behind for the next Dock click or relaunch to restore.
-//
-// primaryWorkArea (shell.Options' first-launch size clamp, P22 D6(a)) is resolved fresh here, on
-// every call, rather than captured once before app.Run() — round-2 review finding 4: GetPrimary()
-// is backed by a cache macOS only starts populating once its native run loop's
-// ApplicationDidFinishLaunching fires (application_darwin.go's own `run()`), which happens only
-// after C.run() — i.e. strictly after app.Run() is called, never before. A value captured before
-// Run() is therefore permanently nil for every window opened this way, including "New Window" and
-// Dock-reopen, even though those happen well after Run() and the cache is long since populated by
-// the time they run. Resolving it per call fixes that for them. It can NOT fix the very first
-// window(s) opened at startup (wireWindowsAndMenu's own call into this): those are still created
-// before app.Run() ever runs, so no ordering of this lookup changes their primaryWorkArea, which
-// stays nil — first real launch keeps the unclamped 1280×800 default until the window is resized
-// once (DefaultBounds' own doc comment). Deferring startup window creation until after
-// ApplicationDidFinishLaunching would close that gap but is a materially larger structural change,
-// out of scope for this fix.
-func (o *windowOpener) open(rec model.WindowRecord) {
-	var primaryWorkArea *application.Rect
-	if screen := o.app.Screen.GetPrimary(); screen != nil {
-		primaryWorkArea = &screen.WorkArea
-	}
-	cfg := shell.Config{AppName: "Kira Studio", WindowTitle: "Kira Studio"}
-	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), toShellWindowRecord(rec), primaryWorkArea, cfg))
-	detach := shell.Attach(win, o.windowDeps, rec.Key)
-	o.windows.Add(rec.Key, win, detach)
-	// Real-interaction fix (item 8): isLastWindow reads the registry fresh at the moment this
-	// window's own close-flush wait completes (closeflush.go's own doc comment) — this window is
-	// still counted (RemoveAndCount, below, is what removes it, and only once a real Close()
-	// actually goes through), so `== 1` means "I am the only one left".
-	shell.AttachCloseFlush(win, rec.Key, o.closeFlush, func() bool { return o.windows.Count() == 1 })
-	win.OnWindowEvent(wailsevents.Common.WindowClosing, func(*application.WindowEvent) {
-		// A window that closes mid-quit-handshake without ever acking through the flush channel is
-		// removed from the pending set here rather than being waited out for the full timeout
-		// (C8) — a no-op when no quit is in flight, since Quitter.Flushed ignores a key it isn't
-		// currently waiting on.
-		o.quitter.Flushed(rec.Key)
-		// P83 §4's teardown table: a terminal never outlives the window that opened it, even when
-		// the renderer never gets to ack.
-		o.terminalSvc.Registry.CloseWindow(rec.Key)
-		if o.windows.RemoveAndCount(rec.Key) > 0 {
-			if err := o.repositories.Windows.Delete(rec.Key); err != nil {
-				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
-			}
-		}
-	})
-}
-
-// openNew is the *New Window* (⇧⌘N) menu command (D8): a fresh workbench, ordered after every
-// existing one, cascaded from whichever window is currently focused (D10).
-func (o *windowOpener) openNew() {
-	records, err := o.repositories.Windows.List()
-	if err != nil {
-		slog.Error("list windows", "scope", "window", "err", err)
-		return
-	}
-	order := 0
-	for _, r := range records {
-		if r.Order >= order {
-			order = r.Order + 1
-		}
-	}
-	var bounds *model.WindowBounds
-	if b := shell.CascadeFrom(o.app.Window.Current()); b != nil {
-		mb := model.WindowBounds(*b)
-		bounds = &mb
-	}
-	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: bounds}
-	if err := o.repositories.Windows.Create(rec); err != nil {
-		slog.Error("create window", "scope", "window", "err", err)
-		return
-	}
-	o.open(rec)
-}
-
-// reopen is the Dock-reopen path (shell.AttachReopen only calls this when zero windows are live):
-// bring back the highest-order stored workbench, or mint a fresh "main" one if every window row
-// was somehow deleted (D5).
-func (o *windowOpener) reopen() {
-	records, err := o.repositories.Windows.List()
-	if err != nil {
-		slog.Error("list windows for reopen", "scope", "window", "err", err)
-		return
-	}
-	if len(records) == 0 {
-		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
-		if err := o.repositories.Windows.Create(rec); err != nil {
-			slog.Error("create window for reopen", "scope", "window", "err", err)
-			return
-		}
-		o.open(rec)
-		return
-	}
-	best := records[0]
-	for _, r := range records[1:] {
-		if r.Order > best.Order {
-			best = r
-		}
-	}
-	o.open(best)
+func (w windowStore) Delete(key string) error {
+	return w.repo.Delete(key)
 }
 
 // platformErrorOnce bounds G29 D7's ErrorHandler to at most one alert per process, independent of

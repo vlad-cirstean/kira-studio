@@ -67,25 +67,24 @@ func stringOrEmpty(p *string) string {
 }
 
 func (r *Router) handleCommitDetail(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p CommitDetailParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: commit.detail: invalid params")
-	}
-	if p.RepoID == "" || p.SHA == "" {
-		return nil, ipcerr.BadRequest("gitrpc: commit.detail: repoId and sha are required")
-	}
-	if err := validRefArg("sha", p.SHA); err != nil {
-		return nil, err
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	detail, err := entry.CommitDetail(ctx, p.SHA, parentIndexOrDefault(p.ParentIndex))
-	if err != nil {
-		return nil, mapDetailError(err)
-	}
-	return detail, nil
+	return handleRepoCall(ctx, c, "commit.detail", params,
+		func(p CommitDetailParams) (string, error) {
+			if p.RepoID == "" || p.SHA == "" {
+				return "", ipcerr.BadRequest("gitrpc: commit.detail: repoId and sha are required")
+			}
+			if err := validRefArg("sha", p.SHA); err != nil {
+				return "", err
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p CommitDetailParams) (porcelain.CommitDetail, error) {
+			detail, err := entry.CommitDetail(ctx, p.SHA, parentIndexOrDefault(p.ParentIndex))
+			if err != nil {
+				return porcelain.CommitDetail{}, mapDetailError(err)
+			}
+			return detail, nil
+		},
+	)
 }
 
 // handleCommitFileDiff is one of D2(b)'s two size-sensitive handlers: it marshals its own result
@@ -193,44 +192,42 @@ func (r *Router) handleFileGoToTarget(ctx context.Context, c *gitsession.Conn, p
 // handleBlameLine is P5's own handler — no size guard needed (unlike commit.fileDiff/file.read):
 // a BlameLine result is a handful of short fields, nowhere near MaxResultBytes.
 func (r *Router) handleBlameLine(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p BlameLineParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: blame.line: invalid params")
-	}
-	if p.RepoID == "" || p.Path == "" || p.Line < 1 {
-		return nil, ipcerr.BadRequest("gitrpc: blame.line: repoId, path and a 1-based line are required")
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	line, err := entry.BlameLine(ctx, p.Path, p.Line)
-	if err != nil {
-		// ErrPathEscapesRoot is already mapped by mapDetailError; everything else (an untracked
-		// path, a line past EOF) falls to mapGitError's default arm.
-		return nil, mapDetailError(err)
-	}
-	return line, nil
+	return handleRepoCall(ctx, c, "blame.line", params,
+		func(p BlameLineParams) (string, error) {
+			if p.RepoID == "" || p.Path == "" || p.Line < 1 {
+				return "", ipcerr.BadRequest("gitrpc: blame.line: repoId, path and a 1-based line are required")
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, p BlameLineParams) (porcelain.BlameLine, error) {
+			line, err := entry.BlameLine(ctx, p.Path, p.Line)
+			if err != nil {
+				// ErrPathEscapesRoot is already mapped by mapDetailError; everything else (an
+				// untracked path, a line past EOF) falls to mapGitError's default arm.
+				return porcelain.BlameLine{}, mapDetailError(err)
+			}
+			return line, nil
+		},
+	)
 }
 
 // handleWorkingDetail is working.detail's own handler (P7, item 2) — no size guard needed
 // (unlike commit.fileDiff/file.read): a FileChange list is bounded by the working tree's own dirty
 // set, the same order of magnitude status.get already returns uncapped-and-unguarded today.
 func (r *Router) handleWorkingDetail(ctx context.Context, c *gitsession.Conn, params json.RawMessage) (any, error) {
-	var p WorkingDetailParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, ipcerr.BadRequest("gitrpc: working.detail: invalid params")
-	}
-	if p.RepoID == "" {
-		return nil, ipcerr.BadRequest("gitrpc: working.detail: repoId is required")
-	}
-	entry, err := entryFor(c, p.RepoID)
-	if err != nil {
-		return nil, err
-	}
-	files, err := entry.WorkingDetail(ctx)
-	if err != nil {
-		return nil, mapDetailError(err)
-	}
-	return workingDetailResult{Files: files}, nil
+	return handleRepoCall(ctx, c, "working.detail", params,
+		func(p WorkingDetailParams) (string, error) {
+			if p.RepoID == "" {
+				return "", ipcerr.BadRequest("gitrpc: working.detail: repoId is required")
+			}
+			return p.RepoID, nil
+		},
+		func(ctx context.Context, entry *gitsession.RepoEntry, _ WorkingDetailParams) (workingDetailResult, error) {
+			files, err := entry.WorkingDetail(ctx)
+			if err != nil {
+				return workingDetailResult{}, mapDetailError(err)
+			}
+			return workingDetailResult{Files: files}, nil
+		},
+	)
 }

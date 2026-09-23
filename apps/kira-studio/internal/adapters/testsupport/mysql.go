@@ -4,24 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"path/filepath"
 	"testing"
-	"time"
 
 	sqldriver "github.com/go-sql-driver/mysql"
 	"github.com/testcontainers/testcontainers-go"
 	tcmysql "github.com/testcontainers/testcontainers-go/modules/mysql"
-
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
-// MysqlFixture is support/mysql.ts's MysqlFixture.
-type MysqlFixture struct {
-	URI       string
-	Config    model.ResolvedConnectionConfig
-	container testcontainers.Container
-}
+// MysqlFixture is support/mysql.ts's MysqlFixture — an alias of mysqlFamilyFixture (P107 T2-5),
+// shared with MariaFixture.
+type MysqlFixture = mysqlFamilyFixture
 
 var mysqlMemo fixture[MysqlFixture]
 
@@ -37,15 +29,7 @@ const (
 // StartMysql is support/mysql.ts's startMysql. See fixture.go's own doc comment for why
 // termination is never wired to t.Cleanup (B15).
 func StartMysql(t *testing.T) *MysqlFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	fixture, err := mysqlMemo.get(startMysql)
-	if err != nil {
-		t.Fatalf("mysql container: %v", err)
-	}
-	return fixture
+	return mysqlMemo.start(t, "mysql container", startMysql)
 }
 
 // StopMysql terminates the memoized container, if one was ever started. Call once, from the test
@@ -55,55 +39,30 @@ func StopMysql() {
 }
 
 func startMysql() (*MysqlFixture, error) {
-	ctx := context.Background()
-
-	container, err := tcmysql.Run(ctx, ImageFor("mysql", mysqlImage),
-		tcmysql.WithDatabase(mysqlDatabase),
-		tcmysql.WithUsername(mysqlUsername),
-		tcmysql.WithPassword(mysqlPassword),
-		testcontainers.WithEnv(map[string]string{"MYSQL_ROOT_PASSWORD": mysqlRootPassword}),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	host, err := container.Host(ctx)
-	if err != nil {
-		return nil, err
-	}
-	port, err := container.MappedPort(ctx, "3306/tcp")
-	if err != nil {
-		return nil, err
-	}
-	portNum := int(port.Num())
-
-	seedPath := filepath.Join(repoRoot(), "packages", "db-fixtures", "fixtures", "0008_mysql_seed.sql")
-	seedSQL, err := os.ReadFile(seedPath)
-	if err != nil {
-		return nil, err
-	}
-
-	rootDSN := rootMysqlDSN(host, portNum, mysqlDatabase)
-	if err := seedMysqlFamilyDatabase(ctx, rootDSN, string(seedSQL)); err != nil {
-		return nil, err
-	}
-	if err := seedMysqlExtras(ctx, host, portNum); err != nil {
-		return nil, err
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339Nano)
-	hostCopy, portCopy := host, portNum
-	cfg := model.ResolvedConnectionConfig{
-		ID: "test-mysql", SortOrder: 0, CreatedAt: now, UpdatedAt: now,
-		Name: "Test MySQL", Kind: "mysql", Color: "teal", Mode: "fields", ReadOnly: false,
-		Host: &hostCopy, Port: &portCopy, Database: Strp(mysqlDatabase), Username: Strp(mysqlUsername),
+	return startMysqlFamily(mysqlFamilySpec{
+		runContainer: func(ctx context.Context) (testcontainers.Container, error) {
+			return tcmysql.Run(ctx, ImageFor("mysql", mysqlImage),
+				tcmysql.WithDatabase(mysqlDatabase),
+				tcmysql.WithUsername(mysqlUsername),
+				tcmysql.WithPassword(mysqlPassword),
+				testcontainers.WithEnv(map[string]string{"MYSQL_ROOT_PASSWORD": mysqlRootPassword}),
+			)
+		},
+		seedFixture: "0008_mysql_seed.sql",
+		dsn:         rootMysqlDSN,
+		seedExtras:  seedMysqlExtras,
+		database:    mysqlDatabase,
+		username:    mysqlUsername,
+		password:    mysqlPassword,
+		uriScheme:   "mysql",
+		configID:    "test-mysql",
+		configName:  "Test MySQL",
+		configKind:  "mysql",
+		configColor: "teal",
 		// P34 D5/D26: TLS is available on a stock server (MySQL auto-generates a self-signed
 		// certificate at init) — this exercises the real remedy path, not a worked-around one.
-		Options:  map[string]any{"sslmode": "require"},
-		Password: Strp(mysqlPassword),
-	}
-	uri := fmt.Sprintf("mysql://%s:%s@%s:%d/%s", mysqlUsername, mysqlPassword, host, portNum, mysqlDatabase)
-	return &MysqlFixture{URI: uri, Config: cfg, container: container}, nil
+		options: map[string]any{"sslmode": "require"},
+	})
 }
 
 func rootMysqlDSN(host string, port int, database string) string {

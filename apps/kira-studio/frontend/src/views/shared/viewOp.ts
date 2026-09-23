@@ -153,3 +153,32 @@ export function applyLoadFailure(
   rt.status = 'error';
   rt.error = { code: failure.code, message: failure.message };
 }
+
+interface CountRuntime {
+  count: { value: number; exact: boolean; stale: boolean } | null;
+  countOpId: string | null;
+}
+
+// P107 T2-16: the countOpId-stamp/guard/assign skeleton — byte-identical across documents/grid/
+// keyvalue/stream's state.ts runCount(). What genuinely differs per view (the request's own
+// filter, which each caller derives its own way) stays with the caller: fetchCount closes over it
+// and gets `refresh` (D18: an already-fresh count stays an L3 hit) handed in, ready to forward.
+export async function runPagedCount(
+  rt: CountRuntime,
+  fetchCount: (
+    opId: string,
+    refresh: boolean,
+  ) => Promise<{ value: number; exact: boolean; stale: boolean }>,
+): Promise<void> {
+  const opId = crypto.randomUUID();
+  rt.countOpId = opId;
+  try {
+    const response = await fetchCount(opId, rt.count?.stale === true);
+    // A filter/refresh change since this count started already stamped a newer countOpId (or
+    // cleared it) — an answer to the previous request landing now would resurrect a stale total.
+    if (rt.countOpId !== opId) return;
+    rt.count = { value: response.value, exact: response.exact, stale: response.stale };
+  } catch {
+    // Leave the previous count (if any) rather than blanking it on a failed refresh.
+  }
+}

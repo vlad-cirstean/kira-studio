@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
 
 // RequiredVersion is the hard floor (docs/v1.3/SPEC.md, "The user's own Git, at 2.38 or newer") —
@@ -46,18 +48,6 @@ type Locator interface {
 	// Locate returns the first usable candidate, and the full list of paths considered (in probe
 	// order) either way — notFound's own Probed field is exactly this list on a miss.
 	Locate(configuredPath string) (path string, probed []string, found bool)
-}
-
-// isExecutable reports whether path exists, is a regular file (or a symlink to one), and has at
-// least one executable bit set — the same check exec.LookPath makes internally, exposed here so
-// the homebrew/usr-local/usr-bin steps below (none of which go through LookPath, since they are
-// absolute-path checks, not a PATH search) can make it too.
-func isExecutable(stat func(string) (os.FileInfo, error), path string) bool {
-	info, err := stat(path)
-	if err != nil || info.IsDir() {
-		return false
-	}
-	return info.Mode()&0o111 != 0
 }
 
 // clToolsShim is the Xcode Command Line Tools' own git shim — the one path D3's own trap is
@@ -97,7 +87,7 @@ func (l *darwinLocator) Locate(configuredPath string) (string, []string, bool) {
 
 	if configuredPath != "" {
 		probed = append(probed, configuredPath)
-		if isExecutable(l.stat, configuredPath) {
+		if toolexec.IsExecutable(l.stat, configuredPath) {
 			return configuredPath, probed, true
 		}
 	}
@@ -111,14 +101,14 @@ func (l *darwinLocator) Locate(configuredPath string) (string, []string, bool) {
 	for _, dir := range []string{"/opt/homebrew/bin", "/usr/local/bin"} {
 		candidate := filepath.Join(dir, "git")
 		probed = append(probed, candidate)
-		if isExecutable(l.stat, candidate) {
+		if toolexec.IsExecutable(l.stat, candidate) {
 			return candidate, probed, true
 		}
 	}
 
 	if l.cltsInstalled() {
 		probed = append(probed, clToolsShim)
-		if isExecutable(l.stat, clToolsShim) {
+		if toolexec.IsExecutable(l.stat, clToolsShim) {
 			return clToolsShim, probed, true
 		}
 	} else {

@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -99,23 +100,9 @@ func (a *Adapter) Connect(_ context.Context, cfg model.ResolvedConnectionConfig,
 
 	details := map[string]string{"file": path, "journalMode": journalMode}
 	if pageSize > 0 {
-		details["pageSize"] = itoaPositive(pageSize)
+		details["pageSize"] = strconv.Itoa(pageSize)
 	}
 	return adapters.ConnectInfo{ServerVersion: "SQLite " + version, Details: details}, nil
-}
-
-func itoaPositive(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }
 
 // Disconnect is index.ts's disconnect.
@@ -245,7 +232,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 func requireTwoSegmentPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 2 || segments[0].Kind != "database" || (segments[1].Kind != "table" && segments[1].Kind != "view") {
 		return model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/table path, got depth "+itoaPositive(len(segments)), nil)
+			adapters.New(adapters.CodeNotFound, opName+" requires a database/table path, got depth "+strconv.Itoa(len(segments)), nil)
 	}
 	return segments[0], segments[1], nil
 }
@@ -299,7 +286,7 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 // together with its columns, in one round trip.
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
 	if len(path.Segments) != 1 || path.Segments[0].Kind != "database" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got depth "+itoaPositive(len(path.Segments)), nil)
+		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database path, got depth "+strconv.Itoa(len(path.Segments)), nil)
 	}
 	databaseSegment := path.Segments[0]
 	return runOnConn(ctx, a, op.OpID, func(driverCtx context.Context, conn *sql.Conn) ([]model.RelationColumns, error) {

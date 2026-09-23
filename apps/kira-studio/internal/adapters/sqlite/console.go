@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
@@ -96,7 +97,7 @@ func execute(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, statements
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
 	// One op-log row for the whole batch (P5 D9's precedent), not one per statement.
-	op.SetCommand(joinSemicolons(statements))
+	op.SetCommand(strings.Join(statements, ";\n"))
 
 	pages := make([]page.Page, len(statements))
 	for i, stmt := range statements {
@@ -110,15 +111,4 @@ func execute(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, statements
 		pages[i] = p
 	}
 	return pages, nil
-}
-
-func joinSemicolons(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ";\n"
-		}
-		out += p
-	}
-	return out
 }

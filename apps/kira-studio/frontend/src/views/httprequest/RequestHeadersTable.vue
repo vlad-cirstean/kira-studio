@@ -4,7 +4,7 @@ import type { HttpHeaderState } from '@shared/domain/http';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import type { HttpRequestTabRecord } from '../../state/tabDomain';
-import FieldRowsTable from './FieldRowsTable.vue';
+import FieldRowsTable from '../shared/fields/FieldRowsTable.vue';
 
 // D15/C6: a thin wrapper over FieldRowsTable — headers write `tab.state.headers` directly (D6:
 // the one persisted array with real write-through, unlike Params which is derived from the URL).

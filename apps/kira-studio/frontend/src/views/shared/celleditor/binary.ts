@@ -1,3 +1,4 @@
+import { base64ToBytes as decodeBase64 } from '@shared/domain/base64';
 import { BASE64_STD_RE, BASE64_URL_RE, base64ToStd } from './detect';
 
 /** `null` means "not decodable as text" — an invalid encoding, or bytes that decode fine but
@@ -31,8 +32,7 @@ function base64ToBytes(t: string): Uint8Array | null {
   const isUrlSafe = !BASE64_STD_RE.test(t) && BASE64_URL_RE.test(t);
   if (!BASE64_STD_RE.test(t) && !isUrlSafe) return null;
   try {
-    const bin = atob(base64ToStd(t, isUrlSafe));
-    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    return decodeBase64(base64ToStd(t, isUrlSafe));
   } catch {
     return null;
   }

@@ -8,49 +8,14 @@
  * `reviewAnchorFor` and the fourth virtual-key field it reads are G14's own seam (D20) — a G14
  * that re-derives "which document, which repo/branch/path, at which revision" has gone wrong.
  */
-import { basename } from 'node:path';
 import type { ReviewComment } from '@kira/git-ipc';
 import * as vscode from 'vscode';
 import type { ConnectionManager } from './connection.ts';
 import { SCHEME } from './ports/editorIntegration.ts';
-import { decodeKey, encodeKey, parseVirtualKey, virtualKey } from './virtualKey.ts';
+import { reviewAnchorFor, reviewDocumentUri } from './virtualUri.ts';
 
 const CONTROLLER_ID = 'kiraSpace.reviewComments';
 const CONTROLLER_LABEL = 'Kira review comments';
-
-/** Everything `review.comment.*` needs about one document, resolved statelessly from its own URI
- *  (D8a/D9/D20) — no registry, no `Map`, survives a window reload. */
-export interface ReviewAnchor {
-  readonly repoId: string;
-  readonly branch: string;
-  readonly path: string;
-  readonly at: string;
-}
-
-/** Is `uri` the branch-tip side of a review diff, and of which `(repoId, branch, path)` at which
- *  revision? Pure and stateless (D9/D20) — the answer lives entirely in the URI's own fourth
- *  virtual-key field (D8a), which only the branch-tip side of `editor.openRangeDiff` ever sets. */
-export function reviewAnchorFor(uri: vscode.Uri): ReviewAnchor | undefined {
-  if (uri.scheme !== SCHEME) return undefined;
-  const [first] = uri.path.split('/').filter((segment) => segment.length > 0);
-  if (first === undefined) return undefined;
-  const parsed = parseVirtualKey(decodeKey(first));
-  if (!parsed || parsed.reviewBranch === undefined) return undefined;
-  return { repoId: parsed.repoId, branch: parsed.reviewBranch, path: parsed.path, at: parsed.rev };
-}
-
-/** The same URI shape `ports/editorIntegration.ts`'s own `toUri` mints for a `{kind: 'virtual'}`
- *  ref — reconstructed here from plain data so `proxyHandlers.ts` (which never imports `vscode`,
- *  by design) can ask for a re-render after opening a diff without holding a `vscode.Uri` itself. */
-function reviewDocumentUri(
-  repoId: string,
-  branchTip: string,
-  path: string,
-  branch: string,
-): vscode.Uri {
-  const key = virtualKey(repoId, branchTip, path, branch);
-  return vscode.Uri.parse(`${SCHEME}:/${encodeKey(key)}/${encodeURIComponent(basename(path))}`);
-}
 
 /** Our own `Comment` objects carry two extra fields no typed API field expresses — `id` for
  *  `review.comment.remove`, `parent` (the owning thread) so a comment-scoped command (`comments/

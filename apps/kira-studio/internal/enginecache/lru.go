@@ -10,6 +10,7 @@ package enginecache
 
 import (
 	"container/list"
+	"strconv"
 	"time"
 )
 
@@ -98,30 +99,8 @@ func (l *ByteLru[V]) Set(key string, value V, bytes int, meta EntryMeta) {
 }
 
 func warnMessage(label string, bytes, budget int) string {
-	return "cache: refusing to store " + label + ": " + itoa(bytes) + " bytes exceeds half the " +
-		itoa(budget) + "-byte budget"
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
+	return "cache: refusing to store " + label + ": " + strconv.Itoa(bytes) + " bytes exceeds half the " +
+		strconv.Itoa(budget) + "-byte budget"
 }
 
 // Update mutates an existing entry's value (and byte size, if it changed) in place, without

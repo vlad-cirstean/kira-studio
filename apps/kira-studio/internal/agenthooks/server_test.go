@@ -34,7 +34,7 @@ func clientFor(s *Server) *http.Client {
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 				var d net.Dialer
-				return d.DialContext(ctx, "unix", s.sockPath)
+				return d.DialContext(ctx, "unix", s.ln.SockPath)
 			},
 		},
 		Timeout: 2 * time.Second,
@@ -90,7 +90,7 @@ func TestValidRequestDeliversEvent(t *testing.T) {
 	client := clientFor(s)
 
 	body := `{"hook_event_name":"PreToolUse","session_id":"sess-1","cwd":"/repo","tool_name":"Bash","tool_use_id":"tu-1","tool_input":{"command":"rm -rf /"}}`
-	resp := postHook(t, client, s.token, "term-1", body)
+	resp := postHook(t, client, s.ln.Token, "term-1", body)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
@@ -138,7 +138,7 @@ func TestMissingTerminalHeaderRejected(t *testing.T) {
 	s := newTestServer(t, rec.record)
 	client := clientFor(s)
 
-	resp := postHook(t, client, s.token, "", `{"hook_event_name":"Stop"}`)
+	resp := postHook(t, client, s.ln.Token, "", `{"hook_event_name":"Stop"}`)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
@@ -156,7 +156,7 @@ func TestOversizedBodyRejected(t *testing.T) {
 	client := clientFor(s)
 
 	oversized := `{"hook_event_name":"PreToolUse","message":"` + strings.Repeat("x", maxHookPayloadBytes+1) + `"}`
-	resp := postHook(t, client, s.token, "term-1", oversized)
+	resp := postHook(t, client, s.ln.Token, "term-1", oversized)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status = %d, want 413", resp.StatusCode)
@@ -185,7 +185,7 @@ func TestDroppedFieldsNeverReachEvent(t *testing.T) {
 		"tool_input": {"file_path": "/repo/secret.txt", "content": "sensitive contents here"},
 		"tool_response": {"filePath": "/repo/secret.txt", "content": "sensitive contents here"}
 	}`
-	resp := postHook(t, client, s.token, "term-1", body)
+	resp := postHook(t, client, s.ln.Token, "term-1", body)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
@@ -206,8 +206,8 @@ func TestDroppedFieldsNeverReachEvent(t *testing.T) {
 // TestCloseRemovesDirectoryAndSocket is §19.2 case 6.
 func TestCloseRemovesDirectoryAndSocket(t *testing.T) {
 	s := newTestServer(t, nil)
-	dir := s.dir
-	sock := s.sockPath
+	dir := s.ln.Dir
+	sock := s.ln.SockPath
 	if _, err := os.Stat(dir); err != nil {
 		t.Fatalf("dir should exist before Close: %v", err)
 	}
@@ -253,7 +253,7 @@ func TestMessageTruncatedOnRuneBoundary(t *testing.T) {
 	msg := b.String()
 
 	body := `{"hook_event_name":"Notification","message":` + jsonString(msg) + `}`
-	resp := postHook(t, client, s.token, "term-1", body)
+	resp := postHook(t, client, s.ln.Token, "term-1", body)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)

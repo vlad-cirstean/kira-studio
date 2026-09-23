@@ -5,6 +5,7 @@
  * belong here, not in lane bookkeeping.
  */
 import { assert } from '../util/assert.ts';
+import { growUint32 } from '../util/typed.ts';
 import {
   EDGE_COLOR,
   EDGE_FROM_LANE,
@@ -18,17 +19,6 @@ import {
   PATCH_UNCHANGED,
   UNRESOLVED_ROW,
 } from './types.ts';
-
-function growUint32(
-  current: Uint32Array<ArrayBuffer>,
-  minLength: number,
-): Uint32Array<ArrayBuffer> {
-  let capacity = current.length === 0 ? 256 : current.length;
-  while (capacity < minLength) capacity *= 2;
-  const grown = new Uint32Array(capacity);
-  grown.set(current);
-  return grown;
-}
 
 export interface BuiltEdges {
   /** `EDGE_STRIDE`-wide records, sorted by `fromRow`, trimmed to exactly the appended count. */

@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -195,7 +196,7 @@ func readPage(ctx context.Context, h *Handle, queryID string, op *adapters.OpCtx
 	if orderBySQL != "" {
 		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
 	}
-	sqlParts = append(sqlParts, "LIMIT "+itoaPositive(limit)+" OFFSET "+itoaPositive(offset))
+	sqlParts = append(sqlParts, "LIMIT "+strconv.Itoa(limit)+" OFFSET "+strconv.Itoa(offset))
 	sql := strings.Join(sqlParts, "\n")
 
 	op.SetCommand(sql)

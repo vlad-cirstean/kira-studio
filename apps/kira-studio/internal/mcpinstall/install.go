@@ -10,7 +10,15 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/kirathecat/kira-studio/internal/toolexec"
 )
+
+// spawnTimeout is this package's own bound on the one spawn Install makes (`claude mcp add`) — a
+// local, fast operation with no network round trip of its own, so a wedged child is the only
+// failure mode a bound needs to guard against.
+const spawnTimeout = 30 * time.Second
 
 // Deps are the three independent seams this package needs: finding `claude`, checking a candidate
 // exists, and spawning one. Function fields rather than an interface — gitvsix.Deps' own
@@ -42,7 +50,7 @@ func New(d Deps) *Installer {
 		i.stat = realStat
 	}
 	if i.run == nil {
-		i.run = realRun
+		i.run = toolexec.Run
 	}
 	return i
 }
@@ -94,30 +102,10 @@ func claudeCandidates() []string {
 	return candidates
 }
 
-func isExecutable(stat func(string) (os.FileInfo, error), path string) bool {
-	info, err := stat(path)
-	if err != nil || info.IsDir() {
-		return false
-	}
-	return info.Mode()&0o111 != 0
-}
-
 // locateClaude mirrors gitvsix's own darwinLocator shape: PATH first, then every absolute
 // candidate in order, every path considered recorded in probed regardless of outcome.
 func (i *Installer) locateClaude() (path string, probed []string, found bool) {
-	if resolved, err := i.lookPath("claude"); err == nil {
-		probed = append(probed, resolved)
-		return resolved, probed, true
-	}
-	probed = append(probed, "claude (on PATH)")
-
-	for _, candidate := range claudeCandidates() {
-		probed = append(probed, candidate)
-		if isExecutable(i.stat, candidate) {
-			return candidate, probed, true
-		}
-	}
-	return "", probed, false
+	return toolexec.Locate(i.lookPath, i.stat, "claude", claudeCandidates())
 }
 
 // Status is the pane's own pre-click read.
@@ -137,7 +125,7 @@ func detailFor(ctx context.Context, err error) string {
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return "timed out"
 	}
-	var runErr *RunError
+	var runErr *toolexec.ExecError
 	if errors.As(err, &runErr) {
 		return runErr.Error()
 	}

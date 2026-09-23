@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -24,13 +25,11 @@ type Adapter struct {
 	handle   *Handle
 	readOnly bool
 
-	mu          sync.Mutex
-	runningByOp map[string]string // opID -> query_id (D8), not a thread id or backend pid
+	// mu guards handle only — the running-query bookkeeping lives in tracker's own lock (P107 T2-3).
+	mu sync.Mutex
 
-	// inFlight mirrors postgres's/mysqlfamily's/sqlite's own field of the same name: RunWithAbortRace
-	// can return to its caller on ctx.Done() before the background goroutine it spawned has actually
-	// stopped touching the *http.Response body it is reading — Disconnect must not race that.
-	inFlight sync.WaitGroup
+	// tracker's Q is the bare query_id string (D8), not a thread id or backend pid.
+	tracker adapters.QueryTracker[string]
 }
 
 func (a *Adapter) Kind() string        { return "clickhouse" }
@@ -69,14 +68,11 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(context.Context) error {
-	a.inFlight.Wait()
+	a.tracker.Drain()
 	if a.handle != nil {
 		a.handle.Client.CloseIdleConnections()
 	}
 	a.handle = nil
-	a.mu.Lock()
-	a.runningByOp = nil
-	a.mu.Unlock()
 	return nil
 }
 
@@ -85,29 +81,16 @@ func (a *Adapter) Disconnect(context.Context) error {
 // index.ts's own instance-per-call closure rather than an instance-level map, since every top-level
 // Adapter method call already gets a fresh, unique op.OpID.
 func (a *Adapter) nextQueryID(opID string, seq int) string {
-	return "kira-" + opID + "-" + itoaPositive(seq)
+	return "kira-" + opID + "-" + strconv.Itoa(seq)
 }
 
 // trackerFor is index.ts's trackerFor (P13 D3): registers the running query_id and hands back its
 // own release. The identity check in the release closure is what makes a multi-statement op
 // (mutate's insert, console's "Run all") correct.
 func (a *Adapter) trackerFor(opID string) TrackQuery {
+	inner := a.tracker.TrackerFor(opID)
 	return func(q RunningQuery) func() {
-		a.mu.Lock()
-		if a.runningByOp == nil {
-			a.runningByOp = make(map[string]string)
-		}
-		a.runningByOp[opID] = q.QueryID
-		a.mu.Unlock()
-		a.inFlight.Add(1)
-		return func() {
-			defer a.inFlight.Done()
-			a.mu.Lock()
-			if a.runningByOp[opID] == q.QueryID {
-				delete(a.runningByOp, opID)
-			}
-			a.mu.Unlock()
-		}
+		return inner(q.QueryID)
 	}
 }
 
@@ -328,9 +311,8 @@ func (a *Adapter) KeyTypes(context.Context, []model.NodePath, *adapters.OpCtx) (
 // free HTTP request on the client's own connection pool (F7/F9), never scoped by this connection's
 // own read-only flag.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
+	queryID, ok := a.tracker.PopRunning(opID)
 	a.mu.Lock()
-	queryID, ok := a.runningByOp[opID]
-	delete(a.runningByOp, opID)
 	handle := a.handle
 	a.mu.Unlock()
 	if !ok || handle == nil {
@@ -344,7 +326,7 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		a.deps.Log("warn", "clickhouse cancel("+opID+") failed: server returned "+itoaPositive(resp.StatusCode))
+		a.deps.Log("warn", "clickhouse cancel("+opID+") failed: server returned "+strconv.Itoa(resp.StatusCode))
 		return false, nil
 	}
 	return true, nil

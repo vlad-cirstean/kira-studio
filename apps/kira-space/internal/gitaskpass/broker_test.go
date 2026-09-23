@@ -255,7 +255,7 @@ func TestBroker_WrongTokenIsRefused(t *testing.T) {
 
 func TestBroker_StaleOpIDIsRefused(t *testing.T) {
 	b := newTestBroker(t, 5*time.Second)
-	resp := dialAndRequest(t, b, b.token, "0000000000000000000000000000000", "Password: ")
+	resp := dialAndRequest(t, b, b.ln.Token, "0000000000000000000000000000000", "Password: ")
 	if resp.OK {
 		t.Fatal("stale op id: want ok:false")
 	}
@@ -266,7 +266,7 @@ func TestBroker_StaleOpIDIsRefused(t *testing.T) {
 // helper would never construct.
 func dialAndRequest(t *testing.T, b *Broker, token, opID, prompt string) socketResponse {
 	t.Helper()
-	conn, err := net.Dial("unix", b.sockPath)
+	conn, err := net.Dial("unix", b.ln.SockPath)
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}

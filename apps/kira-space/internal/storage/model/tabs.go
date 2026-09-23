@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
 // TabRecord's `State` stays raw JSON here — Kira Studio's own model.TabRecord (storage/model/
@@ -43,12 +45,7 @@ func IsRenderableTabKind(kind string) bool {
 // IsJSONObject reports whether raw is valid JSON whose top-level value is an object — Kira
 // Studio's own IsJSONObject, unchanged.
 func IsJSONObject(raw []byte) bool {
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return false
-	}
-	_, ok := v.(map[string]any)
-	return ok
+	return appstorage.IsJSONObject(raw)
 }
 
 // Validate asserts the same envelope repos.TabsRepo.List already enforces on read, plus the

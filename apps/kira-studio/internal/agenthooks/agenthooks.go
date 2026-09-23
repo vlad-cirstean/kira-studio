@@ -9,16 +9,15 @@ package agenthooks
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/localsock"
 )
 
 // closeHTTPGraceTimeout mirrors internal/dbmcp/http.go's own bound on Close's graceful Shutdown
@@ -56,15 +55,12 @@ type Options struct {
 // instance per enable — internal/bridge/agenthooks.go's AgentHooksService constructs and closes
 // one each time the setting toggles on, mirroring internal/dbmcp.Server's own start/stop shape.
 type Server struct {
-	dir       string
 	hooksPath string
 	shimPath  string
-	sockPath  string
-	token     string
 	onEvent   func(Event)
 
-	listener net.Listener
-	http     *http.Server
+	ln   *localsock.Listener
+	http *http.Server
 }
 
 // New resolves curl, builds the temp directory/shim/socket/hooks.json, starts serving in its own
@@ -77,70 +73,44 @@ func New(opts Options) (*Server, error) {
 		return nil, errors.New("curl not found; hooks cannot report")
 	}
 
-	// POSIX mkdtemp(3) creates the directory 0700 already; os.MkdirTemp is documented to use it —
-	// gitaskpass.New's own identical precedent (D8's security boundary): no other OS user can read
-	// the shim, the token or reach the socket.
-	dir, err := os.MkdirTemp("", "kira-agent-")
+	// localsock.Listen is gitaskpass.New's own identical precedent (D8's security boundary): no
+	// other OS user can read the shim, the token or reach the socket (P107 T2-9).
+	ln, err := localsock.Listen(localsock.Options{DirPrefix: "kira-agent-", TokenBytes: 32})
 	if err != nil {
-		return nil, fmt.Errorf("agenthooks: mkdtemp: %w", err)
+		return nil, fmt.Errorf("agenthooks: %w", err)
 	}
 
-	token, err := randHex(32)
-	if err != nil {
-		_ = os.RemoveAll(dir)
-		return nil, fmt.Errorf("agenthooks: token: %w", err)
-	}
-
-	// Named "s" (gitaskpass's own precedent, §5.1): macOS caps sun_path at 104 bytes, so the
-	// socket's own filename has to stay short.
-	sockPath := filepath.Join(dir, "s")
-	ln, err := net.Listen("unix", sockPath)
-	if err != nil {
-		_ = os.RemoveAll(dir)
-		return nil, fmt.Errorf("agenthooks: listen: %w", err)
-	}
-	if err := os.Chmod(sockPath, 0o600); err != nil {
-		_ = ln.Close()
-		_ = os.RemoveAll(dir)
-		return nil, fmt.Errorf("agenthooks: chmod socket: %w", err)
-	}
-
-	shimBody, err := buildShim(curlPath, sockPath)
+	shimBody, err := buildShim(curlPath, ln.SockPath)
 	if err != nil {
 		_ = ln.Close()
-		_ = os.RemoveAll(dir)
 		return nil, err
 	}
-	shimPath := filepath.Join(dir, "hook")
+	shimPath := filepath.Join(ln.Dir, "hook")
 	if err := os.WriteFile(shimPath, []byte(shimBody), 0o700); err != nil {
 		_ = ln.Close()
-		_ = os.RemoveAll(dir)
 		return nil, fmt.Errorf("agenthooks: write shim: %w", err)
 	}
 
 	quotedShim, err := ShellSingleQuote(shimPath)
 	if err != nil {
 		_ = ln.Close()
-		_ = os.RemoveAll(dir)
 		return nil, err
 	}
 	hooksDoc, err := buildHooksDocument(quotedShim)
 	if err != nil {
 		_ = ln.Close()
-		_ = os.RemoveAll(dir)
 		return nil, err
 	}
-	hooksPath := filepath.Join(dir, "hooks.json")
+	hooksPath := filepath.Join(ln.Dir, "hooks.json")
 	if err := os.WriteFile(hooksPath, hooksDoc, 0o600); err != nil {
 		_ = ln.Close()
-		_ = os.RemoveAll(dir)
 		return nil, fmt.Errorf("agenthooks: write hooks.json: %w", err)
 	}
 
 	s := &Server{
-		dir: dir, hooksPath: hooksPath, shimPath: shimPath, sockPath: sockPath, token: token,
-		onEvent:  opts.OnEvent,
-		listener: ln,
+		hooksPath: hooksPath, shimPath: shimPath,
+		onEvent: opts.OnEvent,
+		ln:      ln,
 	}
 	s.http = &http.Server{
 		Handler: s.mux(),
@@ -151,20 +121,12 @@ func New(opts Options) (*Server, error) {
 		IdleTimeout:       120 * time.Second,
 	}
 	go func() {
-		if err := s.http.Serve(s.listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.http.Serve(s.ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			_ = err // Serve's own error after Close is expected (listener closed); nothing to log.
 		}
 	}()
 
 	return s, nil
-}
-
-func randHex(n int) (string, error) {
-	buf := make([]byte, n)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
 }
 
 // SettingsPath is the generated hooks.json's own absolute path — internal/bridge/terminal.go's
@@ -179,8 +141,8 @@ func (s *Server) SettingsPath() string {
 func (s *Server) Env(terminalID string) []string {
 	return []string{
 		"KIRA_TERMINAL_ID=" + terminalID,
-		"KIRA_AGENT_HOOK_SOCKET=" + s.sockPath,
-		"KIRA_AGENT_HOOK_TOKEN=" + s.token,
+		"KIRA_AGENT_HOOK_SOCKET=" + s.ln.SockPath,
+		"KIRA_AGENT_HOOK_TOKEN=" + s.ln.Token,
 	}
 }
 
@@ -196,7 +158,7 @@ func (s *Server) Close() error {
 		_ = s.http.Close()
 		err = shutdownErr
 	}
-	if rmErr := os.RemoveAll(s.dir); err == nil {
+	if rmErr := os.RemoveAll(s.ln.Dir); err == nil {
 		err = rmErr
 	}
 	return err

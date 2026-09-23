@@ -9,7 +9,13 @@ import { pinia } from '../../state/pinia';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { registerTabReload } from '../../state/viewCommands';
-import { applyLoadFailure, beginOp, createRuntimeStore, stopOp } from '../shared/viewOp';
+import {
+  applyLoadFailure,
+  beginOp,
+  createRuntimeStore,
+  runPagedCount,
+  stopOp,
+} from '../shared/viewOp';
 import { drop, setPage } from './page';
 import { useStreamFilterHistoryStore } from './streamFilterHistory';
 
@@ -175,32 +181,24 @@ export const useStreamViewStore = defineStore('streamView', () => {
   async function runCount(tabId: string): Promise<void> {
     const tab = useTabsStore().findStreamTab(tabId);
     if (!tab?.connectionId) return;
+    const connectionId = tab.connectionId;
     const rt = ensureRuntime(tabId);
-    const opId = crypto.randomUUID();
-    rt.countOpId = opId;
-    try {
-      const response = await data.count({
+    // P21 round 2 functional finding 7: this used to hard-code `filter: null`, so the Σ readout
+    // answered a different question than the rows beside it — the high-low watermark summed across
+    // *every* partition, printed next to a page that load() had already scoped to the selected
+    // partition/offset/timestamp filter. Sending the same encoded filter here scopes the count
+    // identically (kafka/count.go's countTopic now shares load's own freshWindows, so "N total"
+    // and the browse agree on what they are counting).
+    await runPagedCount(rt, (opId, refresh) =>
+      data.count({
         opId,
         tabId,
-        connectionId: tab.connectionId,
+        connectionId,
         path: tab.path,
-        // P21 round 2 functional finding 7: this used to hard-code `filter: null`, so the Σ
-        // readout answered a different question than the rows beside it — the high-low watermark
-        // summed across *every* partition, printed next to a page that load() had already scoped
-        // to the selected partition/offset/timestamp filter. Sending the same encoded filter here
-        // scopes the count identically (kafka/count.go's countTopic now shares load's own
-        // freshWindows, so "N total" and the browse agree on what they are counting).
         filter: currentStreamFilter(tab),
-        // D18: a Σ click on an already-fresh count stays an L3 hit; only a stale one bypasses it.
-        refresh: rt.count?.stale === true,
-      });
-      // A Refresh since this count started already stamped a newer countOpId — an answer to the
-      // previous request landing now would resurrect a stale total.
-      if (rt.countOpId !== opId) return;
-      rt.count = { value: response.value, exact: response.exact, stale: response.stale };
-    } catch {
-      // Leave the previous count (if any) rather than blanking it on a failed refresh.
-    }
+        refresh,
+      }),
+    );
   }
 
   function stop(tabId: string): void {

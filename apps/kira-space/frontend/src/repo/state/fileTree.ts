@@ -1,8 +1,9 @@
 import type { FileStatusCode } from '@shared/domain/repo';
 import type { StickyRowLike } from '@theme/stickyBand';
 import { defineStore } from 'pinia';
-import { markRaw, reactive } from 'vue';
+import { markRaw } from 'vue';
 import { control } from '../../bridge/control';
+import { createPerRepoState } from './perRepo.ts';
 
 // C5 §7.2: the flat path list -> row model fold. No single-child directory compaction (VS Code's
 // `a/b/c` collapsing) — deliberately declined: it complicates the fold, the expand set and reveal,
@@ -143,25 +144,9 @@ function emptyTreeState(): RepoTreeState {
 }
 
 export const useFileTreeStore = defineStore('fileTree', () => {
-  // One entry per open repo workspace. The Map itself must be `reactive()`, not just each value —
-  // visibleRepoRows' first read (from RepoFileTree.vue's `rows` computed, evaluated on initial
-  // render before ensureRepoTreeLoaded's onMounted has run) hits `byRepo.get(repoId)` while the
-  // entry doesn't exist yet and returns `[]` early, without ever touching a `.tree` property to
-  // depend on. A plain (non-reactive) Map makes that `.get()` itself untracked, so Vue never
-  // reruns the computed once `stateFor` later creates the entry and `refreshRepoTree` populates it
-  // — the tree would silently never render. Wrapping the Map in `reactive()` makes `.get()` itself
-  // a tracked read (Vue 3's native Map/Set support), so the computed correctly reruns once the
-  // entry is set.
-  const byRepo = reactive(new Map<string, RepoTreeState>());
-
-  function stateFor(repoId: string): RepoTreeState {
-    let state = byRepo.get(repoId);
-    if (!state) {
-      state = reactive(emptyTreeState()) as RepoTreeState;
-      byRepo.set(repoId, state);
-    }
-    return state;
-  }
+  const perRepo = createPerRepoState(emptyTreeState);
+  const byRepo = perRepo.all;
+  const { stateFor } = perRepo;
 
   /** True once repoId's listing has loaded at least once — GitPanel.vue's own loading gate. */
   function isRepoTreeLoaded(repoId: string): boolean {
@@ -230,9 +215,7 @@ export const useFileTreeStore = defineStore('fileTree', () => {
 
   /** Drops repoId's own cached tree — RemoveRepo's own cleanup (a removed repo's tree state must
    *  not outlive it, however briefly, in this module-level map). */
-  function dropRepoTree(repoId: string): void {
-    byRepo.delete(repoId);
-  }
+  const dropRepoTree = perRepo.drop;
 
   return {
     isRepoTreeLoaded,

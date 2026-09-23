@@ -1,6 +1,18 @@
 // P15b D7 (item 7): a header-name vocabulary for the request builder's Headers table — F6's own
 // finding that nothing in the repo enumerates header names today (`userContentTypeHeader`,
 // body.ts, looks for exactly one).
+import type { HttpHeaderState } from '@kira/shared/domain/http';
+
+/** The last `Content-Type` header's own value (headers can repeat; the last one wins, matching
+ *  how a real HTTP client resolves a duplicate) — `undefined` when none is set. `curl/parse.ts`
+ *  and `raw/parse.ts` each fed this into their own `codeLanguageForContentType`. */
+export function explicitContentType(headers: readonly HttpHeaderState[]): string | undefined {
+  let value: string | undefined;
+  for (const h of headers) {
+    if (h.name.trim().toLowerCase() === 'content-type') value = h.value;
+  }
+  return value;
+}
 
 /** Structurally identical to `theme/completion.ts`'s own `Completion` (label, optional
  *  insert/detail/icon/caretOffsetFromEnd) — declared independently rather than imported, since

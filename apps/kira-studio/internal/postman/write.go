@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"sort"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -113,7 +114,7 @@ func buildRequest(origin json.RawMessage, saved model.SavedRequest) json.RawMess
 	// P22b D7: a param description can change with the URL string untouched, so the origin `url`
 	// member has to be rebuilt on either change, not just the raw string comparison alone.
 	urlChanged := ImportURL(members["url"]) != saved.URL
-	descriptionsChanged := !paramDescriptionsEqual(ImportParamDescriptions(members["url"]), saved.ParamDescriptions)
+	descriptionsChanged := !maps.Equal(ImportParamDescriptions(members["url"]), saved.ParamDescriptions)
 	if urlChanged || descriptionsChanged {
 		if saved.URL == "" {
 			delete(out, "url")
@@ -211,7 +212,7 @@ func ShedOrigin(origin map[string]json.RawMessage, saved model.SavedRequest) map
 	// P22b D7: a param description can change with the URL string untouched (see buildRequest's
 	// own comment above) — the origin url member must be shed on either change.
 	if ImportURL(request["url"]) != saved.URL ||
-		!paramDescriptionsEqual(ImportParamDescriptions(request["url"]), saved.ParamDescriptions) {
+		!maps.Equal(ImportParamDescriptions(request["url"]), saved.ParamDescriptions) {
 		delete(request, "url")
 	}
 	if !headersEqual(importHeaders(request["header"]), saved.Headers) {
@@ -233,21 +234,7 @@ func ShedOrigin(origin map[string]json.RawMessage, saved model.SavedRequest) map
 func requestEqual(a, b model.SavedRequest) bool {
 	return a.Method == b.Method && a.URL == b.URL &&
 		headersEqual(a.Headers, b.Headers) && bodyEqual(bodyOf(a), bodyOf(b)) &&
-		paramDescriptionsEqual(a.ParamDescriptions, b.ParamDescriptions)
-}
-
-// P22b D7: a query param's own description can change independently of the URL string itself, so
-// this needs its own comparison rather than folding into requestEqual's plain field checks above.
-func paramDescriptionsEqual(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
+		maps.Equal(a.ParamDescriptions, b.ParamDescriptions)
 }
 
 func headersEqual(a, b []model.SavedHeader) bool {

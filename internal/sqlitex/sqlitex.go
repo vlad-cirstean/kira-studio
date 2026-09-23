@@ -164,3 +164,16 @@ func Migrate(db *sql.DB, migrations []Migration) error {
 	}
 	return nil
 }
+
+// RequireOneRow turns an UPDATE/DELETE's RowsAffected() == 0 into a "no such <what>" error — both
+// apps' repos packages' own requireOneRow, genericized to one shared copy (P107 T1-7).
+func RequireOneRow(res sql.Result, what string) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("sqlitex: rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("sqlitex: no %s", what)
+	}
+	return nil
+}

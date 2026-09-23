@@ -1,6 +1,8 @@
 package model
 
-import "fmt"
+import (
+	"github.com/kirathecat/kira-studio/internal/appstorage"
+)
 
 // WindowBounds is a plain screen rectangle, shared by every window's stored geometry.
 type WindowBounds struct {
@@ -51,11 +53,5 @@ func NormalizeMode(mode string) string {
 // discipline applied here too): a bad row is refused at the write site, not left to silently
 // round-trip and vanish on the next read.
 func (w WindowRecord) Validate() error {
-	if w.Key == "" {
-		return fmt.Errorf("model: window: key is required")
-	}
-	if w.Order < 0 {
-		return fmt.Errorf("model: window %q: order must be >= 0", w.Key)
-	}
-	return nil
+	return appstorage.ValidateWindowBounds(w.Key, w.Order)
 }

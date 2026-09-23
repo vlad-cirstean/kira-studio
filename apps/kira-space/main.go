@@ -30,7 +30,6 @@ import (
 	"github.com/kirathecat/kira-studio/internal/startupfail"
 	"github.com/kirathecat/kira-studio/internal/terminal"
 	"github.com/wailsapp/wails/v3/pkg/application"
-	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Any files in frontend/dist are embedded into the binary — empty until Part 2's own frontend
@@ -205,20 +204,19 @@ func main() {
 
 	appshell.RegisterGitStream(app, gitRouter)
 
-	opener := &windowOpener{
-		app:          app,
-		windowDeps:   shell.WindowDeps{Windows: windowStore{repositories.Windows}, StartedAt: startedAt},
-		windows:      windows,
-		closeFlush:   closeFlush,
-		quitter:      quitter,
-		terminalSvc:  terminalSvc,
-		repositories: repositories,
+	winDeps := shell.WindowOpenerDeps{
+		App:        app,
+		WindowDeps: shell.WindowDeps{Windows: windowStore{repositories.Windows}, StartedAt: startedAt},
+		Windows:    windows, CloseFlush: closeFlush, Quitter: quitter,
+		Terminal: terminalSvc.Registry, Repo: windowStore{repositories.Windows},
+		Cfg: shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
 	}
-	shell.AttachReopen(app, opener.reopen)
+	openNew := func() { shell.OpenNewWindow(winDeps) }
+	shell.AttachReopen(app, func() { shell.ReopenWindows(winDeps) })
 
 	app.Menu.Set(shell.BuildMenu(shell.MenuDeps{
 		AppName: "Kira Space", Template: appshell.BuildTemplate("Kira Space"),
-		Quit: quitter.RequestQuit, NewWindow: opener.openNew,
+		Quit: quitter.RequestQuit, NewWindow: openNew,
 	}))
 
 	records, err := repositories.Windows.List()
@@ -233,7 +231,12 @@ func main() {
 		records = []model.WindowRecord{rec}
 	}
 	for _, rec := range records {
-		opener.open(rec)
+		var bounds *shell.WindowBounds
+		if rec.Bounds != nil {
+			b := shell.WindowBounds(*rec.Bounds)
+			bounds = &b
+		}
+		shell.OpenWindow(winDeps, shell.ToWindowRecord(rec.Key, rec.Order, bounds))
 	}
 
 	if err := app.Run(); err != nil {
@@ -304,117 +307,41 @@ func wireGit(repositories *repos.Repos) gitWired {
 	}
 }
 
-// windowOpener is Kira Studio's own windowOpener (main.go), grown in P100 Part 2 to carry
-// events/closeFlush/quitter/terminalSvc — Part 1's own trimmed copy had none of the three yet
-// (no tabs/layout to flush, no terminal registry to tear down).
-type windowOpener struct {
-	app          *application.App
-	windowDeps   shell.WindowDeps
-	windows      *shell.WindowRegistry
-	closeFlush   *shell.CloseFlushCoordinator
-	quitter      *shell.Quitter
-	terminalSvc  *bridge.TerminalService
-	repositories *repos.Repos
-}
-
-// windowStore adapts *repos.WindowsRepo to shell.WindowStore (P103 Part 3 §6.3) — a plain struct
-// conversion at the call site (model.WindowBounds and shell.WindowBounds are field-for-field
-// identical), not a behaviour change.
+// windowStore adapts *repos.WindowsRepo to shell.WindowRepo (P103 Part 3 §6.3 / P107 T2-15) — a
+// plain struct conversion at each call site (model.WindowBounds and shell.WindowBounds are
+// field-for-field identical), not a behaviour change.
 type windowStore struct{ repo *repos.WindowsRepo }
 
 func (w windowStore) SetBounds(key string, b shell.WindowBounds) error {
 	return w.repo.SetBounds(key, model.WindowBounds(b))
 }
 
-// toShellWindowRecord converts this app's own storage/model.WindowRecord into the two fields
-// repo-root internal/shell's window building actually reads (P103 Part 3 §6.3) — a plain struct
-// conversion, not hoisting the storage model.
-func toShellWindowRecord(rec model.WindowRecord) shell.WindowRecord {
-	var bounds *shell.WindowBounds
+func (w windowStore) List() ([]shell.WindowRecord, error) {
+	records, err := w.repo.List()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]shell.WindowRecord, len(records))
+	for i, r := range records {
+		var bounds *shell.WindowBounds
+		if r.Bounds != nil {
+			b := shell.WindowBounds(*r.Bounds)
+			bounds = &b
+		}
+		out[i] = shell.ToWindowRecord(r.Key, r.Order, bounds)
+	}
+	return out, nil
+}
+
+func (w windowStore) Create(rec shell.WindowRecord) error {
+	var bounds *model.WindowBounds
 	if rec.Bounds != nil {
-		b := shell.WindowBounds(*rec.Bounds)
+		b := model.WindowBounds(*rec.Bounds)
 		bounds = &b
 	}
-	return shell.WindowRecord{Key: rec.Key, Bounds: bounds}
+	return w.repo.Create(model.WindowRecord{Key: rec.Key, Order: rec.Order, Bounds: bounds})
 }
 
-// open opens one workbench from an already-persisted record and registers it. Its own
-// WindowClosing listener keeps Kira Studio's own D5 rule: delete the row only if another window
-// remains open, so closing the last window leaves it behind for the next Dock click or relaunch
-// to restore.
-func (o *windowOpener) open(rec model.WindowRecord) {
-	var primaryWorkArea *application.Rect
-	if screen := o.app.Screen.GetPrimary(); screen != nil {
-		primaryWorkArea = &screen.WorkArea
-	}
-	cfg := shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"}
-	win := o.app.Window.NewWithOptions(shell.Options(shell.Harden(), toShellWindowRecord(rec), primaryWorkArea, cfg))
-	detach := shell.Attach(win, o.windowDeps, rec.Key)
-	o.windows.Add(rec.Key, win, detach)
-	shell.AttachCloseFlush(win, rec.Key, o.closeFlush, func() bool { return o.windows.Count() == 1 })
-	win.OnWindowEvent(events.Common.WindowClosing, func(*application.WindowEvent) {
-		// A window that closes mid-quit-handshake without ever acking through the flush channel is
-		// removed from the pending set here rather than being waited out for the full timeout — a
-		// no-op when no quit is in flight (Quitter.Flushed ignores a key it isn't waiting on).
-		o.quitter.Flushed(rec.Key)
-		o.terminalSvc.Registry.CloseWindow(rec.Key)
-		if o.windows.RemoveAndCount(rec.Key) > 0 {
-			if err := o.repositories.Windows.Delete(rec.Key); err != nil {
-				slog.Warn("delete window row", "scope", "window", "key", rec.Key, "err", err)
-			}
-		}
-	})
-}
-
-// openNew is the New Window menu command: a fresh workbench, ordered after every existing one,
-// cascaded from whichever window is currently focused.
-func (o *windowOpener) openNew() {
-	records, err := o.repositories.Windows.List()
-	if err != nil {
-		slog.Error("list windows", "scope", "window", "err", err)
-		return
-	}
-	order := 0
-	for _, r := range records {
-		if r.Order >= order {
-			order = r.Order + 1
-		}
-	}
-	var bounds *model.WindowBounds
-	if b := shell.CascadeFrom(o.app.Window.Current()); b != nil {
-		mb := model.WindowBounds(*b)
-		bounds = &mb
-	}
-	rec := model.WindowRecord{Key: uuid.NewString(), Order: order, Bounds: bounds}
-	if err := o.repositories.Windows.Create(rec); err != nil {
-		slog.Error("create window", "scope", "window", "err", err)
-		return
-	}
-	o.open(rec)
-}
-
-// reopen is the Dock-reopen path: bring back the highest-order stored workbench, or mint a fresh
-// one if every window row was somehow deleted.
-func (o *windowOpener) reopen() {
-	records, err := o.repositories.Windows.List()
-	if err != nil {
-		slog.Error("list windows for reopen", "scope", "window", "err", err)
-		return
-	}
-	if len(records) == 0 {
-		rec := model.WindowRecord{Key: uuid.NewString(), Order: 0}
-		if err := o.repositories.Windows.Create(rec); err != nil {
-			slog.Error("create window for reopen", "scope", "window", "err", err)
-			return
-		}
-		o.open(rec)
-		return
-	}
-	best := records[0]
-	for _, r := range records[1:] {
-		if r.Order > best.Order {
-			best = r
-		}
-	}
-	o.open(best)
+func (w windowStore) Delete(key string) error {
+	return w.repo.Delete(key)
 }

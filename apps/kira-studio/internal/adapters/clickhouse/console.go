@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -92,7 +93,7 @@ func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuer
 	}
 	// One op-log row for the whole batch (P5 D9's precedent) — StreamQuery/RunCommand deliberately
 	// never call op.SetCommand() themselves so this one call is authoritative.
-	op.SetCommand(joinSemicolons(statements))
+	op.SetCommand(strings.Join(statements, ";\n"))
 
 	pages := make([]page.Page, len(statements))
 	for i, sql := range statements {
@@ -110,19 +111,8 @@ func execute(ctx context.Context, h *Handle, op *adapters.OpCtx, track TrackQuer
 			if err != nil {
 				return nil, err
 			}
-			pages[i] = adapters.SingleStatusPage(itoaPositive(int(written))+" row(s) written", "String")
+			pages[i] = adapters.SingleStatusPage(strconv.Itoa(int(written))+" row(s) written", "String")
 		}
 	}
 	return pages, nil
-}
-
-func joinSemicolons(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ";\n"
-		}
-		out += p
-	}
-	return out
 }

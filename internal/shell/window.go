@@ -129,20 +129,11 @@ func DefaultBounds(work *application.Rect) (width, height int) {
 	if work == nil || work.Width <= 0 || work.Height <= 0 {
 		return defaultWindowWidth, defaultWindowHeight
 	}
-	width = clampInt(min(defaultWindowWidth, work.Width-windowSizeMargin), minWindowWidth, defaultWindowWidth)
-	height = clampInt(min(defaultWindowHeight, work.Height-windowSizeMargin), minWindowHeight, defaultWindowHeight)
+	width = min(max(min(defaultWindowWidth, work.Width-windowSizeMargin), minWindowWidth), defaultWindowWidth)
+	height = min(max(min(defaultWindowHeight, work.Height-windowSizeMargin), minWindowHeight), defaultWindowHeight)
 	return width, height
 }
 
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
 
 // boundsFromRect converts Wails' int-fielded Rect (webview_window.go's Bounds()) to the
 // float64-fielded WindowBounds a WindowStore persists — split out so the conversion is testable

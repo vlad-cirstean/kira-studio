@@ -3,6 +3,7 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // mysql.go ports planParsers/mysql.ts verbatim: MySQL's `EXPLAIN FORMAT=JSON` — one row, one
@@ -131,7 +132,7 @@ func mysqlTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) No
 	if len(table.PossibleKeys) > 0 && table.Key == nil {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "unused-index",
-			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relationOrPlaceholder, joinStrings(table.PossibleKeys)),
+			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relationOrPlaceholder, strings.Join(table.PossibleKeys, ", ")),
 		})
 	}
 	// D15: filesort, when the flag sits on the table itself rather than an ordering_operation
@@ -170,17 +171,6 @@ func mysqlWrap(label string, children []Node, issues []Issue) Node {
 		children = []Node{}
 	}
 	return Node{Label: label, Metrics: []Metric{}, Issues: issues, Children: children}
-}
-
-func joinStrings(ss []string) string {
-	out := ""
-	for i, s := range ss {
-		if i > 0 {
-			out += ", "
-		}
-		out += s
-	}
-	return out
 }
 
 func mysqlBlockNodes(raw json.RawMessage, thresholdRows int, scans *[]float64) []Node {

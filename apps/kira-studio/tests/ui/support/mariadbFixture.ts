@@ -1,8 +1,11 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
-import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
-import { IPC } from './ipcChannels';
+import {
+  connectAndExpandControl as sharedConnectAndExpandControl,
+  connectionSummary as sharedConnectionSummary,
+  orderItemsFixture as sharedOrderItemsFixture,
+} from './engineFixture';
 
 // Real captures against a real MariaDB container, seeded with packages/db-fixtures/fixtures/0002_mariadb_seed.sql
 // — via `node out/scripts/capture-tree.cjs mariadb --recipe-file ...` (scripts/capture-tree.ts, the
@@ -311,49 +314,12 @@ function orderItemsRows(filtered: boolean) {
       ];
 }
 
-function orderItemsPage(filtered: boolean) {
-  return {
-    kind: 'tabular' as const,
-    columns: ORDER_ITEMS_COLUMNS,
-    rows: orderItemsRows(filtered),
-    position: {
-      offset: 0,
-      pageSize: 100,
-      hasMore: false,
-      nextToken: null,
-      prevToken: null,
-      strategy: 'keyset' as const,
-    },
-    truncatedCells: 0,
-  };
-}
-
 /** The connect + expand-to-`kira_test` boilerplate every fixture below shares. */
 export function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
-  return [
-    {
-      channel: IPC.connectionsConnect,
-      args: { id: connectionId },
-      response: {
-        connectionId,
-        status: 'connected',
-        serverVersion: SERVER_VERSION,
-        error: null,
-        since: 1735689600000,
-        caps: CAPS,
-      },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: '', refresh: false },
-      response: { nodes: ROOT_CHILDREN, source: 'server', truncated: false },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: DB_PATH, refresh: false },
-      response: { nodes: DB_CHILDREN, source: 'server', truncated: false },
-    },
-  ];
+  return sharedConnectAndExpandControl(connectionId, SERVER_VERSION, CAPS, [
+    { path: '', children: ROOT_CHILDREN },
+    { path: DB_PATH, children: DB_CHILDREN },
+  ]);
 }
 
 /** Connect, expand to `kira_test`, open `order_items` (describe + unfiltered read) and — the one
@@ -363,44 +329,22 @@ export function orderItemsFixture(connectionId: string): {
   control: ControlSnapshot[];
   port: PortSnapshot[];
 } {
-  return {
-    control: [
-      ...connectAndExpandControl(connectionId),
-      {
-        channel: IPC.treeDescribe,
-        args: { connectionId, path: ORDER_ITEMS_PATH, refresh: false, tabId: null },
-        response: { meta: ORDER_ITEMS_META, source: 'server' },
-      },
+  return sharedOrderItemsFixture(
+    connectionId,
+    SERVER_VERSION,
+    CAPS,
+    [
+      { path: '', children: ROOT_CHILDREN },
+      { path: DB_PATH, children: DB_CHILDREN },
     ],
-    port: [
-      {
-        op: DATA_OP.read,
-        payload: {
-          connectionId,
-          path: ORDER_ITEMS_PATH,
-          projection: null,
-          filter: null,
-          sort: null,
-          pageSize: 100,
-          cursor: { mode: 'offset', offset: 0 },
-        },
-        response: { kind: 'read', page: orderItemsPage(false), source: 'server' },
-      },
-      {
-        op: DATA_OP.read,
-        payload: {
-          connectionId,
-          path: ORDER_ITEMS_PATH,
-          projection: null,
-          filter: 'quantity > 1',
-          sort: null,
-          pageSize: 100,
-          cursor: { mode: 'offset', offset: 0 },
-        },
-        response: { kind: 'read', page: orderItemsPage(true), source: 'server' },
-      },
+    ORDER_ITEMS_PATH,
+    ORDER_ITEMS_META,
+    ORDER_ITEMS_COLUMNS,
+    [
+      { filter: null, pageSize: 100, rows: orderItemsRows(false) },
+      { filter: 'quantity > 1', pageSize: 100, rows: orderItemsRows(true) },
     ],
-  };
+  );
 }
 
 export function mariadbConnectionSummary(
@@ -408,31 +352,5 @@ export function mariadbConnectionSummary(
   name: string,
   color: ConnectionSummary['color'],
 ): ConnectionSummary {
-  return {
-    id,
-    name,
-    kind: 'mariadb',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 3306,
-    database: 'kira_test',
-    username: 'kira',
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
-    sortOrder: 0,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  };
+  return sharedConnectionSummary('mariadb', 3306, 'kira_test', 'kira', id, name, color);
 }

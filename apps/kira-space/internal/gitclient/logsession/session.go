@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -257,7 +258,7 @@ func (s *Session) spawnOrResumeLocked(ctx context.Context) (stale bool, err erro
 		s.baseSnapshot = snap
 		args = porcelain.LogSessionArgs(s.opts.Walk)
 	} else {
-		if !refsEqual(s.baseSnapshot, snap) {
+		if !maps.Equal(s.baseSnapshot, snap) {
 			return true, nil
 		}
 		args = porcelain.LogSessionSkipArgs(s.opts.Walk, s.readCount)
@@ -313,18 +314,6 @@ func (s *Session) snapshot(ctx context.Context) (map[string]string, error) {
 		return nil, err
 	}
 	return porcelain.ParseRefSnapshot(stdout)
-}
-
-func refsEqual(a, b map[string]string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if b[k] != v {
-			return false
-		}
-	}
-	return true
 }
 
 // Remaining is one `rev-list --count` over the same rev set as the walk, cached for the life of

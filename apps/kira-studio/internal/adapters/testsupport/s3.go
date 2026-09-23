@@ -65,15 +65,7 @@ var s3Memo fixture[S3Fixture]
 
 // StartS3 is support/s3.ts's startS3. Skips the test when Docker is unreachable.
 func StartS3(t *testing.T) *S3Fixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	f, err := s3Memo.get(startS3)
-	if err != nil {
-		t.Fatalf("s3 container: %v", err)
-	}
-	return f
+	return s3Memo.start(t, "s3 container", startS3)
 }
 
 // StopS3 terminates the memoized container, if ever started. Call once, from the test binary's

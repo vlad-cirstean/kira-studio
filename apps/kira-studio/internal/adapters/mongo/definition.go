@@ -31,15 +31,6 @@ func stringifyRelaxed(value any) (string, error) {
 	return buf.String(), nil
 }
 
-func bsonDGet(d bson.D, key string) (any, bool) {
-	for _, e := range d {
-		if e.Key == key {
-			return e.Value, true
-		}
-	}
-	return nil, false
-}
-
 // buildDocumentSchema ports definition.ts's buildDocumentSchema: $jsonSchema renders as the
 // Validation section's field table; any other validator document is real and genuinely allowed by
 // Mongo — it renders as read-only JSON instead, never as an empty table pretending the schema fit
@@ -57,7 +48,7 @@ func buildDocumentSchema(validator any, validationLevel, validationAction any) (
 	if !ok {
 		return model.DocumentSchemaMeta{IsJSONSchema: false, ValidationLevel: level, ValidationAction: action}, nil
 	}
-	if jsonSchema, ok := bsonDGet(validatorDoc, "$jsonSchema"); ok {
+	if jsonSchema, ok := lookupField(validatorDoc, "$jsonSchema"); ok {
 		text, err := stringifyRelaxed(jsonSchema)
 		if err != nil {
 			return model.DocumentSchemaMeta{}, err
@@ -92,9 +83,9 @@ func buildDefinition(ctx context.Context, db *mongodriver.Database, segments []m
 
 	var validator, validationLevel, validationAction any
 	if hasOptions {
-		validator, _ = bsonDGet(options, "validator")
-		validationLevel, _ = bsonDGet(options, "validationLevel")
-		validationAction, _ = bsonDGet(options, "validationAction")
+		validator, _ = lookupField(options, "validator")
+		validationLevel, _ = lookupField(options, "validationLevel")
+		validationAction, _ = lookupField(options, "validationAction")
 	}
 	documentSchema, err := buildDocumentSchema(validator, validationLevel, validationAction)
 	if err != nil {

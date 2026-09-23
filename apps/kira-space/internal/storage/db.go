@@ -10,6 +10,8 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/migrations"
+	"github.com/kirathecat/kira-studio/internal/appstorage"
 	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
@@ -33,15 +35,20 @@ func OpenAt(home string) (*DB, error) {
 	}
 
 	path := config.DbPathAt(home)
-	sqlDB, err := sqlitex.Open(path)
+	steps, err := migrations.All()
 	if err != nil {
-		return nil, fmt.Errorf("storage: %w", err)
+		return nil, fmt.Errorf("storage: load migrations: %w", err)
 	}
-
-	db := &DB{sqlDB}
-	if err := db.migrate(); err != nil {
-		_ = sqlDB.Close()
+	sqlitexSteps := make([]sqlitex.Migration, len(steps))
+	for i, m := range steps {
+		sqlitexSteps[i] = sqlitex.Migration{Version: m.Version, Name: m.Name, SQL: m.SQL}
+	}
+	// appstorage.OpenAt: same shared open+migrate mechanics Kira Studio's own storage.OpenAt uses
+	// (P107 T2-10). Not wrapped: a *sqlitex.SchemaTooNewError must reach the caller as-is — see
+	// internal/startupfail's Classify.
+	sqlDB, err := appstorage.OpenAt(path, sqlitexSteps)
+	if err != nil {
 		return nil, err
 	}
-	return db, nil
+	return &DB{sqlDB}, nil
 }

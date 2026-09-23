@@ -514,50 +514,6 @@ type RestackProgress struct {
 	Total  int    `json:"total"`
 }
 
-// restackSlot is the ≤1-per-repository box (D6/D9) — the same shape prepareOpSlot (worktree.go)
-// uses: a restack is ALWAYS cancellable, never needing remoteOpSlot's own killable toggle, because
-// there is no phase of a restack whose outcome is unknowable the way a half-delivered push is (D9).
-type restackSlot struct {
-	mu     sync.Mutex
-	active bool
-	cancel context.CancelFunc
-}
-
-func (s *restackSlot) claim(cancel context.CancelFunc) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.active {
-		return false
-	}
-	s.active = true
-	s.cancel = cancel
-	return true
-}
-
-func (s *restackSlot) release() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.active, s.cancel = false, nil
-}
-
-func (s *restackSlot) tryCancel() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.active {
-		return false
-	}
-	s.cancel()
-	return true
-}
-
-func (s *restackSlot) forceCancel() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cancel != nil {
-		s.cancel()
-	}
-}
-
 // CancelRestack is stack.cancelRestack's own executor (D9) — false, never an error, when nothing
 // is running (a cancel racing a just-finished restack is ordinary, not a fault). No palette command
 // serves this directly (D13: cancel is a button on the surface that started the work, matching
@@ -715,7 +671,7 @@ func branchNames(entries []gitpreflight.RestackPlanEntry) []string {
 //  7. Release the slot (deferred) and return.
 func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (RestackResult, error) {
 	opCtx, cancel := context.WithCancel(ctx)
-	if !e.restack.claim(cancel) {
+	if !e.restack.claimAlways("restack", cancel) {
 		cancel()
 		return e.restackResultNoSpawn(ctx, &OpError{
 			Kind: "OperationInProgress", Message: "another restack is already running on this repository",

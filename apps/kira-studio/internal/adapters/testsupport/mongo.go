@@ -47,15 +47,7 @@ var mongoMemo fixture[MongoFixture]
 
 // StartMongo is support/mongo.ts's startMongo. Skips the test when Docker is unreachable.
 func StartMongo(t *testing.T) *MongoFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	f, err := mongoMemo.get(startMongo)
-	if err != nil {
-		t.Fatalf("mongo container: %v", err)
-	}
-	return f
+	return mongoMemo.start(t, "mongo container", startMongo)
 }
 
 // StopMongo terminates the memoized container, if one was ever started. Call once, from the test

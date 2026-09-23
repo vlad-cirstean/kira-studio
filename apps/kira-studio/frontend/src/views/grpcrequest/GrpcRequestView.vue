@@ -30,7 +30,8 @@ import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { templateToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
-import MetadataTable from './MetadataTable.vue';
+import { useRequestTabSave } from '../shared/request/useRequestTabSave';
+import GrpcMetadataTable from './GrpcMetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
 import SchemaBrowser from './SchemaBrowser.vue';
 import { findMethod, resolveGrpcTabState, useGrpcRequestViewStore } from './state';
@@ -145,29 +146,19 @@ const saved = computed(() => collectionsStore.savedGrpcRequestFor(props.tab.stat
 const dirty = computed(() => isGrpcDirty(props.tab.state, saved.value));
 const canSave = computed(() => props.tab.state.itemId !== null && saved.value !== null);
 
-// P71 §3.2: HttpRequestView.vue's own pair — see its comment.
-function onSave(): void {
-  if (incognito.value) return;
-  const itemId = props.tab.state.itemId;
-  if (!itemId || !saved.value) {
-    onSaveAs();
-    return;
-  }
-  void collectionsStore.saveGrpcRequest(
-    itemId,
-    props.tab.state.name || title.value,
-    toSavedGrpcRequest(props.tab.state),
-  );
-}
-
-function onSaveAs(): void {
-  if (incognito.value) return;
-  collectionsStore.openSaveGrpcDialog(
-    props.tab.id,
-    props.tab.state.name || title.value,
-    toSavedGrpcRequest(props.tab.state),
-  );
-}
+// P71 §3.2/P107 T1-16: HttpRequestView.vue's own pair — see views/shared/request/useRequestTabSave.ts.
+// onSaveAs is only ever reached from onSave's own no-saved-row fallback — no separate UI trigger
+// in this view, so it isn't destructured here.
+const { onSave } = useRequestTabSave({
+  tabId: () => props.tab.id,
+  incognito: () => incognito.value,
+  itemId: () => props.tab.state.itemId,
+  saved: () => saved.value,
+  name: () => props.tab.state.name || title.value,
+  toSaved: () => toSavedGrpcRequest(props.tab.state),
+  save: (itemId, name, body) => collectionsStore.saveGrpcRequest(itemId, name, body),
+  openSaveDialog: (tabId, name, body) => collectionsStore.openSaveGrpcDialog(tabId, name, body),
+});
 
 function onCall(): void {
   void grpcRequestViewStore.call(props.tab.id);
@@ -557,7 +548,7 @@ onUnmounted(() => {
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
-          <MetadataTable
+          <GrpcMetadataTable
             :tab="tab"
             :filter-query="fieldFilterQuery"
             :variables="variables"

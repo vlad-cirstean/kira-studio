@@ -193,27 +193,14 @@ func mutateDB(ctx context.Context, db *mongodriver.Database, op *adapters.OpCtx,
 	}
 	op.SetCommand(commandText)
 
-	affectedRows := 0
-	for _, rowOp := range plan.Ops {
-		if err := adapters.CheckCancelled(ctx); err != nil {
-			return model.MutationResult{}, err
-		}
-		var affected int
-		var err error
+	return adapters.RunRowOps(ctx, plan, readOnly, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
 		switch rowOp.Kind {
 		case "update":
-			affected, err = applyUpdate(ctx, collection, op, rowOp)
+			return applyUpdate(ctx, collection, op, rowOp)
 		case "delete":
-			affected, err = applyDelete(ctx, collection, op, rowOp)
+			return applyDelete(ctx, collection, op, rowOp)
 		default: // insert
-			affected, err = applyInsert(ctx, collection, op, rowOp)
+			return applyInsert(ctx, collection, op, rowOp)
 		}
-		if err != nil {
-			return model.MutationResult{}, err
-		}
-		affectedRows += affected
-	}
-
-	return model.MutationResult{AffectedRows: affectedRows}, nil
+	})
 }
-

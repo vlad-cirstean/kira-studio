@@ -234,40 +234,40 @@ type connEntry struct {
 // ConnSet is client.ts's ConnectionSet (B5, mirrors postgres/client.go's ConnSet): one *sql.DB per
 // (connection, database), each bounded to a single open connection (SetMaxOpenConns(1)) so a
 // pinned *sql.Conn — never a pool — is what every query in this package actually runs against.
-// KILL QUERY needs a known thread id, which a pool does not reliably give you.
+// KILL QUERY needs a known thread id, which a pool does not reliably give you. The LRU pool with
+// single-flight dial (P21 round 3 performance finding 5) is adapters.ConnSet — only Dial and the
+// eviction Close stay dialect-specific here.
 type ConnSet struct {
 	cfg     model.ResolvedConnectionConfig
 	profile Profile
 	log     LogFunc
 
-	mu    sync.Mutex
-	conns map[string]*connEntry
-	lru   []string
-	// P21 round 3 performance finding 5(b), porting postgres/client.go's own round-2 fix
-	// verbatim: keyed by the same key as conns — a dial in progress for a not-yet-open database,
-	// so a second concurrent get() for it waits on this dial's own outcome instead of starting a
-	// duplicate one. Without this, two concurrent get() calls for the same not-yet-open database
-	// (routine — expanding a database node while a tab loads from it) both dialed, and the second
-	// overwrote the first in conns: a leaked *sql.DB, its pinned *sql.Conn and a live MySQL
-	// server-side connection for the life of the app.
-	dialing map[string]*dialInFlight
-}
-
-// dialInFlight is one in-progress get() dial for a key — see postgres/client.go's own doc comment
-// on the identical type; the semantics here are byte-for-byte the same.
-type dialInFlight struct {
-	done chan struct{}
+	inner *adapters.ConnSet[string, *connEntry]
 }
 
 // NewConnSet constructs a ConnSet for cfg.
 func NewConnSet(cfg model.ResolvedConnectionConfig, profile Profile, log LogFunc) *ConnSet {
-	return &ConnSet{
-		cfg:     cfg,
-		profile: profile,
-		log:     log,
-		conns:   make(map[string]*connEntry),
-		dialing: make(map[string]*dialInFlight),
-	}
+	s := &ConnSet{cfg: cfg, profile: profile, log: log}
+	s.inner = adapters.NewConnSet(adapters.ConnSetOptions[string, *connEntry]{
+		// key normalizes "" (the primary) to primaryKey for the pool's own map/lru; dial itself
+		// always wants the original, possibly-empty database argument.
+		Dial: func(ctx context.Context, key string) (*connEntry, error) {
+			database := key
+			if database == primaryKey {
+				database = ""
+			}
+			return s.dial(ctx, database)
+		},
+		Close: func(_ context.Context, e *connEntry) {
+			e.mu.Lock()
+			_ = e.conn.Close()
+			_ = e.db.Close()
+			e.mu.Unlock()
+		},
+		Max:     maxConns,
+		Primary: primaryKey,
+	})
+	return s
 }
 
 // Entry is one pinned connection plus its own server-assigned thread id, cached at Acquire time
@@ -276,78 +276,6 @@ func NewConnSet(cfg model.ResolvedConnectionConfig, profile Profile, log LogFunc
 type Entry struct {
 	Conn     *sql.Conn
 	ThreadID uint32
-}
-
-// get returns the entry for database (empty string means the primary), opening one if none exists
-// yet and evicting the least-recently-used non-primary entry first if the set is full.
-//
-// P21 round 3 performance finding 5: two independent fixes, porting postgres/client.go's own
-// round-2 fixes verbatim.
-// (a) detachLRULocked below only touches the map/lru under s.mu; the actual close (a real network
-// round trip, plus the victim's own per-connection lock held for its entire in-flight op) happens
-// after s.mu is released — evictLRULocked used to do both under s.mu, so opening a 9th database
-// while a long query ran on the LRU victim blocked get()/Acquire() for every database of this
-// connection, including a bare map lookup for an already-open, unrelated primary.
-// (b) the dialing map above turns the dial into a single-flight: the first caller for a key dials
-// while holding a placeholder; everyone else waits on that placeholder's own outcome instead of
-// starting a duplicate dial.
-func (s *ConnSet) get(ctx context.Context, database string) (*connEntry, error) {
-	key := database
-	if key == "" {
-		key = primaryKey
-	}
-
-	for {
-		s.mu.Lock()
-		if existing, ok := s.conns[key]; ok {
-			s.touchLocked(key)
-			s.mu.Unlock()
-			return existing, nil
-		}
-		if inFlight, ok := s.dialing[key]; ok {
-			s.mu.Unlock()
-			select {
-			case <-inFlight.done:
-				// Re-check from the top, exactly as postgres/client.go's get() does — see its own
-				// comment for why this can never spin on a reused key.
-				continue
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
-		// This goroutine is now the one dialing key — every concurrent caller for the same key
-		// takes the branch above instead, until waiter.done closes.
-		waiter := &dialInFlight{done: make(chan struct{})}
-		s.dialing[key] = waiter
-		var victim *connEntry
-		// Counting in-flight dials against maxConns too closes the same "related, minor" gap
-		// postgres/client.go's own comment names: without it, N concurrent first-time opens could
-		// all pass this check before any of them finished dialing, transiently exceeding maxConns.
-		if len(s.conns)+len(s.dialing) > maxConns {
-			victim = s.detachLRULocked()
-		}
-		s.mu.Unlock()
-
-		if victim != nil {
-			victim.mu.Lock()
-			_ = victim.conn.Close()
-			_ = victim.db.Close()
-			victim.mu.Unlock()
-		}
-
-		entry, err := s.dial(ctx, database)
-
-		s.mu.Lock()
-		delete(s.dialing, key)
-		if err == nil {
-			s.conns[key] = entry
-			s.touchLocked(key)
-		}
-		s.mu.Unlock()
-
-		close(waiter.done)
-		return entry, err
-	}
 }
 
 // mysqlNewConnector — the exact function dial calls to produce the driver.Connector db.Conn then
@@ -407,7 +335,11 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 // individual statements, or a racing Read could execute between two of them (P21 round 2
 // performance finding 3, mirroring postgres/client.go's own Acquire and its identical reasoning).
 func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), error) {
-	entry, err := s.get(ctx, database)
+	key := database
+	if key == "" {
+		key = primaryKey
+	}
+	entry, err := s.inner.Get(ctx, key)
 	if err != nil {
 		return Entry{}, nil, err
 	}
@@ -420,66 +352,8 @@ func (s *ConnSet) Primary(ctx context.Context) (Entry, func(), error) {
 	return s.Acquire(ctx, "")
 }
 
-func (s *ConnSet) touchLocked(key string) {
-	for i, k := range s.lru {
-		if k == key {
-			s.lru = append(s.lru[:i], s.lru[i+1:]...)
-			break
-		}
-	}
-	s.lru = append(s.lru, key)
-}
-
-// detachLRULocked picks the least-recently-used non-primary connection to make room, removes it
-// from the map/lru under s.mu (the only part of eviction that needs the global lock), and returns
-// it for the caller to close *after* releasing s.mu. A no-op (nil) if every open connection is the
-// primary (never evicted).
-//
-// P21 round 3 performance finding 5(a), porting postgres/client.go's own detachLRULocked verbatim:
-// this used to be evictLRULocked, which closed the victim (its own per-connection lock — held for
-// the victim's entire in-flight op — plus a real network Close() round trip for both conn and db)
-// while s.mu was still held by get()'s own caller. That meant opening a 9th database while a long
-// query ran on the LRU victim blocked get()/Acquire() for *every* database of this connection,
-// including a bare map lookup for an already-open, completely unrelated primary, until the long
-// query finished.
-func (s *ConnSet) detachLRULocked() *connEntry {
-	var victimKey string
-	for _, k := range s.lru {
-		if k != primaryKey {
-			victimKey = k
-			break
-		}
-	}
-	if victimKey == "" {
-		return nil
-	}
-	victim := s.conns[victimKey]
-	delete(s.conns, victimKey)
-	for i, k := range s.lru {
-		if k == victimKey {
-			s.lru = append(s.lru[:i], s.lru[i+1:]...)
-			break
-		}
-	}
-	return victim
-}
-
 // CloseAll closes every open connection, taking each one's own lock first (P21 round 2 performance
-// finding 3 — see evictLRULocked's own comment).
+// finding 3 — see the Close closure NewConnSet builds above).
 func (s *ConnSet) CloseAll(ctx context.Context) {
-	s.mu.Lock()
-	all := make([]*connEntry, 0, len(s.conns))
-	for _, e := range s.conns {
-		all = append(all, e)
-	}
-	s.conns = make(map[string]*connEntry)
-	s.lru = nil
-	s.mu.Unlock()
-
-	for _, e := range all {
-		e.mu.Lock()
-		_ = e.conn.Close()
-		_ = e.db.Close()
-		e.mu.Unlock()
-	}
+	s.inner.CloseAll(ctx)
 }

@@ -39,15 +39,7 @@ var sqsMemo fixture[SqsFixture]
 
 // StartSqs is support/sqs.ts's startSqs. Skips the test when Docker is unreachable.
 func StartSqs(t *testing.T) *SqsFixture {
-	t.Helper()
-	if !IsDockerAvailable() {
-		t.Skip(DockerUnavailableMessage)
-	}
-	f, err := sqsMemo.get(startSqs)
-	if err != nil {
-		t.Fatalf("sqs container: %v", err)
-	}
-	return f
+	return sqsMemo.start(t, "sqs container", startSqs)
 }
 
 // StopSqs terminates the memoized container and proxy, if ever started. Call once, from the test

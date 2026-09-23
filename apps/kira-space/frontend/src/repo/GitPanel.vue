@@ -4,15 +4,16 @@ import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
+import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
 import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
 import { openRepoTerminalTab } from '../state/repoTabs';
@@ -117,33 +118,9 @@ async function onImport(): Promise<void> {
   await codeReposStore.importRepoViaDialog();
 }
 
-// Electron's renderer has no window.prompt() — the same in-app substitute
-// ConsoleSavedMenu.vue/FilterHistoryMenu.vue already use.
-const textPrompt = ref<{
-  title: string;
-  value: string;
-  resolve: (v: string | null) => void;
-} | null>(null);
-// ui/input's root IS the <input> element itself, unlike the old TextField's wrapping <span>.
-const promptInput = ref<{ $el: HTMLInputElement } | null>(null);
-function promptText(title: string, initial: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    textPrompt.value = { title, value: initial, resolve };
-    void nextTick(() => promptInput.value?.$el.focus());
-  });
-}
-function submitPrompt(): void {
-  if (!textPrompt.value) return;
-  const { value, resolve } = textPrompt.value;
-  textPrompt.value = null;
-  resolve(value);
-}
-function cancelPrompt(): void {
-  if (!textPrompt.value) return;
-  const { resolve } = textPrompt.value;
-  textPrompt.value = null;
-  resolve(null);
-}
+// P107 T2-19: shared in-app substitute for window.prompt() (Electron's renderer doesn't implement
+// it) — see packages/workbench/src/prompt/useTextPrompt.ts.
+const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
 
 async function onRenameRepo(id: string, currentName: string): Promise<void> {
   const name = await promptText('Rename repository', currentName);
@@ -644,33 +621,14 @@ onUnmounted(() => {
     </div>
   </div>
 
-  <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
-    <div class="prompt-box p-float">
-      <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-      <Input
-        ref="promptInput"
-        :model-value="textPrompt.value"
-        class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2"
-        data-testid="text-prompt-input"
-        @update:model-value="(v) => textPrompt && (textPrompt.value = String(v))"
-        @keydown.enter="submitPrompt"
-        @keydown.escape="cancelPrompt"
-      />
-      <div class="prompt-actions">
-        <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt"
-          >Cancel</Button
-        >
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          data-testid="text-prompt-ok"
-          @click="submitPrompt"
-        >
-          OK
-        </Button>
-      </div>
-    </div>
-  </div>
+  <TextPromptDialog
+    v-if="textPrompt"
+    :title="textPrompt.title"
+    :model-value="textPrompt.value"
+    @update:model-value="(v) => textPrompt && (textPrompt.value = v)"
+    @submit="submitPrompt"
+    @cancel="cancelPrompt"
+  />
 </template>
 
 <style scoped>
@@ -785,20 +743,5 @@ onUnmounted(() => {
 
 .error-note {
   @apply text-error;
-}
-
-.prompt-scrim {
-  /* z-30, not var(--kira-z-dialog): unlike ConsoleSavedMenu.vue's own prompt-scrim (P28 D17(c)),
-     this prompt is raised directly from the panel, never from inside a popover with its own
-     full-viewport backdrop to clear — no cascade requirement to preserve here. */
-  @apply fixed inset-0 flex items-center justify-center bg-black/50 z-30;
-}
-
-.prompt-box {
-  @apply w-72 p-2 flex flex-col gap-1.5;
-}
-
-.prompt-actions {
-  @apply flex justify-end gap-1.5;
 }
 </style>

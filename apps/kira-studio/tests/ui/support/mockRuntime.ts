@@ -1,12 +1,18 @@
-import { execFileSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import type { Page, Route } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { defaultLayout } from '@shared/domain/layout';
+import {
+  buildChannelMaps,
+  type ControlSnapshot,
+  resolveWailsRuntimeJsPath,
+  emitWailsEvent as sharedEmitWailsEvent,
+  installControlMocks as sharedInstallControlMocks,
+} from '@workbench/testing/ui/mockRuntime';
 import { defaultSettings } from '../../../frontend/src/state/settingsDomain';
 import { STUDIO_TAB_KIND_MODE, type StudioTabKind } from '../../../frontend/src/state/tabDomain';
-import type { ControlSnapshot } from '../../ipc/support/types';
 import { IPC } from './ipcChannels';
+
+export type { ControlLogEntry, ControlMockHandle } from '@workbench/testing/ui/mockRuntime';
 
 // The real Wails runtime, served under /wails/ so the app's own `import ... from
 // '/wails/runtime.js'` (control.ts, port.ts, every generated binding) loads real
@@ -24,12 +30,7 @@ import { IPC } from './ipcChannels';
 // dist/runtime.js file instead — two different files, one URL, unresolvable by aliasing alone).
 // `go list` resolves the on-disk path for whatever version go.mod actually pins, rather than
 // hand-writing a GOPATH-shaped path that would silently go stale on a version bump.
-const WAILS_MODULE_DIR = execFileSync(
-  'go',
-  ['list', '-m', '-f', '{{.Dir}}', 'github.com/wailsapp/wails/v3'],
-  { cwd: resolve(__dirname, '../../../'), encoding: 'utf8' },
-).trim();
-const WAILS_RUNTIME_JS = resolve(WAILS_MODULE_DIR, 'internal/assetserver/bundledassets/runtime.js');
+const WAILS_RUNTIME_JS = resolveWailsRuntimeJsPath(resolve(__dirname, '../../../'));
 
 const BRIDGE_PKG = 'github.com/kirathecat/kira-studio/apps/kira-studio/internal/bridge';
 
@@ -191,17 +192,10 @@ const FQN_SUFFIX_BY_IPC_KEY: Record<string, string> = {
  *  `mockRuntime.spec.ts` guards both directions: every value here must appear in the generated
  *  bindings' own `$Call.ByName("…")` literals, and every channel any committed fixture uses must
  *  have an entry. */
-export const CHANNEL_TO_FQN: Readonly<Record<string, string>> = Object.freeze(
-  Object.fromEntries(
-    Object.entries(FQN_SUFFIX_BY_IPC_KEY).map(([key, suffix]) => [
-      IPC[key as keyof typeof IPC],
-      `${BRIDGE_PKG}.${suffix}`,
-    ]),
-  ),
-);
-
-const FQN_TO_CHANNEL: Readonly<Record<string, string>> = Object.freeze(
-  Object.fromEntries(Object.entries(CHANNEL_TO_FQN).map(([channel, fqn]) => [fqn, channel])),
+export const { channelToFqn: CHANNEL_TO_FQN, fqnToChannel: FQN_TO_CHANNEL } = buildChannelMaps(
+  IPC,
+  FQN_SUFFIX_BY_IPC_KEY,
+  BRIDGE_PKG,
 );
 
 // A call this mock never expects a fixture to cover, answered the same way regardless of a
@@ -266,10 +260,6 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   // "absent until the user writes one" empty document D2 gives a fresh connection, not a fixture
   // miss. connectionId is echoed as '' here since the frontend only reads `.ddl` off this call.
   [IPC.schemaGet]: JSON.stringify({ connectionId: '', ddl: '', updatedAt: '' }),
-  // P22 D12: the boot-time mode read added to this same call — 'studio' is the app's own default
-  // (state/mode.ts's defaultMode / the migration's own column DEFAULT), the correct answer for
-  // any spec that doesn't seed its own windowsEnsure snapshot.
-  [IPC.windowsEnsure]: JSON.stringify({ mode: 'studio' }),
   [IPC.windowsSetMode]: 'null',
   [IPC.tabsSave]: 'null',
   [IPC.layoutSet]: JSON.stringify(defaultLayout),
@@ -393,282 +383,75 @@ const WILDCARD_DEFAULTS: Readonly<Record<string, string>> = Object.freeze({
   [IPC.codeWorkspaceCancelSearch]: 'null',
 });
 
-interface CallRequestBody {
-  object: number;
-  method: number;
-  args?: {
-    'call-id': string;
-    methodName?: string;
-    args?: unknown[];
-  };
-}
-
 // Structured clone (what ipcRenderer.invoke actually used, pre-P57) preserves a key whose value
 // is `undefined`; the wire format here is JSON, which drops it outright — both are normalised the
 // same way before comparing, so a fixture recorded from either transport matches. `tabId` is
 // excluded outright — a per-tab UUID the renderer generates at tab-open time, never reproducible
-// from a fixture (same reasoning mockPort.ts's own matchKey already applies).
-function canonical(value: unknown): string {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const out: Record<string, unknown> = {};
-    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-      if (key === 'tabId') continue;
-      const v = (value as Record<string, unknown>)[key];
-      if (v === undefined) continue;
-      // `refresh` defaults to `false` at every call site (control.ts's own `refresh ?? false`),
-      // so a live call always carries it explicitly — but a captured fixture snapshot can predate
-      // that default becoming part of the args shape and simply omit the key. Normalising a
-      // `false` value the same as an absent key means the two compare equal, the same way
-      // `v !== undefined` already does for every other field.
-      if (key === 'refresh' && v === false) continue;
-      out[key] = v;
-    }
-    return JSON.stringify(out);
-  }
-  return JSON.stringify(value);
-}
+// from a fixture (same reasoning mockPort.ts's own matchKey already applies). `refresh` defaults
+// to `false` at every call site (control.ts's own `refresh ?? false`), so a live call always
+// carries it explicitly — but a captured fixture snapshot can predate that default becoming part
+// of the args shape and simply omit the key; dropping an explicit `false` too means the two
+// compare equal, the same way an absent key already does.
+const CANONICAL_OPTIONS = {
+  excludeKeys: ['tabId'],
+  dropKey: (key: string, value: unknown) => key === 'refresh' && value === false,
+};
 
-function runtimeErrorBody(code: string, message: string, details?: unknown): string {
-  // The exact shape apps/kira-studio/internal/bridge/transport_http.go's httpError writes for a bound
-  // method's error (P57 §1.6/D5): `.message` is ipcerr.Error's own JSON encoding, `.cause` is
-  // that same {code, message} as a real object. control.ts's `unwrap` reads `.cause` first, so a
-  // fixture miss surfaces as a diagnosable `E_FIXTURE_MISS`, not a raw network failure. `details`
-  // is P10 D15's own addition — undefined drops the key from both the JSON-encoded `.message` and
-  // `.cause`, exactly what ipcerr.Error's own `omitempty` does for every producer that never sets
-  // it.
-  const body: Record<string, unknown> = { code, message };
-  if (details !== undefined) body.details = details;
-  return JSON.stringify({
-    kind: 'RuntimeError',
-    message: JSON.stringify(body),
-    cause: body,
-  });
-}
-
-export interface ControlLogEntry {
-  channel: string;
-  args: unknown;
-}
-
-export interface ControlMockHandle {
-  /** Every Call this mock actually answered, in order (P50 D7's capability, ported). */
-  log(): ControlLogEntry[];
-}
-
-let cachedRuntimeJs: Buffer | undefined;
-
-async function serveWailsRuntimeJs(route: Route): Promise<void> {
-  cachedRuntimeJs ??= await readFile(WAILS_RUNTIME_JS);
-  await route.fulfill({
-    status: 200,
-    contentType: 'text/javascript; charset=utf-8',
-    body: cachedRuntimeJs,
-  });
+// P22 D12: the mode a fresh boot answers windowsEnsure with, when a spec provides no explicit
+// snapshot for it — read the (mode-independent) tabsList snapshot the spec *did* configure, so a
+// spec restoring an Api-mode tab as active boots displaying it, the same way it always did before
+// mode became its own persisted column. Only ever consults the first tabsList snapshot (a spec
+// keying tabsList by args to answer differently per window is not a shape any spec uses today) and
+// only its args-less/single form — args-matched multi-snapshot tabsList specs fall back to
+// 'studio', same as providing no tabsList snapshot at all.
+function inferredBootMode(byChannel: ReadonlyMap<string, ControlSnapshot[]>): string {
+  const tabsSnaps = byChannel.get(IPC.tabsList);
+  const tabs = (tabsSnaps?.length === 1 ? tabsSnaps[0].response : undefined) as
+    | { kind?: string; active?: boolean }[]
+    | undefined;
+  if (!tabs || tabs.length === 0) return 'studio';
+  const bootTab = tabs.find((t) => t.active) ?? tabs[0];
+  const kind = bootTab?.kind;
+  return kind && kind in STUDIO_TAB_KIND_MODE
+    ? STUDIO_TAB_KIND_MODE[kind as StudioTabKind]
+    : 'studio';
 }
 
 /**
  * Replaces the control channel's answers at the network layer (P57 D13) — `page.route`
  * intercepts every request under `/wails/`: the real runtime bundle itself (served for real, off
- * disk — see `serveWailsRuntimeJs` above) and the one RPC endpoint bound calls POST to. Unlike the
- * pre-P57 `tests/ipc/support/mockControl.ts` (which sat behind a real
- * `contextBridge`/`ipcRenderer.invoke` inside an Electron main process), this sits behind nothing
- * — the mocked HTTP response is exactly what `unwrap`/`trust` in `bridge/control.ts` are written
- * to consume, so a frontend spec still exercises that code for real.
+ * disk) and the one RPC endpoint bound calls POST to. Unlike the pre-P57
+ * `tests/ipc/support/mockControl.ts` (which sat behind a real `contextBridge`/`ipcRenderer.invoke`
+ * inside an Electron main process), this sits behind nothing — the mocked HTTP response is exactly
+ * what `unwrap`/`trust` in `bridge/control.ts` are written to consume, so a frontend spec still
+ * exercises that code for real.
  */
 export async function installControlMocks(
   page: Page,
   snapshots: readonly ControlSnapshot[],
-): Promise<ControlMockHandle> {
-  const log: ControlLogEntry[] = [];
-  const byChannel = new Map<string, ControlSnapshot[]>();
-  for (const snap of snapshots) {
-    const list = byChannel.get(snap.channel) ?? [];
-    list.push(snap);
-    byChannel.set(snap.channel, list);
-  }
-  // Two or more snapshots can share one (channel, args) key on purpose — mirrors
-  // tests/ipc/support/mockControl.ts's own comment and reasoning verbatim.
-  const byKey = new Map<string, Map<string, ControlSnapshot[]>>();
-  for (const [channel, list] of byChannel) {
-    const grouped = new Map<string, ControlSnapshot[]>();
-    for (const snap of list) {
-      const key = canonical(snap.args);
-      const group = grouped.get(key) ?? [];
-      group.push(snap);
-      grouped.set(key, group);
-    }
-    byKey.set(channel, grouped);
-  }
-  const cursors = new Map<string, number>();
-
-  // P22 D12: the mode a fresh boot answers windowsEnsure with, when a spec provides no explicit
-  // snapshot for it — read the (mode-independent) tabsList snapshot the spec *did* configure, so
-  // a spec restoring an Api-mode tab as active boots displaying it, the same way it always did
-  // before mode became its own persisted column. Only ever consults the first tabsList snapshot
-  // (a spec keying tabsList by args to answer differently per window is not a shape any spec
-  // uses today) and only its args-less/single form — args-matched multi-snapshot tabsList specs
-  // fall back to 'studio', same as providing no tabsList snapshot at all.
-  function inferredBootMode(): string {
-    const tabsSnaps = byChannel.get(IPC.tabsList);
-    const tabs = (tabsSnaps?.length === 1 ? tabsSnaps[0].response : undefined) as
-      | { kind?: string; active?: boolean }[]
-      | undefined;
-    if (!tabs || tabs.length === 0) return 'studio';
-    const bootTab = tabs.find((t) => t.active) ?? tabs[0];
-    const kind = bootTab?.kind;
-    return kind && kind in STUDIO_TAB_KIND_MODE
-      ? STUDIO_TAB_KIND_MODE[kind as StudioTabKind]
-      : 'studio';
-  }
-
-  await page.route('**/wails/**', async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-
-    if (request.method() === 'GET' && url.pathname === '/wails/runtime.js') {
-      await serveWailsRuntimeJs(route);
-      return;
-    }
-
-    // The runtime bundle's own last line (runtime.js's `loadOptionalScript`) HEADs this once per
-    // page load, unconditionally, to decide whether to inject a user-provided custom.js. A 404
-    // (what a real Wails backend answers when none exists) is a legitimate HTTP outcome the app
-    // itself handles via a `.catch(() => {})` — but Chromium's own devtools console logs *any*
-    // non-2xx response as a "Failed to load resource" error line regardless of whether the page's
-    // own JS ever sees or handles it, which would otherwise show up in every single spec's
-    // `consoleErrors` collection for a probe no spec asked for and no spec's `channel` fixture
-    // covers. Answering 200 with a non-JavaScript content type is what a real Wails backend's own
-    // custom-asset-not-configured path would look like at the HTTP level too: `n.ok` is true, so
-    // no console error, but `loadOptionalScript`'s own content-type check fails, so no script is
-    // injected either — the same no-op outcome as a 404, with none of the console noise.
-    if (url.pathname === '/wails/custom.js') {
-      await route.fulfill({ status: 200, contentType: 'text/plain', body: '' });
-      return;
-    }
-
-    if (url.pathname !== '/wails/runtime' || request.method() !== 'POST') {
-      await route.fulfill({
-        status: 501,
-        contentType: 'text/plain',
-        body: `unmocked ${request.method()} ${url.pathname}`,
-      });
-      return;
-    }
-
-    const body = JSON.parse(request.postData() ?? '{}') as CallRequestBody;
-    const methodName = body.args?.methodName;
-    const channel = methodName ? FQN_TO_CHANNEL[methodName] : undefined;
-    const callArgs = body.args?.args?.[0];
-
-    if (!channel) {
-      await route.fulfill({
-        status: 422,
-        contentType: 'application/json',
-        body: runtimeErrorBody('E_FIXTURE_MISS', `no CHANNEL_TO_FQN entry for ${methodName}`),
-      });
-      return;
-    }
-    log.push({ channel, args: callArgs });
-
-    const grouped = byKey.get(channel);
-    const list = byChannel.get(channel) ?? [];
-    // A channel called with the same args every time (connectionsList, connectionsStates) has
-    // exactly one snapshot and answers regardless of the exact args it was called with — e.g.
-    // opsCancel's opId is generated client-side per run and can never appear in a captured
-    // fixture (mirrors mockControl.ts's own single-snapshot shortcut).
-    function findSnap(args: unknown): ControlSnapshot | undefined {
-      if (!grouped) return undefined;
-      const key = canonical(args);
-      const group = grouped.get(key);
-      if (!group) return undefined;
-      const at = cursors.get(`${channel}:${key}`) ?? 0;
-      cursors.set(`${channel}:${key}`, at + 1);
-      return group[Math.min(at, group.length - 1)];
-    }
-    function findSnapWithRefreshFallback(args: unknown): ControlSnapshot | undefined {
-      const direct = findSnap(args);
-      if (direct) return direct;
-      // P57 finding: `refresh:true` never appears in a captured fixture (D15/D5's own write-mode
-      // capture always reads `refresh:false` first, the same discipline
-      // tests/ipc/support/harness.ts's own cache-aside stand-in follows) — a real Wails backend
-      // still answers it with the same data a `refresh:false` read would, since nothing in a
-      // static fixture's world ever actually changes between the two. Falling back to the
-      // `refresh:false` entry for the same otherwise-identical args is what a real server does in
-      // this case, not a shortcut around a missing capture.
+): ReturnType<typeof sharedInstallControlMocks> {
+  return sharedInstallControlMocks(page, snapshots, {
+    fqnToChannel: FQN_TO_CHANNEL,
+    wildcardDefaults: WILDCARD_DEFAULTS,
+    runtimeJsPath: WAILS_RUNTIME_JS,
+    canonicalOptions: CANONICAL_OPTIONS,
+    // P57 finding: `refresh:true` never appears in a captured fixture (D15/D5's own write-mode
+    // capture always reads `refresh:false` first, the same discipline
+    // tests/ipc/support/harness.ts's own cache-aside stand-in follows) — a real Wails backend
+    // still answers it with the same data a `refresh:false` read would, since nothing in a static
+    // fixture's world ever actually changes between the two.
+    resolveSnapshotFallback: (_channel, args, findSnap) => {
       if (args && typeof args === 'object' && (args as { refresh?: unknown }).refresh === true) {
         return findSnap({ ...args, refresh: false });
       }
       return undefined;
-    }
-    const snap = list.length === 1 ? list[0] : findSnapWithRefreshFallback(callArgs);
-    if (!snap) {
-      // P22 D12: a spec with no windowsEnsure snapshot of its own gets a mode inferred from
-      // whatever tabsList snapshot it *does* provide, rather than the flat 'studio' default —
-      // the real backend's own persisted mode and "which tab is active at boot" agree in every
-      // realistic case (D12's own mechanism keeps them in sync), and the overwhelming majority
-      // of specs restoring an Api-mode tab as active are asserting on that tab's own content,
-      // not on mode persistence itself. A spec that genuinely wants to test the persisted-mode
-      // seam provides its own explicit windowsEnsure snapshot, which always wins (see `snap`
-      // above) regardless of this inference.
-      if (channel === IPC.windowsEnsure) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ mode: inferredBootMode() }),
-        });
-        return;
-      }
-      const wildcard = WILDCARD_DEFAULTS[channel];
-      if (wildcard !== undefined) {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: wildcard });
-        return;
-      }
-      await route.fulfill({
-        status: 422,
-        contentType: 'application/json',
-        body: runtimeErrorBody(
-          'E_FIXTURE_MISS',
-          `no fixture snapshot for ${channel} args ${JSON.stringify(callArgs)}`,
-        ),
-      });
-      return;
-    }
-    if (snap.error) {
-      await route.fulfill({
-        status: 422,
-        contentType: 'application/json',
-        body: runtimeErrorBody(snap.error.code, snap.error.message, snap.error.details),
-      });
-      return;
-    }
-    // `response: undefined` (a void-returning channel, e.g. opsCancel) round-trips through
-    // JSON.stringify as a dropped key — `JSON.stringify(undefined)` is itself `undefined`, not the
-    // string `"undefined"`, so it is special-cased to the JSON literal `null`, exactly what a Go
-    // method returning no value marshals to.
-    const responseBody = snap.response === undefined ? 'null' : JSON.stringify(snap.response);
-    await route.fulfill({ status: 200, contentType: 'application/json', body: responseBody });
-  });
-
-  return { log: () => log };
-}
-
-/**
- * P11 F20: delivers a pushed Wails event into a page that has real runtime.js loaded — the piece
- * `installControlMocks` above deliberately does not cover (it intercepts only the `Call` RPC
- * endpoint, D13). The bundle exposes `window._wails.dispatchWailsEvent({name, data})` for exactly
- * this shape (confirmed by reading the pinned `runtime.js` itself): `name` is the same channel
- * string `control.ts`'s `on(...)` subscribes `Events.On` to (e.g. `CHANNEL.grpcCall`), `data` is
- * whatever that channel's own `cb(ev.data)` expects — D8's coalesced `GrpcCallEvent`, here.
- */
-export async function emitWailsEvent(page: Page, name: string, data: unknown): Promise<void> {
-  await page.evaluate(
-    ({ name, data }) => {
-      (
-        window as unknown as {
-          _wails: { dispatchWailsEvent(e: { name: string; data: unknown }): void };
-        }
-      )._wails.dispatchWailsEvent({ name, data });
     },
-    { name, data },
-  );
+    // See `inferredBootMode`'s own doc comment above.
+    resolveMissingBody: (channel, byChannel) =>
+      channel === IPC.windowsEnsure
+        ? JSON.stringify({ mode: inferredBootMode(byChannel) })
+        : undefined,
+  });
 }
+
+export const emitWailsEvent = sharedEmitWailsEvent;

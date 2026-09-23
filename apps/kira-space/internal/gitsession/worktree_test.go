@@ -13,26 +13,26 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 )
 
-// --- prepareOpSlot: D13's own ≤1-slot concurrency matrix, mirroring remoteOpSlot's own tests ------
+// --- prepare's own opSlot use: D13's own ≤1-slot concurrency matrix, mirroring remote's own tests -
 
 func TestPrepareOpSlot_SecondClaimIsRefused(t *testing.T) {
 	t.Parallel()
-	var s prepareOpSlot
-	if !s.claim(func() {}) {
+	var s opSlot
+	if !s.claimAlways("prepare", func() {}) {
 		t.Fatal("first claim should succeed")
 	}
-	if s.claim(func() {}) {
+	if s.claimAlways("prepare", func() {}) {
 		t.Fatal("a second claim while the slot is occupied should be refused")
 	}
 	s.release()
-	if !s.claim(func() {}) {
+	if !s.claimAlways("prepare", func() {}) {
 		t.Fatal("a claim after release should succeed")
 	}
 }
 
 func TestPrepareOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
 	t.Parallel()
-	var s prepareOpSlot
+	var s opSlot
 	if s.tryCancel() {
 		t.Fatal("cancelling an idle slot must report false, never true")
 	}
@@ -40,9 +40,9 @@ func TestPrepareOpSlot_CancelOnIdleReportsFalse(t *testing.T) {
 
 func TestPrepareOpSlot_CancelCancelsAndReportsTrue(t *testing.T) {
 	t.Parallel()
-	var s prepareOpSlot
+	var s opSlot
 	cancelled := false
-	s.claim(func() { cancelled = true })
+	s.claimAlways("prepare", func() { cancelled = true })
 	if !s.tryCancel() {
 		t.Fatal("cancelling an active slot must report true")
 	}
@@ -53,9 +53,9 @@ func TestPrepareOpSlot_CancelCancelsAndReportsTrue(t *testing.T) {
 
 func TestPrepareOpSlot_ForceCancel(t *testing.T) {
 	t.Parallel()
-	var s prepareOpSlot
+	var s opSlot
 	cancelled := false
-	s.claim(func() { cancelled = true })
+	s.claimAlways("prepare", func() { cancelled = true })
 	s.forceCancel()
 	if !cancelled {
 		t.Fatal("forceCancel must cancel")
@@ -408,7 +408,7 @@ func TestRunPrepare_AlreadyRunning(t *testing.T) {
 	entry := newWorktreeTestEntry(t, dir, script)
 	fake := &fakePrepareRunner{}
 
-	if !entry.prepare.claim(func() {}) {
+	if !entry.prepare.claimAlways("prepare", func() {}) {
 		t.Fatal("test setup: claim should succeed")
 	}
 	defer entry.prepare.release()

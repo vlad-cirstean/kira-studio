@@ -14,6 +14,7 @@
  * `RowContextMenu.vue` already did. Submenus are explicitly not included (D3's own non-goal) —
  * nothing in `packages/git-ui`'s own menus needs one.
  */
+import { onClickOutside } from '@vueuse/core';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import type { MenuSection } from './contextMenuModel.ts';
 import { computeFloatPosition, pointReference } from './floatingPosition.ts';
@@ -48,10 +49,7 @@ const listRef = ref<InstanceType<typeof KuiMenuList> | null>(null);
 
 let invoker: HTMLElement | null = null;
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (rootEl.value && event.target instanceof Node && rootEl.value.contains(event.target)) return;
-  emit('close');
-}
+onClickOutside(rootEl, () => emit('close'));
 
 /** G20 D3: positioned via `floatingPosition.ts`'s real `flip`/`shift`/`size` middleware, replacing
  *  the hand-rolled post-mount clamp G19 relocated here verbatim from `RowContextMenu.vue`. Starts
@@ -66,7 +64,6 @@ const style = ref({ left: '-9999px', top: '-9999px' });
 
 onMounted(async () => {
   invoker = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  document.addEventListener('pointerdown', onDocumentPointerDown, true);
   listRef.value?.focusFirst();
   const el = menuEl.value;
   if (el) {
@@ -79,7 +76,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown, true);
   invoker?.focus();
 });
 </script>

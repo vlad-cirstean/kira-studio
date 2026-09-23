@@ -3,7 +3,6 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 )
@@ -25,15 +24,7 @@ type QueryOptions struct {
 	LogParams bool
 }
 
-func setCommand(op *adapters.OpCtx, sql string, params []any, logParams bool) {
-	if logParams && len(params) > 0 {
-		if b, err := json.Marshal(params); err == nil {
-			op.SetCommand(sql + " -- params: " + string(b))
-			return
-		}
-	}
-	op.SetCommand(sql)
-}
+var setCommand = adapters.SetCommand
 
 // runArrayQuery is read.ts's/console.ts's own runQuery({rowsAsArray: true, ...}) call shape: every
 // row scanned as []*string in column order, nil for SQL NULL, via B3's DatabaseTypeName-driven

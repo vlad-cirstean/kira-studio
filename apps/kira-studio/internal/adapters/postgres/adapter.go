@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"github.com/jackc/pgx/v5"
@@ -22,21 +23,19 @@ type Adapter struct {
 	deps adapters.Deps
 
 	connSet         *ConnSet
-	cfg             *model.ResolvedConnectionConfig
 	primaryDatabase string
 	readOnly        bool
 
-	mu          sync.Mutex
-	runningByOp map[string]RunningQuery
+	// mu guards cfg only — the running-query bookkeeping below is tracker's own (P13 D3, hoisted
+	// P107 T2-3): pgx's own *Conn is not safe for concurrent use, and closing one mid-Query (were
+	// Disconnect to race a still-in-flight query) is a real, race-detector-confirmed data race, not
+	// a theoretical one (found running go test ./... -race for P58b M6.1) — tracker.Drain() is what
+	// makes Disconnect wait for every RunWithAbortRace goroutine to actually stop touching its
+	// connection first.
+	mu  sync.Mutex
+	cfg *model.ResolvedConnectionConfig
 
-	// inFlight counts query.go/console.go's own adapters.RunWithAbortRace background goroutines
-	// that are still touching a *pgx.Conn. RunWithAbortRace can return to its caller (on ctx.Done())
-	// well before the goroutine it spawned actually stops using the connection — by design, so a
-	// local op abort does not itself kill the query (query.ts:77-80). Disconnect must not close a
-	// connection out from under one of these goroutines: pgx's own *Conn is not safe for concurrent
-	// use, and closing one mid-Query is a real, race-detector-confirmed data race, not a theoretical
-	// one (found running go test ./... -race for P58b M6.1).
-	inFlight sync.WaitGroup
+	tracker adapters.QueryTracker[RunningQuery]
 }
 
 func (a *Adapter) Kind() string        { return "postgres" }
@@ -96,15 +95,12 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 	// connection is closed (see inFlight's own doc comment). A caller that wants Disconnect to
 	// return promptly on a stuck query calls Cancel first — matching CancelOp's own two-step design,
 	// which already assumes the explicit cancel is what makes the server-side work actually end.
-	a.inFlight.Wait()
+	a.tracker.Drain()
 	if a.connSet != nil {
 		a.connSet.CloseAll(ctx)
 	}
 	a.connSet = nil
 	a.primaryDatabase = ""
-	a.mu.Lock()
-	a.runningByOp = nil
-	a.mu.Unlock()
 	return nil
 }
 
@@ -187,7 +183,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 func requireThreeSegmentObjectPath(segments []model.PathSegment, opName string) (databaseSegment, schemaSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 3 || segments[0].Kind != "database" || segments[1].Kind != "schema" {
 		return model.PathSegment{}, model.PathSegment{}, model.PathSegment{},
-			adapters.New(adapters.CodeNotFound, opName+" requires a database/schema/table path, got depth "+itoaPositive(len(segments)), nil)
+			adapters.New(adapters.CodeNotFound, opName+" requires a database/schema/table path, got depth "+strconv.Itoa(len(segments)), nil)
 	}
 	return segments[0], segments[1], segments[2], nil
 }
@@ -254,7 +250,7 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *adapters.OpCtx) ([]model.RelationColumns, error) {
 	segments := path.Segments
 	if len(segments) != 2 || segments[0].Kind != "database" || segments[1].Kind != "schema" {
-		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database/schema path, got depth "+itoaPositive(len(segments)), nil)
+		return nil, adapters.New(adapters.CodeNotFound, "schemaColumns requires a database/schema path, got depth "+strconv.Itoa(len(segments)), nil)
 	}
 	databaseSegment, schemaSegment := segments[0], segments[1]
 
@@ -391,9 +387,8 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 
 // Cancel is index.ts's cancel.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
+	running, ok := a.tracker.PopRunning(opID)
 	a.mu.Lock()
-	running, ok := a.runningByOp[opID]
-	delete(a.runningByOp, opID)
 	cfg := a.cfg
 	a.mu.Unlock()
 	if !ok || cfg == nil {
@@ -425,21 +420,5 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 // (mutate's BEGIN/…/COMMIT, console's "Run all") correct — an earlier statement settling after a
 // later one has started must not unregister the later one, since both share this one opId.
 func (a *Adapter) trackerFor(opID string) TrackQuery {
-	return func(q RunningQuery) func() {
-		a.mu.Lock()
-		if a.runningByOp == nil {
-			a.runningByOp = make(map[string]RunningQuery)
-		}
-		a.runningByOp[opID] = q
-		a.mu.Unlock()
-		a.inFlight.Add(1)
-		return func() {
-			defer a.inFlight.Done()
-			a.mu.Lock()
-			if a.runningByOp[opID] == q {
-				delete(a.runningByOp, opID)
-			}
-			a.mu.Unlock()
-		}
-	}
+	return a.tracker.TrackerFor(opID)
 }

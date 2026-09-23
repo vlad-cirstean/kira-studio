@@ -3,6 +3,7 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // clickhouse.go ports planParsers/clickhouse.ts verbatim: ClickHouse's `EXPLAIN PLAN json = 1,
@@ -40,7 +41,7 @@ func chIndexMetrics(indexes []chRawIndex) []Metric {
 			typ = *idx.Type
 		}
 		if idx.Keys != nil {
-			out = append(out, Metric{Label: typ + " keys", Value: joinStrings(idx.Keys)})
+			out = append(out, Metric{Label: typ + " keys", Value: strings.Join(idx.Keys, ", ")})
 		}
 		if idx.Condition != nil {
 			out = append(out, Metric{Label: typ + " condition", Value: *idx.Condition})

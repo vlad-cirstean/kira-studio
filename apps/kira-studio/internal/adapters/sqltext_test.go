@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -192,7 +193,7 @@ func TestPageToken_MismatchedFingerprint(t *testing.T) {
 
 // 10. the operator flips with both direction and mode
 func TestBuildKeysetPredicate_OperatorFlips(t *testing.T) {
-	ph := func(i int) string { return "$" + itoa(int64(i)) }
+	ph := func(i int) string { return "$" + strconv.FormatInt(int64(i), 10) }
 	cases := []struct {
 		direction, mode, want string
 	}{

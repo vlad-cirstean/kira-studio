@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -18,12 +19,7 @@ import (
 // (rather than threading an error return through every quoteIdent call site) is fine specifically
 // because this can only ever fire from Host.RunOp's own recover() boundary (P58 D16), which turns
 // it into a failed op rather than a crash — the exact reason that boundary exists.
-func quoteIdent(name string) string {
-	if strings.ContainsRune(name, '\x00') {
-		panic(adapters.New(adapters.CodeQuery, "identifier contains a NUL byte", nil))
-	}
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
-}
+var quoteIdent = adapters.QuoteIdentDouble
 
 var numericTypePrefix = regexp.MustCompile(`^(int2|int4|int8|smallint|integer|bigint|numeric|decimal|real|double precision|float4|float8|money)\b`)
 var temporalTypePrefix = regexp.MustCompile(`^(date|time|timetz|timestamp|timestamptz|interval)\b`)
@@ -65,63 +61,7 @@ func normalizeCellText(value string, typeClass page.TypeClass) string {
 }
 
 // readReq is adapter.ts's ReadRequest minus Path — the request shape readPage actually consumes.
-type readReq struct {
-	Projection []string
-	Filter     *string
-	Sort       *model.SortSpec
-	PageSize   int
-	Cursor     model.PageCursor
-}
-
-// buildKeysetWhere extends whereSQL with the keyset boundary predicate decoded from the cursor
-// token, when the request actually wants one. addParam is the caller's own $N param accumulator.
-func buildKeysetWhere(req readReq, order adapters.EffectiveOrder, fingerprint, whereSQL string, addParam func(any) int) (string, error) {
-	keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
-	if err != nil {
-		return "", err
-	}
-	if len(keyValues) != len(order.KeysetColumns) {
-		return "", adapters.New(adapters.CodeQuery, "page token key length does not match the sort key", nil)
-	}
-	firstIndex := 0
-	for i, v := range keyValues {
-		idx := addParam(v)
-		if i == 0 {
-			firstIndex = idx
-		}
-	}
-	quotedKeyColumns := make([]string, len(order.KeysetColumns))
-	for i, c := range order.KeysetColumns {
-		quotedKeyColumns[i] = quoteIdent(c)
-	}
-	predicate := adapters.BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, firstIndex, dollarPlaceholder)
-	if whereSQL != "" {
-		return whereSQL + " AND " + predicate, nil
-	}
-	return "WHERE " + predicate, nil
-}
-
-// buildPageSQL assembles the final SELECT text: SELECT/FROM, the (already keyset-extended) WHERE,
-// ORDER BY and LIMIT/OFFSET, in that order.
-func buildPageSQL(relationSQL, selectList, whereSQL, orderBySQL string, req readReq, addParam func(any) int) string {
-	offsetSQL := ""
-	if req.Cursor.Mode == "offset" {
-		idx := addParam(req.Cursor.Offset)
-		offsetSQL = " OFFSET " + dollarPlaceholder(idx)
-	}
-	// D24: fetch pageSize + 1 to compute hasMore without a count.
-	limitIdx := addParam(req.PageSize + 1)
-
-	sqlParts := []string{"SELECT " + selectList, "FROM " + relationSQL}
-	if whereSQL != "" {
-		sqlParts = append(sqlParts, whereSQL)
-	}
-	if orderBySQL != "" {
-		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
-	}
-	sqlParts = append(sqlParts, "LIMIT "+dollarPlaceholder(limitIdx)+offsetSQL)
-	return strings.Join(sqlParts, "\n")
-}
+type readReq = adapters.ReadReq
 
 // readPage is read.ts's readPage — the densest function in the package.
 func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
@@ -163,13 +103,13 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 
 	whereSQL := adapters.WhereClause(req.Filter)
 	if plan.WantsKeyset {
-		whereSQL, err = buildKeysetWhere(req, order, plan.Fingerprint, whereSQL, addParam)
+		whereSQL, err = adapters.BuildKeysetWhereSQL(req, order, plan.Fingerprint, whereSQL, quoteIdent, dollarPlaceholder, addParam)
 		if err != nil {
 			return page.TabularPage{}, err
 		}
 	}
 
-	sql := buildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, addParam)
+	sql := adapters.BuildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, dollarPlaceholder, addParam)
 
 	// Streamed straight into the builder (P2 R1) rather than materialized into a [][]*string and
 	// transposed afterward: BuildKeysetPosition's CellAt is only ever called for the first and last
@@ -243,30 +183,12 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 	return builder.Finish(position), nil
 }
 
-func dollarPlaceholder(i int) string { return "$" + itoaPositive(i) }
-
-func itoaPositive(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
-}
+func dollarPlaceholder(i int) string { return "$" + strconv.Itoa(i) }
 
 // countRows is read.ts's countRows.
 func countRows(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {
 	relationSQL := quoteIdent(target.Schema) + "." + quoteIdent(target.Relation)
-	sqlParts := []string{"SELECT count(*) AS n", "FROM " + relationSQL}
-	if where := adapters.WhereClause(filter); where != "" {
-		sqlParts = append(sqlParts, where)
-	}
-	sql := strings.Join(sqlParts, "\n")
+	sql := adapters.BuildCountSQL(relationSQL, filter)
 
 	rows, err := runArrayQuery(ctx, conn, sql, nil, op, track, QueryOptions{TextMode: true})
 	if err != nil {

@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"strconv"
 	"sync"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -143,23 +144,9 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 func requireTwoSegmentObjectPath(segments []model.PathSegment, opName string) (databaseSegment, objectSegment model.PathSegment, err error) {
 	if len(segments) != 2 || segments[0].Kind != "database" || segments[1].Kind != "collection" {
 		return model.PathSegment{}, model.PathSegment{}, adapters.New(adapters.CodeNotFound,
-			opName+" requires a database/collection path, got depth "+itoaLen(len(segments)), nil)
+			opName+" requires a database/collection path, got depth "+strconv.Itoa(len(segments)), nil)
 	}
 	return segments[0], segments[1], nil
-}
-
-func itoaLen(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [8]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }
 
 // Describe is index.ts's describe. §8.5: "Mongo has no FK navigation in v1" — this stub satisfies

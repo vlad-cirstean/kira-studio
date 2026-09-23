@@ -3,9 +3,7 @@ package gitaskpass
 import (
 	"bufio"
 	"context"
-	"crypto/rand"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -15,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kirathecat/kira-studio/internal/localsock"
 )
 
 // DefaultTimeout is the broker's own bound on one credential wait (D4's table) — long enough for a
@@ -45,22 +45,17 @@ type opEntry struct {
 // Broker owns the shim file, the private socket and every in-flight op's registration. One per
 // process (main.go constructs it once); Close removes its temp directory.
 type Broker struct {
-	dir      string
 	shimPath string
-	sockPath string
-	token    string
 	timeout  time.Duration
 	// inheritedGitAskpass is captured once, at construction (D10) — os.Getenv read here rather
 	// than per-op, matching upstream's own "the inherited value comes from os.Getenv('GIT_ASKPASS')
 	// at broker construction".
 	inheritedGitAskpass string
 
-	listener net.Listener
+	ln *localsock.Listener
 
 	mu  sync.Mutex
 	ops map[string]*opEntry
-
-	wg sync.WaitGroup
 }
 
 // New constructs the broker's 0700 temp directory, writes the shim, opens the private socket
@@ -86,48 +81,25 @@ func New(opts Options) (*Broker, error) {
 		return nil, err
 	}
 
-	// POSIX mkdtemp(3) creates the directory 0700 already; os.MkdirTemp is documented to use it —
-	// D8's whole security boundary starts here: no other OS user can read the shim or reach the
-	// socket.
-	dir, err := os.MkdirTemp("", "kira-askpass-")
+	// localsock.Listen is agenthooks.New's own identical precedent (D8's whole security boundary,
+	// P107 T2-9): no other OS user can read the shim or reach the socket.
+	ln, err := localsock.Listen(localsock.Options{DirPrefix: "kira-askpass-", TokenBytes: 32})
 	if err != nil {
-		return nil, fmt.Errorf("gitaskpass: mkdtemp: %w", err)
+		return nil, fmt.Errorf("gitaskpass: %w", err)
 	}
 
-	shimPath := filepath.Join(dir, "shim")
+	shimPath := filepath.Join(ln.Dir, "shim")
 	if err := os.WriteFile(shimPath, []byte(shimBody), 0o700); err != nil {
-		_ = os.RemoveAll(dir)
+		_ = ln.Close()
 		return nil, fmt.Errorf("gitaskpass: write shim: %w", err)
 	}
 
-	// Named "s" (D8/P14): macOS caps sun_path at 104 bytes and $TMPDIR there is already ~50, so the
-	// socket's own filename has to stay short.
-	sockPath := filepath.Join(dir, "s")
-	ln, err := net.Listen("unix", sockPath)
-	if err != nil {
-		_ = os.RemoveAll(dir)
-		return nil, fmt.Errorf("gitaskpass: listen: %w", err)
-	}
-	if err := os.Chmod(sockPath, 0o600); err != nil {
-		_ = ln.Close()
-		_ = os.RemoveAll(dir)
-		return nil, fmt.Errorf("gitaskpass: chmod socket: %w", err)
-	}
-
-	token, err := randHex(32)
-	if err != nil {
-		_ = ln.Close()
-		_ = os.RemoveAll(dir)
-		return nil, fmt.Errorf("gitaskpass: token: %w", err)
-	}
-
 	b := &Broker{
-		dir: dir, shimPath: shimPath, sockPath: sockPath, token: token, timeout: timeout,
+		shimPath: shimPath, timeout: timeout,
 		inheritedGitAskpass: os.Getenv("GIT_ASKPASS"),
-		listener:            ln, ops: make(map[string]*opEntry),
+		ln:                  ln, ops: make(map[string]*opEntry),
 	}
-	b.wg.Add(1)
-	go b.acceptLoop()
+	go b.ln.Serve(b.handleConn)
 	return b, nil
 }
 
@@ -150,14 +122,6 @@ func buildShim(helperCommand []string) (string, error) {
 	return b.String(), nil
 }
 
-func randHex(n int) (string, error) {
-	buf := make([]byte, n)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
-}
-
 // Env returns the constant env every remote-op spawn needs to reach this broker (D8): GIT_ASKPASS/
 // SSH_ASKPASS point at the shim, SSH_ASKPASS_REQUIRE=force is what makes OpenSSH >= 8.4 use
 // SSH_ASKPASS unconditionally (probed against 9.6, P4), and the session socket/token are constant
@@ -167,8 +131,8 @@ func (b *Broker) Env() []string {
 		"GIT_ASKPASS=" + b.shimPath,
 		"SSH_ASKPASS=" + b.shimPath,
 		"SSH_ASKPASS_REQUIRE=force",
-		"KIRA_ASKPASS_SOCK=" + b.sockPath,
-		"KIRA_ASKPASS_TOKEN=" + b.token,
+		"KIRA_ASKPASS_SOCK=" + b.ln.SockPath,
+		"KIRA_ASKPASS_TOKEN=" + b.ln.Token,
 	}
 }
 
@@ -185,7 +149,7 @@ func (b *Broker) ShouldInterpose(coreAskPass string) bool {
 // this op's spawn might trigger; D4's table names the other three bounds (dismissal, the broker's
 // own timer, Conn's own disconnect signal) as Prompter.Ask's own responsibility.
 func (b *Broker) WithOp(ctx context.Context, prompter Prompter, fn func(opEnv []string) error) error {
-	opID, err := randHex(16)
+	opID, err := localsock.RandHex(16)
 	if err != nil {
 		return err
 	}
@@ -208,27 +172,7 @@ func (b *Broker) WithOp(ctx context.Context, prompter Prompter, fn func(opEnv []
 // Close stops accepting new connections, waits for every in-flight one to finish, and removes the
 // broker's temp directory (the shim and the socket file along with it).
 func (b *Broker) Close() error {
-	err := b.listener.Close()
-	b.wg.Wait()
-	if rmErr := os.RemoveAll(b.dir); err == nil {
-		err = rmErr
-	}
-	return err
-}
-
-func (b *Broker) acceptLoop() {
-	defer b.wg.Done()
-	for {
-		conn, err := b.listener.Accept()
-		if err != nil {
-			return // listener closed by Close() — normal shutdown.
-		}
-		b.wg.Add(1)
-		go func() {
-			defer b.wg.Done()
-			b.handleConn(conn)
-		}()
-	}
+	return b.ln.Close()
 }
 
 // handleConn answers exactly one request-response round trip (D8's protocol) — bounded by
@@ -250,7 +194,7 @@ func (b *Broker) handleConn(conn net.Conn) {
 		return
 	}
 
-	if subtle.ConstantTimeCompare([]byte(req.Token), []byte(b.token)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(req.Token), []byte(b.ln.Token)) != 1 {
 		writeResponse(conn, socketResponse{OK: false})
 		return
 	}
