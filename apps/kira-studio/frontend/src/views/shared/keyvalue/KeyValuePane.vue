@@ -36,14 +36,15 @@ import {
   OBJECT_BODY_EDIT_BYTES,
   OBJECT_BODY_PREVIEW_BYTES,
 } from '@shared/protocol/page';
+import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -57,7 +58,6 @@ import { useSettingsStore } from '../../../state/settings';
 import type { KeyValueTabRecord } from '../../../state/tabDomain';
 import { browseInvalidate } from '../../../state/viewCommands';
 import EngineIcon from '../../../theme/EngineIcon.vue';
-import PopoverPanel from '../../../theme/primitives/PopoverPanel.vue';
 import CellEditorDock from '../celleditor/CellEditorDock.vue';
 import { datasetNumber } from '../eventCoords';
 import SearchToolbar from '../page/SearchToolbar.vue';
@@ -181,9 +181,30 @@ function rowAt(i: number) {
 }
 
 // P49 F7/D5: matches the density this row's own CSS (`--kira-row-height`) already resolves to —
-// VirtualList needs the pixel value in JS for its offset math, the CSS var alone isn't reachable
-// from there.
+// the virtualizer needs the pixel value in JS for its offset math, the CSS var alone isn't
+// reachable from there.
 const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
+
+// P104 §3.4: @tanstack/vue-virtual replaces VirtualList.vue directly at this call site — the
+// scroll container (below, in the template) is now this component's own, not a wrapper's.
+// overscan: 8 matches VirtualList's own former default.
+const scrollRef = ref<HTMLElement | null>(null);
+const rowVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: rowIndices.value.length,
+    getScrollElement: () => scrollRef.value,
+    estimateSize: () => rowHeight.value,
+    overscan: 8,
+  })),
+);
+const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+// A virtual item's own `index` is its position in rowIndices (0..count-1), not the page-row
+// number the rest of this file works in (rowAt/isSearchMatch/data-row) — resolved once per row
+// here rather than at every one of the template's own uses of it.
+const visibleRows = computed(() =>
+  virtualRows.value.map((row) => ({ row, i: rowIndices.value[row.index] })),
+);
 
 function ttlText(ttlMs: number | null): string {
   if (ttlMs === null) return 'no expiry';
@@ -311,6 +332,7 @@ const objectEditGate = computed<ObjectEditGate>(() => {
 // --- edit popover: a single TextField pre-filled with the current string value, mutating
 // immediately on Save (no staged/pending edit set — mirrors documents/mutations.ts). -----------
 const editOpen = ref(false);
+const editAnchorRef = ref<HTMLElement | null>(null);
 const editDraft = ref('');
 const editSaving = ref(false);
 const editError = ref<string | null>(null);
@@ -436,6 +458,7 @@ async function onDownload(): Promise<void> {
 // For an S3 object page, Add instead opens the upload dialog (state/objectStore.ts) targeting
 // this object's own container — pathParent(host.path), the bucket or prefix it lives under. ---
 const addOpen = ref(false);
+const addAnchorRef = ref<HTMLElement | null>(null);
 const addName = ref('');
 const addValue = ref('');
 const addSaving = ref(false);
@@ -585,10 +608,11 @@ function onCloseSearch(): void {
 // number has to be looked up by position rather than assumed to equal it — same as
 // ConsoleResultGrid.vue's/DocumentView.vue's own goToMatch, now that this view's rows are
 // virtualized too (a plain querySelector can no longer find an off-screen row's DOM node).
-const listRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
+// `align: 'auto'` reproduces VirtualList's own scrollToIndex: a no-op if already visible,
+// top-aligned above the viewport, bottom-aligned below it.
 function onGoToMatch(match: Match): void {
   const index = rowIndices.value.indexOf(match.row);
-  if (index >= 0) listRef.value?.scrollToIndex(index);
+  if (index >= 0) rowVirtualizer.value.scrollToIndex(index, { align: 'auto' });
 }
 
 // P49 F7/D5: closes the hole keyvalue/search.ts's own runSearch doc comment named — until this
@@ -596,16 +620,21 @@ function onGoToMatch(match: Match): void {
 // always started from row 0 with no on-screen rows to prioritize first.
 //
 // P5 C3/F5: the same bounds also prune page.ts's decode cache (`setVisibleWindow`, mirrors
-// grid/console) — already widened by VirtualList's own overscan, so a fling never prunes a row
-// about to be re-rendered.
-function onVisibleRangeIndices(range: { start: number; end: number }): void {
-  const list = rowIndices.value;
-  const from = list[range.start];
-  const to = list[Math.max(range.start, range.end - 1)];
-  if (from === undefined || to === undefined) return;
-  setVisibleRows(props.viewKey, from, to + 1);
-  setVisibleWindow(props.viewKey, from, to + 1);
-}
+// grid/console) — already widened by the virtualizer's own overscan (getVirtualItems already
+// includes it), so a fling never prunes a row about to be re-rendered.
+watch(
+  virtualRows,
+  (rows) => {
+    if (rows.length === 0) return;
+    const list = rowIndices.value;
+    const from = list[rows[0].index];
+    const to = list[rows[rows.length - 1].index];
+    if (from === undefined || to === undefined) return;
+    setVisibleRows(props.viewKey, from, to + 1);
+    setVisibleWindow(props.viewKey, from, to + 1);
+  },
+  { immediate: true },
+);
 
 // Rebuilt only when the search result changes (a completed scan or prev/next), not per row.
 const matchIndex = createMatchIndex(searchState, () => props.viewKey);
@@ -724,7 +753,7 @@ onUnmounted(() => {
         </div>
         <span class="p-push" />
         <span
-          class="p-run-state inline-flex items-center gap-1 font-[family-name:var(--kira-font-data)] text-kira-xs text-subtle"
+          class="p-run-state inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
           :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
         >
           <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span>
@@ -847,18 +876,21 @@ onUnmounted(() => {
         <!-- Canonical [add, edit/delete, search] group — add leads (DataToolbar.vue's own
              add-before-delete order), search trails, same as every other view. -->
         <div class="group">
-          <div class="add-anchor">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-                  <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
-                    <CodiconIcon name="add" :size="13" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{{ addTitle }}</TooltipContent>
-            </Tooltip>
-            <PopoverPanel v-if="addOpen" test-id="keyvalue-add-popover" :width="320" @close="closeAdd">
+          <Popover :open="addOpen" @update:open="(v) => !v && closeAdd()">
+            <div ref="addAnchorRef" class="add-anchor">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                    <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
+                      <CodiconIcon name="add" :size="13" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{{ addTitle }}</TooltipContent>
+              </Tooltip>
+              <PopoverAnchor :reference="addAnchorRef ?? undefined" />
+            </div>
+            <PopoverContent align="start" class="w-[320px]" data-testid="keyvalue-add-popover">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Add key (string value)</div>
                 <Input v-model="addName" placeholder="Key name" class="w-full" data-testid="keyvalue-add-name" />
@@ -884,26 +916,24 @@ onUnmounted(() => {
                   >Save</Button>
                 </div>
               </div>
-            </PopoverPanel>
-          </div>
+            </PopoverContent>
+          </Popover>
 
-          <div class="edit-anchor">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
-                  <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
-                    <CodiconIcon name="edit" :size="13" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{{ editTitle }}</TooltipContent>
-            </Tooltip>
-            <PopoverPanel
-              v-if="editOpen && !isSingleObjectPage"
-              test-id="keyvalue-edit-popover"
-              :width="320"
-              @close="closeEdit"
-            >
+          <Popover :open="editOpen && !isSingleObjectPage" @update:open="(v) => !v && closeEdit()">
+            <div ref="editAnchorRef" class="edit-anchor">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                    <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
+                      <CodiconIcon name="edit" :size="13" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{{ editTitle }}</TooltipContent>
+              </Tooltip>
+              <PopoverAnchor :reference="editAnchorRef ?? undefined" />
+            </div>
+            <PopoverContent align="start" class="w-[320px]" data-testid="keyvalue-edit-popover">
               <div class="popover-form">
                 <div class="popover-title p-sm muted">Edit value</div>
                 <Input
@@ -927,8 +957,8 @@ onUnmounted(() => {
                   >Save</Button>
                 </div>
               </div>
-            </PopoverPanel>
-          </div>
+            </PopoverContent>
+          </Popover>
 
           <Tooltip>
             <TooltipTrigger as-child>
@@ -1058,61 +1088,58 @@ onUnmounted(() => {
               Show all rows
             </Button>
           </Alert>
-          <VirtualList
-            v-else
-            ref="listRef"
-            :items="rowIndices"
-            :row-height="rowHeight"
-            @visible-range="onVisibleRangeIndices"
-          >
-            <template #default="{ item: i }">
-              <div
-                class="kv-row"
-                data-testid="keyvalue-row"
-                :data-row="i"
-                @click="onRowClickFromEvent"
-                @contextmenu="onRowContextMenuFromEvent"
-              >
-                <div class="p-td gutter kv-col-gutter">{{ i + 1 }}</div>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <div
-                      class="p-td kv-col-field"
-                      :class="{
-                        'search-match': isSearchMatch(i, 'field'),
-                        'search-match-current': isCurrentSearchMatch(i, 'field'),
-                      }"
-                      data-testid="keyvalue-field"
-                    >
-                      {{ rowAt(i)?.field }}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ rowAt(i)?.field }}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <div
-                      class="p-td kv-col-value"
-                      :class="{
-                        'search-match': isSearchMatch(i, 'value'),
-                        'search-match-current': isCurrentSearchMatch(i, 'value'),
-                      }"
-                      data-testid="keyvalue-value"
-                    >
-                      {{ rowAt(i)?.value }}
-                      <Tooltip v-if="rowAt(i)?.isTruncated">
-                        <TooltipTrigger as-child>
-                          <span class="p-chip truncated-chip">truncated</span>
-                        </TooltipTrigger>
-                        <TooltipContent>value truncated</TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>{{ rowAt(i)?.value }}</TooltipContent>
-                </Tooltip>
-              </div>
-            </template>
-          </VirtualList>
+          <div v-else ref="scrollRef" class="kv-virtual-scroll" data-testid="virtual-list">
+            <div class="kv-virtual-inner" :style="{ height: `${totalSize}px` }">
+              <template v-for="entry in visibleRows" :key="entry.row.index">
+                <div
+                  class="kv-row"
+                  data-testid="keyvalue-row"
+                  :data-row="entry.i"
+                  :style="{ transform: `translateY(${entry.row.start}px)` }"
+                  @click="onRowClickFromEvent"
+                  @contextmenu="onRowContextMenuFromEvent"
+                >
+                  <div class="p-td gutter kv-col-gutter">{{ entry.i + 1 }}</div>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <div
+                        class="p-td kv-col-field"
+                        :class="{
+                          'search-match': isSearchMatch(entry.i, 'field'),
+                          'search-match-current': isCurrentSearchMatch(entry.i, 'field'),
+                        }"
+                        data-testid="keyvalue-field"
+                      >
+                        {{ rowAt(entry.i)?.field }}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ rowAt(entry.i)?.field }}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <div
+                        class="p-td kv-col-value"
+                        :class="{
+                          'search-match': isSearchMatch(entry.i, 'value'),
+                          'search-match-current': isCurrentSearchMatch(entry.i, 'value'),
+                        }"
+                        data-testid="keyvalue-value"
+                      >
+                        {{ rowAt(entry.i)?.value }}
+                        <Tooltip v-if="rowAt(entry.i)?.isTruncated">
+                          <TooltipTrigger as-child>
+                            <span class="p-chip truncated-chip">truncated</span>
+                          </TooltipTrigger>
+                          <TooltipContent>value truncated</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>{{ rowAt(entry.i)?.value }}</TooltipContent>
+                  </Tooltip>
+                </div>
+              </template>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -1132,10 +1159,20 @@ onUnmounted(() => {
 }
 
 .tbody {
-  /* P49 D5: VirtualList owns scrolling internally now (its own `.virtual-list { overflow: auto }`,
-     height:100% against this flex:1/min-height:0 parent) — EmptyState's two branches above never
-     needed to scroll either. */
+  /* P49 D5/P104 §3.4: the virtualizer's own scroll container (.kv-virtual-scroll below) owns
+     scrolling now, against this flex:1/min-height:0 parent — EmptyState's two branches above
+     never needed to scroll either. */
   @apply flex-1 min-h-0 flex flex-col overflow-hidden;
+}
+
+/* P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against — this
+   component owns it directly now, VirtualList.vue no longer wraps it. */
+.kv-virtual-scroll {
+  @apply flex-1 min-h-0 overflow-auto;
+}
+
+.kv-virtual-inner {
+  @apply relative w-full;
 }
 
 .kv-col-gutter {
@@ -1151,7 +1188,7 @@ onUnmounted(() => {
 }
 
 .kv-row {
-  @apply flex cursor-pointer h-row;
+  @apply flex cursor-pointer h-row absolute top-0 left-0 w-full;
 }
 
 .kv-row:hover {

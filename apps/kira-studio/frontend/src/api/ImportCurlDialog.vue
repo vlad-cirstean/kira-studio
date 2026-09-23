@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { refDebounced } from '@vueuse/core';
 import { computed, ref } from 'vue';
 import { useImportCurlStore } from './state/curl';
@@ -37,14 +38,29 @@ function close(): void {
 </script>
 
 <template>
-  <DialogFrame
-    title="Import from curl"
-    :width="560"
-    max-height="80vh"
-    test-id="import-curl-dialog"
-    close-test-id="import-curl-dialog-close"
-    @close="close"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && close()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="import-curl-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 560px; max-width: min(560px, calc(100% - 2rem)); max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Import from curl</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="import-curl-dialog-close"
+            @click="close"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <div class="overflow-auto">
     <div class="p-dialog-body">
       <textarea
         v-model="text"
@@ -73,22 +89,24 @@ function close(): void {
         </Alert>
       </template>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions p-push">
-        <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          data-testid="import-curl-submit"
-          :disabled="text.trim() === '' || preview.error !== null"
-          @click="onImport"
-        >
-          Import
-        </Button>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="p-dialog-actions p-push">
+          <Button variant="dialog" size="kira-lg" data-testid="import-curl-cancel" @click="close">Cancel</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="import-curl-submit"
+            :disabled="text.trim() === '' || preview.error !== null"
+            @click="onImport"
+          >
+            Import
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>

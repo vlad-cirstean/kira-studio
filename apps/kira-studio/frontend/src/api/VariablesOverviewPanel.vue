@@ -2,11 +2,11 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { copyText } from '@workbench/util/clipboard';
 import { computed, ref } from 'vue';
-import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useCollectionsStore } from './state/collections';
 import { useVariableSetStore, useVariablesStore, type VariableOverviewRow } from './state/variables';
 import { openVariableSetTab } from './tabs';
@@ -83,7 +83,7 @@ function editEnvironmentVariables(): void {
 </script>
 
 <template>
-  <PopoverPanel :width="360" anchor="left" test-id="variables-overview" backdrop-test-id="variables-overview-backdrop" @close="close">
+  <PopoverContent align="start" class="w-[360px] gap-0 p-0" data-testid="variables-overview">
     <div class="overview-panel">
       <InputGroup>
         <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
@@ -191,7 +191,7 @@ function editEnvironmentVariables(): void {
         </button>
       </div>
     </div>
-  </PopoverPanel>
+  </PopoverContent>
 </template>
 
 <style scoped>

@@ -3,6 +3,7 @@ import type { PageSize } from '@shared/domain/tabs';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref } from 'vue';
@@ -163,6 +164,7 @@ function onGenerateData(): void {
 }
 
 const columnsOpen = ref(false);
+const columnsAnchorRef = ref<HTMLElement | null>(null);
 
 // P16 design system's p-badge on the Columns button: "selected / total" — both counts already
 // live on data this component reads anyway (the projection list and the describe-derived meta),
@@ -294,29 +296,32 @@ function onDeleteRow(): void {
       </TooltipContent>
     </Tooltip>
 
-    <div class="columns-anchor">
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button
-            variant="toolbar"
-            size="kira-icon"
-            class="relative"
-            data-testid="toolbar-columns"
-            :class="{ 'bg-input text-fg': columnsOpen }"
-            aria-label="Columns"
-            @click="columnsOpen = !columnsOpen"
-          >
-            <CodiconIcon name="list-selection" :size="13" />
-            <span
-              v-if="columnsIndicator"
-              class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-[var(--kira-state-on)]"
-            />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{{ columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns' }}</TooltipContent>
-      </Tooltip>
-      <ColumnsMenu v-if="columnsOpen" :tab-id="tab.id" :caps="caps" @close="columnsOpen = false" />
-    </div>
+    <Popover :open="columnsOpen" @update:open="columnsOpen = $event">
+      <div ref="columnsAnchorRef" class="columns-anchor">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              class="relative"
+              data-testid="toolbar-columns"
+              :class="{ 'bg-input text-fg': columnsOpen }"
+              aria-label="Columns"
+              @click="columnsOpen = !columnsOpen"
+            >
+              <CodiconIcon name="list-selection" :size="13" />
+              <span
+                v-if="columnsIndicator"
+                class="absolute top-0.5 right-0.5 h-[5px] w-[5px] rounded-full bg-[var(--kira-state-on)]"
+              />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ columnCountLabel ? `Columns — ${columnCountLabel} shown` : 'Columns' }}</TooltipContent>
+        </Tooltip>
+        <PopoverAnchor :reference="columnsAnchorRef ?? undefined" />
+      </div>
+      <ColumnsMenu v-if="columnsOpen" :tab-id="tab.id" :caps="caps" />
+    </Popover>
   </div>
 
   <div class="sep" />

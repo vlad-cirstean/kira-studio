@@ -1366,7 +1366,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // "changed" indicator (P16's own bug, P31's dot-based version of the same guard). -------------
   await page.click('[data-testid="toolbar-columns"]');
   await expect(page.locator('[data-testid="columns-menu"]')).toBeVisible();
-  await page.click('[data-testid="columns-menu-backdrop"]');
+  await page.keyboard.press('Escape'); // P104: reka Popover has no backdrop element to click
   await expect(page.locator('[data-testid="toolbar-columns"]')).not.toHaveClass(/has-indicator/);
 
   // --- projection: half the columns, header shrinks, the request itself carries only those ----
@@ -1374,7 +1374,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await expect(page.locator('[data-testid="columns-menu"]')).toBeVisible();
   const columnItems = page.locator('[data-testid="columns-menu-item"]');
   await columnItems.nth(1).click(); // uncheck "hash", leaving only "id"
-  await page.click('[data-testid="columns-menu-backdrop"]');
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid="grid-header-cell"]')).toHaveCount(1, {
     timeout: 10_000,
   });
@@ -1387,7 +1387,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   // Restore the full projection for the remaining scenarios.
   await page.click('[data-testid="toolbar-columns"]');
   await page.locator('[data-testid="columns-select-all"]').click();
-  await page.click('[data-testid="columns-menu-backdrop"]');
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid="grid-header-cell"]')).toHaveCount(2, {
     timeout: 10_000,
   });

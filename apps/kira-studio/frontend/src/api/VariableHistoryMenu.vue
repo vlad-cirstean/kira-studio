@@ -3,19 +3,19 @@ import type { ApiVariableHistoryEntry } from '@shared/domain/variables';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { formatRelative } from '@workbench/util/format';
-import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 import { useVariableSetStore } from './state/variables';
 
 const variableSetStore = useVariableSetStore();
 
-// P5 D13: the per-row history popover, on the existing PopoverPanel, anchored to the row's own
-// history button. Each entry's relative recorded time, its value (masked for a secret, with its
-// own gated eye — a secret's old value is exactly as sensitive as its current one), and a Restore
-// action, which writes it back through the ordinary Upsert path (so the restore is itself
-// recorded, and therefore undoable).
-const emit = defineEmits<{ close: [] }>();
+// P5 D13: the per-row history popover — a PopoverContent anchored to the row's own history button
+// via VariableRow.vue's own PopoverAnchor (a plain content component; VariableRow.vue's Popover
+// owns open state and the closeHistoryMenu() side effect for every dismissal). Each entry's
+// relative recorded time, its value (masked for a secret, with its own gated eye — a secret's old
+// value is exactly as sensitive as its current one), and a Restore action, which writes it back
+// through the ordinary Upsert path (so the restore is itself recorded, and therefore undoable).
 
 function displayValue(entry: ApiVariableHistoryEntry): string {
   return entry.isSecret ? (variableSetStore.revealedHistoryValues[entry.id] ?? '') : entry.value;
@@ -30,21 +30,10 @@ function onReveal(id: string): void {
 function onRestore(entry: ApiVariableHistoryEntry): void {
   void variableSetStore.restoreHistoryEntry(entry);
 }
-
-function close(): void {
-  variableSetStore.closeHistoryMenu();
-  emit('close');
-}
 </script>
 
 <template>
-  <PopoverPanel
-    :width="280"
-    anchor="left"
-    test-id="variable-history"
-    backdrop-test-id="variable-history-backdrop"
-    @close="close"
-  >
+  <PopoverContent align="start" class="w-[280px] gap-0 p-0" data-testid="variable-history">
     <div class="history-menu">
       <Alert
         v-if="variableSetStore.entries.length === 0"
@@ -99,7 +88,7 @@ function close(): void {
         </Tooltip>
       </div>
     </div>
-  </PopoverPanel>
+  </PopoverContent>
 </template>
 
 <style scoped>

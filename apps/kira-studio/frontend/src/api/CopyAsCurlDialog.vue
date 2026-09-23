@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { computed } from 'vue';
 import { useCopyAsCurlStore } from './state/curl';
 
@@ -9,10 +10,8 @@ const copyAsCurlStore = useCopyAsCurlStore();
 
 // P7 D10: the generated command, masked by default. Secrets are still {{token}} until Show secret
 // values is pressed — the gate is `revealSecretValues`'s own `revealVariable` calls
-// (http/state/variables.ts's existing four-outcome flow), not anything here. Built on DialogFrame
-// + the `.strip-note`/`.strip-warn` tone classes (ImportReportStrip.vue's own technique) — P104
-// §3 leaves DialogFrame's own call sites unchanged (its P99 Part 2 comment declines shadcn's
-// dialog vocabulary for this design system's pixel-exact chrome).
+// (http/state/variables.ts's existing four-outcome flow), not anything here. Built on ui/dialog
+// + the `.strip-note`/`.strip-warn` tone classes (ImportReportStrip.vue's own technique).
 const command = computed(() => copyAsCurlStore.currentCurlCommand());
 
 const maskedNames = computed(() =>
@@ -65,14 +64,29 @@ function close(): void {
 </script>
 
 <template>
-  <DialogFrame
-    title="Copy as curl"
-    :width="680"
-    max-height="80vh"
-    test-id="copy-as-curl-dialog"
-    close-test-id="copy-as-curl-dialog-close"
-    @close="close"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && close()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="copy-as-curl-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 680px; max-width: min(680px, calc(100% - 2rem)); max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Copy as curl</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="copy-as-curl-dialog-close"
+            @click="close"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <div class="overflow-auto">
     <div class="p-dialog-body">
       <textarea
         class="p-textarea mono min-h-[180px]"
@@ -114,21 +128,23 @@ function close(): void {
         <AlertDescription>{{ copyAsCurlStore.error }}</AlertDescription>
       </Alert>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions p-push">
-        <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          data-testid="copy-as-curl-copy"
-          @click="onCopy"
-        >
-          Copy
-        </Button>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="p-dialog-actions p-push">
+          <Button variant="dialog" size="kira-lg" data-testid="copy-as-curl-close" @click="close">Close</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="copy-as-curl-copy"
+            @click="onCopy"
+          >
+            Copy
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>

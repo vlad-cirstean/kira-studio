@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { useDebounceFn } from '@vueuse/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import MonacoHost from '../editor/MonacoHost.vue';
@@ -66,14 +67,29 @@ function close(): void {
 </script>
 
 <template>
-  <DialogFrame
-    title="Edit as raw HTTP"
-    :width="680"
-    max-height="80vh"
-    test-id="edit-raw-dialog"
-    close-test-id="edit-raw-dialog-close"
-    @close="close"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && close()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="edit-raw-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 680px; max-width: min(680px, calc(100% - 2rem)); max-height: 80vh"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Edit as raw HTTP</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="edit-raw-dialog-close"
+            @click="close"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <div class="overflow-auto">
     <div class="p-dialog-body">
       <div class="p-sm muted" data-testid="edit-raw-hint">{{ hint }}</div>
 
@@ -109,22 +125,24 @@ function close(): void {
         </Alert>
       </template>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions p-push">
-        <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          data-testid="edit-raw-apply"
-          :disabled="preview.error !== null"
-          @click="onApply"
-        >
-          Apply
-        </Button>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="p-dialog-actions p-push">
+          <Button variant="dialog" size="kira-lg" data-testid="edit-raw-cancel" @click="close">Cancel</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="edit-raw-apply"
+            :disabled="preview.error !== null"
+            @click="onApply"
+          >
+            Apply
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>

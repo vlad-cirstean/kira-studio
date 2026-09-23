@@ -5,12 +5,12 @@ import {
   grpcCodeClass,
   grpcCodeHint,
 } from '@shared/domain/grpc';
+import { useVirtualizer } from '@tanstack/vue-virtual';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { formatBytes } from '@workbench/util/format';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -143,21 +143,36 @@ function toggleExpanded(seq: number): void {
   expanded.value = next;
 }
 
-// Finding 11: the message list is now a VirtualList (below), which needs one known height per
-// row — MESSAGE_ROW_HEIGHT for a collapsed header, or that plus MESSAGE_DETAIL_HEIGHT for an
-// expanded one (a fixed, internally-scrollable box, not an auto-growing one — the same "one
-// resolved height per row" contract OperationsPanel.vue's own expandable row already follows). A
-// per-row rowHeights array is passed only while something is actually expanded (the rare,
-// deliberate case): the common case — a stream appending thousands of collapsed messages — stays
-// on VirtualList's O(1) uniform-height path instead of remapping every row on every single push.
+// Finding 11: the message list is virtualized (below), which needs one known height per row —
+// MESSAGE_ROW_HEIGHT for a collapsed header, or that plus MESSAGE_DETAIL_HEIGHT for an expanded
+// one (a fixed, internally-scrollable box, not an auto-growing one — the same "one resolved
+// height per row" contract OperationsPanel.vue's own expandable row already follows).
 const MESSAGE_ROW_HEIGHT = 22; // matches --kira-h-sm
 const MESSAGE_DETAIL_HEIGHT = 200;
-const messageRowHeights = computed<readonly number[] | undefined>(() => {
-  if (expanded.value.size === 0) return undefined;
-  return messages.value.map((m) =>
-    expanded.value.has(m.seq) ? MESSAGE_ROW_HEIGHT + MESSAGE_DETAIL_HEIGHT : MESSAGE_ROW_HEIGHT,
-  );
-});
+function messageRowHeight(index: number): number {
+  const m = messages.value[index];
+  return m && expanded.value.has(m.seq) ? MESSAGE_ROW_HEIGHT + MESSAGE_DETAIL_HEIGHT : MESSAGE_ROW_HEIGHT;
+}
+
+// P104 §3.4: @tanstack/vue-virtual replaces VirtualList.vue directly at this call site.
+// estimateSize is the *actual* per-row height, not merely a first guess (P27 D18's own "rowHeights
+// replaces the uniform math" contract, carried over unchanged) — options are a computed, so
+// toggling one row's expanded state re-measures through the same reactive path count does.
+const scrollRef = ref<HTMLElement | null>(null);
+const messageVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: messages.value.length,
+    getScrollElement: () => scrollRef.value,
+    estimateSize: messageRowHeight,
+    overscan: 8,
+    getItemKey: (index: number) => messages.value[index]?.seq ?? index,
+  })),
+);
+const virtualMessages = computed(() => messageVirtualizer.value.getVirtualItems());
+const totalMessagesSize = computed(() => messageVirtualizer.value.getTotalSize());
+const visibleMessages = computed(() =>
+  virtualMessages.value.map((row) => ({ row, m: messages.value[row.index] })),
+);
 // D14: a unary call is the same pane with exactly one entry, expanded.
 watch(
   messages,
@@ -373,33 +388,38 @@ onUnmounted(() => {
       </div>
     </div>
     <div v-else class="message-list" data-testid="grpc-message-list">
-      <VirtualList
+      <div
         v-if="messages.length > 0"
+        ref="scrollRef"
         class="message-virtual-list"
-        :items="messages"
-        :row-height="MESSAGE_ROW_HEIGHT"
-        :row-heights="messageRowHeights"
+        data-testid="virtual-list"
       >
-        <template #default="{ item: m }">
-          <div class="message-entry" data-testid="grpc-message-entry">
-            <button type="button" class="message-header" @click="toggleExpanded(m.seq)">
-              <span class="p-xs dim" data-testid="grpc-message-offset">+{{ m.offsetMs }} ms</span>
-              <span class="p-xs dim">{{ formatBytes(m.wireBytes) }}</span>
+        <div class="message-virtual-inner" :style="{ height: `${totalMessagesSize}px` }">
+          <div
+            v-for="entry in visibleMessages"
+            :key="entry.row.index"
+            class="message-entry"
+            data-testid="grpc-message-entry"
+            :style="{ transform: `translateY(${entry.row.start}px)` }"
+          >
+            <button type="button" class="message-header" @click="toggleExpanded(entry.m.seq)">
+              <span class="p-xs dim" data-testid="grpc-message-offset">+{{ entry.m.offsetMs }} ms</span>
+              <span class="p-xs dim">{{ formatBytes(entry.m.wireBytes) }}</span>
               <span class="p-push" />
-              <span class="p-xs dim">#{{ m.seq }}</span>
+              <span class="p-xs dim">#{{ entry.m.seq }}</span>
             </button>
-            <div v-if="expanded.has(m.seq)" class="message-detail">
+            <div v-if="expanded.has(entry.m.seq)" class="message-detail">
               <MonacoHost
-                :ref="(el) => setMessageHost(m.seq, el)"
-                :doc="m.json"
+                :ref="(el) => setMessageHost(entry.m.seq, el)"
+                :doc="entry.m.json"
                 language="json"
                 :read-only="true"
-                :range-highlights="m.seq === targetSeq ? messageHighlights : undefined"
+                :range-highlights="entry.m.seq === targetSeq ? messageHighlights : undefined"
               />
             </div>
           </div>
-        </template>
-      </VirtualList>
+        </div>
+      </div>
       <Alert v-if="messages.length === 0" class="empty-state" variant="default">
         <CodiconIcon name="arrow-right" :size="24" class="empty-state-icon" />
         <AlertTitle class="empty-state-title">Call this method to see its response</AlertTitle>
@@ -444,12 +464,18 @@ onUnmounted(() => {
   @apply flex flex-1 min-h-0 flex-col;
 }
 
+/* P104 §3.4: the scroll element @tanstack/vue-virtual measures and virtualizes against — this
+   component owns it directly now, VirtualList.vue no longer wraps it. */
 .message-virtual-list {
-  @apply flex-1 min-h-0;
+  @apply flex-1 min-h-0 overflow-auto;
+}
+
+.message-virtual-inner {
+  @apply relative w-full;
 }
 
 .message-entry {
-  @apply flex flex-col;
+  @apply flex flex-col absolute top-0 left-0 w-full;
 }
 
 /* height (not padding) so this row's own rendered height stays exactly MESSAGE_ROW_HEIGHT

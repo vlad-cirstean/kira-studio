@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { HTTP_METHODS, type HttpMethod, httpMethodToken } from '@shared/domain/http';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Popover, PopoverContent, PopoverTrigger } from '@theme/components/ui/popover';
 import { ref } from 'vue';
-import PopoverPanel from '../theme/primitives/PopoverPanel.vue';
 
 // P17 D18/D19, item 1: an app-drawn menu trigger, on the exact P42 D27 precedent
 // (views/shared/celleditor/CellEditorView.vue's own format-select/openFormatMenu, F12) — a native
@@ -30,26 +30,22 @@ function select(method: HttpMethod): void {
 </script>
 
 <template>
-  <div class="method-anchor">
-    <button
-      type="button"
-      class="p-select bordered method-select p-method"
-      :class="httpMethodToken(props.modelValue)"
-      :data-testid="testid"
-      :data-value="props.modelValue"
-      @click="open = !open"
-    >
-      <span class="method-select-label">{{ props.modelValue }}</span>
-      <CodiconIcon name="chevron-down" :size="12" />
-    </button>
-    <PopoverPanel
-      v-if="open"
-      :width="140"
-      anchor="left"
-      test-id="method-menu"
-      backdrop-test-id="method-menu-backdrop"
-      @close="open = false"
-    >
+  <Popover v-model:open="open">
+    <div class="method-anchor">
+      <PopoverTrigger as-child>
+        <button
+          type="button"
+          class="p-select bordered method-select p-method"
+          :class="httpMethodToken(props.modelValue)"
+          :data-testid="testid"
+          :data-value="props.modelValue"
+        >
+          <span class="method-select-label">{{ props.modelValue }}</span>
+          <CodiconIcon name="chevron-down" :size="12" />
+        </button>
+      </PopoverTrigger>
+    </div>
+    <PopoverContent align="start" class="w-[140px] gap-0 p-0" data-testid="method-menu">
       <div class="method-menu">
         <button
           v-for="m in HTTP_METHODS"
@@ -67,8 +63,8 @@ function select(method: HttpMethod): void {
           </span>
         </button>
       </div>
-    </PopoverPanel>
-  </div>
+    </PopoverContent>
+  </Popover>
 </template>
 
 <style scoped>
@@ -82,7 +78,7 @@ function select(method: HttpMethod): void {
    (unaffected by the element swap); the chevron is drawn explicitly since a <button> has no
    ::picker-icon of its own to rely on. */
 .method-select {
-  @apply font-semibold font-[family-name:var(--kira-font-data)];
+  @apply font-semibold font-data;
 }
 
 .method-menu {

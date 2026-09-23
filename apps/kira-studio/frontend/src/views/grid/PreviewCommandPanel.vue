@@ -2,12 +2,12 @@
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed } from 'vue';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useTabsStore } from '../../state/tabs';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import { usePendingChangesStore } from './pendingChanges';
 
@@ -51,13 +51,7 @@ function close(): void {
 </script>
 
 <template>
-  <PopoverPanel
-    anchor="right"
-    :width="480"
-    test-id="preview-command-panel"
-    backdrop-test-id="preview-command-backdrop"
-    @close="close"
-  >
+  <PopoverContent align="end" class="w-[480px] gap-0 p-0" data-testid="preview-command-panel">
     <div class="preview-panel-inner">
       <div class="preview-panel-header p-panel-head">
         <span class="icon-box"><CodiconIcon name="code" :size="13" /></span>
@@ -93,7 +87,7 @@ function close(): void {
         <MonacoHost :doc="doc" language="sql" :sql-dialect="sqlDialect" :read-only="true" />
       </div>
     </div>
-  </PopoverPanel>
+  </PopoverContent>
 </template>
 
 <style scoped>

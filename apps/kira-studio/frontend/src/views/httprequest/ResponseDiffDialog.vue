@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { statusClass, statusHint } from '@shared/domain/http';
 import type { ResponseHistorySnapshot } from '@shared/domain/response-history';
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { KIRA_EDITOR_THEME, loadMonaco } from '@workbench/editor/monaco';
 import { formatBytes, formatRelative } from '@workbench/util/format';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
@@ -218,14 +219,29 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <DialogFrame
-    title="Compare responses"
-    :width="900"
-    :height="640"
-    test-id="http-diff-dialog"
-    close-test-id="http-diff-close"
-    @close="emit('close')"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && emit('close')">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="http-diff-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 900px; max-width: min(900px, calc(100% - 2rem)); height: 640px"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Compare responses</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="http-diff-close"
+            @click="emit('close')"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <div class="overflow-auto flex-1 min-h-0">
     <div v-if="loadingSnapshots" class="diff-status p-xs dim">Loading…</div>
     <Alert v-else-if="loadError" variant="destructive"><AlertDescription>{{ loadError }}</AlertDescription></Alert>
     <div v-else-if="snapA && snapB" class="diff-body">
@@ -321,13 +337,15 @@ onUnmounted(() => {
         <div ref="mergeHostRef" class="diff-merge-host" data-testid="http-diff-merge"></div>
       </template>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions end">
-        <Button variant="dialog" size="kira" data-testid="http-diff-close" @click="emit('close')">Close</Button>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="p-dialog-actions end">
+          <Button variant="dialog" size="kira" data-testid="http-diff-close" @click="emit('close')">Close</Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>

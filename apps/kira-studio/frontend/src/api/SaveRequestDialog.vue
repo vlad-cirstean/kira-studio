@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
-import DialogFrame from '@theme/primitives/DialogFrame.vue';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
 
@@ -67,13 +68,29 @@ function splitTarget(value: string): [string, string | null] {
 </script>
 
 <template>
-  <DialogFrame
-    title="Save request"
-    :width="480"
-    test-id="save-request-dialog"
-    close-test-id="save-request-close"
-    @close="collectionsStore.closeSaveDialog"
-  >
+  <Dialog :open="true" @update:open="(v) => !v && collectionsStore.closeSaveDialog()">
+    <DialogContent
+      :show-close-button="false"
+      data-testid="save-request-dialog"
+      class="flex flex-col p-0 gap-0"
+      style="width: 480px; max-width: min(480px, calc(100% - 2rem))"
+    >
+      <DialogHeader class="flex-row items-center gap-1.5 border-b border-border px-3 py-2">
+        <DialogTitle class="text-kira-lg font-normal">Save request</DialogTitle>
+        <DialogClose as-child>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            class="ml-auto"
+            aria-label="Close"
+            data-testid="save-request-close"
+            @click="collectionsStore.closeSaveDialog"
+          >
+            <CodiconIcon name="close" :size="13" />
+          </Button>
+        </DialogClose>
+      </DialogHeader>
+      <div class="overflow-auto">
     <div class="p-dialog-body">
       <label class="p-sm muted mt-1">Name</label>
       <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
@@ -95,22 +112,24 @@ function splitTarget(value: string): [string, string | null] {
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
     </div>
+      </div>
 
-    <template #footer>
-      <span class="p-dialog-actions p-push">
-        <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="collectionsStore.closeSaveDialog">Cancel</Button>
-        <Button
-          variant="dialog-primary"
-          size="kira-lg"
-          data-testid="save-request-submit"
-          :disabled="!name.trim() || !target || saving"
-          @click="onSave"
-        >
-          Save
-        </Button>
-      </span>
-    </template>
-  </DialogFrame>
+      <DialogFooter class="border-t border-border">
+        <span class="p-dialog-actions p-push">
+          <Button variant="dialog" size="kira-lg" data-testid="save-request-cancel" @click="collectionsStore.closeSaveDialog">Cancel</Button>
+          <Button
+            variant="dialog-primary"
+            size="kira-lg"
+            data-testid="save-request-submit"
+            :disabled="!name.trim() || !target || saving"
+            @click="onSave"
+          >
+            Save
+          </Button>
+        </span>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>

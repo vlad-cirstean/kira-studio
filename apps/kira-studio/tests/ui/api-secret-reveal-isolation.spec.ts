@@ -257,11 +257,9 @@ test("switching the history popover to a different row clears the previous row's
   await expect(page.locator('[data-testid="variable-history-value"]')).toHaveText('old-a-secret');
 
   // Switch straight to row B's popover — row A's own is unmounted by `v-if`, with no `@close`.
-  // PopoverPanel's full-viewport backdrop blocks a plain pointer click reaching row B's button
-  // while row A's is open (exactly the click-outside-closes-it behaviour it exists for), but
-  // nothing stops a keyboard user tabbing to it and pressing Enter — a real `click` event
-  // dispatched straight at the target element, bypassing hit-testing entirely (unlike a pointer
-  // click, which the backdrop would intercept first).
+  // reka Popover's dismissable layer treats a pointer click outside as close-this-one-first, not
+  // reach-the-target — a keyboard `focus()` + Enter dispatches a real `click` event straight at
+  // row B's own button instead, bypassing that outside-pointer-down handling entirely.
   await variableRow(page, 'var-b').locator('[data-testid="variable-history"]').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-testid="variable-history-entry"]')).toBeVisible();
