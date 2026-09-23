@@ -91,7 +91,9 @@ func TestHandleRepoOpen_UsesConfiguredGitPath(t *testing.T) {
 // (D6) without ever touching a disk.
 
 // handlersScriptedProcess is a canned-bytes gitclient.Process — Run(ctx, r, ...) drains it exactly
-// like a real spawn.
+// like a real spawn. Wait returns the full result (Stdout included, F5): the real buffered path
+// (gitclient.bufferedExecProcess) carries Stdout on Wait rather than a separate Stdout() read, and
+// Run relies on that same contract for every Process it drives, fake or real.
 type handlersScriptedProcess struct{ result gitclient.Result }
 
 func (p *handlersScriptedProcess) Stdout() io.ReadCloser {
@@ -99,7 +101,7 @@ func (p *handlersScriptedProcess) Stdout() io.ReadCloser {
 }
 func (p *handlersScriptedProcess) Stdin() io.WriteCloser { return nil }
 func (p *handlersScriptedProcess) Wait() (gitclient.Result, error) {
-	return gitclient.Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil
+	return p.result, nil
 }
 func (p *handlersScriptedProcess) Close() error { return nil }
 

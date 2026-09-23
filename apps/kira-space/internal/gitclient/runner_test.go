@@ -335,6 +335,45 @@ func TestStart_GrandchildDoesNotHoldPipeOpen(t *testing.T) {
 	_, _ = p.Wait()
 }
 
+// TestRun_DoesNotHangOnGrandchildHoldingPipesOpen is F5's own regression guard: Run's buffered
+// path (bufferedExecProcess) must not block forever reading to an EOF a hook's backgrounded
+// grandchild — inheriting stdout/stderr, e.g. a post-commit/post-checkout hook's `cmd &` without
+// redirecting output — can hold off indefinitely, with no ctx cancellation to rescue it (the
+// ordinary case: nothing here ever cancels ctx, unlike TestStart_GrandchildDoesNotHoldPipeOpen's
+// own streaming-path scenario, which needs an explicit cancel to trigger the group kill). Before
+// F5, this hung for the shim's full 30-second background sleep at best (StdoutPipe()/
+// StderrPipe() readers get no help from cmd.WaitDelay); after it, cmd.Stdout/cmd.Stderr being
+// plain io.Writers lets Go's own copy goroutines — and WaitDelay's force-close against them —
+// unblock Wait almost immediately once the direct child (the shim) has exited.
+func TestRun_DoesNotHangOnGrandchildHoldingPipesOpen(t *testing.T) {
+	requireExecGit(t)
+	r := NewExecRunner()
+	dir := t.TempDir()
+	shim := writeGrandchildGitShim(t, dir)
+
+	type outcome struct {
+		res Result
+		err error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		res, err := Run(context.Background(), r, shim, Spec{Args: []string{}})
+		done <- outcome{res, err}
+	}()
+
+	select {
+	case out := <-done:
+		if out.err != nil {
+			t.Fatalf("Run: %v", out.err)
+		}
+		if string(out.res.Stdout) != "hello\n" {
+			t.Fatalf("Stdout = %q, want %q", out.res.Stdout, "hello\n")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run hung on a grandchild holding stdout/stderr open after the direct child exited")
+	}
+}
+
 // writeSleepyGitShim writes an executable shell script masquerading as "git": it sleeps for
 // seconds before ever producing output, standing in for a git invocation this test wants to cancel
 // mid-flight.

@@ -21,8 +21,12 @@ type fakeProcess struct{ stdout []byte }
 
 func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.stdout)) }
 func (p *fakeProcess) Stdin() io.WriteCloser { return nil }
+
+// Wait returns Stdout directly (F5): the real buffered path (gitclient.bufferedExecProcess)
+// carries Stdout on Wait rather than a separate Stdout() read, and gitclient.Run relies on that
+// same contract for every Process it drives, fake or real.
 func (p *fakeProcess) Wait() (gitclient.Result, error) {
-	return gitclient.Result{ExitCode: 0}, nil
+	return gitclient.Result{Stdout: p.stdout, ExitCode: 0}, nil
 }
 func (p *fakeProcess) Close() error { return nil }
 

@@ -43,7 +43,9 @@ func (f *fakeRunner) Start(ctx context.Context, gitPath string, spec Spec) (Proc
 }
 
 // fakeProcess is the canned-bytes Process discovery_test.go's fakes construct — Run(ctx, r, ...)
-// drains it exactly like a real execProcess.
+// drains it exactly like a real execProcess. Wait returns the full result (Stdout included, F5):
+// the real buffered path (bufferedExecProcess) carries Stdout on Wait rather than a separate
+// Stdout() read, and Run relies on that same contract for every Process it drives, fake or real.
 type fakeProcess struct {
 	result Result
 }
@@ -51,7 +53,7 @@ type fakeProcess struct {
 func (p *fakeProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(p.result.Stdout)) }
 func (p *fakeProcess) Stdin() io.WriteCloser { return nil }
 func (p *fakeProcess) Wait() (Result, error) {
-	return Result{Stderr: p.result.Stderr, ExitCode: p.result.ExitCode}, nil
+	return p.result, nil
 }
 func (p *fakeProcess) Close() error { return nil }
 

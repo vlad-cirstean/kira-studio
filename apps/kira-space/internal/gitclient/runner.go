@@ -60,6 +60,16 @@ type Spec struct {
 	// cat-file, rev-parse, for-each-ref) stays on Setpgid — a read cannot trigger an interactive
 	// prompt, so it is safe by construction and untouched since G2.
 	Setsid bool
+	// buffered is Run's own private signal to Start (F5, unexported — never set by a caller of
+	// Run, which is the only place that sets it): give cmd.Stdout/cmd.Stderr a plain io.Writer
+	// directly rather than StdoutPipe()/StderrPipe(). Go's os/exec spins its own internal copy
+	// goroutine only for the direct-Writer form, and WaitDelay can force-close ITS OWN pipe once
+	// the child has exited even if a grandchild (a hook's `cmd &` inheriting stdout/stderr) still
+	// holds the write end open — a *Pipe()-obtained reader gets no such rescue (verified against
+	// Go 1.27's os/exec), which is what left Run blocked forever reading to EOF that never comes.
+	// A genuinely streaming caller (logsession, gitsearch, catfile) needs the incremental *Pipe()
+	// form and leaves this false.
+	buffered bool
 }
 
 // Result is the raw outcome of one Spec — no interpretation of Stdout/Stderr's bytes at all
@@ -205,25 +215,26 @@ type Runner interface {
 	Start(ctx context.Context, gitPath string, spec Spec) (Process, error)
 }
 
-// Run starts spec, drains stdout to completion and waits — the buffered shape most callers in this
-// package use. It is a function, not a Runner method, precisely so a fake Runner cannot supply a
-// buffered path that disagrees with its streaming one. err is non-nil only when the process could
-// not be started or reaped at all; a non-zero exit is reported through Result.ExitCode, exactly the
-// shape errors.go's Classify expects.
+// Run starts spec, captures stdout/stderr to completion and waits — the buffered shape most
+// callers in this package use. It is a function, not a Runner method, precisely so a fake Runner
+// cannot supply a buffered path that disagrees with its streaming one. err is non-nil only when
+// the process could not be started or reaped at all; a non-zero exit is reported through
+// Result.ExitCode, exactly the shape errors.go's Classify expects.
+//
+// F5: sets spec.buffered so Start gives cmd.Stdout/cmd.Stderr a direct io.Writer instead of
+// *Pipe() — see Spec.buffered's own doc comment for why that is what lets WaitDelay actually
+// unblock this call against a hook's background process inheriting stdout/stderr, rather than
+// leaving Run blocked reading to an EOF a live grandchild can hold off forever.
 func Run(ctx context.Context, r Runner, gitPath string, spec Spec) (Result, error) {
+	spec.buffered = true
 	p, err := r.Start(ctx, gitPath, spec)
 	if err != nil {
 		return Result{}, err
 	}
-	stdout, readErr := io.ReadAll(p.Stdout())
 	res, waitErr := p.Wait()
 	if waitErr != nil {
 		return Result{}, waitErr
 	}
-	if readErr != nil {
-		return Result{}, readErr
-	}
-	res.Stdout = stdout
 	return res, nil
 }
 
@@ -290,7 +301,22 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 		return nil
 	}
 	cmd.WaitDelay = gracefulStopDelay
+	stopEscalate := func() {
+		if escalate != nil {
+			escalate.Stop()
+		}
+	}
 
+	if spec.buffered {
+		return startBuffered(cmd, spec, stopEscalate)
+	}
+	return startStreaming(cmd, spec, stopEscalate)
+}
+
+// startStreaming is Start's own non-buffered path: cmd.Stdout/cmd.Stderr are left unset and the
+// caller reads through *Pipe() instead, for a genuinely incremental/paused reader (logsession,
+// gitsearch, catfile) that must not buffer a whole command's output in memory up front.
+func startStreaming(cmd *exec.Cmd, spec Spec, stopEscalate func()) (Process, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
@@ -314,15 +340,51 @@ func (execRunner) Start(ctx context.Context, gitPath string, spec Spec) (Process
 	p := &execProcess{
 		cmd: cmd, stdout: stdout, stdin: stdin,
 		stderr: &boundedWriter{max: maxStderrBytes}, stderrDone: make(chan struct{}),
-		onStderr: spec.OnStderr,
-		stopEscalate: func() {
-			if escalate != nil {
-				escalate.Stop()
-			}
-		},
+		onStderr:     spec.OnStderr,
+		stopEscalate: stopEscalate,
 	}
 	go p.drainStderr(stderrPipe)
 	return p, nil
+}
+
+// startBuffered is Run's own path (F5): cmd.Stdout/cmd.Stderr get a plain io.Writer directly, so
+// Go's own internal copy goroutines run — and WaitDelay can force-close ITS OWN pipe against a
+// hook's background process still holding the write end open, once the direct child has exited —
+// instead of this package reading a *Pipe() to an EOF that process could hold off forever.
+// Spec.buffered's own doc comment has the full reasoning. stderrTee gives the same
+// OnStderr-then-bounded-buffer behavior the streaming path's drainStderr gives, just invoked by
+// Go's own copy goroutine instead of one of ours.
+func startBuffered(cmd *exec.Cmd, spec Spec, stopEscalate func()) (Process, error) {
+	if spec.Stdin {
+		// No caller combines Stdin with the buffered (Run) path today (catfile, the one Spec.Stdin
+		// user, always streams via Start directly) — refused rather than silently ignored, so a
+		// future caller does not quietly lose its stdin pipe.
+		return nil, errors.New("gitclient: Spec.Stdin is not supported on the buffered Run path")
+	}
+	var stdout bytes.Buffer
+	stderr := &boundedWriter{max: maxStderrBytes}
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderrTee{onStderr: spec.OnStderr, dest: stderr}
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	return &bufferedExecProcess{cmd: cmd, stdout: &stdout, stderr: stderr, stopEscalate: stopEscalate}, nil
+}
+
+// stderrTee is startBuffered's own cmd.Stderr: every Write is handed to onStderr (if set), then to
+// dest — the same order and "before it's appended to the bounded buffer" guarantee Spec.OnStderr's
+// own doc comment promises.
+type stderrTee struct {
+	onStderr func([]byte)
+	dest     *boundedWriter
+}
+
+func (t *stderrTee) Write(p []byte) (int, error) {
+	if t.onStderr != nil {
+		t.onStderr(p)
+	}
+	return t.dest.Write(p)
 }
 
 // boundedWriter caps how many bytes it retains, appending stderrTruncationMarker once the cap is
@@ -433,6 +495,71 @@ func (p *execProcess) Close() error {
 		if p.stdin != nil {
 			_ = p.stdin.Close()
 		}
+		if p.cmd.Process != nil {
+			_ = killGroup(p.cmd.Process.Pid, syscall.SIGTERM)
+			escalate := time.AfterFunc(gracefulStopDelay, func() {
+				_ = killGroup(p.cmd.Process.Pid, syscall.SIGKILL)
+			})
+			_, _ = p.Wait()
+			escalate.Stop()
+		}
+	})
+	return nil
+}
+
+// bufferedExecProcess is Process for the F5 buffered path (Run's only spawn shape): stdout/stderr
+// are captured directly by cmd's own internal copy goroutines rather than read incrementally by
+// this package (startBuffered's own doc comment), so Stdout/Stdin return placeholders — nothing in
+// this package reads either on a bufferedExecProcess; Wait's own Result carries everything a
+// buffered caller needs. cmd.Wait() is called at most once, guarded by waitOnce, exactly like
+// execProcess's own (Process.Wait and Process.Close can never race Go's "Wait was already called"
+// panic path).
+type bufferedExecProcess struct {
+	cmd          *exec.Cmd
+	stdout       *bytes.Buffer
+	stderr       *boundedWriter
+	stopEscalate func()
+
+	waitOnce   sync.Once
+	waitResult Result
+	waitErr    error
+
+	closeOnce sync.Once
+}
+
+func (p *bufferedExecProcess) Stdout() io.ReadCloser { return io.NopCloser(bytes.NewReader(nil)) }
+func (p *bufferedExecProcess) Stdin() io.WriteCloser { return nil }
+
+func (p *bufferedExecProcess) reap() {
+	err := p.cmd.Wait()
+	p.stopEscalate()
+	// cmd.ProcessState is set once the DIRECT CHILD itself has exited — before Wait ever gets to
+	// the separate "wait for the I/O copy goroutines" phase WaitDelay bounds — so it is populated
+	// for a clean exit, a non-zero exit (err is *exec.ExitError), AND F5's own scenario: a
+	// grandchild still holding cmd.Stdout/cmd.Stderr's write end open after the direct child has
+	// already exited, which surfaces as a distinct "WaitDelay expired before I/O complete" error,
+	// not an *exec.ExitError. That last case is not a spawn/reap failure — the command itself
+	// completed; the data captured in stdout/stderr up to the forced close is exactly what the
+	// direct child wrote (it has already exited, so it wrote nothing more after that point), only
+	// possibly missing whatever a STILL-RUNNING grandchild might separately write to the same fd —
+	// never the case for git's own child processes. Reporting the real exit code either way is
+	// what lets a caller no longer wait forever on a hook's background process (F5) while still
+	// treating an ordinary non-zero git exit exactly as before.
+	if p.cmd.ProcessState != nil {
+		p.waitResult = Result{Stdout: p.stdout.Bytes(), Stderr: p.stderr.buf.Bytes(), ExitCode: p.cmd.ProcessState.ExitCode()}
+		return
+	}
+	// Could not even start, or a genuine reap failure — no exit code to report.
+	p.waitErr = err
+}
+
+func (p *bufferedExecProcess) Wait() (Result, error) {
+	p.waitOnce.Do(p.reap)
+	return p.waitResult, p.waitErr
+}
+
+func (p *bufferedExecProcess) Close() error {
+	p.closeOnce.Do(func() {
 		if p.cmd.Process != nil {
 			_ = killGroup(p.cmd.Process.Pid, syscall.SIGTERM)
 			escalate := time.AfterFunc(gracefulStopDelay, func() {
