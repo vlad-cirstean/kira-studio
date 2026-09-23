@@ -26,14 +26,10 @@ type Adapter struct {
 	primaryDatabase string
 	readOnly        bool
 
-	mu          sync.Mutex
-	runningByOp map[string]RunningQuery
+	// mu guards cfg only — the running-query bookkeeping lives in tracker's own lock (P107 T2-3).
+	mu sync.Mutex
 
-	// inFlight mirrors postgres/adapter.go's own field and exists for exactly the same reason: a
-	// adapters.RunWithAbortRace background goroutine can still be touching a *sql.Conn well after
-	// its caller has returned on ctx.Done() — Disconnect must not close that connection out from
-	// under it (found for real running go test ./... -race during P58a M5/P58b M6.1).
-	inFlight sync.WaitGroup
+	tracker adapters.QueryTracker[RunningQuery]
 }
 
 // New constructs an Adapter for profile/caps — mariadb/adapter.go's and mysql/adapter.go's own
@@ -108,15 +104,12 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	a.inFlight.Wait()
+	a.tracker.Drain()
 	if a.connSet != nil {
 		a.connSet.CloseAll(ctx)
 	}
 	a.connSet = nil
 	a.primaryDatabase = ""
-	a.mu.Lock()
-	a.runningByOp = nil
-	a.mu.Unlock()
 	return nil
 }
 
@@ -381,9 +374,8 @@ func (a *Adapter) KeyTypes(ctx context.Context, paths []model.NodePath, op *adap
 // pg_cancel_backend path (D26). Killing your own query needs no PROCESS/SUPER privilege — only
 // killing someone else's does.
 func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
+	running, ok := a.tracker.PopRunning(opID)
 	a.mu.Lock()
-	running, ok := a.runningByOp[opID]
-	delete(a.runningByOp, opID)
 	cfg := a.cfg
 	a.mu.Unlock()
 	if !ok || cfg == nil {
@@ -414,21 +406,5 @@ func (a *Adapter) Cancel(ctx context.Context, opID string) (bool, error) {
 // release, identity-checked so an earlier statement settling after a later one has started never
 // unregisters the later one.
 func (a *Adapter) trackerFor(opID string) TrackQuery {
-	return func(q RunningQuery) func() {
-		a.mu.Lock()
-		if a.runningByOp == nil {
-			a.runningByOp = make(map[string]RunningQuery)
-		}
-		a.runningByOp[opID] = q
-		a.mu.Unlock()
-		a.inFlight.Add(1)
-		return func() {
-			defer a.inFlight.Done()
-			a.mu.Lock()
-			if a.runningByOp[opID] == q {
-				delete(a.runningByOp, opID)
-			}
-			a.mu.Unlock()
-		}
-	}
+	return a.tracker.TrackerFor(opID)
 }
