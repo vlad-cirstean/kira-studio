@@ -3485,7 +3485,7 @@ every other finding its own commit).
   leaving that fact silent. Regression test
   `TestRunOp_AutoStashCheckout_SwitchFailureMentionsTheStash` drives a real git-level switch failure
   after a real, successful stash push.
-- **F13 (LOW) `362f6fb`** — `Registry.release` closed the entry's cat-file session
+- **F13 (LOW) `884fae5`** — `Registry.release` closed the entry's cat-file session
   (`closeCatFile`, which can block on an in-flight request — e.g. a slow lazy-object fetch in a
   partial clone) while still holding `reg.mu`, blocking every OTHER repo's own
   Acquire/release/IsOpen/ReconcileAutoFetch behind it. Moved the `closeCatFile` call to after
@@ -3517,16 +3517,21 @@ deferred there.
 `apps/kira-studio/internal/adapters/**` throughout this phase, followed by a concurrent Part 6
 session (no scope overlap by design, per `CLAUDE.md`'s own concurrency guidance: `git add` only this
 phase's own files, `git status`/`git show --stat HEAD` checked immediately after every commit). Two
-of this phase's own commits nonetheless briefly absorbed the other session's own uncommitted, staged
-changes — the same shared-index race Part 15's own result section already documented: `cc9dd05` (F5)
-picked up `apps/kira-studio/internal/adapters/{mongo,redis}/client.go`; `362f6fb` (F13) picked up
-`apps/kira-studio/internal/adapterhost/{host,router}.go`, a new
-`router_reconnect_race_test.go`, and `apps/kira-studio/internal/adapters/live.go`. Both caught
-immediately by diffing `git show --stat HEAD` against this phase's own intended file list; both
-confirmed non-destructive — every absorbed file's content matched the other session's own working
-tree exactly (`git diff` empty) both times, so nothing was lost, only committed under this phase's
-message instead of that session's own. Not re-committed a second time, matching Part 15's own
-precedent, since no fix content was lost and doing so would only fragment the history further.
+of this phase's own commits nonetheless briefly absorbed one of those sessions' own uncommitted,
+staged changes — the same shared-index race Part 15's own result section already documented:
+`cc9dd05` (F5) picked up `apps/kira-studio/internal/adapters/{mongo,redis}/client.go` (still true as
+of this writing — `cc9dd05` is unmodified); the F13 commit originally absorbed
+`apps/kira-studio/internal/adapterhost/{host,router}.go`, a new `router_reconnect_race_test.go`, and
+`apps/kira-studio/internal/adapters/live.go`, but a later history rewrite by the concurrent Part 6
+session (rebasing/amending its own commit that this phase's F13 commit sat on top of, rehashing
+every descendant including it, `362f6fb` → `884fae5`) separated those files back out on its own —
+`884fae5` (the hash cited above) now touches only `registry.go`, confirmed by re-diffing after the
+rewrite. Both occurrences caught immediately by diffing `git show --stat HEAD` against this phase's
+own intended file list; both confirmed non-destructive at the time — every absorbed file's content
+matched the other session's own working tree exactly (`git diff` empty), so nothing was ever lost,
+only briefly committed under this phase's message instead of that session's own. `cc9dd05`'s own
+absorption was not re-committed a second time, matching Part 15's own precedent, since no fix content
+was lost and doing so would only fragment the history further.
 
 **Verification, run for real:**
 
