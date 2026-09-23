@@ -22,6 +22,7 @@ import {
   KuiTooltip,
   pointReference,
 } from '@kira/kira-ui';
+import { onClickOutside } from '@vueuse/core';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from './bridge/client.ts';
 // A .vue default export is a *value* — the component object the template instantiates. `import
@@ -72,6 +73,7 @@ import type { SearchOption } from './components/searchResultsModel.ts';
 import { childOf, parentOf } from './components/stackListModel.ts';
 import UncommittedChangesStrip from './components/UncommittedChangesStrip.vue';
 import WorkingDetailPane from './components/WorkingDetailPane.vue';
+import { retryBootstrap as sharedRetryBootstrap } from './state/bootstrap.ts';
 import { DetailState } from './state/detail.ts';
 import { createDetailActions, type DetailActions } from './state/detailActions.ts';
 import { GraphOrderState } from './state/graphOrder.ts';
@@ -1121,13 +1123,8 @@ onMounted(() => {
     });
 });
 
-/** Retries a failed bootstrap() (G12 D6) — clears the error panel first so a second failure
- *  replaces the first rather than appearing to do nothing. */
 function retryBootstrap(): void {
-  bootError.value = undefined;
-  void bootstrap().catch((err: unknown) => {
-    bootError.value = err instanceof Error ? err.message : String(err);
-  });
+  sharedRetryBootstrap(bootError, bootstrap);
 }
 
 // `docs/plans/P11.md` W7 / `docs/plans/G23-search.md` D12/F11: the four search toggles/scope
@@ -1452,16 +1449,16 @@ function onDocumentKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && detailOpen.value) closeDetail();
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  // The overlay drawer's own "dismissible... on a click outside" (§6.3) — only listened for
-  // while the drawer is actually showing, and only at the overlay breakpoint (the docked pane at
-  // wide/narrow has no such behaviour; clicking the grid to select a different row is normal use
-  // there, not a dismissal).
-  if (breakpoint.value !== 'overlay' || !detailOpen.value) return;
-  const drawer = document.querySelector('[data-testid="detail-region"]');
-  if (drawer && event.target instanceof Node && drawer.contains(event.target)) return;
-  closeDetail();
-}
+// The overlay drawer's own "dismissible... on a click outside" (§6.3) — only acted on while the
+// drawer is actually showing, and only at the overlay breakpoint (the docked pane at wide/narrow
+// has no such behaviour; clicking the grid to select a different row is normal use there, not a
+// dismissal).
+onClickOutside(
+  () => document.querySelector<HTMLElement>('[data-testid="detail-region"]'),
+  () => {
+    if (breakpoint.value === 'overlay' && detailOpen.value) closeDetail();
+  },
+);
 
 function scheduleBreakpointUpdate(): void {
   if (breakpointRaf !== 0) return;
@@ -1539,7 +1536,6 @@ let stopTooltips: (() => void) | null = null;
 
 onMounted(() => {
   document.addEventListener('keydown', onDocumentKeydown);
-  document.addEventListener('pointerdown', onDocumentPointerDown);
   if (rootEl.value) {
     breakpoint.value = breakpointFor(rootEl.value.clientWidth);
     breakpointObserver = new ResizeObserver(scheduleBreakpointUpdate);
@@ -1550,7 +1546,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onDocumentKeydown);
-  document.removeEventListener('pointerdown', onDocumentPointerDown);
   breakpointObserver?.disconnect();
   if (breakpointRaf !== 0) cancelAnimationFrame(breakpointRaf);
   stopTooltips?.();

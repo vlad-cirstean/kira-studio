@@ -4,6 +4,7 @@ import {
   type HttpHeaderState,
   type HttpRequestTabState,
 } from '@kira/shared/domain/http';
+import { explicitContentType } from '../headers';
 
 // P9 D11: the warning vocabulary — a closed union, mirroring http/curl/tokenize.ts's own
 // CurlWarningKind shape (P7 D4) so the dialog can render either list with the same component.
@@ -38,14 +39,6 @@ function codeLanguageForContentType(contentType: string): HttpCodeLanguage | nul
   if (type === 'text/html') return 'html';
   if (type === 'application/javascript') return 'javascript';
   return null;
-}
-
-function explicitContentType(headers: readonly HttpHeaderState[]): string | undefined {
-  let value: string | undefined;
-  for (const h of headers) {
-    if (h.name.trim().toLowerCase() === 'content-type') value = h.value;
-  }
-  return value;
 }
 
 /** Splits on '\n', stripping one trailing '\r' per line — tolerant of both a generate.ts-produced

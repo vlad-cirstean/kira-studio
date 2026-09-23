@@ -1,7 +1,7 @@
 import type { ResultOf } from '@kira/git-ipc';
-import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createLatestRequest } from './latestRequest.ts';
 
 export type FileChange = ResultOf<'working.detail'>['files'][number];
 
@@ -29,7 +29,7 @@ export class WorkingDetailState {
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
-  #requestController: AbortController | undefined;
+  readonly #detailRequest = createLatestRequest<ResultOf<'working.detail'>>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -44,7 +44,7 @@ export class WorkingDetailState {
    *  the file list — re-selecting the strip later always re-fetches rather than showing stale
    *  data. */
   select(selected: boolean): void {
-    this.#requestController?.abort();
+    this.#detailRequest.abort();
     this.selected.value = selected;
     this.files.value = [];
     this.error.value = undefined;
@@ -75,23 +75,15 @@ export class WorkingDetailState {
   async #requestDetail(): Promise<void> {
     const repoId = this.#repoId;
     if (!repoId) return;
-    const controller = new AbortController();
-    this.#requestController = controller;
-    const stillCurrent = (): boolean => this.selected.value && this.#repoId === repoId;
-    try {
-      const result = await this.#bridge.request('working.detail', { repoId }, controller.signal);
-      if (!stillCurrent()) return;
-      this.files.value = result.files;
-    } catch (error) {
-      if (error instanceof TransportError && error.code === 'cancelled') return;
-      if (!stillCurrent()) return;
-      this.error.value = error instanceof Error ? error.message : String(error);
-    } finally {
-      if (this.#requestController === controller) this.#requestController = undefined;
-    }
+    const outcome = await this.#detailRequest.run(
+      (signal) => this.#bridge.request('working.detail', { repoId }, signal),
+      () => this.selected.value && this.#repoId === repoId,
+    );
+    if (outcome.status === 'ok') this.files.value = outcome.value.files;
+    else if (outcome.status === 'error') this.error.value = outcome.message;
   }
 
   dispose(): void {
-    this.#requestController?.abort();
+    this.#detailRequest.abort();
   }
 }

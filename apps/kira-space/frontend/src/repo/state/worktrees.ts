@@ -1,10 +1,12 @@
+import { worktreeLabel } from '@kira/git-core';
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
 import { defineStore } from 'pinia';
-import { reactive, watch } from 'vue';
+import { watch } from 'vue';
 import { useCodeReposStore } from '../../state/coderepos';
 import { ensureRepoOpen } from '../../state/repoOpenHold';
 import { useWorkspaceStore } from '../../state/workspace';
 import { disposeGitTransport, gitTransportFor } from '../git/transport';
+import { createPerRepoState } from './perRepo.ts';
 import { useRepoLinksStore } from './repoLinks';
 
 // P82 §6: per-repo worktree disclosure state, session-scoped and module-level — same shape and
@@ -22,23 +24,11 @@ export const useWorktreesStore = defineStore('worktrees', () => {
   const workspaceStore = useWorkspaceStore();
   const repoLinksStore = useRepoLinksStore();
 
-  // reactive() on the Map itself, not just each value — fileTree.ts:144-152's own reasoning: the
-  // template reads byRepo.get(id) before any entry exists, and a plain Map makes that read untracked.
-  const byRepo = reactive(new Map<string, RepoWorktreeState>());
-
-  function stateFor(codeRepoId: string): RepoWorktreeState {
-    let state = byRepo.get(codeRepoId);
-    if (!state) {
-      state = reactive({
-        expanded: false,
-        loading: false,
-        error: null,
-        entries: [],
-      }) as RepoWorktreeState;
-      byRepo.set(codeRepoId, state);
-    }
-    return state;
-  }
+  const perRepo = createPerRepoState(
+    (): RepoWorktreeState => ({ expanded: false, loading: false, error: null, entries: [] }),
+  );
+  const byRepo = perRepo.all;
+  const { stateFor } = perRepo;
 
   // Leases are not reactive state (§6.1) — a real Stream('git') client plus its repo.changed
   // subscription, kept alive for exactly as long as a row is expanded (§6.3's invariant).
@@ -127,7 +117,7 @@ export const useWorktreesStore = defineStore('worktrees', () => {
 
   function collapseRepoWorktrees(codeRepoId: string): void {
     release(codeRepoId);
-    byRepo.delete(codeRepoId);
+    perRepo.drop(codeRepoId);
   }
 
   /** §7: "switch to this worktree" — a worktree row's click. Clicking the entry that *is* this row's
@@ -194,12 +184,4 @@ export const useWorktreesStore = defineStore('worktrees', () => {
   };
 });
 
-/** git-ui's `pickerModel.ts:94`-`98` twin, four lines, replicated rather than imported:
- *  `pickerModel.ts` is not on `@kira/git-ui`'s exports map (only "." and "./icons"), and "."
- *  pulls the whole graph chunk. Keep the two in step by hand if either changes. Pure function, no
- *  reactive state — stays outside the store. */
-export function worktreeLabel(entry: WorktreeEntry): string {
-  if (entry.branch) return entry.branch.replace(/^refs\/heads\//, '');
-  if (entry.isDetached && entry.head) return `detached @ ${entry.head.slice(0, 7)}`;
-  return entry.isBare ? 'bare' : 'unknown';
-}
+export { worktreeLabel };

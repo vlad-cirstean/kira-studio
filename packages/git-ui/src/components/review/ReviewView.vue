@@ -48,6 +48,7 @@ import {
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import { BridgeClient } from '../../bridge/client.ts';
 import { ACTION_ICONS } from '../../icons/index.ts';
+import { retryBootstrap as sharedRetryBootstrap } from '../../state/bootstrap.ts';
 import { copyToClipboard } from '../../state/clipboardActions.ts';
 import type { FileListMode } from '../../state/detail.ts';
 import type { Capabilities, DetailActions } from '../../state/detailActions.ts';
@@ -383,13 +384,8 @@ onMounted(() => {
   stopTooltips = initTooltips();
 });
 
-/** Retries a failed bootstrap() (G12 D6) — clears the error panel first so a second failure
- *  replaces the first rather than appearing to do nothing. */
 function retryBootstrap(): void {
-  bootError.value = undefined;
-  void bootstrap().catch((err: unknown) => {
-    bootError.value = err instanceof Error ? err.message : String(err);
-  });
+  sharedRetryBootstrap(bootError, bootstrap);
 }
 
 onBeforeUnmount(() => {

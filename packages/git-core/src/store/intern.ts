@@ -6,6 +6,7 @@
  * objects).
  */
 import { assert } from '../util/assert.ts';
+import { growUint32 } from '../util/typed.ts';
 
 /** Rough per-string retained-heap estimate: a UTF-16 char is 2 bytes in V8, plus a fixed
  *  string-object overhead. Not exact — exactness would need engine internals no public API
@@ -85,17 +86,6 @@ function growBuffer(current: Uint8Array<ArrayBuffer>, minLength: number): Uint8A
   return grown;
 }
 
-function growOffsets(
-  current: Uint32Array<ArrayBuffer>,
-  minLength: number,
-): Uint32Array<ArrayBuffer> {
-  let capacity = current.length === 0 ? 256 : current.length;
-  while (capacity < minLength) capacity *= 2;
-  const grown = new Uint32Array(capacity);
-  grown.set(current);
-  return grown;
-}
-
 /**
  * A single growing `Uint8Array` of UTF-8 bytes plus a `Uint32Array` of start offsets: subject
  * `i` is `bytes[offsets[i] .. offsets[i+1])`. `append` always assigns the next sequential
@@ -122,7 +112,7 @@ export class SubjectBuffer {
     this.#byteLength = end;
 
     if (this.#count + 1 >= this.#offsets.length) {
-      this.#offsets = growOffsets(this.#offsets, this.#count + 2);
+      this.#offsets = growUint32(this.#offsets, this.#count + 2);
     }
     this.#offsets[this.#count + 1] = end;
     this.#count++;

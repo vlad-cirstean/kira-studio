@@ -33,29 +33,12 @@ import * as vscode from 'vscode';
 import type { ConnectionManager } from './connection.ts';
 import { goToFile } from './goToFile.ts';
 import type { KiraGraphViewProvider } from './panelView.ts';
-import { SCHEME } from './ports/editorIntegration.ts';
-import { decodeKey, parseVirtualKey } from './virtualKey.ts';
+import { resolveVirtualUri } from './virtualUri.ts';
 
 export interface DiffToolbarDeps {
   readonly connection: ConnectionManager;
   readonly editor: EditorIntegration;
   readonly graphProvider: KiraGraphViewProvider;
-}
-
-/** The URI shape both `editor.openDiff` and `editor.openRangeDiff` mint (`ports/
- *  editorIntegration.ts`'s `toUri`): `kira-space:/<encoded-key>/<label>`. Resolves either side
- *  of a diff to `{repoId, rev, path}` — `reviewAnchorFor`'s own two opening lines (F11), reused
- *  here rather than re-derived. `undefined` for the `.empty` side (an added/deleted file's other
- *  half) or any URI this scheme did not mint. */
-function resolveVirtualUri(
-  uri: vscode.Uri,
-): { repoId: string; rev: string; path: string } | undefined {
-  if (uri.scheme !== SCHEME) return undefined;
-  const [first] = uri.path.split('/').filter((segment) => segment.length > 0);
-  if (first === undefined) return undefined;
-  const parsed = parseVirtualKey(decodeKey(first));
-  if (!parsed) return undefined;
-  return { repoId: parsed.repoId, rev: parsed.rev, path: parsed.path };
 }
 
 /** The diff tab currently active — never `vscode.window.activeTextEditor`, whose own "active

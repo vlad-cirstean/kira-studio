@@ -1,7 +1,7 @@
 import type { ResultOf } from '@kira/git-ipc';
-import { TransportError } from '@kira/git-ipc';
 import { type ShallowRef, shallowRef } from 'vue';
 import type { BridgeClient } from '../bridge/client.ts';
+import { createLatestRequest } from './latestRequest.ts';
 
 export type CommitDetail = ResultOf<'commit.detail'>;
 
@@ -46,7 +46,7 @@ export class DetailState {
 
   readonly #bridge: BridgeClient;
   #repoId: string | undefined;
-  #detailController: AbortController | undefined;
+  readonly #detailRequest = createLatestRequest<CommitDetail>();
 
   constructor(bridge: BridgeClient) {
     this.#bridge = bridge;
@@ -66,7 +66,7 @@ export class DetailState {
    * reaches this method (callers only invoke it on an actual change).
    */
   select(sha: string | null): void {
-    this.#detailController?.abort();
+    this.#detailRequest.abort();
     this.sha.value = sha;
     this.parentIndex.value = 0;
     this.detail.value = undefined;
@@ -109,29 +109,16 @@ export class DetailState {
     const repoId = this.#repoId;
     const sha = this.sha.value;
     if (!repoId || !sha) return;
-    const controller = new AbortController();
-    this.#detailController = controller;
     const parentIndex = this.parentIndex.value;
-    const stillCurrent = (): boolean =>
-      this.sha.value === sha && this.parentIndex.value === parentIndex;
-    try {
-      const result = await this.#bridge.request(
-        'commit.detail',
-        { repoId, sha, parentIndex },
-        controller.signal,
-      );
-      if (!stillCurrent()) return;
-      this.detail.value = result;
-    } catch (error) {
-      if (error instanceof TransportError && error.code === 'cancelled') return;
-      if (!stillCurrent()) return;
-      this.error.value = error instanceof Error ? error.message : String(error);
-    } finally {
-      if (this.#detailController === controller) this.#detailController = undefined;
-    }
+    const outcome = await this.#detailRequest.run(
+      (signal) => this.#bridge.request('commit.detail', { repoId, sha, parentIndex }, signal),
+      () => this.sha.value === sha && this.parentIndex.value === parentIndex,
+    );
+    if (outcome.status === 'ok') this.detail.value = outcome.value;
+    else if (outcome.status === 'error') this.error.value = outcome.message;
   }
 
   dispose(): void {
-    this.#detailController?.abort();
+    this.#detailRequest.abort();
   }
 }

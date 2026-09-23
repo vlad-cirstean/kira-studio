@@ -16,7 +16,6 @@
  * `goToFile.ts`'s split applies here too (D11): this file is the `vscode`-facing controller;
  * `reviewRanges.ts` is the pure algebra beneath it, importable and testable with no extension host.
  */
-import { basename } from 'node:path';
 import {
   clampRanges,
   coverage,
@@ -29,8 +28,7 @@ import * as vscode from 'vscode';
 import type { ConnectionManager, ConnectionState } from './connection.ts';
 import { memoizedSetter } from './memoizedSetter.ts';
 import { SCHEME } from './ports/editorIntegration.ts';
-import { reviewAnchorFor } from './reviewComments.ts';
-import { decodeKey, encodeKey, parseVirtualKey, virtualKey } from './virtualKey.ts';
+import { resolveVirtualUri, reviewAnchorFor, reviewDocumentUri } from './virtualUri.ts';
 
 const MARK_REVIEWED_COMMAND = 'kiraSpace.markSelectionReviewed';
 const MARK_UNREVIEWED_COMMAND = 'kiraSpace.markSelectionUnreviewed';
@@ -83,31 +81,6 @@ interface MarkingState {
   readonly reviewedRanges: readonly LineRange[];
   readonly lineCount: number;
   readonly stale: boolean;
-}
-
-/** The URI shape `ports/editorIntegration.ts`'s own `toUri` mints, generalised to either side —
- *  `diffToolbar.ts`'s own `resolveVirtualUri`, re-derived here (not imported) for the same reason
- *  `reviewComments.ts` and `diffToolbar.ts` each already carry their own small copy rather than a
- *  shared one: this file, like those, stays a single self-contained `vscode`-facing unit. */
-function resolveVirtualUri(
-  uri: vscode.Uri,
-): { repoId: string; rev: string; path: string } | undefined {
-  if (uri.scheme !== SCHEME) return undefined;
-  const [first] = uri.path.split('/').filter((segment) => segment.length > 0);
-  if (first === undefined) return undefined;
-  const parsed = parseVirtualKey(decodeKey(first));
-  if (!parsed) return undefined;
-  return { repoId: parsed.repoId, rev: parsed.rev, path: parsed.path };
-}
-
-function reviewDocumentUri(
-  repoId: string,
-  branchTip: string,
-  path: string,
-  branch: string,
-): vscode.Uri {
-  const key = virtualKey(repoId, branchTip, path, branch);
-  return vscode.Uri.parse(`${SCHEME}:/${encodeKey(key)}/${encodeURIComponent(basename(path))}`);
 }
 
 function toVscodeRange(range: LineRange): vscode.Range {

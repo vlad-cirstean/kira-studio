@@ -32,7 +32,8 @@ import {
   KuiTextInput,
   type MenuItem,
 } from '@kira/kira-ui';
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { onClickOutside } from '@vueuse/core';
+import { computed, nextTick, ref, watch } from 'vue';
 import { PICKER_TAB_ICONS, STATE_ICONS } from '../icons/index.ts';
 import type { OpsState } from '../state/ops.ts';
 import type { PrState } from '../state/pr.ts';
@@ -538,15 +539,8 @@ async function submitRename(): Promise<void> {
   await props.ops.branchRename(pending.name, to);
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (!isOpen.value) return;
-  if (rootEl.value && event.target instanceof Node && rootEl.value.contains(event.target)) return;
-  close();
-}
-
-watch(isOpen, (open) => {
-  if (open) document.addEventListener('pointerdown', onDocumentPointerDown);
-  else document.removeEventListener('pointerdown', onDocumentPointerDown);
+onClickOutside(rootEl, () => {
+  if (isOpen.value) close();
 });
 
 // G24 D7 point 4: opening the picker is one of the few user acts allowed to touch the network at
@@ -570,10 +564,6 @@ const visibleBranchNames = computed<readonly string[]>(() => {
 watch(visibleBranchNames, (names) => {
   if (names.length === 0 || !props.pr) return;
   void props.pr.ensureSnapshot(names);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown);
 });
 </script>
 

@@ -1,7 +1,10 @@
 import type { ConnectionSummary } from '@shared/domain/connection';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, PortSnapshot } from '../../ipc/support/types';
-import { IPC } from './ipcChannels';
+import {
+  connectAndExpandControl as sharedConnectAndExpandControl,
+  connectionSummary as sharedConnectionSummary,
+} from './engineFixture';
 
 // Real captures against a real Mongo 7 container, seeded with packages/db-fixtures/fixtures/0003_mongo_seed.ts
 // (the same seed packages/db-fixtures/mongo.spec.ts and tests/e2e/mongo.spec.ts use) — via
@@ -148,30 +151,10 @@ const WIDGET_1_BODY =
 
 /** The connect + expand-to-`kira_test` boilerplate every fixture below shares. */
 export function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
-  return [
-    {
-      channel: IPC.connectionsConnect,
-      args: { id: connectionId },
-      response: {
-        connectionId,
-        status: 'connected',
-        serverVersion: SERVER_VERSION,
-        error: null,
-        since: 1735689600000,
-        caps: CAPS,
-      },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: '', refresh: false },
-      response: { nodes: ROOT_CHILDREN, source: 'server', truncated: false },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: DB_PATH, refresh: false },
-      response: { nodes: DB_CHILDREN, source: 'server', truncated: false },
-    },
-  ];
+  return sharedConnectAndExpandControl(connectionId, SERVER_VERSION, CAPS, [
+    { path: '', children: ROOT_CHILDREN },
+    { path: DB_PATH, children: DB_CHILDREN },
+  ]);
 }
 
 /** Connect, expand to `kira_test`, and open `widgets` — a real captured 25-document unfiltered
@@ -251,31 +234,5 @@ export function mongoConnectionSummary(
   name: string,
   color: ConnectionSummary['color'],
 ): ConnectionSummary {
-  return {
-    id,
-    name,
-    kind: 'mongodb',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 27017,
-    database: 'kira_test',
-    username: 'kira',
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
-    sortOrder: 0,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  };
+  return sharedConnectionSummary('mongodb', 27017, 'kira_test', 'kira', id, name, color);
 }
