@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { assertTooltipShows } from '../ui/support/tooltip';
 import { expect, test } from './fixtures';
 import { installPassthrough } from './support/passthrough';
 import {
@@ -73,7 +74,8 @@ test('real Postgres container round-trips through the real Go bridge', async ({
   // The real adapter's own server-version handshake, not a canned one.
   const statusDot = connRow.locator('.status-dot');
   await expect(statusDot).toHaveAttribute('data-status', 'connected', { timeout: 15_000 });
-  await expect(statusDot).toHaveAttribute('data-kira-tip', /^PostgreSQL \d+\./);
+  // P104 §6: the status-dot hint moved off `data-kira-tip` onto the real Tooltip system.
+  await assertTooltipShows(page, statusDot, /^PostgreSQL \d+\./);
 
   await connRow.locator('.twisty').click();
   const dbRow = page.locator('[data-testid="tree-row"][data-path="database:kira_test"]');

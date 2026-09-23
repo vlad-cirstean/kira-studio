@@ -7,6 +7,7 @@ import {
   compositePkConnectAndOpen,
   postgresConnectionSummary,
 } from './support/postgresFixture';
+import { assertTooltipShows, tooltipContent } from './support/tooltip';
 import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
 
 // Ported from tests/e2e/tooltips.spec.ts (P57 D16), against the same real-captured
@@ -121,23 +122,9 @@ const PORT: PortSnapshot[] = [...RW_PORT, ...RO_FIXTURE.port];
 // Every scenario, including 5 and the geometry tests: the real reka tooltip, rendered through a
 // TooltipPortal — `[data-slot="tooltip-content"]` is `ui/tooltip`'s own TooltipContent.vue marker
 // (§6.5's named migration selector), not tied to any one call site's DOM. AttributeTooltip.vue
-// (§6.4's grid-header bridge) renders through this exact same component.
-const tooltipContent = (page: Page): Locator => page.locator('[data-slot="tooltip-content"]');
-
-/** Hovers `trigger` and asserts the real tooltip becomes visible with `text`, well within
- *  TooltipProvider's 400 ms delayDuration. Scenario 1 below additionally checks the "before" side
- *  of that delay; the other scenarios only care that it eventually shows the right thing.
- *  toContainText, not toHaveText: reka's own TooltipContent renders a visually-hidden a11y mirror
- *  span alongside the visible text, so a bare .textContent read sees the text doubled. */
-async function assertTooltipShows(
-  page: Page,
-  trigger: Locator,
-  text: string | RegExp,
-): Promise<void> {
-  await trigger.hover();
-  await expect(tooltipContent(page)).toBeVisible({ timeout: 1_000 });
-  await expect(tooltipContent(page)).toContainText(text);
-}
+// (§6.4's grid-header bridge) renders through this exact same component. `tooltipContent`/
+// `assertTooltipShows` live in `./support/tooltip` — the ipc/e2e-real specs' status-dot and
+// toolbar-button tooltip assertions share this exact helper, not a re-copy.
 
 /** Scenario 1's own connect-and-open steps, factored out for the geometry tests below: they need
  *  a real grid open (so `.slick-header-columns` exists in the DOM for AttributeTooltip.vue's own

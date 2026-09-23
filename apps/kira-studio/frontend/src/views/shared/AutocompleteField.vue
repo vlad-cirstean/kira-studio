@@ -29,10 +29,10 @@ defineOptions({ inheritAttrs: false });
 // whole contract, that the real <input>/<textarea> keeps DOM focus throughout, with
 // `activeIndex` alone driving which suggestion looks current.
 
-// P104 §3.2: the reka `AutocompleteRoot`/`Combobox*` swap for theme/primitives/AutocompleteField.vue
-// — a Stream B-owned sibling rather than an edit to that file, since one of its 7 call sites
-// (DocumentView.vue) is Stream A territory. Keeps every behaviour theme/primitives/
-// AutocompleteField.vue's own header comment named as having no combobox equivalent (a real
+// P104 §3.2: the reka `AutocompleteRoot`/`Combobox*` swap for the old hand-rolled autocomplete
+// field — a Stream B-owned sibling rather than an edit to that file, since one of its 7 call
+// sites (DocumentView.vue) is Stream A territory. Keeps every behaviour the old file's own
+// header comment named as having no combobox equivalent (a real
 // <input>/<textarea> for Playwright's `locator.fill()` and keydown-time enter interception, the
 // Monaco paint overlay, the pointer-hit-tested hover panel) entirely unchanged — this file still
 // owns the real element and its own keyboard model. reka supplies only what it actually has an
