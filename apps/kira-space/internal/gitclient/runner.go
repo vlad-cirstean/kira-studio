@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -159,12 +160,47 @@ var hygieneEnv = []string{
 	"LC_ALL=C",
 }
 
+// gitRedirectEnvKeys (F16) retarget every git spawn to a DIFFERENT repository regardless of
+// Spec.Dir when inherited from this process's own parent (a wrapper script, an IDE task runner):
+// GIT_DIR/GIT_WORK_TREE point git at a whole different repo/worktree; GIT_INDEX_FILE, GIT_OBJECT_
+// DIRECTORY and GIT_COMMON_DIR retarget the index/object store/shared dir of whatever repo IS
+// used; GIT_NAMESPACE silently prefixes every ref this app reads or writes. Stripped from the base
+// environment before spawning (not merely overridden with an empty value — git does not treat an
+// empty GIT_DIR the same as unset) — the same precaution ghclient's own GH_REPO= clear takes for
+// `gh api`, applied by removal here since these can't be safely neutralised with an empty value.
+var gitRedirectEnvKeys = []string{
+	"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_NAMESPACE",
+}
+
+// stripEnvKeys returns base with every "KEY=value" entry whose KEY is in keys removed, preserving
+// the relative order of everything else.
+func stripEnvKeys(base []string, keys []string) []string {
+	out := make([]string, 0, len(base))
+	for _, kv := range base {
+		key, _, _ := strings.Cut(kv, "=")
+		stripped := false
+		for _, k := range keys {
+			if key == k {
+				stripped = true
+				break
+			}
+		}
+		if !stripped {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
 // buildEnv returns the process environment for one spawn — os.Environ() (real inherited
 // environment) is not read directly by tests, which pass their own base instead (see
-// runner_test.go), keeping this pure and independent of the machine it runs on. extra (G7 D5) is
-// appended last, so a spec's own entry wins over hygieneEnv on a duplicate key — the askpass
-// broker's own GIT_ASKPASS/SSH_ASKPASS/tokens are the one caller today.
+// runner_test.go), keeping this pure and independent of the machine it runs on. base is stripped
+// of gitRedirectEnvKeys first (F16) — before hygieneEnv and extra are appended, so neither could
+// ever reintroduce one of them by accident. extra (G7 D5) is appended last, so a spec's own entry
+// wins over hygieneEnv on a duplicate key — the askpass broker's own GIT_ASKPASS/SSH_ASKPASS/
+// tokens are the one caller today.
 func buildEnv(base []string, extra []string) []string {
+	base = stripEnvKeys(base, gitRedirectEnvKeys)
 	env := make([]string, 0, len(base)+len(hygieneEnv)+len(extra))
 	env = append(env, base...)
 	env = append(env, hygieneEnv...)

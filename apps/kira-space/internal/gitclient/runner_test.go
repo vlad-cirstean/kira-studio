@@ -39,6 +39,31 @@ func TestBuildEnv_ExtraWinsOverHygieneOnDuplicateKey(t *testing.T) {
 	}
 }
 
+// TestBuildEnv_StripsGitRedirectEnvKeys is F16's own regression guard: an inherited GIT_DIR (or
+// any of gitRedirectEnvKeys) must never reach the child, regardless of Spec.Dir — it silently
+// retargets every spawn to a different repository. Stripped, not overridden with an empty value
+// (git does not treat GIT_DIR= the same as unset).
+func TestBuildEnv_StripsGitRedirectEnvKeys(t *testing.T) {
+	base := []string{
+		"PATH=/usr/bin",
+		"GIT_DIR=/some/other/repo/.git",
+		"GIT_WORK_TREE=/some/other/repo",
+		"GIT_INDEX_FILE=/tmp/evil.index",
+		"GIT_OBJECT_DIRECTORY=/tmp/evil-objects",
+		"GIT_COMMON_DIR=/tmp/evil-common",
+		"GIT_NAMESPACE=evil",
+		"HOME=/home/kira",
+	}
+	got := buildEnv(base, nil)
+	want := []string{
+		"PATH=/usr/bin", "HOME=/home/kira",
+		"GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0", "GIT_PAGER=cat", "GIT_EDITOR=true", "LC_ALL=C",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("buildEnv with redirect keys in base = %v, want %v (every gitRedirectEnvKeys entry stripped)", got, want)
+	}
+}
+
 func TestBuildArgv_ConfigOverridesThenNoPagerFirst(t *testing.T) {
 	got := buildArgv(Spec{Args: []string{"status"}})
 	want := []string{

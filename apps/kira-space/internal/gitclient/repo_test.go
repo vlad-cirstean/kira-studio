@@ -125,6 +125,70 @@ func TestRepo_ReadBoundsConcurrency(t *testing.T) {
 	}
 }
 
+// TestRepo_PendingWriteBlocksNewReadAdmission is F17's own regression guard: before it, Read's own
+// admission check was only !writing && readers < maxConcurrentReads, so a steady stream of new,
+// overlapping Reads — one finishing and another starting continuously, never letting readers hit
+// zero all at once — could keep a Write waiting forever. Tested at the state level (deterministic,
+// not a wall-clock race against goroutine scheduling): once a Write is registered as pending, a
+// brand-new Read must queue behind it even though a read slot is still free, not sneak in ahead of
+// it.
+func TestRepo_PendingWriteBlocksNewReadAdmission(t *testing.T) {
+	r := newTestRepo()
+
+	// Hold one Read open so the Write below has something to wait for.
+	readHolding := make(chan struct{})
+	readRelease := make(chan struct{})
+	go func() {
+		_ = r.Read(context.Background(), func(context.Context) error {
+			close(readHolding)
+			<-readRelease
+			return nil
+		})
+	}()
+	<-readHolding
+
+	writeDone := make(chan error, 1)
+	go func() {
+		writeDone <- r.Write(context.Background(), func(context.Context) error { return nil })
+	}()
+	// No synchronous signal for "the Write is now pending" — a short, generous sleep is the
+	// simplest wait for that goroutine to reach its own blocking wait loop.
+	time.Sleep(50 * time.Millisecond)
+
+	// F17: a NEW Read must be refused admission (blocked) while that Write is pending, even
+	// though a read slot is still free under maxConcurrentReads.
+	newReadAdmitted := make(chan struct{})
+	go func() {
+		_ = r.Read(context.Background(), func(context.Context) error {
+			close(newReadAdmitted)
+			return nil
+		})
+	}()
+
+	select {
+	case <-newReadAdmitted:
+		t.Fatal("a new Read was admitted while a Write was pending — it should have queued behind the Write instead")
+	case <-time.After(150 * time.Millisecond):
+		// Expected: still blocked.
+	}
+
+	// Release the original Read — the pending Write must proceed, and only afterward the new Read.
+	close(readRelease)
+	select {
+	case err := <-writeDone:
+		if err != nil {
+			t.Fatalf("Write: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Write never completed after the blocking Read released")
+	}
+	select {
+	case <-newReadAdmitted:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the queued Read never got admitted after the Write completed")
+	}
+}
+
 func TestRepo_WriteCancelledWhileQueued(t *testing.T) {
 	r := newTestRepo()
 	// Hold the gate open with a real in-flight Write so the next one genuinely has to queue.

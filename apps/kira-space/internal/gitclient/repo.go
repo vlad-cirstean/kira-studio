@@ -56,7 +56,14 @@ type Repo struct {
 	mu      sync.Mutex
 	writing bool
 	readers int
-	waitCh  chan struct{}
+	// pendingWriters (F17) is how many Write calls are currently waiting for their turn — not
+	// whether one holds the gate (writing already tracks that). Read's own admission check refuses
+	// a NEW reader whenever this is non-zero, so continuous overlapping reads cannot starve a
+	// pending Write forever: once one is waiting, the reader pool only drains, it never refills,
+	// until that Write gets its turn (or gives up). A reader already admitted keeps running
+	// unaffected — this only changes who gets ADMITTED next.
+	pendingWriters int
+	waitCh         chan struct{}
 }
 
 // Runner returns this repo's own spawn seam — G3's logsession/catfile need it directly (their
@@ -99,6 +106,21 @@ func (r *Repo) notifyLocked() {
 // operation in P1 actually calls this yet (§0.2: no porcelain, no mutating command); it exists now
 // so a later phase's first real write has nowhere else to go.
 func (r *Repo) Write(ctx context.Context, fn func(ctx context.Context) error) error {
+	// F17: registered as pending for the whole wait, not just while actually holding the gate —
+	// this is the signal Read's own admission check refuses a new reader against. notifyLocked on
+	// the way out covers the ctx-cancellation exit below too: a reader parked on the OLD waitCh
+	// must be woken to recheck once this Write gives up and pendingWriters drops back to zero, or
+	// it would otherwise have no reason to ever wake on its own.
+	r.mu.Lock()
+	r.pendingWriters++
+	r.mu.Unlock()
+	defer func() {
+		r.mu.Lock()
+		r.pendingWriters--
+		r.notifyLocked()
+		r.mu.Unlock()
+	}()
+
 	for {
 		r.mu.Lock()
 		if !r.writing && r.readers == 0 {
@@ -124,11 +146,13 @@ func (r *Repo) Write(ctx context.Context, fn func(ctx context.Context) error) er
 }
 
 // Read runs fn with one of maxConcurrentReads slots — many can run at once, bounded, and never
-// alongside a Write.
+// alongside a Write. F17: also refuses admission whenever a Write is pending (Repo.pendingWriters),
+// even though !writing still holds — a Write waiting for the CURRENT readers to drain must not be
+// joined by new ones indefinitely; an already-admitted reader is unaffected and keeps running.
 func (r *Repo) Read(ctx context.Context, fn func(ctx context.Context) error) error {
 	for {
 		r.mu.Lock()
-		if !r.writing && r.readers < maxConcurrentReads {
+		if !r.writing && r.pendingWriters == 0 && r.readers < maxConcurrentReads {
 			r.readers++
 			r.mu.Unlock()
 			break
