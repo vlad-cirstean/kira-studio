@@ -60,8 +60,20 @@ type Session struct {
 	stop   sync.Once
 
 	mu          sync.Mutex
-	activeWork  map[int]context.CancelFunc
+	activeWork  map[int]*activeEntry
 	creditGates map[int]*creditGate
+}
+
+// activeEntry is one in-flight request/stream's own identity, not just the id it is keyed by
+// (F8): handleRequest/handleOpen keep the exact *activeEntry handleRaw registered and compare it
+// back (removeActiveWork, below) before deleting activeWork[id] or creditGates[id] — so a request
+// finishing after its id slot was already reassigned can never delete a newer request's own entry
+// out from under it. handleRaw's own already-in-flight check refuses a client that reuses a live
+// id outright, so this is latent hardening for the one path that check does not cover — id reuse
+// after cancel/finish — rather than a bug hit by the one real client today (rpc.ts issues ids
+// monotonically from 1).
+type activeEntry struct {
+	cancel context.CancelFunc
 }
 
 // NewSession constructs a Session over conn — Serve (below) is what actually runs it; a caller
@@ -73,7 +85,7 @@ func NewSession(conn Conn, h Handlers) *Session {
 		conn:        conn,
 		sendCh:      make(chan []byte, 16),
 		done:        make(chan struct{}),
-		activeWork:  make(map[int]context.CancelFunc),
+		activeWork:  make(map[int]*activeEntry),
 		creditGates: make(map[int]*creditGate),
 	}
 	go s.writeLoop()
@@ -156,14 +168,17 @@ func (s *Session) Emit(method string, payload any) {
 	s.send(frame{T: "evt", Method: method, Payload: b})
 }
 
-// removeActiveWork deletes id from activeWork and reports whether it was actually present —
-// mirrors rpc.ts's own `if (activeWork.delete(id))` idiom: a completion that loses the race
-// against an incoming 'cancel' frame (which deletes the same entry first) must send nothing, since
-// the client already resolved locally the moment it sent 'cancel' and is not waiting on a reply.
-func (s *Session) removeActiveWork(id int) bool {
+// removeActiveWork deletes id from activeWork iff its current entry is exactly entry — identity,
+// not just the id key (F8) — and reports whether it did. Mirrors rpc.ts's own
+// `if (activeWork.delete(id))` idiom, extended: a completion that loses the race against an
+// incoming 'cancel' frame (which deletes the same entry first) must send nothing, since the client
+// already resolved locally the moment it sent 'cancel' and is not waiting on a reply — and a
+// completion that loses the race against id reuse (a later request already holding that id slot)
+// must likewise send nothing and must never delete the later request's own entry.
+func (s *Session) removeActiveWork(id int, entry *activeEntry) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.activeWork[id]; !ok {
+	if current, ok := s.activeWork[id]; !ok || current != entry {
 		return false
 	}
 	delete(s.activeWork, id)
@@ -177,11 +192,11 @@ func (s *Session) removeActiveWork(id int) bool {
 // acquiring the lock, where a second 'req' frame for the same id passes handleRaw's own
 // already-in-flight check and both goroutines end up racing to set the same map entry — exactly
 // the silent-response-drop this fix exists to close.
-func (s *Session) handleRequest(ctx context.Context, cancel context.CancelFunc, id int, method string, params json.RawMessage) {
+func (s *Session) handleRequest(ctx context.Context, entry *activeEntry, id int, method string, params json.RawMessage) {
 	result, err := s.h.Request(ctx, method, params)
-	cancel()
+	entry.cancel()
 
-	if !s.removeActiveWork(id) {
+	if !s.removeActiveWork(id, entry) {
 		return
 	}
 	if err != nil {
@@ -201,7 +216,7 @@ func (s *Session) handleRequest(ctx context.Context, cancel context.CancelFunc, 
 // immediately after 'open' (every real client does, rpc.ts's own stream() posts both back to
 // back) must always find the gate already there; registering it from inside this goroutine would
 // race the very next frame handleRaw's own receive loop processes.
-func (s *Session) handleOpen(ctx context.Context, cancel context.CancelFunc, gate *creditGate, id int, method string, params json.RawMessage) {
+func (s *Session) handleOpen(ctx context.Context, entry *activeEntry, gate *creditGate, id int, method string, params json.RawMessage) {
 	seq := 0
 	emit := func(payload any, blob []byte) error {
 		if err := gate.acquire(ctx); err != nil {
@@ -220,12 +235,14 @@ func (s *Session) handleOpen(ctx context.Context, cancel context.CancelFunc, gat
 
 	streamErr := s.h.Stream(ctx, method, params, emit)
 
-	cancel()
+	entry.cancel()
 	s.mu.Lock()
-	delete(s.creditGates, id)
+	if s.creditGates[id] == gate {
+		delete(s.creditGates, id)
+	}
 	s.mu.Unlock()
 
-	if !s.removeActiveWork(id) {
+	if !s.removeActiveWork(id, entry) {
 		return
 	}
 	if streamErr != nil {
@@ -246,14 +263,14 @@ func (s *Session) handleCredit(id, n int) {
 
 func (s *Session) handleCancel(id int) {
 	s.mu.Lock()
-	cancel, ok := s.activeWork[id]
+	entry, ok := s.activeWork[id]
 	if ok {
 		delete(s.activeWork, id)
 		delete(s.creditGates, id)
 	}
 	s.mu.Unlock()
 	if ok {
-		cancel()
+		entry.cancel()
 	}
 }
 
@@ -281,6 +298,7 @@ func (s *Session) handleRaw(raw []byte) {
 		// handleOpen's own already-synchronous registration below) so a second 'req' for the
 		// same id can never slip past the check before the first's registration lands.
 		ctx, cancel := context.WithCancel(context.Background())
+		entry := &activeEntry{cancel: cancel}
 		s.mu.Lock()
 		if _, inFlight := s.activeWork[env.Body.ID]; inFlight {
 			s.mu.Unlock()
@@ -290,12 +308,13 @@ func (s *Session) handleRaw(raw []byte) {
 			)})
 			return
 		}
-		s.activeWork[env.Body.ID] = cancel
+		s.activeWork[env.Body.ID] = entry
 		s.mu.Unlock()
-		go s.handleRequest(ctx, cancel, env.Body.ID, env.Body.Method, env.Body.Params)
+		go s.handleRequest(ctx, entry, env.Body.ID, env.Body.Method, env.Body.Params)
 	case "open":
 		ctx, cancel := context.WithCancel(context.Background())
 		gate := newCreditGate()
+		entry := &activeEntry{cancel: cancel}
 		s.mu.Lock()
 		if _, inFlight := s.activeWork[env.Body.ID]; inFlight {
 			s.mu.Unlock()
@@ -305,10 +324,10 @@ func (s *Session) handleRaw(raw []byte) {
 			)})
 			return
 		}
-		s.activeWork[env.Body.ID] = cancel
+		s.activeWork[env.Body.ID] = entry
 		s.creditGates[env.Body.ID] = gate
 		s.mu.Unlock()
-		go s.handleOpen(ctx, cancel, gate, env.Body.ID, env.Body.Method, env.Body.Params)
+		go s.handleOpen(ctx, entry, gate, env.Body.ID, env.Body.Method, env.Body.Params)
 	case "credit":
 		s.handleCredit(env.Body.ID, env.Body.N)
 	case "cancel":
@@ -322,10 +341,10 @@ func (s *Session) handleRaw(raw []byte) {
 
 func (s *Session) close() {
 	s.mu.Lock()
-	for _, cancel := range s.activeWork {
-		cancel()
+	for _, entry := range s.activeWork {
+		entry.cancel()
 	}
-	s.activeWork = make(map[int]context.CancelFunc)
+	s.activeWork = make(map[int]*activeEntry)
 	s.creditGates = make(map[int]*creditGate)
 	s.mu.Unlock()
 	s.stop.Do(func() { close(s.done) })
