@@ -126,9 +126,10 @@ test('the .md control family in SettingsDialog is one height, equal to --kira-co
   // P104 §2: settings-font-size is now InputGroupInput's own borderless leaf, nested one level
   // inside the bordered InputGroup box (the stepper recipe's own box-model split) -- the group's
   // own root is what actually renders at --kira-control-h-lg, so that's what this measures.
+  // P105 §16: InputGroup's own root is a <fieldset> (implicit role="group"), not a <div>.
   const fontSizeInputHeight = await page
     .locator('[data-testid="settings-font-size"]')
-    .locator('xpath=ancestor::div[@data-slot="input-group"][1]')
+    .locator('xpath=ancestor::fieldset[@data-slot="input-group"][1]')
     .evaluate((el) => el.getBoundingClientRect().height);
   expect(fontSizeInputHeight).toBeCloseTo(controlHLg, 0);
 
