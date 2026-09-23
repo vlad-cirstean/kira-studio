@@ -150,6 +150,9 @@ func (e *RepoEntry) Stacks(ctx context.Context) (gitpreflight.StackListResult, e
 	if cached, ok := e.stack.get(); ok {
 		return cached, nil
 	}
+	// F10 (P108 Part 16 review): captured before every spawn below — see Refs' own identical
+	// guard and cacheGeneration's own doc comment.
+	gen := e.cacheGeneration()
 	config, err := e.rawStackConfig(ctx)
 	if err != nil {
 		return gitpreflight.StackListResult{}, err
@@ -162,7 +165,9 @@ func (e *RepoEntry) Stacks(ctx context.Context) (gitpreflight.StackListResult, e
 	if err != nil {
 		return gitpreflight.StackListResult{}, err
 	}
-	e.stack.set(result)
+	if e.cacheGeneration() == gen {
+		e.stack.set(result)
+	}
 	return result, nil
 }
 

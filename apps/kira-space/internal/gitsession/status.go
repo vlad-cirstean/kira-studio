@@ -34,6 +34,12 @@ func (e *RepoEntry) statusAndInProgress(ctx context.Context) (porcelain.StatusRe
 	var stateFiles gitpreflight.InProgressStateFiles
 	var statusErr error
 
+	// F10 (P108 Part 16 review): captured before the spawns below — see Refs' own identical guard
+	// and cacheGeneration's own doc comment. setHead below is skipped, not just this method's own
+	// cache, since a stale head is exactly the same "serve pre-change data after the change already
+	// invalidated it" hazard.
+	gen := e.cacheGeneration()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -62,7 +68,9 @@ func (e *RepoEntry) statusAndInProgress(ctx context.Context) (porcelain.StatusRe
 	}
 
 	inProgress := gitpreflight.ClassifyInProgress(stateFiles, gitpreflight.UnmergedPaths(statusResult))
-	e.setHead(headStateFromStatusBranch(statusResult.Branch))
+	if e.cacheGeneration() == gen {
+		e.setHead(headStateFromStatusBranch(statusResult.Branch))
+	}
 	return statusResult, inProgress, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/ghclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
@@ -86,6 +87,16 @@ type RepoEntry struct {
 	// dropped on refsChanged and by invalidateAfterWrite exactly like refs/stack (cache.go's own
 	// doc comment on mergeBaseCache).
 	mergeBases *mergeBaseCache
+
+	// cacheGen is F10's own generation counter (P108 Part 16 review): bumped by invalidateAfterWrite
+	// and note's own refsChanged branch, alongside (and for the same reason as) every cache drop
+	// those two already make. Nothing stops a read that started BEFORE a ref change from calling its
+	// own cache.set()/setHead() AFTER that change already cleared the cache for it — serving
+	// pre-change data even to the client's own refetch after the repo.changed event this same change
+	// triggers, until the next ref change happens to clear it again. A reader captures
+	// cacheGeneration() before spawning its own work and only writes back if it still matches
+	// afterward — see CommitDetail/Stacks/mergeBase/Refs/statusAndInProgress's own call sites.
+	cacheGen atomic.Uint64
 
 	// headMu guards head/headStale, separate from mu (subs' own lock): every read/status/pre-flight
 	// spawn touches head far more often than it touches the subscriber set.
@@ -224,6 +235,9 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 	// a Walk stale — a client that reacts to repo.changed by re-requesting a detail, a ref list or
 	// a fresh head must never be served the pre-change decoration.
 	if sig == gitclient.SignalRefsChanged {
+		// F10 (P108 Part 16 review): bumped alongside the drops below — see cacheGeneration's own
+		// doc comment.
+		e.cacheGen.Add(1)
 		e.detail.dropAll()
 		e.refs.drop()
 		e.stack.drop()
@@ -335,7 +349,16 @@ func (e *RepoEntry) setHead(h gitclient.HeadState) {
 // that fans repo.changed out to subscribers. This emits no event (a second emitter would double
 // every event a client sees) and marks no Walk stale (a Walk is per-connection; reaching from an
 // entry into every connection's walks would invert the dependency the subscriber already owns).
+// cacheGeneration returns the entry's current cache generation (F10) — see cacheGen's own doc
+// comment on the RepoEntry struct.
+func (e *RepoEntry) cacheGeneration() uint64 {
+	return e.cacheGen.Load()
+}
+
 func (e *RepoEntry) invalidateAfterWrite() {
+	// F10 (P108 Part 16 review): bumped alongside the drops below — see cacheGeneration's own doc
+	// comment.
+	e.cacheGen.Add(1)
 	e.detail.dropAll()
 	e.refs.drop()
 	e.stack.drop()

@@ -23,11 +23,18 @@ func (e *RepoEntry) Refs(ctx context.Context) (RefsResult, error) {
 	if cached, ok := e.refs.get(); ok {
 		return cached, nil
 	}
+	// F10 (P108 Part 16 review): captured before the spawn below — a ref change that lands (and
+	// clears this cache) while refsSnapshot is still in flight must not have its own clear
+	// clobbered by this call's now-stale result once it finally returns. See cacheGeneration's own
+	// doc comment.
+	gen := e.cacheGeneration()
 	result, err := e.refsSnapshot(ctx)
 	if err != nil {
 		return RefsResult{}, err
 	}
-	e.refs.set(result)
+	if e.cacheGeneration() == gen {
+		e.refs.set(result)
+	}
 	return result, nil
 }
 

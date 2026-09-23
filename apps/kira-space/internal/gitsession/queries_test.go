@@ -5,8 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 	"github.com/kirathecat/kira-studio/internal/testx"
 )
@@ -309,5 +312,58 @@ func TestBlameLine_PathEscapingRootIsRefused(t *testing.T) {
 	_, err := e.BlameLine(context.Background(), "../../etc/passwd", 1)
 	if err != ErrPathEscapesRoot {
 		t.Fatalf("err = %v, want ErrPathEscapesRoot", err)
+	}
+}
+
+// refsChangeDuringFirstForEachRefRunner wraps a real Runner, firing entry's own refsChanged
+// signal (note()) exactly once, synchronously, the first time it sees a for-each-ref spawn —
+// simulates a ref change landing WHILE refsSnapshot's own read is still in flight, deterministically
+// rather than racing real timing.
+type refsChangeDuringFirstForEachRefRunner struct {
+	gitclient.Runner
+	entry   atomic.Pointer[RepoEntry]
+	trigger sync.Once
+}
+
+func (r *refsChangeDuringFirstForEachRefRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	if len(spec.Args) > 0 && spec.Args[0] == "for-each-ref" {
+		r.trigger.Do(func() {
+			if e := r.entry.Load(); e != nil {
+				e.note(gitclient.SignalRefsChanged)
+			}
+		})
+	}
+	return r.Runner.Start(ctx, gitPath, spec)
+}
+
+// TestRefs_ConcurrentInvalidationDuringSpawnNotClobbered is F10's own regression proof (P108 Part
+// 16 review): nothing stopped a Refs() read that started BEFORE a ref change from calling its own
+// e.refs.set() AFTER that change already cleared the cache for it -- serving pre-change data even
+// to the client's own refetch after the very repo.changed event this change triggers, until the
+// next ref change happens to clear it again.
+func TestRefs_ConcurrentInvalidationDuringSpawnNotClobbered(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir := t.TempDir()
+	runGitQ(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("1\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	runGitQ(t, dir, "add", "f.txt")
+	runGitQ(t, dir, "commit", "-q", "-m", "c1")
+
+	runner := &refsChangeDuringFirstForEachRefRunner{Runner: gitclient.NewExecRunner()}
+	_, entry := newTestEntry(t, ConnID("f10-test-conn"), dir, testEntryOpts{runner: runner})
+	runner.entry.Store(entry)
+
+	ctx := context.Background()
+	if _, err := entry.Refs(ctx); err != nil {
+		t.Fatalf("Refs (first, triggers the mid-flight refsChanged): %v", err)
+	}
+
+	// The refsChanged signal fired mid-spawn already cleared the cache; Refs' own result (computed
+	// from a snapshot taken before that change) must not have been written back over that clear.
+	if _, ok := entry.refs.get(); ok {
+		t.Fatal("refs cache holds a value after a concurrent refsChanged invalidated it mid-spawn -- the in-flight read's own stale result clobbered the clear")
 	}
 }

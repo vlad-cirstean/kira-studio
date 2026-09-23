@@ -147,6 +147,9 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 	if cached, ok := e.detail.get(sha, parentIndex); ok {
 		return cached, nil
 	}
+	// F10 (P108 Part 16 review): captured before every spawn below — see Refs' own identical
+	// guard and cacheGeneration's own doc comment.
+	gen := e.cacheGeneration()
 
 	metaRaw, err := e.runOne(ctx, porcelain.ShowMetadataArgs(sha))
 	if err != nil {
@@ -230,7 +233,9 @@ func (e *RepoEntry) CommitDetail(ctx context.Context, sha string, parentIndex in
 		Decoration: meta.Decoration, ParentIndex: parentIndex,
 		Files: porcelain.CombineFileChanges(numstat, nameStatus),
 	}
-	e.detail.set(sha, parentIndex, detail)
+	if e.cacheGeneration() == gen {
+		e.detail.set(sha, parentIndex, detail)
+	}
 	return detail, nil
 }
 

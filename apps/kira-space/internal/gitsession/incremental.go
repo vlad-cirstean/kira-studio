@@ -118,16 +118,23 @@ func (e *RepoEntry) mergeBase(ctx context.Context, base, branch string) (string,
 	if v, ok := e.mergeBases.get(base, branch); ok {
 		return v.sha, v.ok, nil
 	}
+	// F10 (P108 Part 16 review): captured before the spawn below — see Refs' own identical guard
+	// and cacheGeneration's own doc comment.
+	gen := e.cacheGeneration()
 	res, err := e.runAllowingExit(ctx, porcelain.MergeBaseArgs(base, branch), 0, 1)
 	if err != nil {
 		return "", false, err
 	}
 	if res.ExitCode != 0 {
-		e.mergeBases.set(base, branch, mergeBaseCacheValue{})
+		if e.cacheGeneration() == gen {
+			e.mergeBases.set(base, branch, mergeBaseCacheValue{})
+		}
 		return "", false, nil
 	}
 	sha := trimTrailingNewline(res.Stdout)
-	e.mergeBases.set(base, branch, mergeBaseCacheValue{sha: sha, ok: true})
+	if e.cacheGeneration() == gen {
+		e.mergeBases.set(base, branch, mergeBaseCacheValue{sha: sha, ok: true})
+	}
 	return sha, true, nil
 }
 
