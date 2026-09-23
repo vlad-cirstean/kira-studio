@@ -254,31 +254,96 @@ func applyConfiguredByURLPassword(fields *ResolvedFields, ds DataSource, expande
 	}
 }
 
-// redactURLCredentials returns raw with any embedded "user:password@" (or bare "user@") userinfo
-// replaced by a fixed placeholder — the one thing standing between a configured-by-url source's
-// JDBC URL and D9's "a password never crosses the bridge" guarantee once that URL is quoted back
-// in a user-facing skip/error string (PreviewRow.SkipDetail, ReportRow.Error). A real net/url
-// round-trip is deliberately not used here: every caller of this function is on a path where the
-// URL is, by definition, one net/url may not parse cleanly (mongodb+srv, a comma-separated
-// multi-host authority, an unmapped/unsupported scheme) — a plain scan-and-mask over the raw text
-// works uniformly across all of them, parseable or not. Only the last '@' before the first '/', '?'
-// or '#' following it is treated as a userinfo delimiter, so an '@' that is actually part of a
-// path/query is left alone rather than risk mangling something that was never a credential.
+// redactURLCredentials returns raw with any embedded "user:password@" (or bare "user@") userinfo,
+// and any query parameter that looks like a credential, replaced by a fixed placeholder — the one
+// thing standing between a configured-by-url source's JDBC URL and D9's "a password never crosses
+// the bridge" guarantee once that URL is quoted back in a user-facing skip/error string
+// (PreviewRow.SkipDetail, ReportRow.Error). A real net/url round-trip is deliberately not used
+// here: every caller of this function is on a path where the URL is, by definition, one net/url
+// may not parse cleanly (mongodb+srv, a comma-separated multi-host authority, an
+// unmapped/unsupported scheme) — a plain scan-and-mask over the raw text works uniformly across
+// all of them, parseable or not.
+//
+// F6 (P108 Part 3): once a real "://" scheme boundary is found, the last '@' after it used to be
+// treated as a userinfo delimiter only when nothing between the scheme and it looked like a raw
+// '/', '?' or '#' — a password containing one of those (e.g.
+// "jdbc:postgresql://u:pa/ss@h1,h2/db") fell through that guard and returned raw *unredacted*,
+// password included. Now redacted unconditionally in that case: once "://" is found, everything up
+// to the next '@' IS the authority, and a raw '/', '?' or '#' inside it can only mean an unencoded
+// password, never a coincidence — over-redacting a small amount of non-credential error text is an
+// acceptable tradeoff against ever leaking a real one. Without a "://" at all (e.g. sqlite's own
+// "jdbc:sqlite:/path" — no authority to anchor on), the old conservative check still applies: an
+// '@' that turns out to sit in a bare path/filename ("jdbc:sqlite:/db/user@host.sqlite") is left
+// alone rather than mangling text that was never a credential. redactQueryCredentials below is
+// this function's own second half — a query-string password (?user=u&password=secret) was never
+// masked at all before this fix, regardless of userinfo.
 func redactURLCredentials(raw string) string {
+	return redactQueryCredentials(redactUserinfo(raw))
+}
+
+// redactUserinfo is redactURLCredentials' own userinfo half.
+func redactUserinfo(raw string) string {
 	at := strings.LastIndex(raw, "@")
 	if at == -1 {
 		return raw
 	}
 	schemeEnd := strings.LastIndex(raw[:at], "://")
-	start := 0
-	if schemeEnd != -1 {
-		start = schemeEnd + len("://")
+	if schemeEnd == -1 {
+		userinfo := raw[:at]
+		if userinfo == "" || strings.ContainsAny(userinfo, "/?#") {
+			return raw
+		}
+		return "REDACTED" + raw[at:]
 	}
-	userinfo := raw[start:at]
-	if userinfo == "" || strings.ContainsAny(userinfo, "/?#") {
+	start := schemeEnd + len("://")
+	if raw[start:at] == "" {
 		return raw
 	}
 	return raw[:start] + "REDACTED" + raw[at:]
+}
+
+// credentialQueryKeys names the substrings (case-insensitive) redactQueryCredentials treats a
+// query parameter's key as a credential for — covers the common spellings a JDBC URL's own query
+// string uses (password, pwd, secret, token, apiToken, access_token, …) without needing an exact
+// key match.
+var credentialQueryKeys = []string{"pass", "pwd", "secret", "token"}
+
+// redactQueryCredentials masks the value of every query parameter (raw's first '?' to its next
+// '#', or to its end) whose key contains one of credentialQueryKeys, case-insensitively. A key
+// with no matching substring, or a value-less key (bare "?flag"), is left untouched.
+func redactQueryCredentials(raw string) string {
+	q := strings.IndexByte(raw, '?')
+	if q < 0 {
+		return raw
+	}
+	query := raw[q+1:]
+	fragment := ""
+	if h := strings.IndexByte(query, '#'); h >= 0 {
+		query, fragment = query[:h], query[h:]
+	}
+	if query == "" {
+		return raw
+	}
+
+	pairs := strings.Split(query, "&")
+	for i, pair := range pairs {
+		eq := strings.IndexByte(pair, '=')
+		if eq < 0 {
+			continue
+		}
+		key, value := pair[:eq], pair[eq+1:]
+		if value == "" {
+			continue
+		}
+		lower := strings.ToLower(key)
+		for _, marker := range credentialQueryKeys {
+			if strings.Contains(lower, marker) {
+				pairs[i] = key + "=REDACTED"
+				break
+			}
+		}
+	}
+	return raw[:q+1] + strings.Join(pairs, "&") + fragment
 }
 
 func stripJDBCPrefix(raw, prefix string) string {

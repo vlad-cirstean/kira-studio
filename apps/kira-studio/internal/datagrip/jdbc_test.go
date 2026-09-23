@@ -244,6 +244,18 @@ func TestRedactURLCredentials(t *testing.T) {
 		{"mongodb+srv scheme", "mongodb+srv://scott:tiger@cluster.example/db", "mongodb+srv://REDACTED@cluster.example/db"},
 		{"no scheme at all", "scott:tiger@host:5432/db", "REDACTED@host:5432/db"},
 		{"at sign only in path, not userinfo", "jdbc:sqlite:/db/user@host.sqlite", "jdbc:sqlite:/db/user@host.sqlite"},
+		// F6 (P108 Part 3): a raw '/' in the password, once "://" itself was found, used to fall
+		// through to returning raw unredacted — reproduced with the exact multi-host shape a real
+		// JDBC URL can carry.
+		{"raw slash in password, multi-host authority", "jdbc:postgresql://u:pa/ss@h1,h2/db", "jdbc:postgresql://REDACTED@h1,h2/db"},
+		{"raw question mark in password", "jdbc:postgresql://u:pa?ss@h/db", "jdbc:postgresql://REDACTED@h/db"},
+		{"raw hash in password", "jdbc:postgresql://u:pa#ss@h/db", "jdbc:postgresql://REDACTED@h/db"},
+		// F6: query-string credentials were never masked at all before this fix.
+		{"password in query string", "jdbc:postgresql://h/db?user=u&password=secret", "jdbc:postgresql://h/db?user=u&password=REDACTED"},
+		{"token in query string, case-insensitive key", "jdbc:mongodb://h/db?apiToken=abc123", "jdbc:mongodb://h/db?apiToken=REDACTED"},
+		{"non-credential query param untouched", "jdbc:postgresql://h/db?sslmode=require", "jdbc:postgresql://h/db?sslmode=require"},
+		{"both userinfo and query credentials", "jdbc:postgresql://u:pa/ss@h/db?token=xyz", "jdbc:postgresql://REDACTED@h/db?token=REDACTED"},
+		{"query credential before a fragment", "jdbc:postgresql://h/db?pwd=secret#frag", "jdbc:postgresql://h/db?pwd=REDACTED#frag"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
