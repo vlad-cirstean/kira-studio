@@ -21,18 +21,19 @@ type ObjectInfo struct {
 var ErrMissing = errors.New("catfile: object missing")
 
 // readHeader reads one response's header line (up to LF) and reports whether the object was
-// found. Missing is recognised by the line's own " missing" suffix, not by counting fields: git
-// echoes the *input* verbatim ahead of it (`<input> missing`), and the input for a `<rev>:<path>`
-// request can itself contain spaces, so a naive field-count/split heuristic cannot tell a found
-// line from a missing one reliably. The suffix can: a found line's third field is always numeric
-// and can never literally read "missing".
+// found. Non-found is recognised by the line's own suffix, not by counting fields: git echoes the
+// *input* verbatim ahead of it (`<input> missing`, and F10's own addition, `<input> ambiguous` —
+// a short OID matching more than one object, verified against real git 2.43), and the input for a
+// `<rev>:<path>` request can itself contain spaces, so a naive field-count/split heuristic cannot
+// tell a found line from a non-found one reliably. The suffix can: a found line's third field is
+// always numeric and can never literally read "missing" or "ambiguous".
 func readHeader(r *bufio.Reader) (ObjectInfo, bool, error) {
 	line, err := r.ReadString('\n')
 	if err != nil {
 		return ObjectInfo{}, false, err
 	}
 	line = strings.TrimSuffix(line, "\n")
-	if strings.HasSuffix(line, " missing") {
+	if strings.HasSuffix(line, " missing") || strings.HasSuffix(line, " ambiguous") {
 		return ObjectInfo{}, false, nil
 	}
 	fields := strings.SplitN(line, " ", 3)

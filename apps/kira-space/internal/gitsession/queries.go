@@ -307,7 +307,7 @@ func (e *RepoEntry) FileDiff(ctx context.Context, sha, path, originalPath string
 		if perr != nil {
 			return FileDiffResult{}, perr
 		}
-		body, err = e.resolveParsedBody(parsed)
+		body, err = e.resolveParsedBody(ctx, parsed)
 		if err != nil {
 			return FileDiffResult{}, err
 		}
@@ -322,7 +322,7 @@ func (e *RepoEntry) FileDiff(ctx context.Context, sha, path, originalPath string
 // resolveParsedBody turns porcelain's own narrower ParsedBody into the wire FileDiffBody — the
 // one step porcelain itself cannot take (§3.2's own note): a binary arm's byte counts need a
 // cat-file round trip, which is this package's job, not a pure parser's.
-func (e *RepoEntry) resolveParsedBody(parsed porcelain.ParsedBody) (porcelain.FileDiffBody, error) {
+func (e *RepoEntry) resolveParsedBody(ctx context.Context, parsed porcelain.ParsedBody) (porcelain.FileDiffBody, error) {
 	switch parsed.Kind {
 	case porcelain.ParsedText:
 		return porcelain.FileDiffBody{Kind: porcelain.BodyText, Hunks: parsed.Hunks}, nil
@@ -331,11 +331,11 @@ func (e *RepoEntry) resolveParsedBody(parsed porcelain.ParsedBody) (porcelain.Fi
 	case porcelain.ParsedLFSPointer:
 		return porcelain.FileDiffBody{Kind: porcelain.BodyLFSPointer, OID: parsed.LFSOID, Bytes: parsed.LFSBytes}, nil
 	case porcelain.ParsedBinary:
-		oldBytes, err := e.blobSizeOrNil(parsed.OldOID)
+		oldBytes, err := e.blobSizeOrNil(ctx, parsed.OldOID)
 		if err != nil {
 			return porcelain.FileDiffBody{}, err
 		}
-		newBytes, err := e.blobSizeOrNil(parsed.NewOID)
+		newBytes, err := e.blobSizeOrNil(ctx, parsed.NewOID)
 		if err != nil {
 			return porcelain.FileDiffBody{}, err
 		}
@@ -348,12 +348,12 @@ func (e *RepoEntry) resolveParsedBody(parsed porcelain.ParsedBody) (porcelain.Fi
 // blobSizeOrNil looks up oid's size via --batch-check alone (never reading content) — nil, not an
 // error, for a missing object: the all-zero oid a new or deleted binary file's pre/post image
 // carries is exactly this case, and the wire's own oldBytes/newBytes are `undefined` for it.
-func (e *RepoEntry) blobSizeOrNil(oid string) (*int64, error) {
+func (e *RepoEntry) blobSizeOrNil(ctx context.Context, oid string) (*int64, error) {
 	session := e.CatFile()
 	if session == nil {
 		return nil, ErrRepoTornDown
 	}
-	info, err := session.Check(oid)
+	info, err := session.Check(ctx, oid)
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
 			return nil, nil
@@ -412,7 +412,7 @@ func (e *RepoEntry) Blob(ctx context.Context, rev, path string) (BlobResult, err
 	if strings.ContainsRune(full, '\n') {
 		info, content, err = session.ReadOneShot(ctx, full)
 	} else {
-		info, content, err = session.Read(full)
+		info, content, err = session.Read(ctx, full)
 	}
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {

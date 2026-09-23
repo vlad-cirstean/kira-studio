@@ -67,6 +67,32 @@ func TestBatchFraming_MissingWithSpacesInEchoedInput(t *testing.T) {
 	}
 }
 
+// TestBatchFraming_Ambiguous is F10's own regression guard: a short OID matching more than one
+// object answers "<input> ambiguous" (verified against real git 2.43, cat-file --batch-check on a
+// deliberately colliding short prefix) — must be treated the same as "missing" (found=false, no
+// error), not a parse failure that trips the circuit breaker on an ordinary short-OID collision.
+func TestBatchFraming_Ambiguous(t *testing.T) {
+	r := bufio.NewReader(&dripReader{data: []byte("76a4f ambiguous\n"), n: 1})
+	_, found, err := readHeader(r)
+	if err != nil {
+		t.Fatalf("readHeader: %v", err)
+	}
+	if found {
+		t.Fatal("expected found=false for an 'ambiguous' reply")
+	}
+}
+
+// TestBatchFraming_GenuinelyMalformedHeaderStillErrors proves F10's own fix did not loosen the
+// circuit breaker's real protection: a header that is neither a found "<oid> <type> <size>" line
+// nor a recognised "<input> missing"/"<input> ambiguous" reply is still a parse error, same as
+// before.
+func TestBatchFraming_GenuinelyMalformedHeaderStillErrors(t *testing.T) {
+	r := bufio.NewReader(&dripReader{data: []byte("not a real header at all\n"), n: 1})
+	if _, _, err := readHeader(r); err == nil {
+		t.Fatal("expected an error for a genuinely malformed header")
+	}
+}
+
 func TestBatchFraming_ContentMissingTrailingLF(t *testing.T) {
 	r := bufio.NewReader(strings.NewReader("hello"))
 	if _, err := readContent(r, 5); err == nil {

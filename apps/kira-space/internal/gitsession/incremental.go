@@ -170,7 +170,7 @@ func (e *RepoEntry) blobOID(ctx context.Context, rev, path string) (string, erro
 	if strings.ContainsRune(full, '\n') {
 		info, err = session.CheckOneShot(ctx, full)
 	} else {
-		info, err = session.Check(full)
+		info, err = session.Check(ctx, full)
 	}
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {
@@ -221,7 +221,7 @@ func (e *RepoEntry) blobOIDs(ctx context.Context, rev string, paths []string) ([
 		batchIndices = append(batchIndices, i)
 	}
 	if len(batchRevs) > 0 {
-		infos, err := session.CheckMany(batchRevs)
+		infos, err := session.CheckMany(ctx, batchRevs)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +264,7 @@ func (e *RepoEntry) readCurrentContent(ctx context.Context, rev, path string) (s
 		}
 		return info.OID, content, nil
 	}
-	info, content, err := session.Read(full)
+	info, content, err := session.Read(ctx, full)
 	return info.OID, content, err
 }
 
@@ -335,7 +335,7 @@ type deltaResult struct {
 
 // parseAndResolve is FileDiff's own marshal-once shape, reused: MaxPatchBytes first (never handed
 // to the parser), then ParseFileDiffBody, then resolveParsedBody's binary-byte-count round trip.
-func (e *RepoEntry) parseAndResolve(raw []byte) (porcelain.ParsedBody, porcelain.FileDiffBody, error) {
+func (e *RepoEntry) parseAndResolve(ctx context.Context, raw []byte) (porcelain.ParsedBody, porcelain.FileDiffBody, error) {
 	if int64(len(raw)) > MaxPatchBytes {
 		return porcelain.ParsedBody{}, porcelain.FileDiffBody{
 			Kind: porcelain.BodyTooLarge, Bytes: int64(len(raw)), LimitBytes: MaxPatchBytes,
@@ -345,7 +345,7 @@ func (e *RepoEntry) parseAndResolve(raw []byte) (porcelain.ParsedBody, porcelain
 	if err != nil {
 		return porcelain.ParsedBody{}, porcelain.FileDiffBody{}, err
 	}
-	body, err := e.resolveParsedBody(parsed)
+	body, err := e.resolveParsedBody(ctx, parsed)
 	if err != nil {
 		return porcelain.ParsedBody{}, porcelain.FileDiffBody{}, err
 	}
@@ -390,7 +390,7 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 		if err != nil {
 			return deltaResult{}, err
 		}
-		parsed, body, err := e.parseAndResolve(raw)
+		parsed, body, err := e.parseAndResolve(ctx, raw)
 		if err != nil {
 			return deltaResult{}, err
 		}
@@ -456,7 +456,7 @@ func (e *RepoEntry) FileDelta(ctx context.Context, branch, path string, rec gitr
 	if err != nil {
 		return deltaResult{}, err
 	}
-	parsed, body, err := e.parseAndResolve(res.Stdout)
+	parsed, body, err := e.parseAndResolve(ctx, res.Stdout)
 	if err != nil {
 		return deltaResult{}, err
 	}
@@ -486,7 +486,7 @@ func (e *RepoEntry) rangeFileDiffBody(ctx context.Context, mergeBase, tip, path 
 	if err != nil {
 		return porcelain.FileDiffBody{}, err
 	}
-	_, body, err := e.parseAndResolve(raw)
+	_, body, err := e.parseAndResolve(ctx, raw)
 	if err != nil {
 		return porcelain.FileDiffBody{}, err
 	}

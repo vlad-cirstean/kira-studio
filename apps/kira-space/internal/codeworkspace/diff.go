@@ -72,7 +72,7 @@ func readHeadSide(ctx context.Context, s *Session, relPath string) (DiffSide, er
 		// so a path containing one must go through the one-shot, argv-only path instead.
 		info, data, err = cf.ReadOneShot(ctx, rev)
 	} else {
-		info, data, err = cf.Read(rev)
+		info, data, err = cf.Read(ctx, rev)
 	}
 
 	switch {

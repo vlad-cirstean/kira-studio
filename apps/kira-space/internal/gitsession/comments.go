@@ -228,7 +228,7 @@ func (e *RepoEntry) anchorOne(
 		if rerr != nil {
 			return gitreview.AnchoredComment{}, rerr
 		}
-		parsed, _, perr := e.parseAndResolve(raw)
+		parsed, _, perr := e.parseAndResolve(ctx, raw)
 		if perr != nil {
 			return gitreview.AnchoredComment{}, perr
 		}

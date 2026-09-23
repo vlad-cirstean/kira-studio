@@ -198,7 +198,7 @@ func (e *RepoEntry) commitResolves(ctx context.Context, sha string) (bool, error
 	if strings.ContainsRune(full, '\n') {
 		_, err = session.CheckOneShot(ctx, full)
 	} else {
-		_, err = session.Check(full)
+		_, err = session.Check(ctx, full)
 	}
 	if err != nil {
 		if errors.Is(err, catfile.ErrMissing) {

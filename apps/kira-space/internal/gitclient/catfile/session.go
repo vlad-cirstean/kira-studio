@@ -11,7 +11,9 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -94,18 +96,39 @@ func (p *persistentProcess) fail() {
 	p.failures++
 }
 
+// watchCtx interrupts an in-flight write/read by closing proc once ctx is done (F11: Check/Read/
+// CheckMany previously took no context at all, so a stalled reply blocked the caller — and every
+// later caller queued behind it on mu — with no way to cancel). It never touches persistentProcess
+// state itself (only the main goroutine, already holding mu, does that, via fail() once the
+// interrupted call returns its own error) — Process.Close is documented safe to call concurrently
+// with an in-flight Read/Write on the same process, same pattern logsession.readChunkLocked
+// already relies on. Returns a func to stop the watcher once the call completes normally.
+func watchCtx(ctx context.Context, proc gitclient.Process) (stop func()) {
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = proc.Close()
+		case <-done:
+		}
+	}()
+	return func() { close(done) }
+}
+
 // request writes line to the child's stdin and hands its stdout reader to readResp — the whole
 // call runs under mu, which is what makes "one request in flight" true regardless of how many
 // goroutines call request concurrently: they queue on the lock, FIFO. readResp must return a
 // non-nil error only for a genuine protocol/IO failure — a normal "object missing" answer is not
 // one (readHeader itself returns found=false, err=nil for it), so a missing lookup never trips
 // the circuit breaker.
-func (p *persistentProcess) request(line string, readResp func(*bufio.Reader) error) error {
+func (p *persistentProcess) request(ctx context.Context, line string, readResp func(*bufio.Reader) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err := p.ensureStarted(); err != nil {
 		return err
 	}
+	stop := watchCtx(ctx, p.proc)
+	defer stop()
 	if _, err := io.WriteString(p.stdin, line); err != nil {
 		p.fail()
 		return err
@@ -128,26 +151,39 @@ func (p *persistentProcess) request(line string, readResp func(*bufio.Reader) er
 // constraint entirely — exactly what --batch-check's own "many requests, one write, streamed
 // answers" protocol exists to allow. Held under the same mu, for the same "one request in flight"
 // reason request's own doc comment gives.
-func (p *persistentProcess) requestPipelined(lines string, readResp func(*bufio.Reader) error) error {
+func (p *persistentProcess) requestPipelined(ctx context.Context, lines string, readResp func(*bufio.Reader) error) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err := p.ensureStarted(); err != nil {
 		return err
 	}
+	stop := watchCtx(ctx, p.proc)
+	defer stop()
+	// stdin is captured into a local before the goroutine starts, not read as p.stdin from
+	// inside it: fail() (below, and F8's own new early call on a respErr) nils p.stdin under mu
+	// as soon as readResp returns, which could otherwise race this goroutine's own unsynchronized
+	// read of that same field against a p that has already moved on.
+	stdin := p.stdin
 	writeErrCh := make(chan error, 1)
 	go func() {
-		_, werr := io.WriteString(p.stdin, lines)
+		_, werr := io.WriteString(stdin, lines)
 		writeErrCh <- werr
 	}()
 	respErr := readResp(p.reader)
+	if respErr != nil {
+		// F8: fail() (closing stdin, killing the process) BEFORE draining writeErrCh — a large
+		// enough batch's own writer goroutine can be blocked on a full stdin pipe (git itself
+		// blocked writing a response to a reader that just stopped reading, on the very same
+		// batch), so waiting on writeErrCh first, as this used to, could deadlock this call
+		// itself, wedging p.mu — and every later Check/Read queued behind it — forever.
+		p.fail()
+		<-writeErrCh // drain: the writer goroutine must not leak past this call's own return.
+		return respErr
+	}
 	writeErr := <-writeErrCh
 	if writeErr != nil {
 		p.fail()
 		return writeErr
-	}
-	if respErr != nil {
-		p.fail()
-		return respErr
 	}
 	p.failures = 0
 	return nil
@@ -197,11 +233,13 @@ func NewSession(deps Deps, maxBlobBytes int64) *Session {
 }
 
 // Check resolves rev via --batch-check alone — no content is ever read. Returns ErrMissing when
-// git could not resolve rev.
-func (s *Session) Check(rev string) (ObjectInfo, error) {
+// git could not resolve rev. ctx (F11) can cancel a stalled reply — a hung child, or a partial
+// clone's lazy blob fetch from its promisor remote — without blocking this caller, and every other
+// caller queued behind it on the persistent process's own mutex, forever.
+func (s *Session) Check(ctx context.Context, rev string) (ObjectInfo, error) {
 	var info ObjectInfo
 	var found bool
-	err := s.check.request(rev+"\n", func(r *bufio.Reader) error {
+	err := s.check.request(ctx, rev+"\n", func(r *bufio.Reader) error {
 		var rerr error
 		info, found, rerr = readHeader(r)
 		return rerr
@@ -224,7 +262,7 @@ func (s *Session) Check(rev string) (ObjectInfo, error) {
 // could not resolve gets a zero ObjectInfo at its own index (Check's own ErrMissing becomes a
 // per-Go-error return for a single rev, but a batch of N cannot fail some and succeed others
 // through one error return, so "missing" is a zero-value slot here instead).
-func (s *Session) CheckMany(revs []string) ([]ObjectInfo, error) {
+func (s *Session) CheckMany(ctx context.Context, revs []string) ([]ObjectInfo, error) {
 	if len(revs) == 0 {
 		return nil, nil
 	}
@@ -234,7 +272,7 @@ func (s *Session) CheckMany(revs []string) ([]ObjectInfo, error) {
 		sb.WriteByte('\n')
 	}
 	infos := make([]ObjectInfo, len(revs))
-	err := s.check.requestPipelined(sb.String(), func(r *bufio.Reader) error {
+	err := s.check.requestPipelined(ctx, sb.String(), func(r *bufio.Reader) error {
 		for i := range revs {
 			info, found, rerr := readHeader(r)
 			if rerr != nil {
@@ -254,9 +292,15 @@ func (s *Session) CheckMany(revs []string) ([]ObjectInfo, error) {
 
 // Read resolves rev and returns its content. Checks the size via --batch-check first (Check) and
 // answers ErrTooLarge without ever asking --batch for the bytes when it exceeds the session's
-// gate — the size gate this session was built to enforce.
-func (s *Session) Read(rev string) (ObjectInfo, []byte, error) {
-	info, err := s.Check(rev)
+// gate. F9: that gate alone is not enough against a mutable rev (e.g. "HEAD:<path>", codeworkspace/
+// diff.go's readHeadSide, or a client-supplied rev via file.read) — the --batch-check process and
+// the --batch process below are two SEPARATE, independently-spawned processes, each resolving rev
+// against whatever HEAD happens to be at the moment IT runs, so HEAD moving between the two calls
+// means the size that passed the gate is not the size actually about to be read. batchInfo.Size —
+// this second process's own, independent snapshot — is re-checked inside the same closure that
+// already has it, before readContent's own unbounded allocation.
+func (s *Session) Read(ctx context.Context, rev string) (ObjectInfo, []byte, error) {
+	info, err := s.Check(ctx, rev)
 	if err != nil {
 		return ObjectInfo{}, nil, err
 	}
@@ -265,12 +309,22 @@ func (s *Session) Read(rev string) (ObjectInfo, []byte, error) {
 	}
 
 	var content []byte
-	var found bool
+	var found, tooLarge bool
 	var batchInfo ObjectInfo
-	err = s.batch.request(rev+"\n", func(r *bufio.Reader) error {
+	err = s.batch.request(ctx, rev+"\n", func(r *bufio.Reader) error {
 		var rerr error
 		batchInfo, found, rerr = readHeader(r)
 		if rerr != nil || !found {
+			return rerr
+		}
+		if batchInfo.Size > s.maxBlobBytes {
+			// Still consumed exactly per readContent's own framing (Size bytes plus the trailing
+			// LF) so the process's own stdout stream stays in sync for the next request. A
+			// legitimate outcome, not a protocol failure — returns nil here (not an error) so
+			// request() resets the failure count instead of tearing the process down and
+			// eventually tripping the circuit breaker on an ordinary large blob.
+			tooLarge = true
+			_, rerr = io.CopyN(io.Discard, r, batchInfo.Size+1)
 			return rerr
 		}
 		content, rerr = readContent(r, batchInfo.Size)
@@ -281,6 +335,9 @@ func (s *Session) Read(rev string) (ObjectInfo, []byte, error) {
 	}
 	if !found {
 		return ObjectInfo{}, nil, ErrMissing
+	}
+	if tooLarge {
+		return batchInfo, nil, ErrTooLarge
 	}
 	return batchInfo, content, nil
 }
@@ -308,24 +365,39 @@ func (s *Session) CheckOneShot(ctx context.Context, rev string) (ObjectInfo, err
 
 // ReadOneShot answers a rev the batch protocol cannot express — a path containing a newline
 // (`cat-file --batch` reads one request per line, so a newline mid-request would be seen as two).
-// It spawns `git show <rev>` once, argv-only (no line framing to break), bounded by the same
-// maxBlobBytes gate as Read — checked only after the full output is read, since there is no
-// `--batch-check`-style size probe for a one-shot spawn; the rarity of a newline-containing path
-// (F5) makes that acceptable. A non-zero exit is reported as ErrMissing, the same answer a batch
-// lookup gives — the overwhelmingly likely cause is a path that does not resolve at rev, and this
-// package draws no finer distinction than the batch protocol already does.
+// F12: checks the size via `cat-file -s <rev>` FIRST, argv-only (no line framing to break, same as
+// the read itself), so the gate is exact before any unbounded read starts — the previous design
+// read the whole (possibly enormous) object into memory via `git show <rev>` and only checked its
+// length afterward, reachable with a client-supplied rev plus a hostile path. A non-zero exit on
+// either spawn is reported as ErrMissing, the same answer a batch lookup gives — the overwhelmingly
+// likely cause is a path that does not resolve at rev, and this package draws no finer distinction
+// than the batch protocol already does.
 func (s *Session) ReadOneShot(ctx context.Context, rev string) (ObjectInfo, []byte, error) {
+	sizeRes, err := gitclient.Run(ctx, s.runner, s.gitPath, gitclient.Spec{
+		Dir: s.dir, Args: []string{"cat-file", "-s", rev}, ReadOnly: true,
+	})
+	if err != nil {
+		return ObjectInfo{}, nil, err
+	}
+	if sizeRes.ExitCode != 0 {
+		return ObjectInfo{}, nil, ErrMissing
+	}
+	size, perr := strconv.ParseInt(strings.TrimSpace(string(sizeRes.Stdout)), 10, 64)
+	if perr != nil {
+		return ObjectInfo{}, nil, fmt.Errorf("catfile: cat-file -s %s: unparseable size %q: %w", rev, sizeRes.Stdout, perr)
+	}
+	if size > s.maxBlobBytes {
+		return ObjectInfo{Type: "blob", Size: size}, nil, ErrTooLarge
+	}
+
 	res, err := gitclient.Run(ctx, s.runner, s.gitPath, gitclient.Spec{
-		Dir: s.dir, Args: []string{"show", rev}, ReadOnly: true,
+		Dir: s.dir, Args: []string{"cat-file", "blob", rev}, ReadOnly: true,
 	})
 	if err != nil {
 		return ObjectInfo{}, nil, err
 	}
 	if res.ExitCode != 0 {
 		return ObjectInfo{}, nil, ErrMissing
-	}
-	if int64(len(res.Stdout)) > s.maxBlobBytes {
-		return ObjectInfo{Type: "blob", Size: int64(len(res.Stdout))}, nil, ErrTooLarge
 	}
 	return ObjectInfo{Type: "blob", Size: int64(len(res.Stdout))}, res.Stdout, nil
 }
