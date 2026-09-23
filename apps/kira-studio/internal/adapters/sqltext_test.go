@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"errors"
 	"reflect"
 	"strconv"
 	"strings"
@@ -126,6 +127,54 @@ func TestComputeEffectiveOrder_NullableSortColumnDisqualifiesKeyset(t *testing.T
 	}
 	if got.KeysetDirection != "asc" {
 		t.Errorf("got direction %q, want asc", got.KeysetDirection)
+	}
+}
+
+// Finding F11: BuildOrderBy (called from BuildScanOrderBy) uppercases Direction into the ORDER BY
+// text, so an upper-case or mixed-case direction still *builds* correct SQL there — but the keyset
+// comparison operator/reversal logic (BuildKeysetPredicate) compares the exact lowercase literal
+// "asc", never normalizing case itself. Pre-fix, "ASC" sailed through ComputeEffectiveOrder,
+// KeysetDirection ended up "ASC", and BuildKeysetPredicate's own `direction == "asc"` comparison
+// then silently picked the wrong comparison operator — a real, silent mispaging bug, not merely a
+// rejected input. ComputeEffectiveOrder must reject anything but the exact lowercase spelling
+// before KeysetDirection is ever set from it.
+func TestComputeEffectiveOrder_InvalidDirectionRejected(t *testing.T) {
+	tests := []struct {
+		name      string
+		direction string
+	}{
+		{"upper-case ASC", "ASC"},
+		{"upper-case DESC", "DESC"},
+		{"mixed case Asc", "Asc"},
+		{"trailing whitespace", "asc "},
+		{"garbage value", "sideways"},
+		{"empty string", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sort := structuredSort(model.SortTerm{Column: "name", Direction: tt.direction})
+			_, err := ComputeEffectiveOrder(sort, testColumns(), []string{"id"})
+			var ae *Error
+			if !errors.As(err, &ae) || ae.Code != CodeQuery {
+				t.Fatalf("ComputeEffectiveOrder(direction=%q) = %v, want an E_QUERY *Error", tt.direction, err)
+			}
+		})
+	}
+}
+
+// The exact operator-mismatch BuildKeysetPredicate itself would have produced had an upper-case
+// direction ever reached it (confirming F11's own "silent mispaging", not just a rejected input,
+// is what ComputeEffectiveOrder's new guard prevents): "after" with the lowercase-correct "asc"
+// picks ">", but the same "after" with "ASC" — never matching the lowercase-only comparison —
+// wrongly picks "<", reversing the page's own scan direction.
+func TestBuildKeysetPredicate_CaseSensitiveDirectionMismatchDemonstratesF11(t *testing.T) {
+	lower := BuildKeysetPredicate([]string{"id"}, "asc", "after", 1, func(i int) string { return "$" + strconv.Itoa(i) })
+	upper := BuildKeysetPredicate([]string{"id"}, "ASC", "after", 1, func(i int) string { return "$" + strconv.Itoa(i) })
+	if !strings.Contains(lower, ">") {
+		t.Fatalf("lower-case asc/after predicate = %q, want a \">\" comparison", lower)
+	}
+	if strings.Contains(upper, ">") {
+		t.Fatalf("upper-case ASC/after predicate = %q, want the (buggy) \"<\" comparison this test documents", upper)
 	}
 }
 
@@ -359,5 +408,22 @@ func TestStripOneTrailingSemicolon(t *testing.T) {
 		if got := StripOneTrailingSemicolon(in); got != want {
 			t.Errorf("StripOneTrailingSemicolon(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// Finding F10: a filter ending in a `--` line comment used to comment out WhereClause's own closing
+// paren (`WHERE (x = 1 -- note)`), breaking every read/count built from it. The closing paren must
+// survive on its own line regardless.
+func TestWhereClause_TrailingLineCommentDoesNotEatClosingParen(t *testing.T) {
+	filter := "x = 1 -- note"
+	got := WhereClause(&filter)
+	if !strings.HasSuffix(got, "\n)") {
+		t.Fatalf("WhereClause(%q) = %q, want it to end with an unstripped closing paren on its own line", filter, got)
+	}
+	// The closing paren must not itself fall inside the filter's own trailing line comment — i.e.
+	// there must be a real newline between "-- note" and the final ")".
+	lastComment := strings.LastIndex(got, "--")
+	if lastComment < 0 || !strings.Contains(got[lastComment:], "\n") {
+		t.Fatalf("WhereClause(%q) = %q, the trailing `--` comment still swallows the closing paren", filter, got)
 	}
 }

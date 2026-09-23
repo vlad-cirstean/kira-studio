@@ -110,6 +110,13 @@ func computeOrderBySql(sort *model.SortSpec, target ReadTarget) (string, error) 
 			if !byName[t.Column] {
 				return "", adapters.New(adapters.CodeNotFound, "unknown column in sort: "+t.Column, nil)
 			}
+			// F11: reject anything but the exact lowercase "asc"/"desc" — adapters.BuildOrderBy
+			// below uppercases Direction straight into the ORDER BY text with no validation of its
+			// own, the same gap ComputeEffectiveOrder's own identical check closes for the other
+			// three relational adapters.
+			if t.Direction != "asc" && t.Direction != "desc" {
+				return "", adapters.New(adapters.CodeQuery, "invalid sort direction: "+t.Direction, nil)
+			}
 			terms[i] = adapters.OrderTerm{Column: t.Column, Direction: t.Direction}
 		}
 		return adapters.BuildOrderBy(terms, quoteIdent), nil

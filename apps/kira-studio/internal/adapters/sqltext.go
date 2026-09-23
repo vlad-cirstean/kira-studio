@@ -260,12 +260,17 @@ func SafeInt(value int, label string) (int, error) {
 }
 
 // WhereClause ports sql-text.ts's whereClause: WHERE (<filter>) or "" — always parenthesised so a
-// keyset predicate joined by a bare AND never silently changes the user's own filter's meaning.
+// keyset predicate joined by a bare AND never silently changes the user's own filter's meaning. The
+// closing paren sits on its own line, after a newline (finding F10): a filter ending in a `--` line
+// comment (`x = 1 -- note`) would otherwise comment out the closing paren itself — and, for a
+// keyset request, everything BuildKeysetWhereSQL appends after it too — breaking every read/count
+// against that filter. A `/* */` block comment has no such gap (it terminates itself), only a
+// trailing line comment does, since nothing before this function's own appended text can close it.
 func WhereClause(filter *string) string {
 	if filter == nil || strings.TrimSpace(*filter) == "" {
 		return ""
 	}
-	return "WHERE (" + *filter + ")"
+	return "WHERE (" + *filter + "\n)"
 }
 
 // ParseCountValue ports sql-text.ts's parseCountValue. int64 rather than float64: count(*) is a
@@ -376,6 +381,26 @@ type EffectiveOrder struct {
 	KeysetDirection string
 }
 
+// validateRequestedTerms is ComputeEffectiveOrder's own column-existence and direction check, split
+// out to keep that function's own cognitive complexity down (golangci-lint's gocognit). F11:
+// BuildOrderBy uppercases Direction for the ORDER BY text itself (so "ASC"/"Asc" still produce
+// correct SQL there), but the keyset comparison further down the pipeline (BuildKeysetPredicate)
+// compares the lowercase literal "asc" — an upper-case direction would build the ORDER BY correctly
+// while silently mismatching the keyset operator/reversal logic, mispaging. Rejecting anything but
+// the exact lowercase spelling here closes that gap at the source, before
+// EffectiveOrder.KeysetDirection is ever set from it.
+func validateRequestedTerms(terms []OrderTerm, columnByName map[string]model.ColumnMeta) error {
+	for _, t := range terms {
+		if _, ok := columnByName[t.Column]; !ok {
+			return New(CodeNotFound, "unknown column in sort: "+t.Column, nil)
+		}
+		if t.Direction != "asc" && t.Direction != "desc" {
+			return New(CodeQuery, "invalid sort direction: "+t.Direction, nil)
+		}
+	}
+	return nil
+}
+
 // ComputeEffectiveOrder ports sql-text.ts's computeEffectiveOrder — the D7 keyset-eligibility rule.
 func ComputeEffectiveOrder(sort_ *model.SortSpec, columns []model.ColumnMeta, tiebreaker []string) (EffectiveOrder, error) {
 	if sort_ != nil && sort_.Kind == "text" {
@@ -393,10 +418,8 @@ func ComputeEffectiveOrder(sort_ *model.SortSpec, columns []model.ColumnMeta, ti
 		columnByName[c.Name] = c
 	}
 	if len(requestedTerms) > 0 {
-		for _, t := range requestedTerms {
-			if _, ok := columnByName[t.Column]; !ok {
-				return EffectiveOrder{}, New(CodeNotFound, "unknown column in sort: "+t.Column, nil)
-			}
+		if err := validateRequestedTerms(requestedTerms, columnByName); err != nil {
+			return EffectiveOrder{}, err
 		}
 	}
 
