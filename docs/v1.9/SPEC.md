@@ -2768,6 +2768,123 @@ a regression from this chunk's fix — same "confirmed unrelated" disposition, l
 - Every one of the 9 commits above ran `.githooks/pre-commit` (`bun run lint` + `bun run typecheck`)
   for real and passed clean — `--no-verify` was never used.
 
+## P108 Part 14 result
+
+Reviewed per `plans/P108-part14-space-git-process.md` (Opus reviewer, no fixing); one Sonnet fixer
+landed all 19 findings (F1-F19) against `ebbf7d3`, none dismissed or deferred, as 12 commits —
+tightly-related findings grouped per the task's own instruction rather than one-per-finding.
+
+- **F1 `643ef26`** — `parseDecorationToken` hard-errored on any unrecognised bare `%D` token, so a
+  shallow clone's "grafted" boundary marker (or a replace ref's "replaced" token) broke
+  `ParseLogRecord` entirely. Now ignored as a non-ref annotation. Fixture built from a real
+  `git clone --depth 1` (git 2.43.0).
+- **F2 `caa2848`** — `consumeChunkLocked` returned early on a split/parse error while the child
+  `git log` stayed alive and the splitter kept its stream position, silently dropping the rest of
+  that chunk and duplicating rows on a later `--skip=readCount` resume. Added `failLocked`: kills
+  the process and marks the Session permanently failed; every later `ReadPage` returns that same
+  error immediately. **Cross-chunk touch into `gitsession/walk.go` (Part 16's file, flagged for its
+  reviewer):** `readPageLocked` now resets the walk on a log-session error, so a permanently-failed
+  Session doesn't wedge every future `loadMore` behind the same error forever — the failing read
+  still surfaces its own error to its own caller.
+- **F3 `e0dc625`** — the `0x1f` field separator can appear inside a non-last field (a hostile
+  author/committer/tagger name or email, verified with `GIT_AUTHOR_NAME=$'Mal\x1fory'`), shifting
+  every field after it — hit `LogFormat`/`ScanFormat`, `StashFormat` (`%gs` mid-record) and
+  `RefsFormat` (`%(taggername)` mid-record). Stash moves its message field last (the one position
+  a stray `0x1f` is harmless); log/scan/tags switch the field delimiter to NUL. New
+  `porcelain.FieldGrouper` groups a flat NUL-field stream into fixed-size records once field and
+  record delimiters are the same byte; `ParseLogRecord`/`ParseScanRecord` take pre-split fields,
+  `ParseLogRecordFromRaw` covers one-shot `show -s -z`. `logsession.Session` and `gitsearch.Scan`
+  each gain a `FieldGrouper` alongside their existing `RecordSplitter`. Testdata regenerated
+  against real git 2.43.0.
+- **F4 `95415e7`** — a user's `diff.suppressBlankEmpty=true` makes git print a bare empty line for
+  a blank context line instead of the usual `" "` prefix (verified against real git 2.43),
+  breaking `parseOneHunk`. Forced `-c diff.suppressBlankEmpty=false` into `configOverrides`; also
+  made `parseOneHunk` tolerate a bare empty line as defense in depth.
+- **F5 `17a2a15`** — `Run`/`reap` waited for stdout/stderr EOF via `StdoutPipe()`/`StderrPipe()`
+  before calling `cmd.Wait()`; those pipes have no internal copy goroutine in Go's `os/exec`, so
+  `cmd.WaitDelay` never force-closes them — a hook's backgrounded process inheriting stdout/stderr
+  keeps the write end open after git exits, blocking `Run` (and therefore `Repo.Write` and every
+  read sharing the repo) indefinitely. New `Spec.buffered`/`startBuffered` path gives direct
+  `io.Writer`s instead of pipes, so `WaitDelay` can force-close them; `startStreaming` (logsession,
+  gitsearch, catfile) is unchanged. `Process.Wait()` now carries `Stdout` directly — updated the
+  three `fakeProcess` test doubles (`gitclient/discovery_test.go`, `gitsession/registry_test.go`,
+  `gitrpc/handlers_test.go`) to match. Regression test spawns a shim that backgrounds a 30s sleep
+  inheriting stdout/stderr; confirmed to hang pre-fix, returns in ~2s post-fix.
+- **F8-F12 `eb6f425`** (all `catfile/`) — F8: `requestPipelined` waited on `writeErrCh` before
+  `fail()` on a response error, deadlocking when the writer goroutine was itself stuck on a full
+  stdin pipe; `fail()` now runs first, and `stdin` is captured to a local before the writer
+  goroutine starts (fixes a latent unsynchronized read racing `fail()`'s nil-out). F9: `Read`'s
+  size gate and its content read can resolve a mutable rev differently if HEAD moves between them;
+  the gate gets a second check inside the same closure that already has the size, and an oversize
+  blob is still fully drained rather than counted as a failure. F10: `readHeader` treated an
+  `" ambiguous"` reply (short-OID collision, real git behavior) as a protocol error, tripping the
+  circuit breaker permanently; recognised by suffix now, same as `" missing"`. F11: `Check`/`Read`/
+  `CheckMany` (plus `persistentProcess`'s own `request`/`requestPipelined`) take a `ctx` now; a new
+  `watchCtx` helper closes the process on cancellation. F12: `ReadOneShot` now runs `cat-file -s`
+  before the unbounded read, so the size gate is exact before any content is read.
+- **F16-F17 `bd1dde8`** — F16: `buildEnv` passed through `GIT_DIR`/`GIT_WORK_TREE`/
+  `GIT_INDEX_FILE`/`GIT_OBJECT_DIRECTORY`/`GIT_COMMON_DIR`/`GIT_NAMESPACE` from the parent process
+  if set, silently retargeting every spawn; stripped outright before spawning. F17: `Repo.Read`'s
+  admission check let readers refill indefinitely, starving a pending `Write`; new
+  `pendingWriters` counter refuses new read admissions once a write is pending (an already-admitted
+  read is unaffected).
+- **F14-F15 `3f14892`** (both `porcelain/`) — F14: `isStackStashHeader`/`isGlobalStashHeader`
+  tested every NUL record in a stash entry's diffstat block, including a rename's own two numstat
+  path records — a renamed file whose name happened to be header-shaped split one rename into a
+  phantom extra entry. New `collectNumstatRecs`/`isRenameNumstatRecord` consume a rename's path
+  records structurally instead. F15: `MergeTreeArgs`' default LF framing C-quotes a conflicting
+  path containing a quote/backslash/tab/LF; switched to `-z` (git 2.38+), `ParseMergeTreeOutput`
+  rewritten for NUL framing.
+- **F7 `47a3028`** — `symbolic-ref --short -q HEAD` shortens ambiguously when a tag shares the
+  checked-out branch's name (`"heads/<b>"` instead of `"<b>"`, verified against real git 2.43),
+  desyncing `gitsession/remote.go`'s pull re-check and `gitsession/stack.go`'s restack undo.
+  `ResolveHead` now reads the plain `symbolic-ref -q HEAD` and strips `refs/heads/` itself.
+  Verified (read, not edited) both `gitsession` consumers already expect the plain short name this
+  now actually provides — no change needed there.
+- **F18 `c1276e3`** (all `porcelain/`) — SHA-1-only literals break every SHA-256 repository:
+  `workingdiff.go`'s hardcoded `EmptyTreeSHA` (replaced with `EmptyTreeHashArgs`/
+  `ParseEmptyTreeHash`, a real `hash-object -t tree /dev/null` spawn — exact and hash-agnostic);
+  `stash.go`'s `isHexSha40` never matched 64-hex (renamed `isHexObjectID`, accepts 40 or 64);
+  `blame.go`'s `UncommittedBlameSHA` kept for SHA-1 back-compat, new width-agnostic
+  `IsUncommittedBlameSHA` added. **Cross-chunk touch into `gitsession/working.go` (Part 16's file,
+  flagged for its reviewer):** `WorkingDetail` spawns `EmptyTreeHashArgs()` itself on an unborn
+  branch, in place of the removed constant — mechanical, not a design change.
+- **F13, F19 `92ac0f2`** (both `gitaskpass/`) — F13: `buildShim` double-quoted each helper-command
+  element, letting the shell expand `$var`/`$(...)`/backticks inside them (verified: a canary file
+  planted via injected `$(touch ...)` was actually created). Single-quoted instead
+  (`shellQuoteSingle`, standard `'\''` POSIX idiom) — no character-refusal list needed any more.
+  F19: the helper treated every prompt as an ordinary masked text field; now reads
+  `SSH_ASKPASS_PROMPT`: `"none"` exits 0 without contacting the broker, `"confirm"` sends a new
+  `Request.Confirm` flag through (forces `Masked: false`) and never prints the answer, carrying
+  the decision in the exit code alone.
+- **F6 `371b035`** — `fseventsBackend.run()`'s inner per-event select had no case for `b.stopping`,
+  only `b.out <- re`/`b.done`; `Close()`'s D10 sequence closes `stopping` before calling
+  `es.Stop()`, so `run()` mid-batch-blocked on a send with no reader deadlocked. Added
+  `case <-b.stopping` to abandon the current batch send and return to the outer drain loop.
+  Darwin+cgo only — this sandbox has no darwin toolchain to build or test it (the file's own
+  documented constraint); verified via `gofmt -l` (no syntax errors), `go list` confirming the file
+  is in scope under `GOOS=darwin CGO_ENABLED=1`, and manual re-check against the D10 sequence.
+
+**Cross-chunk touches into `gitsession/*` (Part 16's files), flagged for that chunk's reviewer:**
+F2 → `gitsession/walk.go` (`readPageLocked` resets on log-session error). F18 →
+`gitsession/working.go` (`WorkingDetail` calls the new `EmptyTreeHashArgs` in place of a removed
+constant). F7 needed no `gitsession` change — verified by reading both consumers, not just
+asserted. All three are minimal, caller-side adjustments only, never a broader review of those
+files.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `bun run lint:go` (`golangci-lint run`): 0 issues.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration
+  hints), all frontend TS/Vue — this chunk touches nothing knip already flags.
+- `go test ./...`: 0 failures repo-wide (full suite, run once near the end per `CLAUDE.md`).
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never
+  used.
+- Every regression test added (F1/F2/F3/F4/F5/F8/F10/F14/F17 each got one) was confirmed to fail,
+  or fail to compile, against the pre-fix code before landing, isolated via `git stash push --
+  <file>` on the single changed file.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
