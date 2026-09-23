@@ -3553,6 +3553,225 @@ was lost and doing so would only fragment the history further.
 - Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never
   used.
 
+## P108 Part 6 result
+
+Reviewed per `plans/P108-part6-studio-engine-wire.md` (Opus reviewer, no fixing — commit `6217ab5`,
+tree surveyed at `a2d64e2`), 10 findings; one Sonnet fixer landed all 10 (F1-F10), none dismissed or
+deferred, as 10 commits (`29c0338`, `b0b1f3b`, `d8ba316`, `fe6f2d9`, `b936da5`, `64d946b`, `e1d99e8`,
+`49e4924`, `bfdca18` — plus one recreated commit, `884fae5`, see the working-tree note below).
+
+- **F1 (HIGH) `29c0338`** and **F2 (HIGH-MEDIUM) `29c0338`** — landed together, same commit, since
+  both are root causes in the exact same reconnect/disconnect call path in `router.go` and are
+  easiest to reason about fixed as one unit. **This closes both Part 4's and Part 5's own explicitly
+  deferred `adapterhost` findings**: Part 4's result section named "adapterhost's own
+  reconnect-ordering (`Router.Connect`'s `existing.Disconnect` call outside `RunOp`, `Router.
+  Disconnect`'s serialization against other ops) is explicitly out of scope here per the plan —
+  deferred to Part 6, which reviews that package directly"; Part 5's F4 named the identical hand-off
+  for `Router.Connect`'s own `context.Background()` call. F1: `Router.Connect`'s reconnect branch and
+  `Router.Disconnect` ran the old adapter's `Disconnect` outside `RunOp`, unbounded under
+  `context.Background()`, with nothing local cancelling whatever ops were still running against it
+  first — `QueryTracker.Drain`/`ConnSet.CloseAll` have no bound of their own, so a dead-network TCP
+  retransmit timeout (or an in-flight op holding `CloseAll`'s own entry mutex) could hang a reconnect
+  or an explicit Disconnect for minutes, with no op-log row for the Operations panel to cancel.
+  `Host.CancelOpsForConnection` locally cancels every other running op for a connection id first; the
+  old adapter's `Disconnect` now runs inside `RunOp` (kind `"disconnect"`) bounded to the caller's own
+  ctx plus a fixed 10s (`disconnectTimeout`), applied at every call site (Connect's failed-probe
+  cleanup, Test's deferred disconnect, `Router.Disconnect` itself, since its own callers pass
+  `context.Background()` by contract). Verified `CancelOp` (`host.go`) is not left stale by this fix:
+  its own "sends Cancel to the replacement adapter for an op still running on the old one" risk is
+  eliminated at the root, since every op on the old adapter is now locally cancelled (unblocking each
+  driver's own ctx watcher) *before* any reconnect/disconnect ever replaces or removes the adapter —
+  a subsequent, redundant `CancelOp` call against the (by then reassigned) live adapter for a
+  since-cancelled opID is a harmless no-op, not a correctness bug. F2: `Router.Disconnect` captured
+  the live adapter, waited on its `Disconnect`, then deleted-by-bare-id — a concurrent reconnect
+  installing a newer adapter for the same id in that window had it deleted out from under it (leaked,
+  never itself disconnected, while the UI still reports "connected" and every op on it starts failing
+  with `E_ENGINE_DOWN`); an early return before the delete (e.g. `RunOp` erroring) also skipped it
+  outright. `adapters.DeleteLiveAdapterIf` is a real compare-and-delete; `Router.
+  takeLiveAdapterForTeardown` wraps it, serialized per connection id (`Router.teardown`, a
+  `keyedMutex`) so a racing reconnect and Disconnect can never both win tearing down the same adapter
+  instance, and performs the registry removal up front — before the slow `Disconnect` call — so there
+  is no error path left that can skip it. Regression tests
+  (`adapterhost/router_reconnect_race_test.go`, new file):
+  `TestRouter_Reconnect_CancelsInFlightOpsBeforeOldDisconnectWaits` and
+  `TestRouter_ConcurrentDisconnectAndReconnect_NeverLosesTheNewerAdapter` both hang/deadlock against
+  the pre-fix `router.go` (confirmed via a scoped `git stash` on `router.go`/`host.go`/`live.go`, run
+  with `-timeout 15s`); `TestRouter_TakeLiveAdapterForTeardown_ExactlyOneCallerWins` exercises a new
+  function with no pre-fix equivalent (fails to compile pre-fix, definitional).
+- **F3 (MEDIUM) `b0b1f3b`** — `Router.SchemaColumns`/`KeyTypes` already passed `"schemaColumns"`/
+  `"keyTypes"` to `RunOp`, but neither was a recognized `OpKind` — `oplog.handleOpStart` rejects an
+  unrecognized kind outright (never `Append`ed), so the matching `op:end` fell through
+  `handleOpEnd`'s own no-matching-start fallback and emitted a phantom record: kind `"test"`,
+  `connectionId` null, `startedAt` "now" — `state/ops.ts` prepends this as a bogus new row on every
+  SQL-completion schema fetch and every Redis browse scroll window. Also missing from
+  `throttledKinds`, bypassing the per-connection rate limit entirely (`keyTypes` up to 200 keys per
+  call). Added both to `model.opKinds` (Go), `opKindSchema` (`packages/shared/domain/ops.ts`) and
+  `throttledKinds`; `tests/unit/go-ts-vocabulary-parity.spec.ts` (Part 8's file, read-only here)
+  already asserts the two lists match and passes with both updated together. No dedicated regression
+  test — a vocabulary-table addition restates a short function body, exactly `CLAUDE.md`'s own
+  default-to-no-test case; the parity spec is the guard against the two lists drifting again.
+- **F4 (MEDIUM) `d8ba316`** — `Read`/`Count` stored their results unconditionally once the
+  underlying op returned, with nothing guarding against `InvalidateAfterMutation`, `DropTarget`,
+  `DropConnection` (including mid-reconnect) or `Clear` running while that op was still in flight —
+  a cache miss racing one of those could still complete and cache its own now-stale,
+  pre-invalidation result as fresh. `StoreCount` is especially exposed since count queries on large
+  tables are slow, widening the race window. `generationTracker` (`enginecache/generation.go`, new
+  file) tracks a monotonically increasing generation per (connectionID, path) target, one per
+  connection, and one global, guarded by `Cache`'s own mutex; `Cache.CurrentGeneration` captures a
+  snapshot right after the miss decision, before the op is issued, and
+  `StorePageIfCurrent`/`StoreCountIfCurrent` only actually store when the snapshot still matches once
+  the op returns — bumped by `DropTarget`, `DropPagesOnly`, `InvalidateAfterMutation` (both the pages
+  drop and the counts stale-mark itself, since an in-flight `Count` must not silently overwrite that
+  mark with a pre-mutation result presented as fresh), `DropConnection` and `Clear`.
+  `Dispatcher.Read`/`Count` (`data.go`) now go through the guarded pair; `StorePage`/`StoreCount` stay
+  plain and unconditional for a caller with no race to guard (the existing direct-store tests).
+  Regression tests: `enginecache/generation_test.go` (new file) covers the guard directly (store
+  skipped after a concurrent `DropTarget`/`DropConnection`/`Clear`/`InvalidateAfterMutation`, still
+  stores when nothing changed, an unrelated target's own invalidation never blocks this one);
+  `adapterhost/data_test.go`'s `TestDispatcher_Read_DoesNotCacheStaleResultRacingConcurrentInvalidate`
+  is the real, genuinely concurrent case (a goroutine race, not a simulated ordering) — confirmed
+  failing its own assertion against the pre-fix `data.go`/`cache.go` (a scoped `git stash`,
+  `generation.go` moved aside so the tree still compiles pre-fix); the guard-level tests reference
+  functions with no pre-fix equivalent (definitional).
+- **F5 (LOW-MEDIUM) `fe6f2d9`** — `eventSub.deliver` did a non-blocking send into a fixed 32-slot
+  buffer, silently dropping an event outright once it filled, on the stated reasoning that "dropping
+  one event is better than blocking every other subscriber" — confirmed that reasoning does not
+  actually hold: `oplog` is the only production subscriber (`main.go`'s `oplog.New(router.Host(),
+  ...)` is the only `Host.Subscribe` call site; `internal/bridge`'s `http.go`/`grpc.go` only ever call
+  `RunOp`, never `Subscribe`), and it does a synchronous SQLite write plus a Wails emit per event —
+  up to 64 concurrent ops (`session.go`'s own inflight cap) plus tree/dbmcp/http/grpc ops can easily
+  outpace that. A dropped `op:end` leaves an `op_log` row stuck "running" forever; a dropped
+  `op:start` produces the same phantom "test"-kind record F3 fixed the vocabulary side of. `eventSub`
+  now queues unboundedly (`deliver` only ever appends, guarded by a mutex, and wakes a dedicated
+  drain goroutine); the one drain goroutine is the only thing that ever sends on or closes the
+  consumer-facing channel, which also fully replaces the previous close/Emit race the old mutex
+  existed to guard against — `deliver` never touches the channel at all, so a send can never race a
+  close. On unsubscribe, drain finishes delivering whatever is still queued before closing the
+  channel, so an event accepted before Stop is called is never lost at shutdown either. Regression
+  test: `TestSubscribe_DeliversEveryEventEvenWhenFarPastTheOldFixedBufferSize` emits 500 events
+  before ever reading one and confirms all 500 arrive; confirmed failing against the pre-fix
+  `host.go` (a scoped `git stash`) — exactly 32/500 delivered, the old fixed buffer size precisely.
+- **F6 (LOW-MEDIUM) `b936da5`** — `decodeFrame`'s envelope checks aside, any `decodePayload` throw
+  propagated straight out — `port.ts`'s `onmessage` wraps the whole call in a try/catch and drops any
+  frame it can't decode, with no id to reject a specific pending call with. But a `res` frame's id is
+  already extracted before `decodePayload` ever runs, and a data op carries no client-side timeout of
+  its own (`timeoutMs: null` means cancellation is the only escape hatch, §5.1), so a `res` frame
+  whose payload specifically failed to decode left that one pending call hanging forever.
+  `decodeFrame` now wraps only the `ok:true` payload decode in its own try/catch and, on failure,
+  returns an ordinary `{ok:false}` response using the id already extracted — `handleMessage` already
+  rejects that shape correctly, no change needed there; a structurally corrupt frame (bad "KIF1"
+  identifier, missing envelope field) still throws and is still dropped by `port.ts`, unchanged, since
+  there is genuinely no id to recover in that case. Regression test (`bridge-port.spec.ts` test 10):
+  a hand-built `res` frame with a valid envelope but a payload type tagged `ReadResponse` with no
+  payload table ever written, reliably reproducing `decodePayload`'s own "payload is missing" throw
+  while the id stays intact — confirmed hanging (`bun test` timed out) against the pre-fix
+  `frame.ts`/`port.ts` (a scoped `git stash`), since with `timeoutMs: null` nothing else would ever
+  settle that pending call.
+- **F7 (LOW) `64d946b`** — `Children`/`Describe`/`Definition`/`SchemaColumns` each `Put` their
+  backend fetch's result unconditionally once it returns. A fetch started just before a reconnect
+  gets its own `metadata_cache` row's `fetchedAt` stamped at `Put` time, which lands *after* the new
+  freshness floor the reconnect just established (`freshnessFloor` reads the same connection
+  `Since`) — so a listing fetched against the connection's old target was wrongly treated as fresh
+  the instant the reconnect completed, matters especially right after an edit-and-reconnect sequence.
+  `sinceEpoch` captures the connection's current `Since` right before each backend call;
+  `putIfSinceUnchanged` only actually stores the result if `Since` is still what it was at that
+  point, skipping the write (not the response) otherwise. Regression test:
+  `TestFetchRacingAReconnectIsNotCachedAsFresh`'s fake backend gains a `childrenMidFlight` hook that
+  advances the connection's epoch while `Children`'s own call is still "in flight" (no real
+  concurrency needed to reproduce the ordering) — confirmed failing against the pre-fix `service.go`
+  (a scoped `git stash`): the race's own result got cached and served back as a cache hit on the very
+  next read.
+- **F8 (LOW, wire mirror) `e1d99e8`** — Go's `truncateUTF8ToBoundary` used `utf8.DecodeLastRune`,
+  which backs off one byte at a time for ANY trailing byte invalid as a standalone rune, not just a
+  genuine continuation byte — a run of bytes that merely resemble a UTF-8 lead byte without ever
+  completing one (Latin-1's own 0xE0-0xFF letter range, à-ÿ) made it walk back through the whole run
+  with no bound, clipping a value far below the intended 64 KiB page-scratch limit. `page.ts`'s own
+  `truncateUtf8ToBoundary` only backs off while the byte at the cut boundary matches the
+  continuation-byte bit pattern, bounded to at most 3 bytes (`utf8.UTFMax-1`) for any real UTF-8
+  sequence — Go's port now uses the identical check (`utf8.RuneStart`) with the same 3-byte cap.
+  Writing the regression test also surfaced an off-by-one in the initial port (checking the last
+  *included* byte instead of the first *excluded* one, mirroring TS's own `bytes[end]` indexing),
+  fixed in the same commit. Regression tests (`page/scratch_test.go`, new file — this package had
+  none): a Latin-1-style run cuts at exactly `maxBytes`; a genuinely split multi-byte rune is still
+  dropped entirely; an adversarial run of real continuation-pattern bytes is capped at exactly 3
+  bytes backed off. Confirmed the first two failing against the pre-fix function (a scoped `git
+  stash`) — the Latin-1 case truncated to 0 bytes instead of 10, precisely the described bug.
+- **F9 (LOW, test harness) `49e4924`** — all six `*_test.go` files using `ipcfixture`'s harness
+  (clickhouse/kafka/mariadb/mysql/redis/sqs) call `Recorder.ConnectionsConnect` and never the
+  matching disconnect — real adapters accumulated in the process-global registry (`adapters.live`)
+  across test runs, well after the test DB and other cleanup had already run.
+  `App.trackConnected`/`disconnectTracked` (the latter split out of `NewApp`'s own `t.Cleanup`
+  closure so it is independently testable) disconnect every tracked connection automatically,
+  registered last so it runs first (`t.Cleanup` is LIFO) — live adapters torn down before
+  `connectionsSvc.Shutdown` and before the DB/repos close. Regression tests
+  (`ipcfixture/harness_test.go`, new file): drive `trackConnected`/`disconnectTracked` directly
+  against a fake adapter registered straight into the live registry, since every real
+  `ConnectionsConnect` path in this package needs a Docker container this sandbox doesn't have —
+  confirms `Disconnect` is called and the adapter is removed from the registry, plus a no-op control
+  case for a test that never connects anything.
+- **F10 (LOW, test harness) `bfdca18`** — `acquireBuildLock` looped forever on `EEXIST` with no
+  stale-lock detection and no overall timeout — a killed test run left `.e2e-real-build.lock`
+  behind (also not gitignored), and the next run hung silently waiting on a lock nobody holds. The
+  lock file now carries its own owner's pid; `isLockStale` reclaims it either on age (older than 10
+  minutes) or once that pid is no longer a live process (a zero-signal `process.kill` probe);
+  `acquireBuildLock` itself now also fails loudly after 15 minutes rather than looping forever if
+  neither check ever reclaims it. Added `.e2e-real-build.lock` to `.gitignore`. Regression tests
+  (`tests/unit/e2e-real-build-lock.spec.ts`, new file): `isLockStale`/`acquireBuildLock` exercised
+  directly against a throwaway lock path (both take an optional path, defaulting to the real
+  cross-process one) — no lock is never stale, a fresh lock owned by this (alive) process is not
+  stale, a lock naming a dead pid is stale even when fresh, an old lock is stale regardless of its
+  own pid, and `acquireBuildLock` actually reclaims a stale lock (rewriting it with its own pid)
+  rather than hanging. New functions with no pre-fix equivalent — definitional.
+
+**Working-tree note.** This phase's own commits landed in the same shared checkout as concurrent
+Part 16/17 fixer sessions (`apps/kira-space/internal/{gitsession,gitsock}/**`,
+`packages/git-ipc/**` — no scope overlap by design) and, later, unrelated sessions in
+`apps/kira-space/internal/storage/repos/**`. One commit attempt (the F1/F2 grouping) was
+transiently swept into a concurrent session's own commit (`362f6fb`, that session's own F13) before
+landing cleanly, and one further commit attempt (F8) was separately swept into another concurrent
+session's own commit (`031747a`, that session's own F1) — both caught immediately by diffing `git
+show --stat HEAD` against this phase's own intended file list right after each attempt, both
+resolved the same way: `git reset --soft HEAD^`, the absorbed commit's own message and file list
+recreated verbatim as its own commit (`884fae5` for the first case, `8d91abe` for the second), then
+this phase's own files committed separately on top. No fix content was lost either time — every
+commit listed above was re-verified to contain exactly its own intended file list once landed, and
+each concurrent session's own result section independently records the same collision from its own
+side (Part 16's result section names `884fae5` as the surviving hash for its F13).
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `go test ./...`: full suite, run once near the end — clean, except a pre-existing build failure
+  in `apps/kira-space/internal/gitsock` (`server_test.go` against `trackConn`'s current signature)
+  belonging to a concurrent Part 17 fixer session's own uncommitted, in-flight edit — confirmed via
+  `git status`/`git diff --stat` (untracked `server_test.go`, modified `pairing.go`/`server.go`,
+  none of them this chunk's own files, none touched here) — `go test $(go list ./... | grep -v
+  .../gitsock)` clean otherwise.
+- `go test ./... -race` for `adapterhost`, `adapters` (and its eleven engine subpackages),
+  `enginecache`, `tree`, `oplog`, `page`, `ipcfixture`, `connections` (the concurrency-sensitive
+  packages F1/F2/F4/F5 touch, plus their own one-hop callers/callees): clean.
+- `bun run lint:go` (`golangci-lint run`): 0 issues.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports; 8 configuration hints,
+  up from Part 4's own 7 — unrelated intervening chapters' own config drift, not this chunk's) —
+  this chunk touches nothing knip already flags.
+- `bun run typecheck`: exit 0 (every project, including `apps/kira-studio/tests/unit`/
+  `tsconfig.tests.json`, `apps/kira-studio/frontend`, both covering F3/F6/F8/F10's TS touches).
+- `bun test apps/kira-studio/tests/unit`: 659 pass, 0 fail (82 files, including this chunk's own
+  new/edited specs).
+- `bun run lint` (biome + `check-tokens.sh`): 0 issues.
+- Docker-backed conformance suites (`ipcfixture`'s own six `*_test.go` files, `e2e-real`) could not
+  run in this sandbox (no Docker daemon reachable) — pre-existing, expected, exactly the constraint
+  F9's own regression tests were designed around (driving the harness's cleanup mechanism directly
+  rather than through a real Docker-gated connect).
+- Every commit above ran `.githooks/pre-commit` for real and passed clean — `--no-verify` never
+  used.
+- Every regression test added (F1 x2, F2 x1, F4 x1 dispatcher-level + x5 cache-level, F5, F7, F8 x3,
+  F9 x2, F10 x4 — F3/F6 excepted, see their own entries above for why no dedicated test) was
+  confirmed to fail against the pre-fix code before landing, either via a scoped `git stash push --
+  <files>` (for an existing function's changed behavior) or definitionally (a brand-new function
+  with no pre-fix equivalent — F2's CAS helper, F4's generation guard, F9's harness cleanup, F10's
+  lock-staleness check).
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
