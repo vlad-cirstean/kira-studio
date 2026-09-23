@@ -214,3 +214,5 @@ export {
   splitLimitedFields,
   splitRecords,
 } from './util/nulSplit.ts';
+export type { WorktreeLabelInput } from './worktree/label.ts';
+export { worktreeLabel } from './worktree/label.ts';

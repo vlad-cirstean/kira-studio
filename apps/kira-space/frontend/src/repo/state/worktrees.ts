@@ -1,3 +1,4 @@
+import { worktreeLabel } from '@kira/git-core';
 import type { Transport, WorktreeEntry } from '@kira/git-ipc';
 import { defineStore } from 'pinia';
 import { reactive, watch } from 'vue';
@@ -194,12 +195,4 @@ export const useWorktreesStore = defineStore('worktrees', () => {
   };
 });
 
-/** git-ui's `pickerModel.ts:94`-`98` twin, four lines, replicated rather than imported:
- *  `pickerModel.ts` is not on `@kira/git-ui`'s exports map (only "." and "./icons"), and "."
- *  pulls the whole graph chunk. Keep the two in step by hand if either changes. Pure function, no
- *  reactive state — stays outside the store. */
-export function worktreeLabel(entry: WorktreeEntry): string {
-  if (entry.branch) return entry.branch.replace(/^refs\/heads\//, '');
-  if (entry.isDetached && entry.head) return `detached @ ${entry.head.slice(0, 7)}`;
-  return entry.isBare ? 'bare' : 'unknown';
-}
+export { worktreeLabel };
