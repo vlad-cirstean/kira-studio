@@ -2,7 +2,6 @@ package gitsock
 
 import (
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -68,33 +67,23 @@ type pendingEntry struct {
 
 // Broker implements D8's queue/cooldown/injected-clock state machine — a FIFO of pending requests
 // (at most one "presented", always the head), a per-clientID cooldown map, and a
-// notify.Emitter[PairingSnapshot] fanning out every change. It knows nothing about whether any
-// Kira Space window is open (F9) — "held with no window open yet" (SPEC §3.3) falls out for free:
-// the request simply sits at the head, presented, until a window later calls Pending() and renders
-// it, or its deadline expires.
+// notify.OrderedEmitter[PairingSnapshot] fanning out every change (P107 T2-8: the queue and the
+// ordered-emit guard both now come from internal/notify, shared with dbmcp.ApprovalBroker). It
+// knows nothing about whether any Kira Space window is open (F9) — "held with no window open yet"
+// (SPEC §3.3) falls out for free: the request simply sits at the head, presented, until a window
+// later calls Pending() and renders it, or its deadline expires.
 type Broker struct {
 	now func() time.Time
 
 	mu       sync.Mutex
-	queue    []*pendingEntry
-	byID     map[string]*pendingEntry
+	queue    *notify.PendingQueue[*pendingEntry]
 	cooldown map[string]time.Time
 
-	// emitSeq/lastEmitted/emitOrdered guard against publishing a stale snapshot after a newer one
-	// already went out (dbmcp.ApprovalBroker's own emitSeq doc comment — this Broker was that one's
-	// model, and shares its snapshot-under-lock-then-unlock-then-Emit shape at every call site
-	// below, so it shares the same race: two of Request/answer/ExpireOverdue/Shutdown can interleave
-	// their post-unlock Emits in the opposite order from the mu-protected changes that produced
-	// them). emitSeq is read/incremented only under mu; lastEmitted is CAS-guarded so emitOrdered
-	// never reacquires mu, avoiding the reentrancy hazard mu-across-Emit would risk.
-	emitSeq     uint64
-	lastEmitted atomic.Uint64
-
-	emitter notify.Emitter[PairingSnapshot]
+	emitter notify.OrderedEmitter[PairingSnapshot]
 }
 
 func NewBroker(now func() time.Time) *Broker {
-	return &Broker{now: now, byID: map[string]*pendingEntry{}, cooldown: map[string]time.Time{}}
+	return &Broker{now: now, queue: notify.NewPendingQueue[*pendingEntry](), cooldown: map[string]time.Time{}}
 }
 
 func (b *Broker) Subscribe(fn func(PairingSnapshot)) (unsubscribe func()) {
@@ -109,33 +98,12 @@ func (b *Broker) Pending() PairingSnapshot {
 }
 
 func (b *Broker) snapshotLocked() PairingSnapshot {
-	if len(b.queue) == 0 {
+	items := b.queue.Snapshot()
+	if len(items) == 0 {
 		return PairingSnapshot{}
 	}
-	head := b.queue[0].req
-	return PairingSnapshot{Pending: &head, Queued: len(b.queue)}
-}
-
-// nextSeqLocked assigns and returns the next emit sequence number (Broker.emitSeq's own doc
-// comment). Caller holds b.mu.
-func (b *Broker) nextSeqLocked() uint64 {
-	b.emitSeq++
-	return b.emitSeq
-}
-
-// emitOrdered emits snap unless a later-sequenced snapshot has already gone out. Called with b.mu
-// already released, matching notify.Emitter.Emit's own contract.
-func (b *Broker) emitOrdered(seq uint64, snap PairingSnapshot) {
-	for {
-		last := b.lastEmitted.Load()
-		if seq <= last {
-			return // superseded — a snapshot reflecting this state and more already went out
-		}
-		if b.lastEmitted.CompareAndSwap(last, seq) {
-			break
-		}
-	}
-	b.emitter.Emit(snap)
+	head := items[0].req
+	return PairingSnapshot{Pending: &head, Queued: len(items)}
 }
 
 // InCooldown reports whether clientID is inside its 60s post-denial window (handshake row 6).
@@ -159,7 +127,7 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 		b.mu.Unlock()
 		return PairingDenied
 	}
-	if len(b.queue) >= maxQueueLen {
+	if b.queue.Len() >= maxQueueLen {
 		b.mu.Unlock()
 		return PairingDenied
 	}
@@ -171,10 +139,9 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 		},
 		result: make(chan PairingOutcome, 1),
 	}
-	b.queue = append(b.queue, entry)
-	b.byID[entry.req.RequestID] = entry
+	b.queue.Add(entry.req.RequestID, entry)
 	snap := b.snapshotLocked()
-	seq := b.nextSeqLocked()
+	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
 
 	if onEnqueued != nil {
@@ -192,7 +159,7 @@ func (b *Broker) Request(clientID, label string, onEnqueued func(PairingRequest)
 	// RequestID for exactly this case ("a snapshot emitted because the count behind it changed
 	// re-presents the same RequestID and is not [worth re-presenting]"), so this was already the
 	// assumed contract on the consuming side.
-	b.emitOrdered(seq, snap)
+	b.emitter.Emit(seq, snap)
 	return <-entry.result
 }
 
@@ -209,13 +176,12 @@ func (b *Broker) Deny(requestID string) PairingActionResult {
 
 func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny bool) PairingActionResult {
 	b.mu.Lock()
-	entry, ok := b.byID[requestID]
+	entry, ok := b.queue.Remove(requestID)
 	if !ok {
 		b.mu.Unlock()
 		return PairingActionAlreadyResolved
 	}
 	expired := !b.now().Before(entry.req.ExpiresAt)
-	b.removeLocked(entry)
 	var others []*pendingEntry
 	if cooldownOnDeny && !expired {
 		b.cooldown[entry.req.ClientID] = b.now().Add(pairingCooldown)
@@ -231,7 +197,7 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny
 		others = b.removeAllForClientLocked(entry.req.ClientID)
 	}
 	snap := b.snapshotLocked()
-	seq := b.nextSeqLocked()
+	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
 
 	if expired {
@@ -242,7 +208,7 @@ func (b *Broker) answer(requestID string, outcome PairingOutcome, cooldownOnDeny
 	for _, other := range others {
 		other.result <- PairingDenied
 	}
-	b.emitOrdered(seq, snap)
+	b.emitter.Emit(seq, snap)
 	if expired {
 		return PairingActionExpired
 	}
@@ -257,23 +223,23 @@ func (b *Broker) ExpireOverdue() {
 	b.mu.Lock()
 	now := b.now()
 	var overdue []*pendingEntry
-	for _, entry := range b.queue {
+	for _, entry := range b.queue.Snapshot() {
 		if !now.Before(entry.req.ExpiresAt) {
 			overdue = append(overdue, entry)
 		}
 	}
 	for _, entry := range overdue {
-		b.removeLocked(entry)
+		b.queue.Remove(entry.req.RequestID)
 	}
 	snap := b.snapshotLocked()
-	seq := b.nextSeqLocked()
+	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
 
 	for _, entry := range overdue {
 		entry.result <- PairingTimedOut
 	}
 	if len(overdue) > 0 {
-		b.emitOrdered(seq, snap)
+		b.emitter.Emit(seq, snap)
 	}
 }
 
@@ -287,46 +253,28 @@ func (b *Broker) ExpireOverdue() {
 // Deny): this is the server going away, not a decision about the client.
 func (b *Broker) Shutdown() {
 	b.mu.Lock()
-	all := append([]*pendingEntry(nil), b.queue...)
-	b.queue = nil
-	b.byID = map[string]*pendingEntry{}
+	all := b.queue.Clear()
 	snap := b.snapshotLocked()
-	seq := b.nextSeqLocked()
+	seq := b.emitter.NextSeq()
 	b.mu.Unlock()
 
 	for _, entry := range all {
 		entry.result <- PairingDenied
 	}
 	if len(all) > 0 {
-		b.emitOrdered(seq, snap)
+		b.emitter.Emit(seq, snap)
 	}
 }
 
-// removeLocked drops entry from both byID and the queue slice. Caller holds b.mu.
-func (b *Broker) removeLocked(entry *pendingEntry) {
-	delete(b.byID, entry.req.RequestID)
-	for i, e := range b.queue {
-		if e == entry {
-			b.queue = append(b.queue[:i], b.queue[i+1:]...)
-			break
-		}
-	}
-}
-
-// removeAllForClientLocked drops every remaining queued entry belonging to clientID from both
-// byID and the queue slice, and returns them so the caller can resolve their result channels
-// outside the lock. Caller holds b.mu.
+// removeAllForClientLocked drops every remaining queued entry belonging to clientID and returns
+// them so the caller can resolve their result channels outside the lock. Caller holds b.mu.
 func (b *Broker) removeAllForClientLocked(clientID string) []*pendingEntry {
 	var removed []*pendingEntry
-	kept := b.queue[:0]
-	for _, e := range b.queue {
+	for _, e := range b.queue.Snapshot() {
 		if e.req.ClientID == clientID {
-			delete(b.byID, e.req.RequestID)
+			b.queue.Remove(e.req.RequestID)
 			removed = append(removed, e)
-		} else {
-			kept = append(kept, e)
 		}
 	}
-	b.queue = kept
 	return removed
 }

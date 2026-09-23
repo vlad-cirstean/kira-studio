@@ -115,52 +115,9 @@ func TestApprovalBroker_EmitsOnEveryEnqueueAndResolution(t *testing.T) {
 	}
 }
 
-// TestApprovalBroker_EmitOrdered_DropsStaleSnapshot is the M7 finding: resolve/Request/AbandonAll
-// each snapshot state under b.mu, then unlock, then Emit — notify.Emitter's own "never hold your
-// own mutex across Emit" rule — so two of them can call Emit in the opposite order from the
-// mu-protected changes that produced their snapshots. A subscriber then ends up holding an older
-// snapshot (naming a request that is already resolved and gone) even though a newer, correct one
-// was computed. emitOrdered's sequence-number guard must drop a stale Emit outright rather than
-// let it land after a newer one already went out — exercised directly and deterministically here,
-// since winning that goroutine-scheduling race is not reliable to force from outside.
-func TestApprovalBroker_EmitOrdered_DropsStaleSnapshot(t *testing.T) {
-	t.Parallel()
-	b := NewApprovalBroker(time.Now)
-
-	events := make(chan ApprovalSnapshot, 4)
-	unsub := b.OnApprovalChange(func(snap ApprovalSnapshot) { events <- snap })
-	defer unsub()
-
-	older := "older-request-id"
-	staleSnap := ApprovalSnapshot{Pending: &ApprovalRequest{RequestID: older}, Queued: 1}
-	newerSnap := ApprovalSnapshot{} // e.g. the same request resolved and the queue now empty
-
-	b.mu.Lock()
-	seqOlder := b.nextSeqLocked()
-	seqNewer := b.nextSeqLocked()
-	b.mu.Unlock()
-
-	// The later (higher-sequence) resolution's Emit reaches the emitter first — the exact
-	// interleaving the finding describes.
-	b.emitOrdered(seqNewer, newerSnap)
-	b.emitOrdered(seqOlder, staleSnap)
-
-	select {
-	case got := <-events:
-		if got.Pending != nil || got.Queued != 0 {
-			t.Fatalf("first (only) event = %+v, want the newer empty snapshot", got)
-		}
-	default:
-		t.Fatal("newer snapshot was never emitted")
-	}
-
-	select {
-	case got := <-events:
-		t.Fatalf("a second, stale event was emitted: %+v — the older snapshot must be dropped, not published after a newer one", got)
-	default:
-		// correct: the stale emitOrdered call above must be a no-op.
-	}
-}
+// The emitOrdered stale-snapshot-drop guarantee (M7 finding) is now OrderedEmitter's own,
+// hoisted with the rest of the queue/emit machinery to internal/notify (P107 T2-8) — see
+// notify.TestOrderedEmitter_DropsStaleEmit, the one authoritative test for it.
 
 func TestApprovalBroker_DoubleApprove_ReportsAlreadyResolved(t *testing.T) {
 	t.Parallel()
