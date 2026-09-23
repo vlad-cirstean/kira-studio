@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
@@ -544,30 +545,18 @@ function widthFor(column: string): number {
   return props.tab.state.columnWidths[column] ?? DEFAULT_COLUMN_WIDTHS[column] ?? 96;
 }
 
-let resizing: { column: string; startX: number; startWidth: number } | null = null;
-
-function onResizeStart(e: PointerEvent, column: string): void {
-  e.stopPropagation();
-  resizing = { column, startX: e.clientX, startWidth: widthFor(column) };
-  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+// P105 §5.2(a): KuiColumnResizeHandle owns the pointer/keyboard drag mechanics now — this view
+// keeps only its own live-preview-then-single-commit split (P21 round 2 finding 10c's own reason,
+// still the point: patchStreamTabState's own skipUnchanged: false makes a per-pixel-move commit
+// allocate + re-render + re-arm the debounced save on every pixel).
+function onResizeLive(column: string, width: number): void {
+  liveResizeWidth.value = { column, width };
 }
-function onResizeMove(e: PointerEvent): void {
-  if (!resizing) return;
-  const width = Math.max(40, resizing.startWidth + (e.clientX - resizing.startX));
-  liveResizeWidth.value = { column: resizing.column, width };
-}
-function onResizeEnd(e: PointerEvent): void {
-  if (resizing && liveResizeWidth.value) {
-    tabsStore.patchStreamTabState(props.tab.id, {
-      columnWidths: {
-        ...props.tab.state.columnWidths,
-        [resizing.column]: liveResizeWidth.value.width,
-      },
-    });
-  }
-  resizing = null;
+function onResizeCommit(column: string, width: number): void {
+  tabsStore.patchStreamTabState(props.tab.id, {
+    columnWidths: { ...props.tab.state.columnWidths, [column]: width },
+  });
   liveResizeWidth.value = null;
-  (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
 }
 
 let unregisterCommand: (() => void) | null = null;
@@ -1072,49 +1061,57 @@ onUnmounted(() => {
             <div class="p-th gutter" style="width: 40px" />
             <div class="p-th" :style="{ width: `${widthFor('key')}px` }">
               <span class="name">key</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-key"
-                @pointerdown="onResizeStart($event, 'key')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize key column"
+                :value="widthFor('key')"
+                :min="40"
+                @update:value="(w) => onResizeLive('key', w)"
+                @change="(w) => onResizeCommit('key', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" :style="{ width: `${widthFor('timestamp')}px` }">
               <span class="name">timestamp</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-timestamp"
-                @pointerdown="onResizeStart($event, 'timestamp')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize timestamp column"
+                :value="widthFor('timestamp')"
+                :min="40"
+                @update:value="(w) => onResizeLive('timestamp', w)"
+                @change="(w) => onResizeCommit('timestamp', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" :style="{ width: `${widthFor('headers')}px` }">
               <span class="name">headers</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-headers"
-                @pointerdown="onResizeStart($event, 'headers')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize headers column"
+                :value="widthFor('headers')"
+                :min="40"
+                @update:value="(w) => onResizeLive('headers', w)"
+                @change="(w) => onResizeCommit('headers', w)"
                 @click.stop
               />
             </div>
             <div class="p-th" :style="{ width: `${widthFor('attrs')}px` }">
               <span class="name">attrs</span>
-              <span
+              <KuiColumnResizeHandle
                 class="resize-handle"
                 draggable="false"
                 data-testid="stream-column-resize-attrs"
-                @pointerdown="onResizeStart($event, 'attrs')"
-                @pointermove="onResizeMove"
-                @pointerup="onResizeEnd"
+                label="Resize attrs column"
+                :value="widthFor('attrs')"
+                :min="40"
+                @update:value="(w) => onResizeLive('attrs', w)"
+                @change="(w) => onResizeCommit('attrs', w)"
                 @click.stop
               />
             </div>

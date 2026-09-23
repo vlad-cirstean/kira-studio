@@ -16,6 +16,7 @@
  * invalidates exactly the two affected rows (`#watchSelection` below), never the whole grid.
  */
 import type { CommitRecord, RowPlan } from '@kira/git-core';
+import { KuiColumnResizeHandle } from '@kira/kira-ui';
 import type { Column, OnRenderedEventArgs } from 'slickgrid';
 import { SlickGrid } from 'slickgrid';
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
@@ -125,7 +126,6 @@ const emit = defineEmits<{
 const MIN_COLUMN_WIDTH = 40;
 const MAX_COLUMN_WIDTH = 600;
 const MIN_MESSAGE_WIDTH = 120;
-const HANDLE_KEY_STEP = 8;
 // G21 D6b: mirrors `--kv-s-2` (density.css), `.slick-cell`'s own horizontal padding — one
 // side; `measureAbsoluteDateWidth`'s own caller doubles it for both sides of the cell.
 const CELL_PADDING_PX = 4;
@@ -397,31 +397,6 @@ function setColumnWidth(column: keyof ColumnWidths, next: number): void {
   widths.value = { ...widths.value, [column]: clamped };
   rebuildColumns();
   emit('update:columnWidths', widths.value);
-}
-
-function startDrag(column: keyof ColumnWidths, event: MouseEvent): void {
-  event.preventDefault();
-  const startX = event.clientX;
-  const startWidth = widths.value[column];
-  const onMove = (moveEvent: MouseEvent): void => {
-    setColumnWidth(column, startWidth + (moveEvent.clientX - startX));
-  };
-  const onUp = (): void => {
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-  };
-  window.addEventListener('mousemove', onMove);
-  window.addEventListener('mouseup', onUp);
-}
-
-function handleHandleKeydown(column: keyof ColumnWidths, event: KeyboardEvent): void {
-  if (event.key === 'ArrowLeft') {
-    event.preventDefault();
-    setColumnWidth(column, widths.value[column] - HANDLE_KEY_STEP);
-  } else if (event.key === 'ArrowRight') {
-    event.preventDefault();
-    setColumnWidth(column, widths.value[column] + HANDLE_KEY_STEP);
-  }
 }
 
 /** P93 §4.2: a placeholder's own click/Enter/Space activation — expands its group, session-only
@@ -1211,50 +1186,35 @@ defineExpose({ scrollToRow, focusGrid, scrollToTopRow, getViewportTop });
          `remeasureDateWidth` has a real element to read a computed `font` shorthand from — never
          shown, never a fifth grid column. -->
     <span ref="dateWidthProbe" class="kv-cell-date kv-date-width-probe" aria-hidden="true"></span>
-    <div
+    <KuiColumnResizeHandle
       class="kv-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize graph column"
-      :aria-valuenow="widths.graph"
-      :aria-valuemin="minWidthFor('graph')"
-      :aria-valuemax="MAX_COLUMN_WIDTH"
-      :aria-valuetext="`${widths.graph} pixels`"
-      tabindex="0"
       :style="{ left: `${handleLeftGraph}px` }"
-      @mousedown="startDrag('graph', $event)"
-      @keydown="handleHandleKeydown('graph', $event)"
-    ></div>
-    <div
+      label="Resize graph column"
+      :value="widths.graph"
+      :min="minWidthFor('graph')"
+      :max="MAX_COLUMN_WIDTH"
+      @update:value="(w) => setColumnWidth('graph', w)"
+    />
+    <KuiColumnResizeHandle
       v-if="!detailOpen"
       class="kv-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize author column"
-      :aria-valuenow="widths.author"
-      :aria-valuemin="MIN_COLUMN_WIDTH"
-      :aria-valuemax="MAX_COLUMN_WIDTH"
-      :aria-valuetext="`${widths.author} pixels`"
-      tabindex="0"
       :style="{ left: `${handleLeftAuthor}px` }"
-      @mousedown="startDrag('author', $event)"
-      @keydown="handleHandleKeydown('author', $event)"
-    ></div>
-    <div
+      label="Resize author column"
+      :value="widths.author"
+      :min="MIN_COLUMN_WIDTH"
+      :max="MAX_COLUMN_WIDTH"
+      @update:value="(w) => setColumnWidth('author', w)"
+    />
+    <KuiColumnResizeHandle
       v-if="!detailOpen"
       class="kv-resize-handle"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label="Resize date column"
-      :aria-valuenow="widths.date"
-      :aria-valuemin="minWidthFor('date')"
-      :aria-valuemax="MAX_COLUMN_WIDTH"
-      :aria-valuetext="`${widths.date} pixels`"
-      tabindex="0"
       :style="{ left: `${handleLeftDate}px` }"
-      @mousedown="startDrag('date', $event)"
-      @keydown="handleHandleKeydown('date', $event)"
-    ></div>
+      label="Resize date column"
+      :value="widths.date"
+      :min="minWidthFor('date')"
+      :max="MAX_COLUMN_WIDTH"
+      @update:value="(w) => setColumnWidth('date', w)"
+    />
   </div>
 </template>
 
