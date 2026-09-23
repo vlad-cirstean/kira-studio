@@ -865,30 +865,37 @@ const statusLine = computed(() => {
             data-testid="console-result-strip"
             @wheel="onResultStripWheel"
           >
-            <button
+            <div
               v-for="(result, i) in rt.results"
               :key="result.key"
-              type="button"
               class="p-tab result-tab"
               :class="{ 'is-active': result.key === rt.activeKey }"
               data-testid="console-result-tab"
               :data-active="result.key === rt.activeKey"
-              @click="consoleViewStore.setActiveResult(tab.id, result.key)"
-              @auxclick.middle="onResultMiddleClick(result.key)"
-              @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
             >
-              <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
-              <span class="result-tab-title">Result {{ i + 1 }}</span>
-              <span
+              <!-- P105 §11: a focusable close control nested inside the tab's own <button> is
+                   invalid HTML and unreachable by keyboard — the close button is this tab's
+                   sibling now, not its child. -->
+              <button
+                type="button"
+                class="result-tab-main"
+                @click="consoleViewStore.setActiveResult(tab.id, result.key)"
+                @auxclick.middle="onResultMiddleClick(result.key)"
+                @contextmenu.prevent="onResultContextMenu($event, result.key, i)"
+              >
+                <CodiconIcon :name="iconForResult(result.key)" :size="13" class="result-tab-icon" />
+                <span class="result-tab-title">Result {{ i + 1 }}</span>
+              </button>
+              <button
+                type="button"
                 class="result-close"
-                role="button"
                 aria-label="Close result"
                 data-testid="console-result-close"
-                @click.stop="consoleViewStore.closeResult(tab.id, result.key)"
+                @click="consoleViewStore.closeResult(tab.id, result.key)"
               >
                 <CodiconIcon name="close" :size="11" />
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
           <span class="p-sm muted p-push" data-testid="console-status">{{ statusLine }}</span>
           <!-- Item (regression pass, task batch P46-4): only shown for a document-shaped (Mongo)
@@ -1069,6 +1076,12 @@ const statusLine = computed(() => {
   @apply bg-hover;
 }
 
+/* P105 §11: the tab's own click/select surface, a plain sibling <button> now rather than the
+   whole chip — unstyled beyond filling the space .p-tab's own padding leaves it. */
+.result-tab-main {
+  @apply flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer;
+}
+
 .result-tab-icon {
   @apply shrink-0;
 }
@@ -1078,7 +1091,7 @@ const statusLine = computed(() => {
 }
 
 .result-close {
-  @apply inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 rounded-kira-sm opacity-0;
+  @apply inline-flex items-center justify-center shrink-0 w-3.5 h-3.5 cursor-pointer rounded-kira-sm border-0 bg-transparent p-0 opacity-0;
 }
 
 .result-tab:hover .result-close,

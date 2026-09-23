@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { useEventListener } from '@vueuse/core';
 import { computed, nextTick, ref, watch } from 'vue';
 import { type TabLike, useWorkbenchHost } from '../host';
 import { type MenuItem, useContextMenuStore } from '../state/contextMenu';
@@ -175,6 +176,26 @@ function onDragOver(id: string): void {
 function onDragEnd(): void {
   dragId.value = null;
 }
+
+// P105 §5.1: dragstart/dragover/dragend delegated off each tab chip onto the strip — a pointer-only
+// gesture with no keyboard equivalent to wire up, same as every other container-level listener this
+// phase moved. `.closest` recovers which chip the event actually landed on.
+function tabIdFromEvent(e: Event): string | null {
+  return (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-testid="tab"]')?.dataset
+    .tabId ?? null;
+}
+function onDragStartFromEvent(e: DragEvent): void {
+  const id = tabIdFromEvent(e);
+  if (id !== null) onDragStart(id);
+}
+function onDragOverFromEvent(e: DragEvent): void {
+  e.preventDefault();
+  const id = tabIdFromEvent(e);
+  if (id !== null) onDragOver(id);
+}
+useEventListener(stripRef, 'dragstart', onDragStartFromEvent);
+useEventListener(stripRef, 'dragover', onDragOverFromEvent);
+useEventListener(stripRef, 'dragend', onDragEnd);
 </script>
 
 <template>
@@ -215,10 +236,13 @@ function onDragEnd(): void {
       <span class="tab-strip-separator" aria-hidden="true"></span>
     </div>
     <div ref="stripRef" class="tab-strip" data-testid="tab-strip-row" @wheel="onWheel">
-      <button
+      <!-- P105 §11: a focusable close control nested inside the tab's own <button> is invalid
+           HTML and unreachable by keyboard — the close button is this tab's sibling now, not its
+           child. `draggable`/drag* stay on this wrapper (the whole chip is the drag handle);
+           click/dblclick/auxclick/contextmenu move onto `.tab-main`. -->
+      <div
         v-for="{ tab, icon } in scrollingTabs"
         :key="tab.id"
-        type="button"
         class="p-tab"
         :class="{
           'is-active': tab.active,
@@ -235,40 +259,42 @@ function onDragEnd(): void {
         :data-color="host.railColorFor(tab)"
         :style="{ '--kira-rail': connColorVar(host.railColorFor(tab)) }"
         draggable="true"
-        @click="onClick(tab)"
-        @dblclick="host.tabs.promoteTab(tab.id)"
-        @auxclick.middle="onMiddleClick(tab)"
-        @contextmenu.prevent="onContextMenu($event, tab)"
-        @dragstart="onDragStart(tab.id)"
-        @dragover.prevent="onDragOver(tab.id)"
-        @dragend="onDragEnd"
       >
         <span class="p-tab-rail" />
-        <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
-        <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
-        <Tooltip v-if="indicatorFor(tab)">
-          <TooltipTrigger as-child>
-            <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="tab-incognito" />
-          </TooltipTrigger>
-          <TooltipContent>{{ indicatorFor(tab)!.tooltip }}</TooltipContent>
-        </Tooltip>
-        <span class="tab-title">{{ titleFor(tab) }}</span>
-        <Tooltip v-if="badgeFor(tab)">
-          <TooltipTrigger as-child>
-            <CodiconIcon :name="badgeFor(tab)!.icon" :size="12" class="tab-badge" data-testid="tab-badge" />
-          </TooltipTrigger>
-          <TooltipContent>{{ badgeFor(tab)!.tooltip }}</TooltipContent>
-        </Tooltip>
-        <span
+        <button
+          type="button"
+          class="tab-main"
+          @click="onClick(tab)"
+          @dblclick="host.tabs.promoteTab(tab.id)"
+          @auxclick.middle="onMiddleClick(tab)"
+          @contextmenu.prevent="onContextMenu($event, tab)"
+        >
+          <CodiconIcon v-if="'codicon' in icon" :name="icon.codicon" :size="13" class="tab-icon" />
+          <span v-else class="tab-icon tab-file-icon" :style="icon.fileStyle" aria-hidden="true" />
+          <Tooltip v-if="indicatorFor(tab)">
+            <TooltipTrigger as-child>
+              <CodiconIcon :name="indicatorFor(tab)!.icon" :size="12" class="tab-incognito" />
+            </TooltipTrigger>
+            <TooltipContent>{{ indicatorFor(tab)!.tooltip }}</TooltipContent>
+          </Tooltip>
+          <span class="tab-title">{{ titleFor(tab) }}</span>
+          <Tooltip v-if="badgeFor(tab)">
+            <TooltipTrigger as-child>
+              <CodiconIcon :name="badgeFor(tab)!.icon" :size="12" class="tab-badge" data-testid="tab-badge" />
+            </TooltipTrigger>
+            <TooltipContent>{{ badgeFor(tab)!.tooltip }}</TooltipContent>
+          </Tooltip>
+        </button>
+        <button
+          type="button"
           class="tab-close"
-          role="button"
           aria-label="Close tab"
           data-testid="tab-close"
           @click="onClose($event, tab)"
         >
           <CodiconIcon name="close" :size="13" />
-        </span>
-      </button>
+        </button>
+      </div>
     </div>
     <!-- P83 §9.1/P91 §8: a third fixed child, after `.tab-strip`, mirroring `.tab-strip-pinned`'s
          own leading-edge fix at the other end. Per-app "new tab" affordance — the whole
@@ -331,6 +357,12 @@ function onDragEnd(): void {
   @apply opacity-50;
 }
 
+/* P105 §11: the tab's own click/select surface, a plain sibling <button> now rather than the
+   whole chip — unstyled beyond filling the space .p-tab's own padding/gap leaves it. */
+.tab-main {
+  @apply flex flex-1 min-w-0 items-center gap-1 border-0 bg-transparent p-0 cursor-pointer;
+}
+
 .tab-icon {
   @apply shrink-0;
 }
@@ -378,7 +410,7 @@ function onDragEnd(): void {
 }
 
 .tab-close {
-  @apply shrink-0 flex items-center justify-center w-4 h-4 opacity-0 rounded-kira-sm;
+  @apply shrink-0 flex items-center justify-center w-4 h-4 cursor-pointer border-0 bg-transparent p-0 opacity-0 rounded-kira-sm;
 }
 
 .p-tab:hover .tab-close,

@@ -131,15 +131,15 @@ const rawLanguage = computed(() =>
           data-testid="explain-plan-node"
           :style="{ paddingLeft: `${row.depth * 18 + 4}px` }"
         >
-          <span
+          <button
             v-if="row.hasChildren"
+            type="button"
             class="plan-toggle"
-            role="button"
             :aria-label="collapsedIds.has(row.id) ? 'Expand' : 'Collapse'"
             @click="toggleNode(row.id)"
           >
             <CodiconIcon :name="collapsedIds.has(row.id) ? 'chevron-right' : 'chevron-down'" :size="12" />
-          </span>
+          </button>
           <span v-else class="plan-toggle-spacer"></span>
           <span class="plan-label">{{ row.node.label }}</span>
           <span v-if="row.node.estimatedRows !== undefined" class="plan-meta muted"
@@ -240,6 +240,10 @@ const rawLanguage = computed(() =>
 .plan-toggle,
 .plan-toggle-spacer {
   @apply inline-flex items-center w-3 shrink-0 cursor-pointer;
+}
+
+.plan-toggle {
+  @apply border-0 bg-transparent p-0;
 }
 
 .plan-label {
