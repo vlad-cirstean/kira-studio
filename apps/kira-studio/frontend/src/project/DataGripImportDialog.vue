@@ -2,6 +2,7 @@
 import type { ConnectionKind } from '@shared/domain/connection';
 import type { DataGripPreviewRow, DataGripReportRow } from '@shared/domain/datagrip';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
@@ -10,7 +11,6 @@ import { computed } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { looksAlreadyImported, useDatagripImportStore } from '../state/datagripImport';
 import EngineIcon from '../theme/EngineIcon.vue';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
 
 // P25 D10: a real review step. Nothing is written until "Import N connections" is pressed —
 // every row here is either checkable (it maps to a supported engine and has enough of a JDBC URL
@@ -162,16 +162,18 @@ async function onConfirm(): Promise<void> {
 
       <div class="flex-1 min-h-0 overflow-auto">
     <div v-if="!report" class="p-dialog-body">
-      <MessageStrip
+      <Alert
         v-if="secretStatus && !secretStatus.available"
-        tone="warn"
         data-testid="datagrip-secrets-unavailable"
+        class="strip-warn"
       >
-        {{ secretStatus.reason ?? 'Passwords cannot be saved on this machine, so every connection will import without one.' }}
-      </MessageStrip>
-      <MessageStrip v-if="datagripImportStore.error" tone="err" data-testid="datagrip-import-error">
-        {{ datagripImportStore.error }}
-      </MessageStrip>
+        <AlertDescription class="strip-warn-text">
+          {{ secretStatus.reason ?? 'Passwords cannot be saved on this machine, so every connection will import without one.' }}
+        </AlertDescription>
+      </Alert>
+      <Alert v-if="datagripImportStore.error" variant="destructive" data-testid="datagrip-import-error">
+        <AlertDescription>{{ datagripImportStore.error }}</AlertDescription>
+      </Alert>
 
       <div class="row-list" data-testid="datagrip-preview-rows">
         <div
@@ -244,9 +246,14 @@ async function onConfirm(): Promise<void> {
          at all — every per-row outcome (created, password imported, or the specific reason it
          wasn't) is now shown here instead of auto-closing. -->
     <div v-else class="p-dialog-body">
-      <MessageStrip :tone="reportTone" data-testid="datagrip-report-summary">
-        {{ reportSummary }}
-      </MessageStrip>
+      <Alert
+        data-testid="datagrip-report-summary"
+        :class="reportTone === 'warn' ? 'strip-warn' : 'strip-note'"
+      >
+        <AlertDescription :class="reportTone === 'warn' ? 'strip-warn-text' : 'strip-note-text'">
+          {{ reportSummary }}
+        </AlertDescription>
+      </Alert>
 
       <div class="row-list" data-testid="datagrip-report-rows">
         <div
@@ -359,5 +366,20 @@ async function onConfirm(): Promise<void> {
   @apply text-center;
   padding: var(--kira-s-5);
   color: var(--kira-fg-muted);
+}
+
+/* Alert tone classes replacing MessageStrip's own warn/note-tone colors (P104 §9 rule 5: literal
+   hex, not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 </style>

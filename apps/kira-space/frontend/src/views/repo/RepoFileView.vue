@@ -1,9 +1,7 @@
 <script setup lang="ts">
-// P104 §3.4/§3.1: EmptyState's ui/alert rewrite and SegmentedControl's ToggleGroup recipe are each
-// a genuinely separate, non-mechanical piece of work -- not attempted in this pass, same deferral
-// as OperationsPanel.vue's own.
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
+import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { registerTabRuntimeCleanup } from '@workbench/state/tabRuntime';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
@@ -270,12 +268,21 @@ onUnmounted(() => {
   <template v-if="state === 'loading' || state === 'found'">
     <div v-if="isMarkdown" class="repo-file">
       <div class="p-toolbar last">
-        <SegmentedControl
+        <ToggleGroup
+          type="single"
           :model-value="view"
-          :options="VIEW_OPTIONS"
           data-testid="repo-file-view-toggle"
-          @update:model-value="onViewChange"
-        />
+          @update:model-value="(v) => v && onViewChange(v as 'source' | 'reading')"
+        >
+          <ToggleGroupItem
+            v-for="opt in VIEW_OPTIONS"
+            :key="opt.value"
+            :value="opt.value"
+            :data-testid="opt.testid"
+          >
+            {{ opt.label }}
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
       <!-- D11: `v-show`, never `v-if` — the editor widget must never be disposed/recreated by this
            toggle, only hidden, so scroll position/selection/find state survive a round trip. -->
@@ -293,18 +300,34 @@ onUnmounted(() => {
     </div>
     <div v-else ref="container" class="monaco-host" data-testid="repo-file-editor" />
   </template>
-  <EmptyState
+  <Alert
     v-else-if="state === 'binary'"
-    icon="file-binary"
-    label="This file is binary and can't be previewed."
-  />
-  <EmptyState
+    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+  >
+    <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
+    <AlertTitle class="text-kira-md font-normal text-muted">This file is binary and can't be previewed.</AlertTitle>
+  </Alert>
+  <Alert
     v-else-if="state === 'tooLarge'"
-    icon="warning"
-    label="This file is too large to preview (over 8 MB)."
-  />
-  <EmptyState v-else-if="state === 'missing'" icon="warning" label="This file no longer exists." />
-  <EmptyState v-else icon="warning" :label="errorMessage || 'Could not open this file.'" />
+    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+  >
+    <CodiconIcon name="warning" :size="24" class="text-subtle" />
+    <AlertTitle class="text-kira-md font-normal text-muted">This file is too large to preview (over 8 MB).</AlertTitle>
+  </Alert>
+  <Alert
+    v-else-if="state === 'missing'"
+    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+  >
+    <CodiconIcon name="warning" :size="24" class="text-subtle" />
+    <AlertTitle class="text-kira-md font-normal text-muted">This file no longer exists.</AlertTitle>
+  </Alert>
+  <Alert
+    v-else
+    class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+  >
+    <CodiconIcon name="warning" :size="24" class="text-subtle" />
+    <AlertTitle class="text-kira-md font-normal text-muted">{{ errorMessage || 'Could not open this file.' }}</AlertTitle>
+  </Alert>
 </template>
 
 <style scoped>

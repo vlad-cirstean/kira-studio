@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import EmptyState from '@theme/primitives/EmptyState.vue';
+import { Alert, AlertAction, AlertTitle } from '@theme/components/ui/alert';
+import { Button } from '@theme/components/ui/button';
 import { ref } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 
@@ -25,13 +26,17 @@ async function onImport(): Promise<void> {
 <template>
   <div class="start" data-testid="git-start">
     <div class="start-inner">
-      <EmptyState icon="source-control" label="No repository open">
-        <button type="button" class="p-dlgbtn primary" data-testid="git-start-import" @click="onImport">
-          <span class="icon-box"><CodiconIcon name="repo" :size="13" /></span>
-          Import repository…
-        </button>
-        <span v-if="importError" class="p-xs error-note">{{ importError }}</span>
-      </EmptyState>
+      <Alert class="w-full flex-col items-center gap-1.5 border-0 bg-transparent text-center">
+        <CodiconIcon name="source-control" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md font-normal text-muted">No repository open</AlertTitle>
+        <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
+          <Button variant="dialog-primary" size="kira-lg" data-testid="git-start-import" @click="onImport">
+            <CodiconIcon name="repo" :size="13" />
+            Import repository…
+          </Button>
+          <span v-if="importError" class="text-kira-xs error-note">{{ importError }}</span>
+        </AlertAction>
+      </Alert>
     </div>
   </div>
 </template>

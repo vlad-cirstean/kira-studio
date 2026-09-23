@@ -2,18 +2,16 @@
 import type { WorktreeEntry } from '@kira/git-ipc';
 import type { RepoSummary } from '@shared/domain/repo';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-// P104 §3.4/§3.1/§3.3: VirtualList's @tanstack/vue-virtual recipe, SegmentedControl's ToggleGroup
-// recipe, and PanelShell's inline-composition rewrite are each a genuinely separate, non-mechanical
-// piece of work -- not attempted in this pass, same deferral as OperationsPanel.vue's own.
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import PanelShell from '@theme/primitives/PanelShell.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
+import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useCodeReposStore } from '../state/coderepos';
 import { useLayoutStore } from '../state/layout';
@@ -323,6 +321,24 @@ function onRefresh(): void {
   void fileTreeStore.refreshRepoTree(repoId.value);
 }
 
+// P104 §3: PanelShell's own search/empty props, inlined -- the panel routes to one of two search
+// strings depending on which top-level tab is active (Repos vs. Files), same as before.
+const panelSearch = computed<string>({
+  get: () => (tab.value === 'repos' ? local.repoSearch : local.fileSearch),
+  set: (v: string) => {
+    if (tab.value === 'repos') local.repoSearch = v;
+    else local.fileSearch = v;
+  },
+});
+const panelEmpty = computed(() => codeReposStore.records.length === 0);
+const panelSearchable = computed(() => tab.value !== 'review');
+const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+  searchable: () => panelSearchable.value,
+  setSearch: (v) => {
+    panelSearch.value = v;
+  },
+});
+
 // C7 S10: `repo.search`'s own palette entry (shortcuts/state.ts) — this panel is the whole of a
 // repo workspace's own left panel, mounted for as long as that workspace is open, so there is no
 // tab-scoping question the way view.find's per-view registration has.
@@ -345,25 +361,31 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PanelShell
-    :search="tab === 'repos' ? local.repoSearch : local.fileSearch"
-    :empty="codeReposStore.records.length === 0"
-    :searchable="tab !== 'review'"
-    @update:search="tab === 'repos' ? (local.repoSearch = $event) : (local.fileSearch = $event)"
-  >
-    <template #title>
+  <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, panelSearch)">
+    <div class="p-panel-head h-[34px]">
       <!-- P84 §8.1/§9: replaces the old repo-name title — the tabs already say what's open.
            P92 item 6: Review joins Repos/Files as a third tab, off the Files body's own segment. -->
-      <SegmentedControl
-        v-model="tab"
-        :options="[
-          { value: 'repos', label: 'Repos', testid: 'git-panel-tab-repos' },
-          { value: 'files', label: 'Files', testid: 'git-panel-tab-files' },
-          { value: 'review', label: 'Review', testid: 'git-panel-tab-review' },
-        ]"
-      />
-    </template>
-    <template #actions>
+      <ToggleGroup
+        type="single"
+        :model-value="tab"
+        @update:model-value="(v) => v && (tab = v as 'repos' | 'files' | 'review')"
+      >
+        <ToggleGroupItem value="repos" data-testid="git-panel-tab-repos">Repos</ToggleGroupItem>
+        <ToggleGroupItem value="files" data-testid="git-panel-tab-files">Files</ToggleGroupItem>
+        <ToggleGroupItem value="review" data-testid="git-panel-tab-review">Review</ToggleGroupItem>
+      </ToggleGroup>
+      <Button
+        variant="toolbar"
+        size="kira-icon"
+        class="p-push"
+        :data-active="showSearch"
+        aria-label="Search"
+        v-tooltip="showSearch ? 'Hide search' : 'Search'"
+        data-testid="toggle-search"
+        @click="toggleSearch"
+      >
+        <CodiconIcon name="search" :size="13" />
+      </Button>
       <!-- C5 §3.3/§3.4: no new dialog, no new native picker — reuses FilesService.ChooseFolder. -->
       <Tooltip v-if="tab === 'repos'">
         <TooltipTrigger as-child>
@@ -395,9 +417,27 @@ onUnmounted(() => {
         </TooltipTrigger>
         <TooltipContent>Refresh file tree</TooltipContent>
       </Tooltip>
-    </template>
-    <template #body>
-      <div class="git-panel-body">
+    </div>
+    <template v-if="!panelEmpty">
+      <div v-if="panelSearchable && showSearch" class="shrink-0 border-b border-border px-1.5 py-1">
+        <InputGroup>
+          <InputGroupAddon>
+            <CodiconIcon name="search" :size="13" />
+          </InputGroupAddon>
+          <InputGroupInput
+            v-model="panelSearch"
+            placeholder="Search"
+            data-testid="tree-search"
+          />
+          <InputGroupAddon v-if="panelSearch" align="inline-end">
+            <InputGroupButton aria-label="Clear search" @click="panelSearch = ''">
+              <CodiconIcon name="close" :size="12" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
+      </div>
+      <div class="min-h-0 flex-1">
+        <div class="git-panel-body">
         <section v-if="tab === 'repos'" class="repo-section" data-testid="repo-section">
           <div class="repo-list">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
@@ -528,7 +568,20 @@ onUnmounted(() => {
           <template v-if="repoId">
             <template v-if="tab === 'files'">
               <div class="view-strip">
-                <SegmentedControl v-model="view" :options="viewOptions" />
+                <ToggleGroup
+                  type="single"
+                  :model-value="view"
+                  @update:model-value="(v) => v && (view = v as 'files' | 'search')"
+                >
+                  <ToggleGroupItem
+                    v-for="opt in viewOptions"
+                    :key="opt.value"
+                    :value="opt.value"
+                    :data-testid="opt.testid"
+                  >
+                    {{ opt.label }}
+                  </ToggleGroupItem>
+                </ToggleGroup>
               </div>
               <template v-if="view === 'files'">
                 <div
@@ -565,14 +618,27 @@ onUnmounted(() => {
               :repo-id="repoId"
             />
           </template>
-          <EmptyState v-else icon="source-control" label="No repository open" />
+          <Alert
+            v-else
+            class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+          >
+            <CodiconIcon name="source-control" :size="24" class="text-subtle" />
+            <AlertTitle class="text-kira-md font-normal text-muted">No repository open</AlertTitle>
+          </Alert>
         </template>
       </div>
+      </div>
     </template>
-    <template #empty>
-      <EmptyState icon="source-control" label="Import a repository to get started." />
-    </template>
-  </PanelShell>
+    <div
+      v-else
+      class="side-empty flex flex-1 min-h-0 flex-col items-center justify-center gap-4 p-6 text-center"
+    >
+      <Alert class="w-auto flex-col items-center gap-1.5 border-0 bg-transparent text-center">
+        <CodiconIcon name="source-control" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md font-normal text-muted">Import a repository to get started.</AlertTitle>
+      </Alert>
+    </div>
+  </div>
 
   <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
     <div class="prompt-box p-float">

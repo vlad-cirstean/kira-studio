@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-// P104 §3.4: EmptyState's ui/alert rewrite is a genuinely separate, non-mechanical piece of work --
-// not attempted in this pass, same deferral as OperationsPanel.vue's own.
-import EmptyState from '@theme/primitives/EmptyState.vue';
 import { type ComponentPublicInstance, nextTick, onUnmounted, type Ref, reactive, ref } from 'vue';
 // P92 item 5/§7.3: one commit's whole changed-file set, one tab — VS Code's own multi-file diff
 // editor's counterpart. A scrolling column of per-file sections; each section's own diff editor
@@ -122,7 +120,10 @@ onUnmounted(() => {
 
 <template>
   <div v-if="!repoId" class="repo-multi-diff-root">
-    <EmptyState icon="warning" label="This tab has no repository." />
+    <Alert class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center">
+      <CodiconIcon name="warning" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md font-normal text-muted">This tab has no repository.</AlertTitle>
+    </Alert>
   </div>
   <div v-else class="repo-multi-diff-root" data-testid="repo-multi-diff-view">
     <div v-for="section in sections" :key="section.path" class="section">
@@ -161,29 +162,43 @@ onUnmounted(() => {
           class="monaco-host"
           data-testid="repo-multi-diff-editor"
         />
-        <EmptyState
+        <Alert
           v-else-if="sectionState[section.path] === 'binary'"
-          icon="file-binary"
-          label="This file is binary and can't be compared."
-        />
-        <EmptyState
+          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
+        >
+          <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md font-normal text-muted">This file is binary and can't be compared.</AlertTitle>
+        </Alert>
+        <Alert
           v-else-if="sectionState[section.path] === 'tooLarge'"
-          icon="warning"
-          label="This file is too large to compare (over 8 MB)."
-        />
-        <EmptyState
+          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
+        >
+          <CodiconIcon name="warning" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md font-normal text-muted">This file is too large to compare (over 8 MB).</AlertTitle>
+        </Alert>
+        <Alert
           v-else-if="sectionState[section.path] === 'bothMissing'"
-          icon="warning"
-          label="This file no longer exists."
-        />
-        <EmptyState
+          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
+        >
+          <CodiconIcon name="warning" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md font-normal text-muted">This file no longer exists.</AlertTitle>
+        </Alert>
+        <Alert
           v-else
-          icon="warning"
-          :label="sectionError[section.path] || 'Could not open this diff.'"
-        />
+          class="flex-col items-center justify-center gap-1.5 border-0 bg-transparent p-4 text-center"
+        >
+          <CodiconIcon name="warning" :size="24" class="text-subtle" />
+          <AlertTitle class="text-kira-md font-normal text-muted">{{ sectionError[section.path] || 'Could not open this diff.' }}</AlertTitle>
+        </Alert>
       </template>
     </div>
-    <EmptyState v-if="sections.length === 0" icon="git-compare" label="No changed files." />
+    <Alert
+      v-if="sections.length === 0"
+      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+    >
+      <CodiconIcon name="git-compare" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md font-normal text-muted">No changed files.</AlertTitle>
+    </Alert>
   </div>
 </template>
 

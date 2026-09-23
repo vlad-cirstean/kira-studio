@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
@@ -13,8 +14,6 @@ import MonacoHost from '../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../state/connections';
 import { useFakeDataStore } from '../state/fakeData';
 import { useTabsStore } from '../state/tabs';
-import MessageStrip from '../theme/primitives/MessageStrip.vue';
-import RunState from '../theme/primitives/RunState.vue';
 import {
   BATCH_SIZE,
   GenerationError,
@@ -438,33 +437,27 @@ function onSequenceStartChange(index: number, start: number): void {
         </div>
       </div>
 
-      <MessageStrip
-        v-if="noColumnsLoaded"
-        tone="warn"
-        icon="warning"
-        data-testid="generate-data-no-columns"
-      >
-        No column information available yet. Close this dialog, let the page load, then try again.
-      </MessageStrip>
-      <MessageStrip
-        v-else-if="allColumnsSkipped"
-        tone="warn"
-        icon="warning"
-        data-testid="generate-data-no-columns"
-      >
-        Every column is set to Skip — pick a recipe for at least one column to generate rows.
-      </MessageStrip>
+      <Alert v-if="noColumnsLoaded" class="strip-warn" data-testid="generate-data-no-columns">
+        <CodiconIcon name="warning" :size="14" class="strip-warn-text" />
+        <AlertDescription class="strip-warn-text">
+          No column information available yet. Close this dialog, let the page load, then try again.
+        </AlertDescription>
+      </Alert>
+      <Alert v-else-if="allColumnsSkipped" class="strip-warn" data-testid="generate-data-no-columns">
+        <CodiconIcon name="warning" :size="14" class="strip-warn-text" />
+        <AlertDescription class="strip-warn-text">
+          Every column is set to Skip — pick a recipe for at least one column to generate rows.
+        </AlertDescription>
+      </Alert>
 
-      <MessageStrip
-        v-if="warnings.length"
-        tone="warn"
-        icon="warning"
-        data-testid="generate-data-warnings"
-      >
-        <ul class="warning-list">
-          <li v-for="w in warnings" :key="w">{{ w }}</li>
-        </ul>
-      </MessageStrip>
+      <Alert v-if="warnings.length" class="strip-warn" data-testid="generate-data-warnings">
+        <CodiconIcon name="warning" :size="14" class="strip-warn-text" />
+        <AlertDescription class="strip-warn-text">
+          <ul class="warning-list">
+            <li v-for="w in warnings" :key="w">{{ w }}</li>
+          </ul>
+        </AlertDescription>
+      </Alert>
 
       <div class="preview-section">
         <button
@@ -491,20 +484,28 @@ function onSequenceStartChange(index: number, start: number): void {
         </div>
       </div>
 
-      <MessageStrip v-if="runError" tone="err" icon="warning" data-testid="generate-data-error">
-        {{ runError }}
-      </MessageStrip>
+      <Alert v-if="runError" variant="destructive" data-testid="generate-data-error">
+        <CodiconIcon name="warning" :size="14" />
+        <AlertDescription>{{ runError }}</AlertDescription>
+      </Alert>
     </div>
       </div>
 
       <DialogFooter class="border-t border-border">
         <span class="flex items-center gap-1 ml-auto">
-          <RunState
-            v-if="running"
-            status="running"
-            :elapsed-ms="null"
-            :title="`${committedRows} / ${rowCount} rows committed`"
-          />
+          <!-- P104 §3: RunState inlined -- status is always 'running' here (elapsedMs is always
+               null, so the label is always the em dash RunState's own computed would give it). -->
+          <Tooltip v-if="running">
+            <TooltipTrigger as-child>
+              <span class="inline-flex items-center gap-1 font-data text-kira-xs text-info">
+                <span class="min-w-[7ch] text-right">—</span>
+                <span
+                  class="h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-t-accent border-r-transparent border-b-accent border-l-accent animate-[spin_0.7s_linear_infinite]"
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{{ `${committedRows} / ${rowCount} rows committed` }}</TooltipContent>
+          </Tooltip>
           <Button v-if="running" variant="dialog" size="kira-lg" data-testid="generate-data-stop" @click="onStop">
             Stop
           </Button>
@@ -582,5 +583,14 @@ function onSequenceStartChange(index: number, start: number): void {
 .preview-body {
   @apply h-[200px];
   margin-top: var(--kira-s-2);
+}
+
+/* Alert tone classes replacing MessageStrip's own warn-tone colors (P104 §9 rule 5: literal hex,
+   not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
 }
 </style>

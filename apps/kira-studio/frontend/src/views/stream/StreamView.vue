@@ -2,33 +2,29 @@
 import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
+import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
+import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-// P104 §3.4/§3.1: VirtualList's @tanstack/vue-virtual recipe and SegmentedControl's ToggleGroup
-// recipe are each a genuinely separate, non-mechanical piece of work -- not attempted in this
-// pass, same deferral as OperationsPanel.vue's own.
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import SegmentedControl from '@theme/primitives/SegmentedControl.vue';
-import VirtualList from '@theme/primitives/VirtualList.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useVirtualRows } from '@workbench/util/virtualRows';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
+import { useRunState } from '../../state/runState';
 import { useSettingsStore } from '../../state/settings';
 import type { StreamTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
 import { cellClass } from '../../theme/cellClass';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
-import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import DateTimePicker from '../shared/DateTimePicker.vue';
 import { datasetNumber } from '../shared/eventCoords';
@@ -72,6 +68,18 @@ const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.co
 const iconColor = computed(() => connColorVar(connRecord.value?.color) ?? 'var(--kira-fg-muted)');
 
 const pathPrefix = computed(() => (connRecord.value ? `${connRecord.value.name} / ` : ''));
+
+// P104 §3: ViewChrome/ViewHeader/RunState inlined -- railColor mirrors ViewChrome.vue's own
+// `envColor ?? (connection ? connection.color ?? null : undefined)`; this view has no envColor.
+const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 // D10/D12: SQS's 'batch' pagination is never auto-loaded — the user must click Poll, because
 // every poll consumes messages from the queue (subject to VisibilityTimeout) rather than
@@ -358,6 +366,9 @@ function onApplyFromHistory(
 // query with no original spelling to preserve, and state.ts's load() feeds it straight to
 // Date.parse.
 const timestampCalendarOpen = ref(false);
+// P104 §3: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
+// established `.$el` idiom, GitPanel.vue's promptInput) -- one ref per popover's own trigger.
+const timestampCalendarTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 const timestampPickerDate = computed(() => {
   if (timestampText.value.trim() === '') return new Date();
   const ms = Date.parse(timestampText.value.trim());
@@ -376,6 +387,7 @@ function onPickTimestamp(date: Date): void {
 // topic's partition count changed since the tab was opened.
 const filterHistoryOpen = ref(false);
 const partitionMenuOpen = ref(false);
+const partitionTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 const partitionOptions = ref<number[]>([]);
 const partitionOptionsLoading = ref(false);
 
@@ -426,6 +438,7 @@ const hasSelectedRow = computed(
 // Item 3/4: the Add-message panel — Kafka's produce vs. SQS's SendMessage differ only in which
 // fields StreamComposeMessage.vue shows (its own `kind` prop switches the shape).
 const composeOpen = ref(false);
+const addMessageTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 // Item 4: SQS-only Delete, gated on canDelete and on a row actually being selected (item 6's
 // click-to-select doubles as this button's target — there is no separate per-row delete
@@ -463,10 +476,18 @@ const currentMatchRow = computed(() => {
 // number has to be looked up by position rather than assumed to equal it — same as
 // KeyValueView.vue's/ConsoleResultGrid.vue's own goToMatch, now that this view's rows are
 // virtualized too (a plain querySelector can no longer find an off-screen row's DOM node).
-const listRef = ref<{ scrollToIndex: (index: number) => void } | null>(null);
+// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
+// useVirtualRows composable.
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
+  count: () => rowIndices.value.length,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollEl,
+});
+
 function onGoToMatch(row: number): void {
   const index = rowIndices.value.indexOf(row);
-  if (index >= 0) listRef.value?.scrollToIndex(index);
+  if (index >= 0) scrollToIndex(index);
 }
 function onCloseSearch(): void {
   streamViewStore.setSearchOpen(props.tab.id, false);
@@ -476,15 +497,18 @@ function onCloseSearch(): void {
 // subkeys per row: key/headers/attrs/timestamp/body, F5's own most expensive per-cell shape) never
 // pruned, growing monotonically for the tab's lifetime. Mirrors KeyValueView.vue's own
 // onVisibleRangeIndices exactly, resolving `rowIndices`' (possibly filtered) positions back to
-// real page rows the same way.
-function onVisibleRangeIndices(range: { start: number; end: number }): void {
+// real page rows the same way. Derived from `virtualItems` (no more `@visible-range` emit) since
+// useVirtualRows exposes no visible-range equivalent of its own -- see DocumentView.vue's own
+// identical note.
+watch(virtualItems, (items) => {
+  if (items.length === 0) return;
   const list = rowIndices.value;
-  const from = list[range.start];
-  const to = list[Math.max(range.start, range.end - 1)];
+  const from = list[items[0].index];
+  const to = list[items[items.length - 1].index];
   if (from === undefined || to === undefined) return;
   setVisibleRows(props.tab.id, from, to + 1);
   setVisibleWindow(props.tab.id, from, to + 1);
-}
+});
 
 // Item 4: per-column resize for the four fixed-width columns (mirrors the deleted DataGrid.vue's
 // own resize-handle pattern — SlickGrid handles its own column resize natively, so this view is
@@ -561,30 +585,34 @@ onUnmounted(() => {
 
 <template>
   <div class="stream-view" data-testid="stream-view" :data-path="tab.path">
-    <!-- P104: SplitterGroup wraps ViewChrome (untouched inside) + CellEditorDock, since the
+    <!-- P104: SplitterGroup wraps the inlined header+toolbar chrome + CellEditorDock, since the
          resize handle must sit as reka's own direct child alongside the panel it resizes
          (CellEditorDock.vue's own comment) -- mirrors DataView.vue/KeyValuePane.vue. -->
     <SplitterGroup direction="vertical" class="stream-split">
     <SplitterPanel class="stream-split-top" :order="1">
-    <!-- Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
-         `false`, not `undefined` — ViewChrome.vue's own `:disabled="canRefresh === false"` made
-         omitting can-refresh here silently mean "always disabled", regardless of connection or
-         load state (DocumentView.vue had the identical bug, same fix). -->
-    <ViewChrome
-      :tab="tab"
-      icon="broadcast"
-      :icon-color="iconColor"
-      :path="pathPrefix"
-      :name="targetTail?.name ?? tab.path"
-      name-testid="stream-target"
-      refresh-testid="stream-refresh"
-      stop-testid="stream-stop"
-      :can-refresh="!isBatch"
-      :can-stop="running"
-      @refresh="onRefresh"
-      @stop="onStop"
-    >
-      <template #head-trailing>
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore.
+         Item (regression pass, task batch P46-5): Vue casts an *absent* Boolean-typed prop to
+         `false`, not `undefined` — the old ViewChrome's own `:disabled="canRefresh === false"`
+         made an absent can-refresh mean "always disabled" -- Refresh below carries the same
+         `:disabled="isBatch"` this view's `can-refresh="!isBatch"` used to compute. -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
+      />
+      <span v-if="connRecord?.kind" class="icon-box">
+        <EngineIcon :kind="connRecord.kind" :size="13" />
+      </span>
+      <span class="icon-box" :style="{ color: iconColor }">
+        <CodiconIcon name="broadcast" :size="13" />
+      </span>
+      <span class="p-view-target"
+        ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+        ><span data-testid="stream-target">{{ targetTail?.name ?? tab.path }}</span></span
+      >
+      <span class="p-push flex items-center gap-1">
         <span
           v-if="page?.visibilityTimeoutSeconds !== null && page?.visibilityTimeoutSeconds !== undefined"
           class="p-badge"
@@ -592,141 +620,210 @@ onUnmounted(() => {
         >
           visibility {{ page.visibilityTimeoutSeconds }}s
         </span>
-      </template>
+      </span>
+    </div>
 
-      <template #toolbar>
-        <!-- Toolbar-consistency pass: a leading separator after ViewChrome's own built-in
-             refresh/stop group, matching every other view's #toolbar slot (KeyValueView.vue,
-             DocumentView.vue) and DataToolbar.vue's own canonical ordering. -->
-        <div class="sep" />
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="p-toolbar" :class="{ last: !isKafka }">
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="stream-refresh"
+              :disabled="isBatch"
+              aria-label="Refresh"
+              @click="onRefresh"
+            >
+              <CodiconIcon name="refresh" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'text-error': running }"
+              data-testid="stream-stop"
+              :disabled="!running"
+              aria-label="Stop"
+              @click="onStop"
+            >
+              <CodiconIcon name="debug-stop" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
+        </Tooltip>
+      </div>
+      <!-- Toolbar-consistency pass: a leading separator after the built-in refresh/stop group,
+           matching every other view's #toolbar slot (KeyValueView.vue, DocumentView.vue) and
+           DataToolbar.vue's own canonical ordering. -->
+      <div class="sep" />
 
-        <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
-             in this same main toolbar (there is no separate DataToolbar-equivalent for streams). -->
-        <div class="group">
-          <Tooltip>
-            <TooltipTrigger as-child>
+      <!-- Item 1: Count/Poll-or-Next and the page-size picker sit together as one group, kept
+           in this same main toolbar (there is no separate DataToolbar-equivalent for streams). -->
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              aria-label="Count"
+              data-testid="stream-count"
+              @click="streamViewStore.runCount(tab.id)"
+            >
+              <CodiconIcon name="symbol-number" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Count</TooltipContent>
+        </Tooltip>
+        <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
+        <Tooltip v-if="isBatch">
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira"
+              class="bg-input text-fg"
+              data-testid="stream-poll"
+              @click="onPoll"
+            >
+              <CodiconIcon name="arrow-swap" :size="13" />
+              Poll
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Poll for messages</TooltipContent>
+        </Tooltip>
+        <Tooltip v-else>
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex">
               <Button
                 variant="toolbar"
                 size="kira-icon"
-                aria-label="Count"
-                data-testid="stream-count"
-                @click="streamViewStore.runCount(tab.id)"
+                :disabled="!rt?.hasMore"
+                aria-label="Next page"
+                data-testid="stream-next"
+                @click="streamViewStore.goNext(tab.id)"
               >
-                <CodiconIcon name="symbol-number" :size="13" />
+                <CodiconIcon name="arrow-right" :size="13" />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>Count</TooltipContent>
-          </Tooltip>
-          <span class="p-sm muted" data-testid="stream-status">{{ statusLine }}</span>
-          <Tooltip v-if="isBatch">
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Next page</TooltipContent>
+        </Tooltip>
+      </div>
+
+      <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
+           (DataToolbar.vue, DocumentView.vue, KeyValueView.vue) — this one was missing its
+           leading sep. -->
+      <div class="sep" />
+
+      <ToggleGroup
+        type="single"
+        :model-value="String(tab.state.pageSize)"
+        data-testid="stream-page-size-picker"
+        @update:model-value="(v) => v && onPageSize(Number(v) as PageSize)"
+      >
+        <ToggleGroupItem
+          v-for="opt in PAGE_SIZE_OPTIONS"
+          :key="opt.value"
+          :value="String(opt.value)"
+          :data-testid="opt.testid"
+        >
+          {{ opt.label }}
+        </ToggleGroupItem>
+      </ToggleGroup>
+
+      <div class="sep" />
+
+      <div class="group">
+        <div class="add-message-anchor">
+          <Tooltip v-if="canInsert">
             <TooltipTrigger as-child>
               <Button
+                ref="addMessageTriggerEl"
                 variant="toolbar"
-                size="kira"
-                class="bg-input text-fg"
-                data-testid="stream-poll"
-                @click="onPoll"
+                size="kira-icon"
+                aria-label="Add message"
+                data-testid="stream-add-message"
+                @click="composeOpen = !composeOpen"
               >
-                <CodiconIcon name="arrow-swap" :size="13" />
-                Poll
+                <CodiconIcon name="add" :size="13" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Poll for messages</TooltipContent>
+            <TooltipContent>{{ isKafka ? 'Produce a message' : 'Send a message' }}</TooltipContent>
           </Tooltip>
-          <Tooltip v-else>
-            <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex">
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  :disabled="!rt?.hasMore"
-                  aria-label="Next page"
-                  data-testid="stream-next"
-                  @click="streamViewStore.goNext(tab.id)"
-                >
-                  <CodiconIcon name="arrow-right" :size="13" />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>Next page</TooltipContent>
-          </Tooltip>
+          <Popover :open="composeOpen && canInsert" @update:open="(v) => (composeOpen = v)">
+            <PopoverAnchor :reference="(addMessageTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+            <PopoverContent align="end" class="w-[380px] p-0" data-testid="stream-add-message-panel">
+              <StreamComposeMessage
+                :tab-id="tab.id"
+                :kind="isKafka ? 'kafka' : 'sqs'"
+                @close="composeOpen = false"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
-
-        <!-- P48 F3: every sibling's page-size picker sits inside a sep boundary on both sides
-             (DataToolbar.vue, DocumentView.vue, KeyValueView.vue) — this one was missing its
-             leading sep. -->
-        <div class="sep" />
-
-        <SegmentedControl
-          :model-value="tab.state.pageSize"
-          :options="PAGE_SIZE_OPTIONS"
-          data-testid="stream-page-size-picker"
-          @update:model-value="onPageSize"
-        />
-
-        <div class="sep" />
-
-        <div class="group">
-          <div class="add-message-anchor">
-            <Tooltip v-if="canInsert">
-              <TooltipTrigger as-child>
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  aria-label="Add message"
-                  data-testid="stream-add-message"
-                  @click="composeOpen = !composeOpen"
-                >
-                  <CodiconIcon name="add" :size="13" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{{ isKafka ? 'Produce a message' : 'Send a message' }}</TooltipContent>
-            </Tooltip>
-            <StreamComposeMessage
-              v-if="composeOpen && canInsert"
-              :tab-id="tab.id"
-              :kind="isKafka ? 'kafka' : 'sqs'"
-              @close="composeOpen = false"
+        <Tooltip v-if="canDelete">
+          <TooltipTrigger as-child>
+            <span tabindex="0" class="inline-flex">
+              <Button
+                variant="toolbar"
+                size="kira-icon"
+                :disabled="!hasSelectedRow"
+                aria-label="Delete message"
+                data-testid="stream-delete-message"
+                @click="onDeleteMessage"
+              >
+                <CodiconIcon name="trash" :size="13" />
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{
+            hasSelectedRow ? 'Delete the selected message' : 'Select a message first'
+          }}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'bg-input text-fg': rt?.searchOpen }"
+              aria-label="Search this page"
+              data-testid="stream-search-toggle"
+              @click="onToggleSearch"
+            >
+              <CodiconIcon name="search" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Search this page</TooltipContent>
+        </Tooltip>
+      </div>
+      <span class="p-push" />
+      <Tooltip :disabled="true">
+        <TooltipTrigger as-child>
+          <span
+            class="p-run-state inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
+            :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+          >
+            <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
+            ><span
+              class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+              :class="{
+                'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
+                  runState.status === 'running',
+                'border-error': runState.status === 'error',
+              }"
             />
-          </div>
-          <Tooltip v-if="canDelete">
-            <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex">
-                <Button
-                  variant="toolbar"
-                  size="kira-icon"
-                  :disabled="!hasSelectedRow"
-                  aria-label="Delete message"
-                  data-testid="stream-delete-message"
-                  @click="onDeleteMessage"
-                >
-                  <CodiconIcon name="trash" :size="13" />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{{
-              hasSelectedRow ? 'Delete the selected message' : 'Select a message first'
-            }}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="toolbar"
-                size="kira-icon"
-                :class="{ 'bg-input text-fg': rt?.searchOpen }"
-                aria-label="Search this page"
-                data-testid="stream-search-toggle"
-                @click="onToggleSearch"
-              >
-                <CodiconIcon name="search" :size="13" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Search this page</TooltipContent>
-          </Tooltip>
-        </div>
-      </template>
+          </span>
+        </TooltipTrigger>
+      </Tooltip>
+      <div class="group"></div>
+    </div>
 
-      <template v-if="isKafka" #toolbar-2>
+    <div v-if="isKafka" class="p-toolbar last">
         <!-- Item 2: Kafka-only positioning filters — SQS shows none of this (no topic/partition/
              offset concept, per connection.kind above). Applies only to a *fresh* browse
              (state.ts's applyStreamFilter always restarts one); a token-continued page ignores it. -->
@@ -758,7 +855,7 @@ onUnmounted(() => {
           >
             <span
               class="shrink-0 text-kira-xs"
-              :class="tab.state.offsetFilter ? 'text-[var(--kira-state-on)]' : 'text-fg-muted'"
+              :class="tab.state.offsetFilter ? 'text-state-on' : 'text-fg-muted'"
               >offset</span
             >
             <Input
@@ -776,6 +873,7 @@ onUnmounted(() => {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                ref="partitionTriggerEl"
                 variant="toolbar"
                 size="kira"
                 data-testid="stream-filter-partition"
@@ -788,41 +886,37 @@ onUnmounted(() => {
             </TooltipTrigger>
             <TooltipContent>Filter by partition</TooltipContent>
           </Tooltip>
-          <PopoverPanel
-            v-if="partitionMenuOpen"
-            anchor="left"
-            :width="200"
-            test-id="stream-partition-menu"
-            backdrop-test-id="stream-partition-menu-backdrop"
-            @close="partitionMenuOpen = false"
-          >
-            <div class="partition-menu">
-              <div v-if="partitionOptionsLoading" class="p-sm muted partition-menu-empty">
-                Loading…
-              </div>
-              <div
-                v-else-if="partitionOptions.length === 0"
-                class="p-sm muted partition-menu-empty"
-              >
-                No partitions
-              </div>
-              <label
-                v-for="p in partitionOptions"
-                :key="p"
-                class="partition-option"
-                :data-testid="`stream-filter-partition-option-${p}`"
-              >
-                <Checkbox
-                  class="size-3.5"
-                  :model-value="isPartitionSelected(p)"
-                  @update:model-value="onTogglePartition(p)"
+          <Popover :open="partitionMenuOpen" @update:open="(v) => (partitionMenuOpen = v)">
+            <PopoverAnchor :reference="(partitionTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+            <PopoverContent align="start" class="w-[200px] p-0" data-testid="stream-partition-menu">
+              <div class="partition-menu">
+                <div v-if="partitionOptionsLoading" class="p-sm muted partition-menu-empty">
+                  Loading…
+                </div>
+                <div
+                  v-else-if="partitionOptions.length === 0"
+                  class="p-sm muted partition-menu-empty"
                 >
-                  <CodiconIcon name="check" :size="10" />
-                </Checkbox>
-                <span>partition {{ p }}</span>
-              </label>
-            </div>
-          </PopoverPanel>
+                  No partitions
+                </div>
+                <label
+                  v-for="p in partitionOptions"
+                  :key="p"
+                  class="partition-option"
+                  :data-testid="`stream-filter-partition-option-${p}`"
+                >
+                  <Checkbox
+                    class="size-3.5"
+                    :model-value="isPartitionSelected(p)"
+                    @update:model-value="onTogglePartition(p)"
+                  >
+                    <CodiconIcon name="check" :size="10" />
+                  </Checkbox>
+                  <span>partition {{ p }}</span>
+                </label>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
         <div class="timestamp-filter-field">
           <div class="ts-input-row">
@@ -834,7 +928,7 @@ onUnmounted(() => {
                 >
                   <span
                     class="shrink-0 text-kira-xs"
-                    :class="tab.state.timestampFilter ? 'text-[var(--kira-state-on)]' : 'text-fg-muted'"
+                    :class="tab.state.timestampFilter ? 'text-state-on' : 'text-fg-muted'"
                     >since</span
                   >
                   <Input
@@ -854,6 +948,7 @@ onUnmounted(() => {
               <Tooltip>
                 <TooltipTrigger as-child>
                   <Button
+                    ref="timestampCalendarTriggerEl"
                     variant="toolbar"
                     size="kira-icon"
                     aria-label="Pick a date and time"
@@ -865,16 +960,16 @@ onUnmounted(() => {
                 </TooltipTrigger>
                 <TooltipContent>Pick a date and time</TooltipContent>
               </Tooltip>
-              <PopoverPanel
-                v-if="timestampCalendarOpen"
-                :width="228"
-                anchor="left"
-                test-id="stream-filter-timestamp-calendar-popover"
-                backdrop-testid="stream-filter-timestamp-calendar-backdrop"
-                @close="timestampCalendarOpen = false"
-              >
-                <DateTimePicker :model-value="timestampPickerDate" zone="local" @update:model-value="onPickTimestamp" />
-              </PopoverPanel>
+              <Popover :open="timestampCalendarOpen" @update:open="(v) => (timestampCalendarOpen = v)">
+                <PopoverAnchor :reference="(timestampCalendarTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+                <PopoverContent
+                  align="start"
+                  class="w-[228px] p-0"
+                  data-testid="stream-filter-timestamp-calendar-popover"
+                >
+                  <DateTimePicker :model-value="timestampPickerDate" zone="local" @update:model-value="onPickTimestamp" />
+                </PopoverContent>
+              </Popover>
             </span>
           </div>
           <span
@@ -892,67 +987,70 @@ onUnmounted(() => {
           </TooltipTrigger>
           <TooltipContent>Empty every field and refetch</TooltipContent>
         </Tooltip>
-      </template>
+    </div>
 
-      <!-- The one destructive truth of this view, stated once at the top. -->
-      <template #strips>
-      <MessageStrip v-if="isBatch" tone="warn" icon="warning" :icon-size="13" data-testid="stream-poll-warning">
-        <span
-          >Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
-          above) — it does not browse a stable position.</span
-        >
-      </MessageStrip>
+    <!-- The one destructive truth of this view, stated once at the top. -->
+    <Alert v-if="isBatch" class="strip-warn" data-testid="stream-poll-warning">
+      <CodiconIcon name="warning" :size="13" class="strip-warn-text" />
+      <AlertDescription class="strip-warn-text">
+        Each poll <b>consumes</b> messages from the queue (subject to the visibility timeout
+        above) — it does not browse a stable position.
+      </AlertDescription>
+    </Alert>
 
-      <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" icon="error" :icon-size="13" data-testid="stream-error">
-        <span>{{ rt.error.message }}</span>
-      </MessageStrip>
+    <Alert v-if="rt?.status === 'error' && rt.error" class="strip-err" data-testid="stream-error">
+      <CodiconIcon name="error" :size="13" class="strip-err-text" />
+      <AlertDescription class="strip-err-text">{{ rt.error.message }}</AlertDescription>
+    </Alert>
 
-      <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
-      <MessageStrip v-if="rt?.actionError" tone="err" icon="error" :icon-size="13" data-testid="stream-action-error">
-        <span>{{ rt.actionError }}</span>
-      </MessageStrip>
+    <!-- P43 F6/D7: a failed SQS delete, distinct from a failed load above. -->
+    <Alert v-if="rt?.actionError" class="strip-err" data-testid="stream-action-error">
+      <CodiconIcon name="error" :size="13" class="strip-err-text" />
+      <AlertDescription class="strip-err-text">{{ rt.actionError }}</AlertDescription>
+    </Alert>
 
-      <StreamSearchToolbar
-        v-if="rt?.searchOpen"
-        :tab-id="tab.id"
-        @go-to-match="onGoToMatch"
-        @close="onCloseSearch"
-      />
-      </template>
+    <StreamSearchToolbar
+      v-if="rt?.searchOpen"
+      :tab-id="tab.id"
+      @go-to-match="onGoToMatch"
+      @close="onCloseSearch"
+    />
 
-      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
-           all) — every other view but the grid's DataView.vue did the same, the one inconsistency
-           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
-           the body — the part that actually needs a live connection — swaps for the gate. -->
-      <ReconnectGate
-        v-if="needsReconnect"
-        container-testid="stream-reconnect"
-        button-testid="stream-reconnect-load"
-        @reconnect="onReconnectAndLoad"
-      />
-      <template v-else>
-      <div class="list-body" data-testid="stream-list">
-        <EmptyState
-          v-if="isBatch && !rt?.polled"
-          class="no-rows"
-          icon="arrow-swap"
-          label="Click Poll to fetch messages"
-        />
-        <EmptyState
-          v-else-if="!rt || rt.rowCount === 0"
-          class="no-rows"
-          icon="inbox"
-          :label="rt ? 'No messages' : ''"
-        />
-        <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
-             from "no messages loaded". -->
-        <EmptyState
-          v-else-if="displayRows && displayRows.length === 0"
-          class="no-rows"
-          icon="search"
-          label="No matching rows"
-          data-testid="stream-no-matching-rows"
-        >
+    <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+         all) — every other view but the grid's DataView.vue did the same, the one inconsistency
+         this fixes. The chrome above (and so its toolbar rows) now always renders; only the body
+         — the part that actually needs a live connection — swaps for the gate. -->
+    <div v-if="needsReconnect" class="p-empty" data-testid="stream-reconnect">
+      <Button variant="dialog-primary" size="kira-lg" data-testid="stream-reconnect-load" @click="onReconnectAndLoad">
+        Reconnect & load
+      </Button>
+    </div>
+    <template v-else>
+    <div class="list-body" data-testid="stream-list">
+      <Alert
+        v-if="isBatch && !rt?.polled"
+        class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+      >
+        <CodiconIcon name="arrow-swap" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md font-normal text-muted">Click Poll to fetch messages</AlertTitle>
+      </Alert>
+      <Alert
+        v-else-if="!rt || rt.rowCount === 0"
+        class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+      >
+        <CodiconIcon name="inbox" :size="24" class="text-subtle" />
+        <AlertTitle v-if="rt" class="text-kira-md font-normal text-muted">No messages</AlertTitle>
+      </Alert>
+      <!-- P31 D19 (P24 D8's precedent): filtering to zero matches is a distinct empty state
+           from "no messages loaded". -->
+      <Alert
+        v-else-if="displayRows && displayRows.length === 0"
+        class="no-rows flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+        data-testid="stream-no-matching-rows"
+      >
+        <CodiconIcon name="search" :size="24" class="text-subtle" />
+        <AlertTitle class="text-kira-md font-normal text-muted">No matching rows</AlertTitle>
+        <AlertAction class="static mt-1 flex flex-col items-center gap-1.5">
           <Button
             variant="toolbar"
             size="kira"
@@ -961,8 +1059,9 @@ onUnmounted(() => {
           >
             Show all rows
           </Button>
-        </EmptyState>
-        <template v-else>
+        </AlertAction>
+      </Alert>
+      <template v-else>
           <div class="p-thead">
             <div class="p-th gutter" style="width: 40px" />
             <div class="p-th" :style="{ width: `${widthFor('key')}px` }">
@@ -1015,35 +1114,32 @@ onUnmounted(() => {
             </div>
             <div class="p-th" style="flex: 1"><span class="name">body</span></div>
           </div>
-          <VirtualList
-            ref="listRef"
-            class="tbody-scroll"
-            :items="rowIndices"
-            :row-height="rowHeight"
-            @visible-range="onVisibleRangeIndices"
-          >
-            <template #default="{ item: i }">
+          <div ref="scrollEl" class="tbody-scroll" data-testid="virtual-list" @scroll="onScroll">
+            <div :style="{ height: `${totalSize}px`, position: 'relative' }">
               <div
-                class="stream-row"
+                v-for="vi in virtualItems"
+                :key="String(vi.key)"
+                class="stream-row virtual-row"
                 data-testid="stream-row"
-                :data-row-index="i"
+                :data-row-index="rowIndices[vi.index]"
+                :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
                 :class="{
-                  selected: rt?.selectedRow === i,
-                  'search-match': matchSet.has(i),
-                  'search-match-current': currentMatchRow === i,
+                  selected: rt?.selectedRow === rowIndices[vi.index],
+                  'search-match': matchSet.has(rowIndices[vi.index]),
+                  'search-match-current': currentMatchRow === rowIndices[vi.index],
                 }"
                 @click="onRowClickFromEvent"
                 @contextmenu="onRowContextMenuFromEvent"
               >
-                <div class="p-td gutter" style="width: 40px">{{ i + 1 }}</div>
+                <div class="p-td gutter" style="width: 40px">{{ rowIndices[vi.index] + 1 }}</div>
                 <div
                   class="p-td"
-                  :class="cellClass({ isNull: rowAt(i)?.key === null })"
+                  :class="cellClass({ isNull: rowAt(rowIndices[vi.index])?.key === null })"
                   :style="{ width: `${widthFor('key')}px` }"
                   data-testid="stream-key"
                   @click.stop="onKeyCellClickFromEvent"
                 >
-                  {{ rowAt(i)?.key ?? '(none)' }}
+                  {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
                 </div>
                 <div
                   class="p-td"
@@ -1051,7 +1147,7 @@ onUnmounted(() => {
                   data-testid="stream-timestamp"
                   @click.stop="onTimestampCellClickFromEvent"
                 >
-                  {{ rowAt(i)?.timestamp ?? '' }}
+                  {{ rowAt(rowIndices[vi.index])?.timestamp ?? '' }}
                 </div>
                 <div
                   class="p-td"
@@ -1059,7 +1155,7 @@ onUnmounted(() => {
                   data-testid="stream-headers"
                   @click.stop="onHeadersCellClickFromEvent"
                 >
-                  {{ rowAt(i)?.headers }}
+                  {{ rowAt(rowIndices[vi.index])?.headers }}
                 </div>
                 <div
                   class="p-td"
@@ -1067,7 +1163,7 @@ onUnmounted(() => {
                   data-testid="stream-attrs"
                   @click.stop="onAttrsCellClickFromEvent"
                 >
-                  {{ rowAt(i)?.attrs }}
+                  {{ rowAt(rowIndices[vi.index])?.attrs }}
                 </div>
                 <div
                   class="p-td msg-body"
@@ -1075,8 +1171,8 @@ onUnmounted(() => {
                   data-testid="stream-body"
                   @click.stop="onBodyCellClickFromEvent"
                 >
-                  {{ rowAt(i)?.body }}
-                  <Tooltip v-if="rowAt(i)?.isTruncated">
+                  {{ rowAt(rowIndices[vi.index])?.body }}
+                  <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">
                     <TooltipTrigger as-child>
                       <span class="p-xs muted">(truncated)</span>
                     </TooltipTrigger>
@@ -1084,12 +1180,11 @@ onUnmounted(() => {
                   </Tooltip>
                 </div>
               </div>
-            </template>
-          </VirtualList>
+            </div>
+          </div>
         </template>
       </div>
       </template>
-    </ViewChrome>
     </SplitterPanel>
     <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
     <CellEditorDock :tab-id="tab.id" :read-only="true" />
@@ -1104,8 +1199,9 @@ onUnmounted(() => {
   @apply h-full flex flex-col min-h-0;
 }
 
-/* P104: the SplitterGroup wrapping ViewChrome + CellEditorDock.vue's own dock panel — the
-   vertical split (row-resize) that used to be CellEditorDock's own internal PanelSplitter. */
+/* P104: the SplitterGroup wrapping the inlined header+toolbar chrome + CellEditorDock.vue's own
+   dock panel — the vertical split (row-resize) that used to be CellEditorDock's own internal
+   PanelSplitter. */
 .stream-split {
   @apply flex flex-1 min-h-0 flex-col;
 }
@@ -1128,9 +1224,9 @@ onUnmounted(() => {
   @apply text-subtle;
 }
 
-/* Task #64: the compose-message popover was rendered as a sibling of ViewChrome, far from the
-   "Add message" button that opens it — PopoverPanel.vue anchors to its own DOM parent, so it needs to
-   be a sibling of the trigger, same wrapper shape as .columns-anchor/.add-anchor elsewhere. */
+/* Wraps the "Add message" trigger button and its Popover — P104 §3: reka's PopoverAnchor takes
+   the trigger's real DOM node via an explicit `:reference`, so this wrapper no longer does the
+   positioning work Task #64's PopoverPanel needed; kept only as the trigger's layout box. */
 .add-message-anchor {
   @apply relative;
 }
@@ -1140,6 +1236,28 @@ onUnmounted(() => {
    same as the source design's own (unshared) .tbody/.tr rules. */
 .tbody-scroll {
   @apply flex-1 min-h-0 overflow-auto;
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
+}
+
+/* GenerateDataDialog.vue's own local warn-strip pattern, reused here since Alert's `destructive`
+   variant assumes an `<svg>` icon child (`has-[>svg]:grid-cols-[auto_1fr]`) — CodiconIcon isn't
+   one. .strip-err is the same shape on the error tone (that dialog has no error-tone strip of its
+   own to mirror). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+
+.strip-err {
+  @apply bg-error/10 border-error/20;
+}
+.strip-err-text {
+  @apply text-error;
 }
 
 .stream-row {
@@ -1182,7 +1300,7 @@ onUnmounted(() => {
   @apply relative flex-1 min-h-0 flex flex-col overflow-hidden;
 }
 
-.list-body .p-empty {
+.list-body .no-rows {
   @apply h-full;
 }
 

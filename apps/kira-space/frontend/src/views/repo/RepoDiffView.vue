@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
-// P104 §3.4: EmptyState's ui/alert rewrite is a genuinely separate, non-mechanical piece of work --
-// not attempted in this pass, same deferral as OperationsPanel.vue's own.
-import EmptyState from '@theme/primitives/EmptyState.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { gitRepoIdFor } from '../../repo/git/hostHandlers';
@@ -131,22 +129,34 @@ onUnmounted(() => {
       class="monaco-host"
       data-testid="repo-diff-editor"
     />
-    <EmptyState
+    <Alert
       v-else-if="state === 'binary'"
-      icon="file-binary"
-      label="This file is binary and can't be compared."
-    />
-    <EmptyState
+      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+    >
+      <CodiconIcon name="file-binary" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md font-normal text-muted">This file is binary and can't be compared.</AlertTitle>
+    </Alert>
+    <Alert
       v-else-if="state === 'tooLarge'"
-      icon="warning"
-      label="This file is too large to compare (over 8 MB)."
-    />
-    <EmptyState
+      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+    >
+      <CodiconIcon name="warning" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md font-normal text-muted">This file is too large to compare (over 8 MB).</AlertTitle>
+    </Alert>
+    <Alert
       v-else-if="state === 'bothMissing'"
-      icon="warning"
-      label="This file no longer exists."
-    />
-    <EmptyState v-else icon="warning" :label="errorMessage || 'Could not open this diff.'" />
+      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+    >
+      <CodiconIcon name="warning" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md font-normal text-muted">This file no longer exists.</AlertTitle>
+    </Alert>
+    <Alert
+      v-else
+      class="flex-1 min-h-0 flex-col items-center justify-center gap-1.5 border-0 bg-transparent text-center"
+    >
+      <CodiconIcon name="warning" :size="24" class="text-subtle" />
+      <AlertTitle class="text-kira-md font-normal text-muted">{{ errorMessage || 'Could not open this diff.' }}</AlertTitle>
+    </Alert>
   </div>
 </template>
 

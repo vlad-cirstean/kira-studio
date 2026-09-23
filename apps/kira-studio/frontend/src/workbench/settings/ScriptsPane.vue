@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PaletteColor } from '@shared/domain/color';
+import { PALETTE_COLOR_CHOICES, type PaletteColor } from '@shared/domain/color';
 import type { CustomScript, CustomScriptFields } from '@shared/domain/scripts';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
@@ -8,8 +8,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { computed, reactive, ref, watch } from 'vue';
 import { useCustomScriptsStore } from '../../state/customScripts';
-import ColorPicker from '../../theme/primitives/ColorPicker.vue';
 import type { SettingsPaneProps } from './types';
+
+// P104 §3: ColorPicker inlined -- the offered subset (not the full storable enum), same as its
+// own `colors` constant.
+const scriptColors = PALETTE_COLOR_CHOICES;
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
 // `v-else-if="activeSection === 'Scripts'"` branch — P85 §10.2's own section. Bypasses
@@ -160,11 +163,24 @@ async function onAddScript(): Promise<void> {
               @blur="onScriptFieldBlur(script)"
             />
           </div>
-          <ColorPicker
-            :model-value="script.color"
-            label="Script colour"
-            @update:model-value="(color) => onScriptColorChange(script, color)"
-          />
+          <div class="color-picker flex h-6.5 flex-wrap items-center gap-1" role="radiogroup" aria-label="Script colour">
+            <Tooltip v-for="color in scriptColors" :key="color">
+              <TooltipTrigger as-child>
+                <Button
+                  variant="ghost"
+                  class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+                  :class="{ 'outline outline-2 outline-offset-2 outline-fg': script.color === color, none: color === 'none' }"
+                  :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                  :aria-label="color === 'none' ? 'No colour' : color"
+                  role="radio"
+                  :aria-checked="script.color === color"
+                  :data-testid="`color-${color}`"
+                  @click="onScriptColorChange(script, color)"
+                />
+              </TooltipTrigger>
+              <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
+            </Tooltip>
+          </div>
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -214,7 +230,24 @@ async function onAddScript(): Promise<void> {
             data-testid="custom-script-add-name"
           />
         </div>
-        <ColorPicker v-model="newScriptColor" label="Script colour" />
+        <div class="color-picker flex h-6.5 flex-wrap items-center gap-1" role="radiogroup" aria-label="Script colour">
+          <Tooltip v-for="color in scriptColors" :key="color">
+            <TooltipTrigger as-child>
+              <Button
+                variant="ghost"
+                class="swatch h-4 w-4 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 hover:bg-transparent"
+                :class="{ 'outline outline-2 outline-offset-2 outline-fg': newScriptColor === color, none: color === 'none' }"
+                :style="color === 'none' ? undefined : { background: `var(--kira-conn-${color})` }"
+                :aria-label="color === 'none' ? 'No colour' : color"
+                role="radio"
+                :aria-checked="newScriptColor === color"
+                :data-testid="`color-${color}`"
+                @click="newScriptColor = color"
+              />
+            </TooltipTrigger>
+            <TooltipContent>{{ color === 'none' ? 'No colour' : color }}</TooltipContent>
+          </Tooltip>
+        </div>
         <Button
           variant="dialog"
           size="kira-lg"
@@ -246,3 +279,18 @@ async function onAddScript(): Promise<void> {
     }}</span>
   </div>
 </template>
+
+<style scoped>
+/* P104 §3: ColorPicker's own "none" swatch -- a diagonal slash, never a 13th hue standing in for
+   "nothing chosen" (its own comment, ported verbatim). */
+.swatch.none {
+  border: 1.5px solid var(--kira-fg-muted);
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% - 0.75px),
+    var(--kira-fg-muted) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
+}
+</style>

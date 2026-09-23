@@ -5,9 +5,11 @@ import { splitSqlStatements, statementAtCursor } from '@shared/domain/sql-split'
 import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
 import { wheelToHorizontal } from '@workbench/util/wheelScroll';
@@ -16,11 +18,11 @@ import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } fr
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
+import { useRunState } from '../../state/runState';
 import { containerPathFor, useSchemaColumnsStore } from '../../state/schemaColumns';
 import { ddlSchemaFor, schemaQueryOptions } from '../../state/schemas';
 import type { ConsoleTabRecord } from '../../state/tabDomain';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import EngineIcon from '../../theme/EngineIcon.vue';
 import CellEditorDock from '../shared/celleditor/CellEditorDock.vue';
 import SearchToolbar from '../shared/page/SearchToolbar.vue';
 import {
@@ -61,9 +63,20 @@ const running = computed(() => rt.value?.status === 'running');
 
 const targetTail = computed(() => pathTail(props.tab.path));
 
-const connectionKind = computed<ConnectionKind | undefined>(
-  () => connectionsStore.connectionRecord(props.tab.connectionId)?.kind,
-);
+// P104 §3: ViewChrome/ViewHeader/RunState inlined -- railColor mirrors ViewChrome.vue's own
+// `envColor ?? (connection ? connection.color ?? null : undefined)`; this view has no envColor.
+const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
+const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
+
+const connectionKind = computed<ConnectionKind | undefined>(() => connRecord.value?.kind);
 
 const dialect = computed(() => sqlDialectFor(connectionKind.value));
 
@@ -550,26 +563,68 @@ const statusLine = computed(() => {
 
 <template>
   <div class="console-view" data-testid="console-view" :data-path="tab.path">
-    <ViewChrome
-      :tab="tab"
-      icon="terminal"
-      :name="targetTail?.name ?? tab.path ?? 'Console'"
-      target-testid="console-target"
-      refresh-testid="console-refresh"
-      stop-testid="console-stop"
-      :can-refresh="needsReconnect"
-      :can-stop="running"
-      @refresh="onReconnectAndLoad"
-      @stop="onStop"
-    >
-      <!-- The console's search_path/schema control and the "writes go to production" chip from
-           Console.html both need tracked data this app does not have yet (no per-console
-           schema, no per-connection write-warning flag) — skipped rather than faked. Refresh
-           itself still isn't a third start verb (Run/Run all cover that, and now reconnect on
-           their own — see runStatement/runAll above): it stays disabled whenever there's nothing
-           to reconnect, and is only ever the reconnect trigger while gated, so it's never a dead,
-           permanently-grey button sitting in the rail for no reason a user can see. -->
-      <template #toolbar>
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
+      />
+      <span v-if="connectionKind" class="icon-box">
+        <EngineIcon :kind="connectionKind" :size="13" />
+      </span>
+      <span class="icon-box">
+        <CodiconIcon name="terminal" :size="13" />
+      </span>
+      <span class="p-view-target" data-testid="console-target">{{
+        targetTail?.name ?? tab.path ?? 'Console'
+      }}</span>
+      <span class="p-push flex items-center gap-1"></span>
+    </div>
+
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="p-toolbar last">
+      <div class="group">
+        <!-- The console's search_path/schema control and the "writes go to production" chip from
+             Console.html both need tracked data this app does not have yet (no per-console
+             schema, no per-connection write-warning flag) — skipped rather than faked. Refresh
+             itself still isn't a third start verb (Run/Run all cover that, and now reconnect on
+             their own — see runStatement/runAll above): it stays disabled whenever there's nothing
+             to reconnect, and is only ever the reconnect trigger while gated, so it's never a dead,
+             permanently-grey button sitting in the rail for no reason a user can see. -->
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              data-testid="console-refresh"
+              :disabled="!needsReconnect"
+              aria-label="Refresh"
+              @click="onReconnectAndLoad"
+            >
+              <CodiconIcon name="refresh" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="toolbar"
+              size="kira-icon"
+              :class="{ 'text-error': running }"
+              data-testid="console-stop"
+              :disabled="!running"
+              aria-label="Stop"
+              @click="onStop"
+            >
+              <CodiconIcon name="debug-stop" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
+        </Tooltip>
+      </div>
         <Tooltip>
           <TooltipTrigger as-child>
             <span tabindex="0" class="inline-flex">
@@ -709,39 +764,59 @@ const statusLine = computed(() => {
         <!-- The autocommit/transaction segmented control from Console.html needs a per-console
              transaction-mode field that doesn't exist anywhere in tab or connection state —
              skipped rather than wiring a control with nowhere to store its value. -->
-      </template>
-
-      <template #strips>
-        <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="console-error">
-          {{ rt.error.message }}
-        </MessageStrip>
-        <MessageStrip v-if="formatError" tone="err" data-testid="console-format-error">
-          {{ formatError }}
-        </MessageStrip>
-        <MessageStrip v-if="formatWarning" tone="warn" data-testid="console-format-warning">
-          {{ formatWarning }}
-        </MessageStrip>
-        <MessageStrip v-if="formatNote" tone="note" data-testid="console-format-note">
-          {{ formatNote }}
-        </MessageStrip>
-        <MessageStrip v-if="explainError" tone="err" data-testid="console-explain-error">
-          {{ explainError }}
-        </MessageStrip>
-        <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is
-             running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
-        <MessageStrip v-if="rt?.autoExplain" tone="warn" data-testid="console-auto-explain">
-          <span class="auto-explain-message">{{ autoExplainMessage }}</span>
-          <button
-            v-if="canShowAutoExplainPlan"
-            type="button"
-            class="auto-explain-action"
-            data-testid="console-auto-explain-show-plan"
-            @click="onShowAutoExplainPlan"
+      <span class="p-push" />
+      <Tooltip :disabled="true">
+        <TooltipTrigger as-child>
+          <span
+            class="p-run-state inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
+            :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
           >
-            Show plan
-          </button>
-        </MessageStrip>
-      </template>
+            <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
+            ><span
+              class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+              :class="{
+                'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
+                  runState.status === 'running',
+                'border-error': runState.status === 'error',
+              }"
+            />
+          </span>
+        </TooltipTrigger>
+      </Tooltip>
+      <div class="group"></div>
+    </div>
+
+    <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="console-error">
+      <AlertDescription>{{ rt.error.message }}</AlertDescription>
+    </Alert>
+    <Alert v-if="formatError" variant="destructive" data-testid="console-format-error">
+      <AlertDescription>{{ formatError }}</AlertDescription>
+    </Alert>
+    <Alert v-if="formatWarning" class="strip-warn" data-testid="console-format-warning">
+      <AlertDescription class="strip-warn-text">{{ formatWarning }}</AlertDescription>
+    </Alert>
+    <Alert v-if="formatNote" class="strip-note" data-testid="console-format-note">
+      <AlertDescription class="strip-note-text">{{ formatNote }}</AlertDescription>
+    </Alert>
+    <Alert v-if="explainError" variant="destructive" data-testid="console-explain-error">
+      <AlertDescription>{{ explainError }}</AlertDescription>
+    </Alert>
+    <!-- P18 D19: warns, never blocks — the query underneath this strip already ran (or is
+         running). "Show plan" pushes the plan this strip already parsed, no second round trip. -->
+    <Alert v-if="rt?.autoExplain" class="strip-warn" data-testid="console-auto-explain">
+      <AlertDescription class="strip-warn-text flex items-center gap-1.5">
+        <span class="auto-explain-message">{{ autoExplainMessage }}</span>
+        <button
+          v-if="canShowAutoExplainPlan"
+          type="button"
+          class="auto-explain-action"
+          data-testid="console-auto-explain-show-plan"
+          @click="onShowAutoExplainPlan"
+        >
+          Show plan
+        </button>
+      </AlertDescription>
+    </Alert>
 
       <!-- Item 4/2 (regression pass, task batch P46-3/4): every other gated view replaced its
            whole ViewChrome (header, toolbar and all) with the reconnect gate — item 4 fixed that
@@ -877,7 +952,6 @@ const statusLine = computed(() => {
       <SplitterResizeHandle v-if="hasCellDock" class="cell-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
       <CellEditorDock :tab-id="tab.id" :read-only="true" />
       </SplitterGroup>
-    </ViewChrome>
   </div>
 </template>
 
@@ -916,10 +990,19 @@ const statusLine = computed(() => {
   @apply relative;
 }
 
-/* p-strip.err already carries the error's own look; only the parent's error message text needs
-   pre-wrap so a long adapter error still wraps instead of scrolling. */
-.p-strip.err {
-  @apply whitespace-pre-wrap font-data;
+/* Alert tone classes replacing MessageStrip's own warn/note-tone colors (P104 §9 rule 5: literal
+   hex, not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+.strip-note {
+  @apply bg-info/8 border-info/20;
+}
+.strip-note-text {
+  @apply text-[#a8c8ee];
 }
 
 .auto-explain-message {

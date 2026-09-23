@@ -1,26 +1,23 @@
 <script setup lang="ts">
 import { decodePath, encodePath, pathTail, type TreeNode } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
+import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-// P104 §3.4: VirtualList/EmptyState are each a genuinely separate, non-mechanical piece of work
-// (a @tanstack/vue-virtual recipe and a ui/alert composition respectively) -- not attempted in
-// this pass, same deferral as OperationsPanel.vue's own.
-import EmptyState from '@theme/primitives/EmptyState.vue';
-import VirtualList from '@theme/primitives/VirtualList.vue';
+import { connColorVar } from '@theme/connColor';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { useVirtualRows } from '@workbench/util/virtualRows';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
+import { useRunState } from '../../state/runState';
 import type { BrowseTabRecord } from '../../state/tabDomain';
 import { useTabsStore } from '../../state/tabs';
+import EngineIcon from '../../theme/EngineIcon.vue';
 import { nodeIcon, redisTypeIcon, redisTypeLabel } from '../../theme/icons';
-import MessageStrip from '../../theme/primitives/MessageStrip.vue';
-import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
-import ViewChrome from '../../theme/primitives/ViewChrome.vue';
 import {
   type KeyValueHost,
   registerKeyValueHost,
@@ -60,6 +57,18 @@ const targetName = computed(() => targetTail.value?.name ?? props.tab.path);
 const headerIcon = computed(() => nodeIcon(targetTail.value?.kind ?? 'database'));
 const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
 const pathPrefix = computed(() => (connRecord.value?.name ? `${connRecord.value.name} / ` : ''));
+
+// P104 §3: ViewChrome/ViewHeader/RunState inlined -- railColor mirrors ViewChrome.vue's own
+// `envColor ?? (connection ? connection.color ?? null : undefined)`; this view has no envColor.
+const railColor = computed(() => (connRecord.value ? (connRecord.value.color ?? null) : undefined));
+const runState = useRunState(() => props.tab.id);
+const runStateLabel = computed(() => {
+  if (runState.value.status === 'error') return 'failed';
+  if (runState.value.elapsedMs === null) return '—';
+  return runState.value.elapsedMs < 1000
+    ? `${Math.round(runState.value.elapsedMs)} ms`
+    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
+});
 
 // The breadcrumb: one crumb per path segment from the current level, each a jump target for
 // goToLevel (D12) — not just the immediate parent Up already covers.
@@ -202,13 +211,6 @@ const ensureKeyTypesDebounced = useDebounceFn((range: { start: number; end: numb
 }, KEY_TYPES_DEBOUNCE_MS);
 onBeforeUnmount(() => ensureKeyTypesDebounced.cancel());
 
-// VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
-// per §4.3, never the whole (up to 200 000-key) level.
-function onVisibleRange(range: { start: number; end: number }): void {
-  if (!supportsKeyTypes.value) return;
-  void ensureKeyTypesDebounced(range);
-}
-
 // D12: a container descends; a leaf opens the existing keyvalue tab — the same tab kind the tree
 // has always opened a redis key / s3 object into.
 function onRowOpen(node: TreeNode): void {
@@ -243,6 +245,22 @@ function onUploadClick(): void {
 
 const rowHeight = 28;
 
+// P104 §3.4: VirtualList's own recipe, rebuilt on @tanstack/vue-virtual via the shared
+// useVirtualRows composable.
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, onScroll } = useVirtualRows({
+  count: () => filteredNodes.value.length,
+  rowHeight: () => rowHeight,
+  scrollElement: scrollEl,
+});
+
+// VirtualList's own visible-range emit (already used by KeyValuePane's identical need) — windowed
+// per §4.3, never the whole (up to 200 000-key) level.
+watch(virtualItems, (items) => {
+  if (!supportsKeyTypes.value || items.length === 0) return;
+  void ensureKeyTypesDebounced({ start: items[0].index, end: items[items.length - 1].index + 1 });
+});
+
 onMounted(() => {
   if (!needsReconnect.value && !browseViewStore.runtime[props.tab.id]) {
     void browseViewStore.load(props.tab.id);
@@ -252,22 +270,50 @@ onMounted(() => {
 
 <template>
   <div class="browse-view" data-testid="browse-view" :data-path="tab.path" :data-level="currentLevelPath">
-    <ViewChrome
-      :tab="tab"
-      :icon="headerIcon"
-      :path="pathPrefix"
-      :name="targetName"
-      target-testid="browse-target"
-      refresh-testid="browse-refresh"
-      stop-testid="browse-stop"
-      :can-refresh="true"
-      :can-stop="false"
-      @refresh="onReload"
-    >
-      <template #toolbar>
+    <!-- P104 §3: ViewChrome/ViewHeader/RunState inlined -- no component wraps this chrome anymore. -->
+    <div class="p-view-head">
+      <span
+        v-if="railColor !== undefined"
+        class="p-conn-dot"
+        :class="{ none: !railColor || railColor === 'none' }"
+        :style="{ '--kira-rail': connColorVar(railColor) }"
+      />
+      <span v-if="connRecord?.kind" class="icon-box">
+        <EngineIcon :kind="connRecord.kind" :size="13" />
+      </span>
+      <span class="icon-box">
+        <CodiconIcon :name="headerIcon" :size="13" />
+      </span>
+      <span class="p-view-target" data-testid="browse-target"
+        ><span v-if="pathPrefix" class="path">{{ pathPrefix }}</span
+        >{{ targetName }}</span
+      >
+      <span class="p-push flex items-center gap-1"></span>
+    </div>
+
+    <div class="p-toolbar-rail" :style="{ '--kira-rail': connColorVar(railColor) }" />
+    <div class="p-toolbar last">
+      <div class="group">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" data-testid="browse-refresh" aria-label="Refresh" @click="onReload">
+              <CodiconIcon name="refresh" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Refresh</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="toolbar" size="kira-icon" data-testid="browse-stop" disabled aria-label="Stop">
+              <CodiconIcon name="debug-stop" :size="13" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Stop</TooltipContent>
+        </Tooltip>
+      </div>
         <!-- P63 §3.2: navigator-scoped controls (back + breadcrumb + count) moved into the list
              pane's own .list-head band, alongside the VirtualList they act on — this toolbar keeps
-             only what is view-scoped: filter, upload, and (ViewChrome's own built-in) refresh. -->
+             only what is view-scoped: filter, upload, and the refresh/stop group above. -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
@@ -297,9 +343,28 @@ onMounted(() => {
           </TooltipTrigger>
           <TooltipContent>Upload file…</TooltipContent>
         </Tooltip>
-      </template>
+      <span class="p-push" />
+      <Tooltip :disabled="true">
+        <TooltipTrigger as-child>
+          <span
+            class="p-run-state inline-flex items-center gap-1 font-data text-kira-xs text-subtle"
+            :class="{ 'text-info': runState.status === 'running', 'text-error': runState.status === 'error' }"
+          >
+            <span class="label min-w-[7ch] text-right">{{ runStateLabel }}</span
+            ><span
+              class="ring h-[11px] w-[11px] shrink-0 rounded-full border-[1.5px] border-border-strong"
+              :class="{
+                'animate-[spin_0.7s_linear_infinite] border-t-accent border-r-transparent border-b-accent border-l-accent':
+                  runState.status === 'running',
+                'border-error': runState.status === 'error',
+              }"
+            />
+          </span>
+        </TooltipTrigger>
+      </Tooltip>
+      <div class="group"></div>
+    </div>
 
-      <template #strips>
         <div v-if="filterOpen" class="shrink-0 px-1.5 py-1 border-b border-border">
           <div
             class="flex items-center gap-1 w-full h-control rounded-kira-sm border border-border-strong bg-input px-2"
@@ -328,32 +393,33 @@ onMounted(() => {
             </Tooltip>
           </div>
         </div>
-        <MessageStrip v-if="rt?.status === 'error' && rt.error" tone="err" data-testid="browse-error">
-          {{ rt.error.message }}
-        </MessageStrip>
+        <Alert v-if="rt?.status === 'error' && rt.error" variant="destructive" data-testid="browse-error">
+          <AlertDescription>{{ rt.error.message }}</AlertDescription>
+        </Alert>
         <!-- P43 F6/D7: a failed delete from this level, distinct from a failed load above. -->
-        <MessageStrip v-if="rt?.actionError" tone="err" data-testid="browse-action-error">
-          {{ rt.actionError }}
-        </MessageStrip>
+        <Alert v-if="rt?.actionError" variant="destructive" data-testid="browse-action-error">
+          <AlertDescription>{{ rt.actionError }}</AlertDescription>
+        </Alert>
         <!-- P43 iter2 F16/D23: the adapter's own round budget cut this level's listing short —
              nothing failed, the listing is real, it's just incomplete. -->
-        <MessageStrip v-if="rt?.truncated" tone="warn" icon="warning" data-testid="browse-truncated">
-          This level stopped short of the full listing — Refresh to try again.
-        </MessageStrip>
-      </template>
+        <Alert v-if="rt?.truncated" class="strip-warn" data-testid="browse-truncated">
+          <CodiconIcon name="warning" :size="13" class="strip-warn-text" />
+          <AlertDescription class="strip-warn-text">
+            This level stopped short of the full listing — Refresh to try again.
+          </AlertDescription>
+        </Alert>
 
-      <!-- Item 4: the reconnect gate used to replace this whole ViewChrome (header, toolbar and
+      <!-- Item 4: the reconnect gate used to replace this whole chrome (header, toolbar and
            all) — every other view but the grid's DataView.vue did the same, the one inconsistency
-           this fixes. ViewChrome itself (and so its toolbar slots above) now always renders; only
+           this fixes. The chrome above (and so its toolbar rows) now always renders; only
            the body — the part that actually needs a live connection — swaps for the gate.
            P63 §2.1: "the body" is now the whole split (list pane + splitter + detail pane), never
            just the list — a disconnected connection means neither side has anything live to show. -->
-      <ReconnectGate
-        v-if="needsReconnect"
-        container-testid="browse-reconnect"
-        button-testid="browse-reconnect-load"
-        @reconnect="onReconnectAndLoad"
-      />
+      <div v-if="needsReconnect" class="p-empty" data-testid="browse-reconnect">
+        <Button variant="dialog-primary" size="kira-lg" data-testid="browse-reconnect-load" @click="onReconnectAndLoad">
+          Reconnect & load
+        </Button>
+      </div>
       <SplitterGroup v-else direction="horizontal" class="browse-body">
         <SplitterPanel
           class="list-pane"
@@ -414,44 +480,55 @@ onMounted(() => {
             >
               No matching items
             </div>
-            <VirtualList
+            <div
               v-else
-              :items="filteredNodes"
-              :row-height="rowHeight"
-              class="body"
-              @visible-range="onVisibleRange"
+              ref="scrollEl"
+              class="body overflow-auto"
+              data-testid="virtual-list"
+              @scroll="onScroll"
             >
-              <template #default="{ item }">
+              <div :style="{ height: `${totalSize}px`, position: 'relative' }">
                 <div
-                  class="browse-row"
+                  v-for="vi in virtualItems"
+                  :key="String(vi.key)"
+                  class="browse-row virtual-row"
                   data-testid="browse-row"
-                  :data-path="item.path"
-                  :data-kind="item.kind"
-                  :class="{ selected: rt?.selected === item.path }"
-                  :style="{ height: `${rowHeight}px` }"
-                  @click="onRowClick(item)"
-                  @dblclick="onRowOpen(item)"
-                  @contextmenu.prevent="onRowContextMenu($event, item)"
+                  :data-path="filteredNodes[vi.index]?.path"
+                  :data-kind="filteredNodes[vi.index]?.kind"
+                  :class="{ selected: rt?.selected === filteredNodes[vi.index]?.path }"
+                  :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
+                  @click="onRowClick(filteredNodes[vi.index]!)"
+                  @dblclick="onRowOpen(filteredNodes[vi.index]!)"
+                  @contextmenu.prevent="onRowContextMenu($event, filteredNodes[vi.index]!)"
                 >
                   <!-- P63 §4.2/§4.3: a redis key's icon becomes its per-type glyph once its TYPE
                        has arrived (redisTypeIcon falls back to the generic key glyph otherwise —
                        never a wrong type). S3 objects and every container kind are unaffected. -->
                   <span class="icon-box muted"
                     ><CodiconIcon
-                      :name="item.kind === 'key' ? redisTypeIcon(keyType(item.path)) : nodeIcon(item.kind)"
+                      :name="
+                        filteredNodes[vi.index]?.kind === 'key'
+                          ? redisTypeIcon(keyType(filteredNodes[vi.index]!.path))
+                          : nodeIcon(filteredNodes[vi.index]!.kind)
+                      "
                       :size="13"
                   /></span>
-                  <span class="row-name">{{ item.name }}</span>
+                  <span class="row-name">{{ filteredNodes[vi.index]?.name }}</span>
                   <span
-                    v-if="item.kind === 'key' && redisTypeLabel(keyType(item.path))"
+                    v-if="
+                      filteredNodes[vi.index]?.kind === 'key' &&
+                      redisTypeLabel(keyType(filteredNodes[vi.index]!.path))
+                    "
                     class="p-badge row-type-badge"
                     data-testid="browse-key-type"
-                    >{{ redisTypeLabel(keyType(item.path)) }}</span
+                    >{{ redisTypeLabel(keyType(filteredNodes[vi.index]!.path)) }}</span
                   >
-                  <span v-if="item.detail" class="row-detail muted">{{ item.detail }}</span>
+                  <span v-if="filteredNodes[vi.index]?.detail" class="row-detail muted">{{
+                    filteredNodes[vi.index]?.detail
+                  }}</span>
                 </div>
-              </template>
-            </VirtualList>
+              </div>
+            </div>
           </div>
         </SplitterPanel>
 
@@ -459,15 +536,12 @@ onMounted(() => {
 
         <SplitterPanel class="detail-pane" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
-          <EmptyState
-            v-else
-            :icon="emptyPreviewIcon"
-            :label="emptyPreviewLabel"
-            data-testid="browse-preview-empty"
-          />
+          <Alert v-else class="preview-empty" data-testid="browse-preview-empty">
+            <CodiconIcon :name="emptyPreviewIcon" :size="24" class="text-subtle" />
+            <AlertTitle class="text-kira-md text-muted font-normal">{{ emptyPreviewLabel }}</AlertTitle>
+          </Alert>
         </SplitterPanel>
       </SplitterGroup>
-    </ViewChrome>
   </div>
 </template>
 
@@ -539,8 +613,26 @@ onMounted(() => {
   @apply h-full;
 }
 
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
+}
+
 .empty {
   @apply h-full flex items-center justify-center text-kira-sm;
+}
+
+/* Alert tone class replacing MessageStrip's own warn-tone colors (P104 §9 rule 5: literal hex,
+   not a --kira-* token, so kept as-is rather than converted through §7.1's scale). */
+.strip-warn {
+  @apply bg-warn/10 border-warn/20;
+}
+.strip-warn-text {
+  @apply text-[#d9c47a];
+}
+
+/* Replaces EmptyState.vue's own `.p-empty` shape for the detail pane's unselected state. */
+.preview-empty {
+  @apply flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center;
 }
 
 .browse-row {
