@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"sync"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
@@ -14,8 +13,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/apivars"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/appcore"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/grpcclient"
-	"github.com/kirathecat/kira-studio/internal/ipcerr"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appevent"
+	"github.com/kirathecat/kira-studio/internal/ipcerr"
 )
 
 // GrpcService is P11 D3/D7/D8's bound service: schema discovery and a call, both run through the
@@ -366,80 +366,49 @@ type GrpcCallEventErr struct {
 	Message string `json:"message"`
 }
 
-// grpcCoalescer is D8's own buffer: accumulates messages from the goroutine RecvMsg-ing the
-// stream and flushes on whichever comes first — 60 ms elapsed, 64 messages, or a terminal event
-// (flushed immediately, unconditionally, even with zero pending messages, so the renderer always
-// sees a done:true event). The timer is the one thing in this package a test needs -race on: it
-// is read/reset from a goroutine distinct from the one calling push (D8's own §6.1 note).
+// grpcCoalescerFinal is the extra payload only the terminal flush carries.
+type grpcCoalescerFinal struct {
+	status  *grpcclient.CallResult
+	errInfo *GrpcCallEventErr
+}
+
+// grpcCoalescer is D8's own buffer: wraps appevent.Coalescer[grpcclient.Message, grpcCoalescerFinal]
+// (P107 T2-7), accumulating messages from the goroutine RecvMsg-ing the stream and flushing on
+// whichever comes first — 60 ms elapsed, 64 messages, or a terminal event (flushed immediately,
+// unconditionally, even with zero pending messages, so the renderer always sees a done:true
+// event). It also tracks nextSeq — the running index of the first message in each batch — which
+// the generic Coalescer knows nothing about, since only this and searchCoalescer need it.
 type grpcCoalescer struct {
 	emit      appcore.Emitter
 	windowKey string
 	callID    string
-
-	mu      sync.Mutex
-	pending []grpcclient.Message
-	nextSeq int
-	timer   *time.Timer
-	done    bool
+	nextSeq   int
+	gen       *appevent.Coalescer[grpcclient.Message, grpcCoalescerFinal]
 }
 
 func newGrpcCoalescer(emit appcore.Emitter, windowKey, callID string) *grpcCoalescer {
-	return &grpcCoalescer{emit: emit, windowKey: windowKey, callID: callID}
+	c := &grpcCoalescer{emit: emit, windowKey: windowKey, callID: callID}
+	c.gen = appevent.NewCoalescer(grpcCoalesceInterval, grpcCoalesceMaxBatch, func(grpcclient.Message) int { return 1 }, c.flush)
+	return c
 }
 
 // push is grpcclient.ServerStream's onMessage callback — called synchronously from the one
 // goroutine reading the stream, never concurrently with itself.
-func (c *grpcCoalescer) push(m grpcclient.Message) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		return
-	}
-	c.pending = append(c.pending, m)
-	if len(c.pending) >= grpcCoalesceMaxBatch {
-		c.flushLocked(false, nil, nil)
-		return
-	}
-	if c.timer == nil {
-		c.timer = time.AfterFunc(grpcCoalesceInterval, c.onTimer)
-	}
-}
-
-func (c *grpcCoalescer) onTimer() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done || len(c.pending) == 0 {
-		return
-	}
-	c.flushLocked(false, nil, nil)
-}
+func (c *grpcCoalescer) push(m grpcclient.Message) { c.gen.Push(m) }
 
 // finish is the terminal flush — always sent, even with nothing pending, so the renderer always
 // learns the call ended.
 func (c *grpcCoalescer) finish(status *grpcclient.CallResult, errInfo *GrpcCallEventErr) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		return
-	}
-	c.flushLocked(true, status, errInfo)
-	c.done = true
+	c.gen.Finish(grpcCoalescerFinal{status: status, errInfo: errInfo})
 }
 
-func (c *grpcCoalescer) flushLocked(done bool, status *grpcclient.CallResult, errInfo *GrpcCallEventErr) {
-	if c.timer != nil {
-		c.timer.Stop()
-		c.timer = nil
-	}
+// flush runs serialized under the generic Coalescer's own lock — the sole mutator of nextSeq, so
+// no lock of its own is needed for it.
+func (c *grpcCoalescer) flush(msgs []grpcclient.Message, done bool, final grpcCoalescerFinal) {
 	seq := c.nextSeq
-	msgs := c.pending
-	if msgs == nil {
-		msgs = []grpcclient.Message{}
-	}
-	c.pending = nil
 	c.nextSeq += len(msgs)
 	c.emit.EmitTo(c.windowKey, ChannelGrpcCall, GrpcCallEvent{
-		CallID: c.callID, Seq: seq, Messages: msgs, Done: done, Status: status, Error: errInfo,
+		CallID: c.callID, Seq: seq, Messages: msgs, Done: done, Status: final.status, Error: final.errInfo,
 	})
 }
 

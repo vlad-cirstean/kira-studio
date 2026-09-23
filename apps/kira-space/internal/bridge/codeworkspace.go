@@ -3,10 +3,8 @@ package bridge
 import (
 	"context"
 	"errors"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"path/filepath"
 	"sort"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +12,9 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/codeworkspace"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/appevent"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
+	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -451,83 +451,50 @@ type CodeSearchEvent struct {
 	Error    *CodeSearchEventErr         `json:"error,omitempty"`
 }
 
-// searchCoalescer is grpcCoalescer's own rules (D8's shape, restated here per D7 rather than
-// generifying grpcCoalescer — that would rewrite a shipped, -race-tested path for one new caller's
-// benefit, and the two payloads share no field), with one difference: it flushes on an accumulated
-// *match* count across possibly many file groups, not a message count, since one file group can
-// itself carry up to MaxMatchesPerFile matches.
+// searchCoalescerFinal is the extra payload only the terminal flush carries.
+type searchCoalescerFinal struct {
+	stats   *codeworkspace.SearchStats
+	errInfo *CodeSearchEventErr
+}
+
+// searchCoalescer is grpcCoalescer's own rules (bridge/grpc.go), both now thin wrappers around
+// appevent.Coalescer (P107 T2-7), with one difference: it flushes on an accumulated *match* count
+// across possibly many file groups, not a message count, since one file group can itself carry up
+// to MaxMatchesPerFile matches — expressed here as the generic Coalescer's own sizeOf function. It
+// also tracks nextSeq itself, the same way grpcCoalescer does, since only these two need it.
 type searchCoalescer struct {
 	emit      appcore.Emitter
 	windowKey string
 	searchID  string
-
-	mu             sync.Mutex
-	pending        []codeworkspace.FileMatches
-	pendingMatches int
-	nextSeq        int
-	timer          *time.Timer
-	done           bool
+	nextSeq   int
+	gen       *appevent.Coalescer[codeworkspace.FileMatches, searchCoalescerFinal]
 }
 
 func newSearchCoalescer(emit appcore.Emitter, windowKey, searchID string) *searchCoalescer {
-	return &searchCoalescer{emit: emit, windowKey: windowKey, searchID: searchID}
+	c := &searchCoalescer{emit: emit, windowKey: windowKey, searchID: searchID}
+	sizeOf := func(fm codeworkspace.FileMatches) int { return len(fm.Matches) }
+	c.gen = appevent.NewCoalescer(searchCoalesceInterval, searchCoalesceMaxMatches, sizeOf, c.flush)
+	return c
 }
 
 // push is codeworkspace.Search's own onFile callback — documented there as "may be called
-// concurrently from different worker goroutines," which is exactly what this mutex covers.
-func (c *searchCoalescer) push(fm codeworkspace.FileMatches) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		return
-	}
-	c.pending = append(c.pending, fm)
-	c.pendingMatches += len(fm.Matches)
-	if c.pendingMatches >= searchCoalesceMaxMatches {
-		c.flushLocked(false, nil, nil)
-		return
-	}
-	if c.timer == nil {
-		c.timer = time.AfterFunc(searchCoalesceInterval, c.onTimer)
-	}
-}
-
-func (c *searchCoalescer) onTimer() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done || len(c.pending) == 0 {
-		return
-	}
-	c.flushLocked(false, nil, nil)
-}
+// concurrently from different worker goroutines," which is exactly what the generic Coalescer's
+// own mutex covers.
+func (c *searchCoalescer) push(fm codeworkspace.FileMatches) { c.gen.Push(fm) }
 
 // finish is the terminal flush — always sent, even with nothing pending, so the panel's own
 // "Searching…" state can never strand (D7).
 func (c *searchCoalescer) finish(stats *codeworkspace.SearchStats, errInfo *CodeSearchEventErr) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		return
-	}
-	c.flushLocked(true, stats, errInfo)
-	c.done = true
+	c.gen.Finish(searchCoalescerFinal{stats: stats, errInfo: errInfo})
 }
 
-func (c *searchCoalescer) flushLocked(done bool, stats *codeworkspace.SearchStats, errInfo *CodeSearchEventErr) {
-	if c.timer != nil {
-		c.timer.Stop()
-		c.timer = nil
-	}
+// flush runs serialized under the generic Coalescer's own lock — the sole mutator of nextSeq, so
+// no lock of its own is needed for it.
+func (c *searchCoalescer) flush(files []codeworkspace.FileMatches, done bool, final searchCoalescerFinal) {
 	seq := c.nextSeq
-	files := c.pending
-	if files == nil {
-		files = []codeworkspace.FileMatches{}
-	}
-	c.pending = nil
-	c.pendingMatches = 0
 	c.nextSeq += len(files)
 	c.emit.EmitTo(c.windowKey, ChannelCodeSearch, CodeSearchEvent{
-		SearchID: c.searchID, Seq: seq, Files: files, Done: done, Stats: stats, Error: errInfo,
+		SearchID: c.searchID, Seq: seq, Files: files, Done: done, Stats: final.stats, Error: final.errInfo,
 	})
 }
 

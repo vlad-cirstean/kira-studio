@@ -1,12 +1,9 @@
 package bridge
 
 import (
-	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
-	"sync"
-	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/appcore"
 	"github.com/kirathecat/kira-studio/internal/ipcerr"
@@ -25,6 +22,13 @@ type TerminalService struct {
 	Registry *terminal.Registry
 }
 
+// svc is the internal/terminal.Service this bound type delegates its generic half to (P107 T2-7)
+// — built fresh per call rather than stored, since it is a stateless pair of pointers already held
+// as Emit/Registry.
+func (s *TerminalService) svc() *terminal.Service {
+	return &terminal.Service{Emit: s.Emit, Registry: s.Registry}
+}
+
 // Shutdown closes every live session — app teardown.
 func (s *TerminalService) Shutdown() {
 	s.Registry.CloseAll()
@@ -39,11 +43,7 @@ type TerminalDefaultCwdResult struct {
 // DefaultCwd is the user's home directory, for an unscoped terminal launch — a repo-scoped
 // terminal keeps using internal/gitsession's own worktree-cwd resolution.
 func (s *TerminalService) DefaultCwd() TerminalDefaultCwdResult {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return TerminalDefaultCwdResult{Path: ""}
-	}
-	return TerminalDefaultCwdResult{Path: home}
+	return TerminalDefaultCwdResult{Path: terminal.DefaultCwd()}
 }
 
 type TerminalOpenArgs struct {
@@ -54,24 +54,10 @@ type TerminalOpenArgs struct {
 	WindowKey  string `json:"windowKey"`
 	// Command, when non-empty, runs as `$SHELL -l -i -c Command` instead of a plain login shell.
 	Command string `json:"command"`
-	// LaunchKind is Kira Studio's own discriminator (one of launchKindShell/ClaudeCode/Script),
-	// never inferred from Command. "" is accepted and treated as launchKindShell.
+	// LaunchKind is Kira Studio's own discriminator (one of internal/terminal's own
+	// LaunchKindShell/ClaudeCode/Script), never inferred from Command. "" is accepted and treated
+	// as terminal.LaunchKindShell.
 	LaunchKind string `json:"launchKind"`
-}
-
-const (
-	launchKindShell      = "shell"
-	launchKindClaudeCode = "claude-code"
-	launchKindScript     = "script"
-)
-
-func validLaunchKind(v string) bool {
-	switch v {
-	case "", launchKindShell, launchKindClaudeCode, launchKindScript:
-		return true
-	default:
-		return false
-	}
 }
 
 type TerminalOpenResult struct {
@@ -94,11 +80,6 @@ type TerminalCloseArgs struct {
 	TerminalID string `json:"terminalId"`
 }
 
-const maxTerminalDim = 1000
-const maxTerminalCommandBytes = 64 * 1024
-
-func validTerminalDim(n int) bool { return n >= 1 && n <= maxTerminalDim }
-
 // Open validates args, spawns a new session and returns its resolved shell path — Kira Studio's
 // own Open, minus the AgentHooks command/env composition.
 func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error) {
@@ -108,7 +89,7 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	if args.WindowKey == "" {
 		return TerminalOpenResult{}, ipcerr.BadRequest("windowKey is required")
 	}
-	if !validTerminalDim(args.Cols) || !validTerminalDim(args.Rows) {
+	if !terminal.ValidDim(args.Cols) || !terminal.ValidDim(args.Rows) {
 		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
 	}
 	if !filepath.IsAbs(args.Cwd) {
@@ -118,30 +99,21 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 	if err != nil || !info.IsDir() {
 		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "cwd does not exist or is not a directory")
 	}
-	if len(args.Command) > maxTerminalCommandBytes {
+	if len(args.Command) > terminal.MaxCommandBytes {
 		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "command is too long")
 	}
-	if !validLaunchKind(args.LaunchKind) {
+	if !terminal.ValidLaunchKind(args.LaunchKind) {
 		return TerminalOpenResult{}, ipcerr.New("E_INVALID", "launchKind must be shell, claude-code or script")
 	}
 
-	coalescer := newTerminalCoalescer(s.Emit, args.WindowKey, args.TerminalID)
-	sess, err := s.Registry.Open(terminal.OpenParams{
+	sess, err := s.svc().OpenWithCoalescedOutput(terminal.OpenParams{
 		ID:        args.TerminalID,
 		WindowKey: args.WindowKey,
 		Cwd:       args.Cwd,
 		Cols:      uint16(args.Cols),
 		Rows:      uint16(args.Rows),
 		Command:   args.Command,
-		OnData:    coalescer.push,
-		OnExit: func(code int, exitErr error) {
-			msg := ""
-			if exitErr != nil {
-				msg = exitErr.Error()
-			}
-			coalescer.finish(code, msg)
-		},
-	})
+	}, args.WindowKey, args.TerminalID)
 	if err != nil {
 		if errors.Is(err, terminal.ErrDuplicateSession) {
 			return TerminalOpenResult{}, ipcerr.New("E_INVALID", "terminalId is already open")
@@ -154,120 +126,15 @@ func (s *TerminalService) Open(args TerminalOpenArgs) (TerminalOpenResult, error
 
 // Write decodes args.Data and forwards it to the pty. A no-op for an id with no live session.
 func (s *TerminalService) Write(args TerminalWriteArgs) error {
-	if args.TerminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
-	}
-	data, err := base64.StdEncoding.DecodeString(args.Data)
-	if err != nil {
-		return ipcerr.New("E_INVALID", "data must be base64")
-	}
-	if err := s.Registry.Write(args.TerminalID, data); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return s.svc().Write(args.TerminalID, args.Data)
 }
 
 // Resize applies cols/rows to the real winsize. A no-op for an id with no live session.
 func (s *TerminalService) Resize(args TerminalResizeArgs) error {
-	if args.TerminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
-	}
-	if !validTerminalDim(args.Cols) || !validTerminalDim(args.Rows) {
-		return ipcerr.New("E_INVALID", "cols/rows must be within [1, 1000]")
-	}
-	if err := s.Registry.Resize(args.TerminalID, uint16(args.Cols), uint16(args.Rows)); err != nil {
-		return ipcerr.Internal(err.Error())
-	}
-	return nil
+	return s.svc().Resize(args.TerminalID, args.Cols, args.Rows)
 }
 
 // Close kills args.TerminalID's own session — idempotent.
 func (s *TerminalService) Close(args TerminalCloseArgs) error {
-	if args.TerminalID == "" {
-		return ipcerr.New("E_INVALID", "terminalId is required")
-	}
-	s.Registry.Close(args.TerminalID)
-	return nil
-}
-
-// ---- the coalescing terminal-output push channel — Kira Studio's own terminalCoalescer, unchanged ----
-
-const (
-	terminalCoalesceInterval = 16 * time.Millisecond
-	terminalCoalesceMaxBytes = 16 * 1024
-)
-
-// TerminalEvent is ChannelTerminal's own payload — one coalesced chunk of a session's output, or
-// its exit.
-type TerminalEvent struct {
-	TerminalID string `json:"terminalId"`
-	Data       string `json:"data,omitempty"`
-	Exited     bool   `json:"exited"`
-	ExitCode   *int   `json:"exitCode,omitempty"`
-	Error      string `json:"error,omitempty"`
-}
-
-type terminalCoalescer struct {
-	emit       appcore.Emitter
-	windowKey  string
-	terminalID string
-
-	mu      sync.Mutex
-	pending []byte
-	timer   *time.Timer
-	done    bool
-}
-
-func newTerminalCoalescer(emit appcore.Emitter, windowKey, terminalID string) *terminalCoalescer {
-	return &terminalCoalescer{emit: emit, windowKey: windowKey, terminalID: terminalID}
-}
-
-func (c *terminalCoalescer) push(b []byte) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		return
-	}
-	c.pending = append(c.pending, b...)
-	if len(c.pending) >= terminalCoalesceMaxBytes {
-		c.flushLocked(false, nil, "")
-		return
-	}
-	if c.timer == nil {
-		c.timer = time.AfterFunc(terminalCoalesceInterval, c.onTimer)
-	}
-}
-
-func (c *terminalCoalescer) onTimer() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done || len(c.pending) == 0 {
-		return
-	}
-	c.flushLocked(false, nil, "")
-}
-
-func (c *terminalCoalescer) finish(exitCode int, errMsg string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.done {
-		return
-	}
-	c.flushLocked(true, &exitCode, errMsg)
-	c.done = true
-}
-
-func (c *terminalCoalescer) flushLocked(exited bool, exitCode *int, errMsg string) {
-	if c.timer != nil {
-		c.timer.Stop()
-		c.timer = nil
-	}
-	var data string
-	if len(c.pending) > 0 {
-		data = base64.StdEncoding.EncodeToString(c.pending)
-		c.pending = nil
-	}
-	c.emit.EmitTo(c.windowKey, ChannelTerminal, TerminalEvent{
-		TerminalID: c.terminalID, Data: data, Exited: exited, ExitCode: exitCode, Error: errMsg,
-	})
+	return s.svc().Close(args.TerminalID)
 }
