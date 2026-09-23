@@ -104,7 +104,7 @@ echo "generate-wire: using $FLATC (version $ACTUAL_VERSION)"
 "$FLATC" --go -o "$ROOT_DIR/apps/kira-studio/internal/page" "$SCHEMA"
 "$FLATC" --ts -o "$ROOT_DIR/packages/shared/protocol" "$SCHEMA"
 
-"$FLATC" --go -o "$ROOT_DIR/apps/kira-studio/internal"        "$GIT_SCHEMA"
-"$FLATC" --ts -o "$ROOT_DIR/packages/git-ipc/src/generated"   "$GIT_SCHEMA"
+"$FLATC" --go -o "$ROOT_DIR/apps/kira-space/internal" "$GIT_SCHEMA"
+"$FLATC" --ts -o "$ROOT_DIR/packages/git-ipc/src/generated" "$GIT_SCHEMA"
 
 echo "generate-wire: done"
