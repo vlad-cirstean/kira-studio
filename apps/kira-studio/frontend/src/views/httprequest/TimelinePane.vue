@@ -11,7 +11,7 @@ import { useHttpRequestViewStore } from './state';
 
 // P10 D11/D12/D13/F18: the waterfall and the per-hop detail — a fifth response-pane segment,
 // mounted here (not http/) for the same reason RawExchangePane.vue is (P9 F16): it needs
-// theme/primitives/ and views/**'s own import rights, which http/** does not have (biome.json).
+// theme/ and views/**'s own import rights, which http/** does not have (biome.json).
 const props = defineProps<{ tab: HttpRequestTabRecord }>();
 const httpRequestViewStore = useHttpRequestViewStore();
 const httpHistoryStore = useHttpHistoryStore();

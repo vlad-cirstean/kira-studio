@@ -10,8 +10,8 @@ import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
-import type { Completion } from '../../theme/primitives/completion';
-import { templateToken, wholeFieldToken } from '../../theme/primitives/completion';
+import type { Completion } from '../../theme/completion';
+import { templateToken, wholeFieldToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 
 // P3 D15/C6: the one row table behind Params, Headers, urlencoded (C7) and form-data (C8) —

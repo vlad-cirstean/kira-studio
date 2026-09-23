@@ -2,7 +2,7 @@
 // finding that nothing in the repo enumerates header names today (`userContentTypeHeader`,
 // body.ts, looks for exactly one).
 
-/** Structurally identical to `theme/primitives/completion.ts`'s own `Completion` (label, optional
+/** Structurally identical to `theme/completion.ts`'s own `Completion` (label, optional
  *  insert/detail/icon/caretOffsetFromEnd) — declared independently rather than imported, since
  *  `packages/api-core` is app-free, DOM-free logic (P12 D16(e)) and may not import anything under
  *  `apps/**`. TypeScript's structural typing makes `WELL_KNOWN_REQUEST_HEADERS` directly usable
@@ -24,8 +24,8 @@ function header(label: string, detail: string): HeaderCompletion {
 /** Request headers a person actually types into a request builder — RFC 9110's own set plus the
  *  conventional non-standard ones. Response-only headers (`Set-Cookie`, `Location`, `Server`, …)
  *  are deliberately absent: this feeds the *request* headers table, never a response viewer.
- *  `detail` is the one-word category the completion popup right-aligns (theme/primitives/
- *  AutocompleteField.vue's own `sugg-detail`). Canonical Train-Case spelling for `label` — matches
+ *  `detail` is the one-word category the completion popup right-aligns (the old
+ *  theme/primitives/AutocompleteField.vue's own `sugg-detail`). Canonical Train-Case spelling for `label` — matches
  *  what the header would render as on the wire, and `rankCandidates` already case-folds
  *  (completion.ts:36-38), so typing `content-t` still matches `Content-Type`. */
 export const WELL_KNOWN_REQUEST_HEADERS: readonly HeaderCompletion[] = [

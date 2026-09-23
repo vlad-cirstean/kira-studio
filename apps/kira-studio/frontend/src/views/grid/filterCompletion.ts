@@ -1,5 +1,5 @@
 // P18 D7/D8: candidate lists for FilterToolbar.vue's WHERE/ORDER BY boxes.
-import type { Completion } from '../../theme/primitives/completion';
+import type { Completion } from '../../theme/completion';
 import { identNeedsQuoting, quoteIdent, type SqlDialect } from '../shared/sqlIdent';
 import { getPage } from './page';
 import { useGridViewStore } from './state';

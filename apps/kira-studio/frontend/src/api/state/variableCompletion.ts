@@ -13,7 +13,7 @@ import {
 import type { EditorCompletionSource } from '../../editor/completion';
 import { type ConsoleHoverInfo, formatHoverValue } from '../../editor/hoverInfo';
 import type { RangeHighlight } from '../../editor/ranges';
-import { type Completion, templateToken } from '../../theme/primitives/completion';
+import { type Completion, templateToken } from '../../theme/completion';
 import { useVariableSetStore } from './variables';
 
 // P15b D4: the Api side supplies the data, in one module, from the call already being made — F5's

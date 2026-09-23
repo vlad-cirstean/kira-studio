@@ -61,7 +61,7 @@ function onKeydown(e: KeyboardEvent): void {
 .palette-backdrop {
   /* P28 D17(c): the dialog rung — the palette is a modal over the whole workbench, and this was
      a bare 100, the literal DialogFrame used to carry. Same relationship, named. */
-  @apply fixed inset-0 flex items-start justify-center pt-[120px] bg-black/30;
+  @apply fixed inset-0 flex items-start justify-center pt-30 bg-black/30;
   z-index: var(--kira-z-dialog);
 }
 

@@ -28,7 +28,7 @@ import { useConnectionsStore } from '../../state/connections';
 import { useRunState } from '../../state/runState';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
-import { templateToken } from '../../theme/primitives/completion';
+import { templateToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 import MetadataTable from './MetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';

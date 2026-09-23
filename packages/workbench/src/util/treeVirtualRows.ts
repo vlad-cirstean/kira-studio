@@ -1,9 +1,4 @@
-import {
-  STICKY_MAX_ROWS,
-  type StickyRowLike,
-  stickyBand,
-  stickyInsetFor,
-} from '@theme/primitives/stickyBand';
+import { STICKY_MAX_ROWS, type StickyRowLike, stickyBand, stickyInsetFor } from '@theme/stickyBand';
 import { computed, type Ref } from 'vue';
 import { useVirtualRows } from './virtualRows';
 

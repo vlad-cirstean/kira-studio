@@ -10,7 +10,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../api/state/variableCompletion';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
-import { type Completion, templateToken, wholeFieldToken } from '../../theme/primitives/completion';
+import { type Completion, templateToken, wholeFieldToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
 
 // P22b D2: this table's own value vocabulary — genuinely different from

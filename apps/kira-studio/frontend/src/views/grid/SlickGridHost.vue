@@ -721,8 +721,18 @@ let gridRootEl: HTMLElement | null = null;
 let selectionModel: SlickHybridSelectionModel | null = null;
 // P104 §6.4 — AttributeTooltip.vue's own `container` prop: a ref (not a plain let) since
 // AttributeTooltip's `useEventListener(computed(() => props.container), ...)` re-binds reactively
-// once this is set, after the constructor's synchronous header build below.
-const headerRowEl = ref<HTMLElement | null>(null);
+// once this is set, after the constructor's synchronous header build below. An ARRAY, not a
+// single element: SlickGrid always splits the header row into two sibling DOM panes — `_headerL`
+// (frozen columns) and `_headerR` (the rest) — appended directly under the grid's own root `el`,
+// with no narrower common ancestor than `el` itself wrapping both (confirmed reading
+// initialize() in slick.grid.js). A single `querySelector('.slick-header-columns')` only ever
+// grabs `_headerL` (first DOM match), so a table with any frozen column silently lost header
+// tooltips for every OTHER column — found live, this session, hovering `tenant_id` on a
+// composite-PK table produced zero pointermove events on the bound container even though the
+// browser's own `:hover` state was set (confirmed via CDP trace), because the pointer was over
+// `_headerR`, never bound. `useEventListener` accepts `Arrayable<HTMLElement>` natively, so both
+// panes get one real listener each — no widening to the whole grid body needed.
+const headerRowEls = ref<HTMLElement[]>([]);
 // P22 postscript §14.2's "cell-editor dock panel is sometimes missing its header" investigation
 // (below, onMounted) surfaced a real, adjacent bug while chasing it: SlickGrid never self-observes
 // its own container's size (confirmed reading slick.grid.ts — no ResizeObserver anywhere in the
@@ -2185,8 +2195,9 @@ onMounted(() => {
   }
 
   // P104 §6.4 — the constructor call above already ran SlickGrid's own synchronous header build
-  // (see the postscript comment just below), so `.slick-header-columns` exists in `el` by now.
-  headerRowEl.value = el.querySelector<HTMLElement>('.slick-header-columns');
+  // (see the postscript comment just below), so both `.slick-header-columns` panes exist in `el`
+  // by now — `querySelectorAll` (not `querySelector`), see `headerRowEls`' own comment above.
+  headerRowEls.value = Array.from(el.querySelectorAll<HTMLElement>('.slick-header-columns'));
 
   // P22 postscript §14.2's two "reported but not reproduced" dock/badge symptoms, root-caused
   // together: `new KiraSlickGrid(...)` above runs synchronously through slick.grid.ts's own
@@ -2324,7 +2335,7 @@ onUnmounted(() => {
   gridRootEl?.removeEventListener('input', onInsertGridInput);
   gridRootEl?.removeEventListener('keydown', onInsertGridKeydown);
   gridRootEl = null;
-  headerRowEl.value = null;
+  headerRowEls.value = [];
   eventHandler?.unsubscribeAll();
   eventHandler = null;
   // C4 — `grid.destroy()` never calls `this.selectionModel?.destroy()` itself (only its own
@@ -2724,7 +2735,7 @@ defineExpose({
     :class="{ 'kira-grid--row-coloring': settingsStore.appearance.rowColoring }"
   >
     <div ref="rootRef" class="slick-grid-mount"></div>
-    <AttributeTooltip :container="headerRowEl" />
+    <AttributeTooltip :container="headerRowEls" />
     <Alert
       v-if="showNoRows"
       class="no-rows flex flex-1 min-h-0 flex-col items-center justify-center gap-2 border-0 bg-transparent text-center"

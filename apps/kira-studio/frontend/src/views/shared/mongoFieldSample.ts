@@ -18,7 +18,7 @@
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
 import { rowKey } from '../../project/state/tree';
-import type { Completion } from '../../theme/primitives/completion';
+import type { Completion } from '../../theme/completion';
 import { MONGO_QUERY_OPERATORS, MONGO_VALUE_CONSTRUCTORS } from './mongoVocabulary';
 
 // Mirrors engine/adapters/mongo/literal.ts's own bare-identifier tokenizer rule exactly — a field

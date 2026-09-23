@@ -1,8 +1,8 @@
 // P15b D3(b): wholeFieldToken and templateToken are pure, DOM-free tokenizers behind
-// AutocompleteField.vue — completion.ts is app-side (theme/primitives/), so this lives here rather
+// AutocompleteField.vue — completion.ts is app-side (theme/), so this lives here rather
 // than in packages/api-core/test.
 import { describe, expect, test } from 'bun:test';
-import { templateToken, wholeFieldToken } from '../../frontend/src/theme/primitives/completion';
+import { templateToken, wholeFieldToken } from '../../frontend/src/theme/completion';
 
 describe('wholeFieldToken (item 7 — F1: Content-T must not become Content-Content-Type)', () => {
   test('a hyphenated header name is one token, trimmed', () => {

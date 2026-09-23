@@ -1504,8 +1504,10 @@ the VS-Code-style type-ahead redirect; both `ProjectPanel.vue` (Studio) and
 layout panels) even though no shared shell component exists any more.
 Separately, `useTreeVirtualRows` (`packages/workbench/src/util/treeVirtualRows.ts`) is the
 virtualized-tree mechanics factored out of `ProjectTree.vue` — `@tanstack/vue-virtual` wiring, the
-pinned-ancestor sticky band (`packages/theme/src/primitives/stickyBand.ts`, kept: a logic helper,
-not a hand-rolled component), reveal-scroll with band inset — generic over any row shape with
+pinned-ancestor sticky band (`packages/theme/src/stickyBand.ts`, kept: a logic helper, not a
+hand-rolled component — moved out of `theme/primitives/` in P104's own A-final pass once every
+`.vue` primitive sharing that directory was gone, so no live import path still reads "primitives"
+for a plain logic module), reveal-scroll with band inset — generic over any row shape with
 `depth`/`hasChildren`/`expanded`/`key`. `ProjectTree.vue` still owns every Studio-specific
 behaviour (the connection-driven row model, the five openable-kind dispatch, context menus,
 keyboard shortcuts) unchanged. **`api/CollectionsTree.vue` is that hook's second consumer**, over

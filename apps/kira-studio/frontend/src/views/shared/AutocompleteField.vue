@@ -10,7 +10,7 @@ import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue';
 import { monacoLanguageIdFor } from '../../editor/monacoLanguages';
 import { overlayOffsetAtPoint, paintOverlayHtml } from '../../editor/paintSpans';
 import type { RangeHighlight } from '../../editor/ranges';
-import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../../theme/primitives/completion';
+import { type Completion, MAX_VISIBLE, rankCandidates, tokenAt } from '../../theme/completion';
 import type { SqlDialect } from './sqlIdent';
 
 // Mirrors TextField.vue's own inheritAttrs:false — data-testid and friends belong on the real
