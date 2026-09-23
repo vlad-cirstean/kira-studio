@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 const codeReposSelectColumns = `id, name, root, repo_id, sort_order, created_at`
@@ -25,23 +26,10 @@ func scanCodeRepoRow(row rowScanner) (model.CodeRepo, error) {
 // List orders by sort_order ASC, name ASC.
 func (r *CodeReposRepo) List() ([]model.CodeRepo, error) {
 	rows, err := r.DB.Query(`SELECT ` + codeReposSelectColumns + ` FROM code_repos ORDER BY sort_order ASC, name ASC`)
-	if err != nil {
-		return nil, fmt.Errorf("repos: query code repos: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.CodeRepo{}
-	for rows.Next() {
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.CodeRepo, bool, error) {
 		rec, err := scanCodeRepoRow(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repos: scan code repo: %w", err)
-		}
-		out = append(out, rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos: code repo rows: %w", err)
-	}
-	return out, nil
+		return rec, true, err
+	})
 }
 
 // Get reads one row by id, (nil, nil) when not found — CodeWorkspaceService's own callers

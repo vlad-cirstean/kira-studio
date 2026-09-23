@@ -63,44 +63,19 @@ func (r *CollectionsRepo) List() ([]model.Collection, []model.CollectionItem, er
 
 func (r *CollectionsRepo) listCollections() ([]model.Collection, error) {
 	rows, err := r.DB.Query(`SELECT ` + collectionSelectColumns + ` FROM api_collections ORDER BY sort_order, name`)
-	if err != nil {
-		return nil, fmt.Errorf("repos/collections: query collections: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.Collection{}
-	for rows.Next() {
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.Collection, bool, error) {
 		var c model.Collection
-		if err := rows.Scan(&c.ID, &c.Name, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("repos/collections: scan collection: %w", err)
-		}
-		out = append(out, c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos/collections: collection rows: %w", err)
-	}
-	return out, nil
+		err := rows.Scan(&c.ID, &c.Name, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt)
+		return c, true, err
+	})
 }
 
 func (r *CollectionsRepo) listItems() ([]model.CollectionItem, error) {
 	rows, err := r.DB.Query(`SELECT ` + itemSelectColumns + ` FROM api_items ORDER BY collection_id, sort_order`)
-	if err != nil {
-		return nil, fmt.Errorf("repos/collections: query items: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.CollectionItem{}
-	for rows.Next() {
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.CollectionItem, bool, error) {
 		item, err := scanItem(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos/collections: item rows: %w", err)
-	}
-	return out, nil
+		return item, true, err
+	})
 }
 
 func scanItem(row rowScanner) (model.CollectionItem, error) {

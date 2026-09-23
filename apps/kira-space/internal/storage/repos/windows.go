@@ -7,6 +7,7 @@ import (
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
 	"github.com/kirathecat/kira-studio/internal/appstorage"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // WindowsRepo reads and writes the `windows` table (P8 D1/D4) — one row per workbench that is
@@ -27,20 +28,14 @@ func (r *WindowsRepo) shared() *appstorage.WindowRepo { return &appstorage.Windo
 // window record), so this has no prepared statement.
 func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
 	rows, err := r.DB.Query(`SELECT key, "order", bounds_json FROM windows ORDER BY "order" ASC`)
-	if err != nil {
-		return nil, fmt.Errorf("repos: query windows: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.WindowRecord{}
-	for rows.Next() {
+	return sqlitex.QueryAll(rows, err, func(rows *sql.Rows) (model.WindowRecord, bool, error) {
 		var (
 			key        string
 			order      int
 			boundsJSON sql.NullString
 		)
 		if err := rows.Scan(&key, &order, &boundsJSON); err != nil {
-			return nil, fmt.Errorf("repos: scan windows: %w", err)
+			return model.WindowRecord{}, false, err
 		}
 		rec := model.WindowRecord{Key: key, Order: order}
 		if boundsJSON.Valid && boundsJSON.String != "" {
@@ -49,12 +44,8 @@ func (r *WindowsRepo) List() ([]model.WindowRecord, error) {
 				rec.Bounds = &b
 			}
 		}
-		out = append(out, rec)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos: windows rows: %w", err)
-	}
-	return out, nil
+		return rec, true, nil
+	})
 }
 
 // Exists reports whether key names a live `windows` row.
