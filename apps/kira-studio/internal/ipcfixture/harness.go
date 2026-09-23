@@ -3,6 +3,7 @@ package ipcfixture
 import (
 	"context"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"sync"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapterhost"
@@ -43,6 +44,33 @@ type App struct {
 	TreeSvc        *bridge.TreeService
 	OpsSvc         *bridge.OpsService
 	MaskRulesSvc   *bridge.MaskRulesService
+
+	// connectedMu guards connectedIDs — F9 (P108 Part 6): every real adapter this harness connects
+	// (Recorder.ConnectionsConnect), tracked so NewApp's own t.Cleanup can disconnect all of them
+	// automatically. A mutex, not a bare slice, since nothing here assumes a single caller
+	// goroutine for the lifetime of one App.
+	connectedMu  sync.Mutex
+	connectedIDs []string
+}
+
+// trackConnected records id as a connection this harness successfully connected — F9's own
+// bookkeeping for NewApp's automatic disconnect cleanup.
+func (a *App) trackConnected(id string) {
+	a.connectedMu.Lock()
+	defer a.connectedMu.Unlock()
+	a.connectedIDs = append(a.connectedIDs, id)
+}
+
+// disconnectTracked disconnects every connection trackConnected has recorded so far — F9's own
+// cleanup half, split out from NewApp's t.Cleanup closure so it is independently testable (a real
+// connect needs Docker; this mechanism does not).
+func (a *App) disconnectTracked() {
+	a.connectedMu.Lock()
+	ids := append([]string(nil), a.connectedIDs...)
+	a.connectedMu.Unlock()
+	for _, id := range ids {
+		_ = a.Router.Disconnect(context.Background(), id)
+	}
 }
 
 // NewApp builds one App per test, in a fresh temp KIRA_HOME, and registers cleanup in the reverse
@@ -96,13 +124,21 @@ func NewApp(t *testing.T) *App {
 		MaskRules: maskRulesSvc,
 	}
 
-	return &App{
+	app := &App{
 		Repos: r, Secrets: secretsRepo, Connections: connectionsSvc, Tree: treeSvc, Router: router, Dispatcher: dispatcher,
 		ConnectionsSvc: &bridge.ConnectionsService{Deps: appDeps},
 		TreeSvc:        &bridge.TreeService{Deps: appDeps},
 		OpsSvc:         &bridge.OpsService{Deps: appDeps, Canceller: router},
 		MaskRulesSvc:   &bridge.MaskRulesService{Deps: appDeps},
 	}
+	// F9 (P108 Part 6): every *_test.go file using this harness calls Recorder.ConnectionsConnect
+	// and none of them call the matching disconnect — real adapters otherwise accumulate in the
+	// process-global registry (adapters.live) across test runs, well after the test DB and
+	// everything else this func's own t.Cleanup calls above have already gone. Registered last, so
+	// it runs first (t.Cleanup is LIFO): live adapters are disconnected before connectionsSvc.Shutdown
+	// tears down preconnect sidecars, and well before db.Close()/r.Close() above.
+	t.Cleanup(app.disconnectTracked)
+	return app
 }
 
 // SeedConnection inserts a connection row through the real repo (bypassing only
@@ -193,6 +229,7 @@ func (r *Recorder) ConnectionsConnect(t *testing.T, id string) model.ConnectionS
 		}
 		t.Fatalf("ipcfixture: connect %s: status=%s error=%s", id, state.Status, msg)
 	}
+	r.App.trackConnected(id) // F9: NewApp's own t.Cleanup disconnects this automatically.
 	r.recordControl(channelConnectionsConnect, bridge.ConnectionsIDArgs{ID: id}, FreezeConnectionState(state))
 	return state
 }
