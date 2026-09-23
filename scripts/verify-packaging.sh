@@ -131,18 +131,22 @@ if grep -rnE 'browser_download_url|releases/download' apps/ packages/ >/dev/null
   fail "release asset download present" "apps/ or packages/ references a release asset download; P66 ships an availability banner only"
 fi
 
-# --- S5: the packaging script cannot publish ---------------------------------------------------
+# --- S5: the packaging scripts cannot publish -----------------------------------------------
 # A POSIX `sed` read, not `node -p require(...)`: this repository does not declare `node` as a
 # dependency anywhere (P58f deleted the vendored runtime), so a machine that satisfies every
 # documented Requirement could still fail this script at line 1 before a single check ran (P20 F13).
-PACKAGE_SCRIPT="$(sed -n 's/^[[:space:]]*"package": *"\(.*\)",\{0,1\}$/\1/p' package.json | head -1)"
-case "$PACKAGE_SCRIPT" in
-  # P10: the shipped artifact is the .dmg, so the script must run the task that builds one.
-  # `darwin:package` alone stops at the .app and would leave the release with nothing to upload —
-  # and it is a prefix of this string, so match the full task name, not a substring of it.
-  *"wails3 task darwin:package:dmg"*) ;;
-  *) fail "package script changed" "package.json's 'package' script no longer runs 'wails3 task darwin:package:dmg' — this check needs updating along with it" ;;
-esac
+# P106 split the single "package" script into "package:studio"/"package:space" — both are read and
+# checked, since a stale/broken one would otherwise never be caught by this script again.
+for SCRIPT_NAME in package:studio package:space; do
+  PACKAGE_SCRIPT="$(sed -n "s/^[[:space:]]*\"$SCRIPT_NAME\": *\"\\(.*\\)\",\\{0,1\\}\$/\\1/p" package.json | head -1)"
+  case "$PACKAGE_SCRIPT" in
+    # P10: the shipped artifact is the .dmg, so each script must run the task that builds one.
+    # `darwin:package` alone stops at the .app and would leave the release with nothing to upload —
+    # and it is a prefix of this string, so match the full task name, not a substring of it.
+    *"wails3 task darwin:package:dmg"*) ;;
+    *) fail "package script changed" "package.json's '$SCRIPT_NAME' script no longer runs 'wails3 task darwin:package:dmg' — this check needs updating along with it" ;;
+  esac
+done
 
 APP="apps/kira-studio/bin/Kira Studio.app"
 DMG="apps/kira-studio/bin/Kira Studio.dmg"
