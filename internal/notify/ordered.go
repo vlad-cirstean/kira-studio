@@ -1,6 +1,9 @@
 package notify
 
-import "sync/atomic"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // OrderedEmitter wraps Emitter[T] with the emitSeq/lastEmitted "never publish a stale snapshot"
 // guard dbmcp.ApprovalBroker and gitsock.Broker each hand-rolled identically (P107 T2-8): every
@@ -14,6 +17,19 @@ type OrderedEmitter[T any] struct {
 	emitter     Emitter[T]
 	seq         atomic.Uint64
 	lastEmitted atomic.Uint64
+	// emitMu serializes Emit's whole check-and-deliver sequence (F8/P108 Part 2 — reported as F7
+	// against dbmcp.ApprovalBroker/gitsock.Broker, the two callers): the original CAS-then-deliver
+	// had a gap between winning the CAS and calling e.emitter.Emit(v) where a second, actually
+	// newer Emit call could win its own CAS and deliver first, so the first call's now-stale value
+	// still went out last. Holding one lock across both steps (separate from whatever lock each
+	// caller already holds across its own NextSeq/build-snapshot/Emit sequence — this one is
+	// private to the emitter, not shared with the caller) closes that gap: "publish" and "record
+	// the high-water mark" happen as one atomic step. Safe against every real subscriber today —
+	// none calls back into Emit synchronously from within its own callback (confirmed by reading
+	// the one production subscriber, bridge/events.go's Attach, which only forwards to Wails'
+	// EventsEmit) — so this cannot self-deadlock; a future subscriber that did call back in would
+	// need the mailbox-plus-delivery-goroutine shape instead, not this lock.
+	emitMu sync.Mutex
 }
 
 // Subscribe registers fn — Emitter.Subscribe's own contract.
@@ -30,16 +46,15 @@ func (e *OrderedEmitter[T]) NextSeq() uint64 {
 }
 
 // Emit publishes v under seq (from NextSeq), unless a later-sequenced value already went out.
+// emitMu holds the check and the delivery together (see its own doc comment) so two calls can
+// never interleave into "the stale one delivers last".
 func (e *OrderedEmitter[T]) Emit(seq uint64, v T) {
-	for {
-		last := e.lastEmitted.Load()
-		if seq <= last {
-			return // superseded — a value reflecting this state and more already went out
-		}
-		if e.lastEmitted.CompareAndSwap(last, seq) {
-			break
-		}
+	e.emitMu.Lock()
+	defer e.emitMu.Unlock()
+	if seq <= e.lastEmitted.Load() {
+		return // superseded — a value reflecting this state and more already went out
 	}
+	e.lastEmitted.Store(seq)
 	e.emitter.Emit(v)
 }
 
