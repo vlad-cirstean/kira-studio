@@ -1,8 +1,8 @@
 <script setup lang="ts" generic="Entry extends { id: string }">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { PopoverContent } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import PopoverPanel from '../../theme/primitives/PopoverPanel.vue';
 
 // Shared popover shell for views/shared/FilterHistoryMenu.vue and console/ConsoleSavedMenu.vue: both are
 // a "Saved" list (pin/rename/delete an entry, click to apply it) with an optional "Recent" list
@@ -22,7 +22,6 @@ defineProps<{
   /** Omit entirely (undefined) to hide the "Recent" section — the console has no history list. */
   recent?: readonly Entry[];
   panelTestId: string;
-  backdropTestId: string;
   savedEntryTestId: string;
   recentEntryTestId?: string;
   emptySavedText: string;
@@ -33,7 +32,6 @@ const emit = defineEmits<{
   apply: [entry: Entry];
   togglePin: [entry: Entry];
   delete: [entry: Entry];
-  close: [];
 }>();
 
 function isPinned(entry: Entry): boolean {
@@ -53,7 +51,7 @@ defineSlots<{
 </script>
 
 <template>
-  <PopoverPanel anchor="left" :width="320" :test-id="panelTestId" :backdrop-test-id="backdropTestId" @close="emit('close')">
+  <PopoverContent align="start" class="w-[320px] gap-0 p-0" :data-testid="panelTestId">
     <div class="saved-list-menu-inner">
       <div class="p-menu-label">{{ title }}</div>
       <div v-if="saved.length === 0" class="empty-row p-sm dim">{{ emptySavedText }}</div>
@@ -108,7 +106,7 @@ defineSlots<{
 
       <slot name="footer" />
     </div>
-  </PopoverPanel>
+  </PopoverContent>
 </template>
 
 <style scoped>

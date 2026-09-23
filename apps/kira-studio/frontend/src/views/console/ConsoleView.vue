@@ -6,6 +6,7 @@ import { pathTail } from '@shared/domain/tree';
 import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -163,6 +164,9 @@ const hoverSource = computed(() => {
 
 const cursorPos = ref(0);
 const savedMenuOpen = ref(false);
+// P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
+// established `.$el` idiom, e.g. GitPanel.vue's promptInput).
+const savedMenuTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 // D9: the console runtime has no actionError field (rt.status === 'error' means the last *run*
 // failed, F11) — a format failure is a client-side text operation with nowhere else to go, so it
 // gets its own component-local strip instead of a runtime-shape change.
@@ -663,6 +667,7 @@ const statusLine = computed(() => {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                ref="savedMenuTriggerEl"
                 variant="toolbar"
                 size="kira"
                 data-testid="console-saved-toggle"
@@ -674,12 +679,10 @@ const statusLine = computed(() => {
             </TooltipTrigger>
             <TooltipContent>Saved queries</TooltipContent>
           </Tooltip>
-          <!-- PopoverPanel.vue anchors itself to its own DOM parent (see its own comment) — this menu
-               used to render several levels away from its trigger button (a direct child of
-               ViewChrome's default slot, down by .editor-body), so it opened pinned to a corner
-               of the window instead of under "Saved queries" (task #58). Wrapping it here next to
-               its button, the same shape every other toolbar menu already uses, fixes that. -->
-          <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
+          <Popover :open="savedMenuOpen" @update:open="(v) => (savedMenuOpen = v)">
+            <PopoverAnchor :reference="(savedMenuTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+            <ConsoleSavedMenu v-if="savedMenuOpen" :tab-id="tab.id" @close="onSavedMenuClose" />
+          </Popover>
         </div>
         <div class="sep"></div>
         <!-- D17: the find toolbar resolves a Page — a plan result set is not one, so the button

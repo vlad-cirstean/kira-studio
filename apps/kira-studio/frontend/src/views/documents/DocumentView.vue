@@ -4,6 +4,7 @@ import type { PageSize } from '@shared/domain/tabs';
 import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 // P104 §3.4/§3.1: VirtualList's @tanstack/vue-virtual recipe and SegmentedControl's ToggleGroup
@@ -20,10 +21,10 @@ import { control } from '../../bridge/control';
 import MonacoHost from '../../editor/MonacoHost.vue';
 import { useConnectionsStore } from '../../state/connections';
 import type { DocumentTabRecord } from '../../state/tabDomain';
-import AutocompleteField from '../../theme/primitives/AutocompleteField.vue';
 import MessageStrip from '../../theme/primitives/MessageStrip.vue';
 import ReconnectGate from '../../theme/primitives/ReconnectGate.vue';
 import ViewChrome from '../../theme/primitives/ViewChrome.vue';
+import AutocompleteField from '../shared/AutocompleteField.vue';
 import DocumentRow from '../shared/document/DocumentRow.vue';
 import DocumentTree from '../shared/document/DocumentTree.vue';
 import { beautifyShellText, toShellText } from '../shared/document/ejson';
@@ -258,6 +259,9 @@ function onClearFilter(): void {
 }
 
 const filterHistoryOpen = ref(false);
+// P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
+// established `.$el` idiom, e.g. GitPanel.vue's promptInput).
+const filterHistoryTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 function applyFromFilterHistory(where: string | null, orderBy: SortSpec | null): void {
   documentViewStore.setSearch(props.tab.id, where ?? '');
@@ -789,6 +793,7 @@ onUnmounted(() => {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                ref="filterHistoryTriggerEl"
                 variant="toolbar"
                 size="kira-icon"
                 aria-label="Saved & recent filters"
@@ -800,15 +805,18 @@ onUnmounted(() => {
             </TooltipTrigger>
             <TooltipContent>Saved & recent filters</TooltipContent>
           </Tooltip>
-          <FilterHistoryMenu
-            v-if="filterHistoryOpen"
-            :connection-id="tab.connectionId"
-            :path="tab.path"
-            :current-filter="searchText === '' ? null : searchText"
-            :current-sort="tab.state.sort"
-            @apply="applyFromFilterHistory"
-            @close="filterHistoryOpen = false"
-          />
+          <Popover :open="filterHistoryOpen" @update:open="(v) => (filterHistoryOpen = v)">
+            <PopoverAnchor :reference="(filterHistoryTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+            <FilterHistoryMenu
+              v-if="filterHistoryOpen"
+              :connection-id="tab.connectionId"
+              :path="tab.path"
+              :current-filter="searchText === '' ? null : searchText"
+              :current-sort="tab.state.sort"
+              @apply="applyFromFilterHistory"
+              @close="filterHistoryOpen = false"
+            />
+          </Popover>
         </div>
         <div class="filter-field">
           <Tooltip>

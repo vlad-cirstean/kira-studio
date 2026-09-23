@@ -102,13 +102,11 @@ async function saveCurrent(): Promise<void> {
     title="Saved queries"
     :saved="saved"
     panel-test-id="console-saved-menu"
-    backdrop-test-id="console-saved-backdrop"
     saved-entry-test-id="console-saved-entry"
     empty-saved-text="No saved queries"
     @apply="apply"
     @toggle-pin="togglePin"
     @delete="remove"
-    @close="emit('close')"
   >
     <template #entry="{ entry }">
       <!-- P31 D27/F27: full, untruncated text — same reasoning as views/shared/FilterHistoryMenu.vue's

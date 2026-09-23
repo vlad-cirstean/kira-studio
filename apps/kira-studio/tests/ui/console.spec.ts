@@ -302,7 +302,7 @@ test('Query console — open, run statement/all, errors, saved queries', async (
   await expect(
     page.locator('[data-testid="console-saved-entry"]', { hasText: 'My saved query' }),
   ).toBeVisible();
-  await page.click('[data-testid="console-saved-backdrop"]');
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-testid="console-saved-menu"]')).toHaveCount(0);
 
   await openConsoleFromMenu(page, ORDER_ITEMS_PATH);

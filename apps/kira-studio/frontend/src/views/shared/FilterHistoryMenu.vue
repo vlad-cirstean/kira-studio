@@ -146,7 +146,6 @@ async function saveCurrent(): Promise<void> {
     :saved="savedEntries"
     :recent="historyEntries"
     panel-test-id="filter-history"
-    backdrop-test-id="filter-history-backdrop"
     saved-entry-test-id="saved-entry"
     recent-entry-test-id="history-entry"
     empty-saved-text="No saved filters"
@@ -154,7 +153,6 @@ async function saveCurrent(): Promise<void> {
     @apply="applyEntry"
     @toggle-pin="togglePin"
     @delete="remove"
-    @close="emit('close')"
   >
     <template #entry="{ entry }">
       <!-- P31 D27/F27: full, untruncated text — the popover is 320px and a WHERE/ORDER BY clause

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import TreeHost from '@theme/primitives/TreeHost.vue';
 import { shortcutFor } from '@workbench/shortcuts/keys';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { runMenuShortcut, useContextMenuStore } from '@workbench/state/contextMenu';
 import { copyText } from '@workbench/util/clipboard';
+import { useTreeVirtualRows } from '@workbench/util/treeVirtualRows';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '../state/settings';
 import CollectionRow from './CollectionRow.vue';
@@ -22,16 +22,20 @@ const importCurlStore = useImportCurlStore();
 const variablesStore = useVariablesStore();
 const settingsStore = useSettingsStore();
 
-// P4 D13: a real TreeHost consumer, with **not one line of tree mechanics** of its own —
-// virtualization, the pinned ancestor band and reveal-scroll all live in the primitive P1 factored
-// out for exactly this. If any of TreeHost's props turned out to need widening here, that would be
-// a signal the row model was wrong; none did.
+// P104 §3.4: TreeHost's own recipe (virtualization + the pinned ancestor band + reveal-scroll),
+// inlined via the shared useTreeVirtualRows composable rather than kept as a wrapper component —
+// the same swap ProjectTree.vue's own call site already made.
 const rowHeight = computed(() => (settingsStore.appearance.rowDensity === 'compact' ? 22 : 28));
-const treeHostRef = ref<{ revealKey: (key: string) => Promise<void> } | null>(null);
+const scrollEl = ref<HTMLElement | null>(null);
+const { virtualItems, totalSize, band, onScroll, revealKey } = useTreeVirtualRows({
+  rows: () => collectionsStore.visibleRows,
+  rowHeight: () => rowHeight.value,
+  scrollElement: scrollEl,
+});
 
 /** Called by the panel after a mutation adds a row worth scrolling to. */
 async function reveal(key: string): Promise<void> {
-  await treeHostRef.value?.revealKey(key);
+  await revealKey(key);
 }
 defineExpose({ reveal });
 
@@ -149,44 +153,73 @@ const TREE_SHORTCUTS = ['tree.open', 'tree.rename', 'tree.delete', 'tree.duplica
 </script>
 
 <template>
-  <TreeHost
-    ref="treeHostRef"
-    class="collections-tree"
-    :rows="collectionsStore.visibleRows"
-    :row-height="rowHeight"
-    :selected-key="collectionsStore.selected"
-    @background-contextmenu="onBackgroundContextMenu"
-    @keydown="onTreeKeydown"
-  >
-    <template #row="{ row, sticky, top }">
-      <CollectionRow
-        :class="{ 'sticky-row': sticky }"
-        :style="sticky ? { top: `${top}px`, height: `${rowHeight}px` } : undefined"
-        :row="row"
-        :selected="collectionsStore.selected === row.key"
-        :sticky="sticky"
-        @select="onSelect"
-        @toggle="onToggle"
-        @open="onOpen"
-        @contextmenu="onContextMenu"
-        @rename="onRename"
-        @cancel-rename="collectionsStore.cancelRename"
-      />
-    </template>
-  </TreeHost>
+  <div class="collections-tree">
+    <div class="tree-body" data-testid="tree-background" @contextmenu.prevent="onBackgroundContextMenu">
+      <div
+        ref="scrollEl"
+        class="virtual-list h-full overflow-auto"
+        data-testid="virtual-list"
+        @scroll="onScroll"
+        @keydown="onTreeKeydown"
+      >
+        <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
+          <template v-for="slot in band" :key="slot.row.key">
+            <CollectionRow
+              class="sticky-row"
+              :style="{ top: `${slot.top}px`, height: `${rowHeight}px` }"
+              :row="slot.row"
+              :selected="collectionsStore.selected === slot.row.key"
+              :sticky="true"
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+              @rename="onRename"
+              @cancel-rename="collectionsStore.cancelRename"
+            />
+          </template>
+        </div>
+        <div :style="{ height: `${totalSize}px`, position: 'relative' }">
+          <template v-for="item in virtualItems" :key="String(item.key)">
+            <CollectionRow
+              class="virtual-row"
+              :style="{ transform: `translateY(${item.start}px)`, height: `${item.size}px` }"
+              :row="collectionsStore.visibleRows[item.index]"
+              :selected="collectionsStore.selected === collectionsStore.visibleRows[item.index].key"
+              :sticky="false"
+              @select="onSelect"
+              @toggle="onToggle"
+              @open="onOpen"
+              @contextmenu="onContextMenu"
+              @rename="onRename"
+              @cancel-rename="collectionsStore.cancelRename"
+            />
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
 @reference "@theme/base.css";
 
 .collections-tree {
-  @apply h-full;
+  @apply h-full flex flex-col min-h-0;
 }
 
-/* Positioned relative to VirtualList's own zero-height .virtual-list-sticky, exactly as
-   ProjectTree.vue's own sticky row is — opaque and full-width so it fully occludes whatever real
-   row has scrolled up behind it. */
+.tree-body {
+  @apply flex-1 min-h-0;
+}
+
+/* Positioned relative to the zero-height .virtual-list-sticky (position: sticky), matching
+   ProjectTree.vue's own sticky row — opaque and full-width so it fully occludes whatever real row
+   has scrolled up behind it. */
 .sticky-row {
-  @apply absolute inset-x-0 z-1 bg-bg;
+  @apply absolute left-0 right-0 z-1 bg-bg;
+}
+
+.virtual-row {
+  @apply absolute top-0 left-0 w-full;
 }
 </style>

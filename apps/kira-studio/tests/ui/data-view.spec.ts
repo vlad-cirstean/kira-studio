@@ -1442,7 +1442,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   await page.fill('[data-testid="text-prompt-input"]', 'Small ids');
   await page.click('[data-testid="text-prompt-ok"]');
   await expect(page.locator('[data-testid="saved-entry"]').first()).toContainText('Small ids');
-  await page.click('[data-testid="filter-history-backdrop"]');
+  await page.keyboard.press('Escape');
   await page.fill('[data-testid="filter-where-input"]', '');
   await page.press('[data-testid="filter-where-input"]', 'Enter');
 

@@ -2,6 +2,7 @@
 import type { SortSpec } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, ref, watch } from 'vue';
 import { control } from '../../bridge/control';
@@ -113,6 +114,9 @@ function onOrderByEscape(): void {
 }
 
 const historyOpen = ref(false);
+// P104: PopoverAnchor's own `:reference` takes the trigger's real DOM node directly (the
+// established `.$el` idiom, e.g. GitPanel.vue's promptInput).
+const historyTriggerEl = ref<{ $el: HTMLElement } | null>(null);
 
 function applyFromHistory(where: string | null, orderBy: SortSpec | null): void {
   whereText.value = where ?? '';
@@ -128,6 +132,7 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
     <Tooltip>
       <TooltipTrigger as-child>
         <Button
+          ref="historyTriggerEl"
           variant="toolbar"
           size="kira-icon"
           :class="{ 'bg-input text-fg': historyOpen }"
@@ -140,15 +145,18 @@ function applyFromHistory(where: string | null, orderBy: SortSpec | null): void 
       </TooltipTrigger>
       <TooltipContent>Saved & recent filters</TooltipContent>
     </Tooltip>
-    <FilterHistoryMenu
-      v-if="historyOpen"
-      :connection-id="tab.connectionId"
-      :path="tab.path"
-      :current-filter="tab.state.filter"
-      :current-sort="tab.state.sort"
-      @apply="applyFromHistory"
-      @close="historyOpen = false"
-    />
+    <Popover :open="historyOpen" @update:open="(v) => (historyOpen = v)">
+      <PopoverAnchor :reference="(historyTriggerEl?.$el as HTMLElement) ?? undefined" class="hidden" />
+      <FilterHistoryMenu
+        v-if="historyOpen"
+        :connection-id="tab.connectionId"
+        :path="tab.path"
+        :current-filter="tab.state.filter"
+        :current-sort="tab.state.sort"
+        @apply="applyFromHistory"
+        @close="historyOpen = false"
+      />
+    </Popover>
   </div>
   <div class="where-input">
     <AutocompleteField
