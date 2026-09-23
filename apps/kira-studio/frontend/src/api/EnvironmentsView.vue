@@ -13,6 +13,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
+import { useDragReorder } from '@workbench/util/useDragReorder';
 import { computed, reactive, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
 import { useRunState } from '../state/runState';
@@ -130,29 +131,10 @@ async function onDuplicate(id: string): Promise<void> {
 // D14: the same drag/keyboard reorder the variable rows use — and the same refusal while filtered
 // (both splice `order` by the rendered index, which a filter can move, but the deeper reason is
 // semantic: "move up" past a filter-hidden neighbour has no defined result).
-const dragIndex = ref<number | null>(null);
-function onDragStart(index: number): void {
-  if (isFiltered.value) return;
-  dragIndex.value = index;
-}
-function onDragOver(index: number): void {
-  if (isFiltered.value) return;
-  const from = dragIndex.value;
-  if (from === null || from === index) return;
-  const next = [...order.value];
-  const [moved] = next.splice(from, 1);
-  next.splice(index, 0, moved);
-  order.value = next;
-  dragIndex.value = index;
-}
-async function onDragEnd(): Promise<void> {
-  if (isFiltered.value) {
-    dragIndex.value = null;
-    return;
-  }
-  dragIndex.value = null;
-  await variablesStore.reorderEnvironmentsList(order.value);
-}
+const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order, {
+  canReorder: () => !isFiltered.value,
+  onReorder: (next) => variablesStore.reorderEnvironmentsList(next),
+});
 async function onMove(id: string, direction: 'up' | 'down'): Promise<void> {
   if (isFiltered.value) return;
   const from = order.value.indexOf(id);

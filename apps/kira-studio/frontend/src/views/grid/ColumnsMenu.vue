@@ -7,6 +7,7 @@ import { Label } from '@theme/components/ui/label';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import { useDragReorder } from '@workbench/util/useDragReorder';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
 import { nextProjectionFromSelectedColumns } from './menu';
@@ -68,23 +69,9 @@ function sameOrder(a: string[], b: string[] | null): boolean {
   return a.length === b.length && a.every((name, i) => name === b[i]);
 }
 
-const dragIndex = ref<number | null>(null);
-
-function onDragStart(index: number): void {
-  dragIndex.value = index;
-}
-function onDragOver(index: number): void {
-  const from = dragIndex.value;
-  if (from === null || from === index) return;
-  const next = [...order.value];
-  const [moved] = next.splice(from, 1);
-  next.splice(index, 0, moved);
-  order.value = next;
-  dragIndex.value = index;
-}
-function onDragEnd(): void {
-  dragIndex.value = null;
-}
+// P107 T2-20: same drag reorder EnvironmentsView.vue/VariableSetView.vue use — persistence stays
+// in onBeforeUnmount below (commits `order` alongside `selected`), so no onReorder callback here.
+const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(order);
 
 // P104 §3: PopoverPanel's own @close (fired for every dismissal reason: outside click, Escape,
 // the toggle button) becomes onBeforeUnmount — DataToolbar.vue's Popover mounts this component
