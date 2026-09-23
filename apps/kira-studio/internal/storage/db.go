@@ -9,7 +9,6 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/config"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/migrations"
 	"github.com/kirathecat/kira-studio/internal/appstorage"
-	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // DB wraps the single *sql.DB connection this app ever opens.
@@ -46,17 +45,13 @@ func OpenAt(home string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("storage: load migrations: %w", err)
 	}
-	sqlitexSteps := make([]sqlitex.Migration, len(steps))
-	for i, m := range steps {
-		sqlitexSteps[i] = sqlitex.Migration{Version: m.Version, Name: m.Name, SQL: m.SQL}
-	}
 	// appstorage.OpenAt runs the four steps this used to run inline (open with the six DSN
 	// pragmas, SetMaxOpenConns(1), Ping to force the lazy first connection, chmod 0600) plus the
 	// migration run — repo-root internal/appstorage, shared with apps/kira-space's own storage
 	// package (P100 Part 1 / P107 T2-10). Not wrapped: a *sqlitex.SchemaTooNewError must reach the
 	// caller as-is, since internal/startupfail's Classify recognises it via a direct type assertion
 	// (err.(schemaTooNew)), not errors.As.
-	sqlDB, err := appstorage.OpenAt(path, sqlitexSteps)
+	sqlDB, err := appstorage.OpenAt(path, steps)
 	if err != nil {
 		return nil, err
 	}

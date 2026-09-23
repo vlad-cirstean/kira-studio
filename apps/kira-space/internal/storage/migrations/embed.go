@@ -6,40 +6,21 @@ package migrations
 
 import (
 	"embed"
-	"sort"
+
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 //go:embed *.sql
 var files embed.FS
 
-// Migration is one forward-only schema step.
-type Migration struct {
-	Version int
-	Name    string
-	SQL     string
-}
-
 // names lists the embedded files in the exact order they must apply, rather than trusting
 // directory listing order.
-var names = []struct {
-	version int
-	name    string
-	file    string
-}{
-	{1, "init", "0001_init.sql"},
-	{2, "p100_tabs_layout", "0002_p100_tabs_layout.sql"},
+var names = []sqlitex.MigrationSource{
+	{Version: 1, Name: "init", File: "0001_init.sql"},
+	{Version: 2, Name: "p100_tabs_layout", File: "0002_p100_tabs_layout.sql"},
 }
 
 // All returns every migration in ascending version order.
-func All() ([]Migration, error) {
-	out := make([]Migration, 0, len(names))
-	for _, n := range names {
-		b, err := files.ReadFile(n.file)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, Migration{Version: n.version, Name: n.name, SQL: string(b)})
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
-	return out, nil
+func All() ([]sqlitex.Migration, error) {
+	return sqlitex.LoadMigrations(files, names)
 }
