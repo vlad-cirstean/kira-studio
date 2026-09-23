@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitaskpass"
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
 )
 
@@ -154,6 +155,69 @@ func TestConcurrent_UnsubscribeAfterTeardown(t *testing.T) {
 		unsub := entry.Subscribe(ConnID("c"), func(Event) {})
 		reg.Close() // tears the entry down immediately, closing the subscriber above itself.
 		unsub()     // must be a safe no-op, not a double close.
+	}
+}
+
+// TestConcurrent_SubscribeSameConnNeverOrphansTheWinner is F3's own regression proof (P108 Part 16
+// review, its own probe: 8 concurrent Opens x 200 trials, 27/200 ended with zero subscribers).
+// Two (or more) concurrent Subscribe calls for the SAME conn id — conn.Open's own real race, two
+// repo.open requests for one repo dispatched on their own goroutines by rpcstream, each calling
+// entry.Subscribe(c.ID, ...) before either learns which one "wins" c.held — used to collide on
+// subs' old ConnID key: the second call's subscriber silently overwrote the first's (orphaning its
+// goroutine), and whichever call's own unsubscribe fired first then deleted-and-closed whatever
+// currently occupied that slot — the OTHER call's subscriber — leaving the repo/conn pair with
+// zero subscribers registered (no repo.changed delivery) until the next repo.open. On the pre-fix
+// tree this fails intermittently: some trials end with 0 remaining subscribers instead of 1, or
+// the surviving subscriber never receives the signal this test sends afterward.
+func TestConcurrent_SubscribeSameConnNeverOrphansTheWinner(t *testing.T) {
+	const trials = 200
+	const concurrent = 8
+
+	for trial := 0; trial < trials; trial++ {
+		reg := newTestRegistry()
+		entry, _, err := reg.Acquire(context.Background(), "/usr/bin/git", "/repo")
+		if err != nil {
+			t.Fatalf("trial %d: Acquire: %v", trial, err)
+		}
+
+		var delivered int32
+		unsubs := make([]func(), concurrent)
+		var wg sync.WaitGroup
+		wg.Add(concurrent)
+		for i := 0; i < concurrent; i++ {
+			go func() {
+				defer wg.Done()
+				unsubs[i] = entry.Subscribe(ConnID("c"), func(Event) {
+					atomic.AddInt32(&delivered, 1)
+				})
+			}()
+		}
+		wg.Wait()
+
+		// conn.Open's own shape: exactly one caller "wins" the c.held race and keeps its
+		// unsubscribe (stored on the connection, called only at conn teardown); every other
+		// caller unsubscribes immediately, right here, on losing.
+		for i := 1; i < concurrent; i++ {
+			unsubs[i]()
+		}
+
+		entry.mu.Lock()
+		remaining := len(entry.subs)
+		entry.mu.Unlock()
+		if remaining != 1 {
+			t.Fatalf("trial %d: %d subscribers remain, want exactly 1 (the winner's)", trial, remaining)
+		}
+
+		entry.note(gitclient.SignalRefsChanged)
+		deadline := time.Now().Add(2 * time.Second)
+		for atomic.LoadInt32(&delivered) == 0 && time.Now().Before(deadline) {
+			time.Sleep(time.Millisecond)
+		}
+		if atomic.LoadInt32(&delivered) == 0 {
+			t.Fatalf("trial %d: the winner's subscriber never received a signal", trial)
+		}
+
+		unsubs[0]()
 	}
 }
 

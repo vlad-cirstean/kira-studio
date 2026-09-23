@@ -37,6 +37,13 @@ type Event struct {
 	Kind   string `json:"kind"` // "refsChanged" | "worktreeChanged"
 }
 
+// subscriptionID is Subscribe's own per-call token (F3, P108 Part 16 review) — unique for the
+// life of a RepoEntry (RepoEntry.nextSubID only ever increments, under mu, and is never reused),
+// unlike the ConnID it replaced as e.subs' key: two concurrent Subscribe calls for the very same
+// conn (a real race — conn.Open's own two-repo.open-requests case) must never collide on one map
+// slot.
+type subscriptionID uint64
+
 // RepoEntry is one repository's SHARED state — everything true of the repository rather than of
 // one viewer (SPEC §6's split rule). G2 gave it the identity, the reader/writer gate (unchanged
 // from gitclient, now shared across connections instead of within one), the watcher, and the
@@ -49,9 +56,19 @@ type RepoEntry struct {
 
 	watcher Watcher
 
-	mu       sync.Mutex
-	subs     map[ConnID]*subscriber
-	tornDown bool // set once, under mu, by teardown() (D4) — makes Subscribe/CatFile/teardown itself
+	mu sync.Mutex
+	// subs is keyed by subscriptionID, not ConnID (F3, P108 Part 16 review): two concurrent
+	// Subscribe calls for the SAME conn (a real case — conn.Open's own two-repo.open-requests
+	// race, D-whatever in conn.go) used to collide on a shared ConnID key, so the second call's
+	// entry silently overwrote the first's, orphaning its goroutine; whichever call's own
+	// unsubscribe fired first then deleted-and-closed whatever currently occupied that slot —
+	// the OTHER call's subscriber — leaving the map with zero entries for this repo/conn pair
+	// until the next repo.open, with no repo.changed delivery in between. subscriptionID is
+	// unique per Subscribe call and never reused, so each call's own unsubscribe can only ever
+	// find, remove and close its own entry.
+	subs      map[subscriptionID]*subscriber
+	nextSubID subscriptionID
+	tornDown  bool // set once, under mu, by teardown() (D4) — makes Subscribe/CatFile/teardown itself
 	// safe against a concurrent subscribe or a second teardown call (F2/F3), guarded by the SAME
 	// mu that already serialises subs.
 
@@ -148,7 +165,7 @@ func newRepoEntry(
 		Summary:         summary,
 		Repo:            repo,
 		watcher:         w,
-		subs:            make(map[ConnID]*subscriber),
+		subs:            make(map[subscriptionID]*subscriber),
 		detail:          newDetailCache(),
 		diff:            newDiffCache(diffCacheCapBytes),
 		refs:            newRefsCache(),
@@ -239,23 +256,29 @@ func (e *RepoEntry) note(sig gitclient.Signal) {
 // a no-op unsubscribe, constructing no subscriber, when this entry has already been torn down
 // (F2a: teardown may run concurrently with Open racing Registry.Close during app quit) — the
 // caller (Conn.Open) then holds a ref on a dead entry for a moment and releases it normally.
-func (e *RepoEntry) Subscribe(id ConnID, deliver func(Event)) func() {
+func (e *RepoEntry) Subscribe(_ ConnID, deliver func(Event)) func() {
 	e.mu.Lock()
 	if e.tornDown {
 		e.mu.Unlock()
 		return func() {}
 	}
+	e.nextSubID++
+	subID := e.nextSubID
 	s := newSubscriber(e.Summary.RepoID, deliver)
-	e.subs[id] = s
+	e.subs[subID] = s
 	e.mu.Unlock()
 
 	var once sync.Once
 	return func() {
 		once.Do(func() {
 			e.mu.Lock()
-			_, present := e.subs[id]
+			// F3 (P108 Part 16 review): subID is unique to this one Subscribe call — never shared
+			// with any other call, even a concurrent one for the same conn — so this identity check
+			// can only ever match this call's own entry, never one a colliding call raced in over
+			// it (the old ConnID-keyed bug) nor one teardown (F2b) already removed and closed.
+			present := e.subs[subID] == s
 			if present {
-				delete(e.subs, id)
+				delete(e.subs, subID)
 			}
 			e.mu.Unlock()
 			// Close only the subscriber this call actually removed from the map — teardown (F2b)
@@ -375,7 +398,7 @@ func (e *RepoEntry) teardown() {
 	}
 	e.tornDown = true
 	subs := e.subs
-	e.subs = make(map[ConnID]*subscriber) // never nil (F2a) — a Subscribe losing this race must
+	e.subs = make(map[subscriptionID]*subscriber) // never nil (F2a) — a Subscribe losing this race must
 	// find a real, writable-looking map rather than panic; it is refused by the tornDown check
 	// above before it would ever write into it.
 	e.mu.Unlock()
