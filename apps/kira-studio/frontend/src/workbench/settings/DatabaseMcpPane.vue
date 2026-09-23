@@ -5,7 +5,8 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
-import { computed, ref } from 'vue';
+import { useBusyAction } from '@workbench/util/useBusyAction';
+import { computed } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
 import { loadMaskRuleCounts, maskRuleCountsQueryKey } from '../../state/maskRules';
@@ -33,35 +34,15 @@ function tokenExpired(expiresAt: string): boolean {
   return !!expiresAt && new Date(expiresAt).getTime() <= Date.now();
 }
 
-const dbMcpToggling = ref(false);
-async function onToggleDbMcpEnabled(enabled: boolean): Promise<void> {
-  dbMcpToggling.value = true;
-  try {
-    await dbMcpStore.setDbMcpEnabled(enabled);
-  } finally {
-    dbMcpToggling.value = false;
-  }
-}
-
-const dbMcpRegenerating = ref(false);
-async function onRegenerateDbMcpToken(): Promise<void> {
-  dbMcpRegenerating.value = true;
-  try {
-    await dbMcpStore.regenerateDbMcpToken();
-  } finally {
-    dbMcpRegenerating.value = false;
-  }
-}
-
-const dbMcpInstalling = ref(false);
-async function onInstallDbMcpClaudeCode(): Promise<void> {
-  dbMcpInstalling.value = true;
-  try {
-    await dbMcpStore.installDbMcpClaudeCode();
-  } finally {
-    dbMcpInstalling.value = false;
-  }
-}
+const { busy: dbMcpToggling, run: onToggleDbMcpEnabled } = useBusyAction((enabled: boolean) =>
+  dbMcpStore.setDbMcpEnabled(enabled),
+);
+const { busy: dbMcpRegenerating, run: onRegenerateDbMcpToken } = useBusyAction(() =>
+  dbMcpStore.regenerateDbMcpToken(),
+);
+const { busy: dbMcpInstalling, run: onInstallDbMcpClaudeCode } = useBusyAction(() =>
+  dbMcpStore.installDbMcpClaudeCode(),
+);
 
 const dbMcpInstallMessage = computed(() => {
   const result = dbMcpStore.installResult;

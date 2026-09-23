@@ -4,7 +4,8 @@ import { Button } from '@theme/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { formatRelative } from '@workbench/util/format';
-import { computed, ref } from 'vue';
+import { useBusyAction } from '@workbench/util/useBusyAction';
+import { computed } from 'vue';
 import { useGitClientsStore } from '../../state/gitClients';
 import type { SettingsPaneProps } from './types';
 
@@ -29,15 +30,9 @@ async function onRevokeGitClient(id: string, label: string): Promise<void> {
 
 // G10 D12/D14: same bypass-draft-entirely posture as onRevokeGitClient above — an install is an
 // action, not a setting. installing starts true only while the click is in flight.
-const vsixInstalling = ref(false);
-async function onInstallVsCodeIntegration(): Promise<void> {
-  vsixInstalling.value = true;
-  try {
-    await gitClientsStore.installVsCodeIntegration();
-  } finally {
-    vsixInstalling.value = false;
-  }
-}
+const { busy: vsixInstalling, run: onInstallVsCodeIntegration } = useBusyAction(() =>
+  gitClientsStore.installVsCodeIntegration(),
+);
 
 // D12's own outcome copy, verbatim where it's a fixed string; installFailed/revealFailed weave in
 // the server's own bounded detail/vsixPath.

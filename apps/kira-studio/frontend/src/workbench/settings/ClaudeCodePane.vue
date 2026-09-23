@@ -2,7 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Label } from '@theme/components/ui/label';
-import { ref } from 'vue';
+import { useBusyAction } from '@workbench/util/useBusyAction';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useKeepAwakeStore } from '../../state/keepAwake';
 import { useSettingsStore } from '../../state/settings';
@@ -18,27 +18,15 @@ const agentHooksStore = useAgentHooksStore();
 const keepAwakeStore = useKeepAwakeStore();
 const settingsStore = useSettingsStore();
 
-const claudeCodeHooksToggling = ref(false);
-async function onToggleAgentHooksEnabled(enabled: boolean): Promise<void> {
-  claudeCodeHooksToggling.value = true;
-  try {
-    await agentHooksStore.setAgentHooksEnabled(enabled);
-  } finally {
-    claudeCodeHooksToggling.value = false;
-  }
-}
+const { busy: claudeCodeHooksToggling, run: onToggleAgentHooksEnabled } = useBusyAction(
+  (enabled: boolean) => agentHooksStore.setAgentHooksEnabled(enabled),
+);
 
 // P87 §9: independent of the title bar's own keep-awake button — either source is enough to hold
 // the assertion.
-const keepAwakeAgentAwareToggling = ref(false);
-async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
-  keepAwakeAgentAwareToggling.value = true;
-  try {
-    await keepAwakeStore.setKeepAwakeAgentAware(enabled);
-  } finally {
-    keepAwakeAgentAwareToggling.value = false;
-  }
-}
+const { busy: keepAwakeAgentAwareToggling, run: onToggleKeepAwakeAgentAware } = useBusyAction(
+  (enabled: boolean) => keepAwakeStore.setKeepAwakeAgentAware(enabled),
+);
 </script>
 
 <template>
