@@ -521,6 +521,33 @@ describe('ipc rpc — streams', () => {
     server.dispose();
   });
 
+  test('a throwing onChunk rejects the stream promise instead of wedging it forever (F2)', async () => {
+    const [a, b] = createInMemoryChannelPair();
+    const handlers = stubHandlers(
+      {},
+      {
+        'graph.stream': async (_params, { emit }) => {
+          for (let i = 0; i < 5; i++) await emit(chunkFor(i));
+        },
+      },
+    );
+    const server = createRpcServer(a, handlers);
+    const client = createRpcClient(b);
+
+    const boom = new Error('bad chunk');
+    const streamPromise = client.stream('graph.stream', { repoId: 'r1' }, () => {
+      throw boom;
+    });
+
+    // Before the F2 fix, this would hang forever: the throwing callback rejected the internal
+    // queue promise, and every later `.then` chained onto it (including `end`'s own
+    // finish/resolve/reject) was silently skipped.
+    await expect(streamPromise).rejects.toBe(boom);
+
+    client.dispose();
+    server.dispose();
+  });
+
   test('a raw chunk handed back to encodeStreamPayload is returned by identity, not rebuilt (G32-PERF5)', async () => {
     const [a, b] = createInMemoryChannelPair();
     const handlers = stubHandlers(

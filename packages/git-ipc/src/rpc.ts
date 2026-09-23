@@ -213,14 +213,26 @@ export function createRpcClient(
       case 'chunk': {
         const entry = pendingStreams.get(frame.id);
         if (!entry || entry.done) return;
+        // F2: this queued callback must never itself reject — a throwing `onChunk` or a bad
+        // `decodeStreamPayload` would otherwise turn `entry.queue` into a rejected promise, and
+        // every later `.then` chained onto it (including `end`'s own finish/resolve/reject) would
+        // then be skipped per standard promise semantics, wedging the stream forever. Catch here,
+        // settle the stream one way or the other, and tell the server to stop sending.
         entry.queue = entry.queue.then(async () => {
           if (entry.done) return;
-          const payload = options?.rawStreamChunks
-            ? frame.chunk
-            : decodeStreamPayload(entry.method, frame.chunk);
-          await entry.onChunk(payload);
-          if (entry.done) return;
-          post(channel, { t: 'credit', id: frame.id, n: 1 });
+          try {
+            const payload = options?.rawStreamChunks
+              ? frame.chunk
+              : decodeStreamPayload(entry.method, frame.chunk);
+            await entry.onChunk(payload);
+            if (entry.done) return;
+            post(channel, { t: 'credit', id: frame.id, n: 1 });
+          } catch (error) {
+            if (entry.done) return;
+            finishStream(frame.id);
+            post(channel, { t: 'cancel', id: frame.id });
+            entry.reject(error);
+          }
         });
         return;
       }
