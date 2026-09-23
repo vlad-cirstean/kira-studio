@@ -25,7 +25,7 @@ import type {
   OnHeaderClickEventArgs,
   SlickEventData,
 } from 'slickgrid';
-import { SlickEventHandler, SlickHybridSelectionModel, SlickRange } from 'slickgrid';
+import { SlickEventHandler, type SlickHybridSelectionModel, SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { type SelectedCell, useCellSelectionStore } from '../../state/cellSelection';
 import { useConnectionsStore } from '../../state/connections';
@@ -57,6 +57,7 @@ import { type EdgeHash, searchCellLayers } from '../shared/slick/cssLayers';
 import { KiraSlickGrid } from '../shared/slick/kiraSlickGrid';
 import { createScrollVelocityTracker } from '../shared/slick/scrollVelocity';
 import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
+import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import { sqlDialectFor } from '../shared/sqlIdent';
 import FkPreviewPopover from './FkPreviewPopover.vue';
 import {
@@ -767,7 +768,6 @@ let scrollEventSeq = 0;
 // ConsoleSlickGrid.vue's own copy — see that module's own comments for why the fix is needed and
 // why the dedupe makes pulling from velocity() itself safe.
 const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
-const { velocity } = scrollVelocityTracker;
 
 // §6 D9 — called from the host's own viewport scroll listener, the same logical point
 // markScrollWork marks in DataGrid.vue today (before the render work, after the browser's own
@@ -2076,27 +2076,9 @@ onMounted(() => {
         dataSource?.extractValue(item, String(columnDef.field)),
     },
   );
-  grid.velocity = velocity;
-  // P22 iter2-pacing D1 — the chase's own quiescence gate. `lastScrollEventAt()` is already
-  // performance.now() at the last native scroll event (onViewportScroll, above); no new sampling.
-  grid.lastScrollEventAt = () => scrollVelocityTracker.lastScrollEventAt();
-  // P22 iter2-onset D2 — the chase's per-frame gate, beside the wall-clock one above.
-  grid.scrollEventSeq = () => scrollEventSeq;
+  attachScrollProbes(grid, scrollVelocityTracker, () => scrollEventSeq);
 
-  // C4/§5 D4 — F1: near-exact match for this app's four selection kinds; the gutter is the one
-  // rowSelectColumnIds entry (clicking it selects the row). enableMultiSelection: false is a
-  // parity choice, not a limitation (§4.1 item 4) — multi-cell disjoint selection has no consumer
-  // (Selection has no shape for it). showDragHandle: false — no Excel-style fill affordance.
-  selectionModel = new SlickHybridSelectionModel({
-    selectionType: 'mixed',
-    rowSelectColumnIds: [GUTTER_FIELD],
-    selectActiveCell: true,
-    selectActiveRow: true,
-    dragToSelect: true,
-    autoScrollWhenDrag: true,
-    enableMultiSelection: false,
-    showDragHandle: false,
-  });
+  selectionModel = createHybridSelectionModel(GUTTER_FIELD);
   grid.setSelectionModel(selectionModel);
 
   eventHandler = new SlickEventHandler();

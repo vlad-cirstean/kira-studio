@@ -10,7 +10,7 @@ import type {
   OnHeaderClickEventArgs,
   SlickEventData,
 } from 'slickgrid';
-import { SlickEventHandler, SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
+import { SlickEventHandler, type SlickHybridSelectionModel, type SlickRange } from 'slickgrid';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useCellSelectionStore } from '../../state/cellSelection';
 import { useSettingsStore } from '../../state/settings';
@@ -48,6 +48,7 @@ import {
   selectionFromRanges,
 } from '../shared/slick/selection';
 import { computeSelEdgeHashes, SEL_EDGE_LAYER_KEYS } from '../shared/slick/selectionEdges';
+import { attachScrollProbes, createHybridSelectionModel } from '../shared/slick/selectionModel';
 import '../shared/slick/slickTheme.css';
 import 'slickgrid/dist/styles/css/slick.grid.css';
 import { tabularCellMenu, tabularColumnMenu, tabularRangeMenu, tabularRowMenu } from './resultMenu';
@@ -263,7 +264,6 @@ let page: TabularPage | null = null;
 // doesn't own.
 let scrollEventSeq = 0;
 const scrollVelocityTracker = createScrollVelocityTracker(() => viewportEl);
-const { velocity } = scrollVelocityTracker;
 
 function onViewportScroll(): void {
   const el = viewportEl;
@@ -760,24 +760,12 @@ onMounted(() => {
     dataItemColumnValueExtractor: (item: RowHandle, columnDef: KiraColumn) =>
       dataSource?.extractValue(item, String(columnDef.field)),
   });
-  grid.velocity = velocity;
-  grid.lastScrollEventAt = () => scrollVelocityTracker.lastScrollEventAt();
-  grid.scrollEventSeq = () => scrollEventSeq;
+  attachScrollProbes(grid, scrollVelocityTracker, () => scrollEventSeq);
 
   // P19 D8: identical configuration to SlickGridHost.vue's own — the row's own words are "rows,
   // columns, or an arbitrary free-form cell range", exactly the four-kind Selection model the data
-  // grid already has. enableMultiSelection: false carries over for the same reason: Selection has
-  // no shape for a disjoint multi-cell selection.
-  selectionModel = new SlickHybridSelectionModel({
-    selectionType: 'mixed',
-    rowSelectColumnIds: [GUTTER_FIELD],
-    selectActiveCell: true,
-    selectActiveRow: true,
-    dragToSelect: true,
-    autoScrollWhenDrag: true,
-    enableMultiSelection: false,
-    showDragHandle: false,
-  });
+  // grid already has.
+  selectionModel = createHybridSelectionModel(GUTTER_FIELD);
   grid.setSelectionModel(selectionModel);
 
   eventHandler = new SlickEventHandler();
