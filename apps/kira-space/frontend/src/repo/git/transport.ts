@@ -133,8 +133,20 @@ const COMMENT_MUTATION_METHODS: ReadonlySet<RequestKey> = new Set([
 const localEmittersByCodeRepoId = new Map<string, ReturnType<typeof createLocalEmitter>>();
 
 function createNativeGitTransport(codeRepoId: string): Transport {
-  const remote = createRpcClient(createStreamChannel(Stream('git')));
+  const channel = createStreamChannel(Stream('git'));
+  const remote = createRpcClient(channel);
   const local = createLocalEmitter();
+
+  // F3: the channel closing (including a self-inflicted close from a decodeFrame failure) used to
+  // go unnoticed entirely — nothing ever subscribed to onClose, so every already-in-flight
+  // request/stream on this client hung forever, and a stale entry in sharedClientsByCodeRepoId
+  // kept handing the now-dead transport to every later gitTransportFor call. remote.dispose()
+  // rejects every pending request/stream immediately; evicting the map entry makes the next
+  // gitTransportFor call dial a fresh connection instead of reusing this one.
+  channel.onClose(() => {
+    remote.dispose();
+    sharedClientsByCodeRepoId.delete(codeRepoId);
+  });
   localEmittersByCodeRepoId.set(codeRepoId, local);
   const host = createHostHandlers({
     remoteRequest: remote.request,

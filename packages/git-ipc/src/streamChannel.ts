@@ -114,19 +114,21 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
   };
 
   socket.onmessage = (ev: { data: ArrayBuffer }) => {
-    let message: unknown;
+    // F3: decode and delivery share one try/catch, matching socketChannel.ts's own deliverFrame —
+    // a synchronous throw from the handler (the RPC client's own ContractVersionMismatchError/
+    // ContractShapeError/TransportError) must destroy the connection the same way a malformed
+    // frame does, never escape uncaught and silently drop the frame.
     try {
-      message = decodeFrame(ev.data);
+      const message = decodeFrame(ev.data);
+      // No pending-frame queue (unlike socketChannel.ts): the transport's own createRpcClient
+      // subscribes with onMessage before the socket can have delivered anything, and this channel
+      // has exactly one subscriber for its whole life — there is no resubscribe-across-an-await
+      // gap to lose a frame in.
+      if (currentHandler) currentHandler(message);
     } catch (err) {
       socket.close();
       fireClose(err instanceof Error ? err : new StreamFrameDeliveryError(String(err)));
-      return;
     }
-    if (currentHandler) currentHandler(message);
-    // No pending-frame queue (unlike socketChannel.ts): the transport's own createRpcClient
-    // subscribes with onMessage before the socket can have delivered anything, and this channel
-    // has exactly one subscriber for its whole life — there is no resubscribe-across-an-await gap
-    // to lose a frame in.
   };
   socket.onclose = () => {
     phase = 'closed';
@@ -145,8 +147,11 @@ export function createStreamChannel(socket: StreamSocketLike): StreamChannel {
       const frame = JSON.stringify(message);
       if (phase === 'open') socket.send(frame);
       else if (phase === 'connecting') queued.push(frame);
-      // 'closed': dropped — the peer is gone; onclose has already fired and the client has
-      // already rejected its pending requests.
+      // 'closed': dropped — the peer is gone; onclose has already fired. This file makes no
+      // guarantee that pending requests get rejected on its own — that is up to whoever created
+      // this channel subscribing to onClose (createNativeGitTransport does, via
+      // remote.dispose() — F3); before that fix nothing did, and every already-in-flight
+      // request/stream on a dead channel hung forever instead.
     },
 
     onMessage(handler): () => void {
