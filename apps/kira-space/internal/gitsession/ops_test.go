@@ -3,6 +3,7 @@ package gitsession
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitops"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
 )
@@ -960,5 +962,64 @@ func TestRunOp_EmptyCherryPick_Reclassifies(t *testing.T) {
 	cherryPickHead := filepath.Join(dir, ".git", "CHERRY_PICK_HEAD")
 	if _, statErr := os.Stat(cherryPickHead); statErr != nil {
 		t.Fatalf("CHERRY_PICK_HEAD missing after an empty-pick refusal: %v", statErr)
+	}
+}
+
+// failOnArgsRunner wraps a real Runner, injecting a spawn failure for the first argv whose own
+// args[0] matches failOn — every other command (including the OTHER argv in a multi-argv op)
+// reaches the real runner untouched. F9's own regression proof needs exactly one argv in a
+// multi-write op to fail with a genuine Go-level error (not a classified non-zero exit), after an
+// earlier argv in the same op already wrote for real.
+type failOnArgsRunner struct {
+	gitclient.Runner
+	failOn string
+}
+
+func (r failOnArgsRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	if len(spec.Args) > 0 && spec.Args[0] == r.failOn {
+		return nil, fmt.Errorf("failOnArgsRunner: injected failure for %q", r.failOn)
+	}
+	return r.Runner.Start(ctx, gitPath, spec)
+}
+
+// TestRunOp_UndoClearedBeforeSecondArgvFails is F9's own regression proof (P108 Part 16 review):
+// a stale undo record (from an EARLIER, unrelated successful op) used to survive a LATER op whose
+// own second argv fails with a genuine Go-level error after its first argv already wrote for
+// real — RunOp returned early on that werr, skipping the end-of-function e.undo.Set(record) call
+// (which would at least have set it to nil) entirely. Its replay is an absolute-ref write that
+// assumes nothing has moved since it was captured, exactly what this op's own first argv (the
+// auto-stash's own `stash push`) just did.
+func TestRunOp_UndoClearedBeforeSecondArgvFails(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	runGitQ(t, dir, "branch", "feature")
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nDIRTY\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt (dirty): %v", err)
+	}
+
+	runner := failOnArgsRunner{Runner: gitclient.NewExecRunner(), failOn: "switch"}
+	_, entry := newTestEntry(t, ConnID("f9-test-conn"), dir, testEntryOpts{runner: runner})
+	ctx := context.Background()
+
+	// Seed a real, PRIOR undoable op's own record -- stands in for "any earlier successful
+	// Undoable op happened before the one this test is actually about."
+	seed, err := entry.RunOp(ctx, ConnID("f9-test-conn"), "test", OpRequest{Kind: "branchDelete", Name: "feature"})
+	if err != nil || !seed.OK || seed.Undo == nil {
+		t.Fatalf("seed RunOp(branchDelete) = %+v, %v, want an ok result with an undo record", seed, err)
+	}
+	if entry.undo.Peek() == nil {
+		t.Fatal("undo slot must be populated before the auto-stash checkout this test is actually about")
+	}
+
+	result, err := entry.RunOp(ctx, ConnID("f9-test-conn"), "test", OpRequest{
+		Kind: "checkout", Target: "target", Mode: "switch", AutoStash: true,
+	})
+	if err == nil {
+		t.Fatalf("RunOp(checkout, AutoStash): expected a genuine spawn error from the injected switch failure, result = %+v", result)
+	}
+
+	if entry.undo.Peek() != nil {
+		t.Fatal("undo slot must be cleared -- the auto-stash's own `stash push` already wrote for real before `switch` failed, so the PRIOR op's record is no longer safe to replay")
 	}
 }

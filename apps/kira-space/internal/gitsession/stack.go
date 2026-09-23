@@ -689,6 +689,15 @@ func (e *RepoEntry) RunRestack(ctx context.Context, conn *Conn, branch string) (
 
 	defer e.invalidateAfterWrite()
 
+	// F9 (P108 Part 16 review), same precedent as runPullOp:576/ops.go's RunOp: clear the PRIOR
+	// undo record before the first write below, not only on this restack's own eventual success.
+	// Several of runRestackPlan's/restoreHead's own early-return branches already clear it
+	// themselves on a CLASSIFIED failure (a paused/cancelled restack) — this covers the ones that
+	// don't, a genuine Go-level werr/terr after one or more earlier branches already rebased, which
+	// is exactly the case a stale record (an absolute-ref replay assuming nothing has moved) must
+	// never survive.
+	e.undo.Set(nil)
+
 	restacked, res, err, done := e.runRestackPlan(opCtx, ctx, conn, prep.pf.Plan)
 	if done {
 		return res, err
@@ -803,6 +812,17 @@ func (e *RepoEntry) runRestackPlan(opCtx, ctx context.Context, conn *Conn, plan 
 
 		spawnRes, werr := e.runRestackSpawn(opCtx, gitops.RebaseOntoArgs(entry.Parent, entry.Base, entry.Branch))
 		if werr != nil {
+			if errors.Is(werr, gitclient.ErrCancelled) {
+				// F9 (P108 Part 16 review): CancelRestack can race Repo.Write's own gate wait —
+				// opCtx cancelled before the write closure ever ran returns gitclient.ErrCancelled
+				// directly, bypassing gitclient.Classify's usual KindCancelled classification. Map
+				// it to the SAME documented Cancelled result every other cancellation branch in
+				// this loop already produces, rather than surfacing a raw error (which also left
+				// the undo record stale — cleared here, same as those other branches).
+				e.undo.Set(nil)
+				res, err = e.restackPausedResult(ctx, &OpError{Kind: "Cancelled", Message: "the restack was cancelled"}, restacked, nil, branchNames(plan[i:]))
+				return restacked, res, err, true
+			}
 			return restacked, RestackResult{}, werr, true
 		}
 		if opCtx.Err() != nil {

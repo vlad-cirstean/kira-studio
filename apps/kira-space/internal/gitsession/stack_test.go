@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient"
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitpreflight"
@@ -908,6 +909,109 @@ func TestRunRestack_UndoReplayOrder(t *testing.T) {
 	headBranch := currentBranchStack(t, dir)
 	if headBranch != "feat3" {
 		t.Fatalf("HEAD after undo = %s, want feat3 (the switch step ran first)", headBranch)
+	}
+}
+
+// failOnStackConfigSetRunner wraps a real Runner, injecting a spawn failure for exactly
+// StackConfigSetArgs' own shape (`config --local <key> <value>`, four args) — never the
+// read-side `config --local --null --get-regexp ...`/`config --get-regexp ...` calls
+// restackPrepare's own reads use, so those still reach the real runner untouched.
+type failOnStackConfigSetRunner struct{ gitclient.Runner }
+
+func (r failOnStackConfigSetRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	if len(spec.Args) == 4 && spec.Args[0] == "config" && spec.Args[1] == "--local" {
+		return nil, fmt.Errorf("failOnStackConfigSetRunner: injected failure")
+	}
+	return r.Runner.Start(ctx, gitPath, spec)
+}
+
+// TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError is F9's own regression proof (P108
+// Part 16 review): a stale undo record (from an EARLIER, unrelated successful op) used to survive
+// a restack whose own per-branch write (StackConfigSetArgs, right after that branch's rebase
+// already landed for real) fails with a genuine Go-level error — runRestackPlan returned early on
+// that werr, never reaching RunRestack's own end-of-function e.undo.Set(prep.undo)/nil. Its replay
+// is an absolute-ref write that assumes nothing has moved since it was captured, exactly what the
+// rebase that just landed did.
+func TestRunRestack_UndoClearedAfterEarlierWriteThenGenuineError(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+	dir := initThreeLevelStack(t)
+	runGitStack(t, dir, "branch", "seed-victim")
+
+	runner := failOnStackConfigSetRunner{Runner: gitclient.NewExecRunner()}
+	conn, entry := newStackTestConnAndEntry(t, runner, dir)
+	ctx := context.Background()
+
+	seed, err := entry.RunOp(ctx, conn.ID, "test", OpRequest{Kind: "branchDelete", Name: "seed-victim"})
+	if err != nil || !seed.OK || seed.Undo == nil {
+		t.Fatalf("seed RunOp(branchDelete) = %+v, %v, want an ok result with an undo record", seed, err)
+	}
+	if entry.undo.Peek() == nil {
+		t.Fatal("undo slot must be populated before the restack this test is actually about")
+	}
+
+	result, err := entry.RunRestack(ctx, conn, "feat3")
+	if err == nil {
+		t.Fatalf("RunRestack: expected a genuine spawn error from the injected stack-config-set failure, result = %+v", result)
+	}
+
+	if entry.undo.Peek() != nil {
+		t.Fatal("undo slot must be cleared -- feat2's own rebase already wrote for real before the stack-config-set write failed, so the PRIOR op's record is no longer safe to replay")
+	}
+}
+
+// TestRunRestackPlan_CancelDuringWriteGateReportsCancelledNotRawError is F9's own second
+// regression proof: CancelRestack can race Repo.Write's own gate wait inside runRestackSpawn —
+// opCtx cancelled before that write's closure ever ran returns gitclient.ErrCancelled directly,
+// bypassing gitclient.Classify's usual KindCancelled classification. runRestackPlan must still
+// answer with the documented Cancelled OpResult, the same shape every OTHER cancellation branch in
+// this loop already produces, not a raw Go error.
+//
+// An uncontended Repo.Write never even checks ctx.Done() (its own doc comment: the gate is granted
+// on the very first loop iteration when nothing else holds it) — reproducing the race for real
+// needs genuine contention, not timing luck, so a held write from a separate goroutine is what
+// forces runRestackSpawn's own Repo.Write call to actually park in its ctx.Done()/wait select.
+// Drives runRestackPlan directly (same package) rather than the full RunRestack, since the exact
+// boundary this fix touches is runRestackPlan's own handling of runRestackSpawn's returned error.
+func TestRunRestackPlan_CancelDuringWriteGateReportsCancelledNotRawError(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+	dir := initThreeLevelStack(t)
+	conn, entry := newStackTestConnAndEntry(t, gitclient.NewExecRunner(), dir)
+	ctx := context.Background()
+
+	holderReady := make(chan struct{})
+	release := make(chan struct{})
+	go func() {
+		_ = entry.Repo.Write(context.Background(), func(context.Context) error {
+			close(holderReady)
+			<-release
+			return nil
+		})
+	}()
+	<-holderReady
+
+	opCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+		// Release the held write once opCtx is cancelled: runRestackSpawn's own Repo.Write call
+		// has by now observed ctx.Done() and returned ErrCancelled (the race this test forces) —
+		// holding the gate any longer would only deadlock restackPausedResult's own status/head
+		// re-read below, which needs it back.
+		close(release)
+	}()
+
+	plan := []gitpreflight.RestackPlanEntry{{Branch: "feat2", Parent: "feat1", Base: revParseStack(t, dir, "feat1")}}
+	_, res, err, done := entry.runRestackPlan(opCtx, ctx, conn, plan)
+	if !done {
+		t.Fatal("runRestackPlan: want done=true")
+	}
+	if err != nil {
+		t.Fatalf("runRestackPlan: want the documented Cancelled OpResult, got a raw error: %v", err)
+	}
+	if res.OK || res.Error == nil || res.Error.Kind != "Cancelled" {
+		t.Fatalf("res = %+v, want a Cancelled result, not ok", res)
 	}
 }
 

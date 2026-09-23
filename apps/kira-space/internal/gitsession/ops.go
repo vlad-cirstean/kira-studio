@@ -1160,6 +1160,14 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	// the only thing that ever notices our own write.
 	defer e.invalidateAfterWrite()
 
+	// F9 (P108 Part 16 review), same precedent as runPullOp:576: clear the PRIOR op's undo record
+	// before the first write below, not only on this op's own eventual success. A stale record
+	// (from before this op even started) would otherwise survive a mid-loop spawn error — argvList's
+	// second argv failing after the first already wrote — and its replay is an absolute-ref write
+	// that assumes nothing has moved since it was captured, exactly what this op's own first argv
+	// just did. e.undo.Set(record) below still runs this op's own record once it actually succeeds.
+	e.undo.Set(nil)
+
 	var opErr *OpError
 	for _, argv := range prep.argvList {
 		oe, werr := e.runWriteArgv(ctx, argv)
