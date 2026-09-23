@@ -21,14 +21,18 @@ func init() {
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards every field below (F3): Connect/Disconnect write client/readOnly/queueURLs/
+	// receiptHandles from whatever goroutine adapterhost dispatches them on, concurrently with any
+	// in-flight op reading them — the same class of unguarded-field race Part 4's own F3 fixed for
+	// the SQL engines. It also folds in the pre-existing "two tabs on one connection are two
+	// goroutines through one *Adapter in Go" guard the queueURLs cache already carried.
+	mu       sync.Mutex
 	client   *awssqs.Client
 	readOnly bool
 
 	// P58d D9: name -> URL, populated by listQueues (free — it already has every URL while paging)
 	// and by resolveQueueURL on a miss; avoids a GetQueueUrl round trip on every read()/count()
-	// call. Mutex-guarded: two tabs on one connection are two goroutines through one *Adapter in
-	// Go, unlike the single-threaded JavaScript this ports from.
-	mu        sync.Mutex
+	// call.
 	queueURLs map[string]string
 
 	receiptHandles *receiptHandles
@@ -48,33 +52,61 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	if _, err := listQueues(ctx, client); err != nil {
 		return adapters.ConnectInfo{}, err
 	}
+	a.mu.Lock()
 	a.client = client
 	a.readOnly = cfg.ReadOnly
 	a.queueURLs = map[string]string{}
 	a.receiptHandles = newReceiptHandles()
+	a.mu.Unlock()
 	return adapters.ConnectInfo{ServerVersion: "Amazon SQS"}, nil
 }
 
 // Disconnect is index.ts's disconnect. Clears both adapter-local caches under the mutex — the
 // property checkpoint scenario 16 asserts.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	a.client = nil
 	a.mu.Lock()
+	a.client = nil
 	a.queueURLs = nil
+	handles := a.receiptHandles
+	a.receiptHandles = nil
 	a.mu.Unlock()
-	if a.receiptHandles != nil {
-		a.receiptHandles.clear()
+	if handles != nil {
+		handles.clear()
 	}
 	return nil
 }
 
-func (a *Adapter) requireClient() (*awssqs.Client, error) {
-	return adapters.RequireConnected(a.client)
+func (a *Adapter) getClient() *awssqs.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.client
 }
 
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
+}
+
+func (a *Adapter) getReceiptHandles() *receiptHandles {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.receiptHandles
+}
+
+func (a *Adapter) requireClient() (*awssqs.Client, error) {
+	return adapters.RequireConnected(a.getClient())
+}
+
+// cacheQueueURL is a no-op once Disconnect has nilled queueURLs (F3): an op already past
+// requireClient can still reach this call (or Children's own listing loop) after a concurrent
+// Disconnect, and writing to a nil map panics — recovered by safeRun into a bare E_INTERNAL before
+// this fix, but a genuine bug regardless of the recover.
 func (a *Adapter) cacheQueueURL(name, url string) {
 	a.mu.Lock()
-	a.queueURLs[name] = url
+	if a.queueURLs != nil {
+		a.queueURLs[name] = url
+	}
 	a.mu.Unlock()
 }
 
@@ -166,7 +198,7 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 	if err != nil {
 		return nil, err
 	}
-	return pollQueue(ctx, client, url, req, op, a.receiptHandles)
+	return pollQueue(ctx, client, url, req, op, a.getReceiptHandles())
 }
 
 // Count is index.ts's count.
@@ -209,7 +241,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutateQueue(ctx, client, url, name, a.readOnly, plan, a.receiptHandles, op)
+	return mutateQueue(ctx, client, url, name, a.getReadOnly(), plan, a.getReceiptHandles(), op)
 }
 
 // Execute is index.ts's execute — caps.SQL is false; never reached.

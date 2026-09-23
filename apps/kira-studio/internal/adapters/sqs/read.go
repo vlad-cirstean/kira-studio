@@ -72,6 +72,20 @@ func encodeHeaders(attrs map[string]types.MessageAttributeValue) (string, error)
 	return string(b), nil
 }
 
+// defaultVisibilityTimeout is F10's own fallback when fetchVisibilityTimeout couldn't read the
+// queue's own attribute (a best-effort call, see its own comment) — AWS's own documented default
+// for a queue whose VisibilityTimeout was never explicitly set.
+const defaultVisibilityTimeout = 30 * time.Second
+
+// receiptHandleEntry is one cached receipt handle plus the bookkeeping F10 needs to tell a still-
+// valid handle from one whose visibility timeout has already passed: receivedAt (when this poll
+// received the message) and visibilityTimeout (the queue's own attribute at receive time).
+type receiptHandleEntry struct {
+	handle            string
+	receivedAt        time.Time
+	visibilityTimeout time.Duration
+}
+
 // receiptHandles is the adapter-local, mutex-guarded FIFO map SqsAdapter threads through from
 // pollQueue (keyed by MessageId) to mutate.go — P58d D9. A receipt handle is an AWS-internal token
 // with no reason to round-trip through the wire protocol, and it is only ever valid for the
@@ -81,39 +95,55 @@ func encodeHeaders(attrs map[string]types.MessageAttributeValue) (string, error)
 // randomised, so a literal port would evict an arbitrary handle rather than the oldest one.
 type receiptHandles struct {
 	mu      sync.Mutex
-	handles map[string]string
+	entries map[string]receiptHandleEntry
 	order   []string
 }
 
 func newReceiptHandles() *receiptHandles {
-	return &receiptHandles{handles: map[string]string{}}
+	return &receiptHandles{entries: map[string]receiptHandleEntry{}}
 }
 
-func (r *receiptHandles) set(messageID, handle string) {
+// set records handle as messageID's own current receipt handle (F10: alongside the moment it was
+// received and the queue's own visibility timeout at that moment), evicting the oldest entry once
+// the cap is exceeded.
+func (r *receiptHandles) set(messageID, handle string, visibilityTimeout time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.handles[messageID]; !exists {
+	if _, exists := r.entries[messageID]; !exists {
 		r.order = append(r.order, messageID)
 	}
-	r.handles[messageID] = handle
+	r.entries[messageID] = receiptHandleEntry{handle: handle, receivedAt: time.Now(), visibilityTimeout: visibilityTimeout}
 	for len(r.order) > receiptHandleCap {
 		oldest := r.order[0]
 		r.order = r.order[1:]
-		delete(r.handles, oldest)
+		delete(r.entries, oldest)
 	}
 }
 
-func (r *receiptHandles) get(messageID string) (string, bool) {
+// forDelete is mutate.go's own lookup (F10): refuses a delete outright, with a clear message,
+// rather than letting AWS silently accept a stale receipt handle and report success while another
+// consumer holds the message — once past the visibility timeout the handle recorded at receive
+// time, AWS can accept a DeleteMessage call using it with no guarantee it still names the same
+// in-flight receipt.
+func (r *receiptHandles) forDelete(messageID string) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	h, ok := r.handles[messageID]
-	return h, ok
+	e, ok := r.entries[messageID]
+	if !ok {
+		return "", adapters.New(adapters.CodeQuery,
+			"this message was not received in the current session (its receipt handle is gone) — poll again before deleting", nil)
+	}
+	if time.Since(e.receivedAt) >= e.visibilityTimeout {
+		return "", adapters.New(adapters.CodeQuery,
+			"this message's receipt handle may have expired (past its visibility timeout) — poll again before deleting", nil)
+	}
+	return e.handle, nil
 }
 
 func (r *receiptHandles) delete(messageID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.handles, messageID)
+	delete(r.entries, messageID)
 	for i, id := range r.order {
 		if id == messageID {
 			r.order = append(r.order[:i], r.order[i+1:]...)
@@ -125,11 +155,11 @@ func (r *receiptHandles) delete(messageID string) {
 func (r *receiptHandles) clear() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.handles = map[string]string{}
+	r.entries = map[string]receiptHandleEntry{}
 	r.order = nil
 }
 
-func pushMessage(builder *page.StreamPageBuilder, m types.Message, handles *receiptHandles) error {
+func pushMessage(builder *page.StreamPageBuilder, m types.Message, handles *receiptHandles, visibilityTimeout time.Duration) error {
 	attrs := m.Attributes
 	var timestamp *string
 	if raw, ok := attrs["SentTimestamp"]; ok {
@@ -155,7 +185,7 @@ func pushMessage(builder *page.StreamPageBuilder, m types.Message, handles *rece
 		Body:      aws.ToString(m.Body),
 	})
 	if handles != nil && m.MessageId != nil && m.ReceiptHandle != nil {
-		handles.set(*m.MessageId, *m.ReceiptHandle)
+		handles.set(*m.MessageId, *m.ReceiptHandle, visibilityTimeout)
 	}
 	return nil
 }
@@ -197,6 +227,13 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 	builder := page.NewStreamPageBuilder(visibilityTimeoutSeconds)
 	collected := 0
 
+	// F10: the duration a cached receipt handle stays trustworthy for — the queue's own attribute
+	// when it was readable, defaultVisibilityTimeout (AWS's own documented default) otherwise.
+	visibilityTimeout := defaultVisibilityTimeout
+	if visibilityTimeoutSeconds != nil {
+		visibilityTimeout = time.Duration(*visibilityTimeoutSeconds) * time.Second
+	}
+
 	op.SetCommand("ReceiveMessage " + queueURL)
 	for collected < req.PageSize {
 		if err := adapters.CheckCancelled(ctx); err != nil {
@@ -217,7 +254,7 @@ func pollQueue(ctx context.Context, client *sqs.Client, queueURL string, req ada
 			return page.StreamPage{}, mapError(err)
 		}
 		for _, m := range result.Messages {
-			if err := pushMessage(builder, m, handles); err != nil {
+			if err := pushMessage(builder, m, handles, visibilityTimeout); err != nil {
 				return page.StreamPage{}, mapError(err)
 			}
 		}

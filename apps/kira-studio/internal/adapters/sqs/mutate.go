@@ -2,6 +2,7 @@ package sqs
 
 import (
 	"context"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -17,7 +18,60 @@ const (
 	bodyField    = "$body"
 	headersField = "$headers"
 	idField      = "messageId" // the row's key column is already the MessageId (read.go's pushMessage)
+	// F9: FIFO-only sentinels — AWS requires MessageGroupId on every SendMessage to a .fifo queue,
+	// and MessageDeduplicationId unless the queue has content-based dedup enabled. Neither has any
+	// non-FIFO meaning, so both stay optional/absent for a standard queue's own insert.
+	messageGroupIDField         = "$messageGroupId"
+	messageDeduplicationIDField = "$messageDeduplicationId"
 )
+
+// isFIFOQueueName reports whether name is a FIFO queue, per AWS's own naming convention: every
+// FIFO queue's name ends in the literal ".fifo" suffix, case-sensitive.
+func isFIFOQueueName(name string) bool {
+	return strings.HasSuffix(name, ".fifo")
+}
+
+// queueContentBasedDedupEnabled reports whether queueURL has ContentBasedDeduplication turned on —
+// the one condition under which a FIFO SendMessage can omit MessageDeduplicationId.
+func queueContentBasedDedupEnabled(ctx context.Context, client *sqs.Client, queueURL string) (bool, error) {
+	result, err := client.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
+		QueueUrl:       aws.String(queueURL),
+		AttributeNames: []types.QueueAttributeName{types.QueueAttributeNameContentBasedDeduplication},
+	})
+	if err != nil {
+		return false, mapError(err)
+	}
+	return result.Attributes["ContentBasedDeduplication"] == "true", nil
+}
+
+// resolveFIFOInsertFields is F9's own fix: SendMessage never set MessageGroupId or
+// MessageDeduplicationId, both required by AWS on a .fifo queue (the former unconditionally, the
+// latter unless content-based dedup is on) — every FIFO insert failed with AWS's own opaque
+// rejection despite caps.CanInsert reporting true for every queue, FIFO included. A non-FIFO queue
+// name is untouched (nil, nil, no extra GetQueueAttributes round trip).
+func resolveFIFOInsertFields(ctx context.Context, client *sqs.Client, queueURL, queueName string, values model.RowValues) (groupID, dedupID *string, err error) {
+	if !isFIFOQueueName(queueName) {
+		return nil, nil, nil
+	}
+	group, ok := values.Get(messageGroupIDField)
+	if !ok || group == nil || strings.TrimSpace(*group) == "" {
+		return nil, nil, adapters.New(adapters.CodeQuery,
+			"a FIFO queue requires "+messageGroupIDField+" on every new message", nil)
+	}
+	dedup, hasDedup := values.Get(messageDeduplicationIDField)
+	if hasDedup && dedup != nil && strings.TrimSpace(*dedup) != "" {
+		return group, dedup, nil
+	}
+	contentBased, err := queueContentBasedDedupEnabled(ctx, client, queueURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !contentBased {
+		return nil, nil, adapters.New(adapters.CodeQuery,
+			"a FIFO queue without content-based deduplication requires "+messageDeduplicationIDField+" on every new message", nil)
+	}
+	return group, nil, nil
+}
 
 func toMessageAttributes(headers map[string]string) map[string]types.MessageAttributeValue {
 	if headers == nil {
@@ -73,10 +127,16 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 			if err != nil {
 				return 0, err
 			}
+			groupID, dedupID, err := resolveFIFOInsertFields(ctx, client, queueURL, queueName, rowOp.Values)
+			if err != nil {
+				return 0, err
+			}
 			_, err = client.SendMessage(ctx, &sqs.SendMessageInput{
-				QueueUrl:          aws.String(queueURL),
-				MessageBody:       body,
-				MessageAttributes: toMessageAttributes(headers),
+				QueueUrl:               aws.String(queueURL),
+				MessageBody:            body,
+				MessageAttributes:      toMessageAttributes(headers),
+				MessageGroupId:         groupID,
+				MessageDeduplicationId: dedupID,
 			})
 			if err != nil {
 				return 0, mapError(err)
@@ -88,12 +148,16 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 			if !ok || messageID == nil {
 				return 0, adapters.New(adapters.CodeQuery, "a delete requires the message's "+idField, nil)
 			}
-			handle, ok := handles.get(*messageID)
-			if !ok {
-				return 0, adapters.New(adapters.CodeQuery,
-					"this message was not received in the current session (its receipt handle is gone) — poll again before deleting", nil)
+			if handles == nil {
+				return 0, adapters.New(adapters.CodeConnect, "not connected", nil)
 			}
-			_, err := client.DeleteMessage(ctx, &sqs.DeleteMessageInput{QueueUrl: aws.String(queueURL), ReceiptHandle: aws.String(handle)})
+			// F10: forDelete refuses a stale receipt handle outright (past its own visibility
+			// timeout) rather than letting AWS silently accept it and report a false success.
+			handle, err := handles.forDelete(*messageID)
+			if err != nil {
+				return 0, err
+			}
+			_, err = client.DeleteMessage(ctx, &sqs.DeleteMessageInput{QueueUrl: aws.String(queueURL), ReceiptHandle: aws.String(handle)})
 			if err != nil {
 				return 0, mapError(err)
 			}
