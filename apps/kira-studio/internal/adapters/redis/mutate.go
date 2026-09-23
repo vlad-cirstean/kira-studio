@@ -14,10 +14,7 @@ import (
 // $document precedent. keySentinel names the target redis key: plan.path only ever resolves to a
 // database, never a specific key, so every op carries its own key name — including insert, which
 // by definition has no existing key a path could point at yet.
-const (
-	keySentinel   = "_key"
-	valueSentinel = "$value"
-)
+const keySentinel = "_key"
 
 func resolveDatabaseSegment(path model.NodePath) (string, error) {
 	if len(path.Segments) == 0 || path.Segments[0].Kind != "database" {
@@ -34,14 +31,6 @@ func keyNameFrom(values model.RowValues, label string) (string, error) {
 	return *raw, nil
 }
 
-func valueFrom(values model.RowValues, label string) (string, error) {
-	raw, ok := values.Get(valueSentinel)
-	if !ok || raw == nil {
-		return "", adapters.New(adapters.CodeUnsupported, "a redis "+label+" mutation requires a "+valueSentinel, nil)
-	}
-	return *raw, nil
-}
-
 func renderOpText(op model.MutationRowOp) (string, error) {
 	switch op.Kind {
 	case "update":
@@ -49,7 +38,7 @@ func renderOpText(op model.MutationRowOp) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		value, err := valueFrom(op.Changes, "update")
+		value, err := adapters.ValueFrom(op.Changes, "update")
 		if err != nil {
 			return "", err
 		}
@@ -68,7 +57,7 @@ func renderOpText(op model.MutationRowOp) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		value, err := valueFrom(op.Values, "insert")
+		value, err := adapters.ValueFrom(op.Values, "insert")
 		if err != nil {
 			return "", err
 		}
@@ -112,7 +101,7 @@ func applyUpdate(ctx context.Context, conn *goredis.Client, rowOp model.Mutation
 	if err != nil {
 		return 0, err
 	}
-	value, err := valueFrom(rowOp.Changes, "update")
+	value, err := adapters.ValueFrom(rowOp.Changes, "update")
 	if err != nil {
 		return 0, err
 	}
@@ -149,7 +138,7 @@ func applyInsert(ctx context.Context, conn *goredis.Client, rowOp model.Mutation
 	if err != nil {
 		return 0, err
 	}
-	value, err := valueFrom(rowOp.Values, "insert")
+	value, err := adapters.ValueFrom(rowOp.Values, "insert")
 	if err != nil {
 		return 0, err
 	}
@@ -186,26 +175,14 @@ func mutateDB(ctx context.Context, conn *goredis.Client, op *adapters.OpCtx, rea
 	}
 	op.SetCommand(commandText)
 
-	affectedRows := 0
-	for _, rowOp := range plan.Ops {
-		if err := adapters.CheckCancelled(ctx); err != nil {
-			return model.MutationResult{}, err
-		}
-		var affected int
-		var err error
+	return adapters.RunRowOps(ctx, plan, readOnly, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
 		switch rowOp.Kind {
 		case "update":
-			affected, err = applyUpdate(ctx, conn, rowOp)
+			return applyUpdate(ctx, conn, rowOp)
 		case "delete":
-			affected, err = applyDelete(ctx, conn, rowOp)
+			return applyDelete(ctx, conn, rowOp)
 		default: // insert
-			affected, err = applyInsert(ctx, conn, rowOp)
+			return applyInsert(ctx, conn, rowOp)
 		}
-		if err != nil {
-			return model.MutationResult{}, err
-		}
-		affectedRows += affected
-	}
-
-	return model.MutationResult{AffectedRows: affectedRows}, nil
+	})
 }

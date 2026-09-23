@@ -2,7 +2,6 @@ package sqs
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -19,29 +18,6 @@ const (
 	headersField = "$headers"
 	idField      = "messageId" // the row's key column is already the MessageId (read.go's pushMessage)
 )
-
-func parseHeaders(raw *string) (map[string]string, error) {
-	if raw == nil || *raw == "" {
-		return nil, nil
-	}
-	var parsed any
-	if err := json.Unmarshal([]byte(*raw), &parsed); err != nil {
-		return nil, adapters.New(adapters.CodeQuery, "malformed $headers JSON", err)
-	}
-	obj, ok := parsed.(map[string]any)
-	if !ok {
-		return nil, adapters.New(adapters.CodeQuery, "$headers must be a JSON object of string values", nil)
-	}
-	out := make(map[string]string, len(obj))
-	for k, v := range obj {
-		s, ok := v.(string)
-		if !ok {
-			return nil, adapters.New(adapters.CodeQuery, "$headers."+k+" must be a string", nil)
-		}
-		out[k] = s
-	}
-	return out, nil
-}
 
 func toMessageAttributes(headers map[string]string) map[string]types.MessageAttributeValue {
 	if headers == nil {
@@ -68,15 +44,7 @@ func renderOpText(op model.MutationRowOp, queueName string) (string, error) {
 // preview is mutate.ts's preview — synchronous (Adapter rule 3): no network, no queue-URL
 // resolution.
 func preview(plan model.MutationPlan, queueName string) ([]string, error) {
-	out := make([]string, len(plan.Ops))
-	for i, op := range plan.Ops {
-		text, err := renderOpText(op, queueName)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = text
-	}
-	return out, nil
+	return adapters.PreviewProduce(plan, queueName, renderOpText)
 }
 
 // mutateQueue is mutate.ts's mutateQueue. handles is the adapter-local, mutex-guarded receipt-
@@ -101,18 +69,17 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 	}
 	op.SetCommand(commandText)
 
-	affectedRows := 0
-	for _, rowOp := range plan.Ops {
+	return adapters.RunRowOps(ctx, plan, readOnly, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
 		switch rowOp.Kind {
 		case "insert":
 			body, ok := rowOp.Values.Get(bodyField)
 			if !ok || body == nil {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery, "a new message requires a "+bodyField, nil)
+				return 0, adapters.New(adapters.CodeQuery, "a new message requires a "+bodyField, nil)
 			}
 			headersRaw, _ := rowOp.Values.Get(headersField)
-			headers, err := parseHeaders(headersRaw)
+			headers, err := adapters.ParseHeaderJSON(headersRaw)
 			if err != nil {
-				return model.MutationResult{}, err
+				return 0, err
 			}
 			_, err = client.SendMessage(ctx, &sqs.SendMessageInput{
 				QueueUrl:          aws.String(queueURL),
@@ -120,31 +87,29 @@ func mutateQueue(ctx context.Context, client *sqs.Client, queueURL, queueName st
 				MessageAttributes: toMessageAttributes(headers),
 			})
 			if err != nil {
-				return model.MutationResult{}, mapError(err)
+				return 0, mapError(err)
 			}
-			affectedRows++
+			return 1, nil
 
 		case "delete":
 			messageID, ok := rowOp.Key.Get(idField)
 			if !ok || messageID == nil {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery, "a delete requires the message's "+idField, nil)
+				return 0, adapters.New(adapters.CodeQuery, "a delete requires the message's "+idField, nil)
 			}
 			handle, ok := handles.get(*messageID)
 			if !ok {
-				return model.MutationResult{}, adapters.New(adapters.CodeQuery,
+				return 0, adapters.New(adapters.CodeQuery,
 					"this message was not received in the current session (its receipt handle is gone) — poll again before deleting", nil)
 			}
 			_, err := client.DeleteMessage(ctx, &sqs.DeleteMessageInput{QueueUrl: aws.String(queueURL), ReceiptHandle: aws.String(handle)})
 			if err != nil {
-				return model.MutationResult{}, mapError(err)
+				return 0, mapError(err)
 			}
 			handles.delete(*messageID)
-			affectedRows++
+			return 1, nil
 
 		default:
-			return model.MutationResult{}, adapters.New(adapters.CodeUnsupported, "sqs has no update operation — delete and resend instead", nil)
+			return 0, adapters.New(adapters.CodeUnsupported, "sqs has no update operation — delete and resend instead", nil)
 		}
-	}
-
-	return model.MutationResult{AffectedRows: affectedRows}, nil
+	})
 }

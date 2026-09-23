@@ -19,7 +19,6 @@ import (
 // redis/mutate.go established.
 const (
 	objectKeySentinel         = "_key"
-	objectValueSentinel       = "$value"
 	objectFileSentinel        = "$file"
 	objectContentTypeSentinel = "$contentType"
 )
@@ -35,14 +34,6 @@ func keyFrom(values model.RowValues, label string) (string, error) {
 	raw, ok := values.Get(objectKeySentinel)
 	if !ok || raw == nil || *raw == "" {
 		return "", adapters.New(adapters.CodeQuery, fmt.Sprintf("an s3 %s mutation requires a non-empty %s", label, objectKeySentinel), nil)
-	}
-	return *raw, nil
-}
-
-func valueFrom(values model.RowValues, label string) (string, error) {
-	raw, ok := values.Get(objectValueSentinel)
-	if !ok || raw == nil {
-		return "", adapters.New(adapters.CodeUnsupported, fmt.Sprintf("an s3 %s mutation requires a %s", label, objectValueSentinel), nil)
 	}
 	return *raw, nil
 }
@@ -87,7 +78,7 @@ func renderOpText(bucket string, op model.MutationRowOp) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		value, err := valueFrom(op.Changes, "update")
+		value, err := adapters.ValueFrom(op.Changes, "update")
 		if err != nil {
 			return "", err
 		}
@@ -139,31 +130,31 @@ func applyPreservedAttributes(in *s3.PutObjectInput, head *s3.HeadObjectOutput) 
 	}
 }
 
-func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) error {
+func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) (int, error) {
 	key, err := keyFrom(op.Key, "update")
 	if err != nil {
-		return err
+		return 0, err
 	}
-	value, err := valueFrom(op.Changes, "update")
+	value, err := adapters.ValueFrom(op.Changes, "update")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	head, err := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
 	if err != nil {
-		return mapError(err)
+		return 0, mapError(err)
 	}
 	in := &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), Body: strings.NewReader(value)}
 	applyPreservedAttributes(in, head)
 	if _, err := client.PutObject(ctx, in); err != nil {
-		return mapError(err)
+		return 0, mapError(err)
 	}
-	return nil
+	return 1, nil
 }
 
-func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) error {
+func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) (int, error) {
 	key, err := keyFrom(op.Values, "insert")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	// NX-equivalent: HeadObject first (P58d D14) — PutObject has no conditional-create option, so
 	// this is the only way to refuse a collision rather than silently overwriting. Matches on
@@ -171,20 +162,20 @@ func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model
 	// (a tightening from the TypeScript's "any query-level error" fallthrough).
 	_, err = client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
 	if err == nil {
-		return adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
+		return 0, adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
 	}
 	var notFound *types.NotFound
 	if !errors.As(err, &notFound) {
-		return mapError(err)
+		return 0, mapError(err)
 	}
 
 	sourcePath, err := fileFrom(op.Values)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	body, size, err := openUploadBody(sourcePath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer body.Close()
 
@@ -193,23 +184,23 @@ func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model
 		ContentLength: aws.Int64(size), ContentType: contentTypeFrom(op.Values),
 	}
 	if _, err := client.PutObject(ctx, in); err != nil {
-		return mapError(err)
+		return 0, mapError(err)
 	}
-	return nil
+	return 1, nil
 }
 
-func applyDelete(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) error {
+func applyDelete(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) (int, error) {
 	key, err := keyFrom(op.Key, "delete")
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if _, err := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}); err != nil {
-		return mapError(err)
+		return 0, mapError(err)
 	}
 	if _, err := client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)}); err != nil {
-		return mapError(err)
+		return 0, mapError(err)
 	}
-	return nil
+	return 1, nil
 }
 
 // mutate is mutate.ts's mutate.
@@ -234,25 +225,14 @@ func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly
 	}
 	op.SetCommand(commandText)
 
-	affectedRows := 0
-	for _, rowOp := range plan.Ops {
-		if err := adapters.CheckCancelled(ctx); err != nil {
-			return model.MutationResult{}, err
-		}
-		var opErr error
+	return adapters.RunRowOps(ctx, plan, readOnly, func(ctx context.Context, _ int, rowOp model.MutationRowOp) (int, error) {
 		switch rowOp.Kind {
 		case "update":
-			opErr = applyUpdate(ctx, client, bucket, rowOp)
+			return applyUpdate(ctx, client, bucket, rowOp)
 		case "delete":
-			opErr = applyDelete(ctx, client, bucket, rowOp)
+			return applyDelete(ctx, client, bucket, rowOp)
 		default:
-			opErr = applyInsert(ctx, client, bucket, rowOp)
+			return applyInsert(ctx, client, bucket, rowOp)
 		}
-		if opErr != nil {
-			return model.MutationResult{}, opErr
-		}
-		affectedRows++
-	}
-
-	return model.MutationResult{AffectedRows: affectedRows}, nil
+	})
 }
