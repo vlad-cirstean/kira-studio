@@ -32,6 +32,24 @@ func ValidateWindowBounds(key string, order int) error {
 	return nil
 }
 
+// WindowRecord is one row of the `windows` table's identity/geometry columns, minus `mode` —
+// Kira Space's own storage/model.WindowRecord is a plain alias of this (P107 I2-3: the two were
+// already field-for-field identical); Kira Studio's own storage/model.WindowRecord stays its own
+// type, since Studio alone carries an extra Mode field (0014_p22_window_mode.sql; Space's schema
+// has no `mode` column at all — the doc's "the mode column both apps carry" turned out not to
+// hold, so List/Delete below move, but the mode-aware read/write stays in Studio's own repo) —
+// internal/shell's own WindowRecord (no per-app fields at all) also aliases this.
+type WindowRecord struct {
+	Key    string        `json:"key"`
+	Order  int           `json:"order"`
+	Bounds *WindowBounds `json:"bounds"`
+}
+
+// Validate is the same non-empty-identity envelope every app's own WindowRecord.Validate enforces.
+func (w WindowRecord) Validate() error {
+	return ValidateWindowBounds(w.Key, w.Order)
+}
+
 // WindowRepo reads and writes the `windows` table's identity/geometry columns. Each app's own
 // WindowsRepo embeds one of these (constructed against its own DB) for Exists/Create/
 // EnsureExists/SetBounds, and keeps its own List/Delete (and Studio's own GetMode/SetMode) on top
@@ -55,14 +73,16 @@ func (r *WindowRepo) Exists(key string) (bool, error) {
 }
 
 // Create inserts a new window record. The caller mints key (D2: a UUID the shell owns); bounds may
-// be nil (a freshly minted window with no stored rectangle yet).
-func (r *WindowRepo) Create(key string, order int, bounds *WindowBounds) error {
-	if err := ValidateWindowBounds(key, order); err != nil {
+// be nil (a freshly minted window with no stored rectangle yet). Never writes `mode` — Studio's
+// own mode column always falls back to the migration's own DEFAULT 'studio' on insert, set only
+// afterward via Studio's own SetMode, so dropping it here changes nothing observable.
+func (r *WindowRepo) Create(rec WindowRecord) error {
+	if err := rec.Validate(); err != nil {
 		return fmt.Errorf("appstorage/windows: %w", err)
 	}
 	var boundsJSON any
-	if bounds != nil {
-		encoded, err := json.Marshal(bounds)
+	if rec.Bounds != nil {
+		encoded, err := json.Marshal(rec.Bounds)
 		if err != nil {
 			return fmt.Errorf("appstorage/windows: encode bounds: %w", err)
 		}
@@ -70,9 +90,54 @@ func (r *WindowRepo) Create(key string, order int, bounds *WindowBounds) error {
 	}
 	if _, err := r.DB.Exec(
 		`INSERT INTO windows (key, "order", bounds_json) VALUES (?, ?, ?)`,
-		key, order, boundsJSON,
+		rec.Key, rec.Order, boundsJSON,
 	); err != nil {
-		return fmt.Errorf("appstorage/windows: insert %s: %w", key, err)
+		return fmt.Errorf("appstorage/windows: insert %s: %w", rec.Key, err)
+	}
+	return nil
+}
+
+// List returns every window record in `order`, minus `mode` (WindowRecord's own doc comment) —
+// Kira Space's own WindowsRepo.List delegates here outright; Kira Studio's own List stays a
+// dedicated query so it can read its own extra `mode` column in the same round trip.
+func (r *WindowRepo) List() ([]WindowRecord, error) {
+	rows, err := r.DB.Query(`SELECT key, "order", bounds_json FROM windows ORDER BY "order" ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("appstorage/windows: query: %w", err)
+	}
+	defer rows.Close()
+
+	out := []WindowRecord{}
+	for rows.Next() {
+		var (
+			key        string
+			order      int
+			boundsJSON sql.NullString
+		)
+		if err := rows.Scan(&key, &order, &boundsJSON); err != nil {
+			return nil, fmt.Errorf("appstorage/windows: scan: %w", err)
+		}
+		rec := WindowRecord{Key: key, Order: order}
+		if boundsJSON.Valid && boundsJSON.String != "" {
+			var b WindowBounds
+			if err := json.Unmarshal([]byte(boundsJSON.String), &b); err == nil {
+				rec.Bounds = &b
+			}
+		}
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("appstorage/windows: rows: %w", err)
+	}
+	return out, nil
+}
+
+// Delete removes one window's row — both apps' own WindowsRepo.Delete ran this identical
+// statement (Studio's own row also cascades its tabs via `tabs.window_key ... ON DELETE CASCADE`,
+// a DB-level constraint this call triggers the same way regardless of which Go code issues it).
+func (r *WindowRepo) Delete(key string) error {
+	if _, err := r.DB.Exec(`DELETE FROM windows WHERE key = ?`, key); err != nil {
+		return fmt.Errorf("appstorage/windows: delete %s: %w", key, err)
 	}
 	return nil
 }

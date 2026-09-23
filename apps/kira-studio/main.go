@@ -575,13 +575,16 @@ func wireWindowsAndMenu(d postAppDeps) {
 	}
 }
 
-// windowStore adapts *repos.WindowsRepo to shell.WindowRepo (P103 Part 3 §6.3 / P107 T2-15) — a
-// plain struct conversion at each call site (model.WindowBounds and shell.WindowBounds are
-// field-for-field identical), not a behaviour change.
+// windowStore adapts *repos.WindowsRepo to shell.WindowRepo (P103 Part 3 §6.3 / P107 I2-3). Kira
+// Studio's own model.WindowRecord alone still carries Mode (P22 D12), so it stays its own type
+// rather than a plain alias of shell.WindowRecord/appstorage.WindowRecord — this adapter is what
+// that costs. Kira Space's identical-minus-Mode WindowRecord is a true alias now (P107 I2-3), so
+// its own main.go passes *repos.WindowsRepo straight through, no adapter needed. WindowBounds is a
+// plain alias on both sides already, so no per-field conversion remains here either.
 type windowStore struct{ repo *repos.WindowsRepo }
 
 func (w windowStore) SetBounds(key string, b shell.WindowBounds) error {
-	return w.repo.SetBounds(key, model.WindowBounds(b))
+	return w.repo.SetBounds(key, b)
 }
 
 func (w windowStore) List() ([]shell.WindowRecord, error) {
@@ -591,23 +594,13 @@ func (w windowStore) List() ([]shell.WindowRecord, error) {
 	}
 	out := make([]shell.WindowRecord, len(records))
 	for i, r := range records {
-		var bounds *shell.WindowBounds
-		if r.Bounds != nil {
-			b := shell.WindowBounds(*r.Bounds)
-			bounds = &b
-		}
-		out[i] = shell.ToWindowRecord(r.Key, r.Order, bounds)
+		out[i] = shell.ToWindowRecord(r.Key, r.Order, r.Bounds)
 	}
 	return out, nil
 }
 
 func (w windowStore) Create(rec shell.WindowRecord) error {
-	var bounds *model.WindowBounds
-	if rec.Bounds != nil {
-		b := model.WindowBounds(*rec.Bounds)
-		bounds = &b
-	}
-	return w.repo.Create(model.WindowRecord{Key: rec.Key, Order: rec.Order, Bounds: bounds})
+	return w.repo.Create(model.WindowRecord{Key: rec.Key, Order: rec.Order, Bounds: rec.Bounds})
 }
 
 func (w windowStore) Delete(key string) error {

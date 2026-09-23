@@ -206,9 +206,9 @@ func main() {
 
 	winDeps := shell.WindowOpenerDeps{
 		App:        app,
-		WindowDeps: shell.WindowDeps{Windows: windowStore{repositories.Windows}, StartedAt: startedAt},
+		WindowDeps: shell.WindowDeps{Windows: repositories.Windows, StartedAt: startedAt},
 		Windows:    windows, CloseFlush: closeFlush, Quitter: quitter,
-		Terminal: terminalSvc.Registry, Repo: windowStore{repositories.Windows},
+		Terminal: terminalSvc.Registry, Repo: repositories.Windows,
 		Cfg: shell.Config{AppName: "Kira Space", WindowTitle: "Kira Space"},
 	}
 	openNew := func() { shell.OpenNewWindow(winDeps) }
@@ -305,43 +305,4 @@ func wireGit(repositories *repos.Repos) gitWired {
 		runner: gitRunner, discovery: gitDiscovery, registry: gitRegistry,
 		askpassBroker: askpassBroker, router: gitRouter, sock: gitSock,
 	}
-}
-
-// windowStore adapts *repos.WindowsRepo to shell.WindowRepo (P103 Part 3 §6.3 / P107 T2-15) — a
-// plain struct conversion at each call site (model.WindowBounds and shell.WindowBounds are
-// field-for-field identical), not a behaviour change.
-type windowStore struct{ repo *repos.WindowsRepo }
-
-func (w windowStore) SetBounds(key string, b shell.WindowBounds) error {
-	return w.repo.SetBounds(key, model.WindowBounds(b))
-}
-
-func (w windowStore) List() ([]shell.WindowRecord, error) {
-	records, err := w.repo.List()
-	if err != nil {
-		return nil, err
-	}
-	out := make([]shell.WindowRecord, len(records))
-	for i, r := range records {
-		var bounds *shell.WindowBounds
-		if r.Bounds != nil {
-			b := shell.WindowBounds(*r.Bounds)
-			bounds = &b
-		}
-		out[i] = shell.ToWindowRecord(r.Key, r.Order, bounds)
-	}
-	return out, nil
-}
-
-func (w windowStore) Create(rec shell.WindowRecord) error {
-	var bounds *model.WindowBounds
-	if rec.Bounds != nil {
-		b := model.WindowBounds(*rec.Bounds)
-		bounds = &b
-	}
-	return w.repo.Create(model.WindowRecord{Key: rec.Key, Order: rec.Order, Bounds: bounds})
-}
-
-func (w windowStore) Delete(key string) error {
-	return w.repo.Delete(key)
 }

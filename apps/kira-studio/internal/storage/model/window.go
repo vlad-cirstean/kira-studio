@@ -4,13 +4,10 @@ import (
 	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
 
-// WindowBounds is a plain screen rectangle, shared by every window's stored geometry.
-type WindowBounds struct {
-	X      float64 `json:"x"`
-	Y      float64 `json:"y"`
-	Width  float64 `json:"width"`
-	Height float64 `json:"height"`
-}
+// WindowBounds is a plain screen rectangle, shared by every window's stored geometry — a plain
+// alias of appstorage.WindowBounds (P107 I2-3: the two were already field-for-field identical,
+// JSON tags included).
+type WindowBounds = appstorage.WindowBounds
 
 // WindowRecord is one row of the `windows` table (P8 D2/D4) — a durable, shell-minted identity
 // for one workbench. Bounds is nil until the window has been moved or resized at least once

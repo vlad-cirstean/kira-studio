@@ -19,8 +19,9 @@ type WindowsRepo struct {
 }
 
 // shared is this repo's own row against repo-root internal/appstorage.WindowRepo, which owns
-// Exists/Create/EnsureExists/SetBounds (P107 T2-10) — everything below that doesn't touch the
-// `mode` column stays a thin delegate to it.
+// Exists/Create/EnsureExists/SetBounds/Delete (P107 T2-10, I2-3) — everything below that doesn't
+// touch the `mode` column stays a thin delegate to it. List stays its own dedicated query (below)
+// since it alone needs the extra `mode` column in the same round trip.
 func (r *WindowsRepo) shared() *appstorage.WindowRepo { return &appstorage.WindowRepo{DB: r.DB} }
 
 // List returns every window record in `order`. Not a hot boot path (read once at startup, per
@@ -60,12 +61,9 @@ func (r *WindowsRepo) Create(rec model.WindowRecord) error {
 	if err := rec.Validate(); err != nil {
 		return fmt.Errorf("repos/windows: %w", err)
 	}
-	var bounds *appstorage.WindowBounds
-	if rec.Bounds != nil {
-		b := appstorage.WindowBounds(*rec.Bounds)
-		bounds = &b
-	}
-	return r.shared().Create(rec.Key, rec.Order, bounds)
+	// model.WindowBounds is appstorage.WindowBounds (a plain alias, I2-3), so rec.Bounds needs no
+	// conversion here.
+	return r.shared().Create(appstorage.WindowRecord{Key: rec.Key, Order: rec.Order, Bounds: rec.Bounds})
 }
 
 // EnsureExists creates a `windows` row for key if one doesn't already exist, ordered after every
@@ -120,15 +118,12 @@ func (r *WindowsRepo) SetMode(key string, mode string) error {
 // SetBounds persists one window's rectangle — the per-window analogue of the single
 // `window.bounds` leaf LayoutRepo used to own for every window there had ever been (F5).
 func (r *WindowsRepo) SetBounds(key string, b model.WindowBounds) error {
-	return r.shared().SetBounds(key, appstorage.WindowBounds(b))
+	return r.shared().SetBounds(key, b)
 }
 
 // Delete removes one window's row, cascading its tabs (`tabs.window_key ... ON DELETE CASCADE`,
 // foreign_keys is on — storage/db.go). D5: the caller decides whether deleting is the right move
 // (only when another window remains) — this method just does it.
 func (r *WindowsRepo) Delete(key string) error {
-	if _, err := r.DB.Exec(`DELETE FROM windows WHERE key = ?`, key); err != nil {
-		return fmt.Errorf("repos/windows: delete %s: %w", key, err)
-	}
-	return nil
+	return r.shared().Delete(key)
 }
