@@ -240,4 +240,40 @@ func TestLog_HandAuthoredEdgeCases(t *testing.T) {
 			t.Fatalf("decoration = %+v, want %+v", got, want)
 		}
 	})
+
+	// F1: a real `--depth 1` clone's boundary commit carries a bare "grafted" %D token ahead of
+	// the real ref tokens — it must be ignored, not fail ParseLogRecord for the whole walk.
+	t.Run("shallowGrafted", func(t *testing.T) {
+		recs := parseFixture(t, "log/shallowGrafted.bin")
+		if len(recs) != 1 {
+			t.Fatalf("got %d records, want 1 (a --depth 1 clone's own boundary commit)", len(recs))
+		}
+		got := recs[0].Decoration
+		want := []porcelain.DecorationRef{
+			{Kind: porcelain.DecorationBranch, Name: "main", IsHead: true},
+			{Kind: porcelain.DecorationRemoteBranch, Name: "origin/main"},
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("decoration = %+v, want %+v (the bare \"grafted\" token must be dropped, not fail the parse)", got, want)
+		}
+	})
+}
+
+// TestParseDecoration_UnrecognisedBareTokenIgnored is F1's own unit-level pin: a bare token
+// matching none of HEAD/"HEAD -> "/"tag: "/"refs/" (git's own "grafted"/"replaced" annotations,
+// or any future one) is dropped rather than failing the whole record's parse.
+func TestParseDecoration_UnrecognisedBareTokenIgnored(t *testing.T) {
+	t.Parallel()
+	record := joinFields(
+		"deadbeef", "", "Name", "e@x", "1", "Name", "e@x", "1",
+		"grafted, HEAD -> refs/heads/main, replaced", "subject",
+	)
+	got, err := porcelain.ParseLogRecord(record)
+	if err != nil {
+		t.Fatalf("ParseLogRecord: %v", err)
+	}
+	want := []porcelain.DecorationRef{{Kind: porcelain.DecorationBranch, Name: "main", IsHead: true}}
+	if !reflect.DeepEqual(got.Decoration, want) {
+		t.Fatalf("decoration = %+v, want %+v", got.Decoration, want)
+	}
 }

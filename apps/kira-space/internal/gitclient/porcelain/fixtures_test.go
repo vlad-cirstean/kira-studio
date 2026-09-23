@@ -449,6 +449,23 @@ func TestFixtures_Regenerate(t *testing.T) {
 		writeFixture(t, "handAuthored/fullDecoration.bin", captureLog(t, b.dir, allScope))
 	}
 
+	// --- log/shallowGrafted.bin: a real `git clone --depth 1`'s own boundary commit — %D emits
+	// a bare "grafted" token ahead of the real ref tokens (F1: an unrecognised bare decoration
+	// token must not fail the whole record's parse). Verified against real git 2.43.0 output. ---
+	{
+		b := newRepoBuilder(t)
+		b.commit("a.txt", "a\n", "first commit")
+		b.commit("b.txt", "b\n", "second commit")
+		b.commit("c.txt", "c\n", "third commit")
+		cloneDir := filepath.Join(t.TempDir(), "shallow")
+		cloneCmd := exec.Command("git", "clone", "--depth", "1", "-q", "file://"+b.dir, cloneDir)
+		cloneCmd.Env = fixtureEnv()
+		if out, err := cloneCmd.CombinedOutput(); err != nil {
+			t.Fatalf("git clone --depth 1: %v\n%s", err, out)
+		}
+		writeFixture(t, "log/shallowGrafted.bin", captureLog(t, cloneDir, allScope))
+	}
+
 	// --- diffTree/renameWithEdit: a rename with a one-line edit (probe P1's own framing). ---
 	{
 		b := newRepoBuilder(t)

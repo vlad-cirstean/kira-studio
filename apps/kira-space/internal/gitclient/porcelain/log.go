@@ -218,9 +218,12 @@ func parseDecoration(raw string) ([]DecorationRef, error) {
 	tokens := strings.Split(raw, ", ")
 	refs := make([]DecorationRef, 0, len(tokens))
 	for _, token := range tokens {
-		ref, err := parseDecorationToken(token)
+		ref, keep, err := parseDecorationToken(token)
 		if err != nil {
 			return nil, err
+		}
+		if !keep {
+			continue
 		}
 		refs = append(refs, ref)
 	}
@@ -233,33 +236,36 @@ func parseDecoration(raw string) ([]DecorationRef, error) {
 // cosmetic). An unrecognised "refs/" namespace (replace, notes, a future git feature) is kept
 // rather than dropped: classified as a branch-shaped decoration carrying its full ref path, so a
 // caller sees every ref pointing at a commit even when this classifier does not have a dedicated
-// bucket for it.
-func parseDecorationToken(token string) (DecorationRef, error) {
+// bucket for it. A bare token that matches none of HEAD/"HEAD -> "/"tag: "/"refs/" (F1: `grafted`
+// in a `--depth`-shallow clone's boundary commit, `replaced` for a replace ref) is a real git
+// annotation, not a ref — ignored rather than treated as a parse failure, since erroring here
+// would fail the whole walk over one benign, non-ref decoration word.
+func parseDecorationToken(token string) (ref DecorationRef, keep bool, err error) {
 	switch {
 	case token == "HEAD":
-		return DecorationRef{Kind: DecorationHead}, nil
+		return DecorationRef{Kind: DecorationHead}, true, nil
 	case strings.HasPrefix(token, "HEAD -> "):
 		name := strings.TrimPrefix(token, "HEAD -> ")
 		name = strings.TrimPrefix(name, "refs/heads/")
-		return DecorationRef{Kind: DecorationBranch, Name: name, IsHead: true}, nil
+		return DecorationRef{Kind: DecorationBranch, Name: name, IsHead: true}, true, nil
 	case strings.HasPrefix(token, "tag: "):
 		name := strings.TrimPrefix(token, "tag: ")
 		name = strings.TrimPrefix(name, "refs/tags/")
-		return DecorationRef{Kind: DecorationTag, Name: name}, nil
+		return DecorationRef{Kind: DecorationTag, Name: name}, true, nil
 	case token == "refs/stash":
 		// Only refs/stash itself is ever a commit decoration (it always names stash@{0}, the top
 		// of the stack — deeper entries have no ref pointing at them directly), so Index is always
 		// 0 here; the stash *list*'s own indices are G8's.
-		return DecorationRef{Kind: DecorationStash, Index: 0}, nil
+		return DecorationRef{Kind: DecorationStash, Index: 0}, true, nil
 	case strings.HasPrefix(token, "refs/heads/"):
-		return DecorationRef{Kind: DecorationBranch, Name: strings.TrimPrefix(token, "refs/heads/")}, nil
+		return DecorationRef{Kind: DecorationBranch, Name: strings.TrimPrefix(token, "refs/heads/")}, true, nil
 	case strings.HasPrefix(token, "refs/remotes/"):
-		return DecorationRef{Kind: DecorationRemoteBranch, Name: strings.TrimPrefix(token, "refs/remotes/")}, nil
+		return DecorationRef{Kind: DecorationRemoteBranch, Name: strings.TrimPrefix(token, "refs/remotes/")}, true, nil
 	case strings.HasPrefix(token, "refs/tags/"):
-		return DecorationRef{Kind: DecorationTag, Name: strings.TrimPrefix(token, "refs/tags/")}, nil
+		return DecorationRef{Kind: DecorationTag, Name: strings.TrimPrefix(token, "refs/tags/")}, true, nil
 	case strings.HasPrefix(token, "refs/"):
-		return DecorationRef{Kind: DecorationBranch, Name: token}, nil
+		return DecorationRef{Kind: DecorationBranch, Name: token}, true, nil
 	default:
-		return DecorationRef{}, fmt.Errorf("porcelain: unrecognised decoration token %q", token)
+		return DecorationRef{}, false, nil
 	}
 }
