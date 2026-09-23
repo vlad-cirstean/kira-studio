@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	smithy "github.com/aws/smithy-go"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -106,6 +107,12 @@ func renderOpText(bucket string, op model.MutationRowOp) (string, error) {
 // HeadObject returns and PutObject accepts. PutObject replaces an object wholesale, so anything
 // not resent here is gone — silently turning application/json into binary/octet-stream, or
 // dropping Content-Encoding: gzip, would change how the object is served to everything downstream.
+//
+// F5: also carries SSE (ServerSideEncryption/SSEKMSKeyId/BucketKeyEnabled — a real security
+// downgrade left out: an SSE-KMS-encrypted object silently re-encrypted under the bucket default
+// after any edit, no longer needing kms:Decrypt to read), Expires, WebsiteRedirectLocation, and the
+// three object-lock fields, all confirmed present on both HeadObjectOutput and PutObjectInput.
+// Tags are handled separately — see applyUpdate's own TagCount check — rather than here.
 func applyPreservedAttributes(in *s3.PutObjectInput, head *s3.HeadObjectOutput) {
 	if head.ContentType != nil {
 		in.ContentType = head.ContentType
@@ -128,9 +135,51 @@ func applyPreservedAttributes(in *s3.PutObjectInput, head *s3.HeadObjectOutput) 
 	if head.Metadata != nil {
 		in.Metadata = head.Metadata
 	}
+	if head.Expires != nil {
+		in.Expires = head.Expires
+	}
+	if head.WebsiteRedirectLocation != nil {
+		in.WebsiteRedirectLocation = head.WebsiteRedirectLocation
+	}
+	if head.ServerSideEncryption != "" {
+		in.ServerSideEncryption = head.ServerSideEncryption
+	}
+	if head.SSEKMSKeyId != nil {
+		in.SSEKMSKeyId = head.SSEKMSKeyId
+	}
+	if head.BucketKeyEnabled != nil {
+		in.BucketKeyEnabled = head.BucketKeyEnabled
+	}
+	if head.ObjectLockMode != "" {
+		in.ObjectLockMode = head.ObjectLockMode
+	}
+	if head.ObjectLockRetainUntilDate != nil {
+		in.ObjectLockRetainUntilDate = head.ObjectLockRetainUntilDate
+	}
+	if head.ObjectLockLegalHoldStatus != "" {
+		in.ObjectLockLegalHoldStatus = head.ObjectLockLegalHoldStatus
+	}
 }
 
-func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) (int, error) {
+// isConditionalPutUnsupported reports whether err is an S3-compatible endpoint's own signal that it
+// doesn't honour IfMatch/IfNoneMatch on PutObject (F5) — real for some older S3-compatible object
+// stores (pre-conditional-write MinIO/Ceph releases), which reject the header outright with
+// NotImplemented rather than evaluating it.
+func isConditionalPutUnsupported(err error) bool {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.ErrorCode() == "NotImplemented"
+}
+
+// isPreconditionFailed reports whether err is S3's own 412 for a failed IfMatch/IfNoneMatch check.
+func isPreconditionFailed(err error) bool {
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "PreconditionFailed"
+}
+
+func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp, log func(level, message string)) (int, error) {
 	key, err := keyFrom(op.Key, "update")
 	if err != nil {
 		return 0, err
@@ -143,32 +192,46 @@ func applyUpdate(ctx context.Context, client *s3.Client, bucket string, op model
 	if err != nil {
 		return 0, mapError(err)
 	}
-	in := &s3.PutObjectInput{Bucket: aws.String(bucket), Key: aws.String(key), Body: strings.NewReader(value)}
-	applyPreservedAttributes(in, head)
-	if _, err := client.PutObject(ctx, in); err != nil {
-		return 0, mapError(err)
+	// F5: this editor has no path to carry object tags across a PutObject replace (which drops
+	// them outright) without a second GetObjectTagging/PutObjectTagging round trip — refusing the
+	// edit is the more contained fix (over adding that second call's own surface) and never
+	// silently drops data the user did not know was there.
+	if head.TagCount != nil && *head.TagCount > 0 {
+		return 0, adapters.New(adapters.CodeUnsupported,
+			"this object has tags, which this editor does not preserve across an edit; remove its tags first, or edit it outside this app", nil)
 	}
-	return 1, nil
+	in := &s3.PutObjectInput{
+		Bucket: aws.String(bucket), Key: aws.String(key), Body: strings.NewReader(value),
+		// F5: IfMatch closes the lost-update race — a concurrent writer's own change between this
+		// HeadObject and the PutObject below is refused rather than silently overwritten.
+		IfMatch: head.ETag,
+	}
+	applyPreservedAttributes(in, head)
+	_, err = client.PutObject(ctx, in)
+	if err == nil {
+		return 1, nil
+	}
+	if isPreconditionFailed(err) {
+		return 0, adapters.New(adapters.CodeQuery,
+			"this object changed since it was loaded; reload and try again", nil)
+	}
+	if isConditionalPutUnsupported(err) {
+		log("warn", "s3: endpoint rejected the conditional If-Match update; retrying unconditionally for s3://"+bucket+"/"+key)
+		in.IfMatch = nil
+		in.Body = strings.NewReader(value)
+		if _, err := client.PutObject(ctx, in); err != nil {
+			return 0, mapError(err)
+		}
+		return 1, nil
+	}
+	return 0, mapError(err)
 }
 
-func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp) (int, error) {
+func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model.MutationRowOp, log func(level, message string)) (int, error) {
 	key, err := keyFrom(op.Values, "insert")
 	if err != nil {
 		return 0, err
 	}
-	// NX-equivalent: HeadObject first (P58d D14) — PutObject has no conditional-create option, so
-	// this is the only way to refuse a collision rather than silently overwriting. Matches on
-	// *types.NotFound structurally: anything but a real 404 fails the insert rather than proceeding
-	// (a tightening from the TypeScript's "any query-level error" fallthrough).
-	_, err = client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
-	if err == nil {
-		return 0, adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
-	}
-	var notFound *types.NotFound
-	if !errors.As(err, &notFound) {
-		return 0, mapError(err)
-	}
-
 	sourcePath, err := fileFrom(op.Values)
 	if err != nil {
 		return 0, err
@@ -182,7 +245,37 @@ func applyInsert(ctx context.Context, client *s3.Client, bucket string, op model
 	in := &s3.PutObjectInput{
 		Bucket: aws.String(bucket), Key: aws.String(key), Body: body,
 		ContentLength: aws.Int64(size), ContentType: contentTypeFrom(op.Values),
+		// F5: PutObjectInput.IfNoneMatch("*") is a real conditional-create — it closes the
+		// HeadObject-then-Put race the previous "HeadObject first, then Put" shape could not: two
+		// concurrent inserts of the same key could both pass the HeadObject check before either
+		// one's Put landed.
+		IfNoneMatch: aws.String("*"),
 	}
+	_, err = client.PutObject(ctx, in)
+	if err == nil {
+		return 1, nil
+	}
+	if isPreconditionFailed(err) {
+		return 0, adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
+	}
+	if !isConditionalPutUnsupported(err) {
+		return 0, mapError(err)
+	}
+	// Fallback for an S3-compatible endpoint that rejects the conditional header outright: the
+	// pre-F5 HeadObject-then-Put shape, logged so the safety check being skipped is visible.
+	log("warn", "s3: endpoint rejected the conditional If-None-Match insert; falling back to a HeadObject-then-Put race for s3://"+bucket+"/"+key)
+	_, headErr := client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
+	if headErr == nil {
+		return 0, adapters.New(adapters.CodeQuery, "key already exists: "+key, nil)
+	}
+	var notFound *types.NotFound
+	if !errors.As(headErr, &notFound) {
+		return 0, mapError(headErr)
+	}
+	if _, err := body.Seek(0, 0); err != nil {
+		return 0, adapters.New(adapters.CodeQuery, "could not rewind local file "+sourcePath+": "+err.Error(), err)
+	}
+	in.IfNoneMatch = nil
 	if _, err := client.PutObject(ctx, in); err != nil {
 		return 0, mapError(err)
 	}
@@ -204,7 +297,7 @@ func applyDelete(ctx context.Context, client *s3.Client, bucket string, op model
 }
 
 // mutate is mutate.ts's mutate.
-func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
+func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan, log func(level, message string)) (model.MutationResult, error) {
 	if err := adapters.AssertWritable(readOnly); err != nil {
 		return model.MutationResult{}, err
 	}
@@ -219,13 +312,13 @@ func mutate(ctx context.Context, client *s3.Client, op *adapters.OpCtx, readOnly
 
 	return adapters.RunKindDispatched(ctx, op, plan, readOnly, statements, adapters.DispatchUpdateDeleteInsert(
 		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
-			return applyUpdate(ctx, client, bucket, rowOp)
+			return applyUpdate(ctx, client, bucket, rowOp, log)
 		},
 		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
 			return applyDelete(ctx, client, bucket, rowOp)
 		},
 		func(ctx context.Context, rowOp model.MutationRowOp) (int, error) {
-			return applyInsert(ctx, client, bucket, rowOp)
+			return applyInsert(ctx, client, bucket, rowOp, log)
 		},
 	))
 }

@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"sync"
 
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 
@@ -23,11 +24,54 @@ func init() {
 type Adapter struct {
 	deps adapters.Deps
 
+	// mu guards every field below (F3): Connect/Disconnect write client/scopedBucket/readOnly from
+	// whatever goroutine adapterhost dispatches them on, concurrently with any in-flight op reading
+	// them — the same class of unguarded-field race Part 4's own F3 fixed for the SQL engines.
+	mu     sync.Mutex
 	client *awss3.Client
 	// scopedBucket (options.bucket) — set, this scopes the whole tree to one bucket, for
 	// credentials that can only ever see that one bucket.
 	scopedBucket string
 	readOnly     bool
+}
+
+// getClient is every op's own locked read of a.client (F3) — requireClient's RequireConnected call
+// takes its result, never a.client directly.
+func (a *Adapter) getClient() *awss3.Client {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.client
+}
+
+// getScopedBucket is Children's own locked read of a.scopedBucket (F3).
+func (a *Adapter) getScopedBucket() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.scopedBucket
+}
+
+// getReadOnly is Mutate's own locked read of a.readOnly (F3).
+func (a *Adapter) getReadOnly() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.readOnly
+}
+
+// setConnected is Connect's own locked write of every field a successful connect fills in (F3).
+func (a *Adapter) setConnected(client *awss3.Client, scopedBucket string, readOnly bool) {
+	a.mu.Lock()
+	a.client = client
+	a.scopedBucket = scopedBucket
+	a.readOnly = readOnly
+	a.mu.Unlock()
+}
+
+// clearConnected is Disconnect's own locked write (F3).
+func (a *Adapter) clearConnected() {
+	a.mu.Lock()
+	a.client = nil
+	a.scopedBucket = ""
+	a.mu.Unlock()
 }
 
 func (a *Adapter) Kind() string        { return "s3" }
@@ -48,21 +92,18 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 	if _, err := listBuckets(ctx, client, scopedBucket); err != nil {
 		return adapters.ConnectInfo{}, err
 	}
-	a.client = client
-	a.scopedBucket = scopedBucket
-	a.readOnly = cfg.ReadOnly
+	a.setConnected(client, scopedBucket, cfg.ReadOnly)
 	return adapters.ConnectInfo{ServerVersion: "Amazon S3"}, nil
 }
 
 // Disconnect is index.ts's disconnect.
 func (a *Adapter) Disconnect(ctx context.Context) error {
-	a.client = nil
-	a.scopedBucket = ""
+	a.clearConnected()
 	return nil
 }
 
 func (a *Adapter) requireClient() (*awss3.Client, error) {
-	return adapters.RequireConnected(a.client)
+	return adapters.RequireConnected(a.getClient())
 }
 
 // Children is index.ts's children.
@@ -73,7 +114,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 	}
 	segments := path.Segments
 	if len(segments) == 0 {
-		nodes, err := listBuckets(ctx, client, a.scopedBucket)
+		nodes, err := listBuckets(ctx, client, a.getScopedBucket())
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
@@ -176,7 +217,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 	if err != nil {
 		return model.MutationResult{}, err
 	}
-	return mutate(ctx, client, op, a.readOnly, plan)
+	return mutate(ctx, client, op, a.getReadOnly(), plan, a.deps.Log)
 }
 
 // Execute is index.ts's execute — caps.SQL is false; never reached.
