@@ -1,4 +1,4 @@
-import { loadDynamicGenerator, type Reference, resolve } from '@kira/api-core';
+import { loadDynamicGenerator, type Reference } from '@kira/api-core';
 import type {
   GrpcCallEvent,
   GrpcCallResultWire,
@@ -15,6 +15,7 @@ import { useVariableSetStore, useVariablesStore } from '../../api/state/variable
 import { findGrpcRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
+import { createSubstituter, resolvePairs } from '../shared/request/resolve';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { useGrpcCallHistoryStore } from './history';
 
@@ -43,17 +44,10 @@ export function resolveGrpcTabState(
   secretNames: readonly string[],
   dynamic?: (name: string) => string | null,
 ): ResolvedGrpcRequest {
-  const refs: Reference[] = [];
-  const sub = (text: string): string => {
-    const result = resolve(text, values, secretNames, dynamic);
-    refs.push(...result.refs);
-    return result.text;
-  };
+  const { sub, refs } = createSubstituter(values, secretNames, dynamic);
 
   const target = sub(state.target);
-  const metadata = state.metadata
-    .filter((m) => m.enabled && m.name.trim() !== '')
-    .map((m) => ({ name: sub(m.name), value: sub(m.value) }));
+  const metadata = resolvePairs(state.metadata, sub);
   const message = sub(state.message);
 
   return { target, metadata, message, refs };

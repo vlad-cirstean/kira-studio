@@ -1,11 +1,4 @@
-import {
-  loadDynamicGenerator,
-  type Reference,
-  type ResolvedRequest,
-  resolve,
-  sanitizeUrlSpan,
-  substituteBody,
-} from '@kira/api-core';
+import { loadDynamicGenerator, type ResolvedRequest, substituteBody } from '@kira/api-core';
 import type {
   HttpBodyWire,
   HttpMethod,
@@ -22,6 +15,7 @@ import { useVariableSetStore, useVariablesStore } from '../../api/state/variable
 import { findHttpRequestTab } from '../../api/tabs';
 import { control } from '../../bridge/control';
 import { useTabIncognitoStore } from '../../state/tabIncognito';
+import { createSubstituter, resolvePairs } from '../shared/request/resolve';
 import { classifyLoadError, createRuntimeStore, stopOp } from '../shared/viewOp';
 import { useHttpHistoryStore } from './history';
 
@@ -91,26 +85,14 @@ export function resolveTabState(
   secretNames: readonly string[],
   dynamic?: (name: string) => string | null,
 ): ResolvedRequest {
-  const refs: Reference[] = [];
-  const sub = (text: string): string => {
-    const result = resolve(text, values, secretNames, dynamic);
-    refs.push(...result.refs);
-    return result.text;
-  };
   // Finding 6 (v1.2 P14 round 2): the URL is the one field with query-string delimiter syntax to
   // break — a genuinely-terminal unresolved reference (a typo, an uncatalogued {{$generator}})
   // must not inject a raw space/&/#/= into it. A 'deferred' secret is unaffected either way:
   // sanitizeUrlSpan is never applied to it, so Go's own apivars.Resolve still finds it untouched.
-  const subUrl = (text: string): string => {
-    const result = resolve(text, values, secretNames, dynamic, sanitizeUrlSpan);
-    refs.push(...result.refs);
-    return result.text;
-  };
+  const { sub, subUrl, refs } = createSubstituter(values, secretNames, dynamic);
 
   const url = subUrl(state.url);
-  const headers = state.headers
-    .filter((h) => h.enabled && h.name.trim() !== '')
-    .map((h) => ({ name: sub(h.name), value: sub(h.value) }));
+  const headers = resolvePairs(state.headers, sub);
   const body = substituteBody(buildBodyWire(state), sub);
 
   return { url, headers, body, refs };

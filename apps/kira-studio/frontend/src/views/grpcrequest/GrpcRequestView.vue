@@ -19,17 +19,15 @@ import {
   variableHoverSource,
   variableSupport,
 } from '../../api/state/variableCompletion';
-import { useVariableSetStore, useVariablesStore } from '../../api/state/variables';
+import { useVariableSetStore } from '../../api/state/variables';
 import { patchGrpcRequestTabState } from '../../api/tabs';
 import VariablesOverviewPanel from '../../api/VariablesOverviewPanel.vue';
 import { beautifyJson } from '../../beautify';
 import MonacoHost from '../../editor/MonacoHost.vue';
-import { useConnectionsStore } from '../../state/connections';
-import { useRunState } from '../../state/runState';
 import type { GrpcRequestTabRecord } from '../../state/tabDomain';
-import { useTabIncognitoStore } from '../../state/tabIncognito';
 import { templateToken } from '../../theme/completion';
 import AutocompleteField from '../shared/AutocompleteField.vue';
+import { useRequestChrome } from '../shared/request/useRequestChrome';
 import { useRequestTabSave } from '../shared/request/useRequestTabSave';
 import GrpcMetadataTable from './GrpcMetadataTable.vue';
 import ResponsePane from './ResponsePane.vue';
@@ -39,43 +37,19 @@ import { findMethod, resolveGrpcTabState, useGrpcRequestViewStore } from './stat
 // MainView.vue keys this component by tab.id — same discipline as every other *View.vue.
 const props = defineProps<{ tab: GrpcRequestTabRecord }>();
 
-const tabIncognitoStore = useTabIncognitoStore();
 const collectionsStore = useCollectionsStore();
-const variablesStore = useVariablesStore();
 const variableSetStore = useVariableSetStore();
 const grpcRequestViewStore = useGrpcRequestViewStore();
-const connectionsStore = useConnectionsStore();
 
 const rt = computed(() => grpcRequestViewStore.runtime[props.tab.id]);
 const running = computed(() => rt.value?.status === 'running');
 const title = computed(() => grpcRequestTitle(props.tab.state));
 
-// P104 §3: ViewChrome/ViewHeader/RunState inlined at this call site (no library counterpart).
-const envColor = computed(() => variablesStore.environmentColorForTab(props.tab.id));
-const connRecord = computed(() => connectionsStore.connectionRecord(props.tab.connectionId));
-const railColor = computed(() =>
-  envColor.value !== undefined
-    ? envColor.value
-    : connRecord.value
-      ? (connRecord.value.color ?? null)
-      : undefined,
-);
-const runState = useRunState(() => props.tab.id);
-const runStateLabel = computed(() => {
-  if (runState.value.status === 'error') return 'failed';
-  if (runState.value.elapsedMs === null) return '—';
-  return runState.value.elapsedMs < 1000
-    ? `${Math.round(runState.value.elapsedMs)} ms`
-    : `${(runState.value.elapsedMs / 1000).toFixed(1)} s`;
-});
-
 // P71 §5/§3.1: HttpRequestView.vue's own pair — this view's incognito state and the per-tab
 // environment id it reads through while incognito.
-const incognito = computed(() => tabIncognitoStore.isIncognito(props.tab.id));
-function toggleIncognito(): void {
-  tabIncognitoStore.setIncognito(props.tab.id, !incognito.value);
-}
-const envId = computed(() => variablesStore.environmentIdForTab(props.tab.id));
+const { railColor, runState, runStateLabel, incognito, toggleIncognito, envId } = useRequestChrome(
+  () => props.tab,
+);
 
 const TLS_OPTIONS = [
   { value: 'tls' as const, label: 'TLS', testid: 'grpc-tls-tls' },
