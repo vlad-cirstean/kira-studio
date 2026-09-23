@@ -831,6 +831,11 @@ export interface PushPreflight {
   /** The matched protected pattern, or `null` — never a bare boolean (D52). */
   readonly protectedBy: string | null;
   readonly fastForward: boolean;
+  /** The branch a force-push actually lands on: the resolved UPSTREAM remote branch name, which
+   *  can differ from the LOCAL branch name a stacked/renamed branch tracks (F2, P108 Part 16
+   *  review). `ForcePushDialog.vue` must gate its typed-confirmation on this name, not the local
+   *  one, to ever match what the server's own `ConfirmToken` check requires. */
+  readonly resolvedBranch: string;
 }
 
 /** `remote.run`'s params — one request key for all five `RemoteOpKind`s (D51). `confirmToken`

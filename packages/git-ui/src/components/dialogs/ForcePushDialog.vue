@@ -39,9 +39,16 @@ watch(pending, () => {
 
 const protectedBy = computed(() => pending.value?.preflight.protectedBy ?? null);
 const isProtected = computed(() => protectedBy.value !== null);
+// F2 (P108 Part 16 review): the backend's ConfirmToken check (gitsession.RunRemote) gates on the
+// resolved UPSTREAM branch name, not pending.branch's LOCAL one — a stacked/renamed branch can
+// track a differently-named protected upstream. Comparing/sending the local name here made the
+// gate impossible to ever satisfy in that case.
+const resolvedBranch = computed(
+  () => pending.value?.preflight.resolvedBranch ?? pending.value?.branch ?? '',
+);
 const confirmToken = computed(() => (isProtected.value ? typedBranch.value : undefined));
 const branchNameMatches = computed(
-  () => !isProtected.value || typedBranch.value === pending.value?.branch,
+  () => !isProtected.value || typedBranch.value === resolvedBranch.value,
 );
 const canConfirmLease = computed(() => branchNameMatches.value);
 const canConfirmPlain = computed(() => branchNameMatches.value && understandPlain.value);
@@ -73,7 +80,7 @@ function confirmPlain(): void {
     @close="cancel"
   >
     <p>
-      This will overwrite <code>{{ pending.remote }}/{{ pending.branch }}</code>, currently at
+      This will overwrite <code>{{ pending.remote }}/{{ resolvedBranch }}</code>, currently at
       <code>{{ shortSha(pending.preflight.remoteTip) }}</code>.
       <template v-if="pending.preflight.behind > 0">
         It is {{ pending.preflight.behind }} commit{{ pending.preflight.behind === 1 ? '' : 's' }}
@@ -82,7 +89,7 @@ function confirmPlain(): void {
     </p>
 
     <p v-if="protectedBy" class="kv-dialog-error">
-      <code>{{ pending.branch }}</code> matches your protected pattern
+      <code>{{ resolvedBranch }}</code> matches your protected pattern
       <code>{{ protectedBy }}</code>. Type the branch name to confirm.
     </p>
     <label v-if="protectedBy" class="kv-dialog-field">
@@ -90,7 +97,7 @@ function confirmPlain(): void {
       <input
         v-model="typedBranch"
         type="text"
-        :placeholder="pending.branch"
+        :placeholder="resolvedBranch"
         data-testid="force-push-confirm-branch"
       />
     </label>

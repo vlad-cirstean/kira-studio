@@ -295,23 +295,30 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 
 	protectedBranches, _, _ := e.settings()
 
+	// F2 (P108 Part 16 review): resolve the upstream remote branch name ONCE per RunRemote call for
+	// forcePush — the protected-branch gate, the lease check and runPushFamily's own spawn each
+	// used to re-resolve it separately (three separate git-config-backed reads that can disagree if
+	// config changes mid-flight); forcePushRemoteBranch is empty and unused for every other kind.
+	var forcePushRemoteBranch string
+	if params.Kind == "forcePush" {
+		remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
+		if uerr != nil {
+			return RemoteOpResult{}, uerr
+		}
+		forcePushRemoteBranch = remoteBranch
+	}
+
 	if params.Kind == "forcePush" || params.Kind == "deleteRemoteBranch" {
-		// P108 Part 15 F1 fix (flagged for Part 16's future reviewer — the bug and its fix both sit
-		// at this exact boundary, but this file belongs to Part 16, not yet reviewed): this gate must
-		// match/confirm against the UPSTREAM's branch name, not params.Branch's LOCAL one —
-		// runPushFamily below force-pushes to resolveUpstreamRemoteBranch's result, which can differ
-		// from params.Branch (a local "feat" tracking "origin/main"). Checking params.Branch let a
-		// force-push to a differently-named protected upstream skip the typed-confirmation gate
-		// entirely: MatchProtectedBranch never saw the real destination name. deleteRemoteBranch
-		// already names the remote branch directly in params.Branch (runPushFamily's own default
-		// case), so only forcePush needs the resolve.
+		// P108 Part 15 F1 fix: this gate must match/confirm against the UPSTREAM's branch name, not
+		// params.Branch's LOCAL one — runPushFamily below force-pushes to
+		// resolveUpstreamRemoteBranch's result, which can differ from params.Branch (a local "feat"
+		// tracking "origin/main"). Checking params.Branch let a force-push to a differently-named
+		// protected upstream skip the typed-confirmation gate entirely: MatchProtectedBranch never
+		// saw the real destination name. deleteRemoteBranch already names the remote branch directly
+		// in params.Branch (runPushFamily's own default case), so only forcePush needs the resolve.
 		checkBranch := params.Branch
 		if params.Kind == "forcePush" {
-			remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
-			if uerr != nil {
-				return RemoteOpResult{}, uerr
-			}
-			checkBranch = remoteBranch
+			checkBranch = forcePushRemoteBranch
 		}
 		if match := gitpreflight.MatchProtectedBranch(checkBranch, protectedBranches); match != nil && params.ConfirmToken != checkBranch {
 			return e.remoteResultNoSpawn(ctx, &RemoteOpError{
@@ -326,11 +333,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		// remote-side ref PushPreflight quoted expectedRemoteTip from, or a differently-named
 		// upstream makes both sides consistently (and wrongly) nil — passing the lease check
 		// trivially right before the push spawns against the wrong destination anyway.
-		remoteBranch, _, uerr := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
-		if uerr != nil {
-			return RemoteOpResult{}, uerr
-		}
-		currentTip, err := e.readRemoteTip(ctx, params.Remote, remoteBranch)
+		currentTip, err := e.readRemoteTip(ctx, params.Remote, forcePushRemoteBranch)
 		if err != nil {
 			return RemoteOpResult{}, err
 		}
@@ -371,7 +374,7 @@ func (e *RepoEntry) RunRemote(ctx context.Context, conn *Conn, params RemoteOpPa
 		e.remoteOp.setKillable(true)
 		updates, opErr, spawnErr = e.runFetch(ctx, opCtx, conn, deps, params, onStderr)
 	case "push", "forcePush", "deleteRemoteBranch":
-		updates, opErr, spawnErr = e.runPushFamily(opCtx, conn, deps, params, onStderr)
+		updates, opErr, spawnErr = e.runPushFamily(opCtx, conn, deps, params, forcePushRemoteBranch, onStderr)
 	case "pull":
 		updates, opErr, spawnErr = e.runPullOp(ctx, opCtx, conn, deps, params, onStderr)
 	default:
@@ -434,8 +437,10 @@ func (e *RepoEntry) runFetch(roCtx, spawnCtx context.Context, conn *Conn, deps R
 
 // runPushFamily executes push/forcePush/deleteRemoteBranch — --porcelain always (F10), NEVER
 // killable (D19: the remote may already have accepted it, so a cancelled push has an unknowable
-// outcome).
-func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
+// outcome). forcePushRemoteBranch is RunRemote's own single resolveUpstreamRemoteBranch call for
+// this RunRemote invocation (F2, P108 Part 16 review) — used only for the "forcePush" case, empty
+// and unused for "push"/"deleteRemoteBranch".
+func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDeps, params RemoteOpParams, forcePushRemoteBranch string, onStderr func([]byte)) ([]gitops.RefUpdate, *RemoteOpError, error) {
 	var argv []string
 	switch params.Kind {
 	case "push":
@@ -445,11 +450,7 @@ func (e *RepoEntry) runPushFamily(ctx context.Context, conn *Conn, deps RemoteDe
 		}
 		argv = gitops.PushArgs(params.Remote, params.Branch, remoteBranch, params.SetUpstream)
 	case "forcePush":
-		remoteBranch, _, err := e.resolveUpstreamRemoteBranch(ctx, params.Remote, params.Branch)
-		if err != nil {
-			return nil, nil, err
-		}
-		argv = gitops.ForcePushArgs(params.Remote, params.Branch, remoteBranch, params.PlainForce)
+		argv = gitops.ForcePushArgs(params.Remote, params.Branch, forcePushRemoteBranch, params.PlainForce)
 	default: // "deleteRemoteBranch": params.Branch already names the remote branch directly (the
 		// UI picks it from the remote-branch list itself, not from a local branch's upstream), so
 		// no resolution applies here.

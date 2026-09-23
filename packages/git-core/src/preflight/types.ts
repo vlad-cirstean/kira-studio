@@ -120,6 +120,10 @@ export interface PushPreflight {
    *  `matchProtectedBranch`'s doc comment). */
   readonly protectedBy: string | null;
   readonly fastForward: boolean;
+  /** The branch a force-push actually lands on: the resolved UPSTREAM remote branch name, which
+   *  can differ from the LOCAL branch name a stacked/renamed branch tracks (F2, P108 Part 16
+   *  review, `apps/kira-space`'s own Go mirror of this type). */
+  readonly resolvedBranch: string;
 }
 
 /** Never wire-carried — see the file header. `existing`/`existingIsAnnotated` are what let the

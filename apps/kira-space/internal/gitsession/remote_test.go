@@ -442,6 +442,37 @@ func TestPushPreflight_ProtectedByChecksUpstreamName(t *testing.T) {
 	}
 }
 
+// TestPushPreflight_ResolvedBranchIsUpstreamName is F2's own regression proof (P108 Part 16
+// review): ForcePushDialog.vue can only ever gate on and display the LOCAL branch name unless the
+// wire response also carries the resolved UPSTREAM one -- a local "feat" tracking a differently
+// named "main" must report ResolvedBranch "main", not "feat", or the dialog's own confirm gate
+// can never be satisfied against a backend that (correctly, since Part 15's F1) checks the
+// upstream name.
+func TestPushPreflight_ResolvedBranchIsUpstreamName(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitStack(t)
+	dir := t.TempDir()
+	runGitStack(t, dir, "init", "-q", "-b", "main")
+	writeFileStack(t, dir, "f.txt", "x\n")
+	runGitStack(t, dir, "add", "f.txt")
+	runGitStack(t, dir, "commit", "-q", "-m", "c1")
+	runGitStack(t, dir, "branch", "feat")
+	runGitStack(t, dir, "remote", "add", "origin", t.TempDir())
+	headSha := runGitStackOutput(t, dir, "rev-parse", "feat")
+	runGitStack(t, dir, "update-ref", "refs/remotes/origin/main", headSha)
+	runGitStack(t, dir, "config", "branch.feat.remote", "origin")
+	runGitStack(t, dir, "config", "branch.feat.merge", "refs/heads/main")
+
+	entry := newStackTestEntryWithRunner(t, gitclient.NewExecRunner(), dir)
+	got, err := entry.PushPreflight(context.Background(), "origin", "feat")
+	if err != nil {
+		t.Fatalf("PushPreflight: %v", err)
+	}
+	if got.ResolvedBranch != "main" {
+		t.Fatalf("ResolvedBranch = %q, want \"main\" -- feat's real upstream, not its own local name", got.ResolvedBranch)
+	}
+}
+
 // TestWantsRebaseMerges is P108 Part 15 F6's own regression proof, flagged for Part 16's future
 // reviewer (same boundary as F1's own touches in this file): the executor must re-derive
 // "--rebase-merges wanted" using the SAME branch.<name>.rebase-over-pull.rebase precedence

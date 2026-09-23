@@ -91,6 +91,12 @@ type PushPreflight struct {
 	RemoteTip        *string `json:"remoteTip"`
 	ProtectedBy      *string `json:"protectedBy"`
 	FastForward      bool    `json:"fastForward"`
+	// ResolvedBranch is the branch a force-push actually lands on — the resolved UPSTREAM remote
+	// branch name (gitsession.resolveUpstreamRemoteBranch's own result), which can differ from the
+	// LOCAL branch name a stacked/renamed branch tracks (F2, P108 Part 16 review). The dialog that
+	// confirms a protected force-push must gate on and display this name, not the local one, or a
+	// user can never type the name the backend's own ConfirmToken check actually requires.
+	ResolvedBranch string `json:"resolvedBranch"`
 }
 
 // ClassifyPushInput is ClassifyPush's own input — gitsession gathers these (the remote-tracking
@@ -116,5 +122,9 @@ func ClassifyPush(in ClassifyPushInput) PushPreflight {
 		Upstream: in.Upstream, WouldSetUpstream: in.Upstream == nil,
 		Ahead: in.Ahead, Behind: in.Behind, RemoteTip: in.RemoteTip,
 		ProtectedBy: protectedBy, FastForward: in.Behind == 0,
+		// F2 (P108 Part 16 review): in.Branch is already the resolved upstream remote branch name
+		// (gitsession.PushPreflight passes remoteBranch, not the local branch, exactly for this
+		// protectedBy match) — surfacing it is a one-line addition, not a new resolve.
+		ResolvedBranch: in.Branch,
 	}
 }
