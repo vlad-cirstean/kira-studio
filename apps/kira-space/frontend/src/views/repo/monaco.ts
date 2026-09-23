@@ -52,6 +52,22 @@ export function repoRevisionFileUri(
   }).toString();
 }
 
+// P107 I2-20: repoDiffUris/repoRevisionDiffUris both build the same two Uri.from calls, differing
+// only in the query strings — shared here, keyed positionally (not by field name) since the two
+// callers return differently-named pairs (head/worktree vs left/right).
+function repoUriPair(
+  mod: MonacoModule,
+  repoId: string,
+  path: string,
+  queryA: string,
+  queryB: string,
+): [import('monaco-editor').Uri, import('monaco-editor').Uri] {
+  return [
+    mod.Uri.from({ scheme: 'kira-repo', authority: repoId, path: `/${path}`, query: queryA }),
+    mod.Uri.from({ scheme: 'kira-repo', authority: repoId, path: `/${path}`, query: queryB }),
+  ];
+}
+
 // C6 §8.3: the diff editor's own two sides share one scheme with the file viewer (so navigation's
 // one selector covers both) but need distinct model identities — `query` tells them apart without
 // a second scheme.
@@ -60,20 +76,8 @@ export function repoDiffUris(
   repoId: string,
   path: string,
 ): { head: import('monaco-editor').Uri; worktree: import('monaco-editor').Uri } {
-  return {
-    head: mod.Uri.from({
-      scheme: 'kira-repo',
-      authority: repoId,
-      path: `/${path}`,
-      query: 'side=head',
-    }),
-    worktree: mod.Uri.from({
-      scheme: 'kira-repo',
-      authority: repoId,
-      path: `/${path}`,
-      query: 'side=worktree',
-    }),
-  };
+  const [head, worktree] = repoUriPair(mod, repoId, path, 'side=head', 'side=worktree');
+  return { head, worktree };
 }
 
 // C10 §6.1: a commit diff's own two sides — keyed by revision, not by "head"/"worktree", since two
@@ -88,20 +92,8 @@ export function repoRevisionDiffUris(
   left: string,
   right: string,
 ): { left: import('monaco-editor').Uri; right: import('monaco-editor').Uri } {
-  return {
-    left: mod.Uri.from({
-      scheme: 'kira-repo',
-      authority: repoId,
-      path: `/${path}`,
-      query: `rev=${left}`,
-    }),
-    right: mod.Uri.from({
-      scheme: 'kira-repo',
-      authority: repoId,
-      path: `/${path}`,
-      query: `rev=${right}`,
-    }),
-  };
+  const [leftUri, rightUri] = repoUriPair(mod, repoId, path, `rev=${left}`, `rev=${right}`);
+  return { left: leftUri, right: rightUri };
 }
 
 export function getOrCreateModel(
