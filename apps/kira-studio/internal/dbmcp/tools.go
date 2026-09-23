@@ -61,6 +61,27 @@ func (s *Server) listConnections(_ context.Context, _ *mcp.CallToolRequest, _ li
 	return jsonResult(out)
 }
 
+// resolveReadGated is list_children/describe_table/describe_schema's shared preamble (I2-44):
+// resolve the connection, then refuse if read mode denies. done is true whenever the caller should
+// return (res, out, err) immediately, same convention as resolveVerdict/awaitApproval below.
+//
+// M7 finding #8: schema-browsing tools are gated at read-mode's own minimum bar — deny refuses,
+// same as every other read here. Not extended to prompt's own approval dialog: unlike run_query/
+// explain_query, none of these run caller-supplied SQL against the connection, so there is no
+// statement to show the human in an approval request.
+func (s *Server) resolveReadGated(connectionID string) (summary model.ConnectionSummary, res *mcp.CallToolResult, out any, err error, done bool) {
+	summary, err = s.resolveEnabled(connectionID)
+	if err != nil {
+		res, out, err = errResult(err.Error())
+		return summary, res, out, err, true
+	}
+	if m := modesOf(summary); m.read == "deny" {
+		res, out, err = errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
+		return summary, res, out, err, true
+	}
+	return summary, nil, nil, nil, false
+}
+
 // --- list_children (§4.2) — replacing the fixed-name list_databases/list_schemas SPEC first named:
 // the adapter layer's metadata primitive is one lazy level (Adapter.Children), and the levels
 // differ per kind (§1.5), so one tool that returns the node's own `kind` is strictly more
@@ -73,16 +94,8 @@ type listChildrenArgs struct {
 }
 
 func (s *Server) listChildren(_ context.Context, _ *mcp.CallToolRequest, args listChildrenArgs) (*mcp.CallToolResult, any, error) {
-	summary, err := s.resolveEnabled(args.ConnectionID)
-	if err != nil {
-		return errResult(err.Error())
-	}
-	// M7 finding #8: a schema-browsing tool, gated at read-mode's own minimum bar — deny refuses,
-	// same as every other read here. Not extended to prompt's own approval dialog: unlike run_query/
-	// explain_query, this never runs caller-supplied SQL against the connection, so there is no
-	// statement to show the human in an approval request.
-	if m := modesOf(summary); m.read == "deny" {
-		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
+	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
+		return res, out, err
 	}
 	result, err := s.cfg.Tree.Children(args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
@@ -103,14 +116,8 @@ type describeTableArgs struct {
 // it already answers E_UNSUPPORTED in its own words (kafka/s3/sqs/redis) — surfaced verbatim by
 // toolError rather than an invented message here (§4.3).
 func (s *Server) describeTable(_ context.Context, _ *mcp.CallToolRequest, args describeTableArgs) (*mcp.CallToolResult, any, error) {
-	summary, err := s.resolveEnabled(args.ConnectionID)
-	if err != nil {
-		return errResult(err.Error())
-	}
-	// M7 finding #8: same read-mode-deny gate as listChildren — see its own comment for why prompt
-	// stops short of an approval dialog here.
-	if m := modesOf(summary); m.read == "deny" {
-		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
+	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
+		return res, out, err
 	}
 	result, err := s.cfg.Tree.Describe(args.ConnectionID, args.Path, args.Refresh, nil)
 	if err != nil {
@@ -128,14 +135,8 @@ type describeSchemaArgs struct {
 }
 
 func (s *Server) describeSchema(_ context.Context, _ *mcp.CallToolRequest, args describeSchemaArgs) (*mcp.CallToolResult, any, error) {
-	summary, err := s.resolveEnabled(args.ConnectionID)
-	if err != nil {
-		return errResult(err.Error())
-	}
-	// M7 finding #8: same read-mode-deny gate as listChildren — see its own comment for why prompt
-	// stops short of an approval dialog here.
-	if m := modesOf(summary); m.read == "deny" {
-		return errResult(fmt.Sprintf("connection %q's MCP permissions deny read statements; change them in the connection's MCP tab", summary.Name))
+	if _, res, out, err, done := s.resolveReadGated(args.ConnectionID); done {
+		return res, out, err
 	}
 	result, err := s.cfg.Tree.SchemaColumns(args.ConnectionID, args.Path, args.Refresh)
 	if err != nil {
