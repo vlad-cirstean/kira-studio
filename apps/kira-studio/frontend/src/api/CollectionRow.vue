@@ -114,7 +114,7 @@ function onTwistyClick(e: MouseEvent): void {
     @contextmenu.prevent.stop="emit('contextmenu', row, $event)"
   >
     <!-- Same reasoning as project/TreeRow.vue's twisty: its entire meaning is drawn by the
-         chevron direction, so no v-tooltip, but :aria-label stays so it isn't nameless. -->
+         chevron direction, so no tooltip, but :aria-label stays so it isn't nameless. -->
     <button
       type="button"
       class="twisty"

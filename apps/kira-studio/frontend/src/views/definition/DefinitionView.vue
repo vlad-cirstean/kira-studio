@@ -430,7 +430,7 @@ const breadcrumb = computed(() => {
 }
 
 .notes-list {
-  @apply m-0 pl-[var(--kira-s-5)];
+  @apply m-0 pl-3;
 }
 
 .editor-body {
@@ -438,6 +438,6 @@ const breadcrumb = computed(() => {
 }
 
 .structure-body {
-  @apply flex-1 min-h-0 overflow-y-auto flex flex-col gap-[var(--kira-s-6)] p-[var(--kira-s-5)];
+  @apply flex-1 min-h-0 overflow-y-auto flex flex-col gap-4 p-3;
 }
 </style>

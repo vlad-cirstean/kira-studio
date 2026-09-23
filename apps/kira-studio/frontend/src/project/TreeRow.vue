@@ -115,9 +115,9 @@ function onContextMenu(e: MouseEvent): void {
 
     <!-- P31 D25/F25: the twisty is the one control in the app whose entire meaning is already
          drawn by the chevron direction, and it fires on the single most-hovered control in the
-         panel — no v-tooltip. :aria-label stays: the app's tooltip directive mirrors into
-         aria-label only when a control has no accessible name otherwise, so dropping both would
-         leave this button nameless. -->
+         panel — no tooltip. :aria-label stays: P104 §6.2 made every icon-only control set its
+         own explicit aria-label by hand (no more directive mirroring it in automatically), so
+         dropping it here would leave this button nameless. -->
     <button
       type="button"
       class="twisty"
@@ -162,9 +162,9 @@ function onContextMenu(e: MouseEvent): void {
     <ErrorPopover v-if="row.error" :message="row.error" />
     <!-- P24: a connect failure has no separate `row.error`/ErrorPopover of its own (tree.ts's
          `error` field is a post-connect children-fetch failure only, never set when connect()
-         itself fails) — previously the reason lived nowhere but the status dot's own v-tooltip
+         itself fails) — previously the reason lived nowhere but the status dot's own tooltip
          (a 8px hit target), with no visible text at all. Truncated-with-hover-detail, matching
-         OperationsPanel.vue's own `error-text`/`v-tooltip` pattern for the same "errors are
+         OperationsPanel.vue's own `error-text`/`Tooltip` pattern for the same "errors are
          truncated by default, full text on hover" shape. -->
     <Tooltip v-else-if="row.kind === 'connection' && row.status === 'error' && row.statusDetail">
       <TooltipTrigger as-child>

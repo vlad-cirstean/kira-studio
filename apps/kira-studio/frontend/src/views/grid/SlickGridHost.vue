@@ -437,10 +437,11 @@ function keyLabelFor(
   return null;
 }
 
-// P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so this replicates
-// workbench/state/tooltip.ts's own updateTip() by hand: data-kira-tip (the plain, newline-joined
-// a11y text) and data-kira-tip-parts (the structured JSON `v-tooltip`'s own directive would have
-// written) plus aria-label — since nothing runs that directive over SlickGrid-owned DOM.
+// P42 D19/D20 — headerCellAttrs is a plain static attribute bag (F3), so this writes the same
+// shape AttributeTooltip.vue's own bridge (packages/workbench/src/components/) reads by hand:
+// data-kira-tip (the plain, newline-joined a11y text) and data-kira-tip-parts (the structured
+// JSON a real TooltipContent would render) plus aria-label — since no Vue component tree mounts
+// over SlickGrid-owned DOM.
 function tooltipAttrs(content: ReturnType<typeof columnHeaderTooltip>): Record<string, string> {
   const plain = [content.title, content.meta, content.body]
     .filter((v): v is string => !!v)
