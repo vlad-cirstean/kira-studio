@@ -351,7 +351,7 @@ onUnmounted(() => {
    every block element below restates its own spacing (and headings their own scale, P73 §7); that
    is expected here, not a workaround. */
 .md-reading {
-  @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-[1.6] p-4;
+  @apply flex-1 min-h-0 overflow-auto text-fg bg-bg font-ui text-kira-md leading-relaxed p-4;
 }
 .md-reading > :deep(*) {
   @apply max-w-[72ch];
@@ -362,7 +362,7 @@ onUnmounted(() => {
 .md-reading :deep(h4),
 .md-reading :deep(h5),
 .md-reading :deep(h6) {
-  @apply font-semibold leading-[1.3] mt-4 mx-0 mb-1.5;
+  @apply font-semibold leading-tight mt-4 mx-0 mb-1.5;
 }
 /* P73 §7(b): em, not --kira-t-xl (tokens.css: deliberately a 20px literal that ignores Appearance)
    — resolves against .md-reading's own font-size, so the scale tracks the Appearance font-size
@@ -397,7 +397,7 @@ onUnmounted(() => {
   @apply text-info cursor-pointer;
 }
 .md-reading :deep(blockquote) {
-  @apply border-l-[3px] border-border text-muted mt-0 mx-0 mb-2 py-0 px-2;
+  @apply border-l-4 border-border text-muted mt-0 mx-0 mb-2 py-0 px-2;
 }
 .md-reading :deep(hr) {
   @apply border-0 border-t border-border my-4 mx-0;

@@ -146,7 +146,7 @@ function onDblClick(): void {
 }
 
 .match-line {
-  @apply shrink-0 min-w-[40px];
+  @apply shrink-0 min-w-10;
 }
 
 .preview {
@@ -154,7 +154,7 @@ function onDblClick(): void {
 }
 
 .preview-match {
-  @apply rounded-[2px];
+  @apply rounded-sm;
   background: var(--kira-search-match);
 }
 </style>
