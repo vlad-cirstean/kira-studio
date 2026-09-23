@@ -6,7 +6,12 @@ import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
@@ -313,7 +318,7 @@ onUnmounted(() => {
              #badges group above, so it shifts position with the dirty mark/unresolved chip. -->
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira"
@@ -324,7 +329,7 @@ onUnmounted(() => {
                 <CodiconIcon name="save" :size="13" />
                 Save
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
@@ -343,11 +348,11 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="grpc-request-stop" @click="onStop">
                 <CodiconIcon name="debug-stop" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -392,7 +397,7 @@ onUnmounted(() => {
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <TooltipDisabledTrigger>
             <Button
               variant="toolbar-primary"
               size="kira"
@@ -403,7 +408,7 @@ onUnmounted(() => {
               <CodiconIcon name="play" :size="13" />
               Call
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Call</TooltipContent>
       </Tooltip>

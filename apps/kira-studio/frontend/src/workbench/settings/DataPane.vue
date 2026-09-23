@@ -2,7 +2,12 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import type { SettingsPaneProps } from './types';
 
 // P103 Part 2 (§5.5): extracted verbatim from workbench/SettingsDialog.vue's own
@@ -26,7 +31,7 @@ function onDefaultPageSizeChange(e: Event): void {
         <span>Default page size</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('data', 'defaultPageSize') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('data', 'defaultPageSize') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -37,7 +42,7 @@ function onDefaultPageSizeChange(e: Event): void {
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>

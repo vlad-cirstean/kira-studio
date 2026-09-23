@@ -24,7 +24,12 @@ import {
 } from '@theme/components/ui/input-group';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
@@ -504,7 +509,7 @@ onUnmounted(() => {
       <span class="p-push flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira"
@@ -515,7 +520,7 @@ onUnmounted(() => {
                 <CodiconIcon name="save" :size="13" />
                 Save
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ incognito ? 'Saving is off in an incognito tab' : (canSave ? 'Save request' : 'Save request to a collection') }}</TooltipContent>
         </Tooltip>
@@ -534,11 +539,11 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button variant="toolbar" size="kira-icon" :class="{ 'is-live': running }" :disabled="!running" aria-label="Stop" data-testid="http-request-stop" @click="onStop">
                 <CodiconIcon name="debug-stop" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -573,7 +578,7 @@ onUnmounted(() => {
       </Tooltip>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <TooltipDisabledTrigger>
             <Button
               variant="toolbar-primary"
               size="kira"
@@ -584,7 +589,7 @@ onUnmounted(() => {
               <CodiconIcon name="play" :size="13" />
               Send
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Send</TooltipContent>
       </Tooltip>
@@ -620,11 +625,11 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button variant="toolbar" size="kira-icon" :disabled="!canEditRaw" aria-label="Edit as raw HTTP" data-testid="http-edit-raw" @click="onEditRaw">
                 <CodiconIcon name="code" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ editRawTooltip }}</TooltipContent>
         </Tooltip>

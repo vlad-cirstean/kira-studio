@@ -43,7 +43,12 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -740,7 +745,7 @@ onUnmounted(() => {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -752,7 +757,7 @@ onUnmounted(() => {
                 >
                   <CodiconIcon name="debug-stop" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Stop</TooltipContent>
           </Tooltip>
@@ -812,7 +817,7 @@ onUnmounted(() => {
                only place the Count button's result (below) ever gets shown, for every engine. -->
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -823,14 +828,14 @@ onUnmounted(() => {
                 >
                   <CodiconIcon name="arrow-left" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Previous page</TooltipContent>
           </Tooltip>
           <span class="mono p-sm muted" data-testid="keyvalue-status">{{ statusLine }}</span>
           <Tooltip v-if="!isSingleObjectPage">
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -841,7 +846,7 @@ onUnmounted(() => {
                 >
                   <CodiconIcon name="arrow-right" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Next page</TooltipContent>
           </Tooltip>
@@ -888,11 +893,11 @@ onUnmounted(() => {
             <div ref="addAnchorRef" class="add-anchor">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <TooltipDisabledTrigger>
                     <Button variant="toolbar" size="kira-icon" aria-label="Add" :disabled="!canInsert" data-testid="keyvalue-add" @click="openAdd">
                       <CodiconIcon name="add" :size="13" />
                     </Button>
-                  </span>
+                  </TooltipDisabledTrigger>
                 </TooltipTrigger>
                 <TooltipContent>{{ addTitle }}</TooltipContent>
               </Tooltip>
@@ -931,11 +936,11 @@ onUnmounted(() => {
             <div ref="editAnchorRef" class="edit-anchor">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <TooltipDisabledTrigger>
                     <Button variant="toolbar" size="kira-icon" aria-label="Edit" :disabled="editDisabled" data-testid="keyvalue-edit" @click="openEdit">
                       <CodiconIcon name="edit" :size="13" />
                     </Button>
-                  </span>
+                  </TooltipDisabledTrigger>
                 </TooltipTrigger>
                 <TooltipContent>{{ editTitle }}</TooltipContent>
               </Tooltip>
@@ -970,11 +975,11 @@ onUnmounted(() => {
 
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button variant="toolbar" size="kira-icon" aria-label="Delete" :disabled="!canDelete" data-testid="keyvalue-delete" @click="onDeleteKey">
                   <CodiconIcon name="trash" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>{{ deleteTitle }}</TooltipContent>
           </Tooltip>

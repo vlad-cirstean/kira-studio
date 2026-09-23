@@ -7,7 +7,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupTextarea } from '@theme/components/ui/input-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import type { VariableSupport } from '../../../api/state/variableCompletion';
 import type { Completion } from '../../../theme/completion';
@@ -367,7 +372,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
       </div>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+          <TooltipDisabledTrigger>
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -378,7 +383,7 @@ function onContainerKeydown(e: KeyboardEvent): void {
             >
               <CodiconIcon name="close" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Remove</TooltipContent>
       </Tooltip>

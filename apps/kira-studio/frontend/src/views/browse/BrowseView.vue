@@ -4,7 +4,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription, AlertTitle } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -437,7 +442,7 @@ onMounted(() => {
           <div class="p-toolbar list-head" data-testid="browse-list-head">
             <Tooltip>
               <TooltipTrigger as-child>
-                <span tabindex="0" class="inline-flex">
+                <TooltipDisabledTrigger>
                   <Button
                     variant="toolbar"
                     size="kira-icon"
@@ -448,7 +453,7 @@ onMounted(() => {
                   >
                     <CodiconIcon name="chevron-left" :size="13" />
                   </Button>
-                </span>
+                </TooltipDisabledTrigger>
               </TooltipTrigger>
               <TooltipContent>Back</TooltipContent>
             </Tooltip>

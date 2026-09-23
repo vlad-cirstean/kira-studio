@@ -6,7 +6,12 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { copyText } from '@workbench/util/clipboard';
@@ -247,21 +252,21 @@ const breadcrumb = computed(() => {
       <div class="group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button variant="toolbar" size="kira-icon" :disabled="loading" aria-label="Refresh" data-testid="definition-refresh" @click="onRefresh">
                 <CodiconIcon name="refresh" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button variant="toolbar" size="kira-icon" disabled aria-label="Stop">
                 <CodiconIcon name="debug-stop" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>

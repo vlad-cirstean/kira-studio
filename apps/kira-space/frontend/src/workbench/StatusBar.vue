@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import StatusBarBase from '@workbench/components/StatusBar.vue';
 import { computed } from 'vue';
 import { useBlameStatusStore } from '../state/blameStatus';
@@ -30,7 +35,7 @@ function onRevealBlameCommit(): void {
       <!-- P76 §5.2: a sibling fact, not the caret-status slot — that readout stays unwired. -->
       <Tooltip v-if="blame">
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex">
+          <TooltipDisabledTrigger>
             <button
               class="p-status blame"
               data-testid="blame-status"
@@ -40,7 +45,7 @@ function onRevealBlameCommit(): void {
               <CodiconIcon name="git-commit" :size="13" />
               <span class="blame-text">{{ blameText }}</span>
             </button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>{{ blameTooltip }}</TooltipContent>
       </Tooltip>

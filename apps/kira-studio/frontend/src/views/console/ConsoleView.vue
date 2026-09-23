@@ -8,7 +8,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -627,7 +632,7 @@ const statusLine = computed(() => {
       </div>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar-primary"
                 size="kira"
@@ -638,13 +643,13 @@ const statusLine = computed(() => {
                 <CodiconIcon name="play" :size="13" />
                 Run
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Run the statement under the cursor</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira"
@@ -655,13 +660,13 @@ const statusLine = computed(() => {
                 <CodiconIcon name="run-all" :size="13" />
                 Run all
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Run every statement in the editor</TooltipContent>
         </Tooltip>
         <Tooltip v-if="canFormat">
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira"
@@ -672,7 +677,7 @@ const statusLine = computed(() => {
                 <CodiconIcon name="indent" :size="13" />
                 Format
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Format the query text</TooltipContent>
         </Tooltip>
@@ -682,7 +687,7 @@ const statusLine = computed(() => {
              console and just not to this particular statement. -->
         <Tooltip v-if="dialect">
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira"
@@ -693,7 +698,7 @@ const statusLine = computed(() => {
                 <CodiconIcon name="list-tree" :size="13" />
                 Explain
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ explainTooltip }}</TooltipContent>
         </Tooltip>

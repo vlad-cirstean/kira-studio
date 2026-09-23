@@ -9,7 +9,12 @@ import { Input } from '@theme/components/ui/input';
 import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -699,7 +704,7 @@ onUnmounted(() => {
         </Tooltip>
         <Tooltip v-else>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -710,7 +715,7 @@ onUnmounted(() => {
               >
                 <CodiconIcon name="arrow-right" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Next page</TooltipContent>
         </Tooltip>
@@ -769,7 +774,7 @@ onUnmounted(() => {
         </div>
         <Tooltip v-if="canDelete">
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -780,7 +785,7 @@ onUnmounted(() => {
               >
                 <CodiconIcon name="trash" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{
             hasSelectedRow ? 'Delete the selected message' : 'Select a message first'

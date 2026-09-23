@@ -4,7 +4,12 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
@@ -215,7 +220,7 @@ function onCloseSearch(): void {
       <div class="group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -226,13 +231,13 @@ function onCloseSearch(): void {
               >
                 <CodiconIcon name="refresh" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Refresh</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -244,7 +249,7 @@ function onCloseSearch(): void {
               >
                 <CodiconIcon name="debug-stop" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>Stop</TooltipContent>
         </Tooltip>
@@ -276,7 +281,7 @@ function onCloseSearch(): void {
             <div ref="previewAnchorRef" class="preview-anchor">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <TooltipDisabledTrigger>
                     <Button
                       variant="toolbar"
                       size="kira-icon"
@@ -287,7 +292,7 @@ function onCloseSearch(): void {
                     >
                       <CodiconIcon name="eye" :size="13" />
                     </Button>
-                  </span>
+                  </TooltipDisabledTrigger>
                 </TooltipTrigger>
                 <TooltipContent>{{ isWritable ? 'Preview the SQL for pending changes' : 'Connection is read-only' }}</TooltipContent>
               </Tooltip>
@@ -297,7 +302,7 @@ function onCloseSearch(): void {
           </Popover>
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar"
                   size="kira-icon"
@@ -308,13 +313,13 @@ function onCloseSearch(): void {
                 >
                   <CodiconIcon name="discard" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Discard pending changes</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   variant="toolbar-primary"
                   size="kira-icon"
@@ -325,7 +330,7 @@ function onCloseSearch(): void {
                 >
                   <CodiconIcon name="save" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Commit pending changes</TooltipContent>
           </Tooltip>

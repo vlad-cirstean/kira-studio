@@ -4,7 +4,12 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { formatBytes } from '@workbench/util/format';
 import { computed, ref } from 'vue';
@@ -63,7 +68,7 @@ async function onClearCaches(): Promise<void> {
         <span>Result page cache budget (MB)</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('cache', 'l2BudgetMb') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('cache', 'l2BudgetMb') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -74,7 +79,7 @@ async function onClearCaches(): Promise<void> {
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>

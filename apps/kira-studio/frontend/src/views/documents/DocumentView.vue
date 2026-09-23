@@ -7,7 +7,12 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/compone
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
@@ -824,7 +829,7 @@ onUnmounted(() => {
       <div class="group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex">
+            <TooltipDisabledTrigger>
               <Button
                 variant="toolbar"
                 size="kira-icon"
@@ -835,7 +840,7 @@ onUnmounted(() => {
               >
                 <CodiconIcon name="add" :size="13" />
               </Button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ insertTitle }}</TooltipContent>
         </Tooltip>
@@ -1083,7 +1088,7 @@ onUnmounted(() => {
                   <span v-if="editingRow === rows[vi.index]" class="p-chip warn">editing</span>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <span tabindex="0" class="inline-flex">
+                      <TooltipDisabledTrigger>
                         <Button
                           variant="toolbar"
                           size="kira-icon"
@@ -1095,13 +1100,13 @@ onUnmounted(() => {
                         >
                           <CodiconIcon name="edit" :size="13" />
                         </Button>
-                      </span>
+                      </TooltipDisabledTrigger>
                     </TooltipTrigger>
                     <TooltipContent>{{ editGate.editable ? 'Edit' : editGate.label }}</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger as-child>
-                      <span tabindex="0" class="inline-flex">
+                      <TooltipDisabledTrigger>
                         <Button
                           variant="toolbar"
                           size="kira-icon"
@@ -1112,7 +1117,7 @@ onUnmounted(() => {
                         >
                           <CodiconIcon name="trash" :size="13" />
                         </Button>
-                      </span>
+                      </TooltipDisabledTrigger>
                     </TooltipTrigger>
                     <TooltipContent>{{ deleteTitle }}</TooltipContent>
                   </Tooltip>

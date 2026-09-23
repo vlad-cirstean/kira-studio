@@ -4,7 +4,12 @@ import { pathTail } from '@shared/domain/tree';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { type MenuItem, useContextMenuStore } from '@workbench/state/contextMenu';
 import { formatBytes } from '@workbench/util/format';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
@@ -508,7 +513,7 @@ const statusLine = computed(() => {
       <span class="format-group">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+            <TooltipDisabledTrigger>
               <button
                 type="button"
                 class="p-select bordered format-select"
@@ -521,7 +526,7 @@ const statusLine = computed(() => {
                 }}</span>
                 <CodiconIcon name="chevron-down" :size="12" />
               </button>
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>{{ formatHint }}</TooltipContent>
         </Tooltip>
@@ -535,7 +540,7 @@ const statusLine = computed(() => {
             <span ref="generateAnchorRef" class="generate-anchor">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+                  <TooltipDisabledTrigger>
                     <Button
                       variant="toolbar"
                       size="kira-icon"
@@ -546,7 +551,7 @@ const statusLine = computed(() => {
                     >
                       <CodiconIcon name="sparkle" :size="13" />
                     </Button>
-                  </span>
+                  </TooltipDisabledTrigger>
                 </TooltipTrigger>
                 <TooltipContent>Generate a value</TooltipContent>
               </Tooltip>

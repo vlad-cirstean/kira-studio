@@ -5,7 +5,12 @@ import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import DateTimePicker from '../DateTimePicker.vue';
 import type { CellFormat } from './formats';
@@ -134,7 +139,7 @@ watch(calendarOpen, (open) => {
       <div class="ts-field">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span tabindex="0" class="inline-flex w-full" :aria-describedby="undefined">
+            <TooltipDisabledTrigger class="w-full">
               <Input
                 :model-value="fieldText"
                 :disabled="readOnly"
@@ -142,7 +147,7 @@ watch(calendarOpen, (open) => {
                 data-testid="cell-editor-timestamp-field"
                 @update:model-value="onFieldInput(String($event))"
               />
-            </span>
+            </TooltipDisabledTrigger>
           </TooltipTrigger>
           <TooltipContent>YYYY-MM-DD HH:mm:ss, in the zone selected above</TooltipContent>
         </Tooltip>
@@ -151,7 +156,7 @@ watch(calendarOpen, (open) => {
         <span ref="calendarAnchorRef" class="ts-calendar-anchor">
           <Tooltip>
             <TooltipTrigger as-child>
-              <span tabindex="0" class="inline-flex" :aria-describedby="undefined">
+              <TooltipDisabledTrigger>
                 <Button
                   ref="calendarTriggerEl"
                   variant="toolbar"
@@ -163,7 +168,7 @@ watch(calendarOpen, (open) => {
                 >
                   <CodiconIcon name="calendar" :size="13" />
                 </Button>
-              </span>
+              </TooltipDisabledTrigger>
             </TooltipTrigger>
             <TooltipContent>Pick a date and time</TooltipContent>
           </Tooltip>

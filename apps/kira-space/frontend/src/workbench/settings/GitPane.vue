@@ -5,7 +5,12 @@ import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipDisabledTrigger,
+  TooltipTrigger,
+} from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref, watch } from 'vue';
 import {
@@ -93,7 +98,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <span>Protected branch patterns (one per line)</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'protectedBranches') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'protectedBranches') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -104,7 +109,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -126,7 +131,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <span>Auto-fetch interval (minutes)</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'fetchAutoIntervalMinutes') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'fetchAutoIntervalMinutes') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -137,7 +142,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -202,7 +207,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <span>Git executable path</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'gitPath') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'gitPath') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -213,7 +218,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
@@ -235,7 +240,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         <span>Font size</span>
         <Tooltip>
         <TooltipTrigger as-child>
-          <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('git', 'graphFontSize') }">
+          <TooltipDisabledTrigger :class="{ 'pointer-events-none': isAtDefault('git', 'graphFontSize') }">
             <Button
               variant="toolbar"
               size="kira-icon"
@@ -246,7 +251,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
             >
               <CodiconIcon name="discard" :size="13" />
             </Button>
-          </span>
+          </TooltipDisabledTrigger>
         </TooltipTrigger>
         <TooltipContent>Reset to default</TooltipContent>
         </Tooltip>
