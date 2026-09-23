@@ -21,6 +21,10 @@ const (
 	worktreeBasePathKey      = "worktreeBasePath"
 )
 
+// checkoutAutoStashKey is G28 D16's own eleventh leaf (kiraSpace.checkout.autoStash) — same
+// ordinary per-repo row shape as every other leaf here.
+const checkoutAutoStashKey = "checkoutAutoStash"
+
 // GitRepoSettingsRepo reads and writes the `git_repo_settings` table — G18 D3's per-repo sibling
 // of SettingsRepo, one JSON-valued row per (repo_id, key) leaf rather than a blob per repository.
 type GitRepoSettingsRepo struct {
@@ -51,6 +55,7 @@ func (r *GitRepoSettingsRepo) Get(repoID string) (model.GitRepoSettings, error) 
 	appsettings.Leaf(stored, worktreePrepareScriptKey, &result.WorktreePrepareScript)
 	appsettings.Leaf(stored, worktreeBasePathKey, &result.WorktreeBasePath)
 	appsettings.LeafValid(stored, logLevelSettingKey, &result.LogLevel, appsettings.ValidLogLevel)
+	appsettings.Leaf(stored, checkoutAutoStashKey, &result.CheckoutAutoStash)
 
 	return result, nil
 }
@@ -108,6 +113,7 @@ func (r *GitRepoSettingsRepo) Set(repoID string, patch model.GitRepoSettingsPatc
 		{"githubEnabled", patch.GithubEnabled != nil, derefAny(patch.GithubEnabled)},
 		{worktreePrepareScriptKey, patch.WorktreePrepareScript != nil, derefAny(patch.WorktreePrepareScript)},
 		{worktreeBasePathKey, patch.WorktreeBasePath != nil, derefAny(patch.WorktreeBasePath)},
+		{checkoutAutoStashKey, patch.CheckoutAutoStash != nil, derefAny(patch.CheckoutAutoStash)},
 	}
 	for _, l := range leaves {
 		if !l.has {
