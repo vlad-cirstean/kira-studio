@@ -130,6 +130,54 @@ func TestDispatcher_Mutate_InvalidatesEvenOnFailure(t *testing.T) {
 	}
 }
 
+// F4 (P108 Part 6): a Read whose cache miss is still in flight when a concurrent mutation
+// invalidates its exact target must not cache its own now-stale, pre-invalidation result once it
+// finally returns. Genuinely concurrent (a real goroutine race, not a simulated ordering) —
+// confirmed hanging on nothing pre-fix but *failing* the final assertion pre-fix via a scoped
+// `git stash` on enginecache/{cache,generation}.go and adapterhost/data.go (pre-fix, the read's
+// result lands in cache regardless of the concurrent Invalidate).
+func TestDispatcher_Read_DoesNotCacheStaleResultRacingConcurrentInvalidate(t *testing.T) {
+	d, _ := newDispatcher()
+	const connID, path = "conn-race", "database:app/table:t"
+
+	readStarted := make(chan struct{})
+	proceed := make(chan struct{})
+	fake := &dataFakeAdapter{readCtxFn: func(ctx context.Context) (page.Page, error) {
+		close(readStarted)
+		<-proceed // held open until the test has invalidated this exact target underneath it
+		return page.TabularPage{RowCount: 1, ByteSize: 10}, nil
+	}}
+	adapters.SetLiveAdapter(connID, fake)
+	defer adapters.DeleteLiveAdapter(connID)
+
+	req := ReadRequestWire{
+		OpID: "op-race", ConnectionID: connID, Path: path, PageSize: 10,
+		Cursor: model.PageCursor{Mode: "offset", Offset: 0},
+	}
+
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		if _, err := d.Read(context.Background(), req); err != nil {
+			t.Errorf("Read: %v", err)
+		}
+	}()
+	<-readStarted
+
+	// A concurrent mutation on the very same target, landing while the read above is still
+	// mid-flight — this is the exact race F4 guards against.
+	d.cache.InvalidateAfterMutation(connID, path)
+	close(proceed)
+	<-readDone
+
+	key, _ := enginecache.PageCacheKey(enginecache.ReadRequest{
+		ConnectionID: connID, Path: path, PageSize: req.PageSize, Cursor: req.Cursor,
+	})
+	if _, ok := d.cache.ReadPage(key); ok {
+		t.Error("a Read racing a concurrent InvalidateAfterMutation must not cache its own stale result")
+	}
+}
+
 // Invalidate's two scopes: "pages" drops only L2 (the post-mutation reload must leave the stale
 // count mark intact); anything else (including the empty default) drops both, hard.
 func TestDispatcher_Invalidate_ScopeRouting(t *testing.T) {

@@ -54,6 +54,10 @@ func (d *Dispatcher) Read(ctx context.Context, req ReadRequestWire) (ReadRespons
 	if cached, ok := d.cache.ReadPage(key); ok {
 		return ReadResponse{Page: cached, Source: "cache"}, nil
 	}
+	// F4 (P108 Part 6): captured now, before the underlying op is even issued — StorePageIfCurrent
+	// below only actually caches the result if nothing has invalidated this target (a mutation, an
+	// explicit drop/refresh, a disconnect/reconnect, or Clear) by the time it returns.
+	gen := d.cache.CurrentGeneration(req.ConnectionID, req.Path)
 
 	adapter, err := requireLiveAdapter(req.ConnectionID)
 	if err != nil {
@@ -80,7 +84,7 @@ func (d *Dispatcher) Read(ctx context.Context, req ReadRequestWire) (ReadRespons
 		return ReadResponse{}, err
 	}
 
-	d.cache.StorePage(key, label, cacheReq, p)
+	d.cache.StorePageIfCurrent(key, label, cacheReq, p, gen)
 	return ReadResponse{Page: p, Source: "server"}, nil
 }
 
@@ -92,6 +96,9 @@ func (d *Dispatcher) Count(ctx context.Context, req CountRequestWire) (CountResp
 			return CountResponse{Value: cached.Value, Exact: cached.Exact, At: cached.At.UnixMilli(), Stale: cached.Stale, Source: "cache"}, nil
 		}
 	}
+	// F4 (P108 Part 6): see Read's own comment above — count queries on large tables are slow,
+	// widening the exact race window this guards against.
+	gen := d.cache.CurrentGeneration(req.ConnectionID, req.Path)
 
 	adapter, err := requireLiveAdapter(req.ConnectionID)
 	if err != nil {
@@ -115,7 +122,7 @@ func (d *Dispatcher) Count(ctx context.Context, req CountRequestWire) (CountResp
 		return CountResponse{}, err
 	}
 
-	d.cache.StoreCount(req.ConnectionID, req.Path, req.Filter, result.Value, result.Exact)
+	d.cache.StoreCountIfCurrent(req.ConnectionID, req.Path, req.Filter, result.Value, result.Exact, gen)
 	return CountResponse{Value: result.Value, Exact: result.Exact, At: time.Now().UnixMilli(), Stale: false, Source: "server"}, nil
 }
 

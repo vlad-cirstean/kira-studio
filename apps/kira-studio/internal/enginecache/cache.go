@@ -35,6 +35,7 @@ type Cache struct {
 	mu     sync.Mutex
 	pages  *pageStore
 	counts *countStore
+	gen    *generationTracker
 
 	listeners      map[int]func(CacheStats)
 	nextListenerID int
@@ -48,7 +49,7 @@ func NewCache(l2BudgetBytes int, log func(level, message string)) *Cache {
 	if log == nil {
 		log = func(string, string) {}
 	}
-	c := &Cache{log: log, listeners: make(map[int]func(CacheStats))}
+	c := &Cache{log: log, listeners: make(map[int]func(CacheStats)), gen: newGenerationTracker()}
 	warn := func(msg string) { c.log("warn", msg) }
 	c.pages = newPageStore(warn)
 	c.counts = newCountStore(warn)
@@ -112,10 +113,36 @@ func (c *Cache) ReadPage(key string) (page.Page, bool) {
 	return p, ok
 }
 
-// StorePage mirrors cache.storePage.
+// StorePage mirrors cache.storePage. Unconditional — kept for callers (tests) that construct and
+// store a page directly with no invalidation race to guard against; Dispatcher.Read goes through
+// StorePageIfCurrent instead (F4).
 func (c *Cache) StorePage(key, label string, req ReadRequest, p page.Page) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.pages.put(key, req, label, p)
+	c.scheduleEmitLocked()
+}
+
+// CurrentGeneration captures connectionID/path's current invalidation generation (F4, P108 Part
+// 6) — Read/Count call this right after their own cache-miss check, before issuing the underlying
+// op, and pass the result to StorePageIfCurrent/StoreCountIfCurrent once that op returns.
+func (c *Cache) CurrentGeneration(connectionID, path string) GenerationSnapshot {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.gen.snapshot(connectionID, path)
+}
+
+// StorePageIfCurrent is StorePage, but only actually stores when gen (from a CurrentGeneration
+// call made before the now-finished op was issued) still matches this target's generation — F4:
+// a cache miss that raced InvalidateAfterMutation/DropTarget/DropConnection/DropPagesOnly/Clear
+// (including mid-reconnect) while the op was in flight must never cache its own now-stale,
+// pre-invalidation result as fresh.
+func (c *Cache) StorePageIfCurrent(key, label string, req ReadRequest, p page.Page, gen GenerationSnapshot) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gen.snapshot(req.ConnectionID, req.Path) != gen {
+		return
+	}
 	c.pages.put(key, req, label, p)
 	c.scheduleEmitLocked()
 }
@@ -127,10 +154,24 @@ func (c *Cache) Count(connectionID, path string, filter *string) (CountEntry, bo
 	return c.counts.get(connectionID, path, filter)
 }
 
-// StoreCount mirrors cache.storeCount.
+// StoreCount mirrors cache.storeCount. Unconditional — see StorePage's own doc comment;
+// Dispatcher.Count goes through StoreCountIfCurrent instead (F4).
 func (c *Cache) StoreCount(connectionID, path string, filter *string, value int64, exact bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.counts.put(connectionID, path, filter, value, exact)
+	c.scheduleEmitLocked()
+}
+
+// StoreCountIfCurrent is StoreCount, guarded the same way StorePageIfCurrent guards StorePage
+// (F4) — count queries on large tables are slow, widening the exact race window this guards
+// against.
+func (c *Cache) StoreCountIfCurrent(connectionID, path string, filter *string, value int64, exact bool, gen GenerationSnapshot) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gen.snapshot(connectionID, path) != gen {
+		return
+	}
 	c.counts.put(connectionID, path, filter, value, exact)
 	c.scheduleEmitLocked()
 }
@@ -142,6 +183,7 @@ func (c *Cache) DropTarget(connectionID, path string) {
 	defer c.mu.Unlock()
 	c.pages.dropTarget(connectionID, path)
 	c.counts.dropTarget(connectionID, path)
+	c.gen.bumpTarget(connectionID, path)
 	c.scheduleEmitLocked()
 }
 
@@ -153,6 +195,7 @@ func (c *Cache) InvalidateAfterMutation(connectionID, path string) {
 	defer c.mu.Unlock()
 	c.pages.dropTarget(connectionID, path)
 	c.counts.markTargetStale(connectionID, path)
+	c.gen.bumpTarget(connectionID, path)
 	c.scheduleEmitLocked()
 }
 
@@ -162,6 +205,7 @@ func (c *Cache) DropPagesOnly(connectionID, path string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.pages.dropTarget(connectionID, path)
+	c.gen.bumpTarget(connectionID, path)
 	c.scheduleEmitLocked()
 }
 
@@ -171,6 +215,7 @@ func (c *Cache) DropConnection(connectionID string) {
 	defer c.mu.Unlock()
 	c.pages.dropConnection(connectionID)
 	c.counts.dropConnection(connectionID)
+	c.gen.bumpConnection(connectionID)
 	c.scheduleEmitLocked()
 }
 
@@ -180,6 +225,7 @@ func (c *Cache) Clear() {
 	defer c.mu.Unlock()
 	c.pages.clear()
 	c.counts.clear()
+	c.gen.bumpGlobal()
 	c.scheduleEmitLocked()
 }
 
