@@ -243,6 +243,41 @@ func TestSigtermEscalatesToSigkill(t *testing.T) {
 	}
 }
 
+// TestBackgroundedSetsidChildDoesNotBlockStop is F1 (P108 Part 3): a script that backgrounds a
+// helper via setsid leaves that helper outside cmd's process group while it keeps inheriting the
+// stderr fd — so `-pid` signals from killEntry never reach it, and it only closes stderr's write
+// end when it exits on its own (here, after 2s). Reproduced by the P108 Part 3 reviewer with
+// `setsid sleep 6 & exit 0`: the outer shell exits 0 almost immediately, but the old
+// StderrPipe-then-Wait ordering blocked cmd.Wait() (and so e.exited, and so killEntry's own wait)
+// on that fd's EOF regardless — Stop only returned once the backgrounded sleep finished on its
+// own. killGrace (120ms in this package's test init) exceeds settleWindow (80ms), so the settled
+// entry is deterministically tracked as a sidecar here — this isn't a one-shot-vs-sidecar test,
+// it is a Stop-returns-promptly test.
+func TestBackgroundedSetsidChildDoesNotBlockStop(t *testing.T) {
+	s := New()
+	var oe exitCollector
+	s.OnExit(oe.handle)
+
+	got, err := s.Start("c1", "setsid sleep 2 & exit 0")
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if got.Kind != KindSidecar {
+		t.Fatalf("Kind = %q, want %q (killGrace > settleWindow in this test config)", got.Kind, KindSidecar)
+	}
+
+	start := time.Now()
+	s.Stop("c1")
+	elapsed := time.Since(start)
+
+	if elapsed >= 1*time.Second {
+		t.Errorf("Stop took %s, want well under the backgrounded child's own 2s lifetime (bounded by WaitDelay/killGrace instead)", elapsed)
+	}
+	if oe.count() != 0 {
+		t.Fatalf("OnExit fired %d times after a self-inflicted Stop, want 0", oe.count())
+	}
+}
+
 // TestProcessGroupKillReachesGrandchild covers Setpgid + kill(-pgid): a pre-connect script that
 // backgrounds its own child must not leave that grandchild running after Stop.
 func TestProcessGroupKillReachesGrandchild(t *testing.T) {

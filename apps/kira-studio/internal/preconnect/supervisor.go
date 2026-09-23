@@ -74,6 +74,16 @@ type entry struct {
 	dead    *Exit // set if the process exited before Arm consumed it
 }
 
+// stderrWriter feeds cmd.Stderr writes into an entry's tail tracker — see the WaitDelay comment
+// at its one call site (Start) for why a plain io.Writer, not StderrPipe, is what lets Wait()
+// itself be bounded.
+type stderrWriter struct{ e *entry }
+
+func (w stderrWriter) Write(p []byte) (int, error) {
+	w.e.pushStderr(string(p))
+	return len(p), nil
+}
+
 func (e *entry) pushStderr(chunk string) {
 	e.tailMu.Lock()
 	e.tail.push(chunk)
@@ -124,38 +134,30 @@ func (s *Supervisor) Start(connectionID, command string) (Start, error) {
 		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
 	}
 
+	e := &entry{exited: make(chan struct{})}
+
 	cmd := exec.Command("/bin/sh", "-c", command)
 	cmd.Dir = dir
 	cmd.Stdout = nil // D8: /dev/null, not a pipe nobody reads — deliberately stricter than the TS original.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Env = withAugmentedPath(os.Environ())
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return Start{}, fmt.Errorf("Pre-connect script could not start: %w", err)
-	}
+	cmd.Stderr = stderrWriter{e: e}
+	// F1 (P108 Part 3): bounds cmd.Wait() itself. cmd.Stderr being a plain io.Writer (not an
+	// *os.File) makes the stdlib spawn its own internal pipe-copy goroutine, and Wait() normally
+	// blocks until that goroutine sees EOF — which never arrives if a descendant left the process
+	// group (setsid, daemon(3)) while keeping the pipe's write end open. WaitDelay makes Wait()
+	// forcibly close that pipe (unblocking the copy goroutine with a read error) once it has been
+	// this long since the process itself was observed to exit, instead of hanging forever.
+	cmd.WaitDelay = killGrace
 
 	if err := cmd.Start(); err != nil {
 		slog.Error(fmt.Sprintf("preconnect[%s] failed to spawn: %s", connectionID, err), "scope", "preconnect")
 		return Start{}, fmt.Errorf("Pre-connect script could not start: %s", err)
 	}
+	e.pid = cmd.Process.Pid
 
-	e := &entry{pid: cmd.Process.Pid, exited: make(chan struct{})}
 	outcomeCh := make(chan outcome, 1)
-
 	go func() {
-		buf := make([]byte, 4096)
-		for {
-			n, rerr := stderr.Read(buf)
-			if n > 0 {
-				e.pushStderr(string(buf[:n]))
-			}
-			if rerr != nil {
-				break
-			}
-		}
-		// 'close', not 'exit' (§1.4 / P54 §1.2): the stderr pipe must be fully drained before
-		// Wait() is called, or the rejection message below loses its tail.
 		outcomeCh <- classifyExit(cmd.Wait())
 		close(e.exited)
 	}()
@@ -276,8 +278,8 @@ func (s *Supervisor) StopAll() {
 }
 
 // killEntry sends SIGTERM to the process group, escalates to SIGKILL after killGrace, waits for
-// the real exit, and removes the entry. Marking killing=true first ensures awaitExit's own exit
-// routing stays silent for this kill.
+// the real exit (bounded — F1, see below), and removes the entry. Marking killing=true first
+// ensures awaitExit's own exit routing stays silent for this kill.
 //
 // P21 round 3 finding 6: an entry can reach here already dead — awaitExit deliberately leaves a
 // sidecar that exited on its own (before Arm was ever called) sitting in s.entries for Arm to
@@ -288,6 +290,13 @@ func (s *Supervisor) StopAll() {
 // that pid now is, not this sidecar. e.exited is closed exactly once cmd.Wait() returns, so
 // checking it first (and re-checking right before the escalation fires, racing the same reap)
 // skips the whole kill/escalate dance for an entry that is already gone.
+//
+// F1 (P108 Part 3): -e.pid (a process-group signal) never reaches a descendant that left the
+// group (setsid, daemon(3)), so SIGKILL is no guarantee the tracked process itself ever dies —
+// waiting on e.exited unconditionally could block Disconnect/Remove/quit forever. Give up
+// killGrace after the SIGKILL escalation fires (Start's own cmd.WaitDelay already bounds the I/O
+// half of Wait(); this bounds the case where the process itself never receives or heeds a signal)
+// and log rather than block further — the entry is still removed from tracking either way.
 func (s *Supervisor) killEntry(connectionID string, e *entry) {
 	e.mu.Lock()
 	e.killing = true
@@ -302,6 +311,7 @@ func (s *Supervisor) killEntry(connectionID string, e *entry) {
 	default:
 		_ = killSignal(-e.pid, syscall.SIGTERM)
 
+		giveUp := make(chan struct{})
 		escalate := time.AfterFunc(killGrace, func() {
 			select {
 			case <-e.exited:
@@ -309,8 +319,14 @@ func (s *Supervisor) killEntry(connectionID string, e *entry) {
 			default:
 			}
 			_ = killSignal(-e.pid, syscall.SIGKILL)
+			time.AfterFunc(killGrace, func() { close(giveUp) })
 		})
-		<-e.exited
+
+		select {
+		case <-e.exited:
+		case <-giveUp:
+			slog.Warn(fmt.Sprintf("preconnect[%s] pid %d did not exit within %s of SIGKILL, giving up", connectionID, e.pid, killGrace), "scope", "preconnect")
+		}
 		escalate.Stop()
 	}
 
