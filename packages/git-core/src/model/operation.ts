@@ -57,11 +57,23 @@ export interface InProgressStateFiles {
   readonly bisectLog: boolean;
   readonly rebaseMergeDir: boolean;
   readonly rebaseApplyDir: boolean;
-  /** `rebase-merge/head-name`'s content, trimmed, e.g. `refs/heads/side`. */
+  /** `rebase-apply/applying`'s own presence (F3) — git's own marker (mirrored from wt-status.c)
+   *  distinguishing a plain `git am` (present) from an apply-backend `git rebase` (absent), both
+   *  of which use the SAME `rebase-apply/` directory. */
+  readonly rebaseApplyApplying: boolean;
+  /** `rebase-merge/head-name`'s content, trimmed, e.g. `refs/heads/side` — or `rebase-apply/`'s
+   *  own copy when it is the apply backend (or `git am`) that is in progress instead. */
   readonly rebaseHeadName: string | undefined;
-  /** `rebase-merge/onto`'s content, trimmed — a sha. */
+  /** `rebase-merge/onto`'s content, trimmed — a sha — or `rebase-apply/`'s own copy, same rule. */
   readonly rebaseOnto: string | undefined;
   readonly sequencerDir: boolean;
+  /** F2's own re-derived kind: when `sequencerDir` is set but every `*Head` field above is already
+   *  `undefined` (a paused multi-commit revert/cherry-pick whose current commit was finished with
+   *  a plain `git commit` instead of `--continue`), git's own sequencer state machine is still
+   *  mid-run — this is `'revert'` or `'cherryPick'`, read from `sequencer/todo`'s first pending
+   *  command, the same source git's own wt-status.c consults for exactly this state. `undefined`
+   *  when `sequencerDir` is false, or its todo does not name either. */
+  readonly sequencerTodoKind: 'revert' | 'cherryPick' | undefined;
 }
 
 function operationOf(
@@ -104,6 +116,23 @@ export function classifyInProgress(input: {
   const { stateFiles: s, unmergedPaths } = input;
 
   if (s.rebaseMergeDir || s.rebaseApplyDir) {
+    if (s.rebaseApplyDir && s.rebaseApplyApplying) {
+      // F3: rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all --
+      // `rebase --continue`/`--abort`/`--skip` all refuse outright ("It looks like 'git am' is in
+      // progress. Cannot rebase."). Report-only: every Can* flag false. A dedicated `am`
+      // InProgressKind would be a git-ipc wire-contract change (Part 17's own boundary, not yet
+      // reviewed) -- out of scope here, so this reuses `'rebase'`'s own kind with every action
+      // gated off rather than widening the union.
+      const op = operationOf('rebase', {
+        otherSha: s.rebaseOnto,
+        headName: s.rebaseHeadName,
+        canContinue: false,
+        canAbort: false,
+        isSequence: s.sequencerDir,
+        unmergedPaths,
+      });
+      return { ...op, canSkip: false }; // operationOf's own kind-based default is true; not here.
+    }
     return operationOf('rebase', {
       otherSha: s.rebaseOnto,
       headName: s.rebaseHeadName,
@@ -141,6 +170,19 @@ export function classifyInProgress(input: {
       canContinue: true,
       canAbort: true,
       isSequence: s.sequencerDir,
+      unmergedPaths,
+    });
+  }
+  if (s.sequencerDir && s.sequencerTodoKind !== undefined) {
+    // F2: no `*Head` field is left (the paused commit was finished with a plain `git commit`
+    // instead of `--continue`), but git's own sequencer state machine is still mid-run --
+    // `git status`/`--continue` both still see it. `sequencerTodoKind` names which one.
+    return operationOf(s.sequencerTodoKind, {
+      otherSha: undefined,
+      headName: undefined,
+      canContinue: true,
+      canAbort: true,
+      isSequence: true,
       unmergedPaths,
     });
   }

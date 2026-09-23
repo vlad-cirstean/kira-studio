@@ -25,29 +25,75 @@ func pathExists(path string) bool {
 	return err == nil
 }
 
-// ReadInProgressStateFiles reads all nine per-worktree state files off gitDir — NEVER commonDir
-// (D9): every one of these lives per-worktree, and in a linked worktree that is
-// <commonDir>/worktrees/<name>/, exactly what gitDir already is. A missing file is the zero value,
-// never an error — os.ReadFile's error is swallowed by design, since "not there" is the answer
-// 99% of the time and ClassifyInProgress has no use for the distinction. AUTO_MERGE is
-// deliberately not read: upstream's probe P4 found it left behind after an aborted cherry-pick, a
-// stale artefact rather than a state signal.
+// ReadInProgressStateFiles reads gitDir's per-worktree state files — NEVER commonDir (D9): every
+// one of these lives per-worktree, and in a linked worktree that is <commonDir>/worktrees/<name>/,
+// exactly what gitDir already is. A missing file is the zero value, never an error —
+// os.ReadFile's error is swallowed by design, since "not there" is the answer 99% of the time and
+// ClassifyInProgress has no use for the distinction. AUTO_MERGE is deliberately not read:
+// upstream's probe P4 found it left behind after an aborted cherry-pick, a stale artefact rather
+// than a state signal.
 //
-// The nine reads run sequentially, not concurrently (F18/D9): stat/read calls on files almost
-// certainly in the page cache, and a goroutine fan-out here would be a JavaScript Promise.all
-// idiom for an I/O model Go does not have.
+// The reads run sequentially, not concurrently (F18/D9): stat/read calls on files almost certainly
+// in the page cache, and a goroutine fan-out here would be a JavaScript Promise.all idiom for an
+// I/O model Go does not have.
 func ReadInProgressStateFiles(gitDir string) gitpreflight.InProgressStateFiles {
-	return gitpreflight.InProgressStateFiles{
-		MergeHead:      readTrimmed(filepath.Join(gitDir, "MERGE_HEAD")),
-		CherryPickHead: readTrimmed(filepath.Join(gitDir, "CHERRY_PICK_HEAD")),
-		RevertHead:     readTrimmed(filepath.Join(gitDir, "REVERT_HEAD")),
-		BisectLog:      pathExists(filepath.Join(gitDir, "BISECT_LOG")),
-		RebaseMergeDir: pathExists(filepath.Join(gitDir, "rebase-merge")),
-		RebaseApplyDir: pathExists(filepath.Join(gitDir, "rebase-apply")),
-		RebaseHeadName: readTrimmed(filepath.Join(gitDir, "rebase-merge", "head-name")),
-		RebaseOnto:     readTrimmed(filepath.Join(gitDir, "rebase-merge", "onto")),
-		SequencerDir:   pathExists(filepath.Join(gitDir, "sequencer")),
+	// F3: head-name/onto live under rebase-merge/ for a merge-backend rebase, but under
+	// rebase-apply/ for an apply-backend one (or a plain `git am`, which shares the same
+	// directory) — only one of the two directories is ever present at a time, so trying the
+	// rebase-merge/ path first and falling back to rebase-apply/ is exactly equivalent to reading
+	// whichever one actually exists.
+	headName := readTrimmed(filepath.Join(gitDir, "rebase-merge", "head-name"))
+	onto := readTrimmed(filepath.Join(gitDir, "rebase-merge", "onto"))
+	if headName == nil {
+		headName = readTrimmed(filepath.Join(gitDir, "rebase-apply", "head-name"))
 	}
+	if onto == nil {
+		onto = readTrimmed(filepath.Join(gitDir, "rebase-apply", "onto"))
+	}
+
+	return gitpreflight.InProgressStateFiles{
+		MergeHead:           readTrimmed(filepath.Join(gitDir, "MERGE_HEAD")),
+		CherryPickHead:      readTrimmed(filepath.Join(gitDir, "CHERRY_PICK_HEAD")),
+		RevertHead:          readTrimmed(filepath.Join(gitDir, "REVERT_HEAD")),
+		BisectLog:           pathExists(filepath.Join(gitDir, "BISECT_LOG")),
+		RebaseMergeDir:      pathExists(filepath.Join(gitDir, "rebase-merge")),
+		RebaseApplyDir:      pathExists(filepath.Join(gitDir, "rebase-apply")),
+		RebaseApplyApplying: pathExists(filepath.Join(gitDir, "rebase-apply", "applying")),
+		RebaseHeadName:      headName,
+		RebaseOnto:          onto,
+		SequencerDir:        pathExists(filepath.Join(gitDir, "sequencer")),
+		SequencerTodoKind:   readSequencerTodoKind(gitDir),
+	}
+}
+
+// readSequencerTodoKind is F2's own read: sequencer/todo's first non-comment, non-blank line names
+// the pending command for a multi-commit revert or cherry-pick — "revert"/"pick" (git never
+// abbreviates either token in this file, unlike interactive rebase's own todo). Mirrors git's own
+// wt-status.c, which reads exactly this to label a sequencer state once every *_HEAD file is
+// already gone. "" for a missing/empty file, or a first command this isn't (there is no other
+// sequencer op — an interactive rebase's own todo lives in rebase-merge/, checked well before this
+// is ever reached).
+func readSequencerTodoKind(gitDir string) gitpreflight.InProgressKind {
+	b, err := os.ReadFile(filepath.Join(gitDir, "sequencer", "todo"))
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		verb, _, _ := strings.Cut(line, " ")
+		switch verb {
+		case "revert":
+			return gitpreflight.InProgressRevert
+		case "pick":
+			return gitpreflight.InProgressCherryPick
+		default:
+			return ""
+		}
+	}
+	return ""
 }
 
 // sequencerVerb maps an InProgressKind to its git subcommand token — the value ContinueArgs/

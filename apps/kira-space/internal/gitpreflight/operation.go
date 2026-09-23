@@ -63,9 +63,21 @@ type InProgressStateFiles struct {
 	BisectLog      bool
 	RebaseMergeDir bool
 	RebaseApplyDir bool
-	RebaseHeadName *string
-	RebaseOnto     *string
-	SequencerDir   bool
+	// RebaseApplyApplying is rebase-apply/applying's own presence (F3) — git's own marker (mirrored
+	// from wt-status.c) distinguishing a plain `git am` (present) from an apply-backend `git rebase`
+	// (absent), both of which use the SAME rebase-apply/ directory.
+	RebaseApplyApplying bool
+	RebaseHeadName      *string
+	RebaseOnto          *string
+	SequencerDir        bool
+	// SequencerTodoKind is F2's own re-derived kind: when SequencerDir is set but every *_HEAD file
+	// is already gone (a paused multi-commit revert/cherry-pick whose current commit was finished
+	// with a plain `git commit` instead of `--continue`), git's own sequencer state machine is still
+	// mid-run — this is InProgressRevert or InProgressCherryPick, read from sequencer/todo's first
+	// pending command (gitops.ReadInProgressStateFiles), the same source git's own wt-status.c
+	// consults for exactly this state. "" when SequencerDir is unset, or its todo does not name
+	// either.
+	SequencerTodoKind InProgressKind
 }
 
 type inProgressInput struct {
@@ -100,6 +112,20 @@ func operationOf(kind InProgressKind, in inProgressInput) *InProgressOperation {
 // rather than a state signal.
 func ClassifyInProgress(files InProgressStateFiles, unmergedPaths []string) *InProgressOperation {
 	if files.RebaseMergeDir || files.RebaseApplyDir {
+		if files.RebaseApplyDir && files.RebaseApplyApplying {
+			// F3: rebase-apply/ with an "applying" marker is a plain `git am`, not a rebase at all
+			// — `rebase --continue`/`--abort`/`--skip` all refuse outright ("It looks like 'git am'
+			// is in progress. Cannot rebase."). Report-only: every Can* flag false. A dedicated
+			// `am` InProgressKind would be a git-ipc wire-contract change (Part 17's own boundary,
+			// not yet reviewed) — out of scope here, so this reuses InProgressRebase's own kind with
+			// every action gated off rather than widening the union.
+			op := operationOf(InProgressRebase, inProgressInput{
+				otherSha: files.RebaseOnto, headName: files.RebaseHeadName,
+				canContinue: false, canAbort: false, isSequence: files.SequencerDir, unmergedPaths: unmergedPaths,
+			})
+			op.CanSkip = false // operationOf's own kind-based default is true for rebase; not here.
+			return op
+		}
 		return operationOf(InProgressRebase, inProgressInput{
 			otherSha: files.RebaseOnto, headName: files.RebaseHeadName,
 			// G26 D12: canContinue true — see CanContinue's own doc comment above.
@@ -122,6 +148,14 @@ func ClassifyInProgress(files InProgressStateFiles, unmergedPaths []string) *InP
 		return operationOf(InProgressRevert, inProgressInput{
 			otherSha: files.RevertHead, canContinue: true, canAbort: true,
 			isSequence: files.SequencerDir, unmergedPaths: unmergedPaths,
+		})
+	}
+	if files.SequencerDir && files.SequencerTodoKind != "" {
+		// F2: no *_HEAD file is left (the paused commit was finished with a plain `git commit`
+		// instead of `--continue`), but git's own sequencer state machine is still mid-run —
+		// `git status`/`--continue` both still see it. SequencerTodoKind names which one.
+		return operationOf(files.SequencerTodoKind, inProgressInput{
+			canContinue: true, canAbort: true, isSequence: true, unmergedPaths: unmergedPaths,
 		})
 	}
 	if files.BisectLog {

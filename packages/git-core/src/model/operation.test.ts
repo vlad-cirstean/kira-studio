@@ -15,9 +15,11 @@ function stateFiles(partial: Partial<InProgressStateFiles>): InProgressStateFile
     bisectLog: false,
     rebaseMergeDir: false,
     rebaseApplyDir: false,
+    rebaseApplyApplying: false,
     rebaseHeadName: undefined,
     rebaseOnto: undefined,
     sequencerDir: false,
+    sequencerTodoKind: undefined,
     ...partial,
   };
 }
@@ -59,6 +61,32 @@ describe('classifyInProgress — precedence table (§7.11)', () => {
     });
     expect(op?.kind).toBe('rebase');
     expect(op?.canContinue).toBe(true);
+  });
+
+  // F3: a `git am` in progress shares rebase-apply/ with an apply-backend rebase, distinguished
+  // only by the "applying" marker file -- without this, every Can* flag was wrongly true and
+  // every offered action (`rebase --continue`/`--abort`/`--skip`) fails outright.
+  test('rebase-apply dir with "applying" marker ⇒ am, report-only (F3)', () => {
+    const op = classifyInProgress({
+      stateFiles: stateFiles({
+        rebaseApplyDir: true,
+        rebaseApplyApplying: true,
+        rebaseHeadName: 'refs/heads/side',
+        rebaseOnto: 'deadbeef',
+      }),
+      unmergedPaths: ['a.txt'],
+    });
+    expect(op).toEqual({
+      kind: 'rebase',
+      otherSha: 'deadbeef',
+      headName: 'refs/heads/side',
+      conflictedPaths: ['a.txt'],
+      canContinue: false,
+      canAbort: false,
+      isSequence: false,
+      unmergedCount: 1,
+      canSkip: false,
+    });
   });
 
   test('MERGE_HEAD present ⇒ merge, can continue and abort', () => {
@@ -131,6 +159,45 @@ describe('classifyInProgress — precedence table (§7.11)', () => {
       unmergedCount: 0,
       canSkip: false,
     });
+  });
+
+  // F2: a paused multi-commit revert/cherry-pick whose current commit was finished with a plain
+  // `git commit` (instead of `--continue`) clears *_HEAD but leaves sequencer/ (and its todo)
+  // behind -- git's own state machine is still mid-run, so this must not fall through to
+  // unmergedOnly (or null, with no unmerged paths left either).
+  test('sequencer dir with no *_HEAD file, todo says revert ⇒ revert, not unmergedOnly (F2)', () => {
+    const op = classifyInProgress({
+      stateFiles: stateFiles({ sequencerDir: true, sequencerTodoKind: 'revert' }),
+      unmergedPaths: [],
+    });
+    expect(op).toEqual({
+      kind: 'revert',
+      otherSha: undefined,
+      headName: undefined,
+      conflictedPaths: [],
+      canContinue: true,
+      canAbort: true,
+      isSequence: true,
+      unmergedCount: 0,
+      canSkip: true,
+    });
+  });
+
+  test('sequencer dir with no *_HEAD file, todo says pick ⇒ cherryPick (F2)', () => {
+    const op = classifyInProgress({
+      stateFiles: stateFiles({ sequencerDir: true, sequencerTodoKind: 'cherryPick' }),
+      unmergedPaths: [],
+    });
+    expect(op?.kind).toBe('cherryPick');
+    expect(op?.isSequence).toBe(true);
+  });
+
+  test('sequencer dir alone, todo unreadable/unrecognised ⇒ falls through to null (unchanged)', () => {
+    const op = classifyInProgress({
+      stateFiles: stateFiles({ sequencerDir: true, sequencerTodoKind: undefined }),
+      unmergedPaths: [],
+    });
+    expect(op).toBeNull();
   });
 
   test('unmerged paths with none of the six state files ⇒ unmergedOnly, cannot continue or abort', () => {

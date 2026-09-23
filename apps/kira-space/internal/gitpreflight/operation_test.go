@@ -90,6 +90,82 @@ func TestClassifyInProgress_RebaseShadowsSequencerFiles(t *testing.T) {
 	}
 }
 
+// TestClassifyInProgress_RebaseApplyDirAmMarker_ReportOnly is P108 Part 15 F3's own regression
+// proof: a plain `git am` shares rebase-apply/ with an apply-backend rebase, distinguished only by
+// the "applying" marker file. Before the fix this was classified as an ordinary rebase, every
+// Can* flag true — but `rebase --continue`/`--abort`/`--skip` all refuse outright against a real
+// `git am` ("It looks like 'git am' is in progress. Cannot rebase.").
+func TestClassifyInProgress_RebaseApplyDirAmMarker_ReportOnly(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		RebaseApplyDir: true, RebaseApplyApplying: true,
+		RebaseHeadName: strp("refs/heads/side"), RebaseOnto: strp("onto-sha"),
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRebase {
+		t.Fatalf("op = %+v, want kind=rebase (no dedicated am kind — a git-ipc wire change out of scope)", op)
+	}
+	if op.CanContinue || op.CanAbort || op.CanSkip {
+		t.Fatalf("op = %+v, want every Can* flag false for a git am in progress", op)
+	}
+	// head-name/onto still read from rebase-apply/ (not only rebase-merge/) so the report-only
+	// case is not also missing its own HeadName/OtherSha.
+	if op.HeadName == nil || *op.HeadName != "refs/heads/side" {
+		t.Fatalf("headName = %v, want refs/heads/side even in the report-only case", op.HeadName)
+	}
+	if op.OtherSha == nil || *op.OtherSha != "onto-sha" {
+		t.Fatalf("otherSha = %v, want onto-sha even in the report-only case", op.OtherSha)
+	}
+}
+
+// TestClassifyInProgress_RebaseApplyDirWithoutAmMarker_StillRebase confirms F3's fix is additive:
+// an apply-backend rebase (no "applying" marker) is unaffected, still an ordinary offer-everything
+// rebase, matching G26 D12.
+func TestClassifyInProgress_RebaseApplyDirWithoutAmMarker_StillRebase(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{RebaseApplyDir: true}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRebase || !op.CanContinue || !op.CanAbort || !op.CanSkip {
+		t.Fatalf("op = %+v, want an ordinary rebase (apply backend, no am marker)", op)
+	}
+}
+
+// TestClassifyInProgress_SequencerTodoKind_Revert is P108 Part 15 F2's own regression proof: a
+// paused multi-commit revert whose current commit was finished with a plain `git commit` (instead
+// of `--continue`) clears REVERT_HEAD but leaves sequencer/ (and its todo) behind — git's own
+// state machine is still mid-run, so this must not fall through to unmergedOnly or nil.
+func TestClassifyInProgress_SequencerTodoKind_Revert(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		SequencerDir: true, SequencerTodoKind: gitpreflight.InProgressRevert,
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressRevert {
+		t.Fatalf("op = %+v, want revert re-derived from sequencer/todo, not nil/unmergedOnly", op)
+	}
+	if !op.CanContinue || !op.CanAbort || !op.CanSkip || !op.IsSequence {
+		t.Fatalf("op = %+v, want continue/abort/skip/isSequence all true", op)
+	}
+}
+
+func TestClassifyInProgress_SequencerTodoKind_CherryPick(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{
+		SequencerDir: true, SequencerTodoKind: gitpreflight.InProgressCherryPick,
+	}, nil)
+	if op == nil || op.Kind != gitpreflight.InProgressCherryPick || !op.IsSequence {
+		t.Fatalf("op = %+v, want cherryPick re-derived from sequencer/todo", op)
+	}
+}
+
+// TestClassifyInProgress_SequencerDirAloneUnrecognisedTodo_FallsThrough confirms F2's fix is
+// additive: sequencerDir alone, with no re-derivable kind (an empty/unreadable todo) and no
+// unmerged paths, still falls all the way through to nil — same as before the fix.
+func TestClassifyInProgress_SequencerDirAloneUnrecognisedTodo_FallsThrough(t *testing.T) {
+	t.Parallel()
+	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{SequencerDir: true}, nil)
+	if op != nil {
+		t.Fatalf("op = %+v, want nil (no re-derivable kind, no unmerged paths)", op)
+	}
+}
+
 func TestClassifyInProgress_Bisect(t *testing.T) {
 	t.Parallel()
 	op := gitpreflight.ClassifyInProgress(gitpreflight.InProgressStateFiles{BisectLog: true}, nil)
