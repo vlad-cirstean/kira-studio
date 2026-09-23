@@ -8,14 +8,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/to
 // (a @tanstack/vue-virtual recipe and a ui/alert composition respectively) -- not attempted in
 // this pass, same deferral as OperationsPanel.vue's own.
 import EmptyState from '@theme/primitives/EmptyState.vue';
-// P104 §3.3: the plan scopes the reka-Splitter conversion to WorkbenchShell.vue's own CSS-grid
-// shell splitters (project/ops, already converted) -- not to every PanelSplitter call site. This
-// one (a plain two-pane list/detail split, no shell grid or layout-store involvement) stays on the
-// primitive as-is, same as every other non-shell caller.
-import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import VirtualList from '@theme/primitives/VirtualList.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useObjectStoreStore } from '../../state/objectStore';
@@ -358,8 +354,16 @@ onMounted(() => {
         button-testid="browse-reconnect-load"
         @reconnect="onReconnectAndLoad"
       />
-      <div v-else class="browse-body">
-        <div class="list-pane" :style="{ width: `${listWidth}px` }">
+      <SplitterGroup v-else direction="horizontal" class="browse-body">
+        <SplitterPanel
+          class="list-pane"
+          size-unit="px"
+          :default-size="listWidth"
+          :min-size="220"
+          :max-size="900"
+          :order="1"
+          @resize="onResizeList"
+        >
           <!-- P63 §3.2: back + breadcrumb + count — navigator-scoped controls, moved out of
                ViewChrome's own toolbar into the pane whose list they act on. Reuses `.p-toolbar`
                styling (the same 26px in-view band every other toolbar already is) rather than
@@ -449,18 +453,11 @@ onMounted(() => {
               </template>
             </VirtualList>
           </div>
-        </div>
+        </SplitterPanel>
 
-        <PanelSplitter
-          orientation="col"
-          :size="listWidth"
-          :min="220"
-          :max="900"
-          divider
-          @resize="onResizeList"
-        />
+        <SplitterResizeHandle class="browse-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-        <div class="detail-pane" data-testid="browse-detail-pane">
+        <SplitterPanel class="detail-pane" data-testid="browse-detail-pane" :order="2">
           <KeyValuePane v-if="previewable" :view-key="previewKey" />
           <EmptyState
             v-else
@@ -468,8 +465,8 @@ onMounted(() => {
             :label="emptyPreviewLabel"
             data-testid="browse-preview-empty"
           />
-        </div>
-      </div>
+        </SplitterPanel>
+      </SplitterGroup>
     </ViewChrome>
   </div>
 </template>
@@ -510,12 +507,28 @@ onMounted(() => {
   @apply flex flex-row flex-1 min-h-0;
 }
 
+/* SplitterPanel's own inline style now owns flex-grow/basis (it always wins over a class rule) —
+   min-w-0/flex layout is all this class still needs to contribute (HttpRequestView.vue's own
+   .response-pane-slot precedent). */
 .list-pane {
-  @apply shrink-0 min-w-0 flex flex-col min-h-0;
+  @apply min-w-0 flex flex-col min-h-0;
 }
 
 .detail-pane {
-  @apply flex-1 min-w-0 flex flex-col min-h-0;
+  @apply min-w-0 flex flex-col min-h-0;
+}
+
+/* P104 §3.3: reka's SplitterResizeHandle carries no divider styling of its own — this reproduces
+   PanelSplitter.vue's old `divider` prop line exactly (a centred inset box-shadow, cleared on
+   hover/drag, --kira-focus fill taking over instead), mirroring HttpRequestView.vue's own
+   .request-splitter for the horizontal (col-resize) case. */
+.browse-splitter {
+  @apply shrink-0 w-1 cursor-col-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset calc(var(--kira-border-width) * -1) 0 0 0 var(--kira-border);
+}
+.browse-splitter:hover,
+.browse-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 .body-panel {
