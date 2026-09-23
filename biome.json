@@ -161,7 +161,7 @@
       }
     },
     {
-      "includes": ["apps/kira-studio/frontend/src/repo/**"],
+      "includes": ["apps/kira-space/frontend/src/repo/**"],
       "linter": {
         "rules": {
           "style": {
