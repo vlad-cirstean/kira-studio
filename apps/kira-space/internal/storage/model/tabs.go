@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
@@ -50,23 +49,10 @@ func IsJSONObject(raw []byte) bool {
 
 // Validate asserts the same envelope repos.TabsRepo.List already enforces on read, plus the
 // non-empty identity fields no SQL constraint covers — Kira Studio's own TabRecord.Validate,
-// minus the ConnectionID it never had here, and with WorkspaceID required unconditionally rather
-// than only for a `repoTabKinds` subset (every kind here is a repo kind).
+// minus the ConnectionID it never had here, and with WorkspaceID required for every kind (every
+// kind here is a repo kind) rather than only "terminal" (P107 I2-30).
 func (t TabRecord) Validate() error {
-	if t.ID == "" {
-		return fmt.Errorf("model: tab: id is required")
-	}
-	if t.Path == "" {
-		return fmt.Errorf("model: tab %q: path is required", t.ID)
-	}
-	if !IsRenderableTabKind(t.Kind) {
-		return fmt.Errorf("model: tab %q: unrecognised kind %q", t.ID, t.Kind)
-	}
-	if !IsJSONObject(t.State) {
-		return fmt.Errorf("model: tab %q: state must be a JSON object", t.ID)
-	}
-	if t.WorkspaceID == nil || *t.WorkspaceID == "" {
-		return fmt.Errorf("model: tab %q: workspaceId is required", t.ID)
-	}
-	return nil
+	return appstorage.ValidateTab(appstorage.TabFields{
+		ID: t.ID, Path: t.Path, Kind: t.Kind, State: t.State, WorkspaceID: t.WorkspaceID,
+	}, IsRenderableTabKind, func(string) bool { return true })
 }

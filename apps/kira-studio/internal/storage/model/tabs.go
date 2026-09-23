@@ -2,7 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/kirathecat/kira-studio/internal/appstorage"
 )
@@ -72,25 +71,12 @@ func IsJSONObject(raw []byte) bool {
 // renderable, state is a JSON object), plus the non-empty identity fields no SQL constraint
 // covers (P2 R2: Save previously wrote records unvalidated, so a bad row round-tripped silently —
 // it persisted, then vanished on the next List() with nothing at the write site to say why).
+// WorkspaceID is required only for "terminal" (P103 Part 2: the other repo-* kinds that used to
+// share this requirement are gone; every remaining kind but terminal derives its workspace from
+// TAB_KIND_MODE instead) — Kira Space's own TabRecord.Validate requires it for every kind
+// (P107 I2-30).
 func (t TabRecord) Validate() error {
-	if t.ID == "" {
-		return fmt.Errorf("model: tab: id is required")
-	}
-	if t.Path == "" {
-		return fmt.Errorf("model: tab %q: path is required", t.ID)
-	}
-	if !IsRenderableTabKind(t.Kind) {
-		return fmt.Errorf("model: tab %q: unrecognised kind %q", t.ID, t.Kind)
-	}
-	if !IsJSONObject(t.State) {
-		return fmt.Errorf("model: tab %q: state must be a JSON object", t.ID)
-	}
-	// P103 Part 2: repoTabKinds used to be a multi-entry subset (the four repo-* kinds plus
-	// terminal); with those four gone, 'terminal' is the only kind left that needs a workspaceId
-	// (every other kind derives its workspace from TAB_KIND_MODE instead), so this collapses to a
-	// single equality check rather than keeping a one-member map around.
-	if t.Kind == "terminal" && (t.WorkspaceID == nil || *t.WorkspaceID == "") {
-		return fmt.Errorf("model: tab %q: kind %q requires a workspaceId", t.ID, t.Kind)
-	}
-	return nil
+	return appstorage.ValidateTab(appstorage.TabFields{
+		ID: t.ID, Path: t.Path, Kind: t.Kind, State: t.State, WorkspaceID: t.WorkspaceID,
+	}, IsRenderableTabKind, func(kind string) bool { return kind == "terminal" })
 }
