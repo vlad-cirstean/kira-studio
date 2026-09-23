@@ -106,17 +106,21 @@ func sameRedirectHost(from, dest *url.URL) bool {
 	return dh == fh || strings.HasSuffix(dh, "."+fh)
 }
 
-// hasScheme reports whether s already begins with "<scheme>://" — deliberately stricter than
+// HasScheme reports whether s already begins with "<scheme>://" — deliberately stricter than
 // url.Parse's own Scheme field, which never populates for a bare "api.example.com/path" (no
-// "//") in the first place, so resolveURL has to know to prepend one before parsing at all.
-func hasScheme(s string) bool {
+// "//") in the first place, so resolveURL has to know to prepend one before parsing at all. An
+// RFC 3986 scheme (leading letter, then letters/digits/+/-/., up to "://") — postman's own url.go
+// kept a second, near-identical copy of this (P107 T1-11).
+func HasScheme(s string) bool {
 	i := strings.Index(s, "://")
 	if i <= 0 {
 		return false
 	}
-	for _, c := range s[:i] {
-		if !(c == '+' || c == '-' || c == '.' ||
-			(c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+	for j, c := range s[:i] {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+		case j > 0 && (c >= '0' && c <= '9' || c == '+' || c == '.' || c == '-'):
+		default:
 			return false
 		}
 	}
@@ -131,7 +135,7 @@ func resolveURL(raw string) (*url.URL, error) {
 	if trimmed == "" {
 		return nil, newError(CodeBadRequest, "URL is required", nil)
 	}
-	if !hasScheme(trimmed) {
+	if !HasScheme(trimmed) {
 		trimmed = "https://" + trimmed
 	}
 	u, err := url.Parse(trimmed)

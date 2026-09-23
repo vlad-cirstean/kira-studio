@@ -9,6 +9,8 @@ package postman
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/httpclient"
 )
 
 // SplitURL is the exact counterpart of url.ts's splitUrl.
@@ -50,21 +52,6 @@ func parseQuery(query string) []queryPair {
 
 // hasScheme mirrors url.ts's withScheme test without adding one — this side never invents a
 // protocol the user did not type.
-func hasScheme(base string) bool {
-	i := strings.Index(base, "://")
-	if i <= 0 {
-		return false
-	}
-	for j, r := range base[:i] {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
-		case j > 0 && (r >= '0' && r <= '9' || r == '+' || r == '.' || r == '-'):
-		default:
-			return false
-		}
-	}
-	return true
-}
 
 // containsVariable reports whether s carries a {{name}} reference — P5's own syntax, which must
 // survive Build's splitting untouched (D8).
@@ -78,7 +65,7 @@ func Build(raw string) map[string]json.RawMessage {
 	parts := Split(raw)
 
 	base := parts.Base
-	if hasScheme(base) {
+	if httpclient.HasScheme(base) {
 		i := strings.Index(base, "://")
 		out["protocol"] = mustRaw(base[:i])
 		base = base[i+3:]
