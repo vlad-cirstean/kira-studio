@@ -270,6 +270,29 @@ func (h *Host) CancelOp(ctx context.Context, opID string) (bool, error) {
 	return true, nil
 }
 
+// CancelOpsForConnection locally cancels every currently-running op registered against
+// connectionID, except exceptOpID (pass "" when there is none to spare) — F1 (P108 Part 6). Used
+// before tearing an old adapter down (a reconnect's own teardown in Router.Connect, or an explicit
+// Router.Disconnect) so each cancelled op's own driver ctx watcher can unblock whatever the old
+// adapter's real Disconnect would otherwise wait on: QueryTracker.Drain's inFlight.Wait has no
+// bound of its own under context.Background, and ConnSet.CloseAll's per-entry Close takes the
+// entry mutex an in-flight op still holds. Only the local abort runs here — same as CancelOp, the
+// adapter-side Cancel (if any of these ops still need it) is left to CancelOp's own path.
+func (h *Host) CancelOpsForConnection(connectionID, exceptOpID string) {
+	h.mu.Lock()
+	var toCancel []context.CancelFunc
+	for opID, op := range h.running {
+		if opID == exceptOpID || op.connectionID == nil || *op.connectionID != connectionID {
+			continue
+		}
+		toCancel = append(toCancel, op.cancel)
+	}
+	h.mu.Unlock()
+	for _, cancel := range toCancel {
+		cancel()
+	}
+}
+
 // Subscribe returns this subscriber's own channel of every op:start/op:end event Host emits, and
 // an unsubscribe func — the exact shape oplog.EventSource wants, since this Host is oplog's only
 // producer now (P58f D9; it used to be fanned together with enginehost.Host's own events).

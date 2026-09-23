@@ -34,3 +34,19 @@ func DeleteLiveAdapter(connectionID string) {
 	defer live.mu.Unlock()
 	delete(live.adapters, connectionID)
 }
+
+// DeleteLiveAdapterIf is a compare-and-delete: it removes connectionID's entry only when the
+// adapter currently registered for it is exactly expected, and reports whether it did. F2 (P108
+// Part 6): a bare-id DeleteLiveAdapter can delete a *different*, newer adapter a concurrent
+// reconnect has since installed for the same id — this is what lets a caller that captured
+// expected via GetLiveAdapter safely tear it down without racing a concurrent Connect/Disconnect
+// for the same id into deleting each other's work.
+func DeleteLiveAdapterIf(connectionID string, expected Adapter) bool {
+	live.mu.Lock()
+	defer live.mu.Unlock()
+	if live.adapters[connectionID] != expected {
+		return false
+	}
+	delete(live.adapters, connectionID)
+	return true
+}
