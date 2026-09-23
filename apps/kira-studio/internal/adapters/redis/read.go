@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +11,7 @@ import (
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/jsonx"
 )
 
 // Never an unbudgeted SCAN (ground rules) — same per-round-trip COUNT hint as catalog.go.
@@ -259,26 +259,11 @@ type streamFieldValue struct {
 type streamFields []streamFieldValue
 
 func (f streamFields) MarshalJSON() ([]byte, error) {
-	var buf bytes.Buffer
-	buf.WriteByte('{')
+	pairs := make([]jsonx.Pair, len(f))
 	for i, fv := range f {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		key, err := json.Marshal(fv.Field)
-		if err != nil {
-			return nil, err
-		}
-		val, err := json.Marshal(fv.Value)
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(key)
-		buf.WriteByte(':')
-		buf.Write(val)
+		pairs[i] = jsonx.Pair{Name: fv.Field, Value: fv.Value}
 	}
-	buf.WriteByte('}')
-	return buf.Bytes(), nil
+	return jsonx.MarshalOrderedObject(pairs)
 }
 
 // parseStreamEntry reads one [id, [field, value, field, value, ...]] tuple off a raw XRANGE
