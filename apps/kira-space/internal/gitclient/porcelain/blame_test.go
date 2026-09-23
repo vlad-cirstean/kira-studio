@@ -3,6 +3,7 @@ package porcelain_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/gitclient/porcelain"
@@ -103,5 +104,30 @@ func TestParseBlameLine_EmptyInput(t *testing.T) {
 	t.Parallel()
 	if _, err := porcelain.ParseBlameLine(nil); err == nil {
 		t.Fatalf("ParseBlameLine(nil): want an error, got nil")
+	}
+}
+
+// TestIsUncommittedBlameSHA is F18's own regression guard: the uncommitted-line sentinel is an
+// all-zero string, but its WIDTH depends on this repository's own object format — 40 zeros for
+// SHA-1, 64 for SHA-256 (verified against real git --object-format=sha256), never just a longer
+// run of the same SHA-1-width value. IsUncommittedBlameSHA must recognise both, and reject
+// anything that merely looks close (wrong width, or not all zero).
+func TestIsUncommittedBlameSHA(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		sha  string
+		want bool
+	}{
+		{porcelain.UncommittedBlameSHA, true},             // 40 zeros (SHA-1).
+		{strings.Repeat("0", 64), true},                   // 64 zeros (SHA-256).
+		{strings.Repeat("0", 39), false},                  // one short of SHA-1 width.
+		{strings.Repeat("0", 41), false},                  // one over SHA-1 width, not 64 either.
+		{"0000000000000000000000000000000000000a", false}, // 40 chars, not all zero.
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := porcelain.IsUncommittedBlameSHA(c.sha); got != c.want {
+			t.Errorf("IsUncommittedBlameSHA(%q) = %v, want %v", c.sha, got, c.want)
+		}
 	}
 }

@@ -8,10 +8,29 @@ import (
 )
 
 // UncommittedBlameSHA is the sentinel commit git itself uses (probed directly, git 2.43.0) for a
-// line whose content is not in any commit yet — a plain, on-disk, unstaged edit. Recognised by
-// value, never by a separate boolean field on BlameLine (P5): both this package's own callers and
-// @kira/git-ipc's wire consumer compare a blame result's SHA against this same literal.
+// line whose content is not in any commit yet — a plain, on-disk, unstaged edit, in a SHA-1
+// repository. Recognised by value, never by a separate boolean field on BlameLine (P5): both this
+// package's own callers and @kira/git-ipc's wire consumer compare a blame result's SHA against
+// this same literal. F18: a SHA-256 repository's own sentinel is a different-width, all-zero
+// string instead (verified against real git --object-format=sha256: 64 zeros, not 40) — kept
+// exactly as-is for SHA-1/wire back-compat, but IsUncommittedBlameSHA below is the width-agnostic
+// check any Go caller should use instead of comparing against this literal directly.
 const UncommittedBlameSHA = "0000000000000000000000000000000000000000"
+
+// IsUncommittedBlameSHA reports whether sha is the uncommitted-line sentinel (F18), regardless of
+// this repository's own object format: all-zero, at either the SHA-1 (40-hex) or SHA-256 (64-hex)
+// width — never just a prefix/length match against UncommittedBlameSHA's own fixed SHA-1 literal.
+func IsUncommittedBlameSHA(sha string) bool {
+	if len(sha) != 40 && len(sha) != 64 {
+		return false
+	}
+	for _, c := range sha {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
+}
 
 // BlameLineArgs is P5's own single-line spawn: `git blame --line-porcelain -L <line>,<line> --
 // <path>`. Probed directly: a range of exactly one line always produces exactly one, fully-headered

@@ -288,21 +288,23 @@ func GlobalStashLogArgs(shas []string) []string {
 }
 
 // isGlobalStashHeader recognises a global-bucket entry's own header record: its first field (up to
-// the first %x1f delimiter, or the whole record if none is present) is exactly 40 hex bytes —
-// unambiguous against a numstat record, which begins with "\n" or a digit-tab and is never a bare
-// 40-hex-byte string (probe P12/P13).
+// the first %x1f delimiter, or the whole record if none is present) is a full-length hex object id
+// — unambiguous against a numstat record, which begins with "\n" or a digit-tab and is never a
+// bare hex-only string of either width (probe P12/P13).
 func isGlobalStashHeader(rec []byte) bool {
 	first := rec
 	if idx := bytes.IndexByte(rec, fieldDelim); idx >= 0 {
 		first = rec[:idx]
 	}
-	return isHexSha40(first)
+	return isHexObjectID(first)
 }
 
-// isHexSha40 reports whether b is exactly 40 lowercase-hex bytes — a full sha1, the only shape
-// GlobalStashFormat's own leading %H field ever takes.
-func isHexSha40(b []byte) bool {
-	if len(b) != 40 {
+// isHexObjectID reports whether b is exactly 40 (SHA-1) or 64 (SHA-256, F18) lowercase-hex bytes —
+// the only two widths GlobalStashFormat's own leading %H field can ever take, depending on this
+// repository's own object format (verified against real git --object-format=sha256: the id is a
+// completely different-width hex string, never just a longer version of the same value).
+func isHexObjectID(b []byte) bool {
+	if len(b) != 40 && len(b) != 64 {
 		return false
 	}
 	for _, c := range b {

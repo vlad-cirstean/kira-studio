@@ -388,6 +388,26 @@ func TestParseGlobalStashList_RenamePathNeverMisdetectedAsHeader(t *testing.T) {
 	}
 }
 
+// TestParseGlobalStashList_SHA256Header is F18's own regression guard: isGlobalStashHeader must
+// recognise a SHA-256 repository's own 64-hex object id, not just SHA-1's 40-hex width (verified
+// against real git --object-format=sha256, a completely different-width id, never just a longer
+// version of the SHA-1 value).
+func TestParseGlobalStashList_SHA256Header(t *testing.T) {
+	t.Parallel()
+	sha256 := strings.Repeat("a", 64)
+	base := strings.Repeat("b", 64)
+
+	raw := []byte(sha256 + "\x1f" + sha256 + "\x1f" + base + "\x1f" + "1690000000" + "\x1f" + "On main: sha256 repo\x00")
+
+	entries, err := porcelain.ParseGlobalStashList(raw, nil, testGlobalStashRefPrefix)
+	if err != nil {
+		t.Fatalf("ParseGlobalStashList: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Sha != sha256 {
+		t.Fatalf("entries = %+v, want one entry with sha %q", entries, sha256)
+	}
+}
+
 func TestParseGlobalStashList_MalformedHeaderNot40Hex(t *testing.T) {
 	t.Parallel()
 	if _, err := porcelain.ParseGlobalStashList([]byte("not-a-sha\x00"), nil, testGlobalStashRefPrefix); err == nil {

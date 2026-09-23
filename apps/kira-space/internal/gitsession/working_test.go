@@ -89,8 +89,9 @@ func TestWorkingDetail_CleanTree(t *testing.T) {
 	}
 }
 
-// TestWorkingDetail_UnbornHead proves the EmptyTreeSHA base works end to end against a fresh,
-// zero-commit repo — the one case statusAndInProgress's own Branch.Unborn exists to signal.
+// TestWorkingDetail_UnbornHead proves the empty-tree hash (EmptyTreeHashArgs, F18) works as the
+// base end to end against a fresh, zero-commit repo — the one case statusAndInProgress's own
+// Branch.Unborn exists to signal.
 func TestWorkingDetail_UnbornHead(t *testing.T) {
 	t.Parallel()
 	skipWithoutGitQueries(t)

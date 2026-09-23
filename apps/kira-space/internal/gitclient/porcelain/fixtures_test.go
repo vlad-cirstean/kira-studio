@@ -874,7 +874,8 @@ func TestFixtures_Regenerate(t *testing.T) {
 	}
 
 	// --- workingDiff/unbornHead.{numstat,nameStatus}.bin: a fresh, zero-commit repo — the
-	// EmptyTreeSHA base gitsession.WorkingDetail uses when statusResult.Branch.Unborn. ---
+	// empty-tree hash (F18: derived via EmptyTreeHashArgs, never a hardcoded literal)
+	// gitsession.WorkingDetail uses as its base when statusResult.Branch.Unborn. ---
 	{
 		dir := t.TempDir()
 		initCmd := exec.Command("git", "init", "-q", "-b", "main")
@@ -892,8 +893,9 @@ func TestFixtures_Regenerate(t *testing.T) {
 		if out, err := addCmd.CombinedOutput(); err != nil {
 			t.Fatalf("git add: %v\n%s", err, out)
 		}
-		writeFixture(t, "workingDiff/unbornHead.numstat.bin", captureRaw(t, dir, porcelain.WorkingNumstatArgs(porcelain.EmptyTreeSHA)))
-		writeFixture(t, "workingDiff/unbornHead.nameStatus.bin", captureRaw(t, dir, porcelain.WorkingNameStatusArgs(porcelain.EmptyTreeSHA)))
+		emptyTree := porcelain.ParseEmptyTreeHash(captureRaw(t, dir, porcelain.EmptyTreeHashArgs()))
+		writeFixture(t, "workingDiff/unbornHead.numstat.bin", captureRaw(t, dir, porcelain.WorkingNumstatArgs(emptyTree)))
+		writeFixture(t, "workingDiff/unbornHead.nameStatus.bin", captureRaw(t, dir, porcelain.WorkingNameStatusArgs(emptyTree)))
 	}
 
 	t.Log("golden corpus regenerated under testdata/ — run `bunx biome check --write` is not needed (Go-only); re-run tests without KIRA_GIT_FIXTURES to verify")
