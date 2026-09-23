@@ -24,6 +24,121 @@ type OrderTerm struct {
 	Direction string // "asc" | "desc"
 }
 
+// QuoteIdentDouble is read.ts's quoteIdent for the double-quote dialects (Postgres, SQLite): NUL
+// is unreachable through any real identifier but panics rather than threading an error return
+// through every call site, matching each adapter's own note (P58 D16's recover() boundary turns
+// this into a failed op, never a crash).
+func QuoteIdentDouble(name string) string {
+	if strings.ContainsRune(name, '\x00') {
+		panic(New(CodeQuery, "identifier contains a NUL byte", nil))
+	}
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+// QuoteIdentBacktick is read.ts's quoteIdent for MySQL/MariaDB's backtick dialect.
+func QuoteIdentBacktick(name string) string {
+	if strings.ContainsRune(name, '\x00') {
+		panic(New(CodeQuery, "identifier contains a NUL byte", nil))
+	}
+	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+}
+
+// ReadReq is adapter.ts's ReadRequest minus Path — the request shape every relational adapter's
+// readPage actually consumes.
+type ReadReq struct {
+	Projection []string
+	Filter     *string
+	Sort       *model.SortSpec
+	PageSize   int
+	Cursor     model.PageCursor
+}
+
+// BuildKeysetWhereSQL extends whereSQL with the keyset boundary predicate decoded from the cursor
+// token, when the request actually wants one. addParam appends a value and returns its 1-based
+// placeholder index (a "?"-style placeholder ignores the index; a "$N"-style one needs it).
+func BuildKeysetWhereSQL(req ReadReq, order EffectiveOrder, fingerprint, whereSQL string, quote func(string) string, placeholder func(int) string, addParam func(any) int) (string, error) {
+	keyValues, err := DecodePageToken(req.Cursor.Token, fingerprint)
+	if err != nil {
+		return "", err
+	}
+	if len(keyValues) != len(order.KeysetColumns) {
+		return "", New(CodeQuery, "page token key length does not match the sort key", nil)
+	}
+	firstIndex := 0
+	for i, v := range keyValues {
+		idx := addParam(v)
+		if i == 0 {
+			firstIndex = idx
+		}
+	}
+	quotedKeyColumns := make([]string, len(order.KeysetColumns))
+	for i, c := range order.KeysetColumns {
+		quotedKeyColumns[i] = quote(c)
+	}
+	predicate := BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, firstIndex, placeholder)
+	if whereSQL != "" {
+		return whereSQL + " AND " + predicate, nil
+	}
+	return "WHERE " + predicate, nil
+}
+
+// BuildPageSQL assembles the final SELECT text: SELECT/FROM, the (already keyset-extended) WHERE,
+// ORDER BY and LIMIT/OFFSET, in that order. The LIMIT param is bound before the OFFSET one — params
+// must line up with the placeholders left to right for a "?"-style dialect.
+func BuildPageSQL(relationSQL, selectList, whereSQL, orderBySQL string, req ReadReq, placeholder func(int) string, addParam func(any) int) string {
+	// D24: fetch pageSize + 1 to compute hasMore without a count.
+	limitIdx := addParam(req.PageSize + 1)
+	offsetSQL := ""
+	if req.Cursor.Mode == "offset" {
+		idx := addParam(req.Cursor.Offset)
+		offsetSQL = " OFFSET " + placeholder(idx)
+	}
+
+	sqlParts := []string{"SELECT " + selectList, "FROM " + relationSQL}
+	if whereSQL != "" {
+		sqlParts = append(sqlParts, whereSQL)
+	}
+	if orderBySQL != "" {
+		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
+	}
+	sqlParts = append(sqlParts, "LIMIT "+placeholder(limitIdx)+offsetSQL)
+	return strings.Join(sqlParts, "\n")
+}
+
+// NewParamAccumulator returns an addParam closure over its own params slice — the shape
+// BuildKeysetWhereSQL/BuildPageSQL expect. A "?"-style placeholder ignores the returned index, so
+// only append order (left to right, matching the "?"s in the SQL text) matters for it; a "$N"-style
+// one uses the index directly.
+func NewParamAccumulator() (addParam func(any) int, params *[]any) {
+	var p []any
+	return func(v any) int {
+		p = append(p, v)
+		return len(p)
+	}, &p
+}
+
+// BuildCountSQL is read.ts's countRows SQL assembly: "SELECT count(*) AS n FROM <relation>
+// [WHERE ...]" — every relational adapter's countRows builds this identically.
+func BuildCountSQL(relationSQL string, filter *string) string {
+	sqlParts := []string{"SELECT count(*) AS n", "FROM " + relationSQL}
+	if where := WhereClause(filter); where != "" {
+		sqlParts = append(sqlParts, where)
+	}
+	return strings.Join(sqlParts, "\n")
+}
+
+// SetCommand is query.ts's own setCommand: the op-log command text, with bound params appended as
+// a trailing JSON comment when the caller opts in (LogParams) and there are any to show.
+func SetCommand(op *OpCtx, sqlText string, params []any, logParams bool) {
+	if logParams && len(params) > 0 {
+		if b, err := json.Marshal(params); err == nil {
+			op.SetCommand(sqlText + " -- params: " + string(b))
+			return
+		}
+	}
+	op.SetCommand(sqlText)
+}
+
 // BuildOrderBy ports sql-text.ts's buildOrderBy.
 func BuildOrderBy(terms []OrderTerm, quote func(string) string) string {
 	parts := make([]string, len(terms))

@@ -13,12 +13,7 @@ import (
 )
 
 // quoteIdent is read.ts's quoteIdent.
-func quoteIdent(name string) string {
-	if strings.ContainsRune(name, '\x00') {
-		panic(adapters.New(adapters.CodeQuery, "identifier contains a NUL byte", nil))
-	}
-	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
-}
+var quoteIdent = adapters.QuoteIdentBacktick
 
 // binaryDatabaseTypes is B3's set: go-sql-driver's own DatabaseTypeName() already tells binary
 // from text apart by the column's collation (fields.go's typeDatabaseName) — this package never
@@ -65,63 +60,9 @@ func typeClassFor(dataType string) page.TypeClass {
 }
 
 // readReq is adapter.ts's ReadRequest minus Path.
-type readReq struct {
-	Projection []string
-	Filter     *string
-	Sort       *model.SortSpec
-	PageSize   int
-	Cursor     model.PageCursor
-}
+type readReq = adapters.ReadReq
 
 func questionPlaceholder(int) string { return "?" }
-
-// buildKeysetWhere extends whereSQL with the keyset boundary predicate decoded from the cursor
-// token, when the request actually wants one.
-func buildKeysetWhere(req readReq, order adapters.EffectiveOrder, fingerprint, whereSQL string, params *[]any) (string, error) {
-	keyValues, err := adapters.DecodePageToken(req.Cursor.Token, fingerprint)
-	if err != nil {
-		return "", err
-	}
-	if len(keyValues) != len(order.KeysetColumns) {
-		return "", adapters.New(adapters.CodeQuery, "page token key length does not match the sort key", nil)
-	}
-	for _, v := range keyValues {
-		*params = append(*params, v)
-	}
-	quotedKeyColumns := make([]string, len(order.KeysetColumns))
-	for i, c := range order.KeysetColumns {
-		quotedKeyColumns[i] = quoteIdent(c)
-	}
-	predicate := adapters.BuildKeysetPredicate(quotedKeyColumns, order.KeysetDirection, req.Cursor.Mode, 1, questionPlaceholder)
-	if whereSQL != "" {
-		return whereSQL + " AND " + predicate, nil
-	}
-	return "WHERE " + predicate, nil
-}
-
-// buildPageSQL assembles the final SELECT text: SELECT/FROM, the (already keyset-extended) WHERE,
-// ORDER BY and LIMIT/OFFSET, in that order.
-func buildPageSQL(relationSQL, selectList, whereSQL, orderBySQL string, req readReq, params *[]any) string {
-	// D24: fetch pageSize + 1 to compute hasMore without a count. Bound before the OFFSET
-	// placeholder — params must line up with the two "?"s in "LIMIT ? OFFSET ?" left to right, the
-	// same order the SQL text below actually emits them in.
-	*params = append(*params, req.PageSize+1)
-	offsetSQL := ""
-	if req.Cursor.Mode == "offset" {
-		*params = append(*params, req.Cursor.Offset)
-		offsetSQL = " OFFSET ?"
-	}
-
-	sqlParts := []string{"SELECT " + selectList, "FROM " + relationSQL}
-	if whereSQL != "" {
-		sqlParts = append(sqlParts, whereSQL)
-	}
-	if orderBySQL != "" {
-		sqlParts = append(sqlParts, "ORDER BY "+orderBySQL)
-	}
-	sqlParts = append(sqlParts, "LIMIT ?"+offsetSQL)
-	return strings.Join(sqlParts, "\n")
-}
 
 // readPage is read.ts's readPage — the same eleven-step shape as postgres/read.go's.
 func readPage(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
@@ -154,16 +95,17 @@ func readPage(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters
 	}
 	selectList := strings.Join(selectNames, ", ")
 
-	var params []any
+	addParam, paramsPtr := adapters.NewParamAccumulator()
 	whereSQL := adapters.WhereClause(req.Filter)
 	if plan.WantsKeyset {
-		whereSQL, err = buildKeysetWhere(req, order, plan.Fingerprint, whereSQL, &params)
+		whereSQL, err = adapters.BuildKeysetWhereSQL(req, order, plan.Fingerprint, whereSQL, quoteIdent, questionPlaceholder, addParam)
 		if err != nil {
 			return page.TabularPage{}, err
 		}
 	}
 
-	query := buildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, &params)
+	query := adapters.BuildPageSQL(relationSQL, selectList, whereSQL, plan.OrderBySQL, req, questionPlaceholder, addParam)
+	params := *paramsPtr
 
 	// Streamed straight into the builder (P2 R1) rather than materialized into a [][]*string and
 	// transposed afterward: BuildKeysetPosition's CellAt is only ever called for the first and last
@@ -226,11 +168,7 @@ func readPage(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters
 // countRows is read.ts's countRows.
 func countRows(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {
 	relationSQL := quoteIdent(target.Database) + "." + quoteIdent(target.Table)
-	sqlParts := []string{"SELECT count(*) AS n", "FROM " + relationSQL}
-	if where := adapters.WhereClause(filter); where != "" {
-		sqlParts = append(sqlParts, where)
-	}
-	query := strings.Join(sqlParts, "\n")
+	query := adapters.BuildCountSQL(relationSQL, filter)
 
 	rows, err := runArrayQuery(ctx, conn, threadID, query, nil, op, track, QueryOptions{})
 	if err != nil {

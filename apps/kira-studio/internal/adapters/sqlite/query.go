@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"regexp"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -144,15 +143,7 @@ func assertSingleStatement(sqlText string) error {
 	return nil
 }
 
-func setCommand(op *adapters.OpCtx, sqlText string, params []any, logParams bool) {
-	if logParams && len(params) > 0 {
-		if b, err := json.Marshal(params); err == nil {
-			op.SetCommand(sqlText + " -- params: " + string(b))
-			return
-		}
-	}
-	op.SetCommand(sqlText)
-}
+var setCommand = adapters.SetCommand
 
 // runRows is query.ts's runQuery generalized with a per-row scan callback, the same shape
 // mysqlfamily/catalog.go's queryExec uses — catalog.go's typed pragma reads and read.go's own
@@ -270,14 +261,4 @@ func runCommand(ctx context.Context, conn *sql.Conn, sqlText string, params []an
 		return 0, mapError(err)
 	}
 	return n, nil
-}
-
-// execLiteral is mutate.ts's execLiteral — BEGIN IMMEDIATE/COMMIT/ROLLBACK, fixed adapter-internal
-// literals never seen by a user, so they bypass assertSingleStatement (nothing to guard against
-// here) and go straight through ExecContext.
-func execLiteral(ctx context.Context, conn *sql.Conn, sqlText string) error {
-	if _, err := conn.ExecContext(ctx, sqlText); err != nil {
-		return mapError(err)
-	}
-	return nil
 }

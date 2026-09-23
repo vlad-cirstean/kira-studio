@@ -1,11 +1,13 @@
 package adapters
 
 import (
+	"context"
 	"encoding/hex"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -235,6 +237,71 @@ func CompileMutationOps(relationSQL string, ordered []model.MutationRowOp, param
 		previewParts[i] = previewPart
 	}
 	return compiled, previewParts, nil
+}
+
+// BinaryColumnsOf builds the isBinary lookup NewParamRenderer needs from a read target's own
+// resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
+// convention and must be decoded to raw bytes before it reaches the driver (P2 R1). typeClassFor is
+// the caller's own dialect-specific mapping.
+func BinaryColumnsOf(columns []model.ColumnMeta, typeClassFor func(dataType string) page.TypeClass) func(name string) bool {
+	binary := make(map[string]bool, len(columns))
+	for _, c := range columns {
+		if typeClassFor(c.DataType) == page.TypeClassBinary {
+			binary[c.Name] = true
+		}
+	}
+	return func(name string) bool { return binary[name] }
+}
+
+// PreviewSQLMutation is mutate.ts's preview — synchronous (D6): no catalog lookup, no network,
+// trusts the plan's column names as given.
+func PreviewSQLMutation(plan model.MutationPlan, relationSQL string, literalRenderer ValueRenderer, quote func(string) string) ([]string, error) {
+	ordered := OrderedOps(plan.Ops)
+	statements := make([]string, len(ordered))
+	for i, op := range ordered {
+		var params []any
+		stmt, err := RenderRowOp(relationSQL, op, literalRenderer, &params, quote)
+		if err != nil {
+			return nil, err
+		}
+		statements[i] = stmt
+	}
+	return statements, nil
+}
+
+// RunSQLMutation is mutate.ts's own transaction wrapper: begin, exec every compiled op in order
+// while asserting each affects exactly one row, commit — with a deferred rollback (never skipped
+// on an early return) that only fires when commit never happened. exec is the caller's own
+// SuppressCommand-style command executor; rollback runs on its own detached, timeout-bounded ctx so
+// it always reaches the server regardless of the caller's own ctx state (P2 R2's own rule, common to
+// all three adapters' mutate()).
+func RunSQLMutation(ctx context.Context, beginSQL string, exec func(sqlText string, params []any) (int64, error), rollback func(context.Context), compiled []CompiledOp) (model.MutationResult, error) {
+	if _, err := exec(beginSQL, nil); err != nil {
+		return model.MutationResult{}, err
+	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		rollback(ctx)
+	}()
+	var affectedRows int64
+	for _, c := range compiled {
+		n, err := exec(c.SQL, c.Params)
+		if err != nil {
+			return model.MutationResult{}, err
+		}
+		if err := AssertAffectedExactlyOne(c.Kind, n); err != nil {
+			return model.MutationResult{}, err
+		}
+		affectedRows += n
+	}
+	if _, err := exec("COMMIT", nil); err != nil {
+		return model.MutationResult{}, err
+	}
+	committed = true
+	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
 }
 
 // ResolveDatabaseTablePath ports sql-mutate.ts's resolveDatabaseTablePath — the two-segment

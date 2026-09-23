@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -29,13 +28,7 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 // resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
 // convention and must be decoded to raw bytes before it reaches the driver (P2 R1).
 func binaryColumnsOf(columns []model.ColumnMeta) func(name string) bool {
-	binary := make(map[string]bool, len(columns))
-	for _, c := range columns {
-		if typeClassFor(c.DataType) == page.TypeClassBinary {
-			binary[c.Name] = true
-		}
-	}
-	return func(name string) bool { return binary[name] }
+	return adapters.BinaryColumnsOf(columns, typeClassFor)
 }
 
 // preview is mutate.ts's preview — synchronous (D6): no catalog lookup, no network.
@@ -45,17 +38,7 @@ func preview(plan model.MutationPlan) ([]string, error) {
 		return nil, err
 	}
 	relationSQL := quoteIdent(database) + "." + quoteIdent(table)
-	ordered := adapters.OrderedOps(plan.Ops)
-	statements := make([]string, len(ordered))
-	for i, op := range ordered {
-		var params []any
-		stmt, err := adapters.RenderRowOp(relationSQL, op, literalRenderer, &params, quoteIdent)
-		if err != nil {
-			return nil, err
-		}
-		statements[i] = stmt
-	}
-	return statements, nil
+	return adapters.PreviewSQLMutation(plan, relationSQL, literalRenderer, quoteIdent)
 }
 
 // mutate is mutate.ts's own — D25: BEGIN IMMEDIATE, not a deferred BEGIN, so a contended file fails
@@ -97,39 +80,19 @@ func mutate(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, readOnly bo
 	// precedent).
 	op.SetCommand(strings.Join(previewParts, ";\n"))
 
-	if err := execLiteral(ctx, conn, "BEGIN IMMEDIATE"); err != nil {
-		return model.MutationResult{}, err
+	execCommand := func(sqlText string, params []any) (int64, error) {
+		return runCommand(ctx, conn, sqlText, params, op, true)
 	}
-	// P2 R2: the ad-hoc `_ = execLiteral(ctx, conn, "ROLLBACK")` this replaced ran on the same ctx as
-	// everything else — database/sql's ExecContext refuses outright on an already-cancelled ctx
-	// without ever reaching the driver, so a cancellation mid-loop or racing COMMIT left neither
-	// COMMIT nor ROLLBACK ever executed. conn is then returned to runOnConn's pool (not closed) still
-	// inside that BEGIN IMMEDIATE, so the next op to get this conn back finds it already in a
-	// transaction. A detached, timeout-bounded ctx (mirrors postgres/mysqlfamily console.go's own
-	// cleanup) guarantees this always runs regardless of the caller's own ctx state.
-	committed := false
-	defer func() {
-		if committed {
-			return
-		}
+	// P2 R2: rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
+	// always runs regardless of the caller's own ctx state — the original ad-hoc rollback ran on the
+	// same ctx as everything else, and database/sql's ExecContext refuses outright on an
+	// already-cancelled one without ever reaching the driver, so a cancellation mid-loop or racing
+	// COMMIT left neither COMMIT nor ROLLBACK executed and conn (returned to runOnConn's pool, not
+	// closed) stuck inside that BEGIN IMMEDIATE for whatever op the pool hands it to next.
+	rollback := func(ctx context.Context) {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 		defer cancel()
-		_ = execLiteral(cleanupCtx, conn, "ROLLBACK")
-	}()
-	var affectedRows int64
-	for _, c := range compiled {
-		n, err := runCommand(ctx, conn, c.SQL, c.Params, op, true)
-		if err != nil {
-			return model.MutationResult{}, err
-		}
-		if err := adapters.AssertAffectedExactlyOne(c.Kind, n); err != nil {
-			return model.MutationResult{}, err
-		}
-		affectedRows += n
+		_, _ = runCommand(cleanupCtx, conn, "ROLLBACK", nil, op, true)
 	}
-	if err := execLiteral(ctx, conn, "COMMIT"); err != nil {
-		return model.MutationResult{}, err
-	}
-	committed = true
-	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
+	return adapters.RunSQLMutation(ctx, "BEGIN IMMEDIATE", execCommand, rollback, compiled)
 }

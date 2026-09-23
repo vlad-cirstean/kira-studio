@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
-	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -29,13 +28,7 @@ func literalRenderer(name string, value *string, _ *[]any) (string, error) {
 // resolved column types — a binary column's edited value is still spelled in the "0x<hex>" display
 // convention and must be decoded to raw bytes before it reaches the driver (P2 R1).
 func binaryColumnsOf(columns []model.ColumnMeta) func(name string) bool {
-	binary := make(map[string]bool, len(columns))
-	for _, c := range columns {
-		if typeClassFor(c.DataType) == page.TypeClassBinary {
-			binary[c.Name] = true
-		}
-	}
-	return func(name string) bool { return binary[name] }
+	return adapters.BinaryColumnsOf(columns, typeClassFor)
 }
 
 // preview is mutate.ts's preview — synchronous (D6): no catalog lookup, no network.
@@ -45,17 +38,7 @@ func preview(plan model.MutationPlan) ([]string, error) {
 		return nil, err
 	}
 	relationSQL := quoteIdent(database) + "." + quoteIdent(table)
-	ordered := adapters.OrderedOps(plan.Ops)
-	statements := make([]string, len(ordered))
-	for i, op := range ordered {
-		var params []any
-		stmt, err := adapters.RenderRowOp(relationSQL, op, literalRenderer, &params, quoteIdent)
-		if err != nil {
-			return nil, err
-		}
-		statements[i] = stmt
-	}
-	return statements, nil
+	return adapters.PreviewSQLMutation(plan, relationSQL, literalRenderer, quoteIdent)
 }
 
 // mutate is mutate.ts's mutate.
@@ -94,39 +77,15 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 		return runCommand(ctx, conn, threadID, sql, params, op, track, CommandOptions{SuppressCommand: true})
 	}
 
-	if _, err := execCommand("START TRANSACTION", nil); err != nil {
-		return model.MutationResult{}, err
-	}
-	// P2 R2: the ad-hoc `_, _ = execCommand("ROLLBACK", nil)` this replaced ran ROLLBACK through
-	// execCommand/runCommand, which refuses on an already-cancelled ctx the same way COMMIT does
-	// (CheckNotStarted) — a cancellation mid-loop or racing the COMMIT call left neither COMMIT nor
-	// ROLLBACK ever reaching the server, and conn is pinned for this adapter's lifetime, so the next
-	// op on it ran inside that same stale, still-open transaction. Mirrors console.go's execute()
-	// cleanup: a detached, timeout-bounded ctx so this always reaches the server regardless of the
-	// caller's own ctx state.
-	committed := false
-	defer func() {
-		if committed {
-			return
-		}
+	// P2 R2: rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
+	// always reaches the server even when the caller's own ctx is already cancelled — the ad-hoc
+	// `_, _ = execCommand("ROLLBACK", nil)` this replaced ran through runCommand's CheckNotStarted,
+	// which refuses outright on an already-cancelled ctx, leaving conn (pinned for this adapter's
+	// lifetime) stuck inside a stale, still-open transaction for whatever op runs on it next.
+	rollback := func(ctx context.Context) {
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 		defer cancel()
 		_, _ = conn.ExecContext(cleanupCtx, "ROLLBACK")
-	}()
-	var affectedRows int64
-	for _, c := range compiled {
-		rowCount, err := execCommand(c.SQL, c.Params)
-		if err != nil {
-			return model.MutationResult{}, err
-		}
-		if err := adapters.AssertAffectedExactlyOne(c.Kind, rowCount); err != nil {
-			return model.MutationResult{}, err
-		}
-		affectedRows += rowCount
 	}
-	if _, err := execCommand("COMMIT", nil); err != nil {
-		return model.MutationResult{}, err
-	}
-	committed = true
-	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
+	return adapters.RunSQLMutation(ctx, "START TRANSACTION", execCommand, rollback, compiled)
 }
