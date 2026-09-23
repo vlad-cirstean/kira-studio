@@ -198,32 +198,36 @@ async function saveCurrent(): Promise<void> {
         <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         Save current filter…
       </button>
+      <!-- P104: this prompt must stay a descendant of PopoverContent (the #footer slot renders
+           inside it), not a sibling of <SavedListMenu> — otherwise promptText()'s own imperative
+           .focus() below moves focus outside reka's Popover content boundary, which its own
+           dismiss layer reads as an outside interaction and closes the whole menu before the
+           prompt is ever seen (data-view.spec.ts's save-current-filter scenario caught it). -->
+      <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
+        <div class="prompt-box p-float">
+          <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
+          <!-- Input's own root *is* the <input> itself, so promptInput's $el (used imperatively
+               above to autofocus this field when the prompt opens) reaches it directly. -->
+          <Input
+            ref="promptInput"
+            v-model="textPrompt.value"
+            type="text"
+            class="w-full"
+            data-testid="text-prompt-input"
+            @keydown="wrapSelectionOnType"
+            @keydown.enter="submitPrompt"
+            @keydown.escape="cancelPrompt"
+          />
+          <div class="prompt-actions">
+            <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt">Cancel</Button>
+            <Button variant="dialog-primary" size="kira-lg" data-testid="text-prompt-ok" @click="submitPrompt">
+              OK
+            </Button>
+          </div>
+        </div>
+      </div>
     </template>
   </SavedListMenu>
-
-  <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
-    <div class="prompt-box p-float">
-      <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-      <!-- Input's own root *is* the <input> itself, so promptInput's $el (used imperatively above
-           to autofocus this field when the prompt opens) reaches it directly. -->
-      <Input
-        ref="promptInput"
-        v-model="textPrompt.value"
-        type="text"
-        class="w-full"
-        data-testid="text-prompt-input"
-        @keydown="wrapSelectionOnType"
-        @keydown.enter="submitPrompt"
-        @keydown.escape="cancelPrompt"
-      />
-      <div class="prompt-actions">
-        <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt">Cancel</Button>
-        <Button variant="dialog-primary" size="kira-lg" data-testid="text-prompt-ok" @click="submitPrompt">
-          OK
-        </Button>
-      </div>
-    </div>
-  </div>
 </template>
 
 <style scoped>
