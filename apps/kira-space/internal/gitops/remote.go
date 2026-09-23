@@ -1,5 +1,7 @@
 package gitops
 
+import "regexp"
+
 // RefUpdate mirrors @kira/git-ipc's own RefUpdate field for field (D5's encoding rule: null, not
 // omitted, for "created"/"deleted") — lives here rather than in gitsession since both producers,
 // this package's own porcelain parser (push.go) and gitsession's ref-snapshot diff, need it (D13).
@@ -40,8 +42,15 @@ func AheadBehindArgs(branch, upstream string) []string {
 // `git config --null --get-regexp '^(pull\.(rebase|ff)|branch\.<branch>\.rebase)$'`. --null frames
 // records with NUL and separates key from value with a newline (probe P10) — not the space-
 // separated form gitops.BranchConfigRegexpArgs' own caller already parses, a different format.
+//
+// P108 Part 15 F5 fix: branch is escaped with regexp.QuoteMeta, the same precedent
+// BranchConfigRegexpArgs already established (branch.go) — before this fix, an unescaped branch
+// name spliced straight into the pattern either silently matched the wrong key (a branch name
+// containing an ERE metacharacter, e.g. "feat+x", widens or narrows the match unpredictably) or
+// made `git config` exit 6 with "invalid key pattern" (an unbalanced one, e.g. "a(b" — a legal git
+// refname), failing the whole PullPreflight.
 func PullConfigArgs(branch string) []string {
-	pattern := `^(pull\.(rebase|ff)|branch\.` + branch + `\.rebase)$`
+	pattern := `^(pull\.(rebase|ff)|branch\.` + regexp.QuoteMeta(branch) + `\.rebase)$`
 	return []string{"config", "--null", "--get-regexp", pattern}
 }
 
