@@ -38,6 +38,12 @@ func (r *Router) handlePreflightCherryPick(ctx context.Context, c *gitsession.Co
 			if err := requireNonEmpty("preflight.cherryPick", "repoId", p.RepoID, "sha", p.SHA); err != nil {
 				return "", err
 			}
+			// F1 (P108 Part 16 review), defense in depth: sha reaches isAncestorOrNot/
+			// MergeTreeArgs/CommitDetail as a bare argv token (gitsession.PreflightCherryPick
+			// already guards it — this is the second layer at the boundary).
+			if err := validRefArg("sha", p.SHA); err != nil {
+				return "", err
+			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightCherryPickParams) (gitpreflight.CherryPickPreflight, error) {

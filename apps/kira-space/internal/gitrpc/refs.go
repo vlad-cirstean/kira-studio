@@ -55,6 +55,12 @@ func (r *Router) handlePreflightCheckout(ctx context.Context, c *gitsession.Conn
 			if p.RepoID == "" || p.Target == "" || (p.Mode != "switch" && p.Mode != "detach") {
 				return "", ipcerr.BadRequest("gitrpc: preflight.checkout: repoId, target and a valid mode are required")
 			}
+			// F1 (P108 Part 16 review), defense in depth: gitsession's own validOpArg is the real
+			// guard (target reaches RewrittenPathsArgs as a bare argv token) — reject here too so a
+			// malformed target never leaves this boundary in the first place.
+			if err := validRefArg("target", p.Target); err != nil {
+				return "", err
+			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightCheckoutParams) (gitpreflight.CheckoutPreflight, error) {
@@ -72,6 +78,14 @@ func (r *Router) handlePreflightRevert(ctx context.Context, c *gitsession.Conn, 
 		func(p PreflightRevertParams) (string, error) {
 			if p.RepoID == "" || len(p.Shas) == 0 {
 				return "", ipcerr.BadRequest("gitrpc: preflight.revert: repoId and a non-empty shas are required")
+			}
+			// F1 (P108 Part 16 review), defense in depth: each sha reaches ShowMetadataArgs as a
+			// bare argv token (gitsession.revertMergeParents already guards it — this is the second
+			// layer at the boundary).
+			for _, sha := range p.Shas {
+				if err := validRefArg("sha", sha); err != nil {
+					return "", err
+				}
 			}
 			return p.RepoID, nil
 		},

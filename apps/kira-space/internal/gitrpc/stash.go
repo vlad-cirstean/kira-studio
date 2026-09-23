@@ -81,6 +81,14 @@ func (r *Router) handlePreflightStashPop(ctx context.Context, c *gitsession.Conn
 			if !validStashScope(p.Scope) {
 				return "", ipcerr.BadRequest("gitrpc: preflight.stashPop: invalid scope " + p.Scope)
 			}
+			// F1 (P108 Part 16 review), defense in depth: targetSha reaches MergeTreeArgs as a
+			// bare argv token (gitsession.PreflightStashPop already guards it — this is the second
+			// layer at the boundary).
+			if p.TargetSHA != nil {
+				if err := validRefArg("targetSha", *p.TargetSHA); err != nil {
+					return "", err
+				}
+			}
 			return p.RepoID, nil
 		},
 		func(ctx context.Context, entry *gitsession.RepoEntry, p PreflightStashPopParams) (gitpreflight.StashPopPreflight, error) {

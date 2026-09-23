@@ -14,7 +14,15 @@ import (
 )
 
 // rewrittenPaths reads T — the paths target's checkout would rewrite (gitops.RewrittenPathsArgs).
+//
+// F1 (P108 Part 16 review): target reaches RewrittenPathsArgs as a bare argv token — a leading "-"
+// would be read by `git diff`/`git diff-index` as a flag of its own (e.g. `--output=<path>`, an
+// arbitrary-file-write primitive) rather than the ref it is meant to be. validOpArg is the same
+// guard op.run's prepare* functions already use at their own point of use.
 func (e *RepoEntry) rewrittenPaths(ctx context.Context, target string) ([]string, error) {
+	if err := validOpArg("target", target); err != nil {
+		return nil, err
+	}
 	raw, err := e.runOne(ctx, gitops.RewrittenPathsArgs(target))
 	if err != nil {
 		return nil, err
@@ -80,7 +88,15 @@ func (e *RepoEntry) PreflightCheckout(ctx context.Context, target, mode string) 
 // Sequential, not concurrent (F18's deviation from upstream's own Promise.all): the read pool is
 // four wide and shared with every other connection on the repository, so a large multi-select
 // revert firing dozens of concurrent reads would starve the graph stream of another window.
+// F1 (P108 Part 16 review): every sha reaches ShowMetadataArgs (`git show -s ...`) as a bare argv
+// token, reached by both PreflightRevert and PreflightCherryPick — validated once here, at the one
+// choke point both callers share, rather than duplicated in each.
 func (e *RepoEntry) revertMergeParents(ctx context.Context, shas []string) (map[string][]gitpreflight.RevertParentChoice, error) {
+	for _, sha := range shas {
+		if err := validOpArg("sha", sha); err != nil {
+			return nil, err
+		}
+	}
 	type meta struct {
 		sha     string
 		parents []string
@@ -441,6 +457,12 @@ func (e *RepoEntry) isAncestorOrNot(ctx context.Context, a, b string) (bool, err
 // known — with none chosen for a merge commit there is no single parent to diff against, and
 // mainlineRequired already blocks the pick regardless of what either would say.
 func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainline *int) (gitpreflight.CherryPickPreflight, error) {
+	// F1 (P108 Part 16 review): sha reaches isAncestorOrNot/MergeTreeArgs/CommitDetail as a bare
+	// argv token directly (not just through revertMergeParents' own guard) — validated once here,
+	// at this entry point, before any of those spawns.
+	if err := validOpArg("sha", sha); err != nil {
+		return gitpreflight.CherryPickPreflight{}, err
+	}
 	var statusResult porcelain.StatusResult
 	var inProgress *gitpreflight.InProgressOperation
 	var mergeParentsBySha map[string][]gitpreflight.RevertParentChoice
@@ -529,21 +551,33 @@ func (e *RepoEntry) PreflightCherryPick(ctx context.Context, sha string, mainlin
 // for the bucket) only changes how entry is resolved — everything downstream (ClassifyStashPop,
 // stashPopPrediction, the untracked-collision os.Stat loop) takes a porcelain.StashEntry and does
 // not care where it came from, so this is the ONLY line in this function that changes for G28.
+// resolveStashPopTarget resolves PreflightStashPop's own targetSha param: a client-supplied value
+// (validated — F1, P108 Part 16 review: it reaches MergeTreeArgs as a bare argv token) or, absent
+// one, a fresh `rev-parse HEAD`. Split out of PreflightStashPop itself to keep that function's own
+// cognitive complexity under the linter's threshold.
+func (e *RepoEntry) resolveStashPopTarget(ctx context.Context, targetSha *string) (string, error) {
+	if targetSha == nil {
+		raw, err := e.runOne(ctx, []string{"rev-parse", "HEAD"})
+		if err != nil {
+			return "", err
+		}
+		return strings.TrimSpace(string(raw)), nil
+	}
+	if err := validOpArg("targetSha", *targetSha); err != nil {
+		return "", err
+	}
+	return *targetSha, nil
+}
+
 func (e *RepoEntry) PreflightStashPop(ctx context.Context, sha string, targetSha *string, scope string) (gitpreflight.StashPopPreflight, error) {
 	entry, err := e.resolveStashEntryScoped(ctx, sha, scope)
 	if err != nil {
 		return gitpreflight.StashPopPreflight{}, err
 	}
 
-	target := ""
-	if targetSha != nil {
-		target = *targetSha
-	} else {
-		raw, herr := e.runOne(ctx, []string{"rev-parse", "HEAD"})
-		if herr != nil {
-			return gitpreflight.StashPopPreflight{}, herr
-		}
-		target = strings.TrimSpace(string(raw))
+	target, err := e.resolveStashPopTarget(ctx, targetSha)
+	if err != nil {
+		return gitpreflight.StashPopPreflight{}, err
 	}
 
 	numstatArgs, _ := porcelain.StashShowArgs(entry.BaseSha, entry.Sha)
