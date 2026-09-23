@@ -391,27 +391,30 @@ func (c *Conn) Walk(repoID string, gitPath string, spec porcelain.WalkSpec, page
 	return w, nil
 }
 
-// WalkFor returns this connection's existing GRAPH walk for repoID, if any, without creating one.
-func (c *Conn) WalkFor(repoID string) (*Walk, bool) {
+// walkForSlot is WalkFor/ReviewWalkFor's shared body (I2-47): locate repoID's walk pair, then read
+// one of its two slots via slot, without creating either.
+func (c *Conn) walkForSlot(repoID string, slot func(*walkPair) *Walk) (*Walk, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	pair, ok := c.walks[repoID]
-	if !ok || pair.graph == nil {
+	if !ok {
 		return nil, false
 	}
-	return pair.graph, true
+	if w := slot(pair); w != nil {
+		return w, true
+	}
+	return nil, false
+}
+
+// WalkFor returns this connection's existing GRAPH walk for repoID, if any, without creating one.
+func (c *Conn) WalkFor(repoID string) (*Walk, bool) {
+	return c.walkForSlot(repoID, func(p *walkPair) *Walk { return p.graph })
 }
 
 // ReviewWalkFor returns this connection's existing REVIEW (ranged) walk for repoID, if any,
 // without creating one.
 func (c *Conn) ReviewWalkFor(repoID string) (*Walk, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	pair, ok := c.walks[repoID]
-	if !ok || pair.review == nil {
-		return nil, false
-	}
-	return pair.review, true
+	return c.walkForSlot(repoID, func(p *walkPair) *Walk { return p.review })
 }
 
 // markWalksStale marks BOTH slots of repoID's walk pair stale (D5) — called by Open's own
