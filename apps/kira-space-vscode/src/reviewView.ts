@@ -1,82 +1,58 @@
 /**
  * The `WebviewViewProvider` for `kiraSpace.review` (P7 W8, §2.1/§6.8). `panelView.ts`'s
- * sibling, deliberately *not* a refactor of it into a shared base class — the two differ in what
- * HTML is rendered and how a review target is pushed in, and a base class hiding that behind a
- * template method would be harder to read than two short files.
+ * sibling — both extend `webviewProviderBase.ts`'s `WebviewProviderBase` (P107 I2-24) for the
+ * shared options/html/channel/server/dispose frame and `notify*` forwarders; what HTML is
+ * rendered and how a review target is pushed in stay this class's own (`bootstrap`,
+ * `reviewBranch`).
  *
  * G1 migration note: see panelView.ts's own note — `service: RepoService` (and with it
  * `setUiVisible`/`endReview`/the `repo.changed` forward) is gone; `handlers` is supplied by the
- * constructor. G6 forwards `repo.changed` (`notifyRepoChanged` below) but does NOT restore
- * `endReview`'s own lifecycle: there is no `review.end` on the wire (D6) — the server invalidates
- * the ranged walk on `refsChanged` instead (D5), which is what makes `notifyRepoChanged` load-
- * bearing here at all (F11): `ReviewSessionState`'s background re-resolve and its "the comparison
- * has changed" banner are the sole consumer of this event in the review webview.
+ * constructor. G6 forwards `repo.changed` (`WebviewProviderBase.notifyRepoChanged`) but does NOT
+ * restore `endReview`'s own lifecycle: there is no `review.end` on the wire (D6) — the server
+ * invalidates the ranged walk on `refsChanged` instead (D5), which is what makes
+ * `notifyRepoChanged` load-bearing here at all (F11): `ReviewSessionState`'s background re-resolve
+ * and its "the comparison has changed" banner are the sole consumer of this event in the review
+ * webview.
  */
-import type {
-  EventPayload,
-  RpcServer,
-  ServerHandlers,
-  SettingsSnapshot,
-  UiActionKind,
-} from '@kira/git-ipc';
-import { createRpcServer } from '@kira/git-ipc';
+import type { UiActionKind } from '@kira/git-ipc';
 import * as vscode from 'vscode';
-import type { ConnectionManager } from './connection.ts';
 import { toWireConnectionState } from './connection.ts';
 import type { ReviewTarget } from './html.ts';
 import { renderHtml } from './html.ts';
-import { createWebviewChannel } from './transport.ts';
+import { WebviewProviderBase, type WebviewProviderBaseDeps } from './webviewProviderBase.ts';
 
 const REVIEW_FOCUS_COMMAND = 'kiraSpace.review.focus';
 
-export interface KiraReviewViewProviderDeps {
-  readonly extensionUri: vscode.Uri;
-  readonly handlers: ServerHandlers;
+export interface KiraReviewViewProviderDeps extends WebviewProviderBaseDeps {
   // G19 D11b: not read by this class directly (review.session.save/.load's own handler lives in
   // proxyHandlers.ts, already closed over context.workspaceState there) — threaded here only so
   // this provider's own deps stay a complete, self-contained bundle, the same shape its
   // constructor already takes everything else through. A small, mechanical addition, not new
   // state: extension.ts's own activate() already holds this.
   readonly context: vscode.ExtensionContext;
-  /** G-UX (item 13): the same fresh-snapshot-at-resolve-time seam `panelView.ts`'s own
-   *  `KiraGraphViewProviderDeps.connection` doc comment explains. */
-  readonly connection: ConnectionManager;
 }
 
-export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
-  readonly #deps: KiraReviewViewProviderDeps;
-  #server: RpcServer | undefined;
+export class KiraReviewViewProvider extends WebviewProviderBase {
   /** The target a cold `resolveWebviewView` should seed into the bootstrap island — set by
    *  `reviewBranch` before the view is revealed, read (and left in place, so a subsequent hide/
    *  reveal without an intervening `reviewBranch` call still repaints the same review) here. */
   #pendingTarget: ReviewTarget | null = null;
 
+  // Narrows the base constructor's `WebviewProviderBaseDeps` to `KiraReviewViewProviderDeps` so
+  // `context` stays required at every call site — `context` itself is never read here (see the
+  // interface's own doc comment).
   constructor(deps: KiraReviewViewProviderDeps) {
-    this.#deps = deps;
+    super(deps);
   }
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
-    const { extensionUri, handlers, connection } = this.#deps;
-
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'ui')],
-    };
-    webviewView.webview.html = renderHtml({
+  protected bootstrap(webviewView: vscode.WebviewView): string {
+    const { extensionUri, connection } = this.deps;
+    return renderHtml({
       webview: webviewView.webview,
       extensionUri,
       view: 'review',
       target: this.#pendingTarget,
       connectionState: toWireConnectionState(connection.state),
-    });
-
-    const channel = createWebviewChannel(webviewView.webview);
-    const server = createRpcServer(channel, handlers);
-    this.#server = server;
-
-    webviewView.onDidDispose(() => {
-      server.dispose();
-      if (this.#server === server) this.#server = undefined;
     });
   }
 
@@ -96,17 +72,11 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
     this.#pendingTarget = repoId !== undefined && branch !== undefined ? { repoId, branch } : null;
     void vscode.commands.executeCommand(REVIEW_FOCUS_COMMAND);
     if (this.#pendingTarget) {
-      this.#server?.emit('review.target', {
+      this.server?.emit('review.target', {
         repoId: this.#pendingTarget.repoId,
         branch: this.#pendingTarget.branch,
       });
     }
-  }
-
-  /** Pushed by `extension.ts` after `onDidChangeConfiguration` re-coerces the settings snapshot
-   *  — a no-op when no webview is currently resolved (view collapsed or never opened). */
-  notifySettingsChanged(settings: SettingsSnapshot): void {
-    this.#server?.emit('settings.changed', { settings });
   }
 
   /**
@@ -120,40 +90,6 @@ export class KiraReviewViewProvider implements vscode.WebviewViewProvider {
    */
   runUiAction(action: UiActionKind): void {
     void vscode.commands.executeCommand(REVIEW_FOCUS_COMMAND);
-    this.#server?.emit('ui.action', { action });
-  }
-
-  /** Forwarded from `ConnectionManager.on('repo.changed', ...)` by `extension.ts` (G6/D15,
-   *  resolving F11) — a three-line copy of `panelView.ts`'s own `notifyRepoChanged`. Without this,
-   *  `ReviewSessionState`'s background re-resolve and its "the comparison has changed" banner can
-   *  never fire: `repo.changed` is their sole trigger. A no-op when no webview is currently
-   *  resolved. */
-  notifyRepoChanged(payload: EventPayload<'repo.changed'>): void {
-    this.#server?.emit('repo.changed', payload);
-  }
-
-  /** G-UX (item 13): forwarded from `ConnectionManager.onStateChange` by `extension.ts` — see
-   *  `panelView.ts`'s own copy of this method for the full explanation. Forwarded here too since
-   *  the review sidebar is exactly as capable of staying open through a live drop as the graph
-   *  panel is. */
-  notifyConnectionState(state: EventPayload<'connection.changed'>['state']): void {
-    this.#server?.emit('connection.changed', { state });
-  }
-
-  /** G31 round-2 functional-correctness review, finding #4: `repoSettings.changed` (G18 D4/D7's
-   *  cross-connection settings fan-out) was never forwarded to EITHER webview — see
-   *  `panelView.ts`'s own copy of this method for the full explanation. Forwarded here too (not
-   *  just the graph panel) since both webviews mount the same `App.vue`, with its own
-   *  `RepoSettingsState`, over two entirely independent connections. */
-  notifyRepoSettingsChanged(payload: EventPayload<'repoSettings.changed'>): void {
-    this.#server?.emit('repoSettings.changed', payload);
-  }
-
-  /** G31 round-2 functional-correctness review, finding #3: `stack.progress` was never forwarded
-   *  to either webview — see `panelView.ts`'s own copy of this method. Forwarded here too since
-   *  both webviews' `App.vue` instantiate their own `StackState` unconditionally, regardless of
-   *  `view`. */
-  notifyStackProgress(payload: EventPayload<'stack.progress'>): void {
-    this.#server?.emit('stack.progress', payload);
+    this.server?.emit('ui.action', { action });
   }
 }
