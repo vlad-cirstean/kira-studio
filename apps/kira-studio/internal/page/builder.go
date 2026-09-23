@@ -72,6 +72,16 @@ func nowEpochMs() int64 {
 	return time.Now().UnixMilli()
 }
 
+// sumChunkBytes totals ChunkByteSize across chunks — DocumentPageBuilder/KeyValuePageBuilder/
+// StreamPageBuilder.Finish (I2-45) each summed their own two-to-five chunks' byte sizes this way.
+func sumChunkBytes(chunks ...Chunk) int {
+	total := 0
+	for _, c := range chunks {
+		total += ChunkByteSize(c)
+	}
+	return total
+}
+
 // TabularPage mirrors page.ts's TabularPage.
 type TabularPage struct {
 	Kind           PageKind
@@ -206,7 +216,7 @@ func (b *DocumentPageBuilder) Finish(position PagePosition) DocumentPage {
 	bodies := b.bodies.finish(b.rowCount, false)
 	return DocumentPage{
 		Kind: PageKindDocument, Position: position, IDs: ids, Bodies: bodies, RowCount: b.rowCount,
-		ByteSize: ChunkByteSize(ids) + ChunkByteSize(bodies), FetchedAt: nowEpochMs(),
+		ByteSize: sumChunkBytes(ids, bodies), FetchedAt: nowEpochMs(),
 	}
 }
 
@@ -282,7 +292,7 @@ func (b *KeyValuePageBuilder) Finish(position PagePosition) KeyValuePage {
 	return KeyValuePage{
 		Kind: PageKindKeyValue, Position: position, RedisType: b.redisType, TTLMs: b.ttlMs, MemoryBytes: b.memoryBytes,
 		Fields: fields, Values: values, RowCount: b.rowCount,
-		ByteSize: ChunkByteSize(fields) + ChunkByteSize(values), FetchedAt: nowEpochMs(),
+		ByteSize: sumChunkBytes(fields, values), FetchedAt: nowEpochMs(),
 		FieldsAreColumns: b.fieldsAreColumns,
 	}
 }
@@ -353,8 +363,7 @@ func (b *StreamPageBuilder) Finish(position PagePosition) StreamPage {
 	return StreamPage{
 		Kind: PageKindStream, Position: position, Keys: keys, Headers: headers, Attrs: attrs, Timestamps: timestamps,
 		Bodies: bodies, RowCount: b.rowCount,
-		ByteSize: ChunkByteSize(keys) + ChunkByteSize(headers) + ChunkByteSize(attrs) +
-			ChunkByteSize(timestamps) + ChunkByteSize(bodies),
+		ByteSize:  sumChunkBytes(keys, headers, attrs, timestamps, bodies),
 		FetchedAt: nowEpochMs(), VisibilityTimeoutSeconds: b.visibilityTimeoutSeconds,
 	}
 }
