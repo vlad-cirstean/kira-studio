@@ -237,33 +237,17 @@ func scanGrpcHistoryEntry(row rowScanner) (model.GrpcCallHistoryEntry, error) {
 	return e, nil
 }
 
+// grpcHistoryTable is the historyTable[T] instance List/Delete/Adopt/SweepOrphans below delegate
+// to (T2-14) — grpc_call_history's own table name/scope/order column/summary columns/scan func.
+var grpcHistoryTable = historyTable[model.GrpcCallHistoryEntry]{
+	table: "grpc_call_history", scope: "grpc_history", timeColumn: "called_at",
+	columns: grpcHistoryEntryColumns, scan: scanGrpcHistoryEntry,
+}
+
 // List is the summary projection (every column but snapshot_json), newest first — ≤
 // grpcHistoryPerScopeCap by construction (Record's own trim).
 func (r *GrpcHistoryRepo) List(scopeKey string) ([]model.GrpcCallHistoryEntry, error) {
-	rows, err := r.DB.Query(
-		`SELECT `+grpcHistoryEntryColumns+`
-		   FROM grpc_call_history
-		  WHERE scope_key = ?
-		  ORDER BY called_at DESC, rowid DESC`,
-		scopeKey,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("repos/grpc_history: query list: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.GrpcCallHistoryEntry{}
-	for rows.Next() {
-		e, err := scanGrpcHistoryEntry(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repos/grpc_history: scan list: %w", err)
-		}
-		out = append(out, e)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos/grpc_history: rows: %w", err)
-	}
-	return out, nil
+	return grpcHistoryTable.List(r.DB, scopeKey)
 }
 
 // Get decodes one row's snapshot_json and rebuilds Entry from the row's own summary columns.
@@ -305,10 +289,7 @@ func (r *GrpcHistoryRepo) Get(id string) (model.GrpcCallSnapshot, error) {
 
 // Delete removes one entry.
 func (r *GrpcHistoryRepo) Delete(id string) error {
-	if _, err := r.DB.Exec(`DELETE FROM grpc_call_history WHERE id = ?`, id); err != nil {
-		return fmt.Errorf("repos/grpc_history: delete: %w", err)
-	}
-	return nil
+	return grpcHistoryTable.Delete(r.DB, id)
 }
 
 // Clear removes every entry in one scope.
@@ -322,28 +303,11 @@ func (r *GrpcHistoryRepo) Clear(scopeKey string) error {
 // Adopt moves a scratch tab's history onto a newly-saved request (mirrors
 // response_history.go's own D14) — one UPDATE, scope follows via the generated column.
 func (r *GrpcHistoryRepo) Adopt(tabID, itemID string) (int, error) {
-	res, err := r.DB.Exec(
-		`UPDATE grpc_call_history SET item_id = ? WHERE item_id IS NULL AND tab_id = ?`,
-		itemID, tabID,
-	)
-	if err != nil {
-		return 0, fmt.Errorf("repos/grpc_history: adopt: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("repos/grpc_history: adopt rows affected: %w", err)
-	}
-	return int(n), nil
+	return grpcHistoryTable.Adopt(r.DB, tabID, itemID)
 }
 
 // SweepOrphans deletes a scratch tab's history once its tab is gone — run once at launch beside
 // response_history's own startup prune (mirrors D7).
 func (r *GrpcHistoryRepo) SweepOrphans() error {
-	if _, err := r.DB.Exec(
-		`DELETE FROM grpc_call_history
-		  WHERE item_id IS NULL AND tab_id NOT IN (SELECT id FROM tabs)`,
-	); err != nil {
-		return fmt.Errorf("repos/grpc_history: sweep orphans: %w", err)
-	}
-	return nil
+	return grpcHistoryTable.SweepOrphans(r.DB)
 }

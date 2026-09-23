@@ -248,33 +248,18 @@ func scanResponseHistoryEntry(row rowScanner) (model.ResponseHistoryEntry, error
 	return e, nil
 }
 
+// responseHistoryTable is the historyTable[T] instance List/Delete/Adopt/SweepOrphans below
+// delegate to (T2-14) — api_response_history's own table name/scope/order column/summary
+// columns/scan func.
+var responseHistoryTable = historyTable[model.ResponseHistoryEntry]{
+	table: "api_response_history", scope: "response_history", timeColumn: "sent_at",
+	columns: responseHistoryEntryColumns, scan: scanResponseHistoryEntry,
+}
+
 // List is the summary projection (every column but snapshot_json), newest first — ≤
 // historyPerScopeLimit by construction (Record's own trim).
 func (r *ResponseHistoryRepo) List(scopeKey string) ([]model.ResponseHistoryEntry, error) {
-	rows, err := r.DB.Query(
-		`SELECT `+responseHistoryEntryColumns+`
-		   FROM api_response_history
-		  WHERE scope_key = ?
-		  ORDER BY sent_at DESC, rowid DESC`,
-		scopeKey,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("repos/response_history: query list: %w", err)
-	}
-	defer rows.Close()
-
-	out := []model.ResponseHistoryEntry{}
-	for rows.Next() {
-		e, err := scanResponseHistoryEntry(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repos/response_history: scan list: %w", err)
-		}
-		out = append(out, e)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repos/response_history: rows: %w", err)
-	}
-	return out, nil
+	return responseHistoryTable.List(r.DB, scopeKey)
 }
 
 // Get decodes one row's snapshot_json and rebuilds Entry from the row's own summary columns
@@ -319,10 +304,7 @@ func (r *ResponseHistoryRepo) Get(id string) (model.ResponseHistorySnapshot, err
 
 // Delete removes one entry.
 func (r *ResponseHistoryRepo) Delete(id string) error {
-	if _, err := r.DB.Exec(`DELETE FROM api_response_history WHERE id = ?`, id); err != nil {
-		return fmt.Errorf("repos/response_history: delete: %w", err)
-	}
-	return nil
+	return responseHistoryTable.Delete(r.DB, id)
 }
 
 // Clear removes every entry in one scope.
@@ -336,18 +318,7 @@ func (r *ResponseHistoryRepo) Clear(scopeKey string) error {
 // Adopt moves a scratch tab's history onto a newly-saved request (D14) — one UPDATE, scope
 // follows via the generated column (F8) with no second write.
 func (r *ResponseHistoryRepo) Adopt(tabID, itemID string) (int, error) {
-	res, err := r.DB.Exec(
-		`UPDATE api_response_history SET item_id = ? WHERE item_id IS NULL AND tab_id = ?`,
-		itemID, tabID,
-	)
-	if err != nil {
-		return 0, fmt.Errorf("repos/response_history: adopt: %w", err)
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("repos/response_history: adopt rows affected: %w", err)
-	}
-	return int(n), nil
+	return responseHistoryTable.Adopt(r.DB, tabID, itemID)
 }
 
 // SweepOrphans deletes a scratch tab's history once its tab is gone (D7) — run once at launch
@@ -355,11 +326,5 @@ func (r *ResponseHistoryRepo) Adopt(tabID, itemID string) (int, error) {
 // rewrites a window's whole tab set but always re-inserts what is currently open, so a row absent
 // there is a tab that was actually closed.
 func (r *ResponseHistoryRepo) SweepOrphans() error {
-	if _, err := r.DB.Exec(
-		`DELETE FROM api_response_history
-		  WHERE item_id IS NULL AND tab_id NOT IN (SELECT id FROM tabs)`,
-	); err != nil {
-		return fmt.Errorf("repos/response_history: sweep orphans: %w", err)
-	}
-	return nil
+	return responseHistoryTable.SweepOrphans(r.DB)
 }
