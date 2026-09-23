@@ -112,6 +112,23 @@ func LogScanArgs(spec WalkSpec) []string {
 	return append(args, walk...)
 }
 
+// parseIdentities parses LogFormat/ScanFormat's shared author/committer field block — fields[2:5]
+// (name, email, unix-seconds timestamp) and fields[5:8] respectively — into a CommitIdentity pair.
+// ParseLogRecord and ParseScanRecord's own identical parse (P107 I2-33).
+func parseIdentities(fields [][]byte) (author, committer CommitIdentity, err error) {
+	authorTime, err := parseUnixSeconds(fields[4])
+	if err != nil {
+		return CommitIdentity{}, CommitIdentity{}, fmt.Errorf("porcelain: author time: %w", err)
+	}
+	committerTime, err := parseUnixSeconds(fields[7])
+	if err != nil {
+		return CommitIdentity{}, CommitIdentity{}, fmt.Errorf("porcelain: committer time: %w", err)
+	}
+	author = CommitIdentity{Name: string(fields[2]), Email: string(fields[3]), Timestamp: authorTime}
+	committer = CommitIdentity{Name: string(fields[5]), Email: string(fields[6]), Timestamp: committerTime}
+	return author, committer, nil
+}
+
 // ParseLogRecord parses one NUL-delimited record (as RecordSplitter returns it) against
 // LogFormat's ten %x1f-separated fields.
 func ParseLogRecord(record []byte) (CommitRecord, error) {
@@ -120,13 +137,9 @@ func ParseLogRecord(record []byte) (CommitRecord, error) {
 		return CommitRecord{}, fmt.Errorf("porcelain: log record has %d fields, want %d", len(fields), FieldCount)
 	}
 
-	authorTime, err := parseUnixSeconds(fields[4])
+	author, committer, err := parseIdentities(fields)
 	if err != nil {
-		return CommitRecord{}, fmt.Errorf("porcelain: author time: %w", err)
-	}
-	committerTime, err := parseUnixSeconds(fields[7])
-	if err != nil {
-		return CommitRecord{}, fmt.Errorf("porcelain: committer time: %w", err)
+		return CommitRecord{}, err
 	}
 	decoration, err := parseDecoration(string(fields[8]))
 	if err != nil {
@@ -134,14 +147,10 @@ func ParseLogRecord(record []byte) (CommitRecord, error) {
 	}
 
 	return CommitRecord{
-		SHA:     string(fields[0]),
-		Parents: parseParents(fields[1]),
-		Author: CommitIdentity{
-			Name: string(fields[2]), Email: string(fields[3]), Timestamp: authorTime,
-		},
-		Committer: CommitIdentity{
-			Name: string(fields[5]), Email: string(fields[6]), Timestamp: committerTime,
-		},
+		SHA:        string(fields[0]),
+		Parents:    parseParents(fields[1]),
+		Author:     author,
+		Committer:  committer,
 		Decoration: decoration,
 		Subject:    string(fields[9]),
 	}, nil
@@ -167,13 +176,9 @@ func ParseScanRecord(record []byte) (ScanRecord, error) {
 		return ScanRecord{}, fmt.Errorf("porcelain: scan record has %d fields, want %d", len(fields), ScanFieldCount)
 	}
 
-	authorTime, err := parseUnixSeconds(fields[4])
+	author, committer, err := parseIdentities(fields)
 	if err != nil {
-		return ScanRecord{}, fmt.Errorf("porcelain: author time: %w", err)
-	}
-	committerTime, err := parseUnixSeconds(fields[7])
-	if err != nil {
-		return ScanRecord{}, fmt.Errorf("porcelain: committer time: %w", err)
+		return ScanRecord{}, err
 	}
 
 	// git emits a trailing "\n" before the record's own NUL terminator; trimmed here, exactly
@@ -183,15 +188,11 @@ func ParseScanRecord(record []byte) (ScanRecord, error) {
 	body = strings.TrimSuffix(body, "\n")
 
 	return ScanRecord{
-		SHA:     string(fields[0]),
-		Subject: string(fields[9]),
-		Body:    body,
-		Author: CommitIdentity{
-			Name: string(fields[2]), Email: string(fields[3]), Timestamp: authorTime,
-		},
-		Committer: CommitIdentity{
-			Name: string(fields[5]), Email: string(fields[6]), Timestamp: committerTime,
-		},
+		SHA:       string(fields[0]),
+		Subject:   string(fields[9]),
+		Body:      body,
+		Author:    author,
+		Committer: committer,
 	}, nil
 }
 
