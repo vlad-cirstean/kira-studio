@@ -7,18 +7,18 @@ import {
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
-export type { AppearanceSettings, GitLogLevel, RowDensity } from '@shared/domain/settings';
 // P103 Part 4 (§7.3): this app's own three-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` — this store used
 // to carry Kira Studio's own data/cache/api/dbMcp/claudeCode sections dead (never populated by this
 // app's own Go backend, apps/kira-space/internal/storage/model/settings.go), the same "tab-kind
 // vocabulary" defect P103 Part 2 already fixed for tabs. appearance/git/gitLogLevel stay genuinely
-// shared; FONT_SIZE_RANGE/FETCH_AUTO_INTERVAL_MINUTES_RANGE are the two this app's own panes read
-// directly (AppearancePane/GitPane), so those two re-export — the raw schema objects
-// (appearanceSettingsSchema/gitLogLevelSchema/gitSettingsSchema/rowDensitySchema) and `GitSettings`
-// stay import-only: nothing outside this file references them directly, every real consumer reads
-// through the composed `Settings`/`SettingsPatch`/`defaultSettings` below or a specific pane-facing
-// type (`AppearanceSettings`/`GitLogLevel`/`RowDensity`, all still exported above).
+// shared; FONT_SIZE_RANGE/FETCH_AUTO_INTERVAL_MINUTES_RANGE are the two this app's own GitPane
+// reads directly, so those two re-export — the raw schema objects (appearanceSettingsSchema/
+// gitLogLevelSchema/gitSettingsSchema/rowDensitySchema) and `GitSettings` stay import-only: nothing
+// outside this file references them directly, every real consumer reads through the composed
+// `Settings`/`SettingsPatch`/`defaultSettings` below. `AppearanceSettings`/`GitLogLevel`/
+// `RowDensity` used to re-export here too; every pane now reads them straight from
+// `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
 export { FETCH_AUTO_INTERVAL_MINUTES_RANGE, FONT_SIZE_RANGE };
 
 // advanced carries just gitLogLevel here — this app's own diagnostic log verbosity, its entire

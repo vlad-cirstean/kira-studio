@@ -10,17 +10,17 @@
  *
  * P77 §11: renders the already filtered/ordered/capped `section` prop `pickerModel.ts` hands it —
  * the same `TagList.vue`/`StashList.vue` contract, this component owns no fold of its own.
+ *
+ * I2-21: the row list itself moved to `StashRows.vue`, shared with `StashList.vue` — see that
+ * file's own doc comment.
  */
 import type { InProgressOperation, StashEntry } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
-import { computed, ref } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import type { StashState } from '../state/stash.ts';
-import { formatRelativeDate } from './dateFormat.ts';
 import type { PickerList } from './pickerModel.ts';
-import RowContextMenu from './RowContextMenu.vue';
-import { REF_LIST_SECTION_CAP } from './refListModel.ts';
-import { buildGlobalStashMenu, buildReadOnlyStashMenu } from './rowMenuModel.ts';
+import { buildGlobalStashMenu } from './rowMenuModel.ts';
+import StashRows, { type StashRowModel } from './StashRows.vue';
 import { globalRowModel } from './stashListModel.ts';
 
 const props = defineProps<{
@@ -48,35 +48,27 @@ const emit = defineEmits<{
   (e: 'selected'): void;
 }>();
 
-function select(entry: StashEntry): void {
-  props.stash.select(entry.sha);
-  emit('selected');
+function globalStashRowModel(entry: StashEntry): StashRowModel {
+  const model = globalRowModel(entry);
+  return {
+    id: `global:${entry.sha}`,
+    origin: model.origin,
+    originTooltip: model.origin === undefined ? undefined : `Saved from ${model.origin}`,
+    auto: model.auto,
+    message: model.label,
+    messageTooltip: entry.message,
+  };
 }
 
-const stashMenu = ref<{ entry: StashEntry; x: number; y: number } | undefined>(undefined);
-
-function openMenu(entry: StashEntry, event: MouseEvent): void {
-  event.preventDefault();
-  stashMenu.value = { entry, x: event.clientX, y: event.clientY };
+function menuFor(entry: StashEntry) {
+  return buildGlobalStashMenu(props.inProgress, entry, props.currentBranch ?? null);
 }
 
-function openMenuFromButton(entry: StashEntry, event: MouseEvent): void {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  stashMenu.value = { entry, x: rect.left, y: rect.bottom };
+function menuLabel(): string {
+  return 'Global stash entry actions';
 }
 
-const stashMenuSections = computed(() => {
-  const entry = stashMenu.value?.entry;
-  if (!entry) return [];
-  return props.writeCapability
-    ? buildGlobalStashMenu(props.inProgress, entry, props.currentBranch ?? null)
-    : buildReadOnlyStashMenu();
-});
-
-async function onMenuSelect(id: string): Promise<void> {
-  const entry = stashMenu.value?.entry;
-  stashMenu.value = undefined;
-  if (!entry) return;
+async function onMenuSelect(id: string, entry: StashEntry): Promise<void> {
   switch (id) {
     case 'stashApply':
       await props.ops.runStashApply(entry);
@@ -85,7 +77,8 @@ async function onMenuSelect(id: string): Promise<void> {
       emit('branchFromStash', entry);
       return;
     case 'stashShow':
-      select(entry);
+      props.stash.select(entry.sha);
+      emit('selected');
       return;
     case 'globalStashRemove':
       await props.ops.runGlobalStashRemove(entry);
@@ -109,50 +102,18 @@ async function onMenuSelect(id: string): Promise<void> {
         @click="emit('saveGlobalStash')"
       />
     </div>
-    <div
-      v-for="entry in section.visible"
-      :key="entry.sha"
-      class="kv-branch-row"
-      :class="{ 'kv-stash-row--selected': stash.selectedSha.value === entry.sha }"
-      :data-row-id="`global:${entry.sha}`"
-      :tabindex="focusedRowId === `global:${entry.sha}` ? 0 : -1"
-    >
-      <KuiButton class="kui-row kv-branch-row-main" icon="codicon-archive" @click="select(entry)">
-        <span
-          v-if="globalRowModel(entry).origin"
-          class="kv-stash-origin"
-          v-kui-tooltip="`Saved from ${globalRowModel(entry).origin}`"
-          >{{ globalRowModel(entry).origin }}</span
-        >
-        <span v-if="globalRowModel(entry).auto" class="kv-stash-auto" v-kui-tooltip="'Created automatically by an auto-stashed checkout'">auto</span>
-        <span class="kv-stash-message" v-kui-tooltip="entry.message">{{ globalRowModel(entry).label }}</span>
-        <span v-if="entry.includedUntracked" class="kv-stash-untracked" v-kui-tooltip="'Includes untracked files'">-u</span>
-        <span class="kv-stash-filecount">{{ entry.fileCount }} file{{ entry.fileCount === 1 ? "" : "s" }}</span>
-        <span class="kv-stash-date">{{ formatRelativeDate(entry.timestamp) }}</span>
-      </KuiButton>
-      <KuiButton
-        variant="icon"
-        v-kui-tooltip="'More actions'"
-        aria-label="More actions"
-        @click="openMenuFromButton(entry, $event)"
-        @contextmenu="openMenu(entry, $event)"
-      >
-        <span class="codicon codicon-ellipsis" aria-hidden="true"></span>
-      </KuiButton>
-    </div>
-    <KuiButton v-if="section.hiddenCount > 0" class="kv-branch-more-button" @click="showMore">
-      Show {{ Math.min(REF_LIST_SECTION_CAP, section.hiddenCount) }} more ({{ section.hiddenCount }} remaining)
-    </KuiButton>
-    <div v-if="section.visible.length === 0" class="kv-branch-empty">No saved entries</div>
-
-    <RowContextMenu
-      v-if="stashMenu"
-      :sections="stashMenuSections"
-      :x="stashMenu.x"
-      :y="stashMenu.y"
-      label="Global stash entry actions"
-      @select="onMenuSelect"
-      @close="stashMenu = undefined"
+    <StashRows
+      :section="section"
+      :stash="stash"
+      :write-capability="writeCapability"
+      :show-more="showMore"
+      :focused-row-id="focusedRowId"
+      empty-message="No saved entries"
+      :row-model="globalStashRowModel"
+      :menu-for="menuFor"
+      :menu-label="menuLabel"
+      @selected="emit('selected')"
+      @menu-select="onMenuSelect"
     />
   </section>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Button } from '@theme/components/ui/button';
 import SettingsShell from '@workbench/components/SettingsShell.vue';
-import { onBeforeUnmount } from 'vue';
+import { useSettingsDeepLinkReset } from '@workbench/settings/useSettingsDeepLinkReset';
 import { sections, useSettingsStore } from '../state/settings';
 import { defaultSettings, type SettingsPatch } from '../state/settingsDomain';
 import AdvancedPane from './settings/AdvancedPane.vue';
@@ -24,9 +24,7 @@ const settingsStore = useSettingsStore();
 
 // §10.1: a later plain open (TitleBar.vue's gear icon) must not inherit a deep link this instance
 // was opened with.
-onBeforeUnmount(() => {
-  settingsStore.settingsSection = null;
-});
+useSettingsDeepLinkReset(settingsStore);
 
 async function save(patch: SettingsPatch): Promise<void> {
   await settingsStore.patchSettings(patch);

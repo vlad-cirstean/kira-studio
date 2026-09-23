@@ -1,6 +1,5 @@
 import {
   appearanceSettingsSchema,
-  FONT_SIZE_RANGE,
   gitLogLevelSchema,
   gitSettingsSchema,
   HTTP_VERSIONS,
@@ -8,19 +7,19 @@ import {
 } from '@shared/domain/settings';
 import { z } from 'zod';
 
-export type { AppearanceSettings, GitLogLevel, RowDensity } from '@shared/domain/settings';
 // P103 Part 4 (§7.3): this app's own eight-section settingsSchema/settingsPatchSchema/
 // defaultSettings, split out of the former one shared `@shared/domain/settings` (which Kira Space's
 // own three-section store carried five dead sections of — data/cache/api/dbMcp/claudeCode — the
 // same "tab-kind vocabulary" defect P103 Part 2 already fixed for tabs). appearance/git/gitLogLevel
-// stay genuinely shared, and this file both re-exports `FONT_SIZE_RANGE` (AppearancePane's own
-// leaf-bound value) and imports `appearanceSettingsSchema`/`gitLogLevelSchema`/`gitSettingsSchema`/
-// `HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed schema below —
-// nothing outside this file references those specific names directly (`HTTP_VERSIONS` is the one
-// exception, re-exported for ApiPane/RequestSettingsPane; `httpVersionSchema` itself stays
-// import-only, domain/http.ts's own dependency on it goes straight to `@shared/domain/settings`,
-// never through here).
-export { FONT_SIZE_RANGE, HTTP_VERSIONS };
+// stay genuinely shared; this file imports `appearanceSettingsSchema`/`gitLogLevelSchema`/
+// `gitSettingsSchema`/`HTTP_VERSIONS`/`httpVersionSchema` unexported, purely to build the composed
+// schema below — nothing outside this file references those specific names directly (`HTTP_VERSIONS`
+// is the one exception, re-exported for ApiPane/RequestSettingsPane; `httpVersionSchema` itself
+// stays import-only, domain/http.ts's own dependency on it goes straight to `@shared/domain/settings`,
+// never through here). `FONT_SIZE_RANGE`/`AppearanceSettings`/`GitLogLevel`/`RowDensity` used to
+// re-export here for AppearancePane/AdvancedPane; both now read them straight from
+// `@shared/domain/settings` via I2-18's shared field components (`FontSizeField.vue` etc.).
+export { HTTP_VERSIONS };
 
 // P17 D6: the two numeric bounds a control can actually violate, as exported constants so the
 // schema (where one applies), the input min/max attributes and the settings dialog's own

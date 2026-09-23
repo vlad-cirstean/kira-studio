@@ -9,11 +9,12 @@
  */
 import type { InProgressOperation, RefRow } from '@kira/git-ipc';
 import { KuiButton } from '@kira/kira-ui';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import type { OpsState } from '../state/ops.ts';
 import RowContextMenu from './RowContextMenu.vue';
 import { REF_LIST_SECTION_CAP, type RefListSection } from './refListModel.ts';
 import { buildReadOnlyRefMenu, buildRefMenu } from './rowMenuModel.ts';
+import { useRowMenu } from './useRowMenu.ts';
 
 const props = defineProps<{
   section: RefListSection;
@@ -53,17 +54,7 @@ function targetCommit(row: RefRow): string {
   return (row.peeledObjectId ?? row.objectId).slice(0, 7);
 }
 
-const refMenu = ref<{ row: RefRow; x: number; y: number } | undefined>(undefined);
-
-function openRefMenu(row: RefRow, event: MouseEvent): void {
-  event.preventDefault();
-  refMenu.value = { row, x: event.clientX, y: event.clientY };
-}
-
-function openRefMenuFromButton(row: RefRow, event: MouseEvent): void {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  refMenu.value = { row, x: rect.left, y: rect.bottom };
-}
+const { menu: refMenu, open: openRefMenu, openFromButton: openRefMenuFromButton } = useRowMenu<RefRow>();
 
 const refMenuSections = computed(() => {
   const entry = refMenu.value;

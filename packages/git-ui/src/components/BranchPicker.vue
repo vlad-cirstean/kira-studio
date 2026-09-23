@@ -63,6 +63,7 @@ import StackList from './StackList.vue';
 import StashList from './StashList.vue';
 import { childOf, parentOf } from './stackListModel.ts';
 import TagList from './TagList.vue';
+import { useRowMenu } from './useRowMenu.ts';
 import WorktreeList from './WorktreeList.vue';
 
 const props = defineProps<{
@@ -408,19 +409,9 @@ async function checkoutRemote(row: RefRow): Promise<void> {
 // The ref-scoped context menu (W14) — one instance, shared by every branch/remote row (TagList
 // opens its own for tag rows, since its rows are not in this file's own DOM).
 // ---------------------------------------------------------------------------------------
-const refMenu = ref<{ row: RefRow; x: number; y: number } | undefined>(undefined);
+const { menu: refMenu, open: openRefMenu, openFromButton: openRefMenuFromButton } = useRowMenu<RefRow>();
 const renaming = ref<{ name: string; value: string } | undefined>(undefined);
 const forceDeleteCandidate = ref<string | undefined>(undefined);
-
-function openRefMenu(row: RefRow, event: MouseEvent): void {
-  event.preventDefault();
-  refMenu.value = { row, x: event.clientX, y: event.clientY };
-}
-
-function openRefMenuFromButton(row: RefRow, event: MouseEvent): void {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  refMenu.value = { row, x: rect.left, y: rect.bottom };
-}
 
 const refMenuSections = computed(() => {
   const entry = refMenu.value;
