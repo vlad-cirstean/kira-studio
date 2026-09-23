@@ -11,7 +11,8 @@
  */
 import type { BaseCandidate, BaseResolution, BaseResolutionReason } from '@kira/git-ipc';
 import { KuiButton, KuiPopoverPanel, KuiSearchInput, useModalFocus } from '@kira/kira-ui';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { onClickOutside } from '@vueuse/core';
+import { computed, ref } from 'vue';
 import { STATE_ICONS } from '../../icons/index.ts';
 import type { RefsState } from '../../state/refs.ts';
 import { buildRefListSections } from '../refListModel.ts';
@@ -66,6 +67,10 @@ function toggle(): void {
   if (!isOpen.value) filter.value = '';
 }
 
+onClickOutside(rootEl, () => {
+  if (isOpen.value) close();
+});
+
 const sections = computed(() =>
   buildRefListSections(
     {
@@ -93,20 +98,6 @@ function pick(ref: string): void {
   emit('select-base', ref);
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (!isOpen.value) return;
-  if (rootEl.value && event.target instanceof Node && rootEl.value.contains(event.target)) return;
-  close();
-}
-
-watch(isOpen, (open) => {
-  if (open) document.addEventListener('pointerdown', onDocumentPointerDown);
-  else document.removeEventListener('pointerdown', onDocumentPointerDown);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown);
-});
 </script>
 
 <template>

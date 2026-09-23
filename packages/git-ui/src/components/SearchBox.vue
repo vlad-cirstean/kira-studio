@@ -59,7 +59,8 @@ import type { KuiSelectOption } from '@kira/kira-ui';
 // `biome.json`'s own `**/*.vue` override turns `useImportType` off for exactly this class of
 // false positive (P96 §5.2).
 import { computeFloatPosition, KuiButton, KuiSearchInput, KuiSelect } from '@kira/kira-ui';
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { onClickOutside } from '@vueuse/core';
+import { computed, nextTick, ref, watch } from 'vue';
 import type { SearchState } from '../state/search.ts';
 import { MIN_TAIL_QUERY_LENGTH } from '../state/search.ts';
 import SearchResults from './SearchResults.vue';
@@ -229,22 +230,8 @@ function onScopeChange(value: string): void {
   props.search.scope.value = value as SearchScope;
 }
 
-function onDocumentPointerDown(event: PointerEvent): void {
-  if (!dropdownVisible.value) return;
-  if (rootEl.value && event.target instanceof Node && rootEl.value.contains(event.target)) return;
-  dropdownDismissed.value = true;
-}
-
-watch(dropdownVisible, (visible) => {
-  if (visible) document.addEventListener('pointerdown', onDocumentPointerDown);
-  else document.removeEventListener('pointerdown', onDocumentPointerDown);
-});
-
-// This component is now conditionally mounted (App.vue's own searchOpen row, G-UX D9) — a
-// dropdown-open unmount (closing the row while a query is mid-search) must still drop the
-// listener the watch above added, since there is no more "closing" transition left to fire it.
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointerDown);
+onClickOutside(rootEl, () => {
+  if (dropdownVisible.value) dropdownDismissed.value = true;
 });
 
 defineExpose({ focus: () => searchInputRef.value?.focus() });
