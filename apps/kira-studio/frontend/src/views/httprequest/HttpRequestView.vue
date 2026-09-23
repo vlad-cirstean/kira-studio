@@ -26,8 +26,8 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import { registerCommand } from '@workbench/shortcuts/commands';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import MethodSelect from '../../api/MethodSelect.vue';
@@ -749,8 +749,17 @@ onUnmounted(() => {
       @close="closeRequestFind"
     />
 
-    <div class="request-response-split">
-      <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="http-request-pane">
+    <SplitterGroup direction="vertical" class="request-response-split">
+      <SplitterPanel
+        class="request-pane"
+        data-testid="http-request-pane"
+        size-unit="px"
+        :default-size="requestPaneHeight"
+        :min-size="120"
+        :max-size="800"
+        :order="1"
+        @resize="onResizeRequestPane"
+      >
         <InputGroup v-if="fieldFilterOpen && showFieldFilterToggle">
           <InputGroupAddon><CodiconIcon name="search" :size="13" /></InputGroupAddon>
           <InputGroupInput v-model="fieldFilterQuery" placeholder="Filter" data-testid="http-field-filter" />
@@ -791,22 +800,14 @@ onUnmounted(() => {
           :filter-query="fieldFilterQuery"
           :show-descriptions="tab.state.fieldDescriptions"
         />
-      </div>
+      </SplitterPanel>
 
-      <PanelSplitter
-        class="request-splitter"
-        orientation="row"
-        :size="requestPaneHeight"
-        :min="120"
-        :max="800"
-        divider
-        @resize="onResizeRequestPane"
-      />
+      <SplitterResizeHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-      <div class="response-pane-slot" data-testid="http-response-pane-slot">
+      <SplitterPanel class="response-pane-slot" data-testid="http-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
-      </div>
-    </div>
+      </SplitterPanel>
+    </SplitterGroup>
   </div>
 </template>
 
@@ -843,21 +844,30 @@ onUnmounted(() => {
   @apply flex min-h-0 flex-col overflow-hidden;
 }
 
-/* Mirrors views/shared/celleditor/CellEditorDock.vue's own .cell-splitter comment: the workbench
-   grid gives a splitter its size from a gap row; inside a view there is no gap band, so the
-   track carries its own explicit height. P22 D13 (F22): the request/response boundary used to be
-   4px of nothing until the pointer crossed it — `divider` (above) draws the line this comment
-   never reached. http-request.spec.ts/grpc-request.spec.ts poll `.request-splitter`'s box-shadow —
-   kept as a marker class. */
+/* P104 §3.3: reka's SplitterResizeHandle carries no divider styling of its own — this reproduces
+   PanelSplitter.vue's old `divider` prop line exactly (a centred inset box-shadow, cleared on
+   hover/drag, --kira-focus fill taking over instead). Mirrors views/shared/celleditor/
+   CellEditorDock.vue's own .cell-splitter comment: the workbench grid gives a splitter its size
+   from a gap row; inside a view there is no gap band, so the track carries its own explicit
+   height. P22 D13 (F22): the request/response boundary used to be 4px of nothing until the
+   pointer crossed it. http-request.spec.ts/grpc-request.spec.ts poll `.request-splitter`'s
+   box-shadow — kept as a marker class. */
 .request-splitter {
-  @apply shrink-0 h-1;
+  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.request-splitter:hover,
+.request-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 .dirty-mark {
   @apply text-warn leading-none text-kira-lg;
 }
 
+/* SplitterPanel's own inline style now owns flex-grow/basis (it always wins over a class rule) —
+   min-h-0 is the only thing this class still needs to contribute. */
 .response-pane-slot {
-  @apply flex-1 min-h-0;
+  @apply min-h-0;
 }
 </style>

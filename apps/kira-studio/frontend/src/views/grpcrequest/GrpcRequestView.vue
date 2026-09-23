@@ -8,9 +8,9 @@ import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
-import PanelSplitter from '@theme/primitives/PanelSplitter.vue';
 import { useDebounceFn } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
+import { SplitterGroup, SplitterPanel, SplitterResizeHandle } from 'reka-ui';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import EnvironmentSelect from '../../api/EnvironmentSelect.vue';
 import { useCollectionsStore } from '../../api/state/collections';
@@ -523,8 +523,17 @@ onUnmounted(() => {
       <EnvironmentSelect :tab-id="tab.id" />
     </div>
 
-    <div class="request-response-split">
-      <div class="request-pane" :style="{ flex: `0 0 ${requestPaneHeight}px` }" data-testid="grpc-request-pane">
+    <SplitterGroup direction="vertical" class="request-response-split">
+      <SplitterPanel
+        class="request-pane"
+        data-testid="grpc-request-pane"
+        size-unit="px"
+        :default-size="requestPaneHeight"
+        :min-size="120"
+        :max-size="800"
+        :order="1"
+        @resize="onResizeRequestPane"
+      >
         <MonacoHost
           v-if="tab.state.requestPane === 'message'"
           :doc="tab.state.message"
@@ -556,22 +565,14 @@ onUnmounted(() => {
           />
         </template>
         <SchemaBrowser v-else :tab="tab" />
-      </div>
+      </SplitterPanel>
 
-      <PanelSplitter
-        class="request-splitter"
-        orientation="row"
-        :size="requestPaneHeight"
-        :min="120"
-        :max="800"
-        divider
-        @resize="onResizeRequestPane"
-      />
+      <SplitterResizeHandle class="request-splitter" :hit-area-margins="{ coarse: 8, fine: 4 }" />
 
-      <div class="response-pane-slot" data-testid="grpc-response-pane-slot">
+      <SplitterPanel class="response-pane-slot" data-testid="grpc-response-pane-slot" :order="2">
         <ResponsePane :tab="tab" />
-      </div>
-    </div>
+      </SplitterPanel>
+    </SplitterGroup>
   </div>
 </template>
 
@@ -615,18 +616,26 @@ onUnmounted(() => {
   @apply flex min-h-0 flex-col overflow-hidden;
 }
 
-/* P22 D13 (F22): the request/response boundary used to be 4px of nothing until the pointer
-   crossed it — `divider` (above) draws the line HttpRequestView.vue's own twin comment names.
-   grpc-request.spec.ts polls `.request-splitter`'s box-shadow — kept as a marker class. */
+/* P104 §3.3: HttpRequestView.vue's own twin comment — reka's SplitterResizeHandle carries no
+   divider styling of its own, reproduced here exactly. P22 D13 (F22): the request/response
+   boundary used to be 4px of nothing until the pointer crossed it. grpc-request.spec.ts polls
+   `.request-splitter`'s box-shadow — kept as a marker class. */
 .request-splitter {
-  @apply shrink-0 h-1;
+  @apply shrink-0 h-1 cursor-row-resize bg-transparent hover:bg-focus data-[state='drag']:bg-focus;
+  box-shadow: inset 0 calc(var(--kira-border-width) * -1) 0 0 var(--kira-border);
+}
+.request-splitter:hover,
+.request-splitter[data-state='drag'] {
+  box-shadow: none;
 }
 
 .dirty-mark {
   @apply text-warn leading-none text-kira-lg;
 }
 
+/* SplitterPanel's own inline style now owns flex-grow/basis (it always wins over a class rule) —
+   min-h-0 is the only thing this class still needs to contribute. */
 .response-pane-slot {
-  @apply flex-1 min-h-0;
+  @apply min-h-0;
 }
 </style>
