@@ -3,13 +3,11 @@ package gitreview
 import (
 	"database/sql"
 	"fmt"
-	"net/url"
-	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/config"
-	_ "modernc.org/sqlite"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // DefaultPath is review.db's own location under KIRA_SPACE_HOME (P100 Part 1: this app's own
@@ -18,20 +16,6 @@ import (
 // TTL/PR-close purges — is nothing like the rest of the app's data).
 func DefaultPath() string {
 	return filepath.Join(config.KiraSpaceHome(), "review.db")
-}
-
-// buildDSN mirrors internal/storage/db.go's buildDSN verbatim (D4): same six pragmas, same
-// single-writer posture. Deliberately duplicated rather than exported and reused — see
-// migrate.go's own doc comment on why this package does not import internal/storage.
-func buildDSN(path string) string {
-	q := url.Values{}
-	q.Set("_busy_timeout", "5000")
-	q.Set("_foreign_keys", "1") // review_range -> review_file -> review_session CASCADE (D4)
-	q.Set("_auto_vacuum", "INCREMENTAL") // SPEC's "purges that want to reclaim space aggressively"
-	q.Set("_pragma", "journal_size_limit(4194304)")
-	q.Set("_journal_mode", "WAL")
-	q.Set("_synchronous", "NORMAL")
-	return "file:" + path + "?" + q.Encode()
 }
 
 // ensureOpen is the lazy-open guard (D3): a Store that never serves a review request never opens
@@ -49,22 +33,12 @@ func (s *Store) ensureOpen() error {
 		return fmt.Errorf("gitreview: ensure layout: %w", err)
 	}
 
-	sqlDB, err := sql.Open("sqlite", buildDSN(s.path))
+	// sqlitex.Open applies the same six startup pragmas storage/db.go's own buildDSN does (D4:
+	// same single-writer posture), pings to force the file into existence, and tightens it to
+	// 0600 — the open/ping/chmod sequence this package used to hand-roll.
+	sqlDB, err := sqlitex.Open(s.path)
 	if err != nil {
-		return fmt.Errorf("gitreview: open %s: %w", s.path, err)
-	}
-	sqlDB.SetMaxOpenConns(1)
-
-	// database/sql's Open is lazy — the file does not exist until the first real connection, so
-	// Ping (which forces one, applying the DSN pragmas above) must run before the chmod below, not
-	// after (storage/db.go's own recorded ordering trap).
-	if err := sqlDB.Ping(); err != nil {
-		_ = sqlDB.Close()
-		return fmt.Errorf("gitreview: open %s: %w", s.path, err)
-	}
-	if err := os.Chmod(s.path, 0o600); err != nil {
-		_ = sqlDB.Close()
-		return fmt.Errorf("gitreview: chmod %s: %w", s.path, err)
+		return fmt.Errorf("gitreview: %w", err)
 	}
 
 	if err := migrate(sqlDB); err != nil {
