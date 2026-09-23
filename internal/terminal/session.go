@@ -8,6 +8,7 @@ package terminal
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"os/exec"
 	"sort"
@@ -27,6 +28,17 @@ const readBufSize = 32 * 1024
 // escalating to SIGKILL — this repo's own existing handshake bound
 // (internal/shell/closeflush.go's closeFlushTimeout).
 const closeGracePeriod = 2 * time.Second
+
+// closeKillWait bounds how long Close waits, after SIGKILL, for readLoop's blocked ptmx.Read to
+// actually return (F1/P108 Part 2). SIGKILL(-pid) can still leave Close waiting forever: a
+// job-control shell (`-i`) can put a child in its own process group, which Kill(-pid, …) misses,
+// and a job that ignores SIGHUP on its controlling terminal (nohup, `trap '' HUP`, zsh's NO_HUP)
+// keeps the slave pty open past both signals either way. Close's own callers —
+// Registry.CloseAll/CloseWindow, in turn both apps' TerminalService.Shutdown (on the app-quit
+// teardown path, before db.Close()) and shell.OpenWindow's own per-window close — must never hang
+// on one stuck session, so this is a second, independent bound, not a substitute for the SIGKILL
+// escalation above it.
+const closeKillWait = 2 * time.Second
 
 // ErrDuplicateSession is Open's error when id is already live, or another Open for the same id is
 // still spawning — the registry rejects it before touching the PTY, per §4/§17.1's
@@ -184,10 +196,13 @@ func (s *Session) Resize(cols, rows uint16) error {
 
 // Close is idempotent and ordered (§4 rule 2): mark closed under the mutex → SIGHUP the whole
 // process group → wait up to closeGracePeriod for the reader goroutine to observe the exit and
-// call Wait() (the `done` channel) → SIGKILL the process group if it hasn't → the reader goroutine
-// closes the master fd itself, once its blocked Read finally returns (readLoop, above). Closing
-// the fd first would race the reader into a use-after-close; signalling first lets the reader
-// observe EOF/EIO and exit on its own, with SIGKILL as the bound on a shell that ignores SIGHUP.
+// call Wait() (the `done` channel) → SIGKILL the process group if it hasn't → wait up to
+// closeKillWait more, then close the master fd ourselves and wait one more closeKillWait bound
+// before giving up and logging (F1) — never blocking forever. Closing the fd first (before either
+// signal) would race the reader into a use-after-close; signalling first lets the reader observe
+// EOF/EIO and exit on its own in the common case, with SIGKILL and then a forced ptmx.Close as the
+// bound on a shell that ignores SIGHUP or sits outside the signalled process group (job control,
+// §4's own edge case).
 func (s *Session) Close() {
 	s.mu.Lock()
 	if s.closed {
@@ -207,7 +222,27 @@ func (s *Session) Close() {
 	}
 
 	_ = syscall.Kill(-pid, syscall.SIGKILL)
-	<-s.done
+
+	select {
+	case <-s.done:
+		return
+	case <-time.After(closeKillWait):
+	}
+
+	// Still not done: a job-control shell's child can live in its own process group (missed by
+	// Kill(-pid, …)), or the pty's slave side can otherwise survive both signals. Closing ptmx
+	// hangs up the slave and reliably unblocks a pending Read on Linux; it is not guaranteed to
+	// on darwin (this repo's shipping platform), so the wait below is bounded regardless — a
+	// logged, permanent leak of this one goroutine/process beats every caller of Close (app-quit
+	// teardown, a single window's own close) hanging forever on it.
+	_ = s.ptmx.Close()
+
+	select {
+	case <-s.done:
+	case <-time.After(closeKillWait):
+		slog.Warn("terminal: session did not exit after SIGKILL and ptmx close",
+			"scope", "terminal", "id", s.id, "pid", pid)
+	}
 }
 
 // OpenParams is Registry.Open's own args — terminalId is client-supplied (the tab id), so the
@@ -390,7 +425,10 @@ func (r *Registry) CloseWindow(key string) {
 	}
 }
 
-// CloseAll closes every live session — app teardown (§4's teardown table).
+// CloseAll closes every live session — app teardown (§4's teardown table). Closes them
+// concurrently (F1): each Close can cost up to closeGracePeriod+2*closeKillWait now that Close
+// itself is bounded, and teardown runs this before db.Close(), so a sequential loop would pay that
+// cost once per open terminal instead of ~once total.
 func (r *Registry) CloseAll() {
 	r.mu.Lock()
 	ids := make([]string, 0, len(r.sessions))
@@ -401,7 +439,13 @@ func (r *Registry) CloseAll() {
 	}
 	r.mu.Unlock()
 
+	var wg sync.WaitGroup
+	wg.Add(len(ids))
 	for _, id := range ids {
-		r.Close(id)
+		go func(id string) {
+			defer wg.Done()
+			r.Close(id)
+		}(id)
 	}
+	wg.Wait()
 }
