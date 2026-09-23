@@ -24,6 +24,15 @@ const (
 // buildConfig is client.ts's buildClientConfig.
 func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(level, message string)) (*pgx.ConnConfig, error) {
 	var connConfig *pgx.ConnConfig
+	// overrode tracks whether this function itself set Host/Port/TLSConfig on connConfig (finding
+	// F6): pgx.ParseConfig's own default sslmode=prefer builds a TLS-primary + plaintext-fallback
+	// pair, each carrying its own Host/Port pulled from PG* environment variables when parsing an
+	// empty connection string — an override below only ever touches the primary, never a Fallbacks
+	// entry, so without also clearing Fallbacks, pgconn.ConnectConfig's own retry-on-any-non-auth-
+	// error (including "server refused TLS") could silently fall through to a fallback carrying an
+	// environment-derived host/port or a plaintext TLSConfig this override was never meant to allow
+	// — exactly the "must fail loudly" this file's own sslmode default case already commits to.
+	overrode := false
 	if cfg.Mode == "uri" && cfg.URI != nil && *cfg.URI != "" {
 		parsed, err := pgx.ParseConfig(*cfg.URI)
 		if err != nil {
@@ -38,9 +47,11 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 		connConfig = parsed
 		if cfg.Host != nil {
 			connConfig.Host = *cfg.Host
+			overrode = true
 		}
 		if cfg.Port != nil {
 			connConfig.Port = uint16(*cfg.Port)
+			overrode = true
 		}
 		if cfg.Username != nil {
 			connConfig.User = *cfg.Username
@@ -81,8 +92,10 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 		switch sslmode {
 		case "require", "prefer":
 			connConfig.TLSConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // matches client.ts's own rejectUnauthorized:false for these two modes
+			overrode = true
 		case "verify-full":
 			connConfig.TLSConfig = &tls.Config{ServerName: connConfig.Host}
+			overrode = true
 		// P21 round 2 architecture/security finding 7: pgx.ParseConfig already resolves
 		// verify-ca correctly from a URI's own ?sslmode= (libpq's "verify the CA chain but not
 		// the hostname" — the standard case for an internal CA or an IP-addressed host), but this
@@ -97,12 +110,20 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 					return verifyChainSkipHostname(certs, nil) // nil roots = the system trust store
 				},
 			}
+			overrode = true
 		default:
 			// An unrecognized sslmode must fail loudly rather than silently fall back to a
 			// plaintext connection — a typo here would otherwise send credentials and data
 			// unencrypted while the user believes TLS is configured.
 			return nil, adapters.New(adapters.CodeConnect, "postgres: unknown sslmode \""+sslmode+"\"", nil)
 		}
+	}
+
+	if overrode {
+		// F6: no environment-derived or protocol-downgraded fallback survives an override above —
+		// pgconn.ConnectConfig retries a Fallbacks entry on any non-auth error from the primary,
+		// which would otherwise silently defeat exactly the override this function just made.
+		connConfig.Fallbacks = nil
 	}
 
 	return connConfig, nil

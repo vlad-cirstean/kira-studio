@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
 
@@ -81,6 +83,53 @@ func TestBuildConfig_ExistingSslmodesUnaffected(t *testing.T) {
 	t.Run("an unrecognized sslmode still fails loudly", func(t *testing.T) {
 		if _, err := buildConfig(cfgWithSslmode("bogus"), "", nil); err == nil {
 			t.Fatal("buildConfig(bogus) returned nil error, want a connect error")
+		}
+	})
+}
+
+// TestBuildConfig_FallbacksClearedOnOverride is finding F6: pgx.ParseConfig("")'s own default
+// sslmode=prefer builds a TLS-primary + plaintext-fallback pair, each carrying its own Host/Port —
+// buildConfig only ever overrides the primary, so pgconn.ConnectConfig's own retry-on-any-non-auth-
+// error could otherwise silently fall through to an environment-derived host/port or a plaintext
+// TLSConfig this override was never meant to allow. Every path that overrides Host/Port or
+// TLSConfig must leave Fallbacks nil.
+func TestBuildConfig_FallbacksClearedOnOverride(t *testing.T) {
+	t.Run("fields mode with no sslmode override still clears Fallbacks (Host/Port overridden)", func(t *testing.T) {
+		host := "pg.example.com"
+		cfg, err := buildConfig(model.ResolvedConnectionConfig{Mode: "fields", Host: &host}, "", nil)
+		if err != nil {
+			t.Fatalf("buildConfig: %v", err)
+		}
+		if cfg.Fallbacks != nil {
+			t.Fatalf("Fallbacks = %+v, want nil once Host/Port were overridden", cfg.Fallbacks)
+		}
+	})
+
+	for _, mode := range []string{"require", "prefer", "verify-full", "verify-ca"} {
+		t.Run("sslmode="+mode+" clears Fallbacks", func(t *testing.T) {
+			cfg, err := buildConfig(cfgWithSslmode(mode), "", nil)
+			if err != nil {
+				t.Fatalf("buildConfig(%s): %v", mode, err)
+			}
+			if cfg.Fallbacks != nil {
+				t.Fatalf("Fallbacks = %+v for sslmode=%s, want nil once TLSConfig was overridden", cfg.Fallbacks, mode)
+			}
+		})
+	}
+
+	t.Run("uri mode with no override at all leaves Fallbacks untouched", func(t *testing.T) {
+		uri := "postgres://u:p@pg.example.com:5432/db"
+		before, err := buildConfig(model.ResolvedConnectionConfig{Mode: "uri", URI: &uri}, "", nil)
+		if err != nil {
+			t.Fatalf("buildConfig: %v", err)
+		}
+		reference, err := pgx.ParseConfig(uri)
+		if err != nil {
+			t.Fatalf("pgx.ParseConfig: %v", err)
+		}
+		if (before.Fallbacks == nil) != (reference.Fallbacks == nil) {
+			t.Fatalf("Fallbacks presence changed with no override: got nil=%v, want nil=%v (this test only guards against buildConfig itself clearing Fallbacks when it made no override)",
+				before.Fallbacks == nil, reference.Fallbacks == nil)
 		}
 	})
 }
