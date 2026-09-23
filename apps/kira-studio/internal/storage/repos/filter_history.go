@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -31,13 +32,48 @@ const historyPerConnectionLimit = 200 * historyLimit
 // picker, not an executor) — a truncated entry is visibly truncated at the moment it matters.
 const maxFilterTextBytes = 4 * 1024
 
-// capFilterText applies maxFilterTextBytes to a value that may be absent — nil stays nil.
+// capFilterText applies maxFilterTextBytes to where_text — a value that may be absent (nil stays
+// nil). F9 (P108 Part 3): truncates on a UTF-8 rune boundary, never mid-sequence, so a truncated
+// entry is still valid UTF-8 rather than a split rune the renderer would have to guess at.
+// order_by_json's own cap is capOrderByJSON below, not this function — an *encoded JSON* string
+// truncated at any byte offset, rune-boundary-safe or not, is still invalid JSON.
 func capFilterText(s *string) *string {
 	if s == nil || len(*s) <= maxFilterTextBytes {
 		return s
 	}
-	truncated := (*s)[:maxFilterTextBytes]
+	truncated := string(truncateUTF8ToBoundary([]byte(*s), maxFilterTextBytes))
 	return &truncated
+}
+
+// truncateUTF8ToBoundary cuts b at maxBytes on a UTF-8 rune boundary, never mid-sequence — mirrors
+// internal/page/scratch.go's own unexported helper of the same name (that package's own, cannot be
+// imported from here).
+func truncateUTF8ToBoundary(b []byte, maxBytes int) []byte {
+	if len(b) <= maxBytes {
+		return b
+	}
+	cut := b[:maxBytes]
+	for len(cut) > 0 {
+		r, size := utf8.DecodeLastRune(cut)
+		if r != utf8.RuneError || size != 1 {
+			break
+		}
+		cut = cut[:len(cut)-1]
+	}
+	return cut
+}
+
+// capOrderByJSON is order_by_json's own cap (F9, P108 Part 3): unlike where_text, this value is
+// encoded JSON, and truncating it at any offset — even a valid UTF-8 rune boundary — still leaves
+// invalid JSON behind. List's own decode guard already drops a row whose order_by_json fails to
+// parse (silently, since a bad row must not make the whole history unreadable), so a truncated one
+// was being written only to be discarded later — this drops the sort spec outright instead,
+// keeping whatever encoded string is short enough to record faithfully.
+func capOrderByJSON(s *string) *string {
+	if s == nil || len(*s) <= maxFilterTextBytes {
+		return s
+	}
+	return nil
 }
 
 type FilterHistoryRepo struct {
@@ -66,7 +102,13 @@ func (r *FilterHistoryRepo) Record(connectionID, path string, where *string, ord
 	// D4's per-row cap, applied before the dedupe delete/insert so both compare (and store)
 	// exactly what will be kept.
 	where = capFilterText(where)
-	orderByJSON = capFilterText(orderByJSON)
+	orderByJSON = capOrderByJSON(orderByJSON)
+	// F9: an oversized orderBy is dropped by capOrderByJSON above, not truncated — re-check the
+	// same "nothing worth recording" condition Record's own top already applies, now that this
+	// value can end up nil here too (an oversized sort spec with no where_text of its own).
+	if where == nil && orderByJSON == nil {
+		return nil
+	}
 
 	tx, err := r.DB.Begin()
 	if err != nil {

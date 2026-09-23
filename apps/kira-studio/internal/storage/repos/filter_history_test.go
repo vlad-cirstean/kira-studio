@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -154,5 +155,90 @@ func TestFilterHistoryWhereTextOverCapIsTruncated(t *testing.T) {
 	}
 	if !strings.HasPrefix(oversized, *entries[0].Where) {
 		t.Fatal("stored where_text is not a prefix of the original")
+	}
+}
+
+// TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary is F9 (P108 Part 3): a raw byte cut can
+// land mid-rune for a where_text made of multi-byte UTF-8 characters, producing an invalid string
+// nothing can safely display. Built from a 2-byte rune ("é") repeated so its 4 KiB cut point falls
+// exactly mid-character under a naive byte truncation (4096 is even, so a 2-byte rune repeated
+// would actually land clean — 3-byte runes don't divide it evenly, which is the point).
+func TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary(t *testing.T) {
+	r := newFilterHistoryRepo(t)
+	seedConnection(t, r.DB, "c1")
+
+	const multiByteRune = "€" // U+20AC, 3 bytes in UTF-8 — 4096 is not a multiple of 3.
+	oversized := strings.Repeat(multiByteRune, 2000)
+	if err := r.Record("c1", "p", &oversized, nil); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("c1", "p", 10)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Where == nil {
+		t.Fatalf("List() = %+v, want exactly 1 entry with a non-nil Where", entries)
+	}
+	got := *entries[0].Where
+	if len(got) > 4*1024 {
+		t.Fatalf("stored where_text is %d bytes, want at most 4096", len(got))
+	}
+	if !strings.HasPrefix(oversized, got) {
+		t.Fatal("stored where_text is not a prefix of the original")
+	}
+	if !utf8.ValidString(got) {
+		t.Fatalf("stored where_text %q is not valid UTF-8 — truncated mid-rune", got)
+	}
+}
+
+// TestFilterHistoryOversizedOrderByIsDroppedNotCorrupted is F9 (P108 Part 3): order_by_json is an
+// *encoded JSON* string — truncating it at any byte offset, rune-boundary-safe or not, still
+// leaves invalid JSON, which List's own decode guard then drops the *whole row* over (including a
+// perfectly good where_text sitting right next to it). An oversized orderBy must be dropped
+// instead, keeping the row and its where_text intact.
+func TestFilterHistoryOversizedOrderByIsDroppedNotCorrupted(t *testing.T) {
+	r := newFilterHistoryRepo(t)
+	seedConnection(t, r.DB, "c1")
+
+	where := "status = 'active'"
+	oversizedSpec := &model.SortSpec{Kind: "text", Text: strings.Repeat("x", 5000)}
+	if err := r.Record("c1", "p", &where, oversizedSpec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("c1", "p", 10)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("List() = %+v, want exactly 1 entry (the row must survive, not be dropped as a bad order_by_json row)", entries)
+	}
+	if entries[0].Where == nil || *entries[0].Where != where {
+		t.Fatalf("Where = %v, want %q — a good where_text must survive an oversized sibling orderBy", entries[0].Where, where)
+	}
+	if entries[0].OrderBy != nil {
+		t.Fatalf("OrderBy = %+v, want nil — an oversized sort spec must be dropped, not stored truncated/corrupt", entries[0].OrderBy)
+	}
+}
+
+// TestFilterHistoryRecordsNothingWhenOnlyAnOversizedOrderByIsGiven is Record's own "nothing worth
+// recording" rule (D4's pre-existing where==nil&&orderBy==nil early return), reached from a second
+// direction now that capOrderByJSON can itself turn a non-nil orderBy into nil (F9).
+func TestFilterHistoryRecordsNothingWhenOnlyAnOversizedOrderByIsGiven(t *testing.T) {
+	r := newFilterHistoryRepo(t)
+	seedConnection(t, r.DB, "c1")
+
+	oversizedSpec := &model.SortSpec{Kind: "text", Text: strings.Repeat("x", 5000)}
+	if err := r.Record("c1", "p", nil, oversizedSpec); err != nil {
+		t.Fatalf("Record: %v", err)
+	}
+
+	entries, err := r.List("c1", "p", 10)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("List() = %+v, want empty — an oversized orderBy with no where_text carries nothing worth recording", entries)
 	}
 }
