@@ -11,6 +11,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
@@ -497,7 +498,7 @@ function onBulkClose(): void {
              populated environment showed two unlabelled text boxes — the placeholder is gone the
              moment either has a value, which is most of the time. Same .cell label convention
              the variable table's own header row below uses. -->
-        <label class="env-field">
+        <Label class="env-field">
           <span class="env-field-label p-xs dim">Name</span>
           <Input
             v-model="envNameDraft"
@@ -505,8 +506,8 @@ function onBulkClose(): void {
             data-testid="environment-name"
             @blur="onEnvFieldBlur"
           />
-        </label>
-        <label class="env-field">
+        </Label>
+        <Label class="env-field">
           <span class="env-field-label p-xs dim">Description</span>
           <Input
             v-model="envDescriptionDraft"
@@ -514,7 +515,7 @@ function onBulkClose(): void {
             data-testid="environment-description"
             @blur="onEnvFieldBlur"
           />
-        </label>
+        </Label>
         <!-- P104 §3 "ColorPicker -> inline composition": the swatch grid of Buttons inlined at the
              call site rather than kept as a shared primitive (theme/primitives/ColorPicker.vue). -->
         <div

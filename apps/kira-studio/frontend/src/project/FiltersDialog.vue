@@ -6,6 +6,7 @@ import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { computed, nextTick, ref, watch } from 'vue';
 import { useConnectionsStore } from '../state/connections';
@@ -181,7 +182,7 @@ const connectionName = computed(
           </span>
         </div>
         <div class="kind-list" data-testid="filter-kind-list">
-          <label
+          <Label
             v-for="row in kinds"
             :key="row.kind"
             class="kind-row"
@@ -197,7 +198,7 @@ const connectionName = computed(
             </Checkbox>
             <span class="kind-label">{{ row.label }}</span>
             <span class="kind-count">{{ row.count }}</span>
-          </label>
+          </Label>
           <span v-if="kinds.length === 0" class="empty-note">Nothing cached yet.</span>
         </div>
       </section>
@@ -240,7 +241,7 @@ const connectionName = computed(
             <span v-else class="twisty-spacer" />
             <Tooltip :disabled="!row.disabledReason">
               <TooltipTrigger as-child>
-                <label class="object-checkbox-label">
+                <Label class="object-checkbox-label">
                   <Checkbox
                     :model-value="row.state === 'partial' ? 'indeterminate' : row.state !== 'off'"
                     :disabled="row.disabled"
@@ -252,7 +253,7 @@ const connectionName = computed(
                     </template>
                   </Checkbox>
                   <span class="object-name">{{ row.name }}</span>
-                </label>
+                </Label>
               </TooltipTrigger>
               <TooltipContent v-if="row.disabledReason">{{ row.disabledReason }}</TooltipContent>
             </Tooltip>

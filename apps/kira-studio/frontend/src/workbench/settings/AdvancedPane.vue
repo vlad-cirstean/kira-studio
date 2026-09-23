@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref } from 'vue';
@@ -60,7 +61,7 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
 
 <template>
   <div class="settings-pane" v-show="active">
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Operation log retention (days)</span>
         <Tooltip>
@@ -126,10 +127,10 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
       <span v-if="opLogRetentionError" class="field-error" data-testid="settings-oplog-retention-error">
         {{ opLogRetentionError }}
       </span>
-    </label>
+    </Label>
     <p class="muted-note">Takes effect after restart.</p>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Expensive query threshold (rows)</span>
         <Tooltip>
@@ -204,9 +205,9 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         expensive by the console's Explain button and by auto-explain. Not comparable
         across engines' own cost figures — see the plan panel's own note.</span
       >
-    </label>
+    </Label>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Git log level</span>
         <Tooltip>
@@ -240,6 +241,6 @@ props.registerFieldError('advanced.expensiveQueryRows', expensiveQueryRowsError)
         <option value="debug">Debug</option>
       </select>
       <span class="helper-text">Verbosity of kira-space's own diagnostic log, for every repository.</span>
-    </label>
+    </Label>
   </div>
 </template>

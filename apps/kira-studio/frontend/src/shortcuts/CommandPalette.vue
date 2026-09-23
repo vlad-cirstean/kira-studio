@@ -1,34 +1,17 @@
 <script setup lang="ts">
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@theme/components/ui/command';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
-import { computed, nextTick, ref, watch } from 'vue';
 import { usePaletteStore } from './state';
 
+// P104 §3: list chrome, filtering and keyboard model now come from ui/command (reka's Listbox) —
+// activeIndex/ArrowUp/ArrowDown/Enter and the hand-rolled `filtered` computed all delete with it.
+// `paletteCommands`' own declaration order is preserved as-is: Command's filter only toggles an
+// item's visibility, it never reorders, so rendering `paletteCommands` straight into the v-for
+// keeps the same ranking the old computed produced.
 const paletteStore = usePaletteStore();
-const inputRef = ref<HTMLInputElement | null>(null);
-const activeIndex = ref(0);
 
-const filtered = computed(() => {
-  const q = paletteStore.query.trim().toLowerCase();
-  if (!q) return paletteStore.paletteCommands;
-  return paletteStore.paletteCommands.filter((c) => c.label.toLowerCase().includes(q));
-});
-
-watch(
-  () => paletteStore.open,
-  async (open) => {
-    if (!open) return;
-    activeIndex.value = 0;
-    await nextTick();
-    inputRef.value?.focus();
-  },
-);
-
-watch(filtered, () => {
-  activeIndex.value = 0;
-});
-
-function runAt(index: number): void {
-  const command = filtered.value[index];
+function runCommand(id: string): void {
+  const command = paletteStore.paletteCommands.find((c) => c.id === id);
   if (!command) return;
   paletteStore.closePalette();
   command.run();
@@ -39,15 +22,6 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault();
     paletteStore.closePalette();
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    activeIndex.value = Math.min(filtered.value.length - 1, activeIndex.value + 1);
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    activeIndex.value = Math.max(0, activeIndex.value - 1);
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    runAt(activeIndex.value);
   }
 }
 </script>
@@ -60,33 +34,23 @@ function onKeydown(e: KeyboardEvent): void {
     @click="paletteStore.closePalette"
   >
     <div class="palette p-float" data-testid="command-palette" @click.stop>
-      <div class="palette-input-pad">
-        <div class="p-input ui md palette-input">
-          <input
-            ref="inputRef"
-            v-model="paletteStore.query"
-            data-testid="command-palette-input"
-            type="text"
-            placeholder="Type a command…"
-            @keydown="onKeydown"
-          />
-        </div>
-      </div>
-      <div class="palette-list">
-        <div
-          v-for="(command, i) in filtered"
-          :key="command.id"
-          class="p-row palette-item"
-          :class="{ 'is-selected': i === activeIndex }"
-          data-testid="command-palette-item"
-          :data-command-id="command.id"
-          @mouseenter="activeIndex = i"
-          @click="runAt(i)"
-        >
-          {{ command.label }}
-        </div>
-        <div v-if="filtered.length === 0" class="palette-empty dim">No matching commands</div>
-      </div>
+      <Command class="rounded-none! p-0!" @keydown="onKeydown">
+        <CommandInput data-testid="command-palette-input" placeholder="Type a command…" />
+        <CommandList class="max-h-[300px]">
+          <CommandEmpty class="dim" data-testid="command-palette-empty">No matching commands</CommandEmpty>
+          <CommandItem
+            v-for="command in paletteStore.paletteCommands"
+            :key="command.id"
+            :value="command.id"
+            class="whitespace-nowrap"
+            data-testid="command-palette-item"
+            :data-command-id="command.id"
+            @select="runCommand(command.id)"
+          >
+            {{ command.label }}
+          </CommandItem>
+        </CommandList>
+      </Command>
     </div>
   </div>
 </template>
@@ -102,35 +66,6 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 .palette {
-  @apply w-[420px] max-h-[360px] flex flex-col;
-}
-
-/* Command palette — Menus.html: one bordered p-input inset in its own padded
-   row, then the list below a hairline, rather than a borderless full-bleed
-   field. */
-.palette-input-pad {
-  @apply shrink-0;
-  padding: var(--kira-s-3);
-}
-
-.palette-input {
-  @apply w-full;
-}
-
-.palette-list {
-  @apply overflow-y-auto flex flex-col gap-px;
-  padding: var(--kira-s-2);
-  border-top: var(--kira-border-width) solid var(--kira-border);
-}
-
-.palette-item {
-  @apply whitespace-nowrap;
-}
-
-.palette-empty {
-  @apply flex items-center;
-  height: var(--kira-h-sm);
-  padding: 0 var(--kira-s-3);
-  font-size: var(--kira-t-md);
+  @apply w-[420px] flex flex-col;
 }
 </style>

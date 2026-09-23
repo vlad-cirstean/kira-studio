@@ -3,6 +3,7 @@ import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { Label } from '@theme/components/ui/label';
 import { Separator } from '@theme/components/ui/separator';
 import { onUnmounted, ref } from 'vue';
 import { useTabsStore } from '../../state/tabs';
@@ -64,7 +65,7 @@ onUnmounted(() => {
       No fields seen yet — load a page first.
     </div>
     <div v-else class="columns-menu-list">
-      <label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
+      <Label v-for="name in fieldNames" :key="name" class="columns-menu-item p-row">
         <Checkbox
           :model-value="selected.has(name)"
           class="size-3.5"
@@ -74,7 +75,7 @@ onUnmounted(() => {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         {{ name }}
-      </label>
+      </Label>
     </div>
     <Separator class="my-1" />
     <div class="columns-menu-footer p-xs dim" data-testid="document-projection-menu-footer">

@@ -4,6 +4,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor } from '@theme/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { ref, watch } from 'vue';
@@ -186,7 +187,7 @@ function onKeydown(e: KeyboardEvent): void {
     </div>
     <Tooltip>
       <TooltipTrigger as-child>
-        <label class="secret-toggle" tabindex="0" :aria-describedby="undefined">
+        <Label class="secret-toggle" tabindex="0" :aria-describedby="undefined">
           <Checkbox
             :model-value="row.isSecret"
             :disabled="secretsUnavailable && !row.isSecret"
@@ -195,7 +196,7 @@ function onKeydown(e: KeyboardEvent): void {
           >
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
-        </label>
+        </Label>
       </TooltipTrigger>
       <TooltipContent>{{ secretsUnavailable ? 'Secret storage is unavailable' : 'Secret' }}</TooltipContent>
     </Tooltip>

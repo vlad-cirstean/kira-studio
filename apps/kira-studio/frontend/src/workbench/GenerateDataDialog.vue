@@ -5,6 +5,7 @@ import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, onMounted, ref } from 'vue';
@@ -254,7 +255,7 @@ function onSequenceStartChange(index: number, start: number): void {
       <div class="overflow-auto">
     <div class="generate-form">
       <div class="run-fields">
-        <label class="field-label p-sm muted">Rows</label>
+        <Label class="field-label p-sm muted">Rows</Label>
         <!-- P104 §2: `ref` on a wrapping display:contents span (not the InputGroup component
              itself, which forwards no DOM ref) -- keeps run-fields' flex layout untouched since the
              wrapper contributes no box of its own. -->
@@ -300,7 +301,7 @@ function onSequenceStartChange(index: number, start: number): void {
           </InputGroupAddon>
         </InputGroup>
         </span>
-        <label class="field-label p-sm muted">Seed</label>
+        <Label class="field-label p-sm muted">Seed</Label>
         <span ref="seedGroupRef" class="contents">
         <InputGroup class="h-control w-full rounded-kira-sm border-border-strong bg-input">
           <InputGroupInput

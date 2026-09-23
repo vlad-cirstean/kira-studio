@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref } from 'vue';
@@ -82,7 +83,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
 
 <template>
   <div class="settings-pane" v-show="active">
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>HTTP version</span>
         <Tooltip>
@@ -111,9 +112,9 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       >
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </select>
-    </label>
+    </Label>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Request timeout (ms)</span>
         <Tooltip>
@@ -184,9 +185,9 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         {{ requestTimeoutMsError }}
       </span>
       <span v-else class="helper-text">0 = no timeout.</span>
-    </label>
+    </Label>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Max response size (MB)</span>
         <Tooltip>
@@ -257,10 +258,10 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
         {{ maxResponseMbError }}
       </span>
       <span v-else class="helper-text">0 = unlimited. A larger body is truncated, not refused.</span>
-    </label>
+    </Label>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           class="size-3.5"
           :model-value="draft.api.sslVerify"
@@ -270,7 +271,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Verify SSL certificates</span>
-      </label>
+      </Label>
       <Tooltip>
       <TooltipTrigger as-child>
         <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'sslVerify') }">
@@ -298,7 +299,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
     </p>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           class="size-3.5"
           :model-value="draft.api.followRedirects"
@@ -308,7 +309,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Follow redirects</span>
-      </label>
+      </Label>
       <Tooltip>
       <TooltipTrigger as-child>
         <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'followRedirects') }">
@@ -329,7 +330,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       </Tooltip>
     </div>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Max redirects</span>
         <Tooltip>
@@ -405,10 +406,10 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
       <span v-else-if="!draft.api.followRedirects" class="helper-text">
         Follow redirects is off — this has no effect.
       </span>
-    </label>
+    </Label>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           class="size-3.5"
           :model-value="draft.api.disableCookieJar"
@@ -422,7 +423,7 @@ const maxRedirectsStepper = useNumberStepper(maxRedirectsGroupRef);
           >Off keeps a session cookie a server sets and replays it on later requests to
           the same host.</span
         >
-      </label>
+      </Label>
       <Tooltip>
       <TooltipTrigger as-child>
         <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('api', 'disableCookieJar') }">

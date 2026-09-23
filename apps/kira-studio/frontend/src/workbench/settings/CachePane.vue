@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { formatBytes } from '@workbench/util/format';
@@ -57,7 +58,7 @@ async function onClearCaches(): Promise<void> {
 
 <template>
   <div class="settings-pane" v-show="active">
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Result page cache budget (MB)</span>
         <Tooltip>
@@ -123,8 +124,8 @@ async function onClearCaches(): Promise<void> {
       <span v-if="cacheBudgetError" class="field-error" data-testid="settings-cache-budget-error">
         {{ cacheBudgetError }}
       </span>
-    </label>
-    <label class="field">
+    </Label>
+    <Label class="field">
       <span>Current usage</span>
       <Input
         type="text"
@@ -132,8 +133,8 @@ async function onClearCaches(): Promise<void> {
         :model-value="cacheSizeLabel"
         disabled
       />
-    </label>
-    <label class="field">
+    </Label>
+    <Label class="field">
       <span>Hit rate</span>
       <Input
         type="text"
@@ -141,7 +142,7 @@ async function onClearCaches(): Promise<void> {
         :model-value="hitRateLabel"
         disabled
       />
-    </label>
+    </Label>
     <Button variant="dialog" size="kira-lg" class="action-button" data-testid="settings-clear-caches" @click="onClearCaches">
       Clear caches
     </Button>

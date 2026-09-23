@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { Label } from '@theme/components/ui/label';
 import { ref } from 'vue';
 import { useAgentHooksStore } from '../../state/agentHooks';
 import { useKeepAwakeStore } from '../../state/keepAwake';
@@ -46,7 +47,7 @@ async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
          this leaf (claudeCode.hooksEnabled) both persists and starts/stops the embedded
          hook listener in one call, so it belongs on the action side of the draft/Save
          line, never mixed with it. -->
-    <label class="field checkbox">
+    <Label class="field checkbox">
       <Checkbox
         class="size-3.5"
         :model-value="settingsStore.claudeCode.hooksEnabled"
@@ -62,7 +63,7 @@ async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
         owns — no project file is written. Turning this off affects only the next launch;
         a session already running simply stops reporting.</span
       >
-    </label>
+    </Label>
 
     <template v-if="settingsStore.claudeCode.hooksEnabled">
       <p
@@ -84,7 +85,7 @@ async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
     <!-- P87 §9: independent of the title bar's own keep-awake button — either source is
          enough to hold the assertion, and this leaf's own instant-action posture mirrors
          the hooks toggle just above. -->
-    <label class="field checkbox">
+    <Label class="field checkbox">
       <Checkbox
         class="size-3.5"
         :model-value="settingsStore.claudeCode.keepAwakeWithAgents"
@@ -100,6 +101,6 @@ async function onToggleKeepAwakeAgentAware(enabled: boolean): Promise<void> {
         Claude Code tab is live. Independent of the title bar's own keep-awake button —
         either one is enough to keep the machine awake.</span
       >
-    </label>
+    </Label>
   </div>
 </template>

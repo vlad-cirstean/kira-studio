@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import type { SettingsPaneProps } from './types';
 
@@ -20,7 +21,7 @@ function onDefaultPageSizeChange(e: Event): void {
 
 <template>
   <div class="settings-pane" v-show="active">
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Default page size</span>
         <Tooltip>
@@ -49,6 +50,6 @@ function onDefaultPageSizeChange(e: Event): void {
       >
         <option v-for="size in PAGE_SIZES" :key="size" :value="size">{{ size }}</option>
       </select>
-    </label>
+    </Label>
   </div>
 </template>

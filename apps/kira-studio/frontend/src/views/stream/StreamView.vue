@@ -6,6 +6,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from '@theme/compone
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { Popover, PopoverAnchor, PopoverContent } from '@theme/components/ui/popover';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -899,7 +900,7 @@ onUnmounted(() => {
                 >
                   No partitions
                 </div>
-                <label
+                <Label
                   v-for="p in partitionOptions"
                   :key="p"
                   class="partition-option"
@@ -913,7 +914,7 @@ onUnmounted(() => {
                     <CodiconIcon name="check" :size="10" />
                   </Checkbox>
                   <span>partition {{ p }}</span>
-                </label>
+                </Label>
               </div>
             </PopoverContent>
           </Popover>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/vue-query';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { Label } from '@theme/components/ui/label';
 import { computed, ref } from 'vue';
 import { useConnectionsStore } from '../../state/connections';
 import { useDbMcpStore } from '../../state/dbmcp';
@@ -100,7 +101,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
          one call, so it belongs on the action side of the draft/Save line, never mixed with
          it. Toggle, then command, then button, strictly in that DOM order (§11.4/SPEC's own
          "enabling is never a silent action"). -->
-    <label class="field checkbox">
+    <Label class="field checkbox">
       <Checkbox
         class="size-3.5"
         :model-value="settingsStore.dbMcp.serverEnabled"
@@ -116,7 +117,7 @@ function mcpDescriptionFirstLine(conn: ConnectionSummary): string {
         the same path this app's own SQL console uses. Starts and stops with this
         toggle.</span
       >
-    </label>
+    </Label>
 
     <template v-if="settingsStore.dbMcp.serverEnabled">
       <p v-if="dbMcpStore.status.error" class="muted-note" data-testid="db-mcp-error">

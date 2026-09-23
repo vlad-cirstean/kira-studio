@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { computed, ref, watch } from 'vue';
 import { useCollectionsStore } from './state/collections';
 
@@ -92,10 +93,10 @@ function splitTarget(value: string): [string, string | null] {
       </DialogHeader>
       <div class="overflow-auto">
     <div class="p-dialog-body">
-      <label class="p-sm muted mt-1">Name</label>
+      <Label class="p-sm muted mt-1">Name</Label>
       <Input v-model="name" data-testid="save-request-name" @keydown.enter="onSave" />
 
-      <label class="p-sm muted mt-1">Save to</label>
+      <Label class="p-sm muted mt-1">Save to</Label>
       <select v-model="target" class="p-select bordered" data-testid="save-request-target">
         <optgroup v-for="c in collectionTargets" :key="c.id" :label="c.name">
           <option :value="`${c.id}:`">(collection root)</option>

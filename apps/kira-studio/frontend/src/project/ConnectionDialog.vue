@@ -21,6 +21,7 @@ import { Checkbox } from '@theme/components/ui/checkbox';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@theme/components/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -716,11 +717,11 @@ const preconnectText = computed({
           <div v-if="activeTab === 'General'" class="tab-pane" role="tabpanel">
           <div class="field-row">
             <div class="field name-field">
-              <label>Name</label>
+              <Label>Name</Label>
               <Input v-model="draft.name" class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-ui" data-testid="connection-name" />
             </div>
             <div class="field color-field">
-              <label>Color</label>
+              <Label>Color</Label>
               <div
                 class="color-picker flex h-6.5 flex-wrap items-center gap-1"
                 role="radiogroup"
@@ -752,7 +753,7 @@ const preconnectText = computed({
           </p>
 
           <div class="field">
-            <label>Mode</label>
+            <Label>Mode</Label>
             <div class="segmented">
               <button
                 type="button"
@@ -775,7 +776,7 @@ const preconnectText = computed({
 
           <template v-if="draft.mode === 'fields' && isFileStyle">
             <div class="field">
-              <label>Database file</label>
+              <Label>Database file</Label>
               <div class="password-row">
                 <div class="password-input">
                   <Input
@@ -795,7 +796,7 @@ const preconnectText = computed({
           <template v-else-if="draft.mode === 'fields'">
             <div v-if="!isAwsStyle" class="field-row">
               <div class="field">
-                <label>Host</label>
+                <Label>Host</Label>
                 <Input
                   :model-value="draft.host ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
@@ -804,7 +805,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="field port-field" ref="portGroupRef">
-                <label>Port</label>
+                <Label>Port</Label>
                 <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
                   <InputGroupInput
                     :model-value="draft.port != null ? String(draft.port) : ''"
@@ -847,7 +848,7 @@ const preconnectText = computed({
             <span v-if="fieldErrors.host" class="field-error">{{ fieldErrors.host }}</span>
             <div v-if="isAwsStyle" class="field-row">
               <div class="field">
-                <label>Region</label>
+                <Label>Region</Label>
                 <Input
                   :model-value="draft.database ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
@@ -856,7 +857,7 @@ const preconnectText = computed({
                 />
               </div>
               <div class="field">
-                <label>AWS profile (optional)</label>
+                <Label>AWS profile (optional)</Label>
                 <Input
                   :model-value="draft.username ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
@@ -867,7 +868,7 @@ const preconnectText = computed({
             </div>
             <template v-else>
               <div class="field">
-                <label>Database</label>
+                <Label>Database</Label>
                 <Input
                   :model-value="draft.database ?? ''"
                   class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
@@ -877,7 +878,7 @@ const preconnectText = computed({
               </div>
               <div class="field-row">
                 <div class="field">
-                  <label>User</label>
+                  <Label>User</Label>
                   <Input
                     :model-value="draft.username ?? ''"
                     class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
@@ -886,7 +887,7 @@ const preconnectText = computed({
                   />
                 </div>
                 <div class="field">
-                  <label>Password</label>
+                  <Label>Password</Label>
                   <div class="password-row">
                     <div class="password-input">
                       <Input
@@ -918,7 +919,7 @@ const preconnectText = computed({
           </template>
           <template v-else>
             <div class="field">
-              <label>Connection URI</label>
+              <Label>Connection URI</Label>
               <Input
                 :model-value="draft.uri ?? ''"
                 class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-data"
@@ -932,7 +933,7 @@ const preconnectText = computed({
           </div>
 
           <div v-else-if="activeTab === 'Advanced'" class="tab-pane" role="tabpanel">
-          <label class="field checkbox">
+          <Label class="field checkbox">
             <Checkbox
               :model-value="draft.readOnly"
               class="size-3.5"
@@ -943,9 +944,9 @@ const preconnectText = computed({
             </Checkbox>
             <span>Read-only</span>
             <span class="helper-text">Blocks every mutation path for this connection — grid edits, DDL, and console writes.</span>
-          </label>
+          </Label>
 
-          <label v-if="isSqlKind" class="field checkbox">
+          <Label v-if="isSqlKind" class="field checkbox">
             <Checkbox
               :model-value="draft.autoExplain"
               class="size-3.5"
@@ -961,10 +962,10 @@ const preconnectText = computed({
               row threshold. EXPLAIN only plans the query — it never runs it — so this costs one
               extra planning round trip, not a second execution.
             </span>
-          </label>
+          </Label>
 
           <div class="field">
-            <label>Throttle commands <span class="dim">— per second</span></label>
+            <Label>Throttle commands <span class="dim">— per second</span></Label>
             <div class="size-input" ref="throttleGroupRef">
               <InputGroup class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input">
                 <InputGroupInput
@@ -1020,7 +1021,7 @@ const preconnectText = computed({
 
           <div v-else-if="activeTab === 'Pre-connect'" class="tab-pane" role="tabpanel">
           <div class="field">
-            <label>Pre-connect command <span class="dim">— optional</span></label>
+            <Label>Pre-connect command <span class="dim">— optional</span></Label>
             <Textarea
               v-model="preconnectText"
               class="font-data"
@@ -1039,7 +1040,7 @@ const preconnectText = computed({
           </div>
           <span v-if="fieldErrors.preconnect" class="field-error">{{ fieldErrors.preconnect }}</span>
 
-          <label v-if="preconnectText" class="field checkbox">
+          <Label v-if="preconnectText" class="field checkbox">
             <Checkbox
               :model-value="draft.preconnectSidecar"
               class="size-3.5"
@@ -1055,11 +1056,11 @@ const preconnectText = computed({
               you connect, and its exit is never monitored — the right choice for a one-off prep
               script.
             </span>
-          </label>
+          </Label>
           </div>
 
           <div v-else-if="activeTab === 'MCP'" class="tab-pane" role="tabpanel">
-          <label class="field checkbox">
+          <Label class="field checkbox">
             <Checkbox
               :model-value="draft.mcpEnabled"
               class="size-3.5"
@@ -1073,12 +1074,12 @@ const preconnectText = computed({
               Nothing is exposed by default. The same switch lives in Settings' Database MCP
               section — either one toggles the other.
             </span>
-          </label>
+          </Label>
 
           <div class="field">
-            <label
+            <Label
               >Description
-              <span class="dim">— what this database is for, read verbatim by an AI client</span></label
+              <span class="dim">— what this database is for, read verbatim by an AI client</span></Label
             >
             <Textarea
               v-model="draft.mcpDescription"
@@ -1092,7 +1093,7 @@ const preconnectText = computed({
             <span v-if="fieldErrors.mcpDescription" class="field-error">{{ fieldErrors.mcpDescription }}</span>
           </div>
 
-          <label class="field checkbox">
+          <Label class="field checkbox">
             <Checkbox
               :model-value="draft.mcpAutoExplain"
               :disabled="!draft.mcpEnabled || !mcpExplainSupported"
@@ -1106,10 +1107,10 @@ const preconnectText = computed({
             <span v-if="!mcpExplainSupported" class="helper-text">
               This engine has no query plan this app can read.
             </span>
-          </label>
+          </Label>
 
           <div class="field">
-            <label>Read <span class="dim">— SELECT and its engine equivalents</span></label>
+            <Label>Read <span class="dim">— SELECT and its engine equivalents</span></Label>
             <ToggleGroup
               type="single"
               :model-value="draft.mcpReadMode"
@@ -1128,7 +1129,7 @@ const preconnectText = computed({
             </ToggleGroup>
           </div>
           <div class="field">
-            <label>Write <span class="dim">— INSERT/UPDATE/DELETE and equivalents</span></label>
+            <Label>Write <span class="dim">— INSERT/UPDATE/DELETE and equivalents</span></Label>
             <ToggleGroup
               type="single"
               :model-value="draft.mcpWriteMode"
@@ -1147,7 +1148,7 @@ const preconnectText = computed({
             </ToggleGroup>
           </div>
           <div class="field">
-            <label>DDL <span class="dim">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></label>
+            <Label>DDL <span class="dim">— CREATE/ALTER/DROP/TRUNCATE and equivalents, SQL engines only</span></Label>
             <ToggleGroup
               type="single"
               :model-value="draft.mcpDdlMode"
@@ -1200,7 +1201,7 @@ const preconnectText = computed({
                   <option value="date">Date</option>
                   <option value="redact">Redact</option>
                 </select>
-                <label v-if="KEEP_HINT_LABEL[rule.kind]" class="field checkbox mask-rule-flag">
+                <Label v-if="KEEP_HINT_LABEL[rule.kind]" class="field checkbox mask-rule-flag">
                   <Checkbox
                     :model-value="rule.keepHint"
                     class="size-3.5"
@@ -1210,8 +1211,8 @@ const preconnectText = computed({
                     <CodiconIcon name="check" :size="10" />
                   </Checkbox>
                   <span>{{ KEEP_HINT_LABEL[rule.kind] }}</span>
-                </label>
-                <label class="field checkbox mask-rule-flag">
+                </Label>
+                <Label class="field checkbox mask-rule-flag">
                   <Checkbox
                     :model-value="rule.correlate"
                     :disabled="rule.kind === 'number'"
@@ -1222,7 +1223,7 @@ const preconnectText = computed({
                     <CodiconIcon name="check" :size="10" />
                   </Checkbox>
                   <span>Correlate</span>
-                </label>
+                </Label>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button

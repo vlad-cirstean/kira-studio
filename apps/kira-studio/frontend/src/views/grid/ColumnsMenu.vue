@@ -3,6 +3,7 @@ import type { Caps } from '@shared/caps';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
+import { Label } from '@theme/components/ui/label';
 import { PopoverContent } from '@theme/components/ui/popover';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
@@ -122,7 +123,7 @@ onBeforeUnmount(() => {
       <!-- Drag by the grip handle to reorder — the same order the grid renders columns in
            (columns.ts's resolveColumnOrder). Checkbox toggles visibility; the PK's is locked. -->
       <div v-else class="columns-menu-list">
-        <label
+        <Label
           v-for="(name, index) in order"
           :key="name"
           class="columns-menu-item p-row"
@@ -155,7 +156,7 @@ onBeforeUnmount(() => {
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
           {{ name }}
-        </label>
+        </Label>
       </div>
       <Separator class="my-1" />
       <div class="columns-menu-footer p-xs dim" data-testid="columns-menu-footer">

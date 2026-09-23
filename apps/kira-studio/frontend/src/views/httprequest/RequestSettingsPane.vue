@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { computed } from 'vue';
 import { patchHttpRequestTabState } from '../../api/tabs';
 import { useSettingsStore } from '../../state/settings';
@@ -88,10 +89,10 @@ function onEditGlobalDefaults(): void {
 
 <template>
   <div class="settings-pane" data-testid="http-settings-pane">
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>HTTP version</span>
-        <label class="inherit">
+        <Label class="inherit">
           <Checkbox
             :model-value="settings.httpVersion === null"
             data-testid="http-settings-httpVersion-inherit"
@@ -100,7 +101,7 @@ function onEditGlobalDefaults(): void {
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
           Inherit
-        </label>
+        </Label>
       </div>
       <select
         class="p-select bordered md"
@@ -112,12 +113,12 @@ function onEditGlobalDefaults(): void {
         <option v-for="v in HTTP_VERSIONS" :key="v" :value="v">HTTP/{{ v }}</option>
       </select>
       <span class="helper-text">Global: HTTP/{{ global.httpVersion }}</span>
-    </label>
+    </Label>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Request timeout (ms)</span>
-        <label class="inherit">
+        <Label class="inherit">
           <Checkbox
             :model-value="settings.requestTimeoutMs === null"
             data-testid="http-settings-requestTimeoutMs-inherit"
@@ -126,7 +127,7 @@ function onEditGlobalDefaults(): void {
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
           Inherit
-        </label>
+        </Label>
       </div>
       <Input
         type="number"
@@ -140,12 +141,12 @@ function onEditGlobalDefaults(): void {
       <span class="helper-text">
         Global: {{ global.requestTimeoutMs === 0 ? 'no timeout' : `${global.requestTimeoutMs} ms` }}
       </span>
-    </label>
+    </Label>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Max response size (MB)</span>
-        <label class="inherit">
+        <Label class="inherit">
           <Checkbox
             :model-value="settings.maxResponseMb === null"
             data-testid="http-settings-maxResponseMb-inherit"
@@ -154,7 +155,7 @@ function onEditGlobalDefaults(): void {
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
           Inherit
-        </label>
+        </Label>
       </div>
       <Input
         type="number"
@@ -168,10 +169,10 @@ function onEditGlobalDefaults(): void {
       <span class="helper-text">
         Global: {{ global.maxResponseMb === 0 ? 'unlimited' : `${global.maxResponseMb} MB` }}
       </span>
-    </label>
+    </Label>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           :model-value="settings.sslVerify ?? global.sslVerify"
           :disabled="settings.sslVerify === null"
@@ -181,8 +182,8 @@ function onEditGlobalDefaults(): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Verify SSL certificates</span>
-      </label>
-      <label class="inherit">
+      </Label>
+      <Label class="inherit">
         <Checkbox
           :model-value="settings.sslVerify === null"
           data-testid="http-settings-sslVerify-inherit"
@@ -191,12 +192,12 @@ function onEditGlobalDefaults(): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         Inherit
-      </label>
+      </Label>
     </div>
     <span class="helper-text">Global: {{ global.sslVerify ? 'on' : 'off' }}</span>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           :model-value="settings.followRedirects ?? global.followRedirects"
           :disabled="settings.followRedirects === null"
@@ -206,8 +207,8 @@ function onEditGlobalDefaults(): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Follow redirects</span>
-      </label>
-      <label class="inherit">
+      </Label>
+      <Label class="inherit">
         <Checkbox
           :model-value="settings.followRedirects === null"
           data-testid="http-settings-followRedirects-inherit"
@@ -216,14 +217,14 @@ function onEditGlobalDefaults(): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         Inherit
-      </label>
+      </Label>
     </div>
     <span class="helper-text">Global: {{ global.followRedirects ? 'on' : 'off' }}</span>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Max redirects</span>
-        <label class="inherit">
+        <Label class="inherit">
           <Checkbox
             :model-value="settings.maxRedirects === null"
             data-testid="http-settings-maxRedirects-inherit"
@@ -232,7 +233,7 @@ function onEditGlobalDefaults(): void {
             <CodiconIcon name="check" :size="10" />
           </Checkbox>
           Inherit
-        </label>
+        </Label>
       </div>
       <Input
         type="number"
@@ -247,10 +248,10 @@ function onEditGlobalDefaults(): void {
         Follow redirects is off — this has no effect.
       </span>
       <span v-else class="helper-text">Global: {{ global.maxRedirects }}</span>
-    </label>
+    </Label>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           :model-value="settings.disableCookieJar ?? global.disableCookieJar"
           :disabled="settings.disableCookieJar === null"
@@ -260,8 +261,8 @@ function onEditGlobalDefaults(): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         <span>Disable cookie jar</span>
-      </label>
-      <label class="inherit">
+      </Label>
+      <Label class="inherit">
         <Checkbox
           :model-value="settings.disableCookieJar === null"
           data-testid="http-settings-disableCookieJar-inherit"
@@ -270,7 +271,7 @@ function onEditGlobalDefaults(): void {
           <CodiconIcon name="check" :size="10" />
         </Checkbox>
         Inherit
-      </label>
+      </Label>
     </div>
     <span class="helper-text">Global: {{ global.disableCookieJar ? 'off' : 'on' }}</span>
 

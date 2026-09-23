@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import type { GitLogLevel } from '../../state/settingsDomain';
 import type { SettingsPaneProps } from './types';
@@ -18,7 +19,7 @@ function onGitLogLevelChange(e: Event): void {
 
 <template>
   <div class="settings-pane" v-show="active">
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Git log level</span>
         <Tooltip>
@@ -52,6 +53,6 @@ function onGitLogLevelChange(e: Event): void {
         <option value="debug">Debug</option>
       </select>
       <span class="helper-text">Kira-version's own diagnostic log verbosity.</span>
-    </label>
+    </Label>
   </div>
 </template>

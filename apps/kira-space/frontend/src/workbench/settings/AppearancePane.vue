@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Checkbox } from '@theme/components/ui/checkbox';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
 import { computed, ref } from 'vue';
@@ -62,7 +63,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
 <template>
   <div class="settings-pane" v-show="active">
     <div class="sec-label first">Typography</div>
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Data font size</span>
         <Tooltip>
@@ -131,7 +132,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
       <span v-else class="helper-text"
         >{{ FONT_SIZE_RANGE.min }}–{{ FONT_SIZE_RANGE.max }} px</span
       >
-    </label>
+    </Label>
 
     <div class="field">
       <div class="field-head">
@@ -174,7 +175,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
     </div>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           class="size-3.5"
           :model-value="draft.appearance.wordWrap"
@@ -185,7 +186,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
         </Checkbox>
         <span>Word wrap</span>
         <span class="helper-text">Long lines wrap instead of scrolling, in the file viewer.</span>
-      </label>
+      </Label>
       <Tooltip>
       <TooltipTrigger as-child>
         <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'wordWrap') }">
@@ -207,7 +208,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
     </div>
 
     <div class="field checkbox-row">
-      <label class="field checkbox">
+      <Label class="field checkbox">
         <Checkbox
           class="size-3.5"
           :model-value="draft.appearance.inlineBlame"
@@ -221,7 +222,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
           >Show who last changed the current line, at the end of that line, in the
           repository file viewer.</span
         >
-      </label>
+      </Label>
       <Tooltip>
       <TooltipTrigger as-child>
         <span tabindex="0" class="inline-flex" :class="{ 'pointer-events-none': isAtDefault('appearance', 'inlineBlame') }">
@@ -242,7 +243,7 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
       </Tooltip>
     </div>
 
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Commit date</span>
         <Tooltip>
@@ -273,6 +274,6 @@ const fontSizeStepper = useNumberStepper(fontSizeGroupRef);
         <option value="absolute">Absolute (2024-12-30 22:48)</option>
       </select>
       <span class="helper-text">The git graph's own commit timestamps.</span>
-    </label>
+    </Label>
   </div>
 </template>

@@ -3,6 +3,7 @@ import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
+import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { useNumberStepper } from '@theme/composables/useNumberStepper';
@@ -87,7 +88,7 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
       Server-owned: applies to every connected editor immediately, since two windows
       disagreeing about either is a safety issue, not a preference.
     </p>
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Protected branch patterns (one per line)</span>
         <Tooltip>
@@ -119,8 +120,8 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         >Force-pushing or deleting a matching remote branch requires typing its name to
         confirm. "*" matches any characters except "/". Ordinary pushes are never gated.</span
       >
-    </label>
-    <label class="field">
+    </Label>
+    <Label class="field">
       <div class="field-head">
         <span>Auto-fetch interval (minutes)</span>
         <Tooltip>
@@ -195,8 +196,8 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         needs one simply fails silently and disables the timer until the next explicit
         fetch.</span
       >
-    </label>
-    <label class="field">
+    </Label>
+    <Label class="field">
       <div class="field-head">
         <span>Git executable path</span>
         <Tooltip>
@@ -227,9 +228,9 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         >Empty uses the host's own discovery (PATH). A remote op reads this fresh every
         time, never cached, so a change here takes effect on the next one.</span
       >
-    </label>
+    </Label>
     <h3 class="section-subhead">Graph</h3>
-    <label class="field">
+    <Label class="field">
       <div class="field-head">
         <span>Font size</span>
         <Tooltip>
@@ -296,6 +297,6 @@ props.registerFieldError('git.graphFontSize', graphFontSizeError);
         {{ graphFontSizeError }}
       </span>
       <span v-else class="helper-text">0 = match the app font size.</span>
-    </label>
+    </Label>
   </div>
 </template>

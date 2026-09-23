@@ -99,11 +99,10 @@ export const usePaletteStore = defineStore('palette', () => {
     },
   ];
 
-  const state = reactive({ open: false, query: '' });
+  const state = reactive({ open: false });
 
   function openPalette(): void {
     state.open = true;
-    state.query = '';
   }
 
   function closePalette(): void {

@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@theme/components/ui/alert';
 import { Button } from '@theme/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@theme/components/ui/dialog';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { formatBytes } from '@workbench/util/format';
 import { computed, ref, watch } from 'vue';
 import { control } from '../bridge/control';
@@ -129,10 +130,10 @@ watch(
         </div>
 
         <template v-if="chosenFile">
-          <label class="p-sm muted p-0">Key</label>
+          <Label class="p-sm muted p-0">Key</Label>
           <Input v-model="key" class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-key" />
 
-          <label class="p-sm muted p-0">Content type</label>
+          <Label class="p-sm muted p-0">Content type</Label>
           <Input v-model="contentType" class="h-control w-full rounded-kira-sm border-border-strong bg-input px-2 font-data" data-testid="upload-content-type" />
         </template>
 

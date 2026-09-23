@@ -2,6 +2,7 @@
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
 import { Input } from '@theme/components/ui/input';
+import { Label } from '@theme/components/ui/label';
 import { Textarea } from '@theme/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { wrapSelectionOnType } from '@theme/wrapSelection';
@@ -77,7 +78,7 @@ async function submit(): Promise<void> {
     </div>
 
     <div class="compose-body">
-      <label v-if="isKafka" class="field">
+      <Label v-if="isKafka" class="field">
         <span class="p-sm muted">Key (optional)</span>
         <Input
           :model-value="key"
@@ -86,9 +87,9 @@ async function submit(): Promise<void> {
           data-testid="stream-add-message-key"
           @update:model-value="(v) => (key = String(v))"
         />
-      </label>
+      </Label>
 
-      <label class="field">
+      <Label class="field">
         <span class="p-sm muted">Body</span>
         <Textarea
           v-model="body"
@@ -98,9 +99,9 @@ async function submit(): Promise<void> {
           data-testid="stream-add-message-body"
           @keydown="wrapSelectionOnType"
         />
-      </label>
+      </Label>
 
-      <label class="field">
+      <Label class="field">
         <span class="p-sm muted">Headers (optional JSON object)</span>
         <Textarea
           v-model="headers"
@@ -110,7 +111,7 @@ async function submit(): Promise<void> {
           data-testid="stream-add-message-headers"
           @keydown="wrapSelectionOnType"
         />
-      </label>
+      </Label>
 
       <span v-if="error" class="p-sm error-text" data-testid="stream-add-message-error">{{
         error
