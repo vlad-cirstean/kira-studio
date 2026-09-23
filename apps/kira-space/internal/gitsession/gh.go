@@ -423,7 +423,12 @@ func (e *RepoEntry) ResolveBranchPr(ctx context.Context, branch string) PrLookup
 	// falls through to the per-branch query below, exactly as before.
 	if snapshot, status := e.ensureSnapshot(ctx); status.OK() {
 		for _, pr := range snapshot {
-			if pr.HeadRef == branch {
+			// F11 (P108 Part 16 review): HeadRef alone is not enough — a fork's own PR from a
+			// commonly-named branch ("main", "master", "patch-1") would otherwise badge onto an
+			// unrelated local branch of the same name. PullsForBranch's own head=owner:branch
+			// query already filters server-side this same way; the repo-wide snapshot loop here
+			// must filter client-side, since OpenPulls has no per-branch owner to ask GitHub for.
+			if pr.HeadRef == branch && pr.HeadRepoOwner == repo.Owner {
 				e.maybePurgeClosed(ctx, branch, &pr)
 				return okResult([]ghclient.PR{pr})
 			}

@@ -66,9 +66,12 @@ func onePullJSON(number int, state string, draft bool, headRef string) []byte {
 		merged = `"2026-01-01T00:00:00Z"`
 		state = "closed"
 	}
+	// head.repo.owner.login "acme" matches every fixture's own newGhTestFixture repo owner
+	// (github.com/acme/widgets) — F11's own same-repo-owner match needs this present and correct,
+	// not just headRef, to find these fixtures at all.
 	return []byte(`[{"number":` + strconv.Itoa(number) + `,"title":"t","html_url":"u","state":"` + state +
 		`","draft":` + strconv.FormatBool(draft) + `,"merged_at":` + merged +
-		`,"head":{"ref":"` + headRef + `","sha":"s"},"base":{"ref":"main"},"updated_at":"2026-01-01T00:00:00Z"}]`)
+		`,"head":{"ref":"` + headRef + `","sha":"s","repo":{"owner":{"login":"acme"}}},"base":{"ref":"main"},"updated_at":"2026-01-01T00:00:00Z"}]`)
 }
 
 // threePullsJSON is a bulk open-PR snapshot (the shape ensureSnapshot's own OpenPulls call
@@ -353,6 +356,76 @@ func TestResolveBranchPr_ColdCacheCostsOneBulkFetchForManyBranches(t *testing.T)
 
 	if after := f.ghRunner.count(); after != before {
 		t.Fatalf("gh runner was invoked %d more times resolving two more branches from an already-warm snapshot, want 0", after-before)
+	}
+}
+
+// forkSnapshotGhRunner is TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch's own
+// fake: the repo-wide open-PR snapshot (`pulls?state=open`) answers with one PR on branch "main"
+// but from a FORK (head.repo.owner.login "forker", not this repo's own "acme") — the per-branch,
+// server-side-filtered query (`pulls?head=acme:main`) correctly answers empty, exactly as real
+// GitHub would for a query that names a different owner than the fork's.
+type forkSnapshotGhRunner struct{ calls int32 }
+
+func (r *forkSnapshotGhRunner) Run(_ context.Context, _ string, spec ghclient.Spec) (ghclient.Result, error) {
+	atomic.AddInt32(&r.calls, 1)
+	if len(spec.Args) == 0 || spec.Args[0] != "api" {
+		return ghclient.Result{ExitCode: 0, Stdout: []byte("gh version 2.42.0 (2024-01-08)\n")}, nil
+	}
+	last := spec.Args[len(spec.Args)-1]
+	switch {
+	case strings.Contains(last, "pulls?state=open"):
+		return ghclient.Result{ExitCode: 0, Stdout: []byte(
+			`[{"number":99,"title":"t","html_url":"u","state":"open","draft":false,"merged_at":null,` +
+				`"head":{"ref":"main","sha":"s","repo":{"owner":{"login":"forker"}}},` +
+				`"base":{"ref":"main"},"updated_at":"2026-01-01T00:00:00Z"}]`)}, nil
+	case strings.Contains(last, "pulls?head="):
+		return ghclient.Result{ExitCode: 0, Stdout: []byte(`[]`)}, nil
+	default:
+		return ghclient.Result{ExitCode: 0, Stdout: []byte(`[]`)}, nil
+	}
+}
+
+func (r *forkSnapshotGhRunner) count() int { return int(atomic.LoadInt32(&r.calls)) }
+
+// TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch is F11's own regression proof
+// (P108 Part 16 review): the repo-wide open-PR snapshot loop used to match a fork's PR onto a
+// local branch of the same name by HeadRef alone, with no owner check — a fork's own "main" PR
+// would badge onto this repo's local "main" branch even though they are unrelated. It must instead
+// fall through to the per-branch query (the one that already filters correctly, server-side) and
+// answer "no PR" once that also finds nothing.
+func TestResolveBranchPr_SnapshotForkPrNotBadgedOntoSameNamedLocalBranch(t *testing.T) {
+	t.Parallel()
+	reg := NewRegistry(githubRemoteRunner{url: "https://github.com/acme/widgets.git"})
+	watcherCh := make(chan *fakeWatcher, 1)
+	reg.NewWatcher = func(gitclient.RepoSummary) (Watcher, error) {
+		w := newFakeWatcher()
+		watcherCh <- w
+		return w, nil
+	}
+	store := gitreview.NewStore(filepath.Join(t.TempDir(), "review.db"))
+	reg.Review = store
+	t.Cleanup(func() { _ = store.Close() })
+
+	ghRunner := &forkSnapshotGhRunner{}
+	reg.Gh = ghclient.NewClient(ghclient.NewDiscovery(fakeGhLocator{}, ghRunner, ghclient.NewRealClock()), ghRunner)
+
+	entry, release, err := reg.Acquire(context.Background(), "git", "/repo")
+	if err != nil {
+		t.Fatalf("Acquire: %v", err)
+	}
+	t.Cleanup(release)
+	t.Cleanup(reg.Close)
+	<-watcherCh
+
+	r := entry.ResolveBranchPr(context.Background(), "main")
+	if r.Kind != "ok" || len(r.PRs) != 0 {
+		t.Fatalf("ResolveBranchPr(main) = %+v, want ok with NO PRs -- PR #99 belongs to a fork (forker), not this repo (acme)", r)
+	}
+	// Confirms the snapshot miss genuinely fell through to the per-branch query (its own "no PR
+	// here either" answer, not a short-circuit) rather than the empty result coming from anywhere
+	// else: one "api" call for the bulk snapshot, one more for the per-branch query.
+	if got := ghRunner.count(); got < 2 {
+		t.Fatalf("gh runner api calls = %d, want at least 2 (snapshot + per-branch fallthrough)", got)
 	}
 }
 

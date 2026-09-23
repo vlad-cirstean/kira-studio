@@ -8,16 +8,24 @@ import (
 )
 
 // PR is one GitHub pull request, trimmed to exactly the fields D4 names as read: number, title,
-// html_url, state, draft, merged_at, head.ref, head.sha, base.ref, updated_at.
+// html_url, state, draft, merged_at, head.ref, head.sha, base.ref, updated_at — plus
+// head.repo.owner.login (F11, P108 Part 16 review).
 type PR struct {
-	Number    int    `json:"number"`
-	Title     string `json:"title"`
-	URL       string `json:"url"`
-	State     string `json:"state"` // "open" | "draft" | "merged" | "closed" — derived, see deriveState.
-	HeadRef   string `json:"headRef"`
-	HeadSha   string `json:"headSha"`
-	BaseRef   string `json:"baseRef"`
-	UpdatedAt int64  `json:"updatedAt"` // Unix milliseconds.
+	Number  int    `json:"number"`
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	State   string `json:"state"` // "open" | "draft" | "merged" | "closed" — derived, see deriveState.
+	HeadRef string `json:"headRef"`
+	HeadSha string `json:"headSha"`
+	// HeadRepoOwner is the owner of the repo HeadRef actually lives in — the SAME repo as this
+	// PR's own base for an ordinary PR, but a DIFFERENT owner for one opened from a fork (F11):
+	// matching a snapshot entry by HeadRef alone, with no owner check, can badge a fork's PR from
+	// a commonly-named branch ("main", "master", "patch-1") onto an unrelated local branch of the
+	// same name. Empty when GitHub reports head.repo as null (the source repo/fork was deleted) —
+	// callers must then treat it as "cannot confirm same-repo," not as a same-owner match.
+	HeadRepoOwner string `json:"headRepoOwner"`
+	BaseRef       string `json:"baseRef"`
+	UpdatedAt     int64  `json:"updatedAt"` // Unix milliseconds.
 }
 
 // rawPull is the GitHub REST response shape, decoded exactly as the API sends it — never exported,
@@ -32,6 +40,13 @@ type rawPull struct {
 	Head   struct {
 		Ref string `json:"ref"`
 		Sha string `json:"sha"`
+		// Repo is a pointer: GitHub reports head.repo as null once the source repo (a fork or
+		// this repo itself) has been deleted (F11) — toPR must not assume it is always present.
+		Repo *struct {
+			Owner struct {
+				Login string `json:"login"`
+			} `json:"owner"`
+		} `json:"repo"`
 	} `json:"head"`
 	Base struct {
 		Ref string `json:"ref"`
@@ -65,15 +80,20 @@ func (p rawPull) toPR() PR {
 	if t, err := time.Parse(time.RFC3339, p.UpdatedAt); err == nil {
 		updatedAtMillis = t.UnixMilli()
 	}
+	var headRepoOwner string
+	if p.Head.Repo != nil {
+		headRepoOwner = p.Head.Repo.Owner.Login
+	}
 	return PR{
-		Number:    p.Number,
-		Title:     p.Title,
-		URL:       p.URL,
-		State:     deriveState(p.State, p.Draft, p.Merged),
-		HeadRef:   p.Head.Ref,
-		HeadSha:   p.Head.Sha,
-		BaseRef:   p.Base.Ref,
-		UpdatedAt: updatedAtMillis,
+		Number:        p.Number,
+		Title:         p.Title,
+		URL:           p.URL,
+		State:         deriveState(p.State, p.Draft, p.Merged),
+		HeadRef:       p.Head.Ref,
+		HeadSha:       p.Head.Sha,
+		HeadRepoOwner: headRepoOwner,
+		BaseRef:       p.Base.Ref,
+		UpdatedAt:     updatedAtMillis,
 	}
 }
 
