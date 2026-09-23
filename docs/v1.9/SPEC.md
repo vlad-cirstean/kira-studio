@@ -2640,6 +2640,134 @@ land intact.
    noted this handoff in those chunks' own task tracking — recorded here too so `docs/v1.9/SPEC.md`
    carries it durably in case that tracking doesn't survive to when those chunks run.
 
+## P108 Part 3 result
+
+Reviewed per `plans/P108-part3-persistence-secrets.md` (Opus reviewer, no fixing); one Sonnet fixer
+landed one commit per finding against `b3f122b`, all 9 findings fixed, none dismissed or deferred.
+
+- **F1 `6b00724`** — `preconnect.Supervisor.Start`'s manual `StderrPipe`-then-`Wait` ordering
+  blocked `cmd.Wait()` on the pipe's own EOF with no upper bound: a script backgrounding a helper
+  outside its process group (`setsid`, `daemon(3)`) while inheriting stderr meant EOF never
+  arrived, so `e.exited` never closed and `killEntry` (SIGTERM/SIGKILL to `-pid`, which never
+  reaches a process outside the group) blocked forever — reachable from
+  `Service.Disconnect`/`Remove`/`Test` and `StopAll` on app quit. Reproduced with `setsid sleep 6 &
+  exit 0`: the outer shell exits 0 almost immediately, but `Stop` only returned once the
+  backgrounded sleep finished on its own. Fixed by setting `cmd.Stderr` to a plain `io.Writer`
+  feeding the tail tracker (not `StderrPipe`) plus `cmd.WaitDelay = killGrace`, so the stdlib
+  itself bounds how long `Wait()` waits for the internal copy goroutine once the process has been
+  observed to exit; `killEntry`'s own post-SIGKILL wait is now bounded too (gives up after
+  `killGrace` and logs). Added `TestBackgroundedSetsidChildDoesNotBlockStop`.
+- **F2 `8476adc`** — `VariablesRepo.Upsert` took a plain `string` value and re-encrypted it
+  unconditionally; a secret's list projection is always `""` (D4/D5), so renaming/re-describing an
+  unrevealed secret sent that blank seed back as "value" and silently wiped it. `value` is now
+  `*string` (nil = leave the stored value untouched), mirroring `connections.Input.Password`'s own
+  nil-means-unchanged contract; `VariablesUpsertArgs.Value` follows suit with a BadRequest guard on
+  create. **Cross-chunk touch:** `apps/kira-studio/frontend/src/api/VariableSetView.vue` (Part 9's
+  own file) gained a per-draft `valueTouched` flag so only a real edit sends a value — a small,
+  targeted fix for this chunk's own bug, explicitly allowed by the pre-plan's §3.3 edit-scope rule;
+  flagged here for Part 9's later reviewer. Added `TestUpsertWithNilValueLeavesASecretUntouched`.
+- **F3 `c0d4242`** — `findAuthority` ends a URI's authority at the first `/`, `?` or `#` after
+  `://`; a password containing one unencoded (`postgres://u:pa/ss@h/db`) truncated the detected
+  authority before the real `@`, so `stripURIPassword` reported no password at all and the full
+  URI — password included — was stored and returned by `List` unencrypted. `validateMode` now
+  rejects this shape outright (`uriHasAmbiguousPassword`) with a BadRequest asking for
+  percent-encoding. Added `TestURIHasAmbiguousPassword` (10 cases).
+- **F4 `87ce68e`** — `Router.Disconnect` no-ops with no live adapter yet, `Preconnect.Stop`
+  no-ops during the 2s settle window (not tracked in `s.entries` until then), and `Backend.Connect`
+  ran on `context.Background()` — nothing could stop a Connect already under way. Each `Connect(id)`
+  attempt now carries its own cancellable context; `Disconnect`/`Remove` cancel it before their own
+  work; `attemptConnect` checks `ctx.Err()` after every step that could race one of them and unwinds
+  (disconnects/stops whatever it registered, re-syncs or deletes the `states` entry) instead of
+  finalizing "connected". `preconnect.Supervisor.Start` gained a `ctx` parameter (preconnect is this
+  chunk's own file too, so this is a within-scope signature change, not cross-chunk) — a
+  `ctx.Done()` case during the settle wait kills the just-spawned process directly. **`router.go`
+  was read but not touched** — the race lives entirely in `connections.Service`'s own attempt
+  lifecycle and `preconnect.Supervisor`'s own settle-window gap, not in `Router.Connect`/`Disconnect`
+  themselves. Added `TestDisconnectWhileConnectingAbortsTheInFlightAttempt`,
+  `TestRemoveWhileConnectingAbortsTheInFlightAttemptAndLeavesNoStateEntry`, and
+  `TestStartAbortsOnContextCancellationDuringSettle` — all three confirmed to fail against the
+  pre-fix code before landing.
+- **F5 `c57b772`** — `destinationUnchanged`'s doc comment described a denylist, but the
+  implementation compared an explicit allowlist of `ConnectionFields` members — every
+  currently-present field was already correctly covered (verified against `model/connection.go`),
+  a latent trap for the next field added, not a live bug. `zeroExemptFields` now clears every
+  exempt member on a copy of both sides, then `reflect.DeepEqual` compares what's left — a future
+  new field is gated by construction. No new test: existing `TestTestInjectsStoredPasswordAcross
+  ThrottleOnlyEdit`/`TestUpdateReconnectsALiveConnectionOnDestinationOrReadOnlyChange` already cover
+  every present field's behavior end-to-end and stayed green.
+- **F6 `b3ad537`** — `redactURLCredentials` returned a JDBC URL unredacted whenever its userinfo
+  contained a raw `/`, `?` or `#` (an unencoded password), and never masked a query-string
+  credential at all — both strings cross the bridge via `SkipDetail`/`ReportRow.Error`. Once a real
+  `://` is found, `redactUserinfo` now redacts unconditionally to the next `@`; without one at all
+  (sqlite's own `jdbc:sqlite:/path`), the original conservative check still applies so a coincidental
+  path `@` is left alone. New `redactQueryCredentials` masks any query param whose key contains
+  `pass`/`pwd`/`secret`/`token`, case-insensitively. Added 8 new `TestRedactURLCredentials` cases;
+  all 6 pre-existing ones still pass unchanged.
+- **F7 `07c3edd`** — `keyring_darwin.go`'s duplicate-item re-query path (an `AddItem` race) skipped
+  the `len(results[0].Data) == keyBytes` check the main path applies, so a wrong-length item reached
+  `secrets.New()`'s `aes.NewCipher` and panicked the app at startup instead of reporting storage
+  unavailable. Same check added on this path too. `darwin && cgo`: unbuildable/untestable in this
+  Linux sandbox (`CLAUDE.md`'s own documented constraint) — verified by `gofmt` and by mirroring the
+  exact pattern the main path two lines above already uses.
+- **F8 `e496d88`** — `Duplicate`'s `copyMaskRules` listed `fromID`'s rules once (to count and mint
+  ids), then `CopyForConnection` listed them *again* to copy — a concurrent rule add/remove between
+  those two calls produced an "N ids for M rules" mismatch after the new connection row was already
+  committed, and the mismatch error returned before `emitListChanged` ran. `CopyForConnection` now
+  lists and inserts inside one transaction (`mintID` called once per row from within it); `Duplicate`
+  also calls `emitListChanged` before returning either post-row-insert failure (mask-rule copy or the
+  `McpEnabled` write after it). Added `TestDuplicateEmitsListChangedEvenWhenMaskRuleCopyFails`,
+  confirmed to fail against the pre-fix code before landing.
+- **F9 `d9d9640`** — `capFilterText` byte-truncated both `where_text` and `order_by_json` at the same
+  raw offset: a multi-byte UTF-8 character straddling the cut in `where_text` produced invalid UTF-8;
+  any cut in the *encoded JSON* `order_by_json` produced invalid JSON, which `List`'s own decode
+  guard then silently dropped — not just the bad order-by, but the whole row, including a good
+  `where_text` next to it. `where_text` now truncates on a UTF-8 rune boundary
+  (`truncateUTF8ToBoundary`, mirroring `internal/page/scratch.go`'s own unexported helper of the same
+  name/algorithm); an oversized `order_by_json` is dropped to nil outright rather than truncated.
+  Added `TestFilterHistoryWhereTextOverCapTruncatesOnRuneBoundary`,
+  `TestFilterHistoryOversizedOrderByIsDroppedNotCorrupted`, and
+  `TestFilterHistoryRecordsNothingWhenOnlyAnOversizedOrderByIsGiven` — the first two confirmed to
+  fail against the pre-fix code before landing.
+
+**Nothing dismissed or deferred** — all 9 findings matched real, reachable code; every fix landed
+as specified, including both findings' own explicitly-allowed cross-chunk touches (F2's
+`VariableSetView.vue`; F4 only read, did not touch, `router.go`).
+
+**Working-tree note.** Other chunks' concurrent work in this same shared checkout
+(`apps/kira-space/internal/{gitclient,ghclient,gitpath,gitaskpass,gitrpc,gitsession,codeworkspace}`)
+landed commits throughout this chunk's own session. Every commit here was staged by explicit file
+path (never `git add -A`/`.`) and verified via `git status`/`git diff --stat` immediately before
+each commit to touch only this chunk's own intended files — the other chunk's in-progress,
+uncommitted files were left exactly as found rather than swept in. One `git stash` (used for a
+baseline-vs-fix comparison while investigating F2's own Playwright flake, see below) briefly and
+inadvertently captured a concurrent chunk's dirty files alongside this chunk's own; recovered via
+`git checkout stash@{0} -- <this chunk's files only>` rather than a full `stash pop`, leaving the
+other chunk's working-tree state untouched throughout. Every stash used after that point was
+scoped by pathspec (`git stash push -- <paths>`) specifically to avoid a repeat.
+
+**Investigated, confirmed pre-existing, not fixed:** `api-secret-reveal-isolation.spec.ts`'s "Copy
+as curl does not skip re-auth" Playwright spec failed intermittently (~3/8 runs) under this
+sandbox's parallel-worker load while verifying F2's frontend touch. Same rigorous methodology
+Part 2's own gitsock finding used: repeated runs with this chunk's own frontend edits stashed out
+(scoped `git stash push -- <paths>`, never a full-tree stash) reproduced the identical ~3/8 failure
+rate against the unmodified baseline code, confirming it is pre-existing sandbox/timing flakiness
+(a Playwright `uncheck()` poll racing an async reactive re-render under parallel WebKit load), not
+a regression from this chunk's fix — same "confirmed unrelated" disposition, left as-is.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `go vet ./...`: clean.
+- `bun run lint:go` (`golangci-lint run`, built via `scripts/install-golangci-lint.sh`, same as the
+  pre-push hook): 0 issues.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration hints)
+  — this chunk touches nothing knip already flags.
+- `go test ./...`: 0 failures repo-wide.
+- `go test -race` on `preconnect`/`connections` (F1/F4's own concurrency-heavy packages): clean.
+- `bun run typecheck`: exit 0 across all 8 parallel splits.
+- Every one of the 9 commits above ran `.githooks/pre-commit` (`bun run lint` + `bun run typecheck`)
+  for real and passed clean — `--no-verify` was never used.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
