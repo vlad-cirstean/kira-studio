@@ -3,6 +3,11 @@ import type { ConnectionSummary } from '@shared/domain/connection';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../../ipc/support/types';
+import {
+  connectAndExpandControl as sharedConnectAndExpandControl,
+  connectionSummary as sharedConnectionSummary,
+  orderItemsFixture as sharedOrderItemsFixture,
+} from './engineFixture';
 import { IPC } from './ipcChannels';
 
 // Real captures against a real Postgres container, seeded with packages/db-fixtures/fixtures/0001_seed.sql —
@@ -94,23 +99,6 @@ export const ANALYTICS_CHILDREN = [
     hasChildren: false,
   },
 ];
-
-function orderItemsPage(pageSize: 100 | 1000) {
-  return {
-    kind: 'tabular' as const,
-    columns: ORDER_ITEMS_COLUMNS,
-    rows: ORDER_ITEMS_ROWS,
-    position: {
-      offset: 0,
-      pageSize,
-      hasMore: false,
-      nextToken: null,
-      prevToken: null,
-      strategy: 'keyset' as const,
-    },
-    truncatedCells: 0,
-  };
-}
 
 export const ORDER_ITEMS_META = {
   path: ORDER_ITEMS_PATH,
@@ -223,35 +211,11 @@ export const SERVER_VERSION =
  *  cell-editor.spec.ts, for two — can still start from the same real connect/root/db/app snapshots
  *  instead of re-deriving them. */
 export function connectAndExpandControl(connectionId: string): ControlSnapshot[] {
-  return [
-    {
-      channel: IPC.connectionsConnect,
-      args: { id: connectionId },
-      response: {
-        connectionId,
-        status: 'connected',
-        serverVersion: SERVER_VERSION,
-        error: null,
-        since: 1735689600000,
-        caps: POSTGRES_CAPS,
-      },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: '', refresh: false },
-      response: { nodes: ROOT_CHILDREN, source: 'server', truncated: false },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: DB_PATH, refresh: false },
-      response: { nodes: DB_CHILDREN, source: 'server', truncated: false },
-    },
-    {
-      channel: IPC.treeChildren,
-      args: { connectionId, path: APP_PATH, refresh: false },
-      response: { nodes: APP_CHILDREN, source: 'server', truncated: false },
-    },
-  ];
+  return sharedConnectAndExpandControl(connectionId, SERVER_VERSION, POSTGRES_CAPS, [
+    { path: '', children: ROOT_CHILDREN },
+    { path: DB_PATH, children: DB_CHILDREN },
+    { path: APP_PATH, children: APP_CHILDREN },
+  ]);
 }
 
 /** A `connectionsDisconnect` snapshot for a connection `connectAndExpandControl` already
@@ -281,44 +245,23 @@ export function orderItemsFixture(connectionId: string): {
   control: ControlSnapshot[];
   port: PortSnapshot[];
 } {
-  return {
-    control: [
-      ...connectAndExpandControl(connectionId),
-      {
-        channel: IPC.treeDescribe,
-        args: { connectionId, path: ORDER_ITEMS_PATH, refresh: false, tabId: null },
-        response: { meta: ORDER_ITEMS_META, source: 'server' },
-      },
+  return sharedOrderItemsFixture(
+    connectionId,
+    SERVER_VERSION,
+    POSTGRES_CAPS,
+    [
+      { path: '', children: ROOT_CHILDREN },
+      { path: DB_PATH, children: DB_CHILDREN },
+      { path: APP_PATH, children: APP_CHILDREN },
     ],
-    port: [
-      {
-        op: DATA_OP.read,
-        payload: {
-          connectionId,
-          path: ORDER_ITEMS_PATH,
-          projection: null,
-          filter: null,
-          sort: null,
-          pageSize: 100,
-          cursor: { mode: 'offset', offset: 0 },
-        },
-        response: { kind: 'read', page: orderItemsPage(100), source: 'server' },
-      },
-      {
-        op: DATA_OP.read,
-        payload: {
-          connectionId,
-          path: ORDER_ITEMS_PATH,
-          projection: null,
-          filter: null,
-          sort: null,
-          pageSize: 1000,
-          cursor: { mode: 'offset', offset: 0 },
-        },
-        response: { kind: 'read', page: orderItemsPage(1000), source: 'server' },
-      },
+    ORDER_ITEMS_PATH,
+    ORDER_ITEMS_META,
+    ORDER_ITEMS_COLUMNS,
+    [
+      { filter: null, pageSize: 100, rows: ORDER_ITEMS_ROWS },
+      { filter: null, pageSize: 1000, rows: ORDER_ITEMS_ROWS },
     ],
-  };
+  );
 }
 
 // P22c: order_items' own columns, projected into RelationColumns' shape (ObjectMeta's ColumnMeta
@@ -664,33 +607,7 @@ export function postgresConnectionSummary(
   name: string,
   color: ConnectionSummary['color'],
 ): ConnectionSummary {
-  return {
-    id,
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
-    sortOrder: 0,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  };
+  return sharedConnectionSummary('postgres', 5432, 'kira_test', 'postgres', id, name, color);
 }
 
 export const BIG_ROWS_PATH = `${APP_PATH}/table:big_rows`;
