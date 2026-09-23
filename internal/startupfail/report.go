@@ -96,8 +96,8 @@ func (r *Reporter) Report(step Step, err error) {
 	r.log(msg.Headline, "scope", "startup", "step", string(step), "err", err)
 
 	title, body := RenderAlert(msg, r.info)
-	fmt.Fprintf(r.stderr, "[%s] kira-studio-shell: %s: %s\n\n%s\n\n",
-		r.now().UTC().Format(time.RFC3339), step, title, body)
+	fmt.Fprintf(r.stderr, "[%s] %s: %s: %s\n\n%s\n\n",
+		r.now().UTC().Format(time.RFC3339), r.info.AppName, step, title, body)
 
 	r.present(msg, err)
 }
