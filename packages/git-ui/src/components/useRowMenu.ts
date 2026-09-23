@@ -6,7 +6,7 @@ import { type ShallowRef, shallowRef } from 'vue';
  * only what the menu's own sections/dispatch do with `row` genuinely differs per caller (a tag
  * row's own action set is a subset of a branch row's), so this composable owns positioning only.
  */
-export interface RowMenuState<T> {
+interface RowMenuState<T> {
   readonly row: T;
   readonly x: number;
   readonly y: number;
