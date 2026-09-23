@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
+import * as wire from '@shared/protocol/wire';
 import type { FakeSocket } from '@workbench/testing/unit/fakeSocket';
 import { getStream } from '@workbench/testing/unit/wailsRuntime';
+import * as flatbuffers from 'flatbuffers';
 import { encodeFrame, type FrameSpec } from '../support/encodeFrame';
 
 // port.ts calls Stream('engine') once at module scope (P57 §4.1), so every test in this file
@@ -49,6 +51,24 @@ function corruptIdentifier(bytes: Uint8Array): ArrayBuffer {
   const copy = bytes.slice();
   copy.set([0, 0, 0, 0], 4);
   return copy.buffer as ArrayBuffer;
+}
+
+// F6 (P108 Part 6): a res frame whose envelope (kind/id/ok) decodes fine but whose own payload
+// table fails to — hand-built, not through encodeFrame's own FramePayload union (which is typed
+// precisely to prevent this mismatch): payloadType is tagged ReadResponse but no payload table is
+// ever written, so decodeFrame's own `frame.payload(...)` returns null and decodePayload throws
+// "frame: ReadResponse payload is missing" — while `frame.id()` is already known by then.
+function resFrameWithUndecodablePayload(id: number): ArrayBuffer {
+  const b = new flatbuffers.Builder(256);
+  wire.Frame.startFrame(b);
+  wire.Frame.addKind(b, wire.FrameKind.res);
+  wire.Frame.addId(b, id);
+  wire.Frame.addOk(b, true);
+  wire.Frame.addPayloadType(b, wire.Payload.ReadResponse);
+  const frameOff = wire.Frame.endFrame(b);
+  wire.Frame.finishFrameBuffer(b, frameOff);
+  const bytes = b.asUint8Array();
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 describe('apps/kira-studio/frontend/src/bridge/port.ts — the Stream transport (P57 D2/D3, P11)', () => {
@@ -213,8 +233,24 @@ describe('apps/kira-studio/frontend/src/bridge/port.ts — the Stream transport 
     off();
   });
 
+  // F6 (P108 Part 6): a data op carries no client-side timeout of its own (test 4's own
+  // `timeoutMs: null`) — cancellation is the only escape hatch (§5.1). Before this fix, decodeFrame
+  // threw on a payload-decode failure the same as it does on a structurally corrupt frame (test 8),
+  // and port.ts's onmessage drops any frame it can't decode, so this pending call would otherwise
+  // hang forever with nothing left to reject it. The id is already known by the time the payload
+  // decode fails, so decodeFrame itself now settles this as an ordinary {ok:false} response.
+  test('10. a response frame whose own payload fails to decode rejects its pending call, not left hanging', async () => {
+    const p = request('read', null, { timeoutMs: null });
+    await flush();
+    const sent = lastSent();
+    socket.__message(resFrameWithUndecodablePayload(sent.id));
+    await expect(p).rejects.toThrow(
+      'frame: payload decode failed: frame: ReadResponse payload is missing',
+    );
+  });
+
   // Terminal: closing the stream is not reversible in this module, so this runs last.
-  test('10. close rejects every pending request, and later requests reject immediately', async () => {
+  test('11. close rejects every pending request, and later requests reject immediately', async () => {
     const pending = request('during-close');
     await flush();
     socket.__close();

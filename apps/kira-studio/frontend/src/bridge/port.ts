@@ -75,14 +75,19 @@ function handleMessage(message: PortResponse | PortEvent): void {
 
 socket.onopen = () => resolveReady();
 
-// P11: decodeFrame throws on a corrupt or truncated frame (a mismatched "KIF1" file identifier,
-// a missing required field) — genuinely reachable, not just a defensive check. This callback runs
-// synchronously from DOM event dispatch, which swallows a listener's throw into an uncaught-error
-// report rather than routing it anywhere a promise could see it, so the try/catch here (the same
-// shape as P2 R2's fix for the pre-P11 decoder) is what keeps a bad frame from leaving some
-// pending request hanging forever. A frame that fails to decode has no reliably extractable id to
-// reject a specific request with either, so it is dropped — the same move dataframe.go's own
-// probe-decode makes on an unparseable frame.
+// P11: decodeFrame still throws on a structurally corrupt or truncated frame (a mismatched "KIF1"
+// file identifier, a missing envelope field such as an event's topic) — genuinely reachable, not
+// just a defensive check, and with no id to reject a specific pending request with either, so it
+// is dropped here, the same move dataframe.go's own probe-decode makes on an unparseable frame.
+// This callback runs synchronously from DOM event dispatch, which swallows a listener's throw into
+// an uncaught-error report rather than routing it anywhere a promise could see it, so the
+// try/catch here (the same shape as P2 R2's fix for the pre-P11 decoder) is what keeps one of
+// those genuinely-unparseable frames from leaving some pending request hanging forever.
+//
+// F6 (P108 Part 6): a `res` frame's own *payload* failing to decode is different — its id is
+// already known by the time that happens, so decodeFrame itself now resolves that case as an
+// ordinary `{ok:false}` response (handleMessage below rejects the matching pending call with it)
+// rather than throwing; nothing here needs to catch that case specially any more.
 socket.onmessage = (ev: MessageEvent<unknown>) => {
   try {
     handleMessage(decodeFrame(new Uint8Array(ev.data as ArrayBuffer)));

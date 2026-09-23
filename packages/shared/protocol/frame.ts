@@ -445,7 +445,25 @@ export function decodeFrame(bytes: Uint8Array): PortResponse | PortEvent {
 
   const id = frame.id();
   if (frame.ok()) {
-    return { kind: 'res', id, ok: true, payload: decodePayload(frame) };
+    // F6 (P108 Part 6): the id above is already extracted — a decodePayload throw here (a data
+    // op's response frame failing to decode) used to propagate straight out of decodeFrame, and
+    // port.ts's onmessage drops any frame it can't decode outright (it has no id to reject a
+    // specific pending call with). But a data op carries no client-side timeout of its own
+    // (port.ts's `request`: `timeoutMs: null` means no timeout, cancellation is the only escape
+    // hatch — §5.1), so a dropped res frame left that one pending call hanging forever. Since the
+    // id is already known here, resolve/reject it with an explicit {ok:false} error instead of
+    // losing the whole frame.
+    try {
+      return { kind: 'res', id, ok: true, payload: decodePayload(frame) };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        kind: 'res',
+        id,
+        ok: false,
+        error: { message: `frame: payload decode failed: ${message}` },
+      };
+    }
   }
   const err = frame.error();
   if (!err) throw new Error('frame: !ok response is missing its error');
