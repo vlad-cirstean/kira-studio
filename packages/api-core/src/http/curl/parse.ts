@@ -7,6 +7,7 @@ import {
   type HttpRequestTabState,
   type HttpUrlEncodedFieldState,
 } from '@kira/shared/domain/http';
+import { explicitContentType } from '../headers';
 import { type CurlFlagId, expandShortCluster, type FlagSpec, lookupFlag } from './flags';
 import { type CurlWarning, tokenize } from './tokenize';
 
@@ -102,14 +103,6 @@ function codeLanguageForContentType(contentType: string): HttpCodeLanguage | nul
   if (type === 'text/html') return 'html';
   if (type === 'application/javascript' || type === 'text/javascript') return 'javascript';
   return null;
-}
-
-function explicitContentType(headers: readonly HttpHeaderState[]): string | undefined {
-  let value: string | undefined;
-  for (const h of headers) {
-    if (h.name.trim().toLowerCase() === 'content-type') value = h.value;
-  }
-  return value;
 }
 
 /** D8: the three file-referencing --data-urlencode spellings — `@path`, `=@path`, `name@path`. */
