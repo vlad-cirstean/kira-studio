@@ -2136,6 +2136,101 @@ risk was resolved by §7.2's own procedure (embedding kept); no new hand-rolled 
 no cross-app `internal/` import or shared-package-imports-app crept in; `test:visual`'s 5 known
 failures stayed at 5, no sixth.
 
+## P106 result
+
+Landed as 2 commits against `c2ce9969`: `a93eca58` (the rename) and `348deb0a` (the doc/comment
+sweep), plus this section's own commit. No `plans/` document — the row itself calls this phase
+small/mechanical/no-design-decision and says no planning-agent pass, one agent implements directly
+from the row, noted here instead.
+
+**Re-audited the full script block rather than trusting the row's own list — found one more pair
+beyond it.** `typecheck:api-core` (Studio-only: `packages/api-core` is imported only by
+`apps/kira-studio/frontend`, confirmed by grep — `apps/kira-space/frontend` and
+`apps/kira-space-vscode` import none of it) reads exactly like the rest of the `typecheck:*`
+family (`typecheck:web`/`typecheck:space-web`, `typecheck:unit`/`typecheck:space-unit`,
+`typecheck:tests`/`typecheck:space-tests`) with no `:space` counterpart of its own — same shape as
+the row's own named no-counterpart cases, so it got the same `:studio` suffix.
+
+**15 scripts renamed** (full rename, no compat alias, per `CLAUDE.md`'s no-backwards-compat-shim
+rule): `dev`→`dev:studio`, `predev`→`predev:studio`, `build`→`build:studio`,
+`build:test`→`build:test:studio`, `package`→`package:studio`, `prepackage`→`prepackage:studio`,
+`typecheck:tests`→`typecheck:tests:studio`, `typecheck:web`→`typecheck:web:studio`,
+`typecheck:unit`→`typecheck:unit:studio`, `typecheck:api-core`→`typecheck:api-core:studio`,
+`test:ui`→`test:ui:studio`, `test:visual`→`test:visual:studio`,
+`test:visual:update`→`test:visual:update:studio`, `test:ipc:fe`→`test:ipc:fe:studio`,
+`test:e2e-real`→`test:e2e-real:studio`. Every composite script's own `bun run <name>` calls
+updated in the same commit: `typecheck`'s four Studio sub-script calls, and each renamed script's
+own internal `bun run build`/`build:test`/`setup` call (e.g. `test:ui:studio` now calls
+`bun run build:test:studio`, `test:e2e-real:studio` now calls `bun run build:studio`).
+
+**Left unscoped, genuinely repo-wide** (row's own list, re-confirmed rather than trusted):
+`test:go`, `test:unit`, `test:compat`, `test:matrix`, `lint`, `lint:go`, `lint:dead` — plus
+`lint:all`, `typecheck`, `format`, `verify:packaging`, `generate:wire`, none of which the row named
+but each independently spans both apps (verified: `verify:packaging` checks both
+`apps/kira-studio` and `apps/kira-space` bundles; `generate:wire` regenerates both
+`packages/shared/protocol/wire.fbs` and `packages/git-ipc/schema/gitwire.fbs`).
+
+**Left unscoped, deliberately — the row's own direction is Studio-only, not both ways.**
+`build:vscode`, `package:vscode`, `test:webview`, `typecheck:git` are all Space-only (their targets
+— `apps/kira-space-vscode`, `packages/git-ipc`, `packages/git-core`, `packages/git-ui`,
+`packages/kira-ui` — are imported only by `apps/kira-space`/`apps/kira-space-vscode`, confirmed by
+grep) but carry no `:space` suffix. The row's own text scopes the fix one way — "rename every
+Studio-only script" — and gives no instruction to add `:space` to an unscoped Space-only script;
+renaming these would be scope creep past what the row and the user's request actually ask for, so
+they're untouched.
+
+**Sweep, beyond the row's explicitly-named files.** Every literal reference to a renamed name
+fixed in: `README.md`, `apps/kira-studio/README.md`, `docs/ARCHITECTURE.md`,
+`docs/DEV_ENVIRONMENT.md`, `docs/PACKAGING.md`, `docs/PERF.md` (none of the row's four named
+targets — `CLAUDE.md`, `docs/DEV_ENVIRONMENT.md`, `docs/ARCHITECTURE.md`, `.claude/hooks/*` —
+actually needed an edit once checked: `CLAUDE.md` and `.claude/hooks/*` name no root script by
+this rename's old names), `apps/kira-studio/tests/visual/README.md`,
+`scripts/verify-packaging.sh`'s own skip/fail messages, and prose comments in
+`apps/kira-studio/tests/e2e-real/fixtures.ts`, `apps/kira-studio/playwright.config.ts`,
+`apps/kira-studio/build/Taskfile.yml` and `packages/workbench/src/testing/ui/server.ts`. Checked
+and correctly left alone: `apps/kira-space/README.md`, `.githooks/pre-commit`/`pre-push`,
+`knip.json`, `biome.json`, `apps/kira-space/build/Taskfile.yml`, both apps'
+`build/Taskfile.yml`/`build/darwin/Taskfile.yml` `bun run dev`/`build` lines (their own
+frontend-local `package.json` scripts, `dir: frontend`, not the root scripts this phase renames).
+
+**`docs/pending-workflows/` carried no entry to begin with** (nothing pending there before this
+phase) — the row's other named workaround target, `docs/pending-changes/`, already held one patch
+each for `.github/workflows/pr.yml` and `release.yml` from earlier phases (P94, P100 Part 3), still
+unapplied. Rather than adding a second, conflicting patch per file, this phase's needed hunks
+(`build`→`build:studio`, `test:ui`→`test:ui:studio`, `test:ipc:fe`→`test:ipc:fe:studio`,
+`test:visual`→`test:visual:studio` in `pr.yml`; `package`→`package:studio` in `release.yml`) were
+merged into each existing patch — built by applying the existing patch to a scratch copy of the
+real file, applying this phase's own rename on top, then re-diffing against the true original, so
+the combined patch is one hunk set per file, not two independently-authored ones. Both combined
+patches verified to `git apply --check` cleanly against the real, currently-unpatched workflow
+files.
+
+**Verification, run for real, all against the new `:studio` names:**
+
+- `bun run setup`: clean — `wails3 task common:generate:bindings` regenerated both apps' bindings
+  (760/319 packages processed) with no error.
+- `bun run lint`: clean — `biome check .` (1308 files, no fixes) + `check-tokens.sh`.
+- `bun run typecheck`: exit 0 across all 8 parallel splits, including the two now-renamed
+  Studio-only names (`typecheck:tests:studio`, `typecheck:web:studio`, `typecheck:unit:studio`,
+  `typecheck:api-core:studio`) invoked by their new names.
+- `bun run build:studio`: exit 0, only the pre-existing `>500 kB` chunk + ineffective-dynamic-import
+  advisories (same baseline P103 Part 4 recorded).
+- `bun run build:space`: exit 0, same pre-existing advisories only.
+- `bun run lint:dead`: exit 0, identical pre-existing baseline (6 duplicate exports, 7 configuration
+  hints) — this phase touches no source import, so an unchanged count is expected, not just hoped.
+- `go build ./...`: exit 0 — this phase touches no Go file, confirming the rename didn't disturb
+  anything on that side.
+- Both `.githooks/pre-commit` hooks (`bun run lint` + `bun run typecheck`) ran for real on both
+  commits above and passed clean, not bypassed.
+
+No pre-existing failing test/lint/typecheck/hook surfaced by this phase's changes — nothing to
+root-cause or defer. `bun run test:ui:studio`/`test:ui:space`/`test:go`/`test:unit` (the
+slower suites) were not re-run here — this phase touches no application source, only script names
+and prose referencing them, so the fast-check set above (lint, typecheck, both builds, lint:dead,
+go build) is the right bar per `CLAUDE.md`'s own "fast checks are cheap and fine per-commit; an
+expensive suite runs once near phase end" — and this phase has no application-behavior change for
+an expensive suite to catch.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
