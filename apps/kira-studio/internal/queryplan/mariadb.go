@@ -3,6 +3,7 @@ package queryplan
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // mariadb.go ports planParsers/mariadb.ts verbatim: MariaDB's `EXPLAIN FORMAT=JSON` — same
@@ -106,7 +107,7 @@ func mariadbTableNode(raw json.RawMessage, thresholdRows int, scans *[]float64) 
 	if len(table.PossibleKeys) > 0 && table.Key == nil {
 		node.Issues = append(node.Issues, Issue{
 			Severity: "warn", Code: "unused-index",
-			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relationOrPlaceholder, joinStrings(table.PossibleKeys)),
+			Message: fmt.Sprintf("%q has an index (%s) the planner did not choose", relationOrPlaceholder, strings.Join(table.PossibleKeys, ", ")),
 		})
 	}
 

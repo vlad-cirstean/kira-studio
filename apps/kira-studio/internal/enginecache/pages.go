@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sort"
+	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -39,20 +40,9 @@ func canonicalSort(sort_ *model.SortSpec) *string {
 		for i, t := range sort_.Terms {
 			parts[i] = t.Column + ":" + t.Direction
 		}
-		s = "structured:" + joinComma(parts)
+		s = "structured:" + strings.Join(parts, ",")
 	}
 	return &s
-}
-
-func joinComma(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ","
-		}
-		out += p
-	}
-	return out
 }
 
 // normalizedRequest is pages.ts's normalizedRequest: sorting the projection and canonicalising the

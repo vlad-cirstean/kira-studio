@@ -88,7 +88,7 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 		return model.MutationResult{}, err
 	}
 	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
-	op.SetCommand(joinSemicolons(previewParts))
+	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	execCommand := func(sql string, params []any) (int64, error) {
 		return runCommand(ctx, conn, threadID, sql, params, op, track, CommandOptions{SuppressCommand: true})
@@ -129,15 +129,4 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 	}
 	committed = true
 	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
-}
-
-func joinSemicolons(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ";\n"
-		}
-		out += p
-	}
-	return out
 }

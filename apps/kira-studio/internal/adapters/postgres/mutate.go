@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -96,7 +97,7 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 		return model.MutationResult{}, err
 	}
 	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
-	op.SetCommand(joinSemicolons(previewParts))
+	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	execCommand := func(sql string, params []any) (int64, error) {
 		return runCommand(ctx, conn, sql, params, op, track, CommandOptions{SuppressCommand: true})
@@ -137,15 +138,4 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 	}
 	committed = true
 	return model.MutationResult{AffectedRows: int(affectedRows)}, nil
-}
-
-func joinSemicolons(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ";\n"
-		}
-		out += p
-	}
-	return out
 }

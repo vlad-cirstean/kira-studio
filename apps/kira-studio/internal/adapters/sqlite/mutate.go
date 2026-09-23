@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -94,7 +95,7 @@ func mutate(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, readOnly bo
 	}
 	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9's own
 	// precedent).
-	op.SetCommand(joinSemicolons(previewParts))
+	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	if err := execLiteral(ctx, conn, "BEGIN IMMEDIATE"); err != nil {
 		return model.MutationResult{}, err

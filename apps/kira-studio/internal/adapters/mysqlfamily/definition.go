@@ -3,6 +3,7 @@ package mysqlfamily
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -82,7 +83,7 @@ func constraintMetaFor(c constraintRow, cols []keyColumnRow) model.ConstraintMet
 	for j, r := range cols {
 		colNames[j] = r.col
 	}
-	columnList := "(" + joinComma(colNames) + ")"
+	columnList := "(" + strings.Join(colNames, ", ") + ")"
 	if typ != "foreignKey" {
 		return model.ConstraintMeta{Name: c.name, Type: typ, Definition: columnList}
 	}
@@ -98,7 +99,7 @@ func constraintMetaFor(c constraintRow, cols []keyColumnRow) model.ConstraintMet
 	}
 	return model.ConstraintMeta{
 		Name: c.name, Type: typ,
-		Definition: columnList + " REFERENCES " + refTable + " (" + joinComma(refCols) + ")",
+		Definition: columnList + " REFERENCES " + refTable + " (" + strings.Join(refCols, ", ") + ")",
 	}
 }
 
@@ -128,17 +129,6 @@ func listConstraints(ctx context.Context, exec queryExec, database, table string
 		metas[i] = constraintMetaFor(c, columnsByConstraint[c.name])
 	}
 	return metas, nil
-}
-
-func joinComma(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ", "
-		}
-		out += p
-	}
-	return out
 }
 
 // buildDefinition is definition.ts's buildDefinition: passes SHOW CREATE … through verbatim —

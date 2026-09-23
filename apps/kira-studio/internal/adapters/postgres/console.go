@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -174,7 +175,7 @@ func execute(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Trac
 			return nil, err
 		}
 	}
-	op.SetCommand(joinSemicolons(statements))
+	op.SetCommand(strings.Join(statements, ";\n"))
 
 	if readOnly {
 		if _, err := conn.Exec(ctx, "BEGIN READ ONLY"); err != nil {
