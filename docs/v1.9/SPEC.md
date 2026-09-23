@@ -2439,6 +2439,112 @@ composition root, the page wire, the git IPC, the Studio data plane and the fron
 The index's edge table was aggregated to 965 module pairs, with cross-language and impossible
 cross-app Go edges filtered as noise. The `codegraph` MCP server exposes no `codegraph_node`.
 
+## P108 Part 2 result
+
+Reviewed per `plans/P108-part2-go-base.md` (Opus reviewer, no fixing); one Sonnet fixer landed one
+commit per finding against `40141d4`, all 13 findings fixed, none dismissed or deferred.
+
+- **F1 `9fbb3db`** — `terminal.Session.Close` had no bound after SIGKILL: a job-control shell's
+  child can sit outside the signalled process group, or ignore SIGHUP/SIGKILL on its controlling
+  terminal, leaving `readLoop`'s blocked `ptmx.Read` never returning and `Close` — reached from
+  both apps' `TerminalService.Shutdown` (quit teardown, before `db.Close()`) and
+  `Registry.CloseWindow` — hanging forever. Added a second bound (`closeKillWait`) after SIGKILL:
+  wait, force-close `ptmx` (hangs up the slave; not guaranteed to unblock `Read` on darwin, so
+  bounded regardless), wait once more, then log and return rather than block. Also made
+  `Registry.CloseAll` close every session concurrently (small, contained, per the finding's own
+  "only if small" allowance) so quit now costs ~one grace period total instead of one per open
+  terminal.
+- **F2 `fb7d9d3`** — `closeflush.go`'s `flushing` flag was never reset after the last-window
+  `win.Hide()` path, so a Dock re-show followed by a second close found the hook stuck and dropped
+  the pending flush. Added `flushing.Store(false)` right after `win.Hide()` — safe since `Hide()`
+  never emits `WindowClosing`, confirmed against the function's own existing doc comment.
+- **F3/F4 `7ec5285`** — one combined edit to `docs/pending-changes/.github__workflows__pr.yml.patch`
+  (the only place a workflow fix can land from this session): retargeted the stale
+  `apps/kira-studio/internal/gitclient` darwin test path to `apps/kira-space/internal/gitclient`
+  (P100 moved it), and added a `bun run build:space` step beside every `build:studio` step in both
+  the `checks` and `container-tests` jobs, since neither ever built Kira Space's frontend and both
+  apps' `//go:embed all:frontend/dist` therefore never compiled in CI. Rebuilt with P106's own
+  technique — apply the existing patch to a scratch copy of the real file, apply both fixes on top,
+  re-diff against the true unpatched original — so the result is one combined hunk set.
+  `git apply --check` verified clean against the real, currently-unpatched `pr.yml`.
+- **F5 `1c1bf22`** — `verify-packaging.sh`'s S5 check read the old `"package"` script key, which
+  P106 split into `package:studio`/`package:space`; S5 always failed, even on a clean tree.
+  Reproduced before/after: `sh scripts/verify-packaging.sh` failed with "package script changed"
+  before the fix, passed after. Now reads and checks both keys.
+- **F6 `f823ad0`** — `generate-wire.sh` wrote gitwire Go to `apps/kira-studio/internal`; P100 moved
+  the package to `apps/kira-space/internal/gitwire`. Retargeted the `--go -o` arg to match both the
+  schema's own `namespace gitwire` and the files actually on disk.
+- **F7 `74923af`** — `notify.OrderedEmitter.Emit`'s CAS-then-deliver had a gap where a later
+  (higher-sequence) call could win its own CAS and deliver first, then an earlier call's now-stale
+  delivery still landed last — reaching `dbmcp.ApprovalBroker` and `gitsock.Broker`. Added a
+  dedicated emit mutex (private to the emitter, not shared with either caller's own state lock)
+  held across the whole check-and-deliver. Verified safe against self-deadlock by reading the one
+  production subscriber (`bridge/events.go`'s `Attach`): it only forwards to Wails' `EventsEmit`,
+  never calls back into `Emit` synchronously.
+- **F8 `510d042`** — `rpcstream.Session`'s `activeWork`/`creditGates` cleanup was keyed by id alone;
+  not exploitable today (the one real client, `packages/git-ipc/src/rpc.ts`, issues ids
+  monotonically) but latent — a completion finishing after its id slot was reassigned could delete
+  a later request's own entry. Added `activeEntry` (a struct pointer wrapping the `CancelFunc`) so
+  `activeWork` stores identity, not just the id key; `creditGates`' existing `*creditGate` pointer
+  is now compared before its own delete too.
+- **F9 `968c7ca`** — `sqlitex.BuildDSN` built `"file:" + path + "?" + query` unescaped; modernc's
+  `sqlite3_open_v2` (opened with `SQLITE_OPEN_URI`) would treat a `?`/`#`/`%` in a
+  `KIRA_HOME`/`KIRA_SPACE_HOME`-derived path as URI syntax, opening the wrong file. Escaped the
+  three bytes explicitly rather than via `net/url`'s `URL{Scheme:"file",...}.String()` — verified
+  with a throwaway Go program that the latter adds an unconditional `"//"` authority marker, which
+  turns a relative path (this DSN's existing shape for one) into `file://<segment>/...`, a URI with
+  a non-empty authority SQLite's own parser rejects.
+- **F10 `00089ac`** — `pathsafe.ValidateRelPath`'s not-exist fallback accepted a dangling symlink
+  leaf (dirent present, target missing) the same way it accepts a genuinely-missing leaf, since
+  both hit `EvalSymlinks`' ENOENT — a TOCTOU risk for `codeworkspace`'s read-only callers. Added an
+  `Lstat` check in the fallback that rejects a symlink leaf outright, and corrected the doc
+  comment's stale "carries no traversal risk" claim for this case.
+- **F11 `a1350e7`** — `biome.json`'s `noRestrictedImports` override still targeted
+  `apps/kira-studio/frontend/src/repo/**`, which P100 moved to
+  `apps/kira-space/frontend/src/repo` — confirmed the old path no longer exists and the new one
+  does, retargeted the `includes` glob.
+- **F12 `9e70ac9`** — `ipcerr.Error.Error()` fell straight to the bare `Message` on a
+  `json.Marshal` failure (possible since `Details` is a `json.RawMessage`, P10, and can hold
+  invalid raw JSON), losing the code the renderer's `control.ts` wrapper branches on. Now retries
+  with `Details: nil` first. Also corrected the comment's stale "both fields are plain strings"
+  claim.
+- **F13 `99622e9`** — `startupfail.Report`'s stderr headline hardcoded `kira-studio-shell`
+  regardless of which app's `Reporter` was writing it (P100 Part 1 made `Reporter` per-app). Now
+  reads `r.info.AppName`.
+
+**Nothing dismissed or deferred** — all 13 findings matched real, reachable code; every fix landed
+as specified.
+
+**A pre-existing flaky test was found and confirmed unrelated, not fixed.**
+`apps/kira-space/internal/gitsock`'s `TestServer_Close_ReturnsPromptlyWithASilentConnection`
+failed once during a full-package run but passed standalone, and passed and failed on repeated
+runs of the pre-fix tree with every one of this chunk's edits stashed out — confirmed flaky before
+this phase touched anything, in a file (`gitsock/server.go`) outside this chunk's own scope
+(Part 17's). Per `CLAUDE.md`'s own root-cause rule this would normally get fixed on the spot, but
+it isn't caused by, or newly exposed by, any change in this chunk — it is Part 17's file, to
+investigate when that chunk runs.
+
+**Verification, run for real:**
+
+- `go build ./...`: exit 0.
+- `bun run lint:go` (`golangci-lint run`, built via `scripts/install-golangci-lint.sh`, same as the
+  pre-push hook): 0 issues.
+- `bun run lint:dead`: identical pre-existing baseline (6 duplicate exports, 7 configuration hints)
+  — this chunk touches no TS/Vue import.
+- `bun run typecheck`: exit 0 across all 8 parallel splits — this chunk is pure Go/scripts/CI/config,
+  confirmed to touch nothing typecheck scans.
+- `go test ./...`: 0 failures repo-wide.
+- Targeted package tests re-run directly: `internal/terminal`, `internal/shell`, `internal/notify`,
+  `internal/rpcstream`, `internal/startupfail`, `apps/kira-space/internal/gitsock`,
+  `apps/kira-space/internal/codeworkspace`, `apps/kira-studio/internal/dbmcp` — all pass.
+- Every one of the 12 commits above ran its `.githooks/pre-commit` hook for real (`bun run lint` +
+  `bun run typecheck`) and passed clean, not bypassed.
+
+**Working-tree note.** Stream B's own Part 13 chunk was running concurrently in this same checkout
+while this phase's commits landed (`CLAUDE.md`'s own 2-stream, shared-checkout design) — each
+commit here was staged and verified to touch only its own intended file(s) before committing, with
+Stream B's in-progress, uncommitted files shielded out of each commit rather than swept in.
+
 ## Layout
 
 - **`SPEC.md`** — this file, one row per phase, updated as phases land or split.
