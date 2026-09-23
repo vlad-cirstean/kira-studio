@@ -721,3 +721,35 @@ vscode tests, adapter conformance suites for I2-11, I2-12, I2-37).
 
 Closing check: re-run S1 and S6 (`sweep.ts` method in §0) and require every remaining S1 exact
 group and every production S6 pair ≥0.85 to be one §3 decline by name.
+
+## 5. Closing-sweep addendum (post-merge, `f3a5d1a8`)
+
+Found by the I2-18/I2-21 deferred implementation pass's own closing S1/S6 re-sweep against the
+merged tree (both streams + deferred findings landed). Every other S1/S6 hit from that re-sweep
+mapped to an existing finding or §3 decline; these five didn't and were left unfixed at the time,
+flagged for this follow-up pass. Re-verify exact locations against current source before touching
+(function/file names given, not line numbers — the sweep's own output didn't carry them).
+
+- **I2-43** `apps/kira-studio/frontend/src/state/tabs.ts`: `openDataTab`/`openDocumentTab`/
+  `openKeyValueTab`/`openStreamTab` (S6, Jaccard 1.00, ~15 lines each) — differ only in the
+  tab-kind string and its default-state factory. Shape: one `openTab(kind, defaultStateFactory)`
+  helper, four one-line callers.
+- **I2-44** `apps/kira-studio/internal/dbmcp/tools.go`: `listChildren`/`describeTable`/
+  `describeSchema` (S6, 0.94-1.00). Shape: extract the shared body into one helper parameterized
+  on what differs; keep each exported wrapper thin.
+- **I2-45** `apps/kira-studio/internal/page/builder.go`: `Finish` ×3 (S6, 0.91-1.00). Shape: same
+  approach — one shared body, thin per-variant wrappers.
+- **I2-46** `apps/kira-space/internal/gitops/conflict.go`: `ContinueArgs`/`AbortArgs`/`SkipArgs`
+  (S6, 1.00). Shape: one shared constructor/builder parameterized on the one thing that differs
+  per variant.
+- **I2-47** `apps/kira-space/internal/gitsession/conn.go`: `WalkFor`/`ReviewWalkFor`/
+  `alreadyHeld` (S6, 0.88-1.00). Shape: same approach; re-check `alreadyHeld`'s exact overlap with
+  the other two before merging — it scored lowest (0.88), confirm it's real duplication and not
+  S6 noise before extracting.
+
+Implementation: one sequential Sonnet subagent, commit per finding, fast checks per commit
+(`go build`, `golangci-lint`, `typecheck`, `lint:dead`). All five are non-overlapping files across
+two apps' Go and one app's frontend, so no parallel split needed at this size. Full suites once at
+the end: `test:go`, `test:unit`, `test:ui:studio`, `test:ui:space`. This addendum, once
+implemented, closes P107 iteration 2 in full — no further closing-sweep pass is required unless a
+future iteration 3 is opened.
