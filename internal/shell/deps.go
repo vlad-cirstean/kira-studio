@@ -27,17 +27,21 @@ type WindowBounds struct {
 	Height float64
 }
 
-// WindowRecord is the two fields window.go's Options/Attach actually read off each app's own
-// storage/model.WindowRecord (which also carries an Order, and Kira Studio's alone carries a
-// Mode) — converted at the one call site in main.go rather than hoisting the storage model.
+// WindowRecord is window.go's own Options/Attach fields (Key/Bounds) plus Order — openwindow.go's
+// own OpenNewWindow/ReopenWindows need Order to pick a cascade position / the highest-order stored
+// window; Kira Studio's own storage/model.WindowRecord alone also carries a Mode, which stays out
+// of this package the same way it always has (converted at each app's own windowStore adapter
+// rather than hoisting the storage model).
 type WindowRecord struct {
 	Key    string
+	Order  int
 	Bounds *WindowBounds
 }
 
 // WindowStore is exactly the method window.go's Attach calls on each app's own
-// *repos.WindowsRepo — SetBounds, the one write Attach's debounced persist() makes. Each app's
-// *repos.WindowsRepo takes its own model.WindowBounds, a different named type even though
+// *repos.WindowsRepo — SetBounds, the one write Attach's debounced persist() makes. WindowRepo
+// (openwindow.go) widens this to the full set OpenWindow/OpenNewWindow/ReopenWindows need. Each
+// app's *repos.WindowsRepo takes its own model.WindowBounds, a different named type even though
 // field-identical, so it does not satisfy this interface directly; main.go wraps it in a one-line
 // adapter at the same call site that builds WindowDeps.
 type WindowStore interface {
