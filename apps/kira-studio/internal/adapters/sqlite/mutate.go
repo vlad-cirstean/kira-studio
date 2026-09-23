@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"strings"
 	"time"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -45,40 +44,22 @@ func preview(plan model.MutationPlan) ([]string, error) {
 // before a single row has changed rather than mid-batch. Issued on the op's own dedicated
 // *sql.Conn (the one runOnConn already obtained), which is what makes the transaction real.
 func mutate(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
-	if err := adapters.AssertWritable(readOnly); err != nil {
-		return model.MutationResult{}, err
+	resolve := func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error) {
+		database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		// Fresh in this same op — never trusts a column name the renderer sent without re-checking it
+		// against the catalog right now (same discipline resolveProjection uses on the read path).
+		exec := execFor(ctx, conn, op)
+		target, err := getReadTarget(exec, database, table)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		relationSQL = quoteIdent(database) + "." + quoteIdent(table)
+		qualifiedName = target.QualifiedName.Database + "." + target.QualifiedName.Table
+		return relationSQL, qualifiedName, target.Columns, target.PrimaryKey, nil
 	}
-
-	database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	relationSQL := quoteIdent(database) + "." + quoteIdent(table)
-
-	// Fresh in this same op — never trusts a column name the renderer sent without re-checking it
-	// against the catalog right now (same discipline resolveProjection uses on the read path).
-	exec := execFor(ctx, conn, op)
-	target, err := getReadTarget(exec, database, table)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-
-	qualifiedName := target.QualifiedName.Database + "." + target.QualifiedName.Table
-	// D23: the table's own rowid, even when it exists and is used internally for keyset paging, is
-	// never an acceptable key here — it is not a column the renderer ever shows.
-	if err := adapters.ValidateMutationOps(plan.Ops, target.Columns, target.PrimaryKey, qualifiedName); err != nil {
-		return model.MutationResult{}, err
-	}
-
-	paramRenderer := adapters.NewParamRenderer(questionPlaceholder, binaryColumnsOf(target.Columns))
-	ordered := adapters.OrderedOps(plan.Ops)
-	compiled, previewParts, err := adapters.CompileMutationOps(relationSQL, ordered, paramRenderer, literalRenderer, quoteIdent)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9's own
-	// precedent).
-	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	execCommand := func(sqlText string, params []any) (int64, error) {
 		return runCommand(ctx, conn, sqlText, params, op, true)
@@ -94,5 +75,13 @@ func mutate(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, readOnly bo
 		defer cancel()
 		_, _ = runCommand(cleanupCtx, conn, "ROLLBACK", nil, op, true)
 	}
-	return adapters.RunSQLMutation(ctx, "BEGIN IMMEDIATE", execCommand, rollback, compiled)
+
+	// D23: the table's own rowid, even when it exists and is used internally for keyset paging, is
+	// never an acceptable key here — it is not a column the renderer ever shows. ValidateMutationOps
+	// (inside RunRelationalMutate) enforces that against target.Columns/PrimaryKey as before.
+	return adapters.RunRelationalMutate(ctx, op, readOnly, plan, adapters.RelationalMutateDeps{
+		Resolve: resolve, Quote: quoteIdent, Placeholder: questionPlaceholder,
+		TypeClassFor: typeClassFor, LiteralRenderer: literalRenderer,
+		BeginSQL: "BEGIN IMMEDIATE", Exec: execCommand, Rollback: rollback,
+	})
 }

@@ -105,6 +105,65 @@ func PlanRelationalPage(args RelationalPageArgs) (RelationalPagePlan, error) {
 	}, nil
 }
 
+// RelationalFingerprint is the Go analogue of each adapter's own anonymous Fingerprint struct
+// literal, identical in shape across postgres/mysqlfamily/sqlite (P107 I2-11) — Path is the only
+// field whose type differs per adapter (each package's own QualifiedName), hence the parameter.
+type RelationalFingerprint[P any] struct {
+	Path       P               `json:"path"`
+	Projection []string        `json:"projection"`
+	Filter     *string         `json:"filter"`
+	Sort       *model.SortSpec `json:"sort"`
+	PageSize   int             `json:"pageSize"`
+}
+
+// KeysetPageCollector is readPage's post-stream bookkeeping, byte-identical across all three
+// relational adapters (P107 I2-11): row counting against PageSize, the ReverseRows edge-row swap,
+// and the BuildKeysetPosition/builder.Finish call. Row storage and cell access stay adapter-owned
+// (firstRow/lastRow are []*string on postgres/mysqlfamily, []any on sqlite) — swapEdges and cellAt
+// are the seam.
+type KeysetPageCollector struct {
+	RowCount    int
+	ProbedExtra bool
+}
+
+// Track records one streamed row against pageSize, reporting whether it should still be appended
+// to the builder — false once pageSize is exceeded (the probe row past the page's own end).
+func (c *KeysetPageCollector) Track(pageSize int) bool {
+	c.RowCount++
+	if c.RowCount > pageSize {
+		c.ProbedExtra = true
+		return false
+	}
+	return true
+}
+
+// Finish applies plan.ReverseRows (builder.Reverse plus swapEdges, the caller's own
+// firstRow/lastRow swap), then builds the page's KeysetPosition and finishes builder.
+func (c *KeysetPageCollector) Finish(
+	builder *page.TabularPageBuilder, plan RelationalPagePlan, req ReadReq, fetch FetchColumns,
+	order EffectiveOrder, swapEdges func(), cellAt func(row, col int) *string,
+) (page.TabularPage, error) {
+	if plan.ReverseRows {
+		builder.Reverse()
+		swapEdges()
+	}
+	displayRowCount := c.RowCount
+	if c.ProbedExtra {
+		displayRowCount--
+	}
+
+	position, err := BuildKeysetPosition(KeysetPositionArgs{
+		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: displayRowCount,
+		ProbedExtra: c.ProbedExtra, Order: order, KeysetColumnIdx: fetch.KeysetColumnIdx,
+		Fingerprint: plan.Fingerprint,
+		CellAt:      cellAt,
+	})
+	if err != nil {
+		return page.TabularPage{}, err
+	}
+	return builder.Finish(position), nil
+}
+
 // selectTiebreaker picks the primary key, else the first unique key, else (only when the caller
 // supplied one, per sqlite's own rowid fallback) extra — the same fallback chain each readPage's
 // prologue ran inline.

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -49,38 +48,22 @@ func preview(plan model.MutationPlan) ([]string, error) {
 
 // mutate is mutate.ts's mutate.
 func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
-	// §8.12's standard: enforced here, not only greyed out in the UI (P5 D11).
-	if err := adapters.AssertWritable(readOnly); err != nil {
-		return model.MutationResult{}, err
+	resolve := func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error) {
+		schema, table, err := resolveTablePath(plan.Path)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		// Fresh in this same op (D7, mirrors resolveProjection's P2 D10 discipline) — never trusts a
+		// column name the renderer sent without re-checking it against the catalog right now.
+		exec := execFor(conn, op, track)
+		target, err := getReadTarget(ctx, exec, schema, table)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		relationSQL = quoteIdent(schema) + "." + quoteIdent(table)
+		qualifiedName = target.QualifiedName.Schema + "." + target.QualifiedName.Relation
+		return relationSQL, qualifiedName, target.Columns, target.PrimaryKey, nil
 	}
-
-	schema, table, err := resolveTablePath(plan.Path)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	relationSQL := quoteIdent(schema) + "." + quoteIdent(table)
-
-	// Fresh in this same op (D7, mirrors resolveProjection's P2 D10 discipline) — never trusts a
-	// column name the renderer sent without re-checking it against the catalog right now.
-	exec := execFor(conn, op, track)
-	target, err := getReadTarget(ctx, exec, schema, table)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-
-	qualifiedName := target.QualifiedName.Schema + "." + target.QualifiedName.Relation
-	if err := adapters.ValidateMutationOps(plan.Ops, target.Columns, target.PrimaryKey, qualifiedName); err != nil {
-		return model.MutationResult{}, err
-	}
-
-	paramRenderer := adapters.NewParamRenderer(dollarPlaceholder, binaryColumnsOf(target.Columns))
-	ordered := adapters.OrderedOps(plan.Ops)
-	compiled, previewParts, err := adapters.CompileMutationOps(relationSQL, ordered, paramRenderer, literalRenderer, quoteIdent)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
-	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	execCommand := func(sql string, params []any) (int64, error) {
 		return runCommand(ctx, conn, sql, params, op, track, CommandOptions{SuppressCommand: true})
@@ -96,5 +79,12 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 		defer cancel()
 		_, _ = conn.Exec(cleanupCtx, "ROLLBACK")
 	}
-	return adapters.RunSQLMutation(ctx, "BEGIN", execCommand, rollback, compiled)
+
+	// §8.12's standard: enforced by RunRelationalMutate's own AssertWritable, not only greyed out in
+	// the UI (P5 D11).
+	return adapters.RunRelationalMutate(ctx, op, readOnly, plan, adapters.RelationalMutateDeps{
+		Resolve: resolve, Quote: quoteIdent, Placeholder: dollarPlaceholder,
+		TypeClassFor: typeClassFor, LiteralRenderer: literalRenderer,
+		BeginSQL: "BEGIN", Exec: execCommand, Rollback: rollback,
+	})
 }

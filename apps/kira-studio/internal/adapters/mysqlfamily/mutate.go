@@ -43,35 +43,20 @@ func preview(plan model.MutationPlan) ([]string, error) {
 
 // mutate is mutate.ts's mutate.
 func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
-	if err := adapters.AssertWritable(readOnly); err != nil {
-		return model.MutationResult{}, err
+	resolve := func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error) {
+		database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		exec := execFor(conn, threadID, op, track)
+		target, err := getReadTarget(ctx, exec, database, table)
+		if err != nil {
+			return "", "", nil, nil, err
+		}
+		relationSQL = quoteIdent(database) + "." + quoteIdent(table)
+		qualifiedName = target.QualifiedName.Database + "." + target.QualifiedName.Table
+		return relationSQL, qualifiedName, target.Columns, target.PrimaryKey, nil
 	}
-
-	database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	relationSQL := quoteIdent(database) + "." + quoteIdent(table)
-
-	exec := execFor(conn, threadID, op, track)
-	target, err := getReadTarget(ctx, exec, database, table)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-
-	qualifiedName := target.QualifiedName.Database + "." + target.QualifiedName.Table
-	if err := adapters.ValidateMutationOps(plan.Ops, target.Columns, target.PrimaryKey, qualifiedName); err != nil {
-		return model.MutationResult{}, err
-	}
-
-	paramRenderer := adapters.NewParamRenderer(questionPlaceholder, binaryColumnsOf(target.Columns))
-	ordered := adapters.OrderedOps(plan.Ops)
-	compiled, previewParts, err := adapters.CompileMutationOps(relationSQL, ordered, paramRenderer, literalRenderer, quoteIdent)
-	if err != nil {
-		return model.MutationResult{}, err
-	}
-	// One op-log row, one setCommand call, before anything executes (Adapter rule 3, P5 D9).
-	op.SetCommand(strings.Join(previewParts, ";\n"))
 
 	execCommand := func(sql string, params []any) (int64, error) {
 		return runCommand(ctx, conn, threadID, sql, params, op, track, CommandOptions{SuppressCommand: true})
@@ -87,5 +72,10 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 		defer cancel()
 		_, _ = conn.ExecContext(cleanupCtx, "ROLLBACK")
 	}
-	return adapters.RunSQLMutation(ctx, "START TRANSACTION", execCommand, rollback, compiled)
+
+	return adapters.RunRelationalMutate(ctx, op, readOnly, plan, adapters.RelationalMutateDeps{
+		Resolve: resolve, Quote: quoteIdent, Placeholder: questionPlaceholder,
+		TypeClassFor: typeClassFor, LiteralRenderer: literalRenderer,
+		BeginSQL: "START TRANSACTION", Exec: execCommand, Rollback: rollback,
+	})
 }

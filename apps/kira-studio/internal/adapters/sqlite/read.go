@@ -108,13 +108,10 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 		TypeClassFor: typeClassFor,
 		GeneratedFor: func(name string) bool { return target.GeneratedColumns[name] },
 		QuoteIdent:   quoteIdent,
-		Fingerprint: struct {
-			Path       QualifiedName   `json:"path"`
-			Projection []string        `json:"projection"`
-			Filter     *string         `json:"filter"`
-			Sort       *model.SortSpec `json:"sort"`
-			PageSize   int             `json:"pageSize"`
-		}{target.QualifiedName, req.Projection, req.Filter, req.Sort, req.PageSize},
+		Fingerprint: adapters.RelationalFingerprint[QualifiedName]{
+			Path: target.QualifiedName, Projection: req.Projection, Filter: req.Filter,
+			Sort: req.Sort, PageSize: req.PageSize,
+		},
 	})
 	if err != nil {
 		return page.TabularPage{}, err
@@ -148,17 +145,14 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 	// most one row ever arrives past req.PageSize, so probing it needs no early cancellation — the
 	// callback just declines to push or track it.
 	builder := page.NewTabularPageBuilder(columns)
-	var rowCount int
-	var probedExtra bool
+	var collector adapters.KeysetPageCollector
 	var firstRow, lastRow []any
 	// cells is pure AppendRow scratch — unlike row (retained below via firstRow/lastRow), AppendRow
 	// copies every cell into the builder's own scratch buffers synchronously and never keeps cells
 	// itself, so one allocation for the whole page is enough instead of one per row (P2 R2, #95).
 	cells := make([]*string, len(projectedColumns))
 	err = streamArrayQuery(ctx, conn, query, params, op, true, func(row []any) error {
-		rowCount++
-		if rowCount > req.PageSize {
-			probedExtra = true
+		if !collector.Track(req.PageSize) {
 			return nil
 		}
 
@@ -179,31 +173,14 @@ func readPage(ctx context.Context, conn *sql.Conn, op *adapters.OpCtx, target Re
 		return page.TabularPage{}, err
 	}
 
-	if plan.ReverseRows {
-		builder.Reverse()
-		firstRow, lastRow = lastRow, firstRow
-	}
-	displayRowCount := rowCount
-	if probedExtra {
-		displayRowCount--
-	}
-
-	position, err := adapters.BuildKeysetPosition(adapters.KeysetPositionArgs{
-		Cursor: req.Cursor, PageSize: req.PageSize, DisplayRowCount: displayRowCount,
-		ProbedExtra: probedExtra, Order: order, KeysetColumnIdx: fetch.KeysetColumnIdx,
-		Fingerprint: plan.Fingerprint,
-		CellAt: func(row, col int) *string {
+	return collector.Finish(builder, plan, req, fetch, order,
+		func() { firstRow, lastRow = lastRow, firstRow },
+		func(row, col int) *string {
 			if row == 0 {
 				return toCellText(firstRow[col])
 			}
 			return toCellText(lastRow[col])
-		},
-	})
-	if err != nil {
-		return page.TabularPage{}, err
-	}
-
-	return builder.Finish(position), nil
+		})
 }
 
 // countRows is read.ts's countRows.
