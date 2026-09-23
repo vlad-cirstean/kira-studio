@@ -26,6 +26,9 @@
     // Invoked by scripts/package-vscode.ts through a constructed filesystem path
     // (`node_modules/@vscode/vsce/vsce`), never a static import.
     "@vscode/vsce",
+    // Root devDependency for apps/kira-studio/tests/support/encodeFrame.ts, a static import but
+    // in a tree no workspace below scans. Bun's isolated linker resolves only declared deps.
+    "flatbuffers",
     // Consumed transitively through @tailwindcss/vite's plugin and `@tailwind` CSS directives —
     // never imported by name in TS.
     "tailwindcss",

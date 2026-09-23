@@ -74,6 +74,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vscode/vsce": "3.9.2",
     "bun-types": "1.4.2",
+    "flatbuffers": "25.9.23",
     "knip": "6.37.0",
     "mariadb": "3.5.4",
     "pg": "8.23.0",
