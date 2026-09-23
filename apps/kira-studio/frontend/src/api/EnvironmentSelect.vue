@@ -140,7 +140,7 @@ function manage(): void {
 @reference "@theme/base.css";
 
 .environment-anchor {
-  @apply relative flex min-w-0 flex-[0_1_auto];
+  @apply relative flex min-w-0 flex-initial;
 }
 
 .environment-select {

@@ -759,7 +759,7 @@ const statusLine = computed(() => {
    encoded value, mirroring ConsoleView.vue's own stacked result panels rather than a side-by-side
    split — this panel is usually too narrow for two columns to read comfortably. */
 .editor-body.has-translate .encoded-pane {
-  @apply flex-[1_1_55%] border-b border-border;
+  @apply flex-1 basis-7/12 border-b border-border;
 }
 
 .translate-head {
@@ -767,10 +767,10 @@ const statusLine = computed(() => {
 }
 
 .translate-pane {
-  @apply flex-[1_1_45%] min-h-0;
+  @apply flex-1 basis-5/12 min-h-0;
 }
 
 .translate-pane-empty {
-  @apply flex-[1_1_45%] items-center text-subtle;
+  @apply flex-1 basis-5/12 items-center text-subtle;
 }
 </style>

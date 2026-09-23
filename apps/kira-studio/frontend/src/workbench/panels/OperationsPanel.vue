@@ -416,7 +416,7 @@ function onRowContextMenu(record: OpRecord, event: MouseEvent): void {
 }
 
 .ops-detail-row {
-  @apply grid-cols-[1fr] overflow-hidden text-ellipsis whitespace-nowrap;
+  @apply grid-cols-1 overflow-hidden text-ellipsis whitespace-nowrap;
   height: var(--kira-h-xs);
   color: var(--kira-fg-muted);
   background: var(--kira-bg-elevated);
