@@ -146,7 +146,7 @@ func scriptedIdentify(root string) map[string]gitclient.Result {
 		"rev-parse --path-format=absolute --absolute-git-dir": {Stdout: []byte(root + "/.git\n")},
 		"rev-parse --path-format=absolute --git-common-dir":   {Stdout: []byte(root + "/.git\n")},
 		"rev-parse --show-toplevel":                           {Stdout: []byte(root + "\n")},
-		"symbolic-ref --short -q HEAD":                        {Stdout: []byte("main\n"), ExitCode: 0},
+		"symbolic-ref -q HEAD":                                {Stdout: []byte("refs/heads/main\n"), ExitCode: 0},
 		"rev-parse -q --verify HEAD":                          {Stdout: []byte(strings.Repeat("a", 40) + "\n"), ExitCode: 0},
 		"worktree list --porcelain -z":                        {Stdout: []byte("worktree " + root + "\x00HEAD " + strings.Repeat("a", 40) + "\x00branch refs/heads/main\x00\x00")},
 	}

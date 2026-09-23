@@ -274,14 +274,19 @@ func revParseBool(ctx context.Context, runner Runner, gitPath, dir string, flag 
 // can re-run it after a ref change instead of trusting the value Identify froze at open — Identify
 // itself is unchanged, still the only caller inside this package.
 func ResolveHead(ctx context.Context, runner Runner, gitPath, dir string) (HeadState, error) {
-	symArgs := []string{"symbolic-ref", "--short", "-q", "HEAD"}
+	// F7: plain `symbolic-ref -q HEAD` (the full "refs/heads/<b>"), --short's own ref-path
+	// prefix stripped by hand below — `--short` shortens AMBIGUOUSLY: when a tag shares the
+	// branch's own name, it returns "heads/<b>" instead of "<b>" (verified against real git
+	// 2.43), which `status`/`refs.list` never do, desyncing every comparison against their own
+	// plain "<b>" answer (gitsession's own pull/restack-undo lookups among them).
+	symArgs := []string{"symbolic-ref", "-q", "HEAD"}
 	symRes, symErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: symArgs, ReadOnly: true})
 	if symErr != nil {
 		return HeadState{}, Classify(ctx, symArgs, symRes, symErr)
 	}
 
 	if symRes.ExitCode == 0 {
-		name := strings.TrimSpace(string(symRes.Stdout))
+		name := strings.TrimPrefix(strings.TrimSpace(string(symRes.Stdout)), "refs/heads/")
 		verifyArgs := []string{"rev-parse", "-q", "--verify", "HEAD"}
 		verifyRes, verifyErr := Run(ctx, runner, gitPath, Spec{Dir: dir, Args: verifyArgs, ReadOnly: true})
 		if verifyErr != nil {

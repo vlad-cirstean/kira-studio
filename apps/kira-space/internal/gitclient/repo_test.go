@@ -366,6 +366,25 @@ func TestIdentify_DetachedHead(t *testing.T) {
 	}
 }
 
+// TestIdentify_BranchNameSharedWithATag is F7's own regression guard: `symbolic-ref --short`
+// shortens AMBIGUOUSLY when a tag shares the current branch's own name, returning "heads/<b>"
+// instead of "<b>" (verified against real git 2.43) — desyncing every later comparison against
+// status/refs.list's own plain "<b>" answer (gitsession's own pull and restack-undo lookups among
+// them). ResolveHead now reads the plain, unshortened symbolic-ref and strips "refs/heads/" itself.
+func TestIdentify_BranchNameSharedWithATag(t *testing.T) {
+	dir := initFixtureRepo(t)
+	gitPath := requireRealGit(t)
+	runGit(t, dir, "tag", "main") // a tag with the SAME name as the checked-out branch.
+
+	summary, err := Identify(context.Background(), NewExecRunner(), gitPath, dir)
+	if err != nil {
+		t.Fatalf("identify: %v", err)
+	}
+	if summary.Head.Kind != "branch" || summary.Head.Name != "main" {
+		t.Errorf("Head = %+v, want {branch main} (not \"heads/main\")", summary.Head)
+	}
+}
+
 func TestIdentify_BareRepo(t *testing.T) {
 	gitPath := requireRealGit(t)
 	dir := t.TempDir()
@@ -475,7 +494,7 @@ func TestIdentify_DecomposedRevParseOutputComposesEverything(t *testing.T) {
 		"rev-parse --path-format=absolute --absolute-git-dir": {Stdout: []byte(decomposedGitDir + "\n")},
 		"rev-parse --path-format=absolute --git-common-dir":   {Stdout: []byte(decomposedGitDir + "\n")},
 		"rev-parse --show-toplevel":                           {Stdout: []byte(decomposedRoot + "\n")},
-		"symbolic-ref --short -q HEAD":                        {Stdout: []byte("main\n"), ExitCode: 0},
+		"symbolic-ref -q HEAD":                                {Stdout: []byte("refs/heads/main\n"), ExitCode: 0},
 		"rev-parse -q --verify HEAD":                          {Stdout: []byte("deadbeef\n"), ExitCode: 0},
 	}}
 
