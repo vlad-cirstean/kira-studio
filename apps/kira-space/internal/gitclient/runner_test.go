@@ -47,6 +47,7 @@ func TestBuildArgv_ConfigOverridesThenNoPagerFirst(t *testing.T) {
 		"-c", "color.ui=false",
 		"-c", "log.showSignature=false",
 		"-c", "i18n.logOutputEncoding=UTF-8",
+		"-c", "diff.suppressBlankEmpty=false",
 		"--no-pager",
 		"status",
 	}
@@ -63,6 +64,7 @@ func TestBuildArgv_ReadOnlyAddsNoOptionalLocks(t *testing.T) {
 		"-c", "color.ui=false",
 		"-c", "log.showSignature=false",
 		"-c", "i18n.logOutputEncoding=UTF-8",
+		"-c", "diff.suppressBlankEmpty=false",
 		"--no-pager", "--no-optional-locks", "log",
 	}
 	if !slices.Equal(got, want) {

@@ -160,6 +160,36 @@ func TestParseFileDiffBody_NoNewlineAtEof(t *testing.T) {
 	}
 }
 
+// TestParseFileDiffBody_BlankContextLineSuppressed is F4's own regression guard: a user's
+// diff.suppressBlankEmpty=true makes git print a bare empty line (no leading " ") for a blank
+// CONTEXT line — the fixture is captured with that config spliced in ahead of gitclient's own
+// -c diff.suppressBlankEmpty=false override, proving parseOneHunk tolerates the bare line as
+// defense in depth, independent of the runner-level fix.
+func TestParseFileDiffBody_BlankContextLineSuppressed(t *testing.T) {
+	t.Parallel()
+	body, err := porcelain.ParseFileDiffBody(readDiffFixture(t, "diff/blankContextSuppressed.bin"))
+	if err != nil {
+		t.Fatalf("ParseFileDiffBody: %v", err)
+	}
+	if body.Kind != porcelain.ParsedText || len(body.Hunks) != 1 {
+		t.Fatalf("body = %+v, want one text hunk", body)
+	}
+	lines := body.Hunks[0].Lines
+	wantKinds := []porcelain.DiffLineKind{porcelain.LineContext, porcelain.LineAdd, porcelain.LineContext, porcelain.LineContext}
+	if len(lines) != len(wantKinds) {
+		t.Fatalf("got %d lines, want %d", len(lines), len(wantKinds))
+	}
+	for i, k := range wantKinds {
+		if lines[i].Kind != k {
+			t.Fatalf("line %d kind = %q, want %q", i, lines[i].Kind, k)
+		}
+	}
+	blank := lines[2]
+	if blank.Text != "" {
+		t.Fatalf("blank context line text = %q, want empty", blank.Text)
+	}
+}
+
 // TestParseFileDiffBody_LFSPointer proves the LFS sniff: a single-hunk, pure-addition new file
 // whose reconstructed content matches the pointer spec is classified lfsPointer, not text.
 func TestParseFileDiffBody_LFSPointer(t *testing.T) {

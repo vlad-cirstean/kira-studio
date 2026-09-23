@@ -297,10 +297,19 @@ func parseOneHunk(m [][]byte, rest [][]byte) (DiffHunk, int, error) {
 		if oldSeen >= oldLines && newSeen >= newLines {
 			break
 		}
+		// F4: diff.suppressBlankEmpty=true (verified against real git 2.43) makes git print a
+		// bare empty line for a blank CONTEXT line instead of the usual " " prefix.
+		// configOverrides now forces this setting off explicitly for every spawn; tolerated here
+		// too, as defense in depth, in case a differently-configured git ever reaches this parser
+		// some other way — an empty line inside a hunk with counts still unsatisfied can only be
+		// an empty context line, never anything else.
+		var marker byte
+		var text string
 		if len(line) == 0 {
-			return DiffHunk{}, 0, fmt.Errorf("porcelain: empty content line inside a hunk")
+			marker, text = ' ', ""
+		} else {
+			marker, text = line[0], string(line[1:])
 		}
-		marker, text := line[0], string(line[1:])
 		switch marker {
 		case ' ':
 			old, new := oldLineNo, newLineNo

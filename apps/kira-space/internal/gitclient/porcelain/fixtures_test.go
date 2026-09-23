@@ -603,6 +603,18 @@ func TestFixtures_Regenerate(t *testing.T) {
 		head := b.commit("asset.bin", lfsContent, "add LFS pointer")
 		writeFixture(t, "diff/lfsPointer.bin", captureFileDiff(t, b.dir, &parent, head, "asset.bin", nil))
 	}
+	{
+		// --- diff/blankContextSuppressed.bin (F4): a blank CONTEXT line under a user's own
+		// diff.suppressBlankEmpty=true, captured with -c diff.suppressBlankEmpty=true spliced in
+		// AHEAD of gitclient's own configOverrides — deliberately bypassing the runner-level fix
+		// (a later `-c` wins) to exercise parseOneHunk's own defense-in-depth against a bare
+		// empty line reaching it some other way. Verified against real git 2.43.0.
+		b := newRepoBuilder(t)
+		parent := b.commit("blank.txt", "line1\n\nline3\n", "add blank.txt")
+		head := b.commit("blank.txt", "line1\nCHANGED\n\nline3\n", "change blank.txt")
+		args := append([]string{"-c", "diff.suppressBlankEmpty=true"}, porcelain.FileDiffArgs(&parent, head, "blank.txt", nil)...)
+		writeFixture(t, "diff/blankContextSuppressed.bin", captureRaw(t, b.dir, args))
+	}
 
 	// --- show/*.bin: the %G?/%GS/%(trailers)/%b record, body last (probe P5). ---
 	{

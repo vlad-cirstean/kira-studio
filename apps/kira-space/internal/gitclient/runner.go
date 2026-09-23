@@ -108,12 +108,21 @@ const stderrTruncationMarker = "\n…[stderr truncated]"
 //     record framing.
 //   - i18n.logOutputEncoding=UTF-8 — commit text arrives in a known encoding, not the repo's own
 //     configured (and possibly unset) one.
+//   - diff.suppressBlankEmpty=false (F3 Part 14 review F4) — a user's own diff.suppressBlankEmpty=
+//     true (verified against real git 2.43) makes `diff-tree -p`/`diff` print a bare empty line
+//     (no leading " ") for a blank CONTEXT line inside a hunk, instead of the single space every
+//     unified-diff context line otherwise starts with — porcelain/diff.go's parseOneHunk rejects
+//     that as "empty content line inside a hunk", breaking every commit file diff, drift re-map
+//     and review diff whose hunk happens to contain a blank context line. Explicit override, not
+//     just defense-in-depth on the parser side, since a differently-configured git could still
+//     reach this parser some other way (a future direct-git-binary path, a test harness).
 var configOverrides = []string{
 	"-c", "core.quotepath=false",
 	"-c", "core.precomposeunicode=true", // G27 D3
 	"-c", "color.ui=false",
 	"-c", "log.showSignature=false",
 	"-c", "i18n.logOutputEncoding=UTF-8",
+	"-c", "diff.suppressBlankEmpty=false",
 }
 
 // hygieneEnv is the fixed environment every spawned git process gets, appended onto the parent's
