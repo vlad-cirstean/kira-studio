@@ -3,6 +3,8 @@ import type { Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { installClipboardSpy, lastClipboardWrite } from './support/clipboard';
+import { connectAndExpand, connectionCreateArgs } from './support/connect';
 import {
   cellText,
   gridCell,
@@ -13,17 +15,15 @@ import {
 } from './support/grid';
 import { IPC } from './support/ipcChannels';
 import {
-  APP_PATH,
   BIG_ROWS_COLUMNS,
   BIG_ROWS_PATH,
   bigRowsFixture,
-  DB_PATH,
   NULLS_AND_UNICODE_PAGE,
   NULLS_META,
   NULLS_PATH,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, findRow, openRowMenu } from './support/tree';
+import { findRow } from './support/tree';
 
 // Ported from tests/e2e/data-view.spec.ts (P57 D16), against a real captured app.big_rows
 // (1,000,000 rows, id/hash=md5(id) — packages/db-fixtures/fixtures/0001_seed.sql) and app.nulls_and_unicode,
@@ -806,27 +806,6 @@ const CANCEL_ERROR = {
   message: 'operation was cancelled',
   code: 'E_CANCELLED',
 };
-function connectionCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-  };
-}
-
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
@@ -1156,51 +1135,11 @@ async function lastGutterNumber(page: Page): Promise<string> {
 // real packaged build embeds), which has no such grant to make. Spying on `writeText` proves the
 // same "one clipboard line per visible row" claim the original's `navigator.clipboard.readText()`
 // did, without depending on a real OS clipboard round trip at all.
-async function installClipboardSpy(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    (window as unknown as { __clipboard: string[] }).__clipboard = [];
-    navigator.clipboard.writeText = (text: string) => {
-      (window as unknown as { __clipboard: string[] }).__clipboard.push(text);
-      return Promise.resolve();
-    };
-  });
-}
-
-async function lastClipboardWrite(page: Page): Promise<string> {
-  return page.evaluate(
-    () => (window as unknown as { __clipboard: string[] }).__clipboard.at(-1) ?? '',
-  );
-}
-
 async function readOpsCount(
   stream: { ops(): Promise<{ op: string }[]> },
   op: string,
 ): Promise<number> {
   return (await stream.ops()).filter((o) => o.op === op).length;
-}
-
-async function connectAndExpand(page: Page): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-postgres"]');
-  await page.fill('[data-testid="connection-name"]', 'Data View DB');
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '5432');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'postgres');
-  await page.click('[data-testid="color-green"]');
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  await expandRow(page, '');
-  await expandRow(page, DB_PATH);
-  await expandRow(page, APP_PATH);
 }
 
 test('data view — pagination, count, projection, sort, filter, search, stop, NULLs', async ({
@@ -1210,7 +1149,7 @@ test('data view — pagination, count, projection, sort, filter, search, stop, N
   test.setTimeout(120_000);
   const { window: page, stream } = await relaunch({ control: CONTROL, stream: PORT });
   await installClipboardSpy(page);
-  await connectAndExpand(page);
+  await connectAndExpand(page, 'Data View DB', 'green');
 
   // --- open: 100 rows, gutter starts at 1, header shows column names ----------------------
   const bigRowsRowLoc = await findRow(page, BIG_ROWS_PATH);

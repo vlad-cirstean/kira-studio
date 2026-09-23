@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ControlSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { connectionCreateArgs } from './support/connect';
 import { acceptConfirm } from './support/dialogs';
 import { IPC } from './support/ipcChannels';
 import {
@@ -78,38 +79,11 @@ const SEQUENCE_PATH = `${APP_PATH}/sequence:invoice_number_seq`;
 // path, never sent to an adapter (project/state/tree.ts's groupPath()).
 const SEQUENCES_FOLDER_PATH = `${APP_PATH}#sequence`;
 
-function connectionCreateArgs(name: string, color: string) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain: false,
-    throttlePerSec: 0,
-    mcpEnabled: false,
-    mcpDescription: '',
-    mcpReadMode: 'allow',
-    mcpWriteMode: 'prompt',
-    mcpDdlMode: 'deny',
-    mcpAutoExplain: true,
-  };
-}
-
 const CONTROL: ControlSnapshot[] = [
   { channel: IPC.connectionsList, response: [] },
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Tree DB', 'blue'),
+    args: connectionCreateArgs('Tree DB', 'blue', { mcp: true }),
     response: CONNECTION_SUMMARY,
   },
   ...connectAndExpandControl(CONNECTION_ID),
@@ -121,7 +95,7 @@ const CONTROL: ControlSnapshot[] = [
   connectionsDisconnectSnapshot(CONNECTION_ID),
   {
     channel: IPC.connectionsCreate,
-    args: connectionCreateArgs('Tree DB 2', 'cyan'),
+    args: connectionCreateArgs('Tree DB 2', 'cyan', { mcp: true }),
     response: CONNECTION_SUMMARY_2,
   },
   ...connectAndExpandControl(CONN2_ID),

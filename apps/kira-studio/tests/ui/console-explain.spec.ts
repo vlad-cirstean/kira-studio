@@ -1,19 +1,17 @@
-import type { Locator, Page } from '@playwright/test';
 import { DATA_OP } from '@shared/protocol/data-ops';
 import type { ColumnDescriptor } from '@shared/protocol/page';
 import { defaultSettings } from '../../frontend/src/state/settingsDomain';
 import type { ControlSnapshot, LogicalPage, PortSnapshot } from '../ipc/support/types';
 import { expect, test } from './fixtures';
+import { connectAndExpand, connectionCreateArgs, openConsoleFromMenu } from './support/connect';
+import { typeInto } from './support/editor';
 import { editorText } from './support/editorText';
 import { IPC } from './support/ipcChannels';
 import {
-  APP_PATH,
-  DB_PATH,
   ORDER_ITEMS_PATH,
   orderItemsFixture,
   postgresConnectionSummary,
 } from './support/postgresFixture';
-import { connectionRow, expandRow, openRowMenu } from './support/tree';
 
 // P18 (v1.1) §7.2: an Explain press is one data:execute call and the data plane is mocked here the
 // same way console-format.spec.ts's own Format scenarios are — the point is asserting the real
@@ -140,69 +138,6 @@ function runSnap(connectionId: string, sql: string, page: LogicalPage): PortSnap
     payload: { connectionId, path: ORDER_ITEMS_PATH, statements: [sql] },
     response: { kind: 'execute', pages: [page] },
   };
-}
-
-function connectionCreateArgs(name: string, color: string, autoExplain = false) {
-  return {
-    name,
-    kind: 'postgres',
-    color,
-    mode: 'fields',
-    readOnly: false,
-    host: '127.0.0.1',
-    port: 5432,
-    database: 'kira_test',
-    username: 'postgres',
-    password: null,
-    uri: null,
-    options: {},
-    preconnect: null,
-    preconnectSidecar: false,
-    autoExplain,
-  };
-}
-
-async function connectAndExpand(
-  page: Page,
-  name: string,
-  color: string,
-  opts?: { autoExplain?: boolean },
-): Promise<void> {
-  await page.click('[data-testid="add-connection"]');
-  await page.click('[data-testid="connection-kind-postgres"]');
-  await page.fill('[data-testid="connection-name"]', name);
-  await page.fill('[data-testid="connection-host"]', '127.0.0.1');
-  await page.fill('[data-testid="connection-port"]', '5432');
-  await page.fill('[data-testid="connection-database"]', 'kira_test');
-  await page.fill('[data-testid="connection-username"]', 'postgres');
-  await page.click(`[data-testid="color-${color}"]`);
-  if (opts?.autoExplain) {
-    await page.click('[data-testid="connection-tab-advanced"]');
-    await page.click('[data-testid="connection-auto-explain"]');
-  }
-  await page.click('[data-testid="connection-save"]');
-  await expect(page.locator('[data-testid="connection-dialog"]')).toHaveCount(0);
-
-  const connRow = connectionRow(page);
-  await expect(connRow).toBeVisible();
-  await openRowMenu(page, '');
-  await page.click('[data-testid="menu-item-connect"]');
-  await expect(connRow.locator('.status-dot')).toHaveAttribute('data-status', 'connected', {
-    timeout: 10_000,
-  });
-  await expandRow(page, '');
-  await expandRow(page, DB_PATH);
-  await expandRow(page, APP_PATH);
-}
-
-async function openConsoleFromMenu(page: Page, path: string): Promise<void> {
-  await openRowMenu(page, path);
-  await page.click('[data-testid="menu-item-open-console"]');
-}
-
-async function typeInto(view: Locator, page: Page, text: string): Promise<void> {
-  await view.locator('.view-lines').click();
-  await page.keyboard.type(text);
 }
 
 test('Query console — Explain produces a plan result set', async ({ relaunch }) => {
@@ -392,7 +327,7 @@ test('Query console — auto-explain warns and still runs the query', async ({ r
     { channel: IPC.connectionsList, response: [] },
     {
       channel: IPC.connectionsCreate,
-      args: connectionCreateArgs('Auto DB', 'amber', true),
+      args: connectionCreateArgs('Auto DB', 'amber', { autoExplain: true }),
       response: CONNECTION_SUMMARY,
     },
     ...FIXTURE.control,
@@ -451,7 +386,7 @@ test('Query console — loading a saved query clears a stale auto-explain warnin
     { channel: IPC.connectionsList, response: [] },
     {
       channel: IPC.connectionsCreate,
-      args: connectionCreateArgs('Stale DB', 'amber', true),
+      args: connectionCreateArgs('Stale DB', 'amber', { autoExplain: true }),
       response: CONNECTION_SUMMARY,
     },
     ...FIXTURE.control,
@@ -529,7 +464,7 @@ test('Query console — a failed EXPLAIN does not fail the real run', async ({ r
     { channel: IPC.connectionsList, response: [] },
     {
       channel: IPC.connectionsCreate,
-      args: connectionCreateArgs('Fail DB', 'magenta', true),
+      args: connectionCreateArgs('Fail DB', 'magenta', { autoExplain: true }),
       response: CONNECTION_SUMMARY,
     },
     ...FIXTURE.control,
