@@ -16,6 +16,13 @@ type Request struct {
 	RepoID string
 	Prompt string
 	Masked bool
+	// Confirm (F19) is true for a yes/no confirmation prompt (OpenSSH's own
+	// SSH_ASKPASS_PROMPT=confirm — e.g. "Allow user@host to reset the passphrase?") rather than
+	// an ordinary masked/unmasked text prompt. A Prompter should render Yes/No for one of these,
+	// never a text field; Masked is always false when Confirm is true (a yes/no question is not
+	// itself a secret to hide). Ask's own returned answer text is never used for a confirm
+	// prompt — only whether it answered at all (ok) — so any non-empty string means "confirmed".
+	Confirm bool
 }
 
 // Prompter is supplied by gitsession, backed by one Conn's own credential waiters (D20). Ask must

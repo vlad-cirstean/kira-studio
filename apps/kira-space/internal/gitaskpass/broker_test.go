@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -85,9 +86,17 @@ type fakePrompter struct {
 	// block, when true, never returns on its own — only ctx.Done()/connDone ends the wait, proving
 	// the broker's/helper's own timeouts are what end it, not the prompter cooperating.
 	block bool
+
+	// called/lastReq (F19) record whether Ask was invoked at all, and with what Request — used to
+	// prove SSH_ASKPASS_PROMPT=none never contacts the broker at all, and that =confirm's own
+	// Request.Confirm/Masked flags reach the Prompter correctly.
+	called  bool
+	lastReq Request
 }
 
-func (p *fakePrompter) Ask(ctx context.Context, _ Request) (string, bool) {
+func (p *fakePrompter) Ask(ctx context.Context, req Request) (string, bool) {
+	p.called = true
+	p.lastReq = req
 	if !p.block {
 		return p.answer, p.answered
 	}
@@ -138,6 +147,87 @@ func TestBroker_DismissalExitsNonZeroPromptly(t *testing.T) {
 	if exitCode == 0 {
 		t.Fatal("exit code = 0, want non-zero for a dismissed prompt")
 	}
+}
+
+// TestRunHelper_SSHAskPassPromptNone_NeverContactsTheBroker is F19's own regression guard: OpenSSH
+// sets SSH_ASKPASS_PROMPT=none for a FIDO/security-key touch notification, where no text answer is
+// ever expected — the old design still relayed this through the broker as an ordinary masked text
+// prompt, leaving a stale, meaningless prompt on screen. The helper must exit 0 without ever
+// reaching the Prompter at all.
+func TestRunHelper_SSHAskPassPromptNone_NeverContactsTheBroker(t *testing.T) {
+	b := newTestBroker(t, 5*time.Second)
+	prompter := &fakePrompter{answer: "should never be used", answered: true}
+
+	var stdout, exitCode = "", -1
+	err := b.WithOp(context.Background(), prompter, func(opEnv []string) error {
+		env := append(append([]string{}, opEnv...), "SSH_ASKPASS_PROMPT=none")
+		stdout, exitCode = runShim(t, b, env, "Confirm user presence for key ED25519 SHA256:abc")
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("WithOp: %v", err)
+	}
+	if exitCode != 0 {
+		t.Fatalf("exit code = %d, want 0", exitCode)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %q, want empty", stdout)
+	}
+	if prompter.called {
+		t.Fatal("Prompter.Ask was called — SSH_ASKPASS_PROMPT=none must never contact the broker at all")
+	}
+}
+
+// TestRunHelper_SSHAskPassPromptConfirm_AnswerNeverPrintedExitCodeCarriesTheDecision is F19's own
+// regression guard for OpenSSH's yes/no variant: the Request reaching the Prompter must say
+// Confirm (so a real UI shows Yes/No, not a masked text field) and Masked=false (a yes/no question
+// is not itself a secret), and the helper's own exit code — never printed stdout — must carry the
+// decision: 0 for confirmed, non-zero for declined/unanswered.
+func TestRunHelper_SSHAskPassPromptConfirm_AnswerNeverPrintedExitCodeCarriesTheDecision(t *testing.T) {
+	t.Run("confirmed", func(t *testing.T) {
+		b := newTestBroker(t, 5*time.Second)
+		prompter := &fakePrompter{answer: "yes", answered: true}
+
+		var stdout, exitCode = "", -1
+		err := b.WithOp(context.Background(), prompter, func(opEnv []string) error {
+			env := append(append([]string{}, opEnv...), "SSH_ASKPASS_PROMPT=confirm")
+			stdout, exitCode = runShim(t, b, env, "Allow user@host to reset the passphrase?")
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("WithOp: %v", err)
+		}
+		if exitCode != 0 {
+			t.Fatalf("exit code = %d, want 0 for a confirmed prompt", exitCode)
+		}
+		if stdout != "" {
+			t.Fatalf("stdout = %q, want empty — a confirm prompt's own answer text must never be printed", stdout)
+		}
+		if !prompter.called || !prompter.lastReq.Confirm {
+			t.Fatalf("Request.Confirm = %v (called=%v), want true", prompter.lastReq.Confirm, prompter.called)
+		}
+		if prompter.lastReq.Masked {
+			t.Fatal("Request.Masked = true, want false for a yes/no confirm prompt")
+		}
+	})
+
+	t.Run("declined", func(t *testing.T) {
+		b := newTestBroker(t, 5*time.Second)
+		prompter := &fakePrompter{answered: false}
+
+		var exitCode = -1
+		err := b.WithOp(context.Background(), prompter, func(opEnv []string) error {
+			env := append(append([]string{}, opEnv...), "SSH_ASKPASS_PROMPT=confirm")
+			_, exitCode = runShim(t, b, env, "Allow user@host to reset the passphrase?")
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("WithOp: %v", err)
+		}
+		if exitCode == 0 {
+			t.Fatal("exit code = 0, want non-zero for a declined confirm prompt")
+		}
+	})
 }
 
 // TestBroker_BrokerTimeoutEndsTheWait is the exit criterion's own headline case: a prompter that
@@ -347,12 +437,55 @@ func TestRunHelper_BrokerNeverAnswersExitsOneWithinItsOwnTimeout(t *testing.T) {
 	}
 }
 
-func TestBuildShim_RefusesUnquotableArgument(t *testing.T) {
-	if _, err := buildShim([]string{`has a "quote"`}); err == nil {
-		t.Fatal("want an error for an argument containing a double quote")
+// TestBuildShim_NoCharacterNeedsRefusing is F13's own regression guard for the OLD design's own
+// refusal list: single-quoting (below) has no special character at all except the quote itself,
+// so none of these — a double quote, a newline, or any of the shell metacharacters double-quoting
+// used to leave live ($, backtick, \) — needs erroring out any more.
+func TestBuildShim_NoCharacterNeedsRefusing(t *testing.T) {
+	args := []string{
+		`has a "quote"`,
+		"has\na newline",
+		"has a $ dollar and ` backtick and \\ backslash",
+		"has an embedded ' single quote",
 	}
-	if _, err := buildShim([]string{"has\na newline"}); err == nil {
-		t.Fatal("want an error for an argument containing a newline")
+	if _, err := buildShim(args); err != nil {
+		t.Fatalf("buildShim: %v, want no error for any of these", err)
+	}
+}
+
+// TestBuildShim_ShellMetacharactersDoNotExpand is F13's own security regression guard: the OLD
+// design double-quoted each helper-command element, and double quotes still let the shell expand
+// $var, $(...) and backticks inside them — an executable path containing one of these ran
+// arbitrary commands, or resolved to the wrong path, before the shim ever execed anything.
+// Single-quoting closes this: proven here by planting a canary file inside a command
+// substitution and confirming it is never created (the shim's own exec necessarily fails, since
+// the literal string is not a real executable — that failure is expected, only the canary matters).
+func TestBuildShim_ShellMetacharactersDoNotExpand(t *testing.T) {
+	cases := []string{"dollar-paren", "backtick"}
+	for _, kind := range cases {
+		t.Run(kind, func(t *testing.T) {
+			dir := t.TempDir()
+			canary := filepath.Join(dir, "pwned")
+			var evil string
+			if kind == "dollar-paren" {
+				evil = "$(touch " + canary + ")"
+			} else {
+				evil = "`touch " + canary + "`"
+			}
+
+			shimBody, err := buildShim([]string{evil})
+			if err != nil {
+				t.Fatalf("buildShim: %v", err)
+			}
+			shimPath := filepath.Join(dir, "shim")
+			if err := os.WriteFile(shimPath, []byte(shimBody), 0o700); err != nil {
+				t.Fatalf("write shim: %v", err)
+			}
+			_ = exec.Command(shimPath, "prompt").Run() // expected to fail; the canary is what matters.
+			if _, statErr := os.Stat(canary); statErr == nil {
+				t.Fatalf("shell metacharacters in %q were expanded — command substitution ran and created the canary file", evil)
+			}
+		})
 	}
 }
 

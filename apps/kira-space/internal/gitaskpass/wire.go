@@ -8,6 +8,11 @@ type socketRequest struct {
 	Token  string `json:"token"`
 	OpID   string `json:"opId"`
 	Prompt string `json:"prompt"`
+	// Confirm (F19) is true for a yes/no confirmation prompt (OpenSSH's own
+	// SSH_ASKPASS_PROMPT=confirm) rather than an ordinary masked/unmasked text prompt — the
+	// relayed UI should show Yes/No, not a text field, and the helper never prints Answer for
+	// one of these; only OK (confirmed or not) matters.
+	Confirm bool `json:"confirm,omitempty"`
 }
 
 type socketResponse struct {

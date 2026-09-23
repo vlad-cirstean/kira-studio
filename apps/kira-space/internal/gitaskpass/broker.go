@@ -104,22 +104,29 @@ func New(opts Options) (*Broker, error) {
 }
 
 // buildShim renders the shim script (D8): one `exec` of helperCommand's own argv, each element
-// double-quoted, followed by "$1" (git's own prompt argument) also double-quoted. Refuses — a hard
-// error, never a best-effort escape — an element containing a double quote or a newline: a path
-// that cannot be quoted safely this way is a hard error, not a best-effort escape.
+// single-quoted (F13), followed by "$1" (git's own prompt argument, still double-quoted — that is
+// shell syntax the shim itself needs for word-splitting/expansion, never attacker-controlled
+// content, so it is never quoted the same way as helperCommand's own elements).
 func buildShim(helperCommand []string) (string, error) {
 	var b strings.Builder
 	b.WriteString("#!/bin/sh\nexec")
 	for _, arg := range helperCommand {
-		if strings.ContainsAny(arg, "\"\n") {
-			return "", fmt.Errorf("gitaskpass: helper command argument cannot be safely quoted: %q", arg)
-		}
-		b.WriteString(` "`)
-		b.WriteString(arg)
-		b.WriteString(`"`)
+		b.WriteString(" ")
+		b.WriteString(shellQuoteSingle(arg))
 	}
 	b.WriteString(` "$1"` + "\n")
 	return b.String(), nil
+}
+
+// shellQuoteSingle wraps s in single quotes, escaping any embedded single quote as '\'' — close
+// the quote, emit a backslash-escaped literal quote outside it, reopen the quote (the standard
+// POSIX idiom). F13: unlike double-quoting (which still expands $var, $(...), backticks and
+// backslash escapes inside it — the actual vulnerability this replaces), single quotes have no
+// special character at all except the quote itself, so no character, including a literal newline
+// (POSIX shell treats an embedded newline inside a single-quoted string as ordinary data, not a
+// statement separator — verified against real /bin/sh), ever needs refusing.
+func shellQuoteSingle(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // Env returns the constant env every remote-op spawn needs to reach this broker (D8): GIT_ASKPASS/
@@ -209,7 +216,9 @@ func (b *Broker) handleConn(conn net.Conn) {
 
 	askCtx, cancel := context.WithTimeout(entry.ctx, b.timeout)
 	defer cancel()
-	answer, answered := entry.prompter.Ask(askCtx, Request{Prompt: req.Prompt, Masked: DeriveMasked(req.Prompt)})
+	answer, answered := entry.prompter.Ask(askCtx, Request{
+		Prompt: req.Prompt, Masked: !req.Confirm && DeriveMasked(req.Prompt), Confirm: req.Confirm,
+	})
 	if !answered {
 		writeResponse(conn, socketResponse{OK: false})
 		return
