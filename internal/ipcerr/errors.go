@@ -25,9 +25,14 @@ type Error struct {
 func (e *Error) Error() string {
 	b, err := json.Marshal(e)
 	if err != nil {
-		// json.Marshal on this struct cannot fail (both fields are plain strings) — this branch
-		// exists only so Error() satisfies the `error` interface without a panic in the theoretical
-		// case, not because it is expected to run.
+		// Code/Message are plain strings and cannot fail Marshal on their own, but Details is a
+		// json.RawMessage (P10) that can hold invalid raw JSON — retry without it so the code the
+		// renderer branches on still survives, before falling back to the bare message.
+		if e.Details != nil {
+			if b2, err2 := json.Marshal(&Error{Code: e.Code, Message: e.Message}); err2 == nil {
+				return string(b2)
+			}
+		}
 		return e.Message
 	}
 	return string(b)
