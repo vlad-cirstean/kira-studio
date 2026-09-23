@@ -408,6 +408,22 @@ func (s *Session) Exhausted() bool {
 	return s.exhaustedLocked()
 }
 
+// Failed reports whether this Session is permanently failed (failLocked's own state, set once by
+// consumeChunkLocked on a split/parse error): every ReadPage call from here on returns that same
+// error immediately, never resuming past it.
+//
+// F4 (P108 Part 16 review), cross-chunk touch into this Part 14 file, flagged for its reviewer:
+// gitsession/walk.go's own readPageLocked needs this to tell a permanently-dead session apart from
+// an ordinary, resumable ReadPage error — a client `cancel` frame (ctx cancellation, readChunkLocked
+// returns ctx.Err() with readCount left exact) or a transient spawn/snapshot/read failure, neither
+// of which marks failed. Only a Failed session should ever make its caller discard already-loaded
+// state; every other error is this one read's own problem, not a reason to throw away the rest.
+func (s *Session) Failed() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.failed != nil
+}
+
 // armReclaimLocked arms the idle-reclaim timer (unless IdleReclaim < 0, "never"). Caller holds mu.
 func (s *Session) armReclaimLocked() {
 	if s.opts.IdleReclaim < 0 {

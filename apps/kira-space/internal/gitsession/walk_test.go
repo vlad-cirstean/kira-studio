@@ -1,7 +1,9 @@
 package gitsession
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -118,6 +120,205 @@ func TestWalk_StreamAndLoadMoreRaceProduceConsistentStore(t *testing.T) {
 	}
 	if !exhausted {
 		t.Fatalf("expected the walk to be exhausted after either race outcome reads all 12 commits")
+	}
+}
+
+// scriptedProcess is a canned gitclient.Process: Stdout() streams stdout (for logsession's own
+// streaming reads), Wait() returns waitResult (for gitclient.Run's buffered callers, e.g.
+// logsession.snapshot). Close is a plain no-op close of the stream.
+type scriptedProcess struct {
+	stdout     io.ReadCloser
+	waitResult gitclient.Result
+}
+
+func newBytesProcess(b []byte) *scriptedProcess {
+	return &scriptedProcess{stdout: io.NopCloser(bytes.NewReader(b)), waitResult: gitclient.Result{Stdout: b, ExitCode: 0}}
+}
+func (p *scriptedProcess) Stdout() io.ReadCloser           { return p.stdout }
+func (p *scriptedProcess) Stdin() io.WriteCloser           { return nil }
+func (p *scriptedProcess) Wait() (gitclient.Result, error) { return p.waitResult, nil }
+func (p *scriptedProcess) Close() error                    { return p.stdout.Close() }
+
+// pipeProcess simulates a `git log` still running: its stdout delivers exactly one write's worth
+// of bytes, then genuinely blocks (no EOF) until Close kills it — deterministic, unlike a real
+// process's own OS-pipe buffering (which can make a "second raw read" resolve instantly regardless
+// of cancellation timing).
+type pipeProcess struct {
+	pr *io.PipeReader
+	pw *io.PipeWriter
+}
+
+func (p *pipeProcess) Stdout() io.ReadCloser           { return p.pr }
+func (p *pipeProcess) Stdin() io.WriteCloser           { return nil }
+func (p *pipeProcess) Wait() (gitclient.Result, error) { return gitclient.Result{ExitCode: 0}, nil }
+func (p *pipeProcess) Close() error {
+	_ = p.pw.CloseWithError(io.EOF)
+	return p.pr.Close()
+}
+
+func argvEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// scriptedWalkRunner delegates everything to a real exec runner EXCEPT the walk's own two exact
+// commands (the ref snapshot and the log session's base/skip spawns), which it answers with
+// pre-captured real git output under full test control — chunk1 (the log session's FIRST spawn)
+// arrives through a still-open pipe (pipeProcess) so a second raw read genuinely blocks, giving a
+// deterministic cancellation race instead of one that depends on OS pipe buffering.
+type scriptedWalkRunner struct {
+	real                       gitclient.Runner
+	refArgs, logArgs, skipArgs []string
+	refBytes, chunk1, chunk2   []byte
+	logSpawns                  int32
+}
+
+func (r *scriptedWalkRunner) Start(ctx context.Context, gitPath string, spec gitclient.Spec) (gitclient.Process, error) {
+	switch {
+	case argvEqual(spec.Args, r.refArgs):
+		return newBytesProcess(r.refBytes), nil
+	case argvEqual(spec.Args, r.logArgs):
+		atomic.AddInt32(&r.logSpawns, 1)
+		pr, pw := io.Pipe()
+		go func() { _, _ = pw.Write(r.chunk1) }() // never closed, nothing more written: the next
+		// raw read past chunk1 must block for real.
+		return &pipeProcess{pr: pr, pw: pw}, nil
+	case argvEqual(spec.Args, r.skipArgs):
+		atomic.AddInt32(&r.logSpawns, 1)
+		return newBytesProcess(r.chunk2), nil
+	default:
+		return r.real.Start(ctx, gitPath, spec)
+	}
+}
+
+func captureGitOutput(t *testing.T, dir string, args []string) []byte {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git %v: %v", args, err)
+	}
+	return out
+}
+
+// TestWalk_ReadPageCancelDoesNotDiscardLoadedStore is F4's own regression proof (P108 Part 16
+// review): Part 14's own F2 fix reset the whole walk on EVERY ReadPage error, not just a
+// permanently-failed session. A client `cancel` frame cancels the host ctx — resumable, readCount
+// left exact — but hit the same resetLocked call and wrongly discarded every row already loaded,
+// breaking the "rows already read are kept" contract; the follow-up re-stream then reloaded from
+// row 0 instead of resuming. Uses scriptedWalkRunner so the cancellation lands on a genuinely
+// in-flight read, deterministically, rather than racing real OS pipe buffering.
+func TestWalk_ReadPageCancelDoesNotDiscardLoadedStore(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitWalk(t)
+	repoDir := initWalkRepo(t, 6)
+	spec := porcelain.WalkSpec{Scope: "all"}
+
+	refArgs := porcelain.RefSnapshotArgs()
+	logArgs := porcelain.LogSessionArgs(spec)
+	// logsession's own lookahead (Part 14's G16 D6): a page never returns after exactly filling
+	// pageSize alone — it keeps reading until one more record parks in pending (definite proof
+	// there is more) or EOF (definite proof there is not). So chunk1 carries pageSize+1 (3)
+	// records: page 1 delivers 2 and queues the 3rd to pending in ONE raw read, with nothing left
+	// to force a second, blocking one — that second, genuinely blocking raw read only happens once
+	// pending drains on the NEXT ReadPage call, which is exactly the one this test cancels.
+	skipArgs := porcelain.LogSessionSkipArgs(spec, 3)
+	rev := porcelain.WalkArgs(spec)
+	base := logArgs[:len(logArgs)-len(rev)]
+	chunk1Args := append(append(append([]string{}, base...), "-n", "3"), rev...)
+
+	refBytes := captureGitOutput(t, repoDir, refArgs)
+	chunk1 := captureGitOutput(t, repoDir, chunk1Args)
+	chunk2 := captureGitOutput(t, repoDir, skipArgs)
+
+	runner := &scriptedWalkRunner{
+		real:    gitclient.NewExecRunner(),
+		refArgs: refArgs, logArgs: logArgs, skipArgs: skipArgs,
+		refBytes: refBytes, chunk1: chunk1, chunk2: chunk2,
+	}
+	conn, _, repoID := newWalkTestConnWithRunner(t, runner, repoDir)
+	defer conn.Close()
+
+	// pageSize 2: the first ReadPage(1) delivers 2 of chunk1's 3 records and queues the 3rd to
+	// pending, leaving the session open (not exhausted) for the cancelled read that follows.
+	w, err := conn.Walk(repoID, "git", spec, 2, nil)
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+
+	if _, err := w.ReadPage(context.Background(), 1); err != nil {
+		t.Fatalf("ReadPage (first): %v", err)
+	}
+	loadedBefore, _, exhausted, err := w.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status (first): %v", err)
+	}
+	if loadedBefore != 2 || exhausted {
+		t.Fatalf("first ReadPage: loaded=%d exhausted=%v, want loaded=2, exhausted=false", loadedBefore, exhausted)
+	}
+	logBefore := w.log
+
+	// The cancelled call first drains chunk1's one pending (already-parsed, queued) record —
+	// pending delivery never touches ctx — THEN tries a genuinely new raw read past it, which
+	// blocks on the still-open pipe and is what the cancellation actually interrupts.
+	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := w.ReadPage(cancelledCtx, 1); err == nil {
+		t.Fatal("ReadPage with an already-cancelled ctx: expected an error, got nil")
+	}
+
+	if w.log.Failed() {
+		t.Fatal("a context cancellation must not mark the session permanently failed")
+	}
+	if w.log != logBefore {
+		t.Fatal("a context cancellation must not reset (replace) the walk's own log session")
+	}
+	loadedAfterCancel, _, _, err := w.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status (after cancel): %v", err)
+	}
+	// The pending record drained (loadedBefore+1 = 3) before the read that actually got cancelled
+	// — the important assertion either way is that it never drops BELOW loadedBefore (a reset to
+	// row 0, this finding's own bug).
+	if loadedAfterCancel < loadedBefore {
+		t.Fatalf("loaded = %d after a cancelled read, want >= %d -- a plain cancel must not discard already-loaded rows", loadedAfterCancel, loadedBefore)
+	}
+	if loadedAfterCancel != loadedBefore+1 {
+		t.Fatalf("loaded = %d after a cancelled read, want %d (the one already-pending record, delivered before the read that actually got cancelled)", loadedAfterCancel, loadedBefore+1)
+	}
+
+	// A fresh ctx must resume correctly from here (a fresh spawn with --skip=2) — no duplicated
+	// or lost rows, ending exhausted at all 6 commits.
+	for {
+		started, err := w.ReadPage(context.Background(), 1)
+		if err != nil {
+			t.Fatalf("ReadPage (resume): %v", err)
+		}
+		if !started {
+			break
+		}
+	}
+	loadedFinal, _, exhaustedFinal, err := w.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status (final): %v", err)
+	}
+	if !exhaustedFinal {
+		t.Fatal("expected the walk to be exhausted after resuming to the end")
+	}
+	if loadedFinal != 6 {
+		t.Fatalf("loaded = %d after resuming to exhaustion, want 6 (no duplicates, nothing lost)", loadedFinal)
+	}
+	if got := atomic.LoadInt32(&runner.logSpawns); got != 2 {
+		t.Fatalf("log spawns = %d, want 2 (the initial spawn plus exactly one resume after the cancel)", got)
 	}
 }
 
