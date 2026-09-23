@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
 	"strconv"
+
+	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
@@ -115,7 +117,7 @@ func (r *VariablesRepo) UpdateEnvironment(id, name, description, color string) e
 	if err != nil {
 		return fmt.Errorf("repos/variables: update environment %s: %w", id, err)
 	}
-	return requireOneRow(res, "environment", id)
+	return sqlitex.RequireOneRow(res, "environment "+id)
 }
 
 // DuplicateEnvironment is P17 D17/item 4: a raw-column copy of one environment and its variables —
@@ -233,7 +235,7 @@ func (r *VariablesRepo) DeleteEnvironment(id string) error {
 	if err != nil {
 		return fmt.Errorf("repos/variables: delete environment %s: %w", id, err)
 	}
-	if err := requireOneRow(res, "environment", id); err != nil {
+	if err := sqlitex.RequireOneRow(res, "environment "+id); err != nil {
 		return err
 	}
 	if err := reindexEnvironments(tx); err != nil {
@@ -262,7 +264,7 @@ func (r *VariablesRepo) SetActiveEnvironment(id string) error {
 		if err != nil {
 			return fmt.Errorf("repos/variables: set active environment %s: %w", id, err)
 		}
-		if err := requireOneRow(res, "environment", id); err != nil {
+		if err := sqlitex.RequireOneRow(res, "environment "+id); err != nil {
 			return err
 		}
 	}
@@ -620,7 +622,7 @@ func (r *VariablesRepo) Delete(id string) error {
 	if err != nil {
 		return fmt.Errorf("repos/variables: delete variable %s: %w", id, err)
 	}
-	if err := requireOneRow(res, "variable", id); err != nil {
+	if err := sqlitex.RequireOneRow(res, "variable "+id); err != nil {
 		return err
 	}
 

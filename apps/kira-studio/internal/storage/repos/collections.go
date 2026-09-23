@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kirathecat/kira-studio/internal/kiratime"
 	"log/slog"
+
+	"github.com/kirathecat/kira-studio/internal/kiratime"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 
 	"github.com/google/uuid"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/postman"
@@ -493,7 +495,7 @@ func (r *CollectionsRepo) Rename(id, target, name string) error {
 	if err != nil {
 		return fmt.Errorf("repos/collections: rename %s %s: %w", target, id, err)
 	}
-	return requireOneRow(res, target, id)
+	return sqlitex.RequireOneRow(res, target+" "+id)
 }
 
 // Delete removes a collection (and its whole item tree) or one item (and its subtree). The cascade
@@ -537,7 +539,7 @@ func (r *CollectionsRepo) Delete(id, target string) error {
 	if err != nil {
 		return fmt.Errorf("repos/collections: delete %s %s: %w", target, id, err)
 	}
-	if err := requireOneRow(res, target, id); err != nil {
+	if err := sqlitex.RequireOneRow(res, target+" "+id); err != nil {
 		return err
 	}
 	if target == "item" {
@@ -559,17 +561,6 @@ func targetTable(target string) (string, error) {
 		return "api_items", nil
 	}
 	return "", fmt.Errorf("repos/collections: unrecognised target %q", target)
-}
-
-func requireOneRow(res sql.Result, target, id string) error {
-	n, err := res.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("repos/collections: rows affected: %w", err)
-	}
-	if n == 0 {
-		return fmt.Errorf("repos/collections: no %s %s", target, id)
-	}
-	return nil
 }
 
 // reindexSiblings rewrites one parent's sort_order dense, 0..n-1, in the order the rows already

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kirathecat/kira-studio/apps/kira-space/internal/storage/model"
+	"github.com/kirathecat/kira-studio/internal/sqlitex"
 )
 
 // GitClientRow is the full row shape, including the salted hash — used only inside this package
@@ -73,7 +74,7 @@ func (r *GitClientsRepo) TouchLastSeen(id string, now int64) error {
 	if err != nil {
 		return fmt.Errorf("repos: touch git client last seen %s: %w", id, err)
 	}
-	return requireOneRow(res, "git client", id)
+	return sqlitex.RequireOneRow(res, "git client "+id)
 }
 
 // Revoke sets revoked_at. gitsock.Server.Revoke calls this before closing any live connection
@@ -84,7 +85,7 @@ func (r *GitClientsRepo) Revoke(id string, now int64) error {
 	if err != nil {
 		return fmt.Errorf("repos: revoke git client %s: %w", id, err)
 	}
-	return requireOneRow(res, "git client", id)
+	return sqlitex.RequireOneRow(res, "git client "+id)
 }
 
 // List returns every client — revoked ones included, so the Connected editors pane can still show
