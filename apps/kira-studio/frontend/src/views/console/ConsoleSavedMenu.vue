@@ -2,10 +2,11 @@
 import type { SavedConsoleQuery } from '@shared/domain/queries';
 import CodiconIcon from '@theme/CodiconIcon.vue';
 import { Button } from '@theme/components/ui/button';
-import { Input } from '@theme/components/ui/input';
 import { Separator } from '@theme/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
-import { nextTick, onMounted, ref } from 'vue';
+import TextPromptDialog from '@workbench/prompt/TextPromptDialog.vue';
+import { useTextPrompt } from '@workbench/prompt/useTextPrompt';
+import { onMounted, ref } from 'vue';
 import { control } from '../../bridge/control';
 import { useTabsStore } from '../../state/tabs';
 import SavedListMenu from '../shared/SavedListMenu.vue';
@@ -23,36 +24,9 @@ function tab() {
 
 const saved = ref<SavedConsoleQuery[]>([]);
 
-// Electron's renderer has no window.prompt() — same in-app substitute as FilterHistoryMenu.vue.
-const textPrompt = ref<{
-  title: string;
-  value: string;
-  resolve: (v: string | null) => void;
-} | null>(null);
-// Typed as the bare $el shape (rather than InstanceType<typeof Input>) so this ref doesn't read as
-// a type-only use of the Input import above — it's a real component, bound as a value by the
-// template below.
-const promptInput = ref<{ $el: HTMLInputElement } | null>(null);
-function promptText(title: string, initial: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    textPrompt.value = { title, value: initial, resolve };
-    // ui/input's root IS the <input> element itself (unlike the old TextField, which wrapped it in
-    // a <span>), so $el is already the focus target — no querySelector needed.
-    void nextTick(() => promptInput.value?.$el.focus());
-  });
-}
-function submitPrompt(): void {
-  if (!textPrompt.value) return;
-  const { value, resolve } = textPrompt.value;
-  textPrompt.value = null;
-  resolve(value);
-}
-function cancelPrompt(): void {
-  if (!textPrompt.value) return;
-  const { resolve } = textPrompt.value;
-  textPrompt.value = null;
-  resolve(null);
-}
+// P107 T2-19: shared in-app substitute for window.prompt() — see
+// packages/workbench/src/prompt/useTextPrompt.ts (same one FilterHistoryMenu.vue uses).
+const { prompt: textPrompt, open: promptText, submit: submitPrompt, cancel: cancelPrompt } = useTextPrompt();
 
 async function reload(): Promise<void> {
   const t = tab();
@@ -142,37 +116,20 @@ async function saveCurrent(): Promise<void> {
         <span class="icon-box"><CodiconIcon name="add" :size="13" /></span>
         Save current query…
       </button>
-      <!-- P104: this prompt must stay a descendant of PopoverContent (the #footer slot renders
-           inside it), not a sibling of <SavedListMenu> — otherwise promptText()'s own imperative
-           .focus() below moves focus outside reka's Popover content boundary, which its own
-           dismiss layer reads as an outside interaction and closes the whole menu before the
-           prompt is ever seen (console.spec.ts's saved-queries scenario caught it). -->
-      <div v-if="textPrompt" class="prompt-scrim" data-testid="text-prompt" @click.stop>
-        <div class="prompt-box p-float">
-          <div class="prompt-title p-sm muted">{{ textPrompt.title }}</div>
-          <Input
-            ref="promptInput"
-            :model-value="textPrompt.value"
-            class="h-control-lg w-full rounded-kira-sm border-border-strong bg-input px-2 font-ui"
-            data-testid="text-prompt-input"
-            @update:model-value="(v) => { if (textPrompt) textPrompt.value = String(v); }"
-            @keydown.enter="submitPrompt"
-            @keydown.escape="cancelPrompt"
-          />
-          <div class="prompt-actions">
-            <Button variant="dialog" size="kira-lg" data-testid="text-prompt-cancel" @click="cancelPrompt"
-              >Cancel</Button
-            >
-            <Button
-              variant="dialog-primary"
-              size="kira-lg"
-              data-testid="text-prompt-ok"
-              @click="submitPrompt"
-              >OK</Button
-            >
-          </div>
-        </div>
-      </div>
+      <!-- P107 T2-19 (was P104): TextPromptDialog.vue must stay a descendant of PopoverContent
+           (the #footer slot renders inside it), not a sibling of <SavedListMenu> — its own
+           imperative .focus() on mount would otherwise move focus outside reka's Popover content
+           boundary, which its own dismiss layer reads as an outside interaction and closes the
+           whole menu before the prompt is ever seen (console.spec.ts's saved-queries scenario
+           caught it; see that file's own header comment for why it isn't shadcn's Dialog). -->
+      <TextPromptDialog
+        v-if="textPrompt"
+        :title="textPrompt.title"
+        :model-value="textPrompt.value"
+        @update:model-value="(v) => textPrompt && (textPrompt.value = v)"
+        @submit="submitPrompt"
+        @cancel="cancelPrompt"
+      />
     </template>
   </SavedListMenu>
 </template>
@@ -184,22 +141,5 @@ async function saveCurrent(): Promise<void> {
    (grey), same workaround as api/CollectionRow.vue's rename-input (Part 3). */
 .save-current {
   @apply w-full text-[var(--kira-accent)] cursor-pointer;
-}
-
-.prompt-scrim {
-  /* P28 D17(c): the dialog rung, not a bare 30 tuned against PopoverPanel's own old 20. This
-     prompt is raised from *inside* a popover and must paint above that popover's full-viewport
-     backdrop, or the backdrop swallows every click aimed at these buttons — which is exactly what
-     the ladder change caused until this line joined it (console.spec.ts caught it). */
-  @apply fixed inset-0 flex items-center justify-center bg-black/50;
-  z-index: var(--kira-z-dialog);
-}
-
-.prompt-box {
-  @apply w-[280px] flex flex-col gap-1.5 p-2;
-}
-
-.prompt-actions {
-  @apply flex justify-end gap-1.5;
 }
 </style>
