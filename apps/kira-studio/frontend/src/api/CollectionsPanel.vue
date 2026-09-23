@@ -5,7 +5,8 @@ import { Button } from '@theme/components/ui/button';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@theme/components/ui/input-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@theme/components/ui/tooltip';
 import { registerCommand } from '@workbench/shortcuts/commands';
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { usePanelHeaderSearch } from '@workbench/util/panelSearch';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import CollectionsTree from './CollectionsTree.vue';
 import ImportReportStrip from './ImportReportStrip.vue';
 import { useCollectionsStore } from './state/collections';
@@ -51,39 +52,12 @@ function onSearch(value: string): void {
   collectionsStore.search = value;
 }
 
-// P104 §3: PanelShell inlined at this call site (no library counterpart) — its search
-// reveal/toggle and type-ahead redirect, moved in verbatim.
-const showSearch = ref(false);
-function revealSearch(): void {
-  if (showSearch.value) return;
-  showSearch.value = true;
-}
-function toggleSearch(): void {
-  showSearch.value = !showSearch.value;
-  if (!showSearch.value) onSearch('');
-}
-// VS Code's own file-explorer "type to search" pattern: a tree row holds real DOM focus once
-// selected, so a printable keystroke lands here via bubbling — this redirects it into the panel's
-// own search box rather than making the user click into Search first.
-function onPanelKeydown(e: KeyboardEvent): void {
-  if (e.defaultPrevented || e.isComposing) return;
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key.length !== 1 || e.key === ' ') return;
-  const target = e.target as HTMLElement | null;
-  if (target?.closest('input, textarea, [contenteditable="true"]')) return;
-  const container = e.currentTarget as HTMLElement;
-  e.preventDefault();
-  onSearch(collectionsStore.search + e.key);
-  const wasHidden = !showSearch.value;
-  revealSearch();
-  if (wasHidden) {
-    void nextTick(() => {
-      container.querySelector<HTMLInputElement>('[data-testid="tree-search"]')?.focus();
-    });
-  } else {
-    container.querySelector<HTMLInputElement>('[data-testid="tree-search"]')?.focus();
-  }
-}
+// P104 §3, P107 T1-17: PanelShell's own header/search-reveal/type-ahead-redirect logic, via the
+// shared usePanelHeaderSearch composable rather than an inline copy.
+const { showSearch, toggleSearch, onPanelKeydown } = usePanelHeaderSearch({
+  searchable: () => true,
+  setSearch: onSearch,
+});
 
 function onNewCollection(): void {
   void collectionsStore.createCollection();
@@ -151,7 +125,7 @@ onUnmounted(() => {
 
 <template>
   <!-- P104 §3: PanelShell inlined (no library counterpart). -->
-  <div class="flex h-full flex-col" @keydown="onPanelKeydown">
+  <div class="flex h-full flex-col" @keydown="(e) => onPanelKeydown(e, collectionsStore.search)">
     <div class="p-panel-head h-[34px]">
       <span>Collections</span>
       <Tooltip>
