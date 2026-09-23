@@ -201,7 +201,14 @@ function onOpen(row: RepoSearchRowVm, preview: boolean): void {
     >
       {{ statusLine }}
     </div>
-    <div ref="scrollEl" class="repo-search-list overflow-auto" data-testid="virtual-list" @scroll="onScroll">
+    <div
+      ref="scrollEl"
+      class="repo-search-list overflow-auto"
+      data-testid="virtual-list"
+      role="listbox"
+      aria-label="Search results"
+      @scroll="onScroll"
+    >
       <div :style="{ height: `${totalSize}px`, position: 'relative' }">
         <template v-for="item in virtualItems" :key="String(item.key)">
           <RepoSearchRow

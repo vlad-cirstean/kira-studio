@@ -84,8 +84,10 @@ onMounted(() => void reposition());
             class="kui-row kv-search-option"
             :class="{ 'kv-search-option--active': option.id === highlightedId }"
             :aria-selected="option.id === highlightedId"
+            tabindex="-1"
             @click="emit('select', option)"
             @mouseenter="emit('hover', option)"
+            @keydown.enter="emit('select', option)"
           >
             <template v-if="option.kind === 'ref'">
               <span

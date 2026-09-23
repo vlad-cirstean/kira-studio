@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from '@theme/components/ui/tooltip';
 import { connColorVar } from '@theme/connColor';
+import { useEventListener } from '@vueuse/core';
 import { registerCommand } from '@workbench/shortcuts/commands';
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import { useContextMenuStore } from '@workbench/state/contextMenu';
@@ -203,8 +204,21 @@ function onRowClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i !== null) onRowClick(i);
 }
-function onRowContextMenuFromEvent(e: MouseEvent): void {
+// P105 §5.2(c): Enter/Space on the gutter cell mirror clicking it — role="grid"/"row"/"gridcell"
+// all want real <table>/<tr>/<td> per Biome's useSemanticElements, so each column (gutter
+// included) is its own role="option" instead, verified clean; the row div itself carries no
+// role or keyboard handler of its own now.
+function onRowKeydownFromEvent(e: KeyboardEvent): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
   const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i !== null) onRowClick(i);
+}
+// P105 §5.2(c): delegated off the container rather than each row — a keyboard equivalent for
+// "open context menu" already exists (the OS/browser's own Shift+F10 on whichever cell is
+// focused), so this is a pointer-only convenience, not an element needing its own role/tabindex.
+function onRowContextMenuFromEvent(e: MouseEvent): void {
+  const i = datasetNumber(e.target, 'rowIndex');
   if (i === null) return;
   onRowContextMenu(e, rowAt(i)?.key ?? null, rowAt(i)?.body ?? '');
 }
@@ -227,6 +241,16 @@ function onAttrsCellClickFromEvent(e: MouseEvent): void {
 function onBodyCellClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'rowIndex');
   if (i !== null) onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
+}
+// P105 §5.2(c): Enter/Space on a cell mirror clicking it.
+function onCellKeydownFromEvent(e: KeyboardEvent, column: 'key' | 'timestamp' | 'headers' | 'attrs' | 'body'): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  e.stopPropagation();
+  const i = datasetNumber(e.currentTarget, 'rowIndex');
+  if (i === null) return;
+  if (column === 'body') onCellClick(i, 'body', rowAt(i)?.body ?? null, rowAt(i)?.isTruncated);
+  else onCellClick(i, column, rowAt(i)?.[column] ?? null);
 }
 
 // P43 iter2 F20/D27: rt.selectedRow is already reset to null on every load (state.ts's own
@@ -491,6 +515,7 @@ const { virtualItems, totalSize, onScroll, scrollToIndex } = useVirtualRows({
   rowHeight: () => rowHeight.value,
   scrollElement: scrollEl,
 });
+useEventListener(scrollEl, 'contextmenu', onRowContextMenuFromEvent);
 
 function onGoToMatch(row: number): void {
   const index = rowIndices.value.indexOf(row);
@@ -1117,7 +1142,14 @@ onUnmounted(() => {
             </div>
             <div class="p-th" style="flex: 1"><span class="name">body</span></div>
           </div>
-          <div ref="scrollEl" class="tbody-scroll" data-testid="virtual-list" @scroll="onScroll">
+          <div
+            ref="scrollEl"
+            class="tbody-scroll"
+            data-testid="virtual-list"
+            role="listbox"
+            aria-label="Stream rows"
+            @scroll="onScroll"
+          >
             <div :style="{ height: `${totalSize}px`, position: 'relative' }">
               <div
                 v-for="vi in virtualItems"
@@ -1131,16 +1163,28 @@ onUnmounted(() => {
                   'search-match': matchSet.has(rowIndices[vi.index]),
                   'search-match-current': currentMatchRow === rowIndices[vi.index],
                 }"
-                @click="onRowClickFromEvent"
-                @contextmenu="onRowContextMenuFromEvent"
               >
-                <div class="p-td gutter" style="width: 40px">{{ rowIndices[vi.index] + 1 }}</div>
+                <div
+                  class="p-td gutter"
+                  style="width: 40px"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onRowClickFromEvent"
+                  @keydown="onRowKeydownFromEvent"
+                >
+                  {{ rowIndices[vi.index] + 1 }}
+                </div>
                 <div
                   class="p-td"
                   :class="cellClass({ isNull: rowAt(rowIndices[vi.index])?.key === null })"
                   :style="{ width: `${widthFor('key')}px` }"
                   data-testid="stream-key"
-                  @click.stop="onKeyCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onKeyCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'key')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.key ?? '(none)' }}
                 </div>
@@ -1148,7 +1192,11 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('timestamp')}px` }"
                   data-testid="stream-timestamp"
-                  @click.stop="onTimestampCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onTimestampCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'timestamp')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.timestamp ?? '' }}
                 </div>
@@ -1156,7 +1204,11 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('headers')}px` }"
                   data-testid="stream-headers"
-                  @click.stop="onHeadersCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onHeadersCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'headers')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.headers }}
                 </div>
@@ -1164,7 +1216,11 @@ onUnmounted(() => {
                   class="p-td"
                   :style="{ width: `${widthFor('attrs')}px` }"
                   data-testid="stream-attrs"
-                  @click.stop="onAttrsCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onAttrsCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'attrs')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.attrs }}
                 </div>
@@ -1172,7 +1228,11 @@ onUnmounted(() => {
                   class="p-td msg-body"
                   style="flex: 1"
                   data-testid="stream-body"
-                  @click.stop="onBodyCellClickFromEvent"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="rt?.selectedRow === rowIndices[vi.index]"
+                  @click="onBodyCellClickFromEvent"
+                  @keydown="onCellKeydownFromEvent($event, 'body')"
                 >
                   {{ rowAt(rowIndices[vi.index])?.body }}
                   <Tooltip v-if="rowAt(rowIndices[vi.index])?.isTruncated">

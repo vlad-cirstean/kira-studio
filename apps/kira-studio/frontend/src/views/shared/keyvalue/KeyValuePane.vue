@@ -599,6 +599,13 @@ function onRowClickFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'row');
   if (i !== null) onRowClick(i);
 }
+// P105 §5.2(c): Enter/Space mirror a single click.
+function onRowKeydownFromEvent(e: KeyboardEvent): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  const i = datasetNumber(e.currentTarget, 'row');
+  if (i !== null) onRowClick(i);
+}
 function onRowContextMenuFromEvent(e: MouseEvent): void {
   const i = datasetNumber(e.currentTarget, 'row');
   if (i === null) return;
@@ -1101,7 +1108,14 @@ onUnmounted(() => {
               Show all rows
             </Button>
           </Alert>
-          <div v-else ref="scrollRef" class="kv-virtual-scroll" data-testid="virtual-list">
+          <div
+            v-else
+            ref="scrollRef"
+            class="kv-virtual-scroll"
+            data-testid="virtual-list"
+            role="listbox"
+            aria-label="Rows"
+          >
             <div class="kv-virtual-inner" :style="{ height: `${totalSize}px` }">
               <template v-for="entry in visibleRows" :key="entry.row.index">
                 <div
@@ -1109,7 +1123,10 @@ onUnmounted(() => {
                   data-testid="keyvalue-row"
                   :data-row="entry.i"
                   :style="{ transform: `translateY(${entry.row.start}px)` }"
+                  role="option"
+                  tabindex="0"
                   @click="onRowClickFromEvent"
+                  @keydown="onRowKeydownFromEvent"
                   @contextmenu="onRowContextMenuFromEvent"
                 >
                   <div class="p-td gutter kv-col-gutter">{{ entry.i + 1 }}</div>

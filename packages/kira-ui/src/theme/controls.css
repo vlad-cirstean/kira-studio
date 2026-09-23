@@ -298,6 +298,7 @@
 .kui-menu-separator {
   height: var(--kui-border-width, 1px);
   margin: var(--kui-space-2, 4px) 0;
+  border: 0;
   background-color: var(--kui-border-strong, currentColor);
 }
 

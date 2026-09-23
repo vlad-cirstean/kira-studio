@@ -234,9 +234,10 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
               class="quick-command-list"
               data-testid="quick-command-list"
             >
-              <div
+              <button
                 v-for="script in filteredRecords"
                 :key="script.id"
+                type="button"
                 class="quick-command-row"
                 :data-testid="`quick-command-${script.id}`"
                 @click="runScript(script)"
@@ -252,7 +253,7 @@ function onContextMenu(e: MouseEvent, script: CustomScript): void {
                   <span class="quick-command-name">{{ script.name }}</span>
                   <span class="quick-command-command">{{ script.command }}</span>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@
 // component's own DOM parent) — so no consumer needs to pass an anchor element in explicitly.
 // The surface itself is only positioned and sized here (anchor + width); each consumer wraps its
 // own list/content in an inner element that owns its own max-height/overflow/flex-direction.
+import { onClickOutside } from '@vueuse/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 import { autoUpdate, computeFloatPosition } from './floatingPosition.ts';
 
@@ -53,6 +54,10 @@ function close(): void {
   emit('close');
 }
 
+// P105 §5.2(b): backdrop is a purely visual, full-viewport layer now (`aria-hidden`) —
+// click-outside-closes moves to VueUse's `onClickOutside` on the popover itself.
+onClickOutside(popoverEl, close);
+
 // Capture phase, not bubble: a bubble-phase document listener only runs after the event has
 // already bubbled up through every ancestor of wherever focus actually was; capture intercepts
 // Escape on the way down, and stopPropagation here keeps it from reaching an ancestor's own
@@ -86,13 +91,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="backdropEl" class="kui-popover-backdrop" :data-testid="backdropTestId" @click="close">
+  <div ref="backdropEl" class="kui-popover-backdrop" :data-testid="backdropTestId" aria-hidden="true">
     <div
       ref="popoverEl"
       class="kui-popover"
       :data-testid="testId"
       :style="{ width: `${props.width}px`, ...popoverPosition }"
-      @click.stop
     >
       <slot />
     </div>

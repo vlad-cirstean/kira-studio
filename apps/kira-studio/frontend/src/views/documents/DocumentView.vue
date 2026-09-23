@@ -1050,6 +1050,8 @@ onUnmounted(() => {
         ref="scrollEl"
         class="document-virtual-list overflow-y-auto"
         data-testid="virtual-list"
+        role="listbox"
+        aria-label="Documents"
         @scroll="onScroll"
       >
         <!-- P5 C2: `rows[vi.index]` is a plain page-row number — `rowAt` (script above) resolves
@@ -1074,7 +1076,7 @@ onUnmounted(() => {
               :style="{ transform: `translateY(${vi.start}px)`, height: `${vi.size}px` }"
               @contextmenu="onRowContextMenu($event, rows[vi.index])"
               :view="rowAt(rows[vi.index])!.view"
-              :scope="tab.id"
+              :row-scope="tab.id"
               :expanded="documentViewStore.isDocumentExpanded(tab.id, rowAt(rows[vi.index])!.view.id)"
               :selected="rt?.selectedRow === vi.index"
               :search-match="isSearchMatch(rows[vi.index])"

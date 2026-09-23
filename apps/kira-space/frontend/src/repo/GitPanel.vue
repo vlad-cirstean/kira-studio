@@ -422,14 +422,19 @@ onUnmounted(() => {
       <div class="min-h-0 flex-1">
         <div class="git-panel-body">
         <section v-if="tab === 'repos'" class="repo-section" data-testid="repo-section">
-          <div class="repo-list">
+          <div class="repo-list" role="listbox" aria-label="Repositories">
             <div v-for="repo in filteredRepos" :key="repo.id" class="repo-entry">
               <div
                 class="repo-row"
                 :class="{ open: isOpen(repo.id), active: isActive(repo.id) }"
                 data-testid="repo-row"
                 :data-repo-id="repo.id"
+                role="option"
+                tabindex="0"
+                :aria-selected="isActive(repo.id)"
                 @click="onRowClick(repo.id)"
+                @keydown.enter.prevent="onRowClick(repo.id)"
+                @keydown.space.prevent="onRowClick(repo.id)"
                 @contextmenu.prevent="onRepoContextMenu($event, repo)"
               >
                 <button
@@ -475,10 +480,11 @@ onUnmounted(() => {
                   }}</TooltipContent>
                 </Tooltip>
               </div>
-              <div
+              <section
                 v-if="worktreesStore.isWorktreesExpanded(repo.id)"
                 class="worktree-list"
                 data-testid="repo-worktrees"
+                aria-label="Worktrees"
               >
                 <div
                   v-for="wt in worktreesStore.worktreeEntries(repo.id)"
@@ -491,7 +497,12 @@ onUnmounted(() => {
                   }"
                   data-testid="repo-worktree-row"
                   :data-worktree-path="wt.path"
+                  role="option"
+                  tabindex="0"
+                  :aria-selected="isActive(worktreeRecordId(wt.path))"
                   @click.stop="worktreesStore.switchToWorktree(repo.id, wt)"
+                  @keydown.enter.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
+                  @keydown.space.prevent.stop="worktreesStore.switchToWorktree(repo.id, wt)"
                   @contextmenu.prevent.stop="onWorktreeContextMenu($event, repo, wt)"
                 >
                   <CodiconIcon name="git-branch" :size="14" class="worktree-icon" />
@@ -543,7 +554,7 @@ onUnmounted(() => {
                 <div v-else-if="worktreesStore.worktreeEntries(repo.id).length === 0" class="worktree-note">
                   No worktrees
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         </section>

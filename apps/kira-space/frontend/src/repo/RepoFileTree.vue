@@ -94,6 +94,8 @@ useEventListener(treeBodyEl, 'contextmenu', (e) => e.preventDefault());
       ref="scrollEl"
       class="virtual-list h-full overflow-auto"
       data-testid="virtual-list"
+      role="tree"
+      aria-label="Repository files"
       @scroll="onScroll"
     >
       <div class="sticky top-0 z-2 h-0" data-testid="tree-sticky-band">

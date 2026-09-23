@@ -16,7 +16,8 @@
  */
 import type { CommitStore } from '@kira/git-core';
 import { KuiButton } from '@kira/kira-ui';
-import { computed, ref } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { computed, ref, useTemplateRef } from 'vue';
 import type { FileListMode } from '../../state/detail.ts';
 import type { DetailActions } from '../../state/detailActions.ts';
 import type { ReviewExpansion } from '../../state/review.ts';
@@ -65,6 +66,12 @@ function onRowClick(event: MouseEvent): void {
   emit('focus-row');
   emit('toggle');
 }
+
+// P105 §5.2(c): the row's own `role="treeitem"` + `@keydown` already own keyboard access — this
+// header is a click sub-region of it, not its own interactive element, so the listener attaches
+// off-template rather than adding a second, redundant tab stop.
+const headerEl = useTemplateRef<HTMLElement>('headerEl');
+useEventListener(headerEl, 'click', onRowClick);
 
 function onKeydown(event: KeyboardEvent): void {
   switch (event.key) {
@@ -189,9 +196,9 @@ function onOpenFile(index: number, pinned: boolean): void {
          collapse the very commit it was clicked inside, since nothing along the way ever called
          stopPropagation()). Only the header itself toggles the row now. -->
     <div
+      ref="headerEl"
       class="kv-review-row-header"
       :class="{ 'kv-review-row-header-focused': focused }"
-      @click="onRowClick"
     >
       <span
         class="codicon kv-review-row-chevron"

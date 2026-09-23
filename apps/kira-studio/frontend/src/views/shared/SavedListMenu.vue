@@ -35,6 +35,14 @@ const emit = defineEmits<{
   delete: [entry: Entry];
 }>();
 
+// P105 §5.2(c): Enter/Space mirror a single click — the pin/delete buttons nested inside a saved
+// row stay their own tab stops, so this handler never claims either key from them.
+function onRowKeydown(e: KeyboardEvent, entry: Entry): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  emit('apply', entry);
+}
+
 function isPinned(entry: Entry): boolean {
   return (
     typeof entry === 'object' &&
@@ -56,52 +64,62 @@ defineSlots<{
     <div class="saved-list-menu-inner">
       <div class="p-menu-label">{{ title }}</div>
       <div v-if="saved.length === 0" class="empty-row p-sm dim">{{ emptySavedText }}</div>
-      <div
-        v-for="entry in saved"
-        :key="entry.id"
-        class="entry-row p-row"
-        :data-testid="savedEntryTestId"
-        @click="emit('apply', entry)"
-      >
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="pin-button"
-              :class="{ pinned: isPinned(entry) }"
-              @click.stop="emit('togglePin', entry)"
-            >
-              <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Pin</TooltipContent>
-        </Tooltip>
-        <slot name="entry" :entry="entry" />
-        <span class="entry-actions">
-          <slot name="entry-actions" :entry="entry" />
+      <div v-else role="listbox" :aria-label="title">
+        <div
+          v-for="entry in saved"
+          :key="entry.id"
+          class="entry-row p-row"
+          :data-testid="savedEntryTestId"
+          role="option"
+          tabindex="0"
+          @click="emit('apply', entry)"
+          @keydown="onRowKeydown($event, entry)"
+        >
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="toolbar" size="kira-icon" aria-label="Delete" @click.stop="emit('delete', entry)">
-                <CodiconIcon name="trash" :size="13" />
-              </Button>
+              <button
+                type="button"
+                class="pin-button"
+                :class="{ pinned: isPinned(entry) }"
+                @click.stop="emit('togglePin', entry)"
+              >
+                <CodiconIcon :name="isPinned(entry) ? 'star-full' : 'star-empty'" :size="13" />
+              </button>
             </TooltipTrigger>
-            <TooltipContent>Delete</TooltipContent>
+            <TooltipContent>Pin</TooltipContent>
           </Tooltip>
-        </span>
+          <slot name="entry" :entry="entry" />
+          <span class="entry-actions">
+            <slot name="entry-actions" :entry="entry" />
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button variant="toolbar" size="kira-icon" aria-label="Delete" @click.stop="emit('delete', entry)">
+                  <CodiconIcon name="trash" :size="13" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Delete</TooltipContent>
+            </Tooltip>
+          </span>
+        </div>
       </div>
 
       <template v-if="recent">
         <Separator class="my-1" />
         <div class="p-menu-label">Recent</div>
         <div v-if="recent.length === 0" class="empty-row p-sm dim">{{ emptyRecentText }}</div>
-        <div
-          v-for="entry in recent"
-          :key="entry.id"
-          class="entry-row p-row"
-          :data-testid="recentEntryTestId"
-          @click="emit('apply', entry)"
-        >
-          <slot name="entry" :entry="entry" />
+        <div v-else role="listbox" aria-label="Recent">
+          <div
+            v-for="entry in recent"
+            :key="entry.id"
+            class="entry-row p-row"
+            :data-testid="recentEntryTestId"
+            role="option"
+            tabindex="0"
+            @click="emit('apply', entry)"
+            @keydown="onRowKeydown($event, entry)"
+          >
+            <slot name="entry" :entry="entry" />
+          </div>
         </div>
       </template>
 

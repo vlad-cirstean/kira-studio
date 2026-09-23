@@ -270,6 +270,14 @@ function selectKeyValueRowFromEvent(e: MouseEvent): void {
   if (r !== null) selectKeyValueRow(r);
 }
 
+// P105 §5.2(c): Enter/Space both mirror a single click — this row has one action, selection.
+function selectKeyValueRowFromKeydown(e: KeyboardEvent): void {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  const r = datasetNumber(e.currentTarget, 'row');
+  if (r !== null) selectKeyValueRow(r);
+}
+
 // P19 D6/D11, P22b D11: the document and key-value branches' own row menu — the document branch
 // gets P22b D11's Shell/Canonical/Relaxed submenu pair (mongoDocumentRowMenu); key-value has no
 // shell/EJSON format of its own and keeps the plain "Copy as JSON"/"Copy all as JSON" pair
@@ -339,6 +347,8 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       ref="docScrollEl"
       class="body doc-body overflow-auto"
       data-testid="virtual-list"
+      role="listbox"
+      aria-label="Documents"
       @scroll="docVirtual.onScroll"
     >
       <div :style="{ height: `${docVirtual.totalSize.value}px`, position: 'relative' }">
@@ -349,7 +359,7 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           data-testid="console-result-doc-row"
           :data-row="documentRows[vi.index]?.index"
           :view="documentRows[vi.index]!"
-          :scope="pageKey"
+          :row-scope="pageKey"
           :expanded="consoleViewStore.isResultDocExpanded(tabId, pageKey, documentRows[vi.index]!.id)"
           :selected="isSelected(documentRows[vi.index]!.index, 0)"
           :search-match="isSearchMatch(documentRows[vi.index]!.index, 0)"
@@ -382,6 +392,8 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
       ref="kvScrollEl"
       class="body overflow-auto"
       data-testid="virtual-list"
+      role="listbox"
+      aria-label="Result rows"
       @scroll="kvVirtual.onScroll"
     >
       <div :style="{ height: `${kvVirtual.totalSize.value}px`, position: 'relative' }">
@@ -393,7 +405,11 @@ function onKeyValueRowContextMenuFromEvent(e: MouseEvent): void {
           :data-row="rowIndices[vi.index]"
           :class="{ selected: isSelected(rowIndices[vi.index]!, 0) }"
           :style="{ height: `${vi.size}px`, transform: `translateY(${vi.start}px)` }"
+          role="option"
+          tabindex="0"
+          :aria-selected="isSelected(rowIndices[vi.index]!, 0)"
           @click="selectKeyValueRowFromEvent"
+          @keydown="selectKeyValueRowFromKeydown"
           @contextmenu="onKeyValueRowContextMenuFromEvent"
         >
           <div

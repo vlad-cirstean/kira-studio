@@ -167,6 +167,8 @@ useEventListener(scrollEl, 'keydown', onTreeKeydown);
         ref="scrollEl"
         class="virtual-list h-full overflow-auto"
         data-testid="virtual-list"
+        role="tree"
+        aria-label="Collections tree"
         @scroll="onScroll"
       >
         <div class="virtual-list-sticky sticky top-0 z-2 h-0" data-testid="tree-sticky-band">
