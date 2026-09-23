@@ -209,6 +209,23 @@ export const useTabsStore = createTabsStore({
     // `recordRecent` itself, gated on `!result.reused` — exactly the old "only a freshly created
     // tab records" behavior (reuseExistingTab's own branch never touched recentKind either).
 
+    // P107 iter2 I2-43: openDataTab/openDocumentTab/openKeyValueTab/openStreamTab shared this exact
+    // body — open-or-reuse via actions.openTab, then recordRecent on a freshly created tab (never
+    // a reused one) — differing only in tab kind and default-state factory.
+    function openTrackedTab<S>(
+      kind: RecentTableEntry['kind'],
+      connectionId: string,
+      path: string,
+      defaultState: () => S,
+      opts: { newTab?: boolean } | undefined,
+    ): OpenTabResult {
+      const result = actions.openTab(kind, connectionId, path, defaultState, {
+        reuse: !opts?.newTab,
+      });
+      if (!result.reused) recentTablesStore.recordRecent(connectionId, path, kind);
+      return result;
+    }
+
     // Without `newTab`, activates an existing tab for the same (connectionId, path) if one exists
     // (§8.10's "Open data"). "Open data in new tab" always creates (`newTab: true`), so the same
     // table can be open N times with independent state — identity is `id`, never `path` (§8.4).
@@ -217,15 +234,13 @@ export const useTabsStore = createTabsStore({
       path: string,
       opts?: { newTab?: boolean },
     ): OpenTabResult {
-      const result = actions.openTab(
+      return openTrackedTab(
         'data',
         connectionId,
         path,
         () => defaultDataTabState(useSettingsStore().data.defaultPageSize),
-        { reuse: !opts?.newTab },
+        opts,
       );
-      if (!result.reused) recentTablesStore.recordRecent(connectionId, path, 'data');
-      return result;
     }
 
     // Opens a 'definition' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -265,15 +280,13 @@ export const useTabsStore = createTabsStore({
       path: string,
       opts?: { newTab?: boolean },
     ): OpenTabResult {
-      const result = actions.openTab(
+      return openTrackedTab(
         'document',
         connectionId,
         path,
         () => defaultDocumentTabState(useSettingsStore().data.defaultPageSize),
-        { reuse: !opts?.newTab },
+        opts,
       );
-      if (!result.reused) recentTablesStore.recordRecent(connectionId, path, 'document');
-      return result;
     }
 
     // Opens a 'keyvalue' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -283,15 +296,13 @@ export const useTabsStore = createTabsStore({
       path: string,
       opts?: { newTab?: boolean },
     ): OpenTabResult {
-      const result = actions.openTab(
+      return openTrackedTab(
         'keyvalue',
         connectionId,
         path,
         () => defaultKeyValueTabState(useSettingsStore().data.defaultPageSize),
-        { reuse: !opts?.newTab },
+        opts,
       );
-      if (!result.reused) recentTablesStore.recordRecent(connectionId, path, 'keyvalue');
-      return result;
     }
 
     // Opens a 'stream' tab, reusing an existing one for the same (connectionId, path) — mirrors
@@ -301,15 +312,13 @@ export const useTabsStore = createTabsStore({
       path: string,
       opts?: { newTab?: boolean },
     ): OpenTabResult {
-      const result = actions.openTab(
+      return openTrackedTab(
         'stream',
         connectionId,
         path,
         () => defaultStreamTabState(useSettingsStore().data.defaultPageSize),
-        { reuse: !opts?.newTab },
+        opts,
       );
-      if (!result.reused) recentTablesStore.recordRecent(connectionId, path, 'stream');
-      return result;
     }
 
     // Opens a 'browse' tab (P41 D11/D14) over a redis database / s3 bucket's key or object space —
