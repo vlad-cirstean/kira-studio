@@ -1,6 +1,6 @@
 import { useConfirmDialogStore } from '@workbench/state/confirmDialog';
 import type { MenuItem } from '@workbench/state/contextMenu';
-import { copyText } from '@workbench/util/clipboard';
+import { copyOrReportError as sharedCopyOrReportError } from '@workbench/util/clipboard';
 import { beautifyJson } from '../../beautify';
 import { parseIdLabel, toPlainJson, toRelaxedText, toShellText } from '../shared/document/ejson';
 import { deleteDocument } from './mutations';
@@ -18,13 +18,12 @@ function prettyJson(text: string): string {
 // way an unhandled promise rejection would — ContextMenu.vue's `onItemClick` is never awaited by
 // its own `@click` binding, so with nothing here to catch it, Copy would fail with zero visible
 // feedback (P43 F6/D7's own `actionError` exists for exactly this).
-async function copyOrReportError(tabId: string, text: string): Promise<void> {
-  try {
-    await copyText(text);
-    useDocumentViewStore().setActionError(tabId, null);
-  } catch (err) {
-    useDocumentViewStore().setActionError(tabId, err instanceof Error ? err.message : String(err));
-  }
+function copyOrReportError(tabId: string, text: string): Promise<void> {
+  return sharedCopyOrReportError(
+    text,
+    (message) => useDocumentViewStore().setActionError(tabId, message),
+    () => useDocumentViewStore().setActionError(tabId, null),
+  );
 }
 
 // §8.10's "Document" row: Expand all, Collapse all, Copy document, Copy _id, Edit, Delete —
