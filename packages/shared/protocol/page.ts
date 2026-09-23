@@ -409,6 +409,43 @@ export function createTabularPageBuilder(columns: ColumnDescriptor[]): TabularPa
   };
 }
 
+/**
+ * P107 I2-40: DocumentPageBuilder/KeyValuePageBuilder/StreamPageBuilder each accumulated 2-5 fixed
+ * semantic columns into their own named ColumnScratch instances, differing only in field count,
+ * per-field maxBytes and (Stream) push()'s own row-object field names. `keys` stays a literal
+ * tuple (K extends string, not string) so `finishColumns()` returns `Record<'ids' | 'bodies',
+ * TextColumnChunk>`, not `Record<string, Chunk>` — no Page field's type widens, and each builder's
+ * own `push(id, body)` / `push(field, value)` / `push(row)` public shape is unchanged below.
+ */
+function createColumnarBuilder<K extends string>(keys: readonly K[], maxBytes: (key: K) => number) {
+  const scratches = new Map<K, ColumnScratch>(keys.map((k) => [k, new ColumnScratch()]));
+  const encoder = new TextEncoder();
+  let rowCount = 0;
+
+  return {
+    push(values: Record<K, string | null>): void {
+      const row = rowCount;
+      for (const k of keys) {
+        // biome-ignore lint/style/noNonNullAssertion: scratches is built from the same `keys`
+        scratches.get(k)!.appendValue(values[k], row, encoder, maxBytes(k));
+      }
+      rowCount++;
+    },
+    finishColumns(): { columns: Record<K, TextColumnChunk>; byteSize: number } {
+      const columns = {} as Record<K, TextColumnChunk>;
+      let byteSize = 0;
+      for (const k of keys) {
+        // biome-ignore lint/style/noNonNullAssertion: scratches is built from the same `keys`
+        const chunk = scratches.get(k)!.finish(rowCount, false);
+        columns[k] = chunk;
+        byteSize += chunkByteSize(chunk);
+      }
+      return { columns, byteSize };
+    },
+    rowCount: () => rowCount,
+  };
+}
+
 /** Mirrors `createTabularPageBuilder`, fixed to the two semantic columns `DocumentPage` uses. */
 export interface DocumentPageBuilder {
   /** `id`/`body` are each pre-serialized EJSON text (caller owns EJSON.stringify). */
@@ -418,32 +455,23 @@ export interface DocumentPageBuilder {
 
 export function createDocumentPageBuilder(opts?: { singleRow?: boolean }): DocumentPageBuilder {
   const maxBytes = opts?.singleRow ? DOCUMENT_TRUNCATE_BYTES_SINGLE : DOCUMENT_TRUNCATE_BYTES;
-  const idScratch = new ColumnScratch();
-  const bodyScratch = new ColumnScratch();
-  const encoder = new TextEncoder();
-  let rowCount = 0;
+  const columnar = createColumnarBuilder(['ids', 'bodies'] as const, () => maxBytes);
 
   return {
     push(id, body) {
-      const row = rowCount;
-      idScratch.appendValue(id, row, encoder, maxBytes);
-      bodyScratch.appendValue(body, row, encoder, maxBytes);
-      rowCount++;
+      columnar.push({ ids: id, bodies: body });
     },
     finish(position) {
-      const ids = idScratch.finish(rowCount, false);
-      const bodies = bodyScratch.finish(rowCount, false);
-      const page: DocumentPage = {
+      const { columns, byteSize } = columnar.finishColumns();
+      return {
         kind: 'document',
         position,
-        ids,
-        bodies,
-        rowCount,
-        byteSize: 0,
+        ids: columns.ids,
+        bodies: columns.bodies,
+        rowCount: columnar.rowCount(),
+        byteSize,
         fetchedAt: Date.now(),
       };
-      page.byteSize = chunkByteSize(ids) + chunkByteSize(bodies);
-      return page;
     },
   };
 }
@@ -465,35 +493,28 @@ export function createKeyValuePageBuilder(opts: {
   singleRow?: boolean;
 }): KeyValuePageBuilder {
   const valueMaxBytes = opts.singleRow ? DOCUMENT_TRUNCATE_BYTES_SINGLE : MAX_CELL_BYTES;
-  const fieldScratch = new ColumnScratch();
-  const valueScratch = new ColumnScratch();
-  const encoder = new TextEncoder();
-  let rowCount = 0;
+  const columnar = createColumnarBuilder(['fields', 'values'] as const, (k) =>
+    k === 'values' ? valueMaxBytes : MAX_CELL_BYTES,
+  );
 
   return {
     push(field, value) {
-      const row = rowCount;
-      fieldScratch.appendValue(field, row, encoder);
-      valueScratch.appendValue(value, row, encoder, valueMaxBytes);
-      rowCount++;
+      columnar.push({ fields: field, values: value });
     },
     finish(position) {
-      const fields = fieldScratch.finish(rowCount, false);
-      const values = valueScratch.finish(rowCount, false);
-      const page: KeyValuePage = {
+      const { columns, byteSize } = columnar.finishColumns();
+      return {
         kind: 'keyvalue',
         position,
         redisType: opts.redisType,
         ttlMs: opts.ttlMs,
         memoryBytes: opts.memoryBytes,
-        fields,
-        values,
-        rowCount,
-        byteSize: 0,
+        fields: columns.fields,
+        values: columns.values,
+        rowCount: columnar.rowCount(),
+        byteSize,
         fetchedAt: Date.now(),
       };
-      page.byteSize = chunkByteSize(fields) + chunkByteSize(values);
-      return page;
     },
   };
 }
@@ -513,50 +534,36 @@ export interface StreamPageBuilder {
 export function createStreamPageBuilder(opts: {
   visibilityTimeoutSeconds: number | null;
 }): StreamPageBuilder {
-  const keyScratch = new ColumnScratch();
-  const headerScratch = new ColumnScratch();
-  const attrScratch = new ColumnScratch();
-  const timestampScratch = new ColumnScratch();
-  const bodyScratch = new ColumnScratch();
-  const encoder = new TextEncoder();
-  let rowCount = 0;
+  const columnar = createColumnarBuilder(
+    ['keys', 'headers', 'attrs', 'timestamps', 'bodies'] as const,
+    () => MAX_CELL_BYTES,
+  );
 
   return {
     push(row) {
-      const i = rowCount;
-      keyScratch.appendValue(row.key, i, encoder);
-      headerScratch.appendValue(row.headers, i, encoder);
-      attrScratch.appendValue(row.attrs, i, encoder);
-      timestampScratch.appendValue(row.timestamp, i, encoder);
-      bodyScratch.appendValue(row.body, i, encoder);
-      rowCount++;
+      columnar.push({
+        keys: row.key,
+        headers: row.headers,
+        attrs: row.attrs,
+        timestamps: row.timestamp,
+        bodies: row.body,
+      });
     },
     finish(position) {
-      const keys = keyScratch.finish(rowCount, false);
-      const headers = headerScratch.finish(rowCount, false);
-      const attrs = attrScratch.finish(rowCount, false);
-      const timestamps = timestampScratch.finish(rowCount, false);
-      const bodies = bodyScratch.finish(rowCount, false);
-      const page: StreamPage = {
+      const { columns, byteSize } = columnar.finishColumns();
+      return {
         kind: 'stream',
         position,
-        keys,
-        headers,
-        attrs,
-        timestamps,
-        bodies,
-        rowCount,
-        byteSize: 0,
+        keys: columns.keys,
+        headers: columns.headers,
+        attrs: columns.attrs,
+        timestamps: columns.timestamps,
+        bodies: columns.bodies,
+        rowCount: columnar.rowCount(),
+        byteSize,
         fetchedAt: Date.now(),
         visibilityTimeoutSeconds: opts.visibilityTimeoutSeconds,
       };
-      page.byteSize =
-        chunkByteSize(keys) +
-        chunkByteSize(headers) +
-        chunkByteSize(attrs) +
-        chunkByteSize(timestamps) +
-        chunkByteSize(bodies);
-      return page;
     },
   };
 }

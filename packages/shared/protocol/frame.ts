@@ -75,6 +75,24 @@ function copyPageBuffers(page: Page): Page {
   }
 }
 
+// P107 I2-40: decodeDocumentPage/decodeKeyValuePage/decodeStreamPage each null-checked and
+// decodeChunk'd 2-5 fixed semantic columns the same way, differing only in field names. Keys stay
+// literal (K extends string, not string) so the return type is Record<'ids' | 'bodies', ...>, not
+// Record<string, Chunk> — Page's own field types stay exact, nothing widens.
+function decodeColumns<K extends string>(
+  keys: readonly K[],
+  raw: Record<K, wire.Chunk | null>,
+  label: string,
+): Record<K, TextColumnChunk> {
+  const result = {} as Record<K, TextColumnChunk>;
+  for (const key of keys) {
+    const c = raw[key];
+    if (!c) throw new Error(`frame: ${label} is missing a required field`);
+    result[key] = decodeChunk(c);
+  }
+  return result;
+}
+
 function decodeColumnDescriptor(c: wire.ColumnDescriptor): ColumnDescriptor {
   const name = c.name();
   const dataType = c.dataType();
@@ -204,16 +222,17 @@ function decodeTabularPage(t: wire.TabularPage): TabularPage {
 
 function decodeDocumentPage(d: wire.DocumentPage): DocumentPage {
   const position = d.position();
-  const ids = d.ids();
-  const bodies = d.bodies();
-  if (!position || !ids || !bodies) {
-    throw new Error('frame: DocumentPage is missing a required field');
-  }
+  if (!position) throw new Error('frame: DocumentPage is missing a required field');
+  const { ids, bodies } = decodeColumns(
+    ['ids', 'bodies'] as const,
+    { ids: d.ids(), bodies: d.bodies() },
+    'DocumentPage',
+  );
   return {
     kind: 'document',
     position: decodePosition(position),
-    ids: decodeChunk(ids),
-    bodies: decodeChunk(bodies),
+    ids,
+    bodies,
     rowCount: d.rowCount(),
     byteSize: d.byteSize(),
     fetchedAt: d.fetchedAt(),
@@ -222,19 +241,20 @@ function decodeDocumentPage(d: wire.DocumentPage): DocumentPage {
 
 function decodeKeyValuePage(k: wire.KeyValuePage): KeyValuePage {
   const position = k.position();
-  const fields = k.fields();
-  const values = k.values();
-  if (!position || !fields || !values) {
-    throw new Error('frame: KeyValuePage is missing a required field');
-  }
+  if (!position) throw new Error('frame: KeyValuePage is missing a required field');
+  const { fields, values } = decodeColumns(
+    ['fields', 'values'] as const,
+    { fields: k.fields(), values: k.values() },
+    'KeyValuePage',
+  );
   return {
     kind: 'keyvalue',
     position: decodePosition(position),
     redisType: decodeRedisType(k.redisType()),
     ttlMs: k.ttlMs(),
     memoryBytes: k.memoryBytes(),
-    fields: decodeChunk(fields),
-    values: decodeChunk(values),
+    fields,
+    values,
     rowCount: k.rowCount(),
     byteSize: k.byteSize(),
     fetchedAt: k.fetchedAt(),
@@ -243,22 +263,26 @@ function decodeKeyValuePage(k: wire.KeyValuePage): KeyValuePage {
 
 function decodeStreamPage(s: wire.StreamPage): StreamPage {
   const position = s.position();
-  const keys = s.keys();
-  const headers = s.headers();
-  const attrs = s.attrs();
-  const timestamps = s.timestamps();
-  const bodies = s.bodies();
-  if (!position || !keys || !headers || !attrs || !timestamps || !bodies) {
-    throw new Error('frame: StreamPage is missing a required field');
-  }
+  if (!position) throw new Error('frame: StreamPage is missing a required field');
+  const { keys, headers, attrs, timestamps, bodies } = decodeColumns(
+    ['keys', 'headers', 'attrs', 'timestamps', 'bodies'] as const,
+    {
+      keys: s.keys(),
+      headers: s.headers(),
+      attrs: s.attrs(),
+      timestamps: s.timestamps(),
+      bodies: s.bodies(),
+    },
+    'StreamPage',
+  );
   return {
     kind: 'stream',
     position: decodePosition(position),
-    keys: decodeChunk(keys),
-    headers: decodeChunk(headers),
-    attrs: decodeChunk(attrs),
-    timestamps: decodeChunk(timestamps),
-    bodies: decodeChunk(bodies),
+    keys,
+    headers,
+    attrs,
+    timestamps,
+    bodies,
     rowCount: s.rowCount(),
     byteSize: s.byteSize(),
     fetchedAt: s.fetchedAt(),
