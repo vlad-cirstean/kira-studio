@@ -270,6 +270,21 @@ func resolveStackBase(branch string, config map[string]StackConfigEntry, exists 
 		return n
 	}
 
+	// F9 fix: a parent with its OWN kirastack config (parentIsStacked) but no ref left at all —
+	// removed via `update-ref -d`, which leaves the branch.<x>.kirastack* config behind — must not
+	// be walked into as though it still existed. Left unchecked, the walk below still resolves to
+	// whatever base THAT dangling parent's own chain would have reached, so branch lands in
+	// baseGroups under a base it was never actually stacked on, and flattenStack (which only walks
+	// from a base through its own MEMBER branches, never the refless parent itself) then drops it
+	// from both Stacks and Orphans — silently, breaking BuildStacks' own "never drops a branch"
+	// contract. Broken here instead: branch becomes a visible orphan, same as a plain dangling
+	// parent already is.
+	if !exists(parent) {
+		n := resolvedNode{state: resolveBroken}
+		memo[branch] = n
+		return n
+	}
+
 	if existing, ok := memo[parent]; ok && existing.state == resolveInProgress {
 		n := resolvedNode{state: resolveBroken} // a cycle, detected mid-walk.
 		memo[branch] = n

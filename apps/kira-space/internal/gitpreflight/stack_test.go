@@ -181,6 +181,48 @@ func TestBuildStacks_Orphan_DanglingParent(t *testing.T) {
 	}
 }
 
+// TestBuildStacks_RefusedParentStackedButRefless is P108 Part 15 F9's own regression proof:
+// feat2's own kirastack config still names feat1 as ITS parent (parentIsStacked=true for feat2),
+// but feat2 has no ref left at all — removed via `git update-ref -d`, which leaves the
+// branch.feat2.kirastack* config behind. feat3 (parent: feat2) must land as a visible orphan, not
+// silently vanish from both Stacks and Orphans.
+func TestBuildStacks_RefusedParentStackedButRefless(t *testing.T) {
+	t.Parallel()
+	in := gitpreflight.BuildStacksInput{
+		Config: map[string]gitpreflight.StackConfigEntry{
+			"feat1": {Branch: "feat1", Parent: "main"},
+			// feat2's own ref is gone (not in LocalRefs/BaseTips below) but its config survives.
+			"feat2": {Branch: "feat2", Parent: "feat1"},
+			"feat3": {Branch: "feat3", Parent: "feat2"},
+		},
+		LocalRefs: map[string]gitpreflight.StackRefInfo{
+			"main": ref("m1"), "feat1": ref("f1"), "feat3": ref("f3"),
+		},
+		BaseTips: map[string]string{"main": "m1", "feat1": "f1", "feat3": "f3"},
+	}
+	result := gitpreflight.BuildStacks(in)
+
+	// feat1 still forms its own valid one-branch stack on main.
+	if len(result.Stacks) != 1 || result.Stacks[0].Base != "main" {
+		t.Fatalf("stacks = %+v, want exactly one, based on main", result.Stacks)
+	}
+	if got := names(result.Stacks[0].Branches); !reflect.DeepEqual(got, []string{"feat1"}) {
+		t.Fatalf("branches = %v, want [feat1] — feat2 has no ref, feat3 must not silently ride along", got)
+	}
+
+	// feat3 must be a VISIBLE orphan — the bug this fix closes let it vanish from both Stacks and
+	// Orphans entirely (BuildStacks' own "never drops a branch" contract, broken).
+	if len(result.Orphans) != 1 {
+		t.Fatalf("orphans = %+v, want exactly one (feat3) — BuildStacks must never silently drop a branch", result.Orphans)
+	}
+	if result.Orphans[0].Name != "feat3" || result.Orphans[0].State != gitpreflight.StackParentMissing {
+		t.Fatalf("orphan = %+v, want feat3/parentMissing", result.Orphans[0])
+	}
+	if result.Orphans[0].Parent != "feat2" {
+		t.Fatalf("orphan parent = %q, want the recorded (refless) name preserved", result.Orphans[0].Parent)
+	}
+}
+
 func TestBuildStacks_SelfCycle(t *testing.T) {
 	t.Parallel()
 	in := gitpreflight.BuildStacksInput{
