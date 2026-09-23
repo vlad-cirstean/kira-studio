@@ -42,15 +42,16 @@ func queryArgs(textMode bool, params []any) []any {
 // every row scanned as []*string in column order, nil for SQL NULL. The server-side kill is
 // entirely adapter.go's Cancel (pg_cancel_backend over a side connection) — this function does not
 // and must not try to make the query itself abort (see adapters.RunWithAbortRace).
-func runArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions) ([][]*string, error) {
+func runArrayQuery(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions) ([][]*string, error) {
 	setCommand(op, sql, params, opts.LogParams)
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return nil, err
 	}
 
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	done := conn.track()
 
-	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) ([][]*string, error) {
+	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) ([][]*string, error) {
 		rows, err := conn.Query(queryCtx, sql, queryArgs(opts.TextMode, params)...)
 		if err != nil {
 			return nil, mapError(err)
@@ -82,15 +83,16 @@ func runArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any
 // onRow is called once per row, in order, with a []*string the callback owns (safe to retain
 // beyond the call, unlike a slice into a shared backing array). Used by the read path's readPage;
 // runArrayQuery itself stays as the array-returning shape countRows and the catalog paths want.
-func streamArrayQuery(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions, onRow func(row []*string) error) error {
+func streamArrayQuery(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions, onRow func(row []*string) error) error {
 	setCommand(op, sql, params, opts.LogParams)
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return err
 	}
 
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	done := conn.track()
 
-	_, err := adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (struct{}, error) {
+	_, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (struct{}, error) {
 		rows, err := conn.Query(queryCtx, sql, queryArgs(opts.TextMode, params)...)
 		if err != nil {
 			return struct{}{}, mapError(err)
@@ -128,7 +130,7 @@ type CommandOptions struct {
 
 // runCommand is query.ts's runCommand: an UPDATE/DELETE/INSERT/BEGIN/COMMIT/ROLLBACK has no rows
 // worth returning, only the number of rows it affected.
-func runCommand(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts CommandOptions) (int64, error) {
+func runCommand(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery, opts CommandOptions) (int64, error) {
 	if !opts.SuppressCommand {
 		op.SetCommand(sql)
 	}
@@ -137,8 +139,9 @@ func runCommand(ctx context.Context, conn *pgx.Conn, sql string, params []any, o
 	}
 
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	done := conn.track()
 
-	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (int64, error) {
+	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (int64, error) {
 		tag, err := conn.Exec(queryCtx, sql, params...)
 		if err != nil {
 			return 0, mapError(err)

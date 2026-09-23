@@ -3,8 +3,6 @@ package postgres
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
 )
@@ -40,7 +38,7 @@ func preview(plan model.MutationPlan) ([]string, error) {
 }
 
 // mutate is mutate.ts's mutate.
-func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
+func mutate(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
 	resolve := func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error) {
 		schema, table, err := resolveTablePath(plan.Path)
 		if err != nil {
@@ -68,6 +66,11 @@ func mutate(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Track
 	// which refuses outright on an already-cancelled ctx, leaving conn (pinned for this adapter's
 	// lifetime) stuck inside a stale, still-open transaction for whatever op runs on it next.
 	rollback := func(ctx context.Context) {
+		// F2: wait for every RunWithAbortRace goroutine this mutate's own statements spawned to
+		// actually finish touching conn before issuing ROLLBACK on it — otherwise an aborted
+		// statement's own background goroutine (still running conn.Exec) races this cleanup on the
+		// same non-concurrency-safe *pgx.Conn.
+		conn.waitInFlight()
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 		defer cancel()
 		_, _ = conn.Exec(cleanupCtx, "ROLLBACK")

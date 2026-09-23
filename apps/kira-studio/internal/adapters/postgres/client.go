@@ -113,9 +113,47 @@ func buildConfig(cfg model.ResolvedConnectionConfig, database string, log func(l
 // serializes ops against the same Adapter — adapterhost dispatches each inbound frame on its own
 // goroutine (bounded only by the session's own in-flight cap), so two Reads on two tabs, or a Read
 // racing a Mutate, can and do reach the same *pgx.Conn concurrently without this lock.
+//
+// inFlight (finding F2, MEDIUM-HIGH/data integrity) is this entry's own count of still-running
+// adapters.RunWithAbortRace background goroutines — distinct from adapter.go's tracker.inFlight,
+// which is adapter-wide and only ever Waited on by Disconnect. RunWithAbortRace can return to its
+// own caller (on the op's ctx.Done(), a Stop/cancel) well before the goroutine it spawned actually
+// stops calling conn.Query/conn.Exec (by design: a local abort must not itself try to kill the
+// query — see RunWithAbortRace's own doc comment). Without this, Acquire's release unlocked mu (and
+// a detached ROLLBACK/COMMIT cleanup ran conn.Exec) the instant the aborted op's own call returned —
+// racing that still-running background goroutine on the same non-concurrency-safe *pgx.Conn,
+// silently swallowed by cleanup's own `_, _ =` and leaving the connection wedged in an aborted or
+// unexpectedly-open transaction for whatever op ran next.
 type connEntry struct {
-	conn *pgx.Conn
-	mu   sync.Mutex
+	conn     *pgx.Conn
+	mu       sync.Mutex
+	inFlight sync.WaitGroup
+}
+
+// trackedConn is Acquire's own handle over one connEntry: embedding *pgx.Conn keeps every existing
+// conn.Query/conn.Exec/conn.PgConn() call site unchanged, while track/waitInFlight expose the
+// entry's own inFlight WaitGroup (F2, above).
+type trackedConn struct {
+	*pgx.Conn
+	entry *connEntry
+}
+
+// track registers one RunWithAbortRace background goroutine against this connection's own entry.
+// Call synchronously, at the same point a TrackQuery closure is called — before
+// adapters.RunWithAbortRace's own goroutine starts — and compose the returned done into whatever
+// release RunWithAbortRace already calls once that goroutine actually finishes (never only on the
+// caller's own ctx.Done()).
+func (c *trackedConn) track() (done func()) {
+	c.entry.inFlight.Add(1)
+	return c.entry.inFlight.Done
+}
+
+// waitInFlight blocks until every RunWithAbortRace goroutine track() has registered against this
+// connection has actually finished touching it. A detached cleanup statement (mutate's own
+// ROLLBACK, console's read-only-wrap COMMIT) calls this immediately before its own conn.Exec, so it
+// never races a just-aborted op's background goroutine still using the same *pgx.Conn (F2).
+func (c *trackedConn) waitInFlight() {
+	c.entry.inFlight.Wait()
 }
 
 // verifyChainSkipHostname is sslmode=verify-ca's certificate check, split out of buildConfig so
@@ -222,7 +260,7 @@ func (s *ConnSet) dial(ctx context.Context, database string) (*connEntry, error)
 // statement: a mutate's BEGIN…COMMIT or a console "run all" must keep any concurrent op off this
 // same conn for its whole duration, not just between individual statements, or a racing Read could
 // execute inside the open transaction (P2 R2).
-func (s *ConnSet) Acquire(ctx context.Context, database string) (*pgx.Conn, func(), error) {
+func (s *ConnSet) Acquire(ctx context.Context, database string) (*trackedConn, func(), error) {
 	key := database
 	if key == "" {
 		key = primaryKey
@@ -232,11 +270,18 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (*pgx.Conn, func
 		return nil, nil, err
 	}
 	entry.mu.Lock()
-	return entry.conn, entry.mu.Unlock, nil
+	return &trackedConn{Conn: entry.conn, entry: entry}, func() {
+			// F2: hold this connection's lock (and so keep the next Acquire waiting) until every
+			// RunWithAbortRace goroutine started under this acquisition has actually finished
+			// touching entry.conn — the server-side cancel adapter.go's Cancel already sends keeps
+			// this wait short in practice, but it must never be skipped.
+			entry.inFlight.Wait()
+			entry.mu.Unlock()
+		}, nil
 }
 
 // Primary acquires the primary (no explicit database override) connection.
-func (s *ConnSet) Primary(ctx context.Context) (*pgx.Conn, func(), error) {
+func (s *ConnSet) Primary(ctx context.Context) (*trackedConn, func(), error) {
 	return s.Acquire(ctx, "")
 }
 

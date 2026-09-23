@@ -12,14 +12,18 @@ import (
 // cancellable and command-logged like any other query. scan is called once per row.
 type queryExec func(ctx context.Context, query string, params []any, scan func(*sql.Rows) error) error
 
-// execFor is adapter.go's own execFor, binding one conn/threadID/op/track quadruple.
-func execFor(conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery) queryExec {
+// execFor is adapter.go's own execFor, binding one conn/op/track triple. Catalog queries run
+// directly on the op's own ctx (no adapters.RunWithAbortRace), so they never spawn the kind of
+// stray background goroutine F2's own Entry.track()/waitInFlight() exist to guard against; conn
+// only needs to be an Entry here so every catalog call site can keep sharing one connEntry with
+// the rest of the package.
+func execFor(conn Entry, op *adapters.OpCtx, track TrackQuery) queryExec {
 	return func(ctx context.Context, query string, params []any, scan func(*sql.Rows) error) error {
 		op.SetCommand(query)
 		if err := adapters.CheckNotStarted(ctx); err != nil {
 			return err
 		}
-		release := track(RunningQuery{ThreadID: threadID})
+		release := track(RunningQuery{ThreadID: conn.ThreadID})
 		defer release()
 
 		rows, err := conn.QueryContext(ctx, query, params...)

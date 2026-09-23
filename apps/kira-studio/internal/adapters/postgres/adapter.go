@@ -107,7 +107,7 @@ func (a *Adapter) Disconnect(ctx context.Context) error {
 // requireClient returns database's connection together with a release func that must be called
 // exactly once — it holds the per-connection lock ConnSet.Acquire's own doc comment describes for
 // as long as the caller keeps conn (P2 R2).
-func (a *Adapter) requireClient(ctx context.Context, database string) (*pgx.Conn, func(), error) {
+func (a *Adapter) requireClient(ctx context.Context, database string) (*trackedConn, func(), error) {
 	connSet, err := adapters.RequireConnected(a.connSet)
 	if err != nil {
 		return nil, nil, err

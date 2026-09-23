@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/storage/model"
@@ -90,7 +88,7 @@ func assertReadOnlyFilterSortSafe(readOnly bool, filter *string, sort *model.Sor
 }
 
 // readPage is read.ts's readPage — the densest function in the package.
-func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
+func readPage(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
 	plan, err := adapters.PlanRelationalPage(adapters.RelationalPageArgs{
 		Columns: target.Columns, Projection: req.Projection,
 		PrimaryKey: target.PrimaryKey, UniqueKeys: target.UniqueKeys,
@@ -189,7 +187,7 @@ func readPage(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Tra
 func dollarPlaceholder(i int) string { return "$" + strconv.Itoa(i) }
 
 // countRows is read.ts's countRows.
-func countRows(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {
+func countRows(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {
 	relationSQL := quoteIdent(target.Schema) + "." + quoteIdent(target.Relation)
 	sql := adapters.BuildCountSQL(relationSQL, filter)
 

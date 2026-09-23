@@ -31,15 +31,16 @@ var setCommand = adapters.SetCommand
 // cellText — never a typeCast callback (the driver has none). The server-side kill is entirely
 // adapter.go's Cancel (KILL QUERY over a side connection) — this function does not and must not
 // try to make the query itself abort (B6, adapters.RunWithAbortRace's own contract).
-func runArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions) ([][]*string, error) {
+func runArrayQuery(ctx context.Context, conn Entry, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions) ([][]*string, error) {
 	setCommand(op, query, params, opts.LogParams)
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return nil, err
 	}
 
-	release := track(RunningQuery{ThreadID: threadID})
+	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	done := conn.track()
 
-	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) ([][]*string, error) {
+	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) ([][]*string, error) {
 		rows, err := conn.QueryContext(queryCtx, query, params...)
 		if err != nil {
 			return nil, mapError(err)
@@ -90,15 +91,16 @@ func runArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, query s
 // row, in order, with a []*string the callback owns, instead of every row being materialized into
 // a [][]*string only to be transposed into the page builder immediately after. runArrayQuery
 // itself stays as the array-returning shape countRows and the catalog paths want.
-func streamArrayQuery(ctx context.Context, conn *sql.Conn, threadID uint32, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions, onRow func(row []*string) error) error {
+func streamArrayQuery(ctx context.Context, conn Entry, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts QueryOptions, onRow func(row []*string) error) error {
 	setCommand(op, query, params, opts.LogParams)
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return err
 	}
 
-	release := track(RunningQuery{ThreadID: threadID})
+	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	done := conn.track()
 
-	_, err := adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (struct{}, error) {
+	_, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (struct{}, error) {
 		rows, err := conn.QueryContext(queryCtx, query, params...)
 		if err != nil {
 			return struct{}{}, mapError(err)
@@ -154,7 +156,7 @@ type CommandOptions struct {
 
 // runCommand is query.ts's runCommand: an UPDATE/DELETE/INSERT/START TRANSACTION/COMMIT/ROLLBACK
 // has no rows worth returning, only the number of rows it affected.
-func runCommand(ctx context.Context, conn *sql.Conn, threadID uint32, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts CommandOptions) (int64, error) {
+func runCommand(ctx context.Context, conn Entry, query string, params []any, op *adapters.OpCtx, track TrackQuery, opts CommandOptions) (int64, error) {
 	if !opts.SuppressCommand {
 		op.SetCommand(query)
 	}
@@ -162,9 +164,10 @@ func runCommand(ctx context.Context, conn *sql.Conn, threadID uint32, query stri
 		return 0, err
 	}
 
-	release := track(RunningQuery{ThreadID: threadID})
+	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	done := conn.track()
 
-	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (int64, error) {
+	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (int64, error) {
 		result, err := conn.ExecContext(queryCtx, query, params...)
 		if err != nil {
 			return 0, mapError(err)

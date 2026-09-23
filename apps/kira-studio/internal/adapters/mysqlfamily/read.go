@@ -2,7 +2,6 @@ package mysqlfamily
 
 import (
 	"context"
-	"database/sql"
 	"encoding/hex"
 	"regexp"
 	"strings"
@@ -64,7 +63,7 @@ type readReq = adapters.ReadReq
 func questionPlaceholder(int) string { return "?" }
 
 // readPage is read.ts's readPage — the same eleven-step shape as postgres/read.go's.
-func readPage(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
+func readPage(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, target ReadTarget, req readReq) (page.TabularPage, error) {
 	plan, err := adapters.PlanRelationalPage(adapters.RelationalPageArgs{
 		Columns: target.Columns, Projection: req.Projection,
 		PrimaryKey: target.PrimaryKey, UniqueKeys: target.UniqueKeys,
@@ -112,7 +111,7 @@ func readPage(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters
 	builder := page.NewTabularPageBuilder(columns)
 	var collector adapters.KeysetPageCollector
 	var firstRow, lastRow []*string
-	err = streamArrayQuery(ctx, conn, threadID, query, params, op, track, QueryOptions{LogParams: true}, func(row []*string) error {
+	err = streamArrayQuery(ctx, conn, query, params, op, track, QueryOptions{LogParams: true}, func(row []*string) error {
 		if !collector.Track(req.PageSize) {
 			return nil
 		}
@@ -142,11 +141,11 @@ func readPage(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters
 }
 
 // countRows is read.ts's countRows.
-func countRows(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {
+func countRows(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, target QualifiedName, filter *string) (adapters.CountResult, error) {
 	relationSQL := quoteIdent(target.Database) + "." + quoteIdent(target.Table)
 	query := adapters.BuildCountSQL(relationSQL, filter)
 
-	rows, err := runArrayQuery(ctx, conn, threadID, query, nil, op, track, QueryOptions{})
+	rows, err := runArrayQuery(ctx, conn, query, nil, op, track, QueryOptions{})
 	if err != nil {
 		return adapters.CountResult{}, err
 	}

@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/page"
 )
@@ -40,13 +38,14 @@ type rawResult struct {
 // the whole batch (P5 D9's precedent). Always text-mode (mirrors read.go's identity type parsing)
 // so every cell arrives as the server's own text representation, with no per-type Go conversion to
 // undo.
-func runRaw(ctx context.Context, conn *pgx.Conn, sql string, params []any, op *adapters.OpCtx, track TrackQuery) (rawResult, error) {
+func runRaw(ctx context.Context, conn *trackedConn, sql string, params []any, op *adapters.OpCtx, track TrackQuery) (rawResult, error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return rawResult{}, err
 	}
 	release := track(RunningQuery{BackendPID: conn.PgConn().PID()})
+	done := conn.track()
 
-	return adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (rawResult, error) {
+	return adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (rawResult, error) {
 		rows, err := conn.Query(queryCtx, sql, queryArgs(true, params)...)
 		if err != nil {
 			return rawResult{}, mapError(err)
@@ -128,7 +127,7 @@ func buildPage(result rawResult, typeNames map[uint32]string) page.TabularPage {
 	return builder.Finish(page.UnpagedPosition(len(result.rows)))
 }
 
-func lookupTypeNames(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, oids []uint32) (map[uint32]string, error) {
+func lookupTypeNames(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, oids []uint32) (map[uint32]string, error) {
 	result, err := runRaw(ctx, conn, "SELECT oid, typname FROM pg_type WHERE oid = ANY($1::oid[])", []any{oids}, op, track)
 	if err != nil {
 		return nil, err
@@ -166,7 +165,7 @@ func parseUint32(s string) (uint32, error) {
 // Wrapping the whole batch in an explicit BEGIN READ ONLY transaction closes every angle actually
 // tried against a real server except that one specific statement, which
 // AssertNoTransactionEscalation rejects outright before anything runs.
-func execute(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
+func execute(ctx context.Context, conn *trackedConn, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -187,6 +186,11 @@ func execute(ctx context.Context, conn *pgx.Conn, op *adapters.OpCtx, track Trac
 			// call unconditionally regardless of the loop's own outcome — issuing COMMIT against an
 			// already-aborted transaction is itself how Postgres ends one (confirmed empirically: the
 			// server reports back a ROLLBACK command tag, not an error).
+			// F2: wait for every RunWithAbortRace goroutine this batch spawned to actually finish
+			// touching conn before issuing COMMIT on it — otherwise an aborted statement's own
+			// background goroutine (still running conn.Query/conn.Exec) races this cleanup on the
+			// same non-concurrency-safe *pgx.Conn.
+			conn.waitInFlight()
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 			defer cancel()
 			_, _ = conn.Exec(cleanupCtx, "COMMIT")

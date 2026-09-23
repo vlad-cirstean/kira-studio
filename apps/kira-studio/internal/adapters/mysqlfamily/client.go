@@ -224,11 +224,22 @@ func parseHost(addr string) string {
 // concurrently without this lock, which go-sql-driver on a single-conn *sql.DB (SetMaxOpenConns(1))
 // surfaces as a busy-buffer/bad-connection error rather than silently corrupting anything — still a
 // real, user-visible failure with no cause the error message names.
+//
+// inFlight (finding F2, MEDIUM-HIGH/data integrity) is this entry's own count of still-running
+// adapters.RunWithAbortRace background goroutines — see postgres/client.go's own connEntry doc
+// comment for the full reasoning (identical here): RunWithAbortRace can return to its own caller
+// (on a Stop/cancel) well before the goroutine it spawned actually stops calling
+// conn.QueryContext/conn.ExecContext, so Acquire's release and a detached ROLLBACK/COMMIT cleanup
+// must both wait for every such goroutine this acquisition spawned before touching the connection
+// again. database/sql serializes concurrent use of one *sql.Conn rather than racing it the way
+// *pgx.Conn would, so this is a correctness/hang fix here (a cleanup statement can otherwise queue
+// behind a still-running query and blow its own 5s cleanupCtx deadline) rather than a data race.
 type connEntry struct {
 	db       *sql.DB
 	conn     *sql.Conn
 	threadID uint32
 	mu       sync.Mutex
+	inFlight sync.WaitGroup
 }
 
 // ConnSet is client.ts's ConnectionSet (B5, mirrors postgres/client.go's ConnSet): one *sql.DB per
@@ -272,10 +283,30 @@ func NewConnSet(cfg model.ResolvedConnectionConfig, profile Profile, log LogFunc
 
 // Entry is one pinned connection plus its own server-assigned thread id, cached at Acquire time
 // (the Go-only addition query.ts's own RunningQuery gets for free from the driver's own
-// conn.threadId).
+// conn.threadId). Conn is embedded so every existing conn.QueryContext/conn.ExecContext call site
+// stays unchanged; track/waitInFlight expose the entry's own inFlight WaitGroup (F2).
 type Entry struct {
-	Conn     *sql.Conn
+	*sql.Conn
 	ThreadID uint32
+	entry    *connEntry
+}
+
+// track registers one RunWithAbortRace background goroutine against this connection's own entry.
+// Call synchronously, at the same point a TrackQuery closure is called — before
+// adapters.RunWithAbortRace's own goroutine starts — and compose the returned done into whatever
+// release RunWithAbortRace already calls once that goroutine actually finishes.
+func (e Entry) track() (done func()) {
+	e.entry.inFlight.Add(1)
+	return e.entry.inFlight.Done
+}
+
+// waitInFlight blocks until every RunWithAbortRace goroutine track() has registered against this
+// connection has actually finished touching it. A detached cleanup statement (mutate's own
+// ROLLBACK, console's read-only-wrap COMMIT) calls this immediately before its own
+// conn.ExecContext, so it never races — or queues, on this dialect, possibly past its own 5s
+// deadline — a just-aborted op's background goroutine still using the same *sql.Conn (F2).
+func (e Entry) waitInFlight() {
+	e.entry.inFlight.Wait()
 }
 
 // mysqlNewConnector — the exact function dial calls to produce the driver.Connector db.Conn then
@@ -344,7 +375,12 @@ func (s *ConnSet) Acquire(ctx context.Context, database string) (Entry, func(), 
 		return Entry{}, nil, err
 	}
 	entry.mu.Lock()
-	return Entry{Conn: entry.conn, ThreadID: entry.threadID}, entry.mu.Unlock, nil
+	return Entry{Conn: entry.conn, ThreadID: entry.threadID, entry: entry}, func() {
+		// F2: hold this connection's lock until every RunWithAbortRace goroutine started under this
+		// acquisition has actually finished touching entry.conn.
+		entry.inFlight.Wait()
+		entry.mu.Unlock()
+	}, nil
 }
 
 // Primary acquires the primary (no explicit database override) connection.

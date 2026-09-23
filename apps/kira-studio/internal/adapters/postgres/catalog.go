@@ -17,8 +17,12 @@ import (
 // still need a `db:"..."` tag for anyway (these queries alias columns as snake_case).
 type queryExec func(ctx context.Context, sql string, params []any, scan func(pgx.Rows) error) error
 
-// execFor is adapter.go's own execFor, binding one conn/op/track triple.
-func execFor(conn *pgx.Conn, op *adapters.OpCtx, track TrackQuery) queryExec {
+// execFor is adapter.go's own execFor, binding one conn/op/track triple. Catalog queries run
+// directly on the op's own ctx (no adapters.RunWithAbortRace — pgx honours ctx cancellation on
+// Query itself here), so they never spawn the kind of stray background goroutine F2's own
+// trackedConn.track()/waitInFlight() exist to guard against; conn only needs to be a *trackedConn
+// here so every catalog call site can keep sharing one connEntry with the rest of the package.
+func execFor(conn *trackedConn, op *adapters.OpCtx, track TrackQuery) queryExec {
 	return func(ctx context.Context, sql string, params []any, scan func(pgx.Rows) error) error {
 		op.SetCommand(sql)
 		if err := adapters.CheckNotStarted(ctx); err != nil {

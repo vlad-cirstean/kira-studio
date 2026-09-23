@@ -56,7 +56,7 @@ func (a *Adapter) Connect(ctx context.Context, cfg model.ResolvedConnectionConfi
 		return adapters.ConnectInfo{}, err
 	}
 
-	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
+	exec := execFor(entry, op, a.trackerFor(op.OpID))
 	var serverVersion, charset string
 	// P24: DATABASE() is SQL NULL, not "", whenever the connection was opened with no default
 	// schema (client.go's BuildConfig only sets mc.DBName when cfg.Database is non-empty) — a
@@ -134,7 +134,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 			return adapters.TreeChildren{}, err
 		}
 		defer release()
-		nodes, err := listDatabases(ctx, execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID)), a.primaryDatabase)
+		nodes, err := listDatabases(ctx, execFor(entry, op, a.trackerFor(op.OpID)), a.primaryDatabase)
 		if err != nil {
 			return adapters.TreeChildren{}, err
 		}
@@ -150,7 +150,7 @@ func (a *Adapter) Children(ctx context.Context, path model.NodePath, op *adapter
 		return adapters.TreeChildren{}, err
 	}
 	defer release()
-	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
+	exec := execFor(entry, op, a.trackerFor(op.OpID))
 
 	if len(segments) == 1 {
 		nodes, err := listTablesAndRoutines(ctx, exec, databaseSegment.Name)
@@ -190,7 +190,7 @@ func (a *Adapter) Describe(ctx context.Context, path model.NodePath, op *adapter
 		return model.ObjectMeta{}, err
 	}
 	defer release()
-	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
+	exec := execFor(entry, op, a.trackerFor(op.OpID))
 
 	rawColumns, err := listColumns(ctx, exec, databaseSegment.Name, objectSegment.Name)
 	if err != nil {
@@ -259,7 +259,7 @@ func (a *Adapter) SchemaColumns(ctx context.Context, path model.NodePath, op *ad
 		return nil, err
 	}
 	defer release()
-	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
+	exec := execFor(entry, op, a.trackerFor(op.OpID))
 	return listSchemaColumns(ctx, exec, databaseSegment.Name)
 }
 
@@ -279,7 +279,7 @@ func (a *Adapter) Definition(ctx context.Context, path model.NodePath, op *adapt
 		return model.ObjectDefinition{}, err
 	}
 	defer release()
-	exec := execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID))
+	exec := execFor(entry, op, a.trackerFor(op.OpID))
 	return buildDefinition(ctx, exec, path.Segments, databaseSegment.Name, objectSegment.Kind, objectSegment.Name)
 }
 
@@ -303,11 +303,11 @@ func (a *Adapter) Read(ctx context.Context, req adapters.ReadRequest, op *adapte
 		return nil, err
 	}
 	defer release()
-	target, err := getReadTarget(ctx, execFor(entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID)), databaseSegment.Name, objectSegment.Name)
+	target, err := getReadTarget(ctx, execFor(entry, op, a.trackerFor(op.OpID)), databaseSegment.Name, objectSegment.Name)
 	if err != nil {
 		return nil, err
 	}
-	return readPage(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), target, readReq{
+	return readPage(ctx, entry, op, a.trackerFor(op.OpID), target, readReq{
 		Projection: req.Projection, Filter: req.Filter, Sort: req.Sort, PageSize: req.PageSize, Cursor: req.Cursor,
 	})
 }
@@ -324,7 +324,7 @@ func (a *Adapter) Count(ctx context.Context, req adapters.CountRequest, op *adap
 	}
 	defer release()
 	target := QualifiedName{Database: databaseSegment.Name, Table: objectSegment.Name}
-	return countRows(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), target, req.Filter)
+	return countRows(ctx, entry, op, a.trackerFor(op.OpID), target, req.Filter)
 }
 
 // Preview is index.ts's preview.
@@ -340,7 +340,7 @@ func (a *Adapter) Mutate(ctx context.Context, plan model.MutationPlan, op *adapt
 		return model.MutationResult{}, err
 	}
 	defer release()
-	return mutate(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), a.readOnly, plan)
+	return mutate(ctx, entry, op, a.trackerFor(op.OpID), a.readOnly, plan)
 }
 
 // Execute is index.ts's execute.
@@ -354,7 +354,7 @@ func (a *Adapter) Execute(ctx context.Context, req model.ConsoleRequest, op *ada
 		return nil, err
 	}
 	defer release()
-	return execute(ctx, entry.Conn, entry.ThreadID, op, a.trackerFor(op.OpID), a.readOnly, req.Statements)
+	return execute(ctx, entry, op, a.trackerFor(op.OpID), a.readOnly, req.Statements)
 }
 
 // DownloadObject is index.ts's downloadObject — caps.FileTransfer is false; never reached.

@@ -58,18 +58,19 @@ func typeClassForField(dbType string) page.TypeClass {
 // never ExecContext: MY-1 confirmed a non-row-returning statement (UPDATE/INSERT/DDL) still comes
 // back through QueryContext with zero columns, the same signal SQLite's own StatementSync gives —
 // so the console needs no per-statement leading-keyword decision the way ClickHouse's does.
-func runRaw(ctx context.Context, conn *sql.Conn, threadID uint32, query string, op *adapters.OpCtx, track TrackQuery) (rows [][]*string, dbTypes []string, names []string, err error) {
+func runRaw(ctx context.Context, conn Entry, query string, op *adapters.OpCtx, track TrackQuery) (rows [][]*string, dbTypes []string, names []string, err error) {
 	if err := adapters.CheckNotStarted(ctx); err != nil {
 		return nil, nil, nil, err
 	}
-	release := track(RunningQuery{ThreadID: threadID})
+	release := track(RunningQuery{ThreadID: conn.ThreadID})
+	done := conn.track()
 
 	type result struct {
 		rows    [][]*string
 		dbTypes []string
 		names   []string
 	}
-	r, err := adapters.RunWithAbortRace(ctx, release, func(queryCtx context.Context) (result, error) {
+	r, err := adapters.RunWithAbortRace(ctx, func() { release(); done() }, func(queryCtx context.Context) (result, error) {
 		sqlRows, err := conn.QueryContext(queryCtx, query)
 		if err != nil {
 			return result{}, mapError(err)
@@ -152,7 +153,7 @@ func buildPage(rows [][]*string, dbTypes, names []string) page.TabularPage {
 // let any statement flip an already-open transaction's own read-only mode, so no additional
 // per-statement rejection is strictly required on this dialect; AssertNoTransactionEscalation
 // still runs for consistency with postgres and as a cheap first line of defense.
-func execute(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
+func execute(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, statements []string) ([]page.Page, error) {
 	if len(statements) == 0 {
 		return nil, adapters.New(adapters.CodeQuery, "no statements to execute", nil)
 	}
@@ -168,6 +169,9 @@ func execute(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.
 			return nil, mapError(err)
 		}
 		defer func() {
+			// F2: wait for every RunWithAbortRace goroutine this batch spawned to actually finish
+			// touching conn before issuing COMMIT on it.
+			conn.waitInFlight()
 			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 			defer cancel()
 			_, _ = conn.ExecContext(cleanupCtx, "COMMIT")
@@ -179,7 +183,7 @@ func execute(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.
 		if err := adapters.CheckCancelled(ctx); err != nil {
 			return nil, err
 		}
-		rows, dbTypes, names, err := runRaw(ctx, conn, threadID, stmt, op, track)
+		rows, dbTypes, names, err := runRaw(ctx, conn, stmt, op, track)
 		if err != nil {
 			return nil, err
 		}

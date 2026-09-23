@@ -2,7 +2,6 @@ package mysqlfamily
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 
 	"github.com/kirathecat/kira-studio/apps/kira-studio/internal/adapters"
@@ -35,13 +34,13 @@ func preview(plan model.MutationPlan) ([]string, error) {
 }
 
 // mutate is mutate.ts's mutate.
-func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
+func mutate(ctx context.Context, conn Entry, op *adapters.OpCtx, track TrackQuery, readOnly bool, plan model.MutationPlan) (model.MutationResult, error) {
 	resolve := func() (relationSQL, qualifiedName string, columns []model.ColumnMeta, primaryKey []string, err error) {
 		database, table, err := adapters.ResolveDatabaseTablePath(plan.Path)
 		if err != nil {
 			return "", "", nil, nil, err
 		}
-		exec := execFor(conn, threadID, op, track)
+		exec := execFor(conn, op, track)
 		target, err := getReadTarget(ctx, exec, database, table)
 		if err != nil {
 			return "", "", nil, nil, err
@@ -52,7 +51,7 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 	}
 
 	execCommand := func(sql string, params []any) (int64, error) {
-		return runCommand(ctx, conn, threadID, sql, params, op, track, CommandOptions{SuppressCommand: true})
+		return runCommand(ctx, conn, sql, params, op, track, CommandOptions{SuppressCommand: true})
 	}
 
 	// P2 R2: rollback runs on its own detached, timeout-bounded ctx (RunSQLMutation's own rule) so it
@@ -61,6 +60,9 @@ func mutate(ctx context.Context, conn *sql.Conn, threadID uint32, op *adapters.O
 	// which refuses outright on an already-cancelled ctx, leaving conn (pinned for this adapter's
 	// lifetime) stuck inside a stale, still-open transaction for whatever op runs on it next.
 	rollback := func(ctx context.Context) {
+		// F2: wait for every RunWithAbortRace goroutine this mutate's own statements spawned to
+		// actually finish touching conn before issuing ROLLBACK on it.
+		conn.waitInFlight()
 		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), endTransactionTimeout)
 		defer cancel()
 		_, _ = conn.ExecContext(cleanupCtx, "ROLLBACK")
