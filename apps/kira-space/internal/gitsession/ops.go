@@ -155,6 +155,11 @@ type prepared struct {
 	argvList   [][]string
 	undo       *gitpreflight.UndoRecord
 	earlyError *OpError
+	// autoStashApplied is prepareCheckout's own F12 signal (P108 Part 16 review): true exactly
+	// when argvList's own first entry is the auto-stash's `stash push` — RunOp uses it to enrich
+	// a later argv's own failure message with "your changes were stashed", rather than leaving
+	// that fact silent, once a real stash exists to point to.
+	autoStashApplied bool
 }
 
 // opSpec is one opTable entry (D6) — the Go stand-in for upstream's TypeScript mapped type
@@ -326,8 +331,13 @@ var opTable = map[string]opSpec{
 
 // prepareCheckout is checkout's own Prepare, widened at G28 D3 by the auto-stash arm: when
 // op.AutoStash is set, a whole-tree `stash push [-u]` argv is PREPENDED to the switch argv this
-// function already built, so both run in order under RunOp's own single e.Repo.Write chain (F6) —
-// there is no window in which the tree is stashed and the switch never happened. Never pops back
+// function already built, so both run in order under RunOp's own single e.Repo.Write acquisition
+// (F6, and F12/P108 Part 16 review: this claim did not actually hold until runWriteArgvList
+// replaced the old per-argv runWriteArgv loop — each argv used to take Repo.Write SEPARATELY,
+// leaving a real window for another write to land between the stash and the switch) — there is no
+// window in which the tree is stashed and the switch never happened. If the switch still fails
+// after the stash succeeded (a real git-level conflict, not a race), RunOp appends the exact stash
+// ref to the error message (autoStashApplied) rather than leaving that fact silent. Never pops back
 // (D1) — the entry stays in the stash list, tagged with the CURRENT branch via git's own reflog-
 // subject convention, cross-branch apply (D5) is the deliberate, user-initiated recovery path.
 func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
@@ -410,7 +420,7 @@ func prepareCheckout(ctx context.Context, e *RepoEntry, _ ConnID, _ string, op O
 	// TARGET this switch is headed to, which is what belongs in the message text itself.
 	msg := gitops.AutoStashMessage(resolved.Name)
 	stashArgv := gitops.StashPushArgs(&msg, includeUntracked, false, nil)
-	return prepared{argvList: [][]string{stashArgv, switchArgv}}, nil
+	return prepared{argvList: [][]string{stashArgv, switchArgv}, autoStashApplied: true}, nil
 }
 
 func prepareBranchCreate(_ context.Context, _ *RepoEntry, _ ConnID, _ string, op OpRequest) (prepared, error) {
@@ -1114,6 +1124,38 @@ func (e *RepoEntry) runWriteArgv(ctx context.Context, argv []string) (*OpError, 
 	return opErr, err
 }
 
+// runWriteArgvList runs every argv in argvList, in order, under ONE e.Repo.Write acquisition (F12,
+// P108 Part 16 review) — closes the window a per-argv Write left open for another window's own
+// write to interleave between two argvs that are meant to happen as one unit (e.g. the auto-stash
+// checkout's own `stash push` immediately followed by `switch` — prepareCheckout's own doc comment
+// already claimed this atomicity; it did not actually hold before this fix). Stops at the first
+// classified failure without running the rest; failedAt is that argv's own index, -1 if every argv
+// completed cleanly. A cancelled ctx or a genuine spawn failure comes back as a real Go error,
+// exactly like runWriteArgv's own single-argv contract.
+func (e *RepoEntry) runWriteArgvList(ctx context.Context, argvList [][]string) (opErr *OpError, failedAt int, err error) {
+	failedAt = -1
+	err = e.Repo.Write(ctx, func(ctx context.Context) error {
+		for i, argv := range argvList {
+			res, rerr := gitclient.Run(ctx, e.Repo.Runner(), e.Repo.GitPath(), gitclient.Spec{
+				Dir: repoWorkingDir(e.Summary), Args: argv, ReadOnly: false,
+				// G8 D6: see runWriteArgv's own identical comment.
+				Setsid: true,
+			})
+			if ctx.Err() != nil || rerr != nil {
+				return gitclient.Classify(ctx, argv, res, rerr)
+			}
+			if res.ExitCode != 0 {
+				kind, message := gitops.ClassifyOpError(string(res.Stderr), res.ExitCode)
+				opErr = &OpError{Kind: kind, Message: message}
+				failedAt = i
+				return nil
+			}
+		}
+		return nil
+	})
+	return opErr, failedAt, err
+}
+
 // RunOp is op.run's own executor (D6/D8), in this exact order:
 //  0. ctx is already detached from the request by the caller (gitrpc, D8) — RunOp does not detach
 //     it itself, it only ever sees the already-detached one.
@@ -1168,15 +1210,27 @@ func (e *RepoEntry) RunOp(ctx context.Context, conn ConnID, connLabel string, op
 	// just did. e.undo.Set(record) below still runs this op's own record once it actually succeeds.
 	e.undo.Set(nil)
 
-	var opErr *OpError
-	for _, argv := range prep.argvList {
-		oe, werr := e.runWriteArgv(ctx, argv)
-		if werr != nil {
-			return OpResult{}, werr
-		}
-		if oe != nil {
-			opErr = oe
-			break
+	// F12 (P108 Part 16 review): the whole argvList runs under ONE Repo.Write acquisition —
+	// prepareCheckout's own doc comment already claimed this ("there is no window in which the
+	// tree is stashed and the switch never happened"), which runWriteArgv's own per-argv Write
+	// did not actually deliver.
+	opErr, failedAt, werr := e.runWriteArgvList(ctx, prep.argvList)
+	if werr != nil {
+		return OpResult{}, werr
+	}
+	if opErr != nil && failedAt > 0 && prep.autoStashApplied {
+		// The auto-stash's own `stash push` (argv 0) already succeeded for real before this LATER
+		// argv (the switch) failed — say so explicitly, with the exact stash ref, rather than
+		// leaving the user's changes stashed with no mention of it. A plain read, safe outside the
+		// write that already completed.
+		if raw, rerr := e.runOne(ctx, []string{"rev-parse", "-q", "--verify", "refs/stash"}); rerr == nil {
+			if sha := strings.TrimSpace(string(raw)); sha != "" {
+				short := sha
+				if len(short) > 7 {
+					short = short[:7]
+				}
+				opErr.Message += fmt.Sprintf(" Your local changes were stashed as %s (stash@{0}) before the switch failed — see stash.list.", short)
+			}
 		}
 	}
 	statusResult, inProgress, serr := e.statusAndInProgress(ctx)

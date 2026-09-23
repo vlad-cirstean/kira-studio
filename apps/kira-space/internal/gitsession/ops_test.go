@@ -1023,3 +1023,45 @@ func TestRunOp_UndoClearedBeforeSecondArgvFails(t *testing.T) {
 		t.Fatal("undo slot must be cleared -- the auto-stash's own `stash push` already wrote for real before `switch` failed, so the PRIOR op's record is no longer safe to replay")
 	}
 }
+
+// TestRunOp_AutoStashCheckout_SwitchFailureMentionsTheStash is F12's own regression proof (P108
+// Part 16 review): prepareCheckout's own doc comment claimed the auto-stash's `stash push` and its
+// `switch` ran as one atomic unit, but each argv took Repo.Write SEPARATELY — and even once made
+// genuinely atomic (runWriteArgvList), a real git-level switch failure AFTER a real, successful
+// stash push must not leave that fact silent: the error message names the exact stash ref.
+// Target "doesnotexist" resolves to neither a branch, tag nor remote branch, falling to
+// resolveCheckoutTarget's own "sha" kind — a real `git switch --detach doesnotexist` fails with a
+// genuine (classified, non-zero-exit) git error, not a Go-level spawn error, so this exercises the
+// opErr path runWriteArgvList's own failedAt tracks, not F9's werr path.
+func TestRunOp_AutoStashCheckout_SwitchFailureMentionsTheStash(t *testing.T) {
+	t.Parallel()
+	skipWithoutGitQueries(t)
+	dir := initAutoStashRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("line1\nDIRTY\n"), 0o644); err != nil {
+		t.Fatalf("write f.txt (dirty): %v", err)
+	}
+	entry := newQueriesTestEntry(t, dir)
+	ctx := context.Background()
+
+	result, err := entry.RunOp(ctx, ConnID("f12-test-conn"), "test", OpRequest{
+		Kind: "checkout", Target: "doesnotexist", Mode: "switch", AutoStash: true,
+	})
+	if err != nil {
+		t.Fatalf("RunOp(checkout, AutoStash): %v", err)
+	}
+	if result.OK {
+		t.Fatalf("result = %+v, want a failed switch (doesnotexist resolves to nothing)", result)
+	}
+	if result.Error == nil || !strings.Contains(result.Error.Message, "stashed as") {
+		t.Fatalf("result.Error = %+v, want a message naming the stash the auto-stash's own `stash push` already created", result.Error)
+	}
+
+	// The stash itself must be real and still present -- nothing silently lost.
+	out, gitErr := exec.Command("git", "-C", dir, "stash", "list").Output()
+	if gitErr != nil {
+		t.Fatalf("git stash list: %v", gitErr)
+	}
+	if !strings.Contains(string(out), "stash@{0}") {
+		t.Fatalf("git stash list = %q, want a real stash entry", out)
+	}
+}
