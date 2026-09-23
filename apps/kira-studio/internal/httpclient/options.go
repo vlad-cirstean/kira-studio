@@ -38,15 +38,6 @@ type resolved struct {
 	ephemeral        bool
 }
 
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
 
 // normalize resolves every field to a concrete value, clamping to the same bounds
 // packages/shared/domain/settings.ts's REQUEST_TIMEOUT_MS_RANGE/MAX_RESPONSE_MB_RANGE/
@@ -72,7 +63,7 @@ func (o Options) normalize() resolved {
 		r.http1 = *o.HTTPVersion == "1.1"
 	}
 	if o.RequestTimeoutMs != nil {
-		ms := clampInt(*o.RequestTimeoutMs, 0, 3_600_000)
+		ms := min(max(*o.RequestTimeoutMs, 0), 3_600_000)
 		if ms == 0 {
 			r.timeout = 0
 		} else {
@@ -80,7 +71,7 @@ func (o Options) normalize() resolved {
 		}
 	}
 	if o.MaxResponseMb != nil {
-		mb := clampInt(*o.MaxResponseMb, 0, 2048)
+		mb := min(max(*o.MaxResponseMb, 0), 2048)
 		if mb == 0 {
 			r.maxResponseBytes = 0
 		} else {
@@ -94,7 +85,7 @@ func (o Options) normalize() resolved {
 		r.followRedirects = *o.FollowRedirects
 	}
 	if o.MaxRedirects != nil {
-		r.maxRedirects = clampInt(*o.MaxRedirects, 0, 100)
+		r.maxRedirects = min(max(*o.MaxRedirects, 0), 100)
 	}
 	if o.DisableCookieJar != nil {
 		r.useJar = !*o.DisableCookieJar
